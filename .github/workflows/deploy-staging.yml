@@ -78,7 +78,7 @@ jobs:
 
       - name: Check out
         if: steps.gate.outputs.configured == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up the toolchain
         if: steps.gate.outputs.configured == 'true'
@@ -127,7 +127,7 @@ jobs:
       # review proves it is additive.
       - name: Apply D1 migrations
         if: steps.gate.outputs.configured == 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -138,7 +138,7 @@ jobs:
 
       - name: Deploy Worker
         if: steps.gate.outputs.configured == 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

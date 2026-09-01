@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -128,7 +128,7 @@ jobs:
       # one that guards the shared branch.
       - name: Restore the ESLint cache
         if: github.event_name == 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .eslintcache
           # `github.sha` never hits, so every run saves a fresh entry and the
@@ -175,7 +175,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -194,7 +194,7 @@ jobs:
 
       - name: Upload the coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage
@@ -238,7 +238,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare the browser-test environment
         uses: ./.github/actions/e2e-env
@@ -264,7 +264,7 @@ jobs:
       # uploads nothing.
       - name: Upload the blob report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-blob-${{ matrix.project }}
           path: blob-report
@@ -273,7 +273,7 @@ jobs:
 
       - name: Upload the dev server log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-dev-server-log-${{ matrix.project }}
           path: dev-server.log
@@ -292,13 +292,13 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
 
       - name: Download the blob reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: e2e-blob-*
           path: all-blob-reports
@@ -315,7 +315,7 @@ jobs:
 
       - name: Upload the Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report
