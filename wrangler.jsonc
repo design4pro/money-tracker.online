@@ -1,0 +1,275 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // money-tracker.online — Cloudflare Workers configuration.
+  //
+  // This file is the INPUT to `@cloudflare/vite-plugin`, not the file wrangler deploys from.
+  // `vite build` emits `dist/server/wrangler.json` and `wrangler deploy` reads that. Two
+  // consequences follow, and both are load-bearing:
+  //
+  //  1. The environment is chosen at BUILD time — `CLOUDFLARE_ENV=staging pnpm build`, then a
+  //     plain `wrangler deploy`. `deploy-staging.yml` asserts
+  //     `JSON.parse(dist/server/wrangler.json).name === 'money-tracker-staging'` and exits 1
+  //     otherwise, because a build that silently produced the production config would deploy
+  //     staging's code over production's bindings. The only command that still takes
+  //     `--env staging` is `d1 migrations apply`.
+  //  2. There is deliberately NO `assets` block here. The plugin injects
+  //     `{ "directory": "../client" }` into the emitted config; declaring one by hand fights it.
+  //
+  // Resource ids below are the real, already-provisioned ones (docs/DEPLOY.md has the runbook).
+  // Local development needs none of them: `vite dev` runs every binding through Miniflare's
+  // local simulators.
+  //
+  // Secrets are NEVER declared here. They live in `.dev.vars` locally and behind
+  // `wrangler secret put` remotely. `.dev.vars.example` is the complete list.
+  "name": "money-tracker",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  // Version preview URLs live on workers.dev and would bypass Cloudflare Access.
+  "preview_urls": false,
+  "upload_source_maps": true,
+
+  // `main` is a hand-written Worker entry rather than `@tanstack/react-start/server-entry`,
+  // because only the entry module's own exports let workerd find the Durable Object classes,
+  // the queue consumer and the scheduled handler.
+
+  // Deploying attaches both custom domains, so deploy.yml's smoke check has a stable hostname
+  // without a manual dashboard step.
+  "routes": [
+    { "pattern": "money-tracker.online", "custom_domain": true },
+    { "pattern": "www.money-tracker.online", "custom_domain": true },
+  ],
+
+  // Smart placement moves the Worker close to D1's primary region, so a request that makes
+  // several sequential D1 round-trips — which every transaction write does, ledger included —
+  // pays the latency once instead of once per query.
+  "placement": { "mode": "smart" },
+
+  // Workers Observability: structured logs from src/server/observability are queryable in the
+  // dashboard and via `wrangler tail`.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "head_sampling_rate": 1,
+    },
+  },
+
+  // The deployed version's id, read by src/server/observability/sentry.ts as the Sentry
+  // `release`. Without it every event is attributed to "unknown" and a regression cannot be
+  // tied to the deploy that introduced it.
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+
+  "vars": {
+    "ENVIRONMENT": "production",
+    "APP_NAME": "money-tracker.online",
+    "APP_URL": "https://money-tracker.online",
+    "LOG_LEVEL": "info",
+    "EMAIL_FROM": "money-tracker.online <no-reply@money-tracker.online>",
+    "EMAIL_API_URL": "https://api.resend.com/emails",
+    // FX providers, in order. `fawaz` (@fawazahmed0/currency-api over jsDelivr) is keyless and
+    // daily; `frankfurter` (ECB) is the fallback for a day it does not answer. Every rate row
+    // records which one produced it, so a bad provider-day is identifiable after the fact.
+    "FX_PRIMARY": "fawaz",
+    "FX_FALLBACK": "frankfurter",
+    "BACKUP_RETENTION_DAYS": 30,
+    "TASK_MAX_ATTEMPTS": 5,
+    "IMPORT_MAX_ROWS": 50000,
+    "EXPORT_MAX_ROWS": 250000,
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "money-tracker-db",
+      "database_id": "9002d5d8-9fac-48c5-b055-5bdbbd30d7d4",
+      "migrations_dir": "drizzle",
+    },
+  ],
+
+  "kv_namespaces": [
+    // Short-TTL read cache: plan state (60 s), queue idempotency markers, the FX day-cache,
+    // import-preset fingerprints, reminder dedupe markers.
+    { "binding": "KV", "id": "54cc3d1d8df34b189746cd79c567e26a" },
+    // Better Auth secondary storage: sessions, OAuth state, rate-limit counters. Read on
+    // nearly every authenticated request, which is why it is its own namespace — a hot cache
+    // eviction must never be able to sign a user out.
+    { "binding": "SESSIONS", "id": "aeff2f0ee1d245e981ba7fc9231d7225" },
+  ],
+
+  "r2_buckets": [
+    // Uploaded import files, generated exports, receipt attachments, dead-letter bodies and
+    // the nightly D1 logical backups.
+    { "binding": "FILES", "bucket_name": "money-tracker-files" },
+  ],
+
+  // LEDGER is a Durable Object rather than "just another queue message" because D1 has neither
+  // interactive transactions nor advisory locks, and a balance-history rebuild is
+  // delete-range + insert. Two concurrent rebuilds of one account can interleave into a hole in
+  // the history. A DO addressed by `idFromName(accountId)` serialises them and gives a
+  // coalescing window: a rebuild request arriving mid-rebuild sets a dirty bit instead of
+  // queueing a second pass. The object holds no ledger data — a lock and a dirty bit — and
+  // calls back into D1.
+  //
+  // No SANDCASTLE_REGISTRY here, and that is the point: the agent-run coordinator is bound on
+  // staging alone (see env.staging). A coordinator is only worth having if there is exactly one
+  // of it; a second registry would let two fleets each believe they hold the backlog, which is
+  // the failure it exists to prevent.
+  "durable_objects": {
+    "bindings": [{ "name": "LEDGER", "class_name": "AccountLedger" }],
+  },
+
+  // Append-only, and per environment. A published tag is a fact about what this worker already
+  // ran, so editing one re-runs history against a class that has moved on.
+  "migrations": [
+    {
+      "tag": "v1",
+      // SQLite-backed Durable Objects: cheaper, higher storage limits, and the only class type
+      // available on the Workers Free plan.
+      "new_sqlite_classes": ["AccountLedger"],
+    },
+  ],
+
+  // One queue, many task kinds: email, CSV/OFX/QIF import, export, nightly backup, ledger
+  // rebuild, FX refresh, recurring materialisation, notification fan-out. The DLQ exists before
+  // the first deploy — a consumer whose `dead_letter_queue` does not resolve fails to deploy.
+  "queues": {
+    "producers": [{ "binding": "TASKS", "queue": "money-tracker-tasks" }],
+    "consumers": [
+      {
+        "queue": "money-tracker-tasks",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "max_concurrency": 4,
+        "retry_delay": 10,
+        "dead_letter_queue": "money-tracker-tasks-dlq",
+      },
+    ],
+  },
+
+  // src/server/worker.ts switches on `controller.cron` against these four literals.
+  "triggers": {
+    "crons": [
+      // Reminder + due sweep: which recurring series are due, which budgets crossed a
+      // threshold, which tag reminders fire. The KV marker is written AFTER dispatch, so a
+      // crash mid-sweep re-sends rather than silently swallowing a notification.
+      "*/15 * * * *",
+      // Recurring auto-record: materialise the `recurring_periods` whose `auto_record` is set
+      // and whose due instant has passed.
+      "7 * * * *",
+      // Nightly: FX refresh for every currency pair any workspace holds; the balance-history
+      // revaluation sweep that self-heals any write path which skipped a rebuild; the D1
+      // logical backup to R2; the expired-export prune.
+      "0 3 * * *",
+      // Weekly: audit-log prune (400-day retention), provider usage roll-up, orphaned R2
+      // object sweep.
+      "17 4 * * 1",
+    ],
+  },
+
+  "env": {
+    "staging": {
+      "name": "money-tracker-staging",
+      // Both false: the workers.dev origin would bypass Cloudflare Access, and staging is
+      // behind Access for good.
+      "workers_dev": false,
+      "preview_urls": false,
+      // Deploying attaches the custom domain, so deploy-staging.yml's smoke check has a stable
+      // hostname without a manual dashboard step.
+      "routes": [
+        { "pattern": "staging.money-tracker.online", "custom_domain": true },
+      ],
+      "placement": { "mode": "smart" },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "logs": {
+          "enabled": true,
+          "invocation_logs": true,
+          "head_sampling_rate": 1,
+        },
+      },
+      // Same reason as production: staging events need a release too, or the pre-production
+      // signal cannot be told apart from the release it was supposed to gate.
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+
+      // An environment's `vars` REPLACES the top-level block rather than merging with it, so
+      // every name production sets is repeated here even where the value is identical.
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "APP_NAME": "money-tracker.online (staging)",
+        "APP_URL": "https://staging.money-tracker.online",
+        "LOG_LEVEL": "debug",
+        "EMAIL_FROM": "money-tracker staging <no-reply@staging.money-tracker.online>",
+        "EMAIL_API_URL": "https://api.resend.com/emails",
+        "FX_PRIMARY": "fawaz",
+        "FX_FALLBACK": "frankfurter",
+        "BACKUP_RETENTION_DAYS": 7,
+        "TASK_MAX_ATTEMPTS": 3,
+        "IMPORT_MAX_ROWS": 50000,
+        "EXPORT_MAX_ROWS": 250000,
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "money-tracker-db-staging",
+          "database_id": "501071ae-4f57-49a4-8cfb-c5c2bb6eec8f",
+          "migrations_dir": "drizzle",
+        },
+      ],
+      "kv_namespaces": [
+        { "binding": "KV", "id": "a5aed155af244bf6a1ea6b2df53c9c0c" },
+        { "binding": "SESSIONS", "id": "76af562c7bcc4b1ab7205da39af3ad60" },
+      ],
+      "r2_buckets": [
+        { "binding": "FILES", "bucket_name": "money-tracker-files-staging" },
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "LEDGER", "class_name": "AccountLedger" },
+          // Staging alone carries the sandcastle run coordinator: one object per repository, so
+          // every claim against the backlog is decided in one thread. Production has neither
+          // this binding nor the SANDCASTLE_COORDINATOR_TOKEN secret, and answers 503 to the
+          // whole /api/sandcastle/* route by design.
+          { "name": "SANDCASTLE_REGISTRY", "class_name": "SandcastleRegistry" },
+        ],
+      },
+      // Append-only, and independent of the production list above: this worker has run one
+      // more tag than production has.
+      "migrations": [
+        { "tag": "v1", "new_sqlite_classes": ["AccountLedger"] },
+        { "tag": "v2", "new_sqlite_classes": ["SandcastleRegistry"] },
+      ],
+      // Workers AI, staging first: import column-mapping assist and statement extraction, both
+      // structured-output-only and never written without review. Whether it ships in v1 is an
+      // open product decision; if it does not, this binding comes out rather than staying
+      // declared and unused.
+      "ai": { "binding": "AI" },
+      "queues": {
+        "producers": [
+          { "binding": "TASKS", "queue": "money-tracker-tasks-staging" },
+        ],
+        "consumers": [
+          {
+            "queue": "money-tracker-tasks-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "max_concurrency": 2,
+            "retry_delay": 10,
+            "dead_letter_queue": "money-tracker-tasks-staging-dlq",
+          },
+        ],
+      },
+      // Staging runs the nightly job only. The reminder sweep would send real email from a
+      // database full of fixtures, and the hourly materialiser would fight the seeded state
+      // every e2e round depends on.
+      "triggers": { "crons": ["0 3 * * *"] },
+    },
+  },
+}

@@ -1,0 +1,15 @@
+# Settings-only workspace file: money-tracker.online is a single package, so there is no
+# `packages:` list. pnpm 10 refuses to run a postinstall script unless the package is named
+# here, and every entry below has a build step we actually need:
+#
+#   esbuild        — native binary, used by vite and vitest transforms
+#   lightningcss   — native binary, Tailwind 4's CSS pipeline
+#   workerd        — the Workers runtime that `vite dev` and `wrangler dev` boot
+#   sharp          — libvips bindings, image work in scripts/ and the email renderer
+#   better-sqlite3 — the local D1 simulator's storage engine
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild
+  - lightningcss
+  - sharp
+  - workerd

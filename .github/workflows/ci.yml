@@ -1,0 +1,323 @@
+name: CI
+
+# The gate. Every rung below has a twin in `.sandcastle/validate.sh`, in the
+# same order and with the same command, so the sandbox loop and CI cannot
+# disagree about what "green" means:
+#
+#   1. route-tree  pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts
+#   2. db-drift    pnpm db:generate     && git diff --exit-code -- drizzle/
+#   3. typecheck   tsc --noEmit
+#   4. lint        eslint
+#   5. vitest      vitest run
+#
+# CI adds two rungs the sandbox cannot afford on every iteration: a production
+# build, and the browser suites (e2e + accessibility). Changing a rung here
+# without changing validate.sh is how the two drift, and a drift means the loop
+# merges what CI then rejects.
+#
+# ── GitHub configuration this workflow needs ──────────────────────────────────
+# secrets    (none are required for CI itself; the deploy workflows own those)
+# variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
+#            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
+#            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
+# ──────────────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+    branches: [main, develop]
+    # `labeled` lets adding the `needs-e2e` label trigger the browser jobs on a
+    # pull request that would otherwise skip them.
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# One run per branch: a force-push supersedes the run it interrupted.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: 'true'
+  # Polar product ids are public and are inlined into both bundles by Vite, so
+  # the build needs them to produce the same output CI is meant to verify. They
+  # live in repository *variables*, never in secrets. Leave one unset and the
+  # build still goes green - `requirePrice()` throws for that plan and interval
+  # alone, at the moment a customer clicks Upgrade.
+  VITE_POLAR_PRODUCT_PLUS_MONTHLY: ${{ vars.VITE_POLAR_PRODUCT_PLUS_MONTHLY }}
+  VITE_POLAR_PRODUCT_PLUS_YEARLY: ${{ vars.VITE_POLAR_PRODUCT_PLUS_YEARLY }}
+  VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY: ${{ vars.VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY }}
+  VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY: ${{ vars.VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY }}
+  # Public by construction - it ships in the client bundle - so a variable, not
+  # a secret. Empty is fine: the SDK is tree-shaken out of the bundle entirely.
+  VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+  VITE_ENVIRONMENT: ci
+
+jobs:
+  # Rungs 1-4 plus the build, in ladder order.
+  verify:
+    name: generated · typecheck · lint · build
+    # A develop→main (or main→develop) pull request duplicates the push-triggered
+    # run on the same commits; the push run is canonical for the shared branches.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/setup
+
+      # Rung 1 - route-tree drift.
+      #
+      # `src/routeTree.gen.ts` is generated and committed. Regenerating it here
+      # proves the committed copy matches the route files in the same commit - a
+      # stale tree is otherwise only discovered as a mystery type error.
+      - name: Generate the route tree
+        run: pnpm generate-routes
+
+      - name: Check the committed route tree is current
+        run: |
+          set -euo pipefail
+          # --intent-to-add first: `git diff` is blind to a file git has never
+          # seen, so without this a *new* generated file (a first route in a new
+          # directory) reports clean and the drift ships.
+          git add --intent-to-add -- src/routeTree.gen.ts
+          git diff --exit-code -- src/routeTree.gen.ts
+
+      # Rung 2 - db drift. A schema edit with no committed migration is caught
+      # here rather than in production, where it presents as a query against a
+      # column that does not exist.
+      #
+      # `< /dev/null` because drizzle-kit asks, on a rename it cannot infer,
+      # whether a column was created or renamed. On a runner there is nobody to
+      # answer, and a prompt with no stdin hangs until the job timeout instead of
+      # failing. Closed stdin turns that into an immediate, readable error.
+      - name: Generate migrations from the schema
+        run: pnpm db:generate < /dev/null
+
+      - name: Check every schema change has a committed migration
+        run: |
+          set -euo pipefail
+          git add --intent-to-add -- drizzle/
+          if ! git diff --exit-code -- drizzle/; then
+            echo "::error title=Uncommitted migration::The schema and drizzle/ disagree. Run 'pnpm db:generate' and commit the result - migrations are additive, and the running Worker has to survive the migrate-then-deploy window."
+            exit 1
+          fi
+
+      # Rung 3.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Rung 4.
+      #
+      # ESLint spends its time building a typed program and then walking it, and
+      # on a pull request almost none of that work is new. `--cache` skips a file
+      # whose bytes have not changed since the last run.
+      #
+      # Pull requests only, and that restriction is the point. The typed rules
+      # mean a change to one file can change another file's verdict, and the
+      # cache cannot know that - it keys on each file's own content, so a lint
+      # can come back green over an error it simply did not look at. The uncached
+      # run on a push to `develop` or `main` is the canonical one, and it is the
+      # one that guards the shared branch.
+      - name: Restore the ESLint cache
+        if: github.event_name == 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: .eslintcache
+          # `github.sha` never hits, so every run saves a fresh entry and the
+          # `restore-keys` prefix picks up the most recent one. Changing the
+          # config, the tsconfig or a dependency starts a new lineage, because a
+          # cache from before any of those describes a different lint.
+          key: eslint-${{ runner.os }}-${{ hashFiles('eslint.config.js', 'tsconfig.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ hashFiles('eslint.config.js', 'tsconfig.json', 'pnpm-lock.yaml') }}-
+
+      # `--cache-strategy content` and not the default. ESLint decides a file is
+      # unchanged by size and mtime unless told otherwise, and a fresh checkout
+      # stamps every file with a new mtime - so the default strategy restores a
+      # perfectly good cache and then ignores all of it.
+      - name: Lint
+        run: >-
+          pnpm lint ${{ github.event_name == 'pull_request'
+          && '--cache --cache-strategy content' || '' }}
+
+      # No `pnpm check` rung. Formatting is enforced on the way in - lint-staged on commit, and
+      # the format-file.sh Claude hook on every edit - and `.sandcastle/validate.sh` does not run
+      # prettier either. Adding it here alone is exactly the drift this file exists to prevent.
+      - name: Build
+        run: pnpm build
+
+      # The TanStack Start vite plugin generates the same file `tsr generate`
+      # does and appends the Start `Register` footer to it; `tsr.config.json`
+      # carries that footer verbatim, which is what keeps the two byte-identical.
+      # Should they ever drift - a Start upgrade that changes the footer, a
+      # `src/router.tsx` rename, a generator bump - the build dirties the
+      # committed tree, and this step says so instead of every later build and
+      # dev server silently doing it.
+      - name: Check the build left the route tree alone
+        run: git diff --exit-code -- src/routeTree.gen.ts
+
+  # Rung 5, with coverage. Its own job rather than a sixth step in `verify`: the
+  # suite is CPU-bound and independent of the build, so running the two in
+  # parallel is the whole gate's critical path minus whichever is shorter.
+  test:
+    name: unit tests · coverage
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/setup
+
+      # The route tree is an import target of half the suite; generating it
+      # keeps a fresh checkout from failing on a module that is committed but
+      # not yet regenerated for this commit's routes.
+      - name: Generate the route tree
+        run: pnpm generate-routes
+
+      # Coverage thresholds live in vitest.config.ts and are per-glob, which is
+      # why this is one unsharded run: a shard executes a fraction of the files,
+      # so what it measures for any one glob is a fraction of the truth.
+      - name: Run the unit suite with coverage
+        run: pnpm test:coverage
+
+      - name: Upload the coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # The browser gate: the same suite, in the same container image, on the two
+  # projects whose baselines are recorded for Linux.
+  #
+  # `chromium` is the desktop layout at 1440x900. `mobile-safari` is an
+  # iPhone 15, and it is not a smaller chromium: safe-area insets, `100dvh` and
+  # momentum scrolling behave differently there than anywhere else, and mobile
+  # transaction entry is the product's most-used screen.
+  #
+  # Demoted from every-PR to a post-merge safety net: the sandcastle loop runs
+  # this exact suite, in this exact image, per issue and again in the
+  # per-iteration audit - so a pull request from the loop arrives already
+  # validated. The job still runs on every push to develop/main, on demand, and
+  # on any pull request carrying the `needs-e2e` label, which is the escape
+  # hatch for branches with no local loop behind them.
+  e2e:
+    name: e2e · ${{ matrix.project }}
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'needs-e2e') &&
+       !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, mobile-safari]
+    # Keep in step with the `@playwright/test` devDependency in package.json:
+    # the image carries the browsers that version expects, and a mismatch is
+    # reported as a missing executable rather than as a wrong one. The image is
+    # also the platform the `-linux` baselines under e2e/__screenshots__ were
+    # recorded on; a run anywhere else compares against a set it does not have.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Prepare the browser-test environment
+        uses: ./.github/actions/e2e-env
+        with:
+          # Both projects seed an identical database; auditing the seed once is
+          # proof enough.
+          verify-seed: ${{ matrix.project == 'chromium' }}
+
+      # `PLAYWRIGHT_BASE_URL` points the suite at the server the composite action
+      # already started and seeded, so the config starts none of its own.
+      # `--reporter=blob` replaces the config's reporters with the one
+      # `merge-reports` consumes - traces and failure screenshots travel inside
+      # the blob. The `setup` project is not named here: it is declared as a
+      # dependency of both browser projects, so Playwright runs it first on its
+      # own, and naming it as well would only run it twice.
+      - name: Run the suite
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3010
+        run: pnpm exec playwright test --project=${{ matrix.project }} --reporter=blob
+
+      # The directory is `blob-report`, not vitest's dot-prefixed convention:
+      # `upload-artifact` treats a dot-prefixed path as hidden and silently
+      # uploads nothing.
+      - name: Upload the blob report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-blob-${{ matrix.project }}
+          path: blob-report
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - name: Upload the dev server log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-dev-server-log-${{ matrix.project }}
+          path: dev-server.log
+          retention-days: 3
+          if-no-files-found: ignore
+
+  # One HTML report for both projects, with the failing frames' diffs and traces
+  # in it. Merging replays recorded results rather than re-running anything, so
+  # this is seconds.
+  e2e-report:
+    name: e2e · merged report
+    needs: e2e
+    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/setup
+
+      - name: Download the blob reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-blob-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge the reports
+        run: |
+          set -euo pipefail
+          if [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo '::notice title=e2e report::no shard reports to merge - the browser gate produced none.'
+            exit 0
+          fi
+          pnpm exec playwright merge-reports --reporter html,github ./all-blob-reports
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1,0 +1,122 @@
+name: Prepare the browser-test environment
+description: >
+  Everything a browser suite needs before its first page load: dependencies, a
+  generated route tree, a throwaway .dev.vars, a migrated local D1, a dev server
+  on port 3010 and the seeded demo workspace behind it.
+
+  Two workflows need this identical preparation - the e2e gate in ci.yml and the
+  accessibility gate in a11y.yml - and a drift between them would show up as a
+  suite that only fails in one of the two. So it lives here once.
+
+  Assumes a runner that already carries the browsers, i.e. a job running in
+  `mcr.microsoft.com/playwright:v<version>-noble`. Installing them per run costs
+  a couple of minutes and pins nothing extra.
+
+  There is no R2 fetch and no asset cache here. This product has no basemap and
+  no large binary fixture: the seed is pure SQL through the Worker, so the whole
+  preparation is dependencies plus a database.
+
+inputs:
+  port:
+    description: >
+      Port the dev server binds. 3010 is what vite.config.ts binds with
+      `strictPort` and what playwright.config.ts defaults `baseURL` to; passing
+      anything else means passing PLAYWRIGHT_BASE_URL to match.
+    required: false
+    default: '3010'
+  verify-seed:
+    description: >
+      Run scripts/seed/verify.mjs after seeding, when that script exists. The
+      seed audit costs ~25 s of wrangler subprocesses, so a sharded gate can
+      turn it off on all but one shard.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up the toolchain
+      uses: ./.github/actions/setup
+
+    - name: Generate route tree
+      shell: bash
+      run: pnpm generate-routes
+
+    # `vite dev` loads this through Miniflare exactly as `wrangler secret put`
+    # does in production. Every value here is a throwaway for a database that
+    # exists for the length of this job: nothing signs anything that outlives it.
+    #
+    # Runtime secrets go in .dev.vars and build-time public values in
+    # .env.local, and the split is not cosmetic: while a .dev.vars exists,
+    # Cloudflare loads no .env file into the Worker's `env`, and a VITE_ name
+    # written into .dev.vars is silently empty at build time rather than an
+    # error. See .dev.vars.example.
+    - name: Write the throwaway .dev.vars
+      shell: bash
+      run: |
+        set -euo pipefail
+        cat > .dev.vars <<EOF
+        BETTER_AUTH_SECRET=$(openssl rand -base64 32)
+        APP_URL=http://localhost:${{ inputs.port }}
+        EOF
+
+    - name: Apply D1 migrations to the local database
+      shell: bash
+      run: pnpm db:migrate:local
+
+    # Started here rather than by Playwright's `webServer` because the seed has
+    # to run against it before the first spec: the seed writes through the
+    # Worker, so there is no seeding a database without a server in front of it.
+    - name: Start the dev server
+      shell: bash
+      env:
+        PORT: ${{ inputs.port }}
+      run: |
+        set -euo pipefail
+        # --host binds v4 and v6. The wait loop below (curl) reaches a ::1-only
+        # vite over IPv6 and reports the server up, but Node's fetch in seed.mjs
+        # resolves localhost to 127.0.0.1 and then finds nothing - the seed then
+        # fails against a server curl just proved alive. Same trap, same fix as
+        # .sandcastle/setup-e2e.sh.
+        pnpm exec vite dev --port "$PORT" --strictPort --host > dev-server.log 2>&1 &
+        for _ in $(seq 1 60); do
+          if curl --silent --fail --output /dev/null "http://localhost:$PORT/"; then
+            echo "dev server up on :$PORT"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "::error title=Dev server::did not answer on :$PORT within 120s"
+        tail -50 dev-server.log
+        exit 1
+
+    # The seed is a first-class artefact, not a convenience: the demo workspace
+    # it writes (accounts across three currencies, ~600 transactions over 18
+    # months, budgets, recurring series, goals, rules) is the fixture every
+    # screenshot and every axe scan is taken against. A missing seed is a hard
+    # error rather than an empty run, because an empty run is green for the
+    # wrong reason.
+    - name: Seed the demo workspace
+      shell: bash
+      env:
+        PORT: ${{ inputs.port }}
+      run: node scripts/seed/seed.mjs --url "http://localhost:$PORT"
+
+    # Optional by design: verify.mjs audits the seed's invariants (double-entry
+    # transfers balance, every ref amount carries its rate) and is worth running
+    # once, but a checkout that has not grown it yet must still be able to run
+    # the suite.
+    - name: Verify the seed
+      if: inputs.verify-seed == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -f scripts/seed/verify.mjs ]; then
+          node scripts/seed/verify.mjs
+        else
+          echo '::notice title=Seed verification::scripts/seed/verify.mjs does not exist yet - skipped.'
+        fi
+
+# The dev server's stdout lands in `dev-server.log` in the workspace. Uploading
+# it is the caller's job, not this action's: an artifact name has to be unique
+# within a workflow run, and only the caller knows its own matrix.

@@ -1,0 +1,172 @@
+name: Deploy staging
+
+# Git Flow's preview leg: every push to `develop` migrates and deploys the `staging` environment
+# from wrangler.jsonc. Production stays in deploy-production.yml, on `main`.
+#
+# ── GitHub configuration this workflow needs ──────────────────────────────────────────────────
+# secrets    CLOUDFLARE_API_TOKEN   Workers Scripts:Edit + D1:Edit on account 6cfdf3b5143cddc631383a4c14736c3a
+#            CLOUDFLARE_ACCOUNT_ID  6cfdf3b5143cddc631383a4c14736c3a
+#            SENTRY_AUTH_TOKEN      optional; without it no source maps are uploaded
+# variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
+#            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY, VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY,
+#            VITE_SENTRY_DSN, SENTRY_ORG, SENTRY_PROJECT
+#
+# The Worker's own runtime secrets (BETTER_AUTH_SECRET, POLAR_*, EMAIL_API_KEY, SENTRY_DSN, …)
+# are NOT set here. They live in Cloudflare, put there once with
+# `wrangler secret put <NAME> --env staging`, and a deploy neither reads nor replaces them.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+# Never run two deploys at once, and never cancel one half-way: an interrupted
+# `d1 migrations apply` would leave the schema between two versions.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Migrate and deploy to staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: staging
+      url: https://staging.money-tracker.online
+
+    env:
+      CI: 'true'
+      # `vars` resolves environment-level values over repository-level ones, so the `staging`
+      # GitHub Environment can override these with the Polar sandbox product ids.
+      VITE_POLAR_PRODUCT_PLUS_MONTHLY: ${{ vars.VITE_POLAR_PRODUCT_PLUS_MONTHLY }}
+      VITE_POLAR_PRODUCT_PLUS_YEARLY: ${{ vars.VITE_POLAR_PRODUCT_PLUS_YEARLY }}
+      VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY: ${{ vars.VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY }}
+      VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY: ${{ vars.VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY }}
+      # The DSN is public by construction - it ships in the client bundle - so it is a variable,
+      # while the token that uploads source maps is a secret. VITE_ENVIRONMENT mirrors the
+      # ENVIRONMENT var the Worker reads from wrangler.jsonc, because the browser cannot read a
+      # Worker var. VITE_SENTRY_RELEASE is read by both bundles, so one deploy is one Sentry
+      # release rather than two halves nothing relates.
+      VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+      VITE_ENVIRONMENT: staging
+      VITE_SENTRY_RELEASE: ${{ github.sha }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+
+    steps:
+      # The `secrets` context is not available in a job-level `if`, so the gate is a first step: a
+      # fork or a freshly cloned repo without Cloudflare credentials reports a warning and skips,
+      # instead of failing red on a deploy it was never going to be able to make.
+      - name: Check the deploy credentials are configured
+        id: gate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::warning title=Deploy skipped::Set the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to enable deploys.'
+          else
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out
+        if: steps.gate.outputs.configured == 'true'
+        uses: actions/checkout@v5
+
+      - name: Set up the toolchain
+        if: steps.gate.outputs.configured == 'true'
+        uses: ./.github/actions/setup
+
+      - name: Generate the route tree
+        if: steps.gate.outputs.configured == 'true'
+        run: pnpm generate-routes
+
+      # The environment is chosen at BUILD time, not at deploy time. The Cloudflare Vite plugin
+      # flattens the selected env of wrangler.jsonc into dist/server/wrangler.json and writes a
+      # .wrangler/deploy/config.json redirect pointing at it, and `wrangler deploy` below follows
+      # that redirect.
+      #
+      # Which is why the deploy step carries no `--env staging`: the flattened config it is
+      # handed IS the staging Worker and has no `env` block left in it, so `--env staging` there
+      # fails with "no environment found". The migrate step is the one command that needs the
+      # flag, because it reads wrangler.jsonc directly and never sees the redirect.
+      - name: Build (staging environment)
+        if: steps.gate.outputs.configured == 'true'
+        run: CLOUDFLARE_ENV=staging pnpm build
+
+      # Cheap insurance against the silent-production gotcha: a build that ran without
+      # CLOUDFLARE_ENV emits the production config, and a deploy from it would overwrite
+      # production from the develop branch. Refuse to continue unless the emitted config is the
+      # staging Worker.
+      - name: Verify the emitted config targets staging
+        if: steps.gate.outputs.configured == 'true'
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const c = JSON.parse(readFileSync('./dist/server/wrangler.json', 'utf8'));
+            if (c.name !== 'money-tracker-staging') {
+              console.error('emitted config is ' + c.name + ', refusing to deploy');
+              process.exit(1);
+            }
+            console.log('emitted config: ' + c.name);
+          "
+
+      # Migrations run BEFORE the deploy, and that ordering is a policy with a cost attached:
+      # between this step and the next, the currently-running Worker - the previous version of
+      # the code - is serving against the NEW schema. Every migration must therefore be additive
+      # (add tables, add nullable columns, add indexes) and never remove or narrow anything the
+      # deployed code still reads. A destructive change is a two-release dance: release one stops
+      # using the column, release two drops it. CI's db-drift rung proves a migration exists; only
+      # review proves it is additive.
+      - name: Apply D1 migrations
+        if: steps.gate.outputs.configured == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: pnpm
+          # Keep in step with the `wrangler` devDependency in package.json.
+          wranglerVersion: '4.70.0'
+          command: d1 migrations apply money-tracker-db-staging --remote --env staging
+
+      - name: Deploy Worker
+        if: steps.gate.outputs.configured == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: pnpm
+          wranglerVersion: '4.70.0'
+          command: deploy
+
+      # Proof that the new version is actually serving, and the cheapest one there is: /api/health
+      # exercises the Worker, the D1 binding and the KV binding in a single request. The status
+      # code is asserted exactly rather than with `curl --fail`, so a 302 to a login page or an
+      # error page served with 200 is not mistaken for success. The retry loop absorbs the few
+      # seconds a new version takes to become globally routable; it does not absorb a broken one.
+      - name: Smoke-check the deployment
+        if: steps.gate.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          url=https://staging.money-tracker.online/api/health
+          for attempt in $(seq 1 10); do
+            code=$(curl --silent --show-error --output /tmp/health.json \
+              --write-out '%{http_code}' --max-time 20 "$url" || echo 000)
+            echo "attempt $attempt: $code"
+            if [ "$code" = 200 ]; then
+              cat /tmp/health.json
+              echo
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "::error title=Smoke check failed::$url answered $code, expected 200. The deploy is live but unhealthy."
+          cat /tmp/health.json || true
+          exit 1

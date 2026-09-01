@@ -1,0 +1,43 @@
+name: Set up the toolchain
+description: >
+  pnpm, Node and a warm pnpm store, then a frozen-lockfile install.
+
+  Every job in every workflow starts with these same four steps, and a drift
+  between two copies of them is the kind of thing that shows up as a build that
+  only fails in one workflow. So they live here once.
+
+inputs:
+  install:
+    description: >
+      Run `pnpm install --frozen-lockfile`. Off only for a job that needs the
+      toolchain but not the dependency tree.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # Pinned, and pinned to the exact string in package.json's `packageManager`
+    # field. action-setup errors out when the two disagree, which is the
+    # behaviour we want: one pnpm version resolves the lockfile, and CI must be
+    # using the one the lockfile was written by.
+    - name: Set up pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.15.0
+
+    # `cache: pnpm` caches pnpm's content-addressable store (the directory
+    # `pnpm store path` prints), keyed on pnpm-lock.yaml. That is the expensive
+    # half of an install; node_modules itself is relinked from the store in
+    # seconds and is deliberately not cached, so a corrupted tree can never be
+    # restored from a previous run.
+    - name: Set up Node
+      uses: actions/setup-node@v5
+      with:
+        node-version: 24.x
+        cache: pnpm
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile

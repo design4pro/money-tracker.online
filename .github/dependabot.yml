@@ -1,0 +1,86 @@
+# Dependency updates, grouped so a week is one or two pull requests rather than fifteen.
+#
+# Every label used here is from the vocabulary the triage loop reads: `type: maintenance` says
+# what the change is, `status: pending` says nobody has looked at it yet. `ready-for-agent` is
+# deliberately absent - that label is the gate an agent acts on, and it is applied by a human or
+# by the triager, never by a bot.
+#
+# Two pins are load-bearing and are NOT ignored here, because a bump to either has to be followed
+# by a matching edit and it is better that the pull request exists and goes red:
+#   * `@playwright/test` - the container image tag `mcr.microsoft.com/playwright:v<version>-noble`
+#     in ci.yml and a11y.yml has to move with it.
+#   * `wrangler` - the `wranglerVersion` input in both deploy workflows has to move with it.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels:
+      - 'type: maintenance'
+      - 'status: pending'
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+      include: scope
+    groups:
+      # The framework moves as a unit; a TanStack Router bump without the matching Start bump is
+      # a type error, not an update.
+      tanstack:
+        patterns:
+          - '@tanstack/*'
+      cloudflare:
+        patterns:
+          - '@cloudflare/*'
+          - 'wrangler'
+          - 'miniflare'
+      react:
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - 'react-aria-components'
+          - '@types/react'
+          - '@types/react-dom'
+      testing:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+          - '@playwright/test'
+          - '@axe-core/*'
+          - '@testing-library/*'
+      # Everything else, as long as it is not a major. Majors stay individual so each gets its
+      # own review and its own red CI run.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    # Workflows live at the root; the composite actions need naming separately, because
+    # Dependabot resolves `uses:` per directory that holds the file.
+    directories:
+      - /
+      - /.github/actions/setup
+      - /.github/actions/e2e-env
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 3
+    labels:
+      - 'type: maintenance'
+      - 'status: pending'
+    commit-message:
+      prefix: 'chore(ci)'
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - '*'

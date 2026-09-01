@@ -1,0 +1,15 @@
+# Blank issues stay on. The triage loop reads and rewrites issues, and a form that forces a
+# shape on a two-line note would only get worked around.
+blank_issues_enabled: true
+
+contact_links:
+  - name: Security report
+    url: https://money-tracker.online/security
+    about: >
+      Do not open a public issue for a vulnerability. The disclosure address and PGP key are on
+      the security page.
+  - name: Label vocabulary
+    url: https://github.com/design4pro/money-tracker.online/blob/develop/.github/labels.yml
+    about: >
+      What each label means and which ones the agent loop acts on - `ready-for-agent` is a gate,
+      not a wish.

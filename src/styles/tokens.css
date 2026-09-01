@@ -1,0 +1,626 @@
+/* ==========================================================================
+   money-tracker.online — design tokens
+   ==========================================================================
+
+   The single source of truth for every colour, space, radius, shadow, easing,
+   duration and z-index in the product. Nothing in `src/components/**` may
+   contain a raw hex, a literal px radius or a hand-written shadow: if a value
+   is missing here, it is added here first.
+
+   This file declares plain custom properties on `:root`. It is imported by
+   `src/styles/app.css`, which maps them into Tailwind's theme namespaces with
+   `@theme inline`. The split matters: `@theme inline` emits utilities that
+   *reference* these variables rather than copying their values, so a single
+   `data-theme` flip on `<html>` repaints the whole product with no second set
+   of utilities and no `dark:` duplication in component code.
+
+   ---------------------------------------------------------------------------
+   HOW COLOUR IS DECLARED — the three-site rule
+   ---------------------------------------------------------------------------
+   Every themed colour is declared in exactly three places:
+
+     1. bare `:root`                                   — the light palette
+     2. `@media (prefers-color-scheme: dark)` guarded by
+        `:root:not([data-theme="light"])`              — the OS-follows case
+     3. `:root[data-theme="dark"]`                     — the explicit choice
+
+   Site 2 is guarded so that a user who explicitly picked *light* keeps light on
+   a dark-mode OS; site 3 exists so an explicit *dark* choice wins on a
+   light-mode OS. Declaring in fewer than three places produces a toggle that
+   works in one direction only.
+
+   Dark is a designed system, not an inversion. Its neutrals are warm charcoal,
+   its chromatic values are lifted rather than flipped, and its shadows are
+   re-declared opaque rather than reused. A dark value computed from a light one
+   is a defect.
+
+   ---------------------------------------------------------------------------
+   THE CONTRAST CONTRACT
+   ---------------------------------------------------------------------------
+   Body and UI text clears **7:1** (WCAG 2.2 §1.4.6 AAA) in both themes,
+   measured against every ground the value can actually land on — not against a
+   convenient one. The binding ground is stated per token as a trailing comment
+   and is:
+
+     light theme → `surface-sunken` (#f1eee9), the darkest ground light text
+                    can sit on;
+     dark theme  → `surface-raised` (#272622), the lightest ground dark text
+                    can sit on.
+
+   Every ratio in this file was computed, not estimated: the ramps were built in
+   OKLCH (perceptually uniform, so a step of L is a step of apparent lightness at
+   every hue) and each pair was measured with the WCAG 2.x relative-luminance
+   formula. Chroma is set to 96% of the sRGB gamut boundary for the given
+   lightness and hue, which is why the chromatic values look saturated without
+   clipping a channel.
+
+   Non-text contrast (WCAG 1.4.11) has its own floor of 3:1 and applies to
+   `border-strong`, the focus indicator, and the category series fills.
+
+   A token added without a measured ratio beside it is not finished.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* ------------------------------------------------------------------------
+     GROUNDS — the four surfaces, warm rather than clinical.
+
+     `canvas` is the page. `surface` is a card face. `surface-raised` is a layer
+     genuinely above the page (popover, menu, dialog). `surface-sunken` is a
+     recessed well (an inset panel, a track, a table header).
+
+     In light, `raised` and `surface` deliberately share a value: white is the
+     top of the range, so elevation there is carried by shadow, not by tone. In
+     dark the two separate, because a shadow against charcoal reads as nothing
+     and tone is the only honest elevation channel. That asymmetry is the point
+     of having both tokens.
+     --------------------------------------------------------------------- */
+  --color-canvas: #fbf9f5;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f1eee9;
+
+  /* ------------------------------------------------------------------------
+     TEXT — two tiers, both AAA.
+
+     `ink-2` is the secondary tier and it still clears 7:1. It is *not* a 4.5:1
+     grey: hierarchy in this product comes from weight, size and position, never
+     from making the less important thing harder to read. There is no third,
+     fainter tier — if a design needs one, the design has too many tiers.
+     --------------------------------------------------------------------- */
+  --color-ink: #23201a; /* 14.03:1 on sunken, 15.99:1 on surface */
+  --color-ink-2: #524e46; /* 7.15:1 on sunken, 8.15:1 on surface */
+
+  /* Foreground for a near-black or saturated fill. */
+  --color-on-accent: #ffffff; /* 16.24:1 on accent, 12.74:1 on accent-hover */
+
+  /* ------------------------------------------------------------------------
+     BORDERS
+
+     `subtle` is decoration: a hairline that separates two things which are not
+     interactive. `strong` is the boundary of anything that can be clicked, and
+     it holds 3:1 on every ground in both themes so a control reads as a control
+     without a heavy border (WCAG 1.4.11). If a box can be pressed its border is
+     `strong`; if it cannot, `subtle`. Readers parse that difference before they
+     parse the label.
+     --------------------------------------------------------------------- */
+  --color-border-subtle: #e3dfd8; /* decorative only — no contrast claim */
+  --color-border-strong: #838078; /* 3.41:1 on sunken, 3.94:1 on surface */
+
+  /* ------------------------------------------------------------------------
+     ACCENT — near-black. The product's authority: whatever is painted in it is
+     the thing to do next. Rationed to one primary button per decision.
+     --------------------------------------------------------------------- */
+  --color-accent: #23201a; /* white on it: 16.24:1 */
+  --color-accent-hover: #36322b; /* white on it: 12.74:1 */
+  --color-accent-press: #16140f; /* white on it: 18.36:1 */
+
+  /* ------------------------------------------------------------------------
+     BRAND — deep azure. Links, active navigation, selection, the focus ring.
+     It points; the accent commands.
+     --------------------------------------------------------------------- */
+  --color-brand: #064f89; /* 7.30:1 on sunken, 8.44:1 on surface */
+  --color-brand-hover: #033c6a; /* 9.79:1 on sunken, 11.30:1 on surface */
+  --color-brand-soft: #e6f2fe; /* carries --color-brand as text at 7.44:1 */
+  --color-on-brand: #ffffff; /* 8.44:1 on brand */
+
+  /* ------------------------------------------------------------------------
+     INTENT — four verdicts.
+
+     Hues were chosen for dichromatic separation, not for convention: the
+     positive/negative pair is bluish-green (168°) against vermillion (30°),
+     the Okabe-Ito axis that survives protanopia and deuteranopia best, rather
+     than the textbook green-vs-red pair that collapses entirely.
+
+     It still is not enough, and this file says so out loud. Measured separation
+     between `positive` and `negative` after dichromat simulation
+     (Viénot-Brettel-Mollon):
+
+       light theme — protanopia 1.89:1 · deuteranopia 1.14:1 · tritanopia 1.14:1
+       dark theme  — protanopia 1.12:1 · deuteranopia 1.28:1 · tritanopia 1.68:1
+
+     A 1.14:1 separation is invisible. Therefore **money direction is never
+     encoded by colour alone**: every amount carries an explicit sign (`+` / `−`
+     via the money formatter), every intent surface carries an icon, and inflow
+     is set at a heavier weight than outflow. Colour is the third channel, and
+     the product remains correct with all colour removed. This is a hard rule,
+     not a preference — see `docs/ACCESS.md`.
+
+     `info` deliberately takes the brand hue. A notice with no verdict speaks in
+     the product's own voice, and giving it a fifth hue would have put a second
+     blue next to the brand blue for no informational gain.
+     --------------------------------------------------------------------- */
+  --color-positive: #085b44; /* 7.01:1 on sunken, 8.11:1 on surface */
+  --color-positive-soft: #dbf8ec; /* carries --color-positive at 7.20:1 */
+  --color-on-positive: #ffffff; /* 8.11:1 on positive */
+
+  --color-negative: #7d0a03; /* 9.47:1 on sunken, 10.96:1 on surface */
+  --color-negative-soft: #feebe8; /* carries --color-negative at 9.53:1 */
+  --color-on-negative: #ffffff; /* 10.96:1 on negative */
+
+  --color-warning: #6c4806; /* 7.07:1 on sunken, 8.18:1 on surface */
+  --color-warning-soft: #feedd7; /* carries --color-warning at 7.13:1 */
+  --color-on-warning: #ffffff; /* 8.18:1 on warning */
+
+  --color-info: #064f89; /* = brand. 7.30:1 on sunken, 8.44:1 on surface */
+  --color-info-soft: #e6f2fe; /* carries --color-info at 7.44:1 */
+  --color-on-info: #ffffff; /* 8.44:1 on info */
+
+  /* ------------------------------------------------------------------------
+     WASHES & SCRIMS — alpha over whatever ground they land on, so one value
+     works on all four surfaces.
+     --------------------------------------------------------------------- */
+  --color-hover: rgb(35 32 26 / 0.055);
+  --color-press: rgb(35 32 26 / 0.1);
+  --color-selection: #cfe3f7;
+  --color-scrim: rgb(28 25 20 / 0.55);
+  --color-skeleton: #ece8e2;
+  --color-skeleton-sheen: rgb(255 255 255 / 0.75);
+
+  /* ------------------------------------------------------------------------
+     FOCUS (WCAG 2.2 §2.4.11 / §2.4.13, and §2.4.12 AAA "not obscured")
+
+     Two rings, drawn *outside* the control: a `--color-focus-gap`-coloured
+     inner band that separates the indicator from whatever fill sits underneath,
+     and the `--color-focus` band itself. The gap is what makes the indicator
+     survive on a brand-filled button, where a single brand ring would be
+     invisible. `--focus-width` is 2px and `--focus-gap` is 2px, which puts the
+     indicator's own contrast at 7.30:1 (light) and 7.22:1 (dark) against the
+     page — far past the 3:1 the criterion asks for.
+
+     Nothing in this product may clip a focus ring. Any scroll container that
+     could crop one reserves `--focus-reserve` of padding; the `focus-ring`
+     utility in `app.css` is drawn with `outline`, which is never affected by
+     `overflow: hidden` on an ancestor the way a `box-shadow` on a nested
+     element is.
+     --------------------------------------------------------------------- */
+  --color-focus: #064f89; /* 7.30:1 on sunken, 8.44:1 on surface */
+  --color-focus-gap: #ffffff;
+
+  /* ------------------------------------------------------------------------
+     CATEGORY SERIES — 8 hues for charts, category chips and legends.
+
+     ### Read this before using a series colour.
+
+     Eight hues that are simultaneously (a) mutually distinguishable, (b) at 7:1
+     against both a near-white and a near-black ground, and (c) stable under
+     dichromacy do not exist inside sRGB. That is not a limitation of this
+     palette; it is the size of the gamut. What this ramp actually guarantees:
+
+       · every series value clears **3:1 against every ground in its own theme**
+         (measured minimum: 4.50:1 light, 4.87:1 dark), which is the WCAG 1.4.11
+         floor for a graphical object — enough for a fill, a stroke or a swatch;
+       · it does **not** guarantee 7:1, so a series colour is never used as text;
+       · the worst-case pair separates by only **1.03:1 in luminance** (series 1
+         against series 6 in light, 1 against 8 in dark), and under simulated
+         deuteranopia the worst pair falls to **1.02:1** — indistinguishable.
+
+     Therefore: **series colour is a secondary encoding, always.** Every chart,
+     legend, donut segment and category chip that paints with this ramp must
+     also carry a text label, a value, or a pattern. A chart whose only channel
+     is series colour is a defect and the chart primitives in `src/components/
+     charts` are built so it cannot be expressed. See `docs/ACCESS.md` §4.
+
+     Hues: 252° 202° 172° 132° 95° 42° 8° 318°.
+     --------------------------------------------------------------------- */
+  --color-series-1: #0d6abb; /* 4.78:1 min vs grounds */
+  --color-series-2: #0a646a; /* 5.96:1 */
+  --color-series-3: #0f7b62; /* 4.50:1 */
+  --color-series-4: #436f0a; /* 5.16:1 */
+  --color-series-5: #625106; /* 6.72:1 */
+  --color-series-6: #b1440c; /* 4.90:1 */
+  --color-series-7: #a60d47; /* 6.55:1 */
+  --color-series-8: #9724b5; /* 5.61:1 */
+
+  /* ------------------------------------------------------------------------
+     SHADOWS — restrained. No glassmorphism, no blur panels, no coloured glow.
+
+     Surfaces are flat at rest: depth comes from the ground ladder (canvas →
+     surface → sunken) and a hairline. Shadow is reserved for things that are
+     genuinely on another layer, plus a single step of hover lift.
+     --------------------------------------------------------------------- */
+  --shadow-card:
+    0 1px 2px rgb(35 32 26 / 0.04), 0 1px 3px -1px rgb(35 32 26 / 0.05);
+  --shadow-elevated:
+    0 1px 2px rgb(35 32 26 / 0.05), 0 10px 24px -8px rgb(35 32 26 / 0.12);
+  --shadow-dropdown:
+    0 2px 6px -1px rgb(35 32 26 / 0.06), 0 12px 32px -10px rgb(35 32 26 / 0.18);
+  --shadow-popover:
+    0 2px 8px -2px rgb(35 32 26 / 0.07), 0 16px 44px -12px rgb(35 32 26 / 0.2);
+  --shadow-modal:
+    0 2px 8px -2px rgb(35 32 26 / 0.1), 0 32px 72px -16px rgb(35 32 26 / 0.28);
+}
+
+/* -------------------------------------------------------------------------
+   DARK — site 2 of 3. Applies when the OS asks for dark and the user has not
+   explicitly chosen light.
+   ---------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --color-canvas: #12110f;
+    --color-surface: #1d1b18;
+    --color-surface-raised: #272622;
+    --color-surface-sunken: #0b0b09;
+
+    --color-ink: #e9e6df; /* 12.15:1 on raised, 14.98:1 on canvas */
+    --color-ink-2: #bcb8b0; /* 7.66:1 on raised, 9.45:1 on canvas */
+    --color-on-accent: #23201a; /* 13.03:1 on accent, 10.25:1 on accent-hover */
+
+    --color-border-subtle: #33312d;
+    --color-border-strong: #7e7b75; /* 3.59:1 on raised, 4.41:1 on canvas */
+
+    --color-accent: #e9e6df; /* ink on it: 13.03:1 */
+    --color-accent-hover: #d1cdc5; /* ink on it: 10.25:1 */
+    --color-accent-press: #f8f5ef; /* ink on it: 14.78:1 */
+
+    --color-brand: #75b8fc; /* 7.22:1 on raised, 8.90:1 on canvas */
+    --color-brand-hover: #a3cffd; /* 9.30:1 on raised */
+    --color-brand-soft: #152433; /* carries --color-brand as text at 7.52:1 */
+    --color-on-brand: #23201a; /* 7.75:1 on brand */
+
+    --color-positive: #21cb9c; /* 7.27:1 on raised, 8.96:1 on canvas */
+    --color-positive-soft: #102820; /* carries --color-positive at 7.49:1 */
+    --color-on-positive: #23201a; /* 7.80:1 on positive */
+
+    --color-negative: #fdaa9c; /* 8.23:1 on raised, 10.14:1 on canvas */
+    --color-negative-soft: #321c19; /* carries --color-negative at 8.67:1 */
+    --color-on-negative: #23201a; /* 8.82:1 on negative */
+
+    --color-warning: #efa51e; /* 7.26:1 on raised, 8.95:1 on canvas */
+    --color-warning-soft: #2d200f; /* carries --color-warning at 7.60:1 */
+    --color-on-warning: #23201a; /* 7.79:1 on warning */
+
+    --color-info: #75b8fc; /* = brand. 7.22:1 on raised */
+    --color-info-soft: #152433; /* carries --color-info at 7.52:1 */
+    --color-on-info: #23201a; /* 7.75:1 on info */
+
+    --color-hover: rgb(233 230 223 / 0.07);
+    --color-press: rgb(233 230 223 / 0.12);
+    --color-selection: #17324a;
+    --color-scrim: rgb(6 6 5 / 0.68);
+    --color-skeleton: #262421;
+    --color-skeleton-sheen: rgb(233 230 223 / 0.08);
+
+    --color-focus: #75b8fc; /* 7.22:1 on raised, 8.90:1 on canvas */
+    --color-focus-gap: #12110f;
+
+    /* Series, re-tuned for a dark ground rather than reused. */
+    --color-series-1: #4da2fb; /* 5.68:1 min vs grounds */
+    --color-series-2: #23cfda; /* 7.94:1 */
+    --color-series-3: #1fbf9b; /* 6.48:1 */
+    --color-series-4: #8fe326; /* 9.51:1 */
+    --color-series-5: #cbac1c; /* 6.82:1 */
+    --color-series-6: #f76316; /* 4.87:1 */
+    --color-series-7: #fd9eb0; /* 7.71:1 */
+    --color-series-8: #dd74fc; /* 5.75:1 */
+
+    /* Re-declared, an order of magnitude more opaque: a 4% shadow is invisible
+       against charcoal, so reusing the light values would silently delete
+       every layer boundary in the product. */
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 1px 1px rgb(0 0 0 / 0.3);
+    --shadow-elevated:
+      0 1px 2px rgb(0 0 0 / 0.5), 0 10px 24px -8px rgb(0 0 0 / 0.6);
+    --shadow-dropdown:
+      0 2px 6px -1px rgb(0 0 0 / 0.55), 0 12px 32px -10px rgb(0 0 0 / 0.7);
+    --shadow-popover:
+      0 2px 8px -2px rgb(0 0 0 / 0.6), 0 16px 44px -12px rgb(0 0 0 / 0.72);
+    --shadow-modal:
+      0 2px 8px -2px rgb(0 0 0 / 0.65), 0 32px 72px -16px rgb(0 0 0 / 0.78);
+  }
+}
+
+/* -------------------------------------------------------------------------
+   DARK — site 3 of 3. The explicit choice, which must win even on a
+   light-mode OS. Values are identical to site 2 by construction.
+   ---------------------------------------------------------------------- */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-canvas: #12110f;
+  --color-surface: #1d1b18;
+  --color-surface-raised: #272622;
+  --color-surface-sunken: #0b0b09;
+
+  --color-ink: #e9e6df; /* 12.15:1 on raised, 14.98:1 on canvas */
+  --color-ink-2: #bcb8b0; /* 7.66:1 on raised, 9.45:1 on canvas */
+  --color-on-accent: #23201a; /* 13.03:1 on accent */
+
+  --color-border-subtle: #33312d;
+  --color-border-strong: #7e7b75; /* 3.59:1 on raised */
+
+  --color-accent: #e9e6df;
+  --color-accent-hover: #d1cdc5;
+  --color-accent-press: #f8f5ef;
+
+  --color-brand: #75b8fc; /* 7.22:1 on raised */
+  --color-brand-hover: #a3cffd;
+  --color-brand-soft: #152433; /* carries --color-brand at 7.52:1 */
+  --color-on-brand: #23201a; /* 7.75:1 on brand */
+
+  --color-positive: #21cb9c; /* 7.27:1 on raised */
+  --color-positive-soft: #102820; /* 7.49:1 */
+  --color-on-positive: #23201a; /* 7.80:1 */
+
+  --color-negative: #fdaa9c; /* 8.23:1 on raised */
+  --color-negative-soft: #321c19; /* 8.67:1 */
+  --color-on-negative: #23201a; /* 8.82:1 */
+
+  --color-warning: #efa51e; /* 7.26:1 on raised */
+  --color-warning-soft: #2d200f; /* 7.60:1 */
+  --color-on-warning: #23201a; /* 7.79:1 */
+
+  --color-info: #75b8fc; /* 7.22:1 on raised */
+  --color-info-soft: #152433; /* 7.52:1 */
+  --color-on-info: #23201a; /* 7.75:1 */
+
+  --color-hover: rgb(233 230 223 / 0.07);
+  --color-press: rgb(233 230 223 / 0.12);
+  --color-selection: #17324a;
+  --color-scrim: rgb(6 6 5 / 0.68);
+  --color-skeleton: #262421;
+  --color-skeleton-sheen: rgb(233 230 223 / 0.08);
+
+  --color-focus: #75b8fc;
+  --color-focus-gap: #12110f;
+
+  --color-series-1: #4da2fb;
+  --color-series-2: #23cfda;
+  --color-series-3: #1fbf9b;
+  --color-series-4: #8fe326;
+  --color-series-5: #cbac1c;
+  --color-series-6: #f76316;
+  --color-series-7: #fd9eb0;
+  --color-series-8: #dd74fc;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 1px 1px rgb(0 0 0 / 0.3);
+  --shadow-elevated:
+    0 1px 2px rgb(0 0 0 / 0.5), 0 10px 24px -8px rgb(0 0 0 / 0.6);
+  --shadow-dropdown:
+    0 2px 6px -1px rgb(0 0 0 / 0.55), 0 12px 32px -10px rgb(0 0 0 / 0.7);
+  --shadow-popover:
+    0 2px 8px -2px rgb(0 0 0 / 0.6), 0 16px 44px -12px rgb(0 0 0 / 0.72);
+  --shadow-modal:
+    0 2px 8px -2px rgb(0 0 0 / 0.65), 0 32px 72px -16px rgb(0 0 0 / 0.78);
+}
+
+/* ==========================================================================
+   NON-THEMED SCALES
+   These do not change between light and dark, so they are declared once.
+   ========================================================================== */
+
+:root {
+  /* ------------------------------------------------------------------------
+     TYPE
+
+     Two faces: a geometric display face for the few large things and a neutral
+     text face for the many small ones. Both stacks name a metric-compensated
+     local fallback *immediately* after the web face, so a heading does not
+     resize when the web font lands.
+
+     `--font-numeric` is the same text face pinned to tabular figures. Every
+     number that can change is set in it — a re-rendered total must not shift
+     the row it sits in, and a column of money must align on the decimal.
+     --------------------------------------------------------------------- */
+  --font-display:
+    'Bricolage Grotesque', 'Bricolage Grotesque Fallback', 'Avenir Next',
+    ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Mono', Menlo, monospace;
+
+  /* The type scale. Nine steps, and the jump from `micro` to `display` is
+     deliberate: an 11px uppercase label sitting directly above a 40px numeral
+     is the product's signature composition, and softening it with an
+     intermediate size is what makes a dashboard read as generic. */
+  --text-hero: clamp(2.5rem, 6.8vw, 4.5rem);
+  --text-hero--line-height: 0.98;
+  --text-hero--letter-spacing: -0.032em;
+  --text-hero--font-weight: 700;
+
+  --text-display: clamp(1.875rem, 4.4vw, 2.5rem);
+  --text-display--line-height: 1.04;
+  --text-display--letter-spacing: -0.028em;
+  --text-display--font-weight: 700;
+
+  --text-title: 1.5rem;
+  --text-title--line-height: 1.18;
+  --text-title--letter-spacing: -0.02em;
+  --text-title--font-weight: 700;
+
+  --text-subtitle: 1.125rem;
+  --text-subtitle--line-height: 1.4;
+  --text-subtitle--letter-spacing: -0.012em;
+  --text-subtitle--font-weight: 600;
+
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.55;
+
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.4;
+  --text-label--font-weight: 500;
+
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.35;
+
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.2;
+  --text-micro--letter-spacing: 0.08em;
+  --text-micro--font-weight: 600;
+
+  --tracking-label: 0.08em;
+
+  /* WCAG 2.2 §1.4.8 AAA — visual presentation. The measure of running text is
+     capped so a line never exceeds ~80 characters, line height inside a
+     paragraph is at least 1.5, and paragraph spacing is at least 1.5× that
+     again. `--measure` is applied by the `prose-measure` utility in `app.css`. */
+  --measure: 68ch;
+  --leading-reading: 1.6;
+  --paragraph-gap: 1.5em;
+
+  /* ------------------------------------------------------------------------
+     SPACE — a strict 4px rhythm.
+
+     `--spacing: 0.25rem` pins Tailwind's own numeric scale to the same grid, so
+     `p-6`, `gap-6` and `--space-6` are always the same 24px. A one-off value in
+     a component is a defect, not a judgement call.
+     --------------------------------------------------------------------- */
+  --spacing: 0.25rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* ------------------------------------------------------------------------
+     TARGET SIZE — WCAG 2.2 §2.5.5 AAA.
+
+     44 CSS px minimum in both axes for every pointer target. The `target-min`
+     utility in `app.css` enforces it without changing a control's visual box:
+     it grows the *hit area* with a pseudo-element, so a 32px icon button still
+     looks 32px and still answers a 44px tap. Visual height stays on the size
+     scale below; the hit area is the token above it.
+     --------------------------------------------------------------------- */
+  --target-min: 2.75rem; /* 44px */
+  --control-h-sm: 2rem; /* 32px */
+  --control-h-md: 2.5rem; /* 40px */
+  --control-h-lg: 3rem; /* 48px */
+
+  /* ------------------------------------------------------------------------
+     RADII — radius as a category signal, not decoration.
+     xl = a sheet · lg = a floating layer · md = a control · sm = a nested inset
+     full = "this is a token you can pick up" (chip, badge, avatar). Never on a
+     panel.
+     --------------------------------------------------------------------- */
+  --radius-sm: 0.5rem; /* 8px */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-lg: 1rem; /* 16px */
+  --radius-xl: 1.25rem; /* 20px */
+  --radius-2xl: 1.75rem; /* 28px */
+  --radius-full: 9999px;
+
+  /* Focus geometry. See the focus colour block above. */
+  --focus-width: 2px;
+  --focus-gap: 2px;
+  --focus-reserve: 0.25rem;
+
+  /* ------------------------------------------------------------------------
+     MOTION
+
+     Four durations and four easings, and **every one of them collapses under
+     `prefers-reduced-motion: reduce`** — see the block at the end of this file.
+     Because the durations are tokens rather than literals, that collapse
+     reaches every animation in the product, including ones written after this
+     file was, and including third-party CSS that consumes the variables.
+
+     Only `transform` and `opacity` (plus paint-only colour properties) are ever
+     animated. Height, width, `top` and margin are reflows and cannot be
+     animated honestly at 60fps.
+     --------------------------------------------------------------------- */
+  --duration-instant: 90ms;
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 320ms;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-quint: cubic-bezier(0.64, 0, 0.78, 0);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ------------------------------------------------------------------------
+     LAYERING — one closed ladder. Nothing in the product may invent a z-index;
+     `src/lib/cn.ts` registers these names with tailwind-merge so an override
+     genuinely wins instead of leaving two classes and letting stylesheet order
+     decide.
+     --------------------------------------------------------------------- */
+  --z-base: 0;
+  --z-nav: 30;
+  --z-dropdown: 40;
+  --z-overlay: 50;
+  --z-modal: 60;
+  --z-popover: 65;
+  --z-tooltip: 70;
+  --z-toast: 80;
+
+  /* ------------------------------------------------------------------------
+     CHROME GEOMETRY — named rows, composed rather than hand-calculated. Every
+     piece of chrome geometry adds `--impersonation-h` unconditionally: with no
+     bar it resolves to 0 and the layout is exactly what it was.
+     --------------------------------------------------------------------- */
+  --nav-h: 4rem; /* 64px */
+  --subnav-h: 3rem; /* 48px */
+  --impersonation-h: 0rem;
+  --content-max: 90rem; /* 1440px */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-start: env(safe-area-inset-left, 0px);
+  --safe-end: env(safe-area-inset-right, 0px);
+
+  /* WCAG 2.2 §2.2.6 AAA — timeouts. No inactivity timer in this product may be
+     shorter than 20 hours without warning the user first, and the warning
+     itself must be dismissible and extendable. The value is a token so the
+     session layer and the "you will be signed out" dialog cannot drift apart. */
+  --timeout-warning-lead: 300s;
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+
+   The single place motion is switched off. Collapsing the *duration tokens*
+   rather than blanket-killing animations is deliberate: a `!important`
+   `animation: none` breaks components that wait on `animationend` (React Aria's
+   overlays do exactly that to unmount an exiting popover), leaving a dialog
+   that never closes. Setting the durations to a value below one frame removes
+   all perceptible motion while every completion event still fires.
+
+   The `!important` on the sweep is what makes it reach animations declared
+   later in the cascade, including ones inside third-party stylesheets.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0.01ms;
+    --duration-fast: 0.01ms;
+    --duration-base: 0.01ms;
+    --duration-slow: 0.01ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

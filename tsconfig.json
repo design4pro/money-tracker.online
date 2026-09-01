@@ -1,0 +1,55 @@
+{
+  // `.sandcastle` is named separately because TypeScript's wildcard globs deliberately skip
+  // dot-directories: without this line the whole AFK loop — main.ts, the coordinator client,
+  // adoption, the triage scripts — goes unchecked while `pnpm typecheck` reports success.
+  // (Line comments, not block ones: a `**` glob written inside a block comment closes it early
+  // on its own `*` `/`.)
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".sandcastle/**/*.ts",
+    "eslint.config.js",
+    "prettier.config.js"
+  ],
+
+  // Spelled out because naming an `exclude` replaces the default one, which is where
+  // `node_modules` comes from. The sandcastle loop creates a full git worktree per run under
+  // `.sandcastle/worktrees`, each a copy of this checkout; without this, typecheck would compile
+  // the whole repo once per worktree left on disk.
+  "exclude": ["node_modules", ".sandcastle/worktrees/**", "dist"],
+
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "paths": {
+      "#/*": ["./src/*"]
+    },
+    /* `ES2023.Intl` is type-only: it declares the string form of `useGrouping`, which the
+       per-locale money formatters in `src/lib` freeze.
+       `ES2023.Array` is for `toSorted`, which the money allocator, the currency picker and the
+       i18n parity gate all use. It is a copying sort: sorting a frozen catalogue in place is a
+       runtime throw, and sorting a caller's array in place is a bug in whatever handed it over.
+       Both workerd and every browser this product supports ship it. */
+    "lib": ["ES2022", "ES2023.Array", "ES2023.Intl", "DOM", "DOM.Iterable"],
+    /* Workers runtime globals (D1Database, KVNamespace, R2Bucket, Queue, DurableObjectNamespace)
+       so `worker-configuration.d.ts` can name them without importing. They collide with `DOM`
+       on Response/Request/WebSocket and friends; `skipLibCheck` below is what makes the two
+       coexist, exactly as it does in the generated-types setup this repo is ported from. */
+    "types": ["vite/client", "@cloudflare/workers-types"],
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    /* Linting */
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  }
+}

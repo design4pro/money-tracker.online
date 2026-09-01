@@ -1,0 +1,64 @@
+name: QA report
+description: The result of exercising a shipped change by hand.
+title: 'qa: '
+labels: ['qa', 'status: pending']
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Manual QA closes the loop the automated gates cannot: the gates prove the code does what
+        the tests say, not that the screen is usable. If the verdict below is "did not hold up",
+        add the `qa-failed` label - that is the label the loop and the release checklist read.
+
+  - type: input
+    id: subject
+    attributes:
+      label: What was exercised
+      description: The pull request, issue or release this covers.
+      placeholder: '#412, staging'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: Verdict
+      options:
+        - Held up - no follow-up needed
+        - Held up with notes - follow-up filed separately
+        - Did not hold up - add the `qa-failed` label
+    validations:
+      required: true
+
+  - type: textarea
+    id: covered
+    attributes:
+      label: What was covered
+      description: The flows walked, the devices and browsers used, the locale.
+      placeholder: |
+        - Add a split transaction, edit a split, delete a split (Safari 26, iPhone 15, pl-PL)
+        - Import a 400-row CSV and roll it back
+    validations:
+      required: true
+
+  - type: textarea
+    id: findings
+    attributes:
+      label: Findings
+      description: >
+        One per line, worst first. A finding that deserves its own fix should also get its own
+        bug report - link it here rather than describing it twice.
+
+  - type: checkboxes
+    id: accessibility
+    attributes:
+      label: Accessibility pass
+      description: >
+        The parts a scanner cannot judge. The A/AA gate runs in CI; these are the ones a person
+        has to try.
+      options:
+        - label: Every action reachable by keyboard alone, in a sensible order
+        - label: Focus visible at all times, and never hidden behind a sticky header or bar
+        - label: Announced sensibly with VoiceOver or NVDA - labels, states, live regions
+        - label: Usable at 200% zoom and at 320px width without horizontal scrolling
+        - label: 'Timeouts (SC 2.2.6): any inactivity warning gave enough notice, or nothing was lost'

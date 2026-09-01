@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "description": "Project-scoped Claude Code settings for money-tracker.online. `allow` holds only commands that read, check or build - nothing that writes outside the working tree, deploys, or touches a secret. Everything else stays behind the normal approval prompt, and `deny` covers the handful of commands that are irreversible enough that a prompt is not protection enough.",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm lint:fix)",
+      "Bash(pnpm check)",
+      "Bash(pnpm format)",
+      "Bash(pnpm build)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test:coverage)",
+      "Bash(pnpm generate-routes)",
+      "Bash(pnpm db:generate)",
+      "Bash(pnpm db:migrate:local)",
+      "Bash(pnpm exec tsc --noEmit)",
+      "Bash(pnpm exec vitest run:*)",
+      "Bash(pnpm exec prettier --check:*)",
+      "Bash(pnpm exec playwright test:*)",
+      "Bash(pnpm exec playwright show-report:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git branch --list:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git merge-base:*)",
+      "Bash(rtk read:*)",
+      "Bash(rtk gh:*)"
+    ],
+    "deny": [
+      "Bash(pnpm run deploy:*)",
+      "Bash(pnpm deploy:*)",
+      "Bash(pnpm deploy:staging:*)",
+      "Bash(pnpm db:migrate:prod:*)",
+      "Bash(pnpm db:migrate:staging:*)",
+      "Bash(wrangler deploy:*)",
+      "Bash(pnpm exec wrangler deploy:*)",
+      "Bash(pnpm exec wrangler secret:*)",
+      "Bash(pnpm exec wrangler d1 delete:*)",
+      "Bash(pnpm exec wrangler r2 bucket delete:*)",
+      "Bash(pnpm exec wrangler kv namespace delete:*)",
+      "Read(./.dev.vars)",
+      "Read(./.env.local)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-generated.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/git-guardrails.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-file.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

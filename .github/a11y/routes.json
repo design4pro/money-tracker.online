@@ -1,0 +1,181 @@
+{
+  "$comment": [
+    "The surface the accessibility gate scans. Keep it in step with the visual specs under",
+    "e2e/visual/: a route that is worth photographing is a route that is worth scanning, and a",
+    "route in neither list is a route nobody is checking.",
+    "",
+    "`access` says what the scanner has to do before the page will render:",
+    "  public   - no session; the page is served to anyone.",
+    "  form     - no session, and the page IS an authentication form, so the enhanced",
+    "             accessible-authentication probe (SC 3.3.9) runs against it.",
+    "  session  - the scanner signs the demo account in first.",
+    "",
+    "Dynamic segments ($accountId, $transactionId, $budgetId, $seriesId, $goalId, $payeeId,",
+    "$ruleId, $invitationId) are absent on purpose: their ids come from the seed and would pin",
+    "this file to the fixture. The e2e suite covers them with ids it looked up at run time.",
+    "",
+    "The /console/* routes are absent because the demo account holds no platform permission and",
+    "every one of them answers with a redirect rather than a page."
+  ],
+  "routes": [
+    { "path": "/", "name": "Landing", "access": "public" },
+    { "path": "/pricing", "name": "Pricing", "access": "public" },
+    { "path": "/features", "name": "Features", "access": "public" },
+    { "path": "/security", "name": "Security", "access": "public" },
+    { "path": "/changelog", "name": "Changelog", "access": "public" },
+
+    { "path": "/legal/privacy", "name": "Privacy policy", "access": "public" },
+    { "path": "/legal/terms", "name": "Terms", "access": "public" },
+    { "path": "/legal/cookies", "name": "Cookie policy", "access": "public" },
+    {
+      "path": "/legal/dpa",
+      "name": "Data processing addendum",
+      "access": "public"
+    },
+
+    { "path": "/login", "name": "Sign in", "access": "form" },
+    { "path": "/register", "name": "Create account", "access": "form" },
+    { "path": "/forgot-password", "name": "Forgot password", "access": "form" },
+
+    { "path": "/dashboard", "name": "Dashboard", "access": "session" },
+    { "path": "/accounts", "name": "Accounts", "access": "session" },
+    {
+      "path": "/accounts/groups",
+      "name": "Account groups",
+      "access": "session"
+    },
+    { "path": "/transactions", "name": "Transactions", "access": "session" },
+    {
+      "path": "/transactions/new",
+      "name": "New transaction",
+      "access": "session"
+    },
+    {
+      "path": "/transactions/groups",
+      "name": "Transaction groups",
+      "access": "session"
+    },
+    {
+      "path": "/transactions/planned",
+      "name": "Planned transactions",
+      "access": "session"
+    },
+    { "path": "/transactions/rules", "name": "Rules", "access": "session" },
+    {
+      "path": "/transactions/rules/new",
+      "name": "New rule",
+      "access": "session"
+    },
+    {
+      "path": "/transactions/suggestions",
+      "name": "Suggestions",
+      "access": "session"
+    },
+    { "path": "/budgets", "name": "Budgets", "access": "session" },
+    { "path": "/recurring", "name": "Recurring", "access": "session" },
+    {
+      "path": "/recurring/candidates",
+      "name": "Recurring candidates",
+      "access": "session"
+    },
+    { "path": "/goals", "name": "Goals", "access": "session" },
+    { "path": "/analytics", "name": "Analytics hub", "access": "session" },
+    {
+      "path": "/analytics/cash-flow",
+      "name": "Cash flow",
+      "access": "session"
+    },
+    {
+      "path": "/analytics/net-worth",
+      "name": "Net worth",
+      "access": "session"
+    },
+    { "path": "/analytics/spending", "name": "Spending", "access": "session" },
+    { "path": "/analytics/pivot", "name": "Pivot", "access": "session" },
+    {
+      "path": "/analytics/annual",
+      "name": "Annual review",
+      "access": "session"
+    },
+    {
+      "path": "/notifications",
+      "name": "Notification inbox",
+      "access": "session"
+    },
+    {
+      "path": "/settings/general",
+      "name": "Settings · general",
+      "access": "session"
+    },
+    {
+      "path": "/settings/appearance",
+      "name": "Settings · appearance",
+      "access": "session"
+    },
+    {
+      "path": "/settings/language",
+      "name": "Settings · language",
+      "access": "session"
+    },
+    {
+      "path": "/settings/categories",
+      "name": "Settings · categories",
+      "access": "session"
+    },
+    {
+      "path": "/settings/tags",
+      "name": "Settings · tags",
+      "access": "session"
+    },
+    {
+      "path": "/settings/payees",
+      "name": "Settings · payees",
+      "access": "session"
+    },
+    {
+      "path": "/settings/currencies",
+      "name": "Settings · currencies",
+      "access": "session"
+    },
+    {
+      "path": "/settings/accounts-groups",
+      "name": "Settings · account groups",
+      "access": "session"
+    },
+    {
+      "path": "/settings/data/import",
+      "name": "Settings · import",
+      "access": "session"
+    },
+    {
+      "path": "/settings/data/export",
+      "name": "Settings · export",
+      "access": "session"
+    },
+    {
+      "path": "/settings/data/backup",
+      "name": "Settings · backup",
+      "access": "session"
+    },
+    {
+      "path": "/settings/notifications",
+      "name": "Settings · notifications",
+      "access": "session"
+    },
+    {
+      "path": "/settings/members",
+      "name": "Settings · members",
+      "access": "session"
+    },
+    {
+      "path": "/settings/billing",
+      "name": "Settings · billing",
+      "access": "session"
+    },
+    {
+      "path": "/settings/security",
+      "name": "Settings · security",
+      "access": "session"
+    }
+  ]
+}

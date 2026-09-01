@@ -1,0 +1,159 @@
+# money-tracker.online — local secrets template
+#
+# Copy to `.dev.vars` and fill in. `vite dev` loads this file into the Worker's `env` through
+# Miniflare, exactly as `wrangler secret put` does in production. `.dev.vars` is gitignored; this
+# file must never contain a real value.
+#
+# This is the complete secret list: every secret the Worker reads is below, with no omissions.
+# The Worker also reads names that are not secrets, and that is the next paragraph's subject
+# rather than a gap in this one.
+#
+# Non-secret configuration (LOG_LEVEL, EMAIL_FROM, FX_PRIMARY, IMPORT_MAX_ROWS, …) is NOT here —
+# it lives in the `vars` block of `wrangler.jsonc` and is checked in. Two names below break that
+# rule deliberately, and each argues the exception in its own comment rather than leaving it
+# silent: the billing environment switch, and the local APP_URL override at the bottom.
+#
+# GOTCHA, and it is the one that costs an afternoon: **a commented-out line is not a key.** The
+# sandcastle env resolver iterates the keys that appear in this file, and so does every reader
+# who treats it as the inventory. A name that exists only inside a `#` comment does not exist.
+# If a secret is real, it gets an uncommented `NAME=` line here, empty value and all.
+#
+# A `.dev.vars.<environment>` file REPLACES this one wholesale instead of merging with it, so a
+# staging variant has to redeclare every name below.
+#
+# In production every name below is set with:
+#   wrangler secret put <NAME>            # add --env staging for staging
+# List what is currently set with:
+#   wrangler secret list
+
+
+# ── Auth (required) ──────────────────────────────────────────────────────────
+
+# Signs session cookies and Better Auth tokens. Rotating it logs everyone out.
+# Generate: openssl rand -base64 32
+BETTER_AUTH_SECRET=
+
+
+# ── Social sign-in (optional; each provider's button is not rendered when unset) ──
+
+# Google Cloud console → APIs & Services → Credentials → OAuth client ID (Web).
+# Authorised redirect URI: <APP_URL>/api/auth/callback/google
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Apple Developer → Certificates, Identifiers & Profiles → Services ID.
+# APPLE_CLIENT_SECRET is the ES256 client-secret JWT, not the .p8 key itself.
+APPLE_CLIENT_ID=
+APPLE_CLIENT_SECRET=
+# Only needed when a native iOS client signs in against this backend.
+APPLE_APP_BUNDLE_IDENTIFIER=
+
+
+# ── Billing (optional; every paid plan fails loudly without it) ──────────────
+
+# Polar dashboard → Settings → Developers → New Token. Scope it to exactly
+# checkouts:write, customer_sessions:write, orders:read, subscriptions:read,
+# subscriptions:write, products:read, webhooks:write, webhooks:read — the token is presented as
+# polar_oat_… and can issue refunds, so it stays server-side.
+POLAR_ACCESS_TOKEN=
+
+# Signing secret of the billing webhook endpoint. `POST /v1/webhooks/endpoints` takes no
+# `secret` field — Polar generates one and returns it on the 201, so you copy it out of the
+# response. The dashboard → Settings → Webhooks → Add endpoint form is the path that lets you
+# supply your own, so mint the value first (openssl rand -base64 32) if you want this secret set
+# before the endpoint exists. Afterwards neither path can assign one: the regenerate endpoint
+# takes no body and the old value stops verifying the moment it returns.
+POLAR_WEBHOOK_SECRET=
+
+# `sandbox` or `production`, nothing else and no default. This one is not a credential, so it is
+# the exception to the header rule above: sandbox and production are separate Polar accounts,
+# and keeping the environment selector in the same file as the token it pairs with is what stops
+# the two drifting apart. Unset, the first Upgrade click raises BillingConfigError.
+POLAR_SERVER=
+
+# Those three are the whole server side of billing. The client side is four public product ids
+# that Vite inlines at build time; they are not secrets, do not belong in this file, and are
+# named in `.env.local.example`. Leave the three above unset and the app still renders —
+# checkout and the customer portal raise a configuration error naming the missing secret instead
+# of half-working.
+
+
+# ── Transactional email (optional; queued mail fails loudly to the DLQ) ──────
+
+# Resend-compatible REST key. The endpoint itself is the EMAIL_API_URL var in wrangler.jsonc.
+EMAIL_API_KEY=
+
+
+# ── Nightly D1 backup to R2 (optional; the cron logs and skips without it) ───
+
+# Cloudflare dashboard → Workers & Pages → Account details → Account ID.
+CLOUDFLARE_ACCOUNT_ID=
+# Scoped API token with `D1:read` on this account only.
+CLOUDFLARE_API_TOKEN=
+# UUID of the D1 database to export — the `database_id` in wrangler.jsonc for this environment.
+D1_DATABASE_ID=
+
+
+# ── FX rates (optional; only a keyed provider needs it) ──────────────────────
+
+# The configured FX_PRIMARY/FX_FALLBACK pair (fawaz → frankfurter) is keyless, so this is empty
+# in every environment today. It exists because swapping in a paid provider is a one-secret
+# change rather than a code change, and because the availability of a free, unowned rate feed on
+# a paid product is a known open risk. Unset, the keyless provider is used.
+FX_API_KEY=
+
+
+# ── Sandcastle coordinator (staging only; the route answers 503 without it) ──
+
+# Shared bearer token for /api/sandcastle/*, the registry every sandcastle run claims its GitHub
+# issues from. Set it on STAGING ALONE:
+#
+#   wrangler secret put SANDCASTLE_COORDINATOR_TOKEN --env staging
+#
+# and nowhere else. The SANDCASTLE_REGISTRY Durable Object is bound in `env.staging` only: a
+# coordinator is worth having only if there is exactly one of it, and a second registry would let
+# two fleets each believe they hold the backlog. Production has neither the binding nor this
+# name, and answers 503 to the whole route.
+#
+# Leave it blank locally unless you are working on the route itself. Local dev has no binding
+# either, so it 503s before it ever looks at this value; the AFK loop in `.sandcastle/` reads its
+# own copy from `.sandcastle/.env` and talks to deployed staging, not to your dev server.
+#
+# The same token goes in the repository's Actions secrets, so triage running as a workflow claims
+# from the registry the laptops claim from. Rotating it stops every run that has not been
+# restarted, which is the intended blast radius.
+# Generate: openssl rand -base64 32
+SANDCASTLE_COORDINATOR_TOKEN=
+
+
+# ── Error reporting (optional; the Worker reports nothing without it) ────────
+
+# Sentry DSN for the Worker half of the reporting. One Sentry project serves both environments
+# and they are told apart by the `environment` tag, read from the ENVIRONMENT var in
+# wrangler.jsonc — so this is the *same* value in staging and production, and setting two
+# different ones splits one bug into two unrelated issues.
+#
+# A DSN is not really a secret: the browser half of the same reporting ships it in the client
+# bundle. It is here because the Worker reads it from `env` like every other name in this file,
+# and because this file promises to list every such name. The public half is a repository
+# variable — see `.env.local.example`.
+#
+# Unset is a supported state, not a broken one: the Sentry client is inert without a DSN and the
+# Worker serves exactly as before. That is what lets `pnpm dev` and a fork's CI work
+# unconfigured.
+#
+# One money-specific rule this project adds, enforced in src/server/observability: no event body
+# may carry an amount, a payee name, an account name or an imported row. The scrubber runs
+# before the transport, not after.
+SENTRY_DSN=
+
+
+# ── Local non-secret override (optional; wrangler.jsonc vars win otherwise) ──
+
+# Local dev origin — overrides the production APP_URL in wrangler.jsonc vars. The port must be
+# the one `pnpm dev` binds, which is 3010 (`server.port` in vite.config.ts, with `strictPort`).
+# Every auth URL is built from this value, so a port nothing is listening on does not fail
+# loudly — it sends the OAuth callback and the verification link in an email to a dead origin.
+# If you deliberately run the dev server on another port, change both this line and the redirect
+# URI registered with each social provider above.
+APP_URL=http://localhost:3010

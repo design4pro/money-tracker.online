@@ -1,0 +1,522 @@
+/* ==========================================================================
+   money-tracker.online — Tailwind v4 entry
+   --------------------------------------------------------------------------
+   Order matters:
+
+     1. `tailwindcss`, which installs `@layer theme, base, components, utilities`.
+     2. `./tokens.css`, which lands UNLAYERED and therefore always outranks the
+        `@layer theme` block Tailwind emits. That is what lets one `data-theme`
+        attribute on `<html>` repaint the whole product.
+     3. `@theme inline`, which teaches Tailwind our token names so `bg-canvas`,
+        `text-ink-2`, `rounded-xl`, `shadow-card`, `ease-out-quint`,
+        `text-micro` and `tracking-label` all resolve to the *live* custom
+        property rather than to a copied value.
+
+   `inline` is load-bearing. Without it Tailwind emits its own copy of each
+   variable into `@layer theme`, the utilities point at that copy, and the theme
+   switch stops working for everything except the four raw `:root` declarations.
+
+   Web fonts are deliberately NOT imported here. An `@import url(…)` inside this
+   file is only discovered once this stylesheet has downloaded and parsed, which
+   puts the font request a full round trip behind first paint. The document
+   shell renders the link tags in `<head>` instead.
+   ========================================================================== */
+
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* React Aria's data attributes as Tailwind variants. Declared because the
+   blueprint names it, and useful for one-off markup — but note that every
+   component in `src/components/ui` writes its state variants as explicit
+   `data-[hovered]:` / `data-[focus-visible]:` / `data-[disabled]:` arbitrary
+   variants instead. Those cannot be broken by a change to this plugin's
+   variant naming or prefix option, and the primitives are the part of the
+   system that must not break. */
+@plugin 'tailwindcss-react-aria-components';
+
+/* --------------------------------------------------------------------------
+   `dark:` for the rare case that a value genuinely cannot be a token — an SVG
+   `stop-color`, a third-party widget's inline style. Both halves are needed:
+   the media query for "follow the OS", the attribute for the explicit choice,
+   each guarded so the other cannot override it in the wrong direction.
+   -------------------------------------------------------------------------- */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(
+      :root:not([data-theme='light']) *,
+      :root:not([data-theme='light'])
+    ) {
+      @slot;
+    }
+  }
+  &:where([data-theme='dark'] *, [data-theme='dark']) {
+    @slot;
+  }
+}
+
+@theme inline {
+  /* ---------------------------------------------------------------- colour */
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-sunken: var(--color-surface-sunken);
+
+  --color-ink: var(--color-ink);
+  --color-ink-2: var(--color-ink-2);
+  --color-on-accent: var(--color-on-accent);
+
+  --color-border-subtle: var(--color-border-subtle);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-press: var(--color-accent-press);
+
+  --color-brand: var(--color-brand);
+  --color-brand-hover: var(--color-brand-hover);
+  --color-brand-soft: var(--color-brand-soft);
+  --color-on-brand: var(--color-on-brand);
+
+  --color-positive: var(--color-positive);
+  --color-positive-soft: var(--color-positive-soft);
+  --color-on-positive: var(--color-on-positive);
+  --color-negative: var(--color-negative);
+  --color-negative-soft: var(--color-negative-soft);
+  --color-on-negative: var(--color-on-negative);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-on-warning: var(--color-on-warning);
+  --color-info: var(--color-info);
+  --color-info-soft: var(--color-info-soft);
+  --color-on-info: var(--color-on-info);
+
+  --color-hover: var(--color-hover);
+  --color-press: var(--color-press);
+  --color-selection: var(--color-selection);
+  --color-scrim: var(--color-scrim);
+  --color-skeleton: var(--color-skeleton);
+  --color-skeleton-sheen: var(--color-skeleton-sheen);
+
+  --color-focus: var(--color-focus);
+  --color-focus-gap: var(--color-focus-gap);
+
+  --color-series-1: var(--color-series-1);
+  --color-series-2: var(--color-series-2);
+  --color-series-3: var(--color-series-3);
+  --color-series-4: var(--color-series-4);
+  --color-series-5: var(--color-series-5);
+  --color-series-6: var(--color-series-6);
+  --color-series-7: var(--color-series-7);
+  --color-series-8: var(--color-series-8);
+
+  /* ------------------------------------------------------------------ type */
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --text-hero: var(--text-hero);
+  --text-hero--line-height: var(--text-hero--line-height);
+  --text-hero--letter-spacing: var(--text-hero--letter-spacing);
+  --text-hero--font-weight: var(--text-hero--font-weight);
+  --text-display: var(--text-display);
+  --text-display--line-height: var(--text-display--line-height);
+  --text-display--letter-spacing: var(--text-display--letter-spacing);
+  --text-display--font-weight: var(--text-display--font-weight);
+  --text-title: var(--text-title);
+  --text-title--line-height: var(--text-title--line-height);
+  --text-title--letter-spacing: var(--text-title--letter-spacing);
+  --text-title--font-weight: var(--text-title--font-weight);
+  --text-subtitle: var(--text-subtitle);
+  --text-subtitle--line-height: var(--text-subtitle--line-height);
+  --text-subtitle--letter-spacing: var(--text-subtitle--letter-spacing);
+  --text-subtitle--font-weight: var(--text-subtitle--font-weight);
+  --text-body: var(--text-body);
+  --text-body--line-height: var(--text-body--line-height);
+  --text-label: var(--text-label);
+  --text-label--line-height: var(--text-label--line-height);
+  --text-label--font-weight: var(--text-label--font-weight);
+  --text-caption: var(--text-caption);
+  --text-caption--line-height: var(--text-caption--line-height);
+  --text-micro: var(--text-micro);
+  --text-micro--line-height: var(--text-micro--line-height);
+  --text-micro--letter-spacing: var(--text-micro--letter-spacing);
+  --text-micro--font-weight: var(--text-micro--font-weight);
+
+  --tracking-label: var(--tracking-label);
+
+  /* ----------------------------------------------------------- shape/space */
+  --spacing: var(--spacing);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-elevated: var(--shadow-elevated);
+  --shadow-dropdown: var(--shadow-dropdown);
+  --shadow-popover: var(--shadow-popover);
+  --shadow-modal: var(--shadow-modal);
+
+  /* ---------------------------------------------------------------- motion */
+  --ease-out-quint: var(--ease-out-quint);
+  --ease-in-quint: var(--ease-in-quint);
+  --ease-standard: var(--ease-standard);
+  --ease-drawer: var(--ease-drawer);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-indeterminate: indeterminate 1.4s var(--ease-standard) infinite;
+  --animate-spin-slow: spin 1s linear infinite;
+  --animate-fade-in: fade-in var(--duration-fast) var(--ease-out-quint);
+  --animate-fade-out: fade-out var(--duration-fast) var(--ease-in-quint);
+  --animate-pop-in: pop-in var(--duration-fast) var(--ease-out-quint);
+  --animate-pop-out: pop-out var(--duration-instant) var(--ease-in-quint);
+  --animate-dialog-in: dialog-in var(--duration-base) var(--ease-out-quint);
+  --animate-dialog-out: dialog-out var(--duration-fast) var(--ease-in-quint);
+  --animate-drawer-in: drawer-in var(--duration-base) var(--ease-drawer);
+  --animate-drawer-out: drawer-out var(--duration-fast) var(--ease-drawer);
+}
+
+/* ==========================================================================
+   KEYFRAMES
+
+   Transform and opacity only. Every one of them is driven by a `--duration-*`
+   token through the `@theme inline` animation shorthands above, so the
+   reduced-motion block in `tokens.css` collapses all of them at once.
+   ========================================================================== */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+}
+@keyframes drawer-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes drawer-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%) scaleX(0.35);
+  }
+  to {
+    transform: translateX(300%) scaleX(0.35);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border-subtle);
+  }
+
+  html {
+    /* Never suppressed globally. A user who navigates by keyboard needs the
+       browser to bring a focused control into view, and `scroll-behavior:
+       smooth` is already neutralised under reduced motion in `tokens.css`. */
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-selection);
+    color: var(--color-ink);
+  }
+
+  /* The default ring is removed only for mouse focus. `:focus-visible` keeps
+     its indicator, and every primitive in `src/components/ui` draws the token
+     ring explicitly on top of that. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Every number that can change is tabular, so a re-rendered total does not
+     shift the row it sits in and a column of money aligns on its decimal. */
+  [data-numeric],
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Reduced-transparency users get the scrim as a flat colour rather than as a
+     translucent wash; the token already has an alpha channel, so the override
+     lands on the one place that matters. */
+  @media (prefers-reduced-transparency: reduce) {
+    [data-scrim] {
+      backdrop-filter: none;
+    }
+  }
+
+  /* Forced-colours (Windows high contrast) keeps our layout but hands colour
+     back to the user agent. The only thing we insist on is that a focus
+     indicator survives, because the system palette has one and ours would
+     otherwise paint over it. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 2px solid Highlight;
+      outline-offset: 2px;
+    }
+
+    [data-selected],
+    [aria-selected='true'] {
+      forced-color-adjust: none;
+      background-color: Highlight;
+      color: HighlightText;
+    }
+  }
+}
+
+/* ==========================================================================
+   UTILITIES
+
+   Tailwind v4 has no `--duration-*` or `--z-*` theme namespace, so the tokens
+   in those two ladders are exposed as explicit utilities. `src/lib/cn.ts`
+   registers both name lists with tailwind-merge; a name that ships a utility
+   here and is missing there merges wrongly and silently.
+   ========================================================================== */
+
+@utility duration-instant {
+  transition-duration: var(--duration-instant);
+  animation-duration: var(--duration-instant);
+}
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+  animation-duration: var(--duration-fast);
+}
+@utility duration-base {
+  transition-duration: var(--duration-base);
+  animation-duration: var(--duration-base);
+}
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
+  animation-duration: var(--duration-slow);
+}
+
+@utility z-nav {
+  z-index: var(--z-nav);
+}
+@utility z-dropdown {
+  z-index: var(--z-dropdown);
+}
+@utility z-overlay {
+  z-index: var(--z-overlay);
+}
+@utility z-modal {
+  z-index: var(--z-modal);
+}
+@utility z-popover {
+  z-index: var(--z-popover);
+}
+@utility z-tooltip {
+  z-index: var(--z-tooltip);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
+}
+
+/* --------------------------------------------------------------------------
+   TARGET SIZE — WCAG 2.2 §2.5.5 (AAA), 44×44 CSS px.
+
+   The hit area is grown with a centred pseudo-element rather than by padding
+   the control, so a 32px icon button keeps its 32px drawing and still answers
+   a 44px tap. `pointer-events: auto` on the pseudo-element is what makes the
+   grown area actually receive the press; the control itself must be
+   `position: relative`, which the primitives set.
+
+   Why a token and not a hand-written `min-height`: 44px is a *hit* dimension,
+   not a *visual* one, and every previous attempt in this house to enforce it
+   with padding produced a toolbar of 44px-tall ghost buttons with 12px of dead
+   space between their labels.
+   -------------------------------------------------------------------------- */
+@utility target-min {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset-block: calc((var(--target-min) - 100%) / -2);
+    inset-inline: calc((var(--target-min) - 100%) / -2);
+    min-width: var(--target-min);
+    min-height: var(--target-min);
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    pointer-events: auto;
+  }
+}
+
+/* The same guarantee for a control that is already at least 44px in one axis
+   and only needs the other grown — a full-width row, a table cell action. */
+@utility target-min-h {
+  min-height: var(--target-min);
+}
+
+/* --------------------------------------------------------------------------
+   FOCUS — the one focus treatment in the product.
+
+   `outline-style` is stated explicitly. In Tailwind v4 the outline utilities
+   share a single `--tw-outline-style` custom property, so pairing `outline-none`
+   with `outline-2` yields a 2px outline styled `none`: a control that reports a
+   focus colour and draws nothing. Writing the shorthand here removes the whole
+   class of that bug from the component layer.
+   -------------------------------------------------------------------------- */
+@utility focus-ring {
+  &:focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+  &[data-focus-visible] {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+}
+
+/* Same ring drawn inward, for a control flush against a panel edge where an
+   outward ring would be clipped by the panel's own `overflow`. */
+@utility focus-ring-inset {
+  &:focus-visible,
+  &[data-focus-visible] {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(var(--focus-gap) * -1);
+  }
+}
+
+/* For a wrapper that takes focus on behalf of a nested input. */
+@utility focus-ring-within {
+  &:has(:focus-visible),
+  &[data-focus-within] {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+}
+
+/* Reserve room so an outward ring is never cropped by a scroll container
+   (WCAG 2.2 §2.4.12 AAA — focus not obscured). Applied by any primitive that
+   owns a scrolling region. */
+@utility focus-safe {
+  padding: var(--focus-reserve);
+  scroll-padding: calc(
+    var(--focus-reserve) + var(--focus-width) + var(--focus-gap)
+  );
+}
+
+/* --------------------------------------------------------------------------
+   READING MEASURE — WCAG 2.2 §1.4.8 (AAA), visual presentation.
+   -------------------------------------------------------------------------- */
+@utility prose-measure {
+  max-width: var(--measure);
+  line-height: var(--leading-reading);
+
+  & > * + * {
+    margin-block-start: var(--paragraph-gap);
+  }
+}
+
+/* Visible only to assistive technology. Used by every chart's data table and
+   by the live regions the toast host and the field errors write into. */
+@utility sr-only-focusable {
+  &:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+/* Chrome geometry, composed. `--impersonation-h` is added unconditionally: with
+   no impersonation bar it resolves to 0 and the layout is unchanged; with one
+   present, no consumer can account for half of it. */
+@utility h-chrome {
+  height: calc(var(--nav-h) + var(--impersonation-h));
+}
+@utility top-chrome {
+  top: calc(var(--nav-h) + var(--impersonation-h));
+}
+@utility pt-chrome {
+  padding-top: calc(var(--nav-h) + var(--impersonation-h) + var(--safe-top));
+}

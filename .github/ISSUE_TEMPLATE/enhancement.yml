@@ -1,0 +1,85 @@
+name: Enhancement
+description: New behaviour, or better behaviour that was never promised.
+title: 'feat: '
+labels: ['type: enhancement', 'status: pending']
+body:
+  - type: markdown
+    attributes:
+      value: >
+        One enhancement per issue. A request that needs more than one slice to land is a PRD, and
+        a PRD never carries `ready-for-agent` - its sub-issues do.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What someone cannot do today, or what they have to do the long way round. Not the
+        solution - the situation the solution would end.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The behaviour you want, described from the outside. Screens, states, edge cases.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >
+        Including doing nothing. If a simpler version of this would carry most of the value, say
+        which one and why it is not enough.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - accounts
+        - transactions
+        - budgets
+        - recurring
+        - goals
+        - analytics
+        - import / export
+        - settings
+        - auth
+        - billing
+        - notifications
+        - marketing / legal pages
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: >
+        The checks that decide this is finished. Behavioural, verifiable, and written before the
+        work starts.
+      placeholder: |
+        - A budget can be marked as rolling from its detail screen
+        - The rollover ledger shows the carried amount per period
+        - Both EN and PL strings exist
+        - A vitest case covers a rollover across a currency change
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope-guards
+    attributes:
+      label: Scope guards
+      description: Tick what applies. Each one changes who has to review this.
+      options:
+        - label: Touches money, a conversion, or a balance
+        - label: Touches auth, sessions or permissions
+        - label: Touches billing, plans or quotas
+        - label: Changes rendered output on purpose (add `visual-change-expected` on the pull request)
+        - label: Needs new strings in both EN and PL
+        - label: Requires a schema change, and therefore an additive migration

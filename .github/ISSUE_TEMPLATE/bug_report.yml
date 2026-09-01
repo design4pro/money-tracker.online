@@ -1,0 +1,107 @@
+name: Bug report
+description: Behaviour that is wrong against a stated expectation.
+title: 'bug: '
+labels: ['type: bug', 'status: pending']
+body:
+  - type: markdown
+    attributes:
+      value: >
+        A bug report is worth what its reproduction is worth. The triager reproduces at HEAD
+        before promoting anything, so the steps below are what decides whether this becomes work
+        or a question.
+
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens
+      description: The observed behaviour, and where you were when you saw it.
+      placeholder: |
+        On /transactions, filtering by two tags returns rows carrying only one of them.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen instead
+      description: The expectation, and where it comes from if it is written down anywhere.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Numbered, from a signed-in demo workspace. Include the data the step depends on - an
+        amount, a currency, a date - because most of this product's bugs are data-shaped.
+      placeholder: |
+        1. Sign in, open /transactions
+        2. Add the tag filter "groceries", then "reimbursed"
+        3. Observe row #4, which carries only "groceries"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - accounts
+        - transactions
+        - budgets
+        - recurring
+        - goals
+        - analytics
+        - import / export
+        - settings
+        - auth
+        - billing
+        - notifications
+        - marketing / legal pages
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: >
+        The triager sets the `priority: *` label from this. Anything that loses data or reports a
+        wrong amount is critical regardless of how rare it is.
+      options:
+        - critical - data loss, a wrong amount, or the product is down
+        - high - a core flow is unusable
+        - medium - a flow is awkward or a screen is wrong
+        - low - cosmetic
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser and version, device, and whether this was production, staging or local.
+      placeholder: 'Safari 26.1, iPhone 15, staging'
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >
+        Screenshots, a console error, a Sentry short id (`MONEY-TRACKER-…`), a network response.
+        Redact anything that identifies a real person.
+
+  - type: checkboxes
+    id: money
+    attributes:
+      label: Does this involve an amount?
+      description: >
+        Money bugs get their own scrutiny: the invariant is that no amount ever leaves integer
+        minor units, and that a historical conversion is never recomputed.
+      options:
+        - label: An amount, a balance, a conversion or a total is wrong or suspicious
+        - label: A currency, a rate or a reference amount is involved

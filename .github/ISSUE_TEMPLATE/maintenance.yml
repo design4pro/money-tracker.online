@@ -1,0 +1,63 @@
+name: Maintenance
+description: Dependencies, tooling, refactoring, docs. No user-visible behaviour change.
+title: 'chore: '
+labels: ['type: maintenance', 'status: pending']
+body:
+  - type: markdown
+    attributes:
+      value: >
+        If the change alters what a user sees or what a number says, it is not maintenance. File
+        it as a bug or an enhancement so it gets the review that goes with one.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing
+    validations:
+      required: true
+
+  - type: textarea
+    id: why-now
+    attributes:
+      label: Why now
+      description: >
+        The cost of leaving it. "It is untidy" is a reason; so is "the pinned image tag and the
+        devDependency have drifted".
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - dependency upgrade
+        - CI / workflows
+        - refactoring
+        - documentation
+        - developer tooling
+        - test coverage
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: blast-radius
+    attributes:
+      label: Blast radius
+      description: >
+        What breaks if this goes wrong, and how it would be noticed. A pinned version that appears
+        in more than one file belongs in this box with every place it appears.
+      placeholder: |
+        `@playwright/test` appears in package.json, in the container image tag in ci.yml and in
+        a11y.yml. All three move together or the browsers are missing.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: behaviour
+    attributes:
+      label: Confirmation
+      options:
+        - label: No user-visible behaviour changes
+          required: true
