@@ -63,7 +63,7 @@ describe('LineChart', () => {
       within(rows[1])
         .getAllByRole('cell')
         .map((cell) => plain(cell.textContent)),
-    ).toEqual(['zł 1,200.00', '-zł 400.00'])
+    ).toEqual(['zł 1,200.00', '\u2212zł 400.00'])
   })
 
   it('renders a gap as a gap: a broken path and a named absence in the table', () => {

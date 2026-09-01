@@ -68,7 +68,13 @@ describe('formatMoney', () => {
   })
 
   it('shows a sign only when the caller wants one', () => {
-    expect(formatMoney('en', makeMoney(-123_456, 'USD'))).toBe('-$1,234.56')
+    // U+2212, not the hyphen CLDR hands out: one minus across the product, so the accounts list
+    // and the ledger cannot draw the same balance two ways.
+    expect(formatMoney('en', makeMoney(-123_456, 'USD'))).toBe(
+      '\u2212$1,234.56',
+    )
+    expect(formatMoney('pl', makeMoney(-123_456, 'PLN'))).toContain('\u2212')
+    expect(formatMoney('pl', makeMoney(-123_456, 'PLN'))).not.toContain('-')
     expect(
       formatMoney('en', makeMoney(123_456, 'USD'), { signDisplay: 'always' }),
     ).toBe('+$1,234.56')

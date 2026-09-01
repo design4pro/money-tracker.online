@@ -8,13 +8,11 @@ export interface NavLinkProps {
   isActive: boolean
   /** Already translated. The label is passed in so this file holds no message key. */
   label: string
-  /** Called after activation, so a drawer or a menu that contains the link can close itself. */
-  onNavigate?: () => void
   className?: string
 }
 
 /**
- * One row in the rail or in the overflow drawer.
+ * One row in the rail.
  *
  * ## Three channels for one meaning
  *
@@ -32,7 +30,6 @@ export function NavLink({
   destination,
   isActive,
   label,
-  onNavigate,
   className,
 }: NavLinkProps) {
   const { href, Icon } = destination
@@ -41,7 +38,6 @@ export function NavLink({
     <Link
       href={href}
       variant="unstyled"
-      onPress={onNavigate}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
         'target-min-h relative flex w-full items-center gap-3 rounded-md py-2 pe-3 ps-4 text-label',

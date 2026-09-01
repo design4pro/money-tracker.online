@@ -1,6 +1,8 @@
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 
+import { amountReading } from '#/components/app/money'
 import { cn } from '#/lib/cn'
+import { useTranslate } from '#/lib/i18n'
 import {
   asMinor,
   formatMoney,
@@ -27,12 +29,17 @@ import type { CurrencyDisplay } from '#/lib/money'
  * `formatMoney`'s job (`currencies.digits`), which is why nothing here composes a string itself:
  * `¥5,000` and `5,000.00 KWD` are both correct and neither is two digits.
  *
- * **Colour is never the only channel.** A negative figure carries the locale's minus sign
- * (U+2212 from `formatSignedMoney`, the locale's own from `formatMoney`) at the front of the
- * number, and {@link DirectionalAmount} adds an arrow and a word on top of that. Greyscale, a
- * forced-colours theme and a reader with deuteranopia all get the same answer as everyone else —
- * `docs/ACCESSIBILITY.md` §1, and the reason `text-negative` is reinforcement rather than
- * meaning.
+ * **Colour is never the only channel.** A negative figure carries a U+2212 minus at the front of
+ * the number — from `formatMoney` and from `formatSignedMoney` alike, which is why the accounts
+ * list and the ledger no longer disagree about the glyph — and {@link DirectionalAmount} adds an
+ * arrow and a word on top of that. Greyscale, a forced-colours theme and a reader with
+ * deuteranopia all get the same answer as everyone else — `docs/ACCESSIBILITY.md` §1, and the
+ * reason `text-negative` is reinforcement rather than meaning.
+ *
+ * **The reading is not the drawing.** The figure a reader sees is marked `aria-hidden` and an
+ * `sr-only` sentence sits beside it: the currency named in full and the sign as a word, because
+ * a narrow symbol is announced inconsistently and U+2212 is frequently announced as nothing at
+ * all. `amountReading` composes it, so this component and the ledger's cannot drift.
  */
 
 /** The type ramp a figure may take. Larger than `lg` is a page's headline number. */
@@ -82,9 +89,10 @@ export function Amount({
   tone = 'plain',
   className,
 }: AmountProps) {
+  const t = useTranslate()
   const value = makeMoney(amountMinor, currencyCode)
   const options = display === undefined ? {} : { display }
-  const text = signed
+  const drawn = signed
     ? formatSignedMoney(locale, value, options)
     : formatMoney(locale, value, options)
 
@@ -97,7 +105,10 @@ export function Amount({
         className,
       )}
     >
-      {text}
+      <span aria-hidden="true">{drawn}</span>
+      <span className="sr-only">
+        {amountReading(t, locale, value, { signed })}
+      </span>
     </span>
   )
 }

@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { plain } from '#/components/charts/__tests__/plain'
+import { drawn, reading } from '#/components/app/money/__tests__/channels'
 import { asCurrencyCode, asMinor } from '#/lib/money'
 
 import { DashboardHeader } from '../dashboard-header'
@@ -36,11 +36,19 @@ describe('DashboardHeader', () => {
     const terms = screen.getAllByRole('term').map((node) => node.textContent)
     expect(terms).toEqual(['Money in', 'Money out', 'Difference'])
 
-    const values = screen
-      .getAllByRole('definition')
-      .map((node) => plain(node.textContent))
-    expect(values[0]).toBe('zł 8,200.00')
-    expect(values[1]).toBe('zł 5,340.50')
+    const values = screen.getAllByRole('definition')
+    expect(values.map(drawn)).toEqual([
+      'zł 8,200.00',
+      'zł 5,340.50',
+      '+zł 2,859.50',
+    ])
+    // The spoken half names the currency and says the sign as a word, because `zł` is announced
+    // inconsistently and U+2212 is frequently announced as nothing at all.
+    expect(values.map(reading)).toEqual([
+      '8,200.00 Polish zlotys',
+      '5,340.50 Polish zlotys',
+      'positive 2,859.50 Polish zlotys',
+    ])
   })
 
   it('says which way the period went in words, not only in a colour', () => {

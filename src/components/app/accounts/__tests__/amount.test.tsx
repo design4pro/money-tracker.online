@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
+import { drawn, reading } from '#/components/app/money/__tests__/channels'
 import { I18nProvider } from '#/lib/i18n'
 import en from '#/lib/i18n/messages/en'
 import { asMinor } from '#/lib/money'
@@ -18,28 +19,28 @@ function withI18n(node: ReactNode) {
 
 describe('Amount', () => {
   it('honours the currency’s own number of digits', () => {
-    const { container } = render(
+    const { container } = withI18n(
       <Amount locale="en" amountMinor={asMinor(123_456)} currencyCode="JPY" />,
     )
     // 123456 minor units of a zero-digit currency is 123,456 — not 1,234.56.
-    expect(container.textContent).toContain('123,456')
-    expect(container.textContent).not.toContain('1,234.56')
+    expect(drawn(container)).toContain('123,456')
+    expect(drawn(container)).not.toContain('1,234.56')
   })
 
   it('formats the same integer differently per locale', () => {
-    const english = render(
+    const english = withI18n(
       <Amount locale="en" amountMinor={asMinor(150_000)} currencyCode="PLN" />,
     )
-    const polish = render(
+    const polish = withI18n(
       <Amount locale="pl" amountMinor={asMinor(150_000)} currencyCode="PLN" />,
     )
 
-    expect(english.container.textContent).not.toBe(polish.container.textContent)
-    expect(polish.container.textContent).toContain(',')
+    expect(drawn(english.container)).not.toBe(drawn(polish.container))
+    expect(drawn(polish.container)).toContain(',')
   })
 
-  it('marks a negative balance with a sign, so the shortfall survives without colour', () => {
-    const { container } = render(
+  it('draws a negative balance with U+2212, the same glyph the ledger draws', () => {
+    const { container } = withI18n(
       <Amount
         locale="en"
         amountMinor={asMinor(-4_200)}
@@ -47,13 +48,28 @@ describe('Amount', () => {
         tone="value"
       />,
     )
-    // Either the locale's own hyphen-minus or the typographic minus — what matters is that a
-    // reader who cannot see the red has a character telling them the balance is below zero.
-    expect(container.textContent).toMatch(/[-\u2212]/u)
+    // One minus across the product. A hyphen here and a U+2212 in the ledger is the drift this
+    // normalisation exists to stop, and the tint is reinforcement rather than meaning.
+    expect(drawn(container)).toContain('\u2212')
+    expect(drawn(container)).not.toContain('-')
+  })
+
+  it('says the sign in a word and names the currency for anybody listening', () => {
+    // U+2212 is announced as nothing at all by several screen readers, and `€` is announced
+    // inconsistently. Neither is allowed to be the only channel carrying "below zero, in euro".
+    const { container } = withI18n(
+      <Amount
+        locale="en"
+        amountMinor={asMinor(-4_200)}
+        currencyCode="EUR"
+        tone="value"
+      />,
+    )
+    expect(reading(container)).toBe('negative 42.00 euros')
   })
 
   it('carries a sign on every value when asked, so plus and minus read as a pair', () => {
-    const positive = render(
+    const positive = withI18n(
       <Amount
         locale="en"
         amountMinor={asMinor(4_200)}
@@ -61,9 +77,10 @@ describe('Amount', () => {
         signed
       />,
     )
-    expect(positive.container.textContent).toContain('+')
+    expect(drawn(positive.container)).toContain('+')
+    expect(reading(positive.container)).toBe('positive 42.00 euros')
 
-    const negative = render(
+    const negative = withI18n(
       <Amount
         locale="en"
         amountMinor={asMinor(-4_200)}
@@ -72,7 +89,8 @@ describe('Amount', () => {
       />,
     )
     // `formatSignedMoney` normalises to U+2212, which is the glyph that pairs with the plus.
-    expect(negative.container.textContent).toContain('\u2212')
+    expect(drawn(negative.container)).toContain('\u2212')
+    expect(reading(negative.container)).toBe('negative 42.00 euros')
   })
 })
 
@@ -123,7 +141,7 @@ describe('the accounts surface as a whole', () => {
     // A compile-time guarantee restated as a runtime one: the component reads `locale` and would
     // throw on `undefined` rather than silently defaulting to the test runner's system locale.
     expect(() =>
-      render(
+      withI18n(
         <Amount locale="pl" amountMinor={asMinor(0)} currencyCode="PLN" />,
       ),
     ).not.toThrow()

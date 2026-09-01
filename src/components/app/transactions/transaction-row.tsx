@@ -14,6 +14,7 @@ import {
   Menu,
   MenuItem,
   MenuTrigger,
+  Popover,
 } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
@@ -89,8 +90,17 @@ export interface TransactionRowProps {
   readonly actions: TransactionRowActions
 }
 
+/**
+ * `scroll-mt-18` is WCAG 2.2 §2.4.11 for this grid specifically.
+ *
+ * `<html>` reserves `scroll-pt-16` for the app header, which is all the header needs — but the
+ * ledger stacks two more sticky bars of its own beneath it, the 36px day bar and this row's 36px
+ * headings. Arrowing down the grid calls `focus()` on a cell, and the browser scrolls it only clear
+ * of the scrollport's own padding, so without these extra 72px the focused cell — ring and all —
+ * comes to rest underneath the headings.
+ */
 const CELL_BASE =
-  'px-2 align-middle outline-focus data-[active]:relative focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
+  'scroll-mt-18 px-2 align-middle outline-focus data-[active]:relative focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
 
 /** A left click with no modifier is ours to intercept; anything else belongs to the browser. */
 function isPlainLeftClick(event: MouseEvent): boolean {
@@ -167,6 +177,10 @@ function TransactionRowImpl({
       >
         <Checkbox
           excludeFromTabOrder
+          // `target-min` rather than the primitive's `target-min-h`: a checkbox with no visible
+          // label is only as wide as its 18px box, and the select column's content box is 24px.
+          // The height was already 44; this is the axis that was not.
+          className="target-min"
           isSelected={isSelected}
           onChange={() => actions.onToggleSelect(row.id)}
           aria-label={t('transactions.row.select', {
@@ -286,39 +300,47 @@ function TransactionRowImpl({
             label={t('transactions.row.actions', { name: title })}
             icon={<MoreHorizontal />}
           />
-          <Menu
-            onAction={(key) => {
-              switch (key) {
-                case 'open':
-                  actions.onOpen(row.id)
-                  return
-                case 'edit':
-                  actions.onEdit(row.id)
-                  return
-                case 'duplicate':
-                  actions.onDuplicate(row.id)
-                  return
-                case 'delete':
-                  actions.onDelete(row.id)
-                  return
-                default:
-                  return
-              }
-            }}
-          >
-            <MenuItem id="open" icon={<SquareArrowOutUpRight />}>
-              {t('transactions.row.open')}
-            </MenuItem>
-            <MenuItem id="edit" icon={<Pencil />}>
-              {t('action.edit')}
-            </MenuItem>
-            <MenuItem id="duplicate" icon={<Copy />}>
-              {t('action.duplicate')}
-            </MenuItem>
-            <MenuItem id="delete" isDestructive icon={<Trash2 />}>
-              {t('action.delete')}
-            </MenuItem>
-          </Menu>
+          {/*
+            React Aria renders a `MenuTrigger`'s overlay only through a `Popover`; `Menu`'s own
+            docblock says so. Without one the menu is not "closed", it is simply always in the
+            document — nineteen open menus and seventy-six menu items on a full ledger, each a
+            tab stop the grid promises it does not have.
+          */}
+          <Popover placement="bottom end">
+            <Menu
+              onAction={(key) => {
+                switch (key) {
+                  case 'open':
+                    actions.onOpen(row.id)
+                    return
+                  case 'edit':
+                    actions.onEdit(row.id)
+                    return
+                  case 'duplicate':
+                    actions.onDuplicate(row.id)
+                    return
+                  case 'delete':
+                    actions.onDelete(row.id)
+                    return
+                  default:
+                    return
+                }
+              }}
+            >
+              <MenuItem id="open" icon={<SquareArrowOutUpRight />}>
+                {t('transactions.row.open')}
+              </MenuItem>
+              <MenuItem id="edit" icon={<Pencil />}>
+                {t('action.edit')}
+              </MenuItem>
+              <MenuItem id="duplicate" icon={<Copy />}>
+                {t('action.duplicate')}
+              </MenuItem>
+              <MenuItem id="delete" isDestructive icon={<Trash2 />}>
+                {t('action.delete')}
+              </MenuItem>
+            </Menu>
+          </Popover>
         </MenuTrigger>
       </td>
     </tr>

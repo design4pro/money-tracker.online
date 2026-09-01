@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, Repeat } from 'lucide-react'
 
+import { amountReading } from '#/components/app/money'
 import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, money } from '#/lib/money'
@@ -96,7 +97,7 @@ export function AmountText({
   // of the plus beside it and the column stops reading as a column.
   const sign = direction === 'income' ? '+' : '−'
   const drawn = `${sign}${formatMoney(locale, value, { display: 'narrowSymbol' })}`
-  const spokenAmount = formatMoney(locale, value, { display: 'name' })
+  const spokenAmount = amountReading(t, locale, value)
   const spoken =
     direction === 'income'
       ? t('transactions.amount.income', { amount: spokenAmount })
@@ -137,27 +138,14 @@ export function ConvertedAmount({
 }: ConvertedAmountProps) {
   const locale = useLocale()
   const t = useTranslate()
-  const formatted = formatMoney(
-    locale,
-    money(refAmountMinor, refCurrencyCode),
-    {
-      display: 'narrowSymbol',
-    },
-  )
+  const value = money(refAmountMinor, refCurrencyCode)
+  const formatted = formatMoney(locale, value, { display: 'narrowSymbol' })
 
   return (
     <span className={cn('block tabular text-caption text-ink-2', className)}>
       <span aria-hidden="true">{formatted}</span>
       <span className="sr-only">
-        {t('money.amountIn', {
-          currency: formatMoney(
-            locale,
-            money(refAmountMinor, refCurrencyCode),
-            {
-              display: 'name',
-            },
-          ),
-        })}
+        {t('money.amountIn', { currency: amountReading(t, locale, value) })}
       </span>
     </span>
   )
@@ -181,13 +169,15 @@ export function NetAmount({
   className,
 }: NetAmountProps) {
   const locale = useLocale()
+  const t = useTranslate()
+  const value = money(amountMinor, currencyCode)
   const magnitude = Math.abs(amountMinor) as Minor
   const formatted = formatMoney(locale, money(magnitude, currencyCode), {
     display: 'narrowSymbol',
   })
-  const spoken = formatMoney(locale, money(magnitude, currencyCode), {
-    display: 'name',
-  })
+  // The sign is a word rather than the glyph beside it: U+2212 is announced as
+  // nothing at all by several screen readers, and `+` fares little better.
+  const spoken = amountReading(t, locale, value, { signed: true })
 
   if (amountMinor === 0) {
     return (
@@ -208,7 +198,7 @@ export function NetAmount({
       )}
     >
       <span aria-hidden="true">{`${positive ? '+' : '−'}${formatted}`}</span>
-      <span className="sr-only">{`${positive ? '+' : '−'} ${spoken}`}</span>
+      <span className="sr-only">{spoken}</span>
     </span>
   )
 }

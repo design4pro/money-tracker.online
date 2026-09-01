@@ -158,6 +158,9 @@ function SearchablePicker({
   emptyState,
   removeLabel,
 }: SearchablePickerProps) {
+  // The disclosure button's accessible name. `components/ui` holds no catalogue, so the caller
+  // localises it; without this the Polish UI announced the English default.
+  const t = useTranslate()
   const chosen = new Set(selected)
   const available = options.filter((option) => !chosen.has(option.id))
   const names = new Map(options.map((option) => [option.id, option.name]))
@@ -166,6 +169,7 @@ function SearchablePicker({
     <div className="flex flex-col gap-2">
       <ComboBox
         label={label}
+        toggleLabel={t('a11y.showSuggestions')}
         items={available}
         placeholder={placeholder}
         emptyState={emptyState}

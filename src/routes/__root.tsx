@@ -9,6 +9,7 @@ import { createServerFn } from '@tanstack/react-start'
 import {
   DEFAULT_LOCALE,
   I18nProvider,
+  createTranslator,
   loadCatalogue,
   useTranslate,
 } from '#/lib/i18n'
@@ -33,8 +34,16 @@ export interface RouterContext {
 
 const SITE_URL = 'https://money-tracker.online'
 const SITE_NAME = 'money-tracker.online'
-const TITLE = 'Money Tracker — know where your money goes'
-const DESCRIPTION =
+
+/**
+ * The last-resort English document copy.
+ *
+ * Used only in the window where `loaderData` is absent — a client-side render of
+ * the shell before the root loader has resolved. On the server it never is, and
+ * `SOURCE_LANGUAGE` below is the same fallback for the same reason.
+ */
+const FALLBACK_TITLE = 'Money Tracker — know where your money goes'
+const FALLBACK_DESCRIPTION =
   'A personal finance tracker for accounts, transactions, budgets, recurring bills and multi-currency reporting. Manual entry and file import only — no bank connectors, ever.'
 
 /** The brand mark, inlined so the tab icon costs no request and never 404s. */
@@ -100,6 +109,43 @@ const SOURCE_LANGUAGE: ShellData = {
   messages: {},
 }
 
+/** What `<head>` needs, in the language the request negotiated. */
+interface DocumentMeta {
+  readonly locale: Locale
+  readonly title: string
+  readonly description: string
+}
+
+/**
+ * The document's own copy, resolved against the same catalogue the page renders
+ * from.
+ *
+ * `<html lang>` has always followed the negotiated locale; the title and the
+ * description did not, so a reader who switched the interface to Polish kept an
+ * English tab, an English share card and an English search result. They are
+ * catalogue keys now, read here through `createTranslator` because `head()` runs
+ * outside React and cannot call `useTranslate`.
+ *
+ * The catalogue travels with the locale in the loader's data, so this costs no
+ * second load — and when there is no loader data at all, the English constants
+ * answer rather than the raw message keys an empty catalogue would render.
+ */
+function documentMeta(data: ShellData | undefined): DocumentMeta {
+  if (data === undefined) {
+    return {
+      locale: DEFAULT_LOCALE,
+      title: FALLBACK_TITLE,
+      description: FALLBACK_DESCRIPTION,
+    }
+  }
+  const t = createTranslator(data.locale, data.messages)
+  return {
+    locale: data.locale,
+    title: t('meta.title'),
+    description: t('meta.description'),
+  }
+}
+
 export const Route = createRootRouteWithContext<RouterContext>()({
   /**
    * One negotiation, on the server, before first paint.
@@ -135,39 +181,41 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   staleTime: Number.POSITIVE_INFINITY,
   /** The document carries one visitor's language; no shared cache may reuse it. */
   headers: () => ({ vary: 'accept-language, cookie' }),
-  head: ({ loaderData }) => ({
-    meta: [
-      { charSet: 'utf-8' },
-      {
-        name: 'viewport',
-        // `viewport-fit=cover` is what makes the safe-area tokens mean anything.
-        content: 'width=device-width, initial-scale=1, viewport-fit=cover',
-      },
-      { title: TITLE },
-      { name: 'description', content: DESCRIPTION },
-      { name: 'application-name', content: SITE_NAME },
-      { name: 'apple-mobile-web-app-title', content: 'Money Tracker' },
-      { name: 'format-detection', content: 'telephone=no' },
-      { name: 'color-scheme', content: 'light dark' },
-      { property: 'og:type', content: 'website' },
-      { property: 'og:site_name', content: SITE_NAME },
-      { property: 'og:title', content: TITLE },
-      { property: 'og:description', content: DESCRIPTION },
-      { property: 'og:url', content: SITE_URL },
-      // The same tag `<html lang>` carries, so a share card and a screen reader are told one
-      // story. `loaderData` is absent only while the loader is in flight, which on the server it
-      // never is.
-      { property: 'og:locale', content: loaderData?.locale ?? DEFAULT_LOCALE },
-      { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:title', content: TITLE },
-      { name: 'twitter:description', content: DESCRIPTION },
-    ],
-    links: [
-      { rel: 'stylesheet', href: appCss },
-      { rel: 'icon', href: FAVICON_HREF, type: 'image/svg+xml' },
-      { rel: 'canonical', href: SITE_URL },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    // Title, description and `og:locale` all read from one resolution, so a share
+    // card, a search result and a screen reader are told one story.
+    const meta = documentMeta(loaderData)
+    return {
+      meta: [
+        { charSet: 'utf-8' },
+        {
+          name: 'viewport',
+          // `viewport-fit=cover` is what makes the safe-area tokens mean anything.
+          content: 'width=device-width, initial-scale=1, viewport-fit=cover',
+        },
+        { title: meta.title },
+        { name: 'description', content: meta.description },
+        { name: 'application-name', content: SITE_NAME },
+        { name: 'apple-mobile-web-app-title', content: 'Money Tracker' },
+        { name: 'format-detection', content: 'telephone=no' },
+        { name: 'color-scheme', content: 'light dark' },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: SITE_NAME },
+        { property: 'og:title', content: meta.title },
+        { property: 'og:description', content: meta.description },
+        { property: 'og:url', content: SITE_URL },
+        { property: 'og:locale', content: meta.locale },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: meta.title },
+        { name: 'twitter:description', content: meta.description },
+      ],
+      links: [
+        { rel: 'stylesheet', href: appCss },
+        { rel: 'icon', href: FAVICON_HREF, type: 'image/svg+xml' },
+        { rel: 'canonical', href: SITE_URL },
+      ],
+    }
+  },
   shellComponent: RootDocument,
   notFoundComponent: NotFound,
 })

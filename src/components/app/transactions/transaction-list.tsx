@@ -86,8 +86,16 @@ export interface TransactionListProps {
   readonly caption: string
 }
 
+/**
+ * The column headings, pinned directly beneath the day bar.
+ *
+ * The offset composes the shell's chrome rather than restating a number: `top-9` alone pinned this
+ * row at 36px from the *viewport*, which is inside the 64px app header — same `z-nav`, later in the
+ * document, so the ledger painted over the product header and the headings sat on top of the
+ * workspace switcher. `--nav-h` plus the day bar's own `h-9` puts it where it belongs.
+ */
 const HEADER_CELL =
-  'sticky top-9 z-nav bg-surface-sunken px-2 py-2 text-micro font-semibold tracking-label uppercase text-ink-2 outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
+  'sticky top-[calc(var(--nav-h)+var(--impersonation-h)+2.25rem)] z-nav bg-surface-sunken px-2 py-2 text-micro font-semibold tracking-label uppercase text-ink-2 outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
 
 function positionKey(position: CellPosition): string {
   return `${position.row}:${position.column}`
@@ -426,7 +434,7 @@ export function TransactionList({
       */}
       <div
         aria-hidden="true"
-        className="sticky top-0 z-nav flex h-9 items-center justify-between gap-3 border-b border-border-subtle bg-canvas/95 px-2 text-caption text-ink-2 backdrop-blur-sm"
+        className="sticky top-chrome z-nav flex h-9 items-center justify-between gap-3 border-b border-border-subtle bg-canvas/95 px-2 text-caption text-ink-2 backdrop-blur-sm"
       >
         <span className="truncate font-medium text-ink">
           {contextDay === null
@@ -472,6 +480,9 @@ export function TransactionList({
             >
               <Checkbox
                 excludeFromTabOrder
+                // See `transaction-row.tsx`: a label-less checkbox is 18px wide, and
+                // `target-min-h` only grows the axis that was already big enough.
+                className="target-min"
                 isSelected={allLoadedSelected}
                 isIndeterminate={someSelected}
                 onChange={toggleSelectAll}

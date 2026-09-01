@@ -97,6 +97,41 @@ function majorOf(amountMinor: Minor, digits: number): number {
   return amountMinor / 10 ** digits
 }
 
+/** U+2212 MINUS SIGN. The only minus this product draws. */
+const MINUS = '\u2212'
+
+/**
+ * Swaps the locale's own minus for U+2212 on the way out.
+ *
+ * CLDR gives both `en` and `pl` the ASCII hyphen-minus, which is a third of the
+ * width of the plus it has to pair with and half the width of the digits it
+ * sits in front of: a ledger column set in tabular figures stops reading as a
+ * column. `formatSignedMoney` has always drawn U+2212 and `Intl` never did, so
+ * the same balance read `−43,81 zł` in one place and `-43,81 zł` in another.
+ * Doing it **here** rather than at each call site is what stops that drifting
+ * apart again — every string this module hands out carries the same glyph.
+ *
+ * Only the first occurrence is replaced, and only on a negative value: the sign
+ * always precedes the digits, and `currencyDisplay: 'name'` puts the currency's
+ * words after them, so nothing inside a currency name is at risk.
+ *
+ * U+2212 is a *drawing*, not a *reading* — several screen readers announce it as
+ * nothing at all. Anything destined for an accessible name formats the
+ * magnitude and says the sign in words instead; see
+ * `src/components/app/money/amount-reading.ts`.
+ */
+function withTypographicMinus(
+  locale: Locale,
+  formatted: string,
+  isNegative: boolean,
+): string {
+  if (!isNegative) {
+    return formatted
+  }
+  const { minusSign } = separatorsOf(locale)
+  return minusSign === MINUS ? formatted : formatted.replace(minusSign, MINUS)
+}
+
 /**
  * `123400` minor EUR in `en` → `€1,234.00`; in `pl` → `1 234,00 €` with a
  * non-breaking space. `5000` JPY → `¥5,000`, because the yen has no minor unit.
@@ -113,12 +148,13 @@ export function formatMoney(
   options: FormatMoneyOptions = {},
 ): string {
   const digits = minorUnitDigits(amount.currencyCode)
-  return formatterFor({
+  const formatted = formatterFor({
     ...options,
     locale,
     currencyCode: amount.currencyCode,
     digits,
   }).format(majorOf(amount.amountMinor, digits))
+  return withTypographicMinus(locale, formatted, amount.amountMinor < 0)
 }
 
 /** The same figure with no currency at all, for a column that already names it. */
@@ -133,10 +169,10 @@ export function formatMoneyPlain(
 /**
  * A balance with its direction shown: `+1 234,00 zł`, `−1 234,00 zł`.
  *
- * The minus is U+2212, not a hyphen: at a dashboard's type sizes a hyphen is a
- * third the width of the plus beside it and the column stops reading as a
- * column. Zero is unsigned, because a settled balance is a fact rather than a
- * direction and `+0,00 zł` reads as a rounding artefact.
+ * The minus is U+2212, which is what {@link formatMoney} draws too — this
+ * function differs from it only by putting a `+` on a credit. Zero is unsigned,
+ * because a settled balance is a fact rather than a direction and `+0,00 zł`
+ * reads as a rounding artefact.
  */
 export function formatSignedMoney(
   locale: Locale,
@@ -151,7 +187,7 @@ export function formatSignedMoney(
   if (amount.amountMinor === 0) {
     return magnitude
   }
-  return `${amount.amountMinor > 0 ? '+' : '−'}${magnitude}`
+  return `${amount.amountMinor > 0 ? '+' : MINUS}${magnitude}`
 }
 
 /**

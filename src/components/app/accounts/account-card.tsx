@@ -106,11 +106,16 @@ export function AccountCard({
             />
             {isForeign ? (
               <p className="mt-0.5 text-caption text-ink-2">
-                <span className="me-1">
+                <span>
                   {t('accounts.balance.inBase', {
                     currency: baseCurrencyCode,
                   })}
                 </span>
+                {/* A real separator rather than `me-1`: margin is CSS and CSS is not in
+                    the accessibility tree, so the label and the figure ran together as
+                    "In PLN24,255.60". The dashboard's accounts panel writes the same pair
+                    the same way. */}
+                {': '}
                 <Amount
                   locale={locale}
                   amountMinor={account.refCurrentBalanceMinor}
