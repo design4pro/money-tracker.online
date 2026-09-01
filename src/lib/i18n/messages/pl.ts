@@ -277,6 +277,122 @@ const messages = {
   'accounts.archived.empty.body':
     'Zarchiwizowane konta trafiają tutaj razem ze swoją historią.',
 
+  /* -- Accounts: the list surface ----------------------------------------- */
+  'accounts.overview.assets': 'Co posiadasz',
+  'accounts.overview.liabilities': 'Ile jesteś winien',
+  'accounts.overview.basis': {
+    one: 'Z {count} konta uwzględnianego w raportach.',
+    few: 'Z {count} kont uwzględnianych w raportach.',
+    many: 'Z {count} kont uwzględnianych w raportach.',
+    other: 'Z {count} konta uwzględnianego w raportach.',
+  },
+  'accounts.overview.excluded':
+    'Konta zarchiwizowane oraz pomijane w raportach nie wchodzą do tych kwot.',
+  'accounts.byCurrency.title': 'Środki według waluty',
+  'accounts.byCurrency.help':
+    'Każda waluta sumuje się we własnych jednostkach. Nic nie jest tu przeliczane.',
+  'accounts.filter.label': 'Pokaż',
+  'accounts.filter.active': 'Konta otwarte',
+  'accounts.filter.archived': 'Konta zarchiwizowane',
+  'accounts.filter.all': 'Otwarte i zarchiwizowane',
+  'accounts.status.excluded': 'Poza raportami',
+  'accounts.list.label': 'Twoje konta',
+  'accounts.list.loading': 'Wczytujemy Twoje konta…',
+  'accounts.error.title': 'Nie udało się wczytać kont',
+  'accounts.error.body':
+    'Nic nie zostało zmienione. Spróbuj ponownie — a jeśli błąd się powtarza, przestrzeń jest chwilowo niedostępna.',
+  'accounts.balance.missing': 'Saldo niedostępne',
+  'accounts.balance.inBase': 'W walucie {currency}',
+  'accounts.empty.pick.title': 'Albo zacznij od jednego z tych',
+  'accounts.empty.pick.body':
+    'Każdy otwiera formularz z wybranym już rodzajem konta. Nic nie powstaje, dopóki nie zapiszesz.',
+  'accounts.active.empty.title': 'Wszystkie konta są zarchiwizowane',
+  'accounts.active.empty.body':
+    'Przywróć któreś z widoku archiwum albo dodaj nowe konto.',
+
+  /* -- Accounts: one account ---------------------------------------------- */
+  'accounts.detail.tab.overview': 'Przegląd',
+  'accounts.detail.tab.settings': 'Ustawienia',
+  'accounts.detail.balanceToday': 'Saldo na dziś',
+  'accounts.detail.transactions': {
+    one: '{count} transakcja na tym koncie',
+    few: '{count} transakcje na tym koncie',
+    many: '{count} transakcji na tym koncie',
+    other: '{count} transakcji na tym koncie',
+  },
+  'accounts.detail.note.empty': 'To konto nie ma jeszcze notatki.',
+  'accounts.detail.error.title': 'Nie udało się wczytać tego konta',
+  'accounts.detail.danger': 'Archiwizacja i usuwanie',
+  'accounts.credit.title': 'Wykorzystany limit',
+  'accounts.credit.valueText': 'wykorzystano {used} z {limit}, czyli {percent}',
+  'accounts.credit.within': 'W granicach limitu',
+  'accounts.credit.approaching': 'Limit na wyczerpaniu',
+  'accounts.credit.over': 'Limit przekroczony',
+  'accounts.credit.available': 'Pozostało {amount}',
+  'accounts.credit.none': 'To konto nie ma limitu kredytowego.',
+
+  /* -- Accounts: the lifecycle -------------------------------------------- */
+  'accounts.archive.title': 'Zarchiwizować konto {name}?',
+  'accounts.archive.body':
+    'Zniknie z sum i z list wyboru, ale zachowa wszystkie transakcje. Możesz je przywrócić w każdej chwili.',
+  'accounts.archive.action': 'Zarchiwizuj konto',
+  'accounts.restore.action': 'Przywróć konto',
+  'accounts.delete.title': 'Usunąć konto {name}?',
+  'accounts.delete.action': 'Usuń bezpowrotnie',
+  'accounts.delete.blocked': {
+    one: 'Na tym koncie jest {count} transakcja, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
+    few: 'Na tym koncie są {count} transakcje, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
+    many: 'Na tym koncie jest {count} transakcji, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
+    other:
+      'Na tym koncie jest {count} transakcji, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
+  },
+  'accounts.actions.label': 'Działania dla konta {name}',
+  'accounts.toast.created': 'Konto {name} zostało dodane.',
+  'accounts.toast.updated': 'Konto {name} zostało zapisane.',
+  'accounts.toast.archived': 'Konto {name} zostało zarchiwizowane.',
+  'accounts.toast.restored': 'Konto {name} jest znowu otwarte.',
+  'accounts.toast.deleted': 'Konto {name} zostało usunięte.',
+
+  /* -- Accounts: the form -------------------------------------------------- */
+  'accounts.form.create.body':
+    'Wymagana jest tylko nazwa i waluta. Resztę możesz uzupełnić później.',
+  'accounts.form.edit.body':
+    'Zmiana waluty albo salda początkowego przelicza całą historię tego konta.',
+  'accounts.form.error.title': 'Nie udało się zapisać konta',
+  'accounts.field.openedOn': 'Data otwarcia',
+  'accounts.field.openedOn.help':
+    'Dzień, którego dotyczy saldo początkowe. To z tego dnia zapisujemy kurs wymiany.',
+  'accounts.field.creditLimit.help':
+    'Kwota dodatnia. Zostaw puste, jeśli konto nie ma limitu.',
+  'accounts.field.currency.help':
+    'Proponujemy tylko waluty, które ma Twoja przestrzeń.',
+
+  /* -- Accounts: correcting a balance ------------------------------------- */
+  'accounts.adjust.body':
+    'Podaj, ile powinno być na koncie. Różnicę zapiszemy jako transakcję, którą znajdziesz, poprawisz i wyeksportujesz.',
+  'accounts.adjust.field.target': 'Ile powinno być na koncie',
+  'accounts.adjust.field.date': 'Na koniec dnia',
+  'accounts.adjust.field.note': 'Powód',
+  'accounts.adjust.field.note.help':
+    'Zapisujemy go przy transakcji, więc powód zostaje razem z korektą.',
+  'accounts.adjust.preview.title': 'Co zostanie zapisane',
+  'accounts.adjust.preview.income': 'Wpływ {amount} z datą księgowania {date}.',
+  'accounts.adjust.preview.expense':
+    'Wydatek {amount} z datą księgowania {date}.',
+  'accounts.adjust.preview.none':
+    'Nic. Saldo na dzień {date} już wynosi {amount}.',
+  'accounts.adjust.preview.past':
+    'Różnicę liczymy wobec salda na koniec dnia {date}, które odczytujemy przy zapisie. Pokażemy dokładnie to, co zostało zapisane.',
+  'accounts.adjust.action': 'Zapisz korektę',
+  'accounts.adjust.result.title': 'Zapisano',
+  'accounts.adjust.result.income':
+    'Zapisaliśmy wpływ {amount} z datą księgowania {date}.',
+  'accounts.adjust.result.expense':
+    'Zapisaliśmy wydatek {amount} z datą księgowania {date}.',
+  'accounts.adjust.result.unchanged':
+    'Nic nie zapisaliśmy — saldo na dzień {date} już wynosiło {amount}.',
+  'accounts.adjust.error.title': 'Nie udało się zapisać korekty',
+
   /* -- Transactions ------------------------------------------------------- */
   'transactions.title': 'Transakcje',
   'transactions.create': 'Nowa transakcja',
@@ -345,6 +461,131 @@ const messages = {
   'transactions.noResults.body':
     'Spróbuj szerszego zakresu dat albo mniejszej liczby filtrów.',
 
+  /* -- Transactions: the ledger surface ----------------------------------- */
+  'transactions.list.label': 'Rejestr transakcji',
+  'transactions.list.caption.all': 'Wszystkie transakcje ({count}), {sort}.',
+  'transactions.list.caption.filtered':
+    'Transakcje pasujące do filtrów {filters} ({count}), {sort}.',
+  'transactions.list.caption.sort': 'sortowanie według: {field}, {order}',
+  'transactions.sort.label': 'Sortuj według',
+  'transactions.sort.ascending': 'od najstarszych',
+  'transactions.sort.descending': 'od najnowszych',
+  'transactions.column.description': 'Opis',
+  'transactions.column.actions': 'Działania',
+  'transactions.day.net': 'Saldo dnia',
+  'transactions.loading': 'Wczytywanie transakcji…',
+  'transactions.loadMore': 'Wczytaj więcej',
+  'transactions.loadingMore': 'Wczytywanie kolejnych transakcji…',
+  'transactions.loadedOf': 'Wczytano {loaded} z {total}',
+  'transactions.selectAllLoaded': 'Zaznacz wszystkie wczytane transakcje',
+  'transactions.excludedFromTotals': 'Poza sumami',
+  'transactions.amount.income': 'Wpływ {amount}',
+  'transactions.amount.expense': 'Wydatek {amount}',
+  'transactions.row.select': 'Zaznacz transakcję {amount} z dnia {date}',
+  'transactions.row.actions': 'Działania dla: {name}',
+  'transactions.row.open': 'Otwórz',
+  'transactions.totals.label': 'Sumy dla wybranych filtrów',
+  'transactions.totals.currency': 'Sumy w walucie {currency}',
+  'transactions.bulk.label': 'Działania na zaznaczonych transakcjach',
+  'transactions.bulk.delete': 'Usuń zaznaczone',
+  'transactions.bulk.confirm': {
+    one: 'Usunąć {count} transakcję? Tej operacji nie można cofnąć.',
+    few: 'Usunąć {count} transakcje? Tej operacji nie można cofnąć.',
+    many: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
+    other: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
+  },
+  'transactions.keyboard.hint':
+    'Strzałki przenoszą między komórkami. E edytuje, D duplikuje, Delete usuwa, spacja zaznacza, Enter otwiera.',
+
+  /* -- Transactions: filters ---------------------------------------------- */
+  'transactions.filter.description':
+    'Zawęź rejestr. Wszystko, co tu ustawisz, zapisuje się w adresie, więc widok można udostępnić.',
+  'transactions.filter.activeLabel': 'Aktywne filtry',
+  'transactions.filter.remove': 'Usuń filtr: {name}',
+  'transactions.filter.direction': 'Wpływy czy wydatki',
+  'transactions.filter.accountGroup': 'Grupa kont',
+  'transactions.filter.dateRange': 'Zakres dat',
+  'transactions.filter.openCalendar': 'Otwórz kalendarz',
+  'transactions.filter.amountRange': 'Zakres kwot',
+  'transactions.filter.amountMin': 'Co najmniej',
+  'transactions.filter.amountMax': 'Nie więcej niż',
+  'transactions.filter.receipt': 'Paragon',
+  'transactions.filter.noMatches': 'Brak dopasowań',
+  'transactions.filter.categoryPlaceholder': 'Znajdź kategorię',
+  'transactions.filter.payeePlaceholder': 'Znajdź kontrahenta',
+  'transactions.filter.tagPlaceholder': 'Znajdź etykietę',
+  'transactions.chip.text': 'Tekst: {value}',
+  'transactions.chip.dates': 'Daty: od {from} do {to}',
+  'transactions.chip.anyDate': 'dowolna',
+  'transactions.chip.accounts': 'Konto: {value}',
+  'transactions.chip.accountGroups': 'Grupa: {value}',
+  'transactions.chip.categories': 'Kategoria: {value}',
+  'transactions.chip.payees': 'Kontrahent: {value}',
+  'transactions.chip.tags': 'Etykieta: {value}',
+  'transactions.chip.direction': 'Kierunek: {value}',
+  'transactions.chip.paymentMethods': 'Forma płatności: {value}',
+  'transactions.chip.amount': 'Kwota: od {from} do {to}',
+  'transactions.chip.anyAmount': 'dowolna',
+  'transactions.chip.withReceipt': 'Z paragonem',
+  'transactions.chip.withoutReceipt': 'Bez paragonu',
+
+  /* -- Transactions: the entry form --------------------------------------- */
+  'transactions.form.newTitle': 'Nowa transakcja',
+  'transactions.form.newSubtitle':
+    'Zaczynamy od kwoty. Poza kontem i datą reszta pól jest opcjonalna.',
+  'transactions.form.editTitle': 'Edycja transakcji',
+  'transactions.form.details': 'Szczegóły',
+  'transactions.form.moreDetails': 'Więcej',
+  'transactions.form.saveAndNew': 'Zapisz i dodaj kolejną',
+  'transactions.form.saveAndNewHint':
+    'Zostawia datę, konto i kategorię, więc do następnego wpisu wystarczy kwota.',
+  'transactions.form.notePlaceholder': 'Czego dotyczyła ta transakcja?',
+  'transactions.form.payeePlaceholder': 'Komu zapłacono albo kto zapłacił',
+  'transactions.form.categoryPlaceholder': 'Wybierz kategorię',
+  'transactions.form.noPayees': 'Nie ma jeszcze kontrahentów',
+  'transactions.form.noCategories': 'Nie ma jeszcze kategorii',
+  'transactions.form.conversionNote':
+    'Zapisujemy w walucie {currency} i przeliczamy na {base} po kursie z daty księgowania.',
+  'transactions.form.error.title': 'Transakcja nie została zapisana',
+  'transactions.form.error.amount': 'Podaj kwotę większą od zera.',
+  'transactions.form.error.account': 'Wybierz konto, którego dotyczy wpis.',
+  'transactions.form.error.date': 'Podaj datę w formacie {example}.',
+  'transactions.form.error.note': 'Notatka może mieć najwyżej {max} znaków.',
+  'transactions.form.noAccounts.title': 'Najpierw konto',
+  'transactions.form.noAccounts.body':
+    'Transakcja musi należeć do konta. Załóż konto i wróć tutaj.',
+  'transactions.form.noAccounts.action': 'Załóż konto',
+  'transactions.saved': 'Transakcja zapisana.',
+  'transactions.deleted': 'Transakcja usunięta.',
+  'transactions.deletedMany': {
+    one: 'Usunięto {count} transakcję.',
+    few: 'Usunięto {count} transakcje.',
+    many: 'Usunięto {count} transakcji.',
+    other: 'Usunięto {count} transakcji.',
+  },
+  'transactions.duplicated':
+    'Skopiowano do nowego wpisu. Nic nie zostało jeszcze zapisane.',
+
+  /* -- Transactions: the detail screen ------------------------------------ */
+  'transactions.detail.title': 'Transakcja',
+  'transactions.detail.back': 'Wróć do transakcji',
+  'transactions.detail.summary': 'Podsumowanie',
+  'transactions.detail.recordedAt': 'Zapisano {datetime}',
+  'transactions.detail.rate': 'Przeliczono po kursie {rate} z dnia {date}.',
+  'transactions.detail.identityRate':
+    'Zapisano w walucie raportowania, więc przeliczenie nie było potrzebne.',
+  'transactions.detail.noTags': 'Ta transakcja nie ma etykiet.',
+  'transactions.detail.noAttachments': 'Nie dołączono paragonu.',
+  'transactions.detail.noRefunds': 'Nie powiązano zwrotu.',
+  'transactions.detail.notFound.title': 'Nie ma takiej transakcji',
+  'transactions.detail.notFound.body':
+    'Mogła zostać usunięta albo adres jest nieprawidłowy.',
+  'transactions.planned.title': 'Transakcje planowane',
+  'transactions.planned.subtitle':
+    'Wpisy zaksięgowane na datę, która jeszcze nie nadeszła. Nie wchodzą do sald, dopóki ich nie potwierdzisz.',
+  'transactions.planned.empty.title': 'Nic nie jest zaplanowane',
+  'transactions.planned.empty.body':
+    'Zapisz transakcję z przyszłą datą i oznacz ją jako planowaną, aby zobaczyć ją tutaj.',
   /* -- Dashboard ---------------------------------------------------------- */
   'dashboard.title': 'Pulpit',
   'dashboard.greeting': 'Dobrze Cię widzieć, {name}.',
@@ -371,6 +612,49 @@ const messages = {
   'dashboard.empty.body': 'Dodaj panele, które chcesz widzieć codziennie.',
   'dashboard.empty.action': 'Dodaj panel',
   'dashboard.chart.tableLabel': 'Te same dane w formie tabeli',
+
+  /* -- Dashboard: the slice ----------------------------------------------- */
+  'dashboard.period.last3Months': 'Ostatnie 3 miesiące',
+  'dashboard.period.last12Months': 'Ostatnie 12 miesięcy',
+  'dashboard.period.showing': 'Zakres: {range}',
+  'dashboard.panels.label': 'Panele pulpitu',
+  'dashboard.summary.label': 'Ten okres w skrócie',
+  'dashboard.chart.noData': 'Brak danych',
+  'dashboard.netWorth.help':
+    'Liczone w walucie {currency}, po kursie zapisanym przy każdym koncie.',
+  'dashboard.netWorth.empty.title': 'Nie ma jeszcze czego sumować',
+  'dashboard.netWorth.empty.body':
+    'Dodaj konto — jego saldo będzie pierwszą kwotą w tym miejscu.',
+  'dashboard.cashFlow.month': 'Miesiąc',
+  'dashboard.cashFlow.surplus': 'Zostało Ci {amount}',
+  'dashboard.cashFlow.deficit': 'Wydatki przewyższyły wpływy o {amount}',
+  'dashboard.cashFlow.balanced': 'Wpływy i wydatki wyszły dokładnie na zero',
+  'dashboard.cashFlow.empty.title': 'W tym okresie nic się nie wydarzyło',
+  'dashboard.cashFlow.empty.body':
+    'Zapisz transakcję albo wybierz dłuższy okres.',
+  'dashboard.spending.other': 'Pozostałe',
+  'dashboard.spending.showOther': 'Pokaż mniejsze kategorie',
+  'dashboard.spending.hideOther': 'Ukryj mniejsze kategorie',
+  'dashboard.spending.share': 'Udział',
+  'dashboard.spending.empty.title': 'Brak wydatków z kategorią',
+  'dashboard.spending.empty.body':
+    'Przypisz wydatkowi kategorię, a jego udział w okresie pojawi się tutaj.',
+  'dashboard.accounts.viewAll': 'Wszystkie konta',
+  'dashboard.accounts.owed': 'Zobowiązanie',
+  'dashboard.recent.viewAll': 'Wszystkie transakcje',
+  'dashboard.firstRun.title': 'Witamy. Trzy kroki i liczby zaczną pracować.',
+  'dashboard.firstRun.body':
+    'Nie ma tu przykładowych kwot. Wszystko, co zobaczysz, będzie Twoje.',
+  'dashboard.firstRun.steps.label': 'Pierwsze kroki',
+  'dashboard.firstRun.step.account.title': 'Dodaj konto',
+  'dashboard.firstRun.step.account.body':
+    'Rachunek osobisty, portfel, karta — cokolwiek chcesz śledzić.',
+  'dashboard.firstRun.step.transaction.title': 'Zapisz transakcję',
+  'dashboard.firstRun.step.transaction.body':
+    'Jedna wystarczy, żeby wykres przepływów miał co narysować.',
+  'dashboard.firstRun.step.review.title': 'Wróć tutaj',
+  'dashboard.firstRun.step.review.body':
+    'Panele poniżej wypełnią się, gdy tylko będzie co pokazać.',
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budżety',
@@ -504,6 +788,60 @@ const messages = {
     'Dodaj jedno konto, wczytaj wyciąg i zobacz, dokąd naprawdę poszły pieniądze.',
   'marketing.cta.action': 'Załóż darmową przestrzeń',
   'marketing.footer.legal': 'Wszelkie prawa zastrzeżone.',
+
+  /* -- The authenticated shell -------------------------------------------- */
+  'app.nav.more': 'Więcej',
+  'app.nav.moreLabel': 'Pozostałe sekcje',
+  'app.nav.section.money': 'Pieniądze',
+  'app.nav.section.plan': 'Planowanie',
+  'app.nav.section.insight': 'Analizy',
+  'app.signedInAs': 'Zalogowano jako {email}',
+  'app.workspace.current': 'Bieżąca przestrzeń',
+  'app.workspace.role.owner': 'Właściciel',
+  'app.workspace.role.admin': 'Administrator',
+  'app.workspace.role.member': 'Uczestnik',
+  'app.shell.pending': 'Wczytujemy tę stronę…',
+  'app.shell.error.body':
+    'Tej części aplikacji nie udało się wczytać. Reszta działa dalej.',
+
+  /* -- The auth screens --------------------------------------------------- */
+  'auth.aside.title': 'Każda kwota co do grosza.',
+  'auth.aside.body':
+    'Kwoty trzymamy jako całkowite jednostki podrzędne i przeliczamy po kursie z dnia księgowania, więc zeszły marzec nadal zgadza się tak, jak zgadzał się w marcu.',
+  'auth.aside.point.privacy':
+    'Żadnych integracji z bankami. Czytamy tylko to, co sam wpiszesz lub zaimportujesz.',
+  'auth.aside.point.currency':
+    'Konta w kilku walutach raportowane w jednej walucie bazowej.',
+  'auth.aside.point.export':
+    'Całą przestrzeń pobierzesz jako CSV lub JSON, kiedy tylko zechcesz.',
+  'auth.continueWith': 'lub',
+  'auth.provider.google': 'Kontynuuj z Google',
+  'auth.provider.apple': 'Kontynuuj z Apple',
+  'auth.backToSignIn': 'Wróć do logowania',
+  'auth.password.help': {
+    one: 'Co najmniej {count} znak. Wklejenie z menedżera haseł jest jak najbardziej w porządku.',
+    few: 'Co najmniej {count} znaki. Wklejenie z menedżera haseł jest jak najbardziej w porządku.',
+    many: 'Co najmniej {count} znaków. Wklejenie z menedżera haseł jest jak najbardziej w porządku.',
+    other:
+      'Co najmniej {count} znaku. Wklejenie z menedżera haseł jest jak najbardziej w porządku.',
+  },
+  'auth.forgot.sentTitle': 'Sprawdź skrzynkę',
+  'auth.forgot.tryAnother': 'Użyj innego adresu',
+  'auth.reset.subtitle':
+    'Wybierz hasło, którego nie używasz jeszcze na tym koncie.',
+  'auth.reset.invalid.title': 'Ten link nie zadziała',
+  'auth.reset.invalid.body':
+    'Link do resetu działa raz i wygasa po godzinie. Poproś o nowy — przyjdzie w chwilę.',
+  'auth.reset.requestNew': 'Wyślij nowy link',
+  'auth.reset.continue': 'Przejdź do logowania',
+  'auth.error.title': 'Nie udało się',
+  'auth.error.generic':
+    'Nie udało się tego teraz wykonać. Spróbuj jeszcze raz.',
+  'auth.error.network':
+    'Nie mogliśmy połączyć się z serwerem. Sprawdź połączenie i spróbuj ponownie.',
+  'auth.error.invalidToken': 'Ten link wygasł albo został już użyty.',
+  'auth.error.weakPassword':
+    'To hasło jest zbyt łatwe do odgadnięcia. Wybierz dłuższe.',
 } satisfies TranslationOf<typeof En>
 
 export default messages

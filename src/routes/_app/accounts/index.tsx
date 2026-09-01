@@ -1,0 +1,425 @@
+import { useState } from 'react'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Plus } from 'lucide-react'
+import { z } from 'zod'
+
+import {
+  AccountCard,
+  AccountEmptyState,
+  AccountListSkeleton,
+  AccountOverviewCard,
+  CurrencyTotalsCard,
+  ErrorPanel,
+  totalsByCurrency,
+} from '#/components/app/accounts'
+import { Button, Card, Select, SelectItem, toast } from '#/components/ui'
+import { useTranslate } from '#/lib/i18n'
+import {
+  archiveAccount,
+  listAccountGroups,
+  listAccounts,
+  restoreAccount,
+} from '#/server/fns/accounts'
+
+import { useDataRefresh } from '../-lib/refresh'
+import { AccountActionsMenu } from './-ui/account-actions-menu'
+import { AccountFormDialog } from './-ui/account-form-dialog'
+import { AdjustBalanceDialog } from './-ui/adjust-balance-dialog'
+import { ConfirmDialog } from './-ui/confirm-dialog'
+
+import type { Key } from 'react-aria-components'
+import type { AccountCategory } from '#/server/db/schema'
+import type { Account } from '#/server/db/types'
+import type { AccountGroupWithMembers } from '#/server/repos/accounts'
+
+/**
+ * `/accounts` — the list.
+ *
+ * ## The filter lives in the URL, not in a `useState`
+ *
+ * `?status=archived` is a bookmark, a back button and a link somebody can send. Holding it in
+ * component state would make all three lie: the back button would leave the page instead of
+ * leaving the filter, and a reload would silently drop the reader back into a different view from
+ * the one they were reading. `loaderDeps` ties the loader to it, so changing the filter refetches
+ * without a manual invalidate.
+ *
+ * ## One request for the figures and the rows
+ *
+ * `listAccounts` returns the overview totals with the accounts, so the header does not cost a
+ * second round trip and cannot disagree with the list beneath it. The groups come alongside it,
+ * and grouping is done here rather than server-side because it is presentation: the same two
+ * responses would drive a flat list or a board.
+ *
+ * ## Totals are per currency, and nothing is converted in this component
+ *
+ * The overview's net worth is converted **by the repository**, at rates it owns. The per-currency
+ * card sums each currency in its own units and says so. A component that divided by a rate to
+ * fill a gap would be inventing a number, and this file has no rate to divide by on purpose.
+ */
+
+const searchSchema = z.object({
+  status: z.enum(['active', 'archived', 'all']).default('active'),
+})
+
+type StatusFilter = z.infer<typeof searchSchema>['status']
+
+export const Route = createFileRoute('/_app/accounts/')({
+  validateSearch: searchSchema,
+  loaderDeps: ({ search }) => ({ status: search.status }),
+  loader: async ({ deps }) => {
+    const [list, groups] = await Promise.all([
+      listAccounts({
+        data:
+          deps.status === 'all'
+            ? { includeExcluded: true }
+            : { status: deps.status, includeExcluded: true },
+      }),
+      listAccountGroups(),
+    ])
+    return { list, groups }
+  },
+  pendingComponent: AccountListSkeleton,
+  errorComponent: AccountsListError,
+  component: AccountsListRoute,
+})
+
+function AccountsListError({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
+  const t = useTranslate()
+  return (
+    <ErrorPanel
+      title={t('accounts.error.title')}
+      body={t('accounts.error.body')}
+      detail={error.message}
+      onRetry={reset}
+    />
+  )
+}
+
+/** What the route is currently asking the reader to confirm, if anything. */
+type Pending =
+  | { kind: 'none' }
+  | { kind: 'form'; account: Account | null; category?: AccountCategory }
+  | { kind: 'adjust'; account: Account }
+  | { kind: 'archive'; account: Account }
+  | { kind: 'restore'; account: Account }
+
+function AccountsListRoute() {
+  const t = useTranslate()
+  const { list, groups } = Route.useLoaderData()
+  const { status } = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const router = useRouter()
+  const refreshCaches = useDataRefresh()
+
+  const [pending, setPending] = useState<Pending>({ kind: 'none' })
+  const close = () => setPending({ kind: 'none' })
+
+  /**
+   * Every write ends here: the loader reruns, so the totals and the rows move together — and the
+   * React Query reference set the transaction form holds for five minutes (the account list it
+   * offers) is marked stale in the same breath, so a newly created account is selectable
+   * immediately rather than after the cache expires.
+   */
+  const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
+
+  const { accounts, overview } = list
+  const totals = totalsByCurrency(accounts)
+  const sections = groupAccounts(
+    accounts,
+    groups,
+    t('accounts.group.ungrouped'),
+  )
+
+  function actionsFor(account: Account) {
+    return (
+      <AccountActionsMenu
+        account={account}
+        onEdit={() => setPending({ kind: 'form', account })}
+        onAdjustBalance={() => setPending({ kind: 'adjust', account })}
+        onArchive={() => setPending({ kind: 'archive', account })}
+        onRestore={() => setPending({ kind: 'restore', account })}
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-title font-bold text-ink">
+            {t('accounts.title')}
+          </h1>
+          <p className="mt-1 text-body text-ink-2">{t('accounts.subtitle')}</p>
+        </div>
+        <Button
+          variant="primary"
+          icon={<Plus aria-hidden="true" />}
+          onPress={() => setPending({ kind: 'form', account: null })}
+        >
+          {t('accounts.create')}
+        </Button>
+      </header>
+
+      {overview.totalAccounts === 0 ? (
+        <AccountEmptyState
+          onCreate={(category) =>
+            setPending({
+              kind: 'form',
+              account: null,
+              ...(category ? { category } : {}),
+            })
+          }
+        />
+      ) : (
+        <>
+          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+            <AccountOverviewCard
+              overview={overview}
+              headingId="accounts-overview"
+            />
+            {totals.length > 1 ? (
+              <CurrencyTotalsCard
+                totals={totals}
+                headingId="accounts-by-currency"
+              />
+            ) : null}
+          </div>
+
+          <div className="max-w-xs">
+            <Select
+              label={t('accounts.filter.label')}
+              selectedKey={status}
+              onSelectionChange={(key: Key | null) => {
+                if (key !== null) {
+                  void navigate({ search: { status: key as StatusFilter } })
+                }
+              }}
+            >
+              <SelectItem id="active">{t('accounts.filter.active')}</SelectItem>
+              <SelectItem id="archived">
+                {t('accounts.filter.archived')}
+              </SelectItem>
+              <SelectItem id="all">{t('accounts.filter.all')}</SelectItem>
+            </Select>
+          </div>
+
+          {accounts.length === 0 ? (
+            <FilteredEmpty status={status} />
+          ) : (
+            <div className="flex flex-col gap-8">
+              {sections.map((section) => (
+                <section
+                  key={section.id}
+                  aria-labelledby={`group-${section.id}`}
+                >
+                  <h2
+                    id={`group-${section.id}`}
+                    className="mb-3 text-micro tracking-label uppercase text-ink-2"
+                  >
+                    {section.name}
+                  </h2>
+                  <ul className="flex flex-col gap-3">
+                    {section.accounts.map((account) => (
+                      <AccountCard
+                        key={account.id}
+                        account={account}
+                        baseCurrencyCode={overview.baseCurrencyCode}
+                        actions={actionsFor(account)}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {pending.kind === 'form' ? (
+        <AccountFormDialog
+          key={pending.account?.id ?? 'new'}
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) close()
+          }}
+          account={pending.account}
+          {...(pending.category ? { initialCategory: pending.category } : {})}
+          currencyOptions={currencyOptions(overview.baseCurrencyCode, accounts)}
+          baseCurrencyCode={overview.baseCurrencyCode}
+          onSaved={(saved, mode) => {
+            toast.success(
+              t(
+                mode === 'created'
+                  ? 'accounts.toast.created'
+                  : 'accounts.toast.updated',
+                {
+                  name: saved.name,
+                },
+              ),
+            )
+            close()
+            void refresh()
+          }}
+        />
+      ) : null}
+
+      {pending.kind === 'adjust' ? (
+        <AdjustBalanceDialog
+          key={pending.account.id}
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) {
+              close()
+              void refresh()
+            }
+          }}
+          account={pending.account}
+          onRecorded={() => void refresh()}
+        />
+      ) : null}
+
+      {pending.kind === 'archive' ? (
+        <ConfirmDialog
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) close()
+          }}
+          title={t('accounts.archive.title', { name: pending.account.name })}
+          body={t('accounts.archive.body')}
+          confirmLabel={t('accounts.archive.action')}
+          errorTitle={t('accounts.error.title')}
+          errorBody={t('accounts.error.body')}
+          onConfirm={async () => {
+            const name = pending.account.name
+            await archiveAccount({ data: { accountId: pending.account.id } })
+            toast.success(t('accounts.toast.archived', { name }))
+            close()
+            void refresh()
+          }}
+        />
+      ) : null}
+
+      {pending.kind === 'restore' ? (
+        <ConfirmDialog
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) close()
+          }}
+          title={t('accounts.restore.action')}
+          body={t('accounts.archive.body')}
+          confirmLabel={t('accounts.restore.action')}
+          errorTitle={t('accounts.error.title')}
+          errorBody={t('accounts.error.body')}
+          onConfirm={async () => {
+            const name = pending.account.name
+            await restoreAccount({ data: { accountId: pending.account.id } })
+            toast.success(t('accounts.toast.restored', { name }))
+            close()
+            void refresh()
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * The list is empty but the workspace is not — so this is a filter result, not a first run.
+ *
+ * Saying "no accounts yet" here would be a lie that sends somebody looking for a bug. The two
+ * cases get their own sentences, and each names the way out.
+ */
+function FilteredEmpty({ status }: { status: StatusFilter }) {
+  const t = useTranslate()
+  const isArchived = status === 'archived'
+  return (
+    <Card variant="inset" className="text-center">
+      <p className="text-subtitle font-semibold text-ink">
+        {t(
+          isArchived
+            ? 'accounts.archived.empty.title'
+            : 'accounts.active.empty.title',
+        )}
+      </p>
+      <p className="mx-auto mt-2 prose-measure text-body text-ink-2">
+        {t(
+          isArchived
+            ? 'accounts.archived.empty.body'
+            : 'accounts.active.empty.body',
+        )}
+      </p>
+    </Card>
+  )
+}
+
+interface Section {
+  readonly id: string
+  readonly name: string
+  readonly accounts: ReadonlyArray<Account>
+}
+
+/**
+ * Splits the accounts into their groups, keeping each group's own order.
+ *
+ * An account can be a member of more than one group in the data model; it is shown under the
+ * first that claims it, because the same balance appearing twice in a list of balances reads as
+ * money that exists twice. Anything unclaimed lands in "Not in a group", which is only drawn when
+ * something is actually in it.
+ */
+function groupAccounts(
+  accounts: ReadonlyArray<Account>,
+  groups: ReadonlyArray<AccountGroupWithMembers>,
+  ungroupedName: string,
+): ReadonlyArray<Section> {
+  const byId = new Map(accounts.map((account) => [account.id, account]))
+  const claimed = new Set<string>()
+  const sections: Array<Section> = []
+
+  for (const entry of groups) {
+    const members: Array<Account> = []
+    for (const id of entry.accountIds) {
+      const account = byId.get(id)
+      if (account !== undefined && !claimed.has(id)) {
+        claimed.add(id)
+        members.push(account)
+      }
+    }
+    if (members.length > 0) {
+      sections.push({
+        id: entry.group.id,
+        name: entry.group.name,
+        accounts: members,
+      })
+    }
+  }
+
+  const rest = accounts.filter((account) => !claimed.has(account.id))
+  if (rest.length > 0) {
+    sections.push({ id: 'ungrouped', name: ungroupedName, accounts: rest })
+  }
+  return sections
+}
+
+/**
+ * The currencies the form may offer: the base, plus every currency already in use.
+ *
+ * Each of those is necessarily one the workspace holds a rate for, so the picker cannot produce a
+ * `CurrencyNotHeldError`. When the workspace-currency server function lands, this is the function
+ * it replaces.
+ */
+function currencyOptions(
+  baseCurrencyCode: string,
+  accounts: ReadonlyArray<Account>,
+): ReadonlyArray<string> {
+  const codes = new Set<string>([baseCurrencyCode])
+  for (const account of accounts) {
+    codes.add(account.currencyCode)
+  }
+  return [...codes].sort((left, right) => left.localeCompare(right))
+}

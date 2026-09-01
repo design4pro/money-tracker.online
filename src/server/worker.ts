@@ -17,22 +17,55 @@ import {
   defaultStreamHandler,
 } from '@tanstack/react-start/server'
 
+import { drizzle } from 'drizzle-orm/d1'
+
+import * as financeSchema from './db/schema'
 import { AccountLedger as LedgerObject } from './do/ledger'
+import { rebuildAccountBalance } from './repos/account-balances'
 import { SandcastleRegistry as RegistryObject } from './do/sandcastle-registry'
 import { loggerFromEnv } from './observability/logger'
 
 import type { Logger } from './observability/logger'
+import type { Database } from './repos/base'
 
 /**
- * Re-exported so `durable_objects.bindings[].class_name` resolves on every environment.
+ * Exported so `durable_objects.bindings[].class_name` resolves on every environment, and
+ * **constructed with its real rebuild port**.
  *
- * The class is declared against narrow port interfaces (`AccountLedgerState`,
- * `AccountLedgerStorage`) rather than against `DurableObjectState`, which is what lets it be
- * constructed with fakes in a plain Node test. A real `DurableObjectState` satisfies those ports
- * structurally; the two descriptions are of the same runtime object and only the static types
- * cannot see it, so this alias is the one place they meet.
+ * `AccountLedger` is declared against narrow port interfaces (`AccountLedgerState`,
+ * `AccountLedgerStorage`, `RebuildPort`) rather than against `DurableObjectState`, which is what
+ * lets it be constructed with fakes in a plain Node test. A real `DurableObjectState` satisfies
+ * those ports structurally; the two descriptions are of the same runtime object and only the
+ * static types cannot see it, so this subclass is the one place they meet.
+ *
+ * The subclass exists for one reason: the runtime instantiates a Durable Object with exactly
+ * `(state, env)`, so an injected dependency has nowhere else to enter. Its own docblock said the
+ * D1 half would be "passed in here and nothing else changes" once the finance domain landed. It
+ * has landed, so it is passed in; without it the object answers `'skipped'` to every rebuild and
+ * every account balance in the product stays at zero.
  */
-export const AccountLedger = LedgerObject
+export class AccountLedger extends LedgerObject {
+  constructor(state: DurableObjectState, env: Env) {
+    super(state, env, {
+      rebuild: (accountId) => rebuildAccountBalance(ledgerDb(env), accountId),
+    })
+  }
+}
+
+/**
+ * A Drizzle handle over this object's D1 binding.
+ *
+ * Built per construction rather than reaching `src/server/auth/db.ts`'s isolate singleton: that one
+ * reads the binding through `cloudflare:workers`, which is the ambient request environment, and a
+ * Durable Object is not serving a request when it rebuilds — it is serving its own turn, with the
+ * `env` it was constructed with.
+ */
+function ledgerDb(env: Env): Database {
+  return drizzle(env.DB, {
+    schema: financeSchema,
+    logger: false,
+  }) as unknown as Database
+}
 
 /**
  * Re-exported for the same reason, and bound on **staging only** (`env.staging` in

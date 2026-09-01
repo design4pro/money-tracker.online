@@ -265,6 +265,116 @@ const messages = {
   'accounts.archived.empty.body':
     'Accounts you archive are kept here with their history.',
 
+  /* -- Accounts: the list surface ----------------------------------------- */
+  'accounts.overview.assets': 'What you hold',
+  'accounts.overview.liabilities': 'What you owe',
+  'accounts.overview.basis': {
+    one: 'From {count} account counted in reports.',
+    other: 'From {count} accounts counted in reports.',
+  },
+  'accounts.overview.excluded':
+    'Archived accounts, and accounts left out of reports, are not in these figures.',
+  'accounts.byCurrency.title': 'Held by currency',
+  'accounts.byCurrency.help':
+    'Each currency is totalled in its own units. Nothing is converted here.',
+  'accounts.filter.label': 'Show',
+  'accounts.filter.active': 'Open accounts',
+  'accounts.filter.archived': 'Archived accounts',
+  'accounts.filter.all': 'Open and archived',
+  'accounts.status.excluded': 'Outside reports',
+  'accounts.list.label': 'Your accounts',
+  'accounts.list.loading': 'Loading your accounts…',
+  'accounts.error.title': 'The accounts did not load',
+  'accounts.error.body':
+    'Nothing was changed. Try again — and if it keeps failing, the workspace is briefly unreachable.',
+  'accounts.balance.missing': 'Balance unavailable',
+  'accounts.balance.inBase': 'In {currency}',
+  'accounts.empty.pick.title': 'Or start from one of these',
+  'accounts.empty.pick.body':
+    'Each one opens the form with the kind already chosen. Nothing is created until you save.',
+  'accounts.active.empty.title': 'Every account is archived',
+  'accounts.active.empty.body':
+    'Restore one from the archived view, or add a new account.',
+
+  /* -- Accounts: one account ---------------------------------------------- */
+  'accounts.detail.tab.overview': 'Overview',
+  'accounts.detail.tab.settings': 'Settings',
+  'accounts.detail.balanceToday': 'Balance today',
+  'accounts.detail.transactions': {
+    one: '{count} transaction on this account',
+    other: '{count} transactions on this account',
+  },
+  'accounts.detail.note.empty': 'No note on this account yet.',
+  'accounts.detail.error.title': 'This account did not load',
+  'accounts.detail.danger': 'Archiving and deleting',
+  'accounts.credit.title': 'Credit used',
+  'accounts.credit.valueText': '{used} of {limit} used, {percent}',
+  'accounts.credit.within': 'Within limit',
+  'accounts.credit.approaching': 'Approaching limit',
+  'accounts.credit.over': 'Over limit',
+  'accounts.credit.available': '{amount} still available',
+  'accounts.credit.none': 'This account has no credit limit.',
+
+  /* -- Accounts: the lifecycle -------------------------------------------- */
+  'accounts.archive.title': 'Archive {name}?',
+  'accounts.archive.body':
+    'It leaves your totals and the pickers and keeps every transaction. You can restore it whenever you like.',
+  'accounts.archive.action': 'Archive account',
+  'accounts.restore.action': 'Restore account',
+  'accounts.delete.title': 'Delete {name}?',
+  'accounts.delete.action': 'Delete permanently',
+  'accounts.delete.blocked': {
+    one: 'There is {count} transaction on this account, so it cannot be deleted. Archive it instead and the history stays.',
+    other:
+      'There are {count} transactions on this account, so it cannot be deleted. Archive it instead and the history stays.',
+  },
+  'accounts.actions.label': 'Actions for {name}',
+  'accounts.toast.created': '{name} was added.',
+  'accounts.toast.updated': '{name} was saved.',
+  'accounts.toast.archived': '{name} was archived.',
+  'accounts.toast.restored': '{name} is open again.',
+  'accounts.toast.deleted': '{name} was deleted.',
+
+  /* -- Accounts: the form -------------------------------------------------- */
+  'accounts.form.create.body':
+    'A name and a currency are all that is required. The rest can wait.',
+  'accounts.form.edit.body':
+    'Changing the currency or the opening balance re-values this account’s whole history.',
+  'accounts.form.error.title': 'The account was not saved',
+  'accounts.field.openedOn': 'Opening date',
+  'accounts.field.openedOn.help':
+    'The day the opening balance is true of. That day’s exchange rate is the one recorded.',
+  'accounts.field.creditLimit.help':
+    'A positive figure. Leave it empty when there is no limit.',
+  'accounts.field.currency.help':
+    'Only the currencies your workspace holds are offered.',
+
+  /* -- Accounts: correcting a balance ------------------------------------- */
+  'accounts.adjust.body':
+    'State what the balance should be. The difference is written as a transaction you can find, edit and export.',
+  'accounts.adjust.field.target': 'What the balance should be',
+  'accounts.adjust.field.date': 'As at the end of',
+  'accounts.adjust.field.note': 'Reason',
+  'accounts.adjust.field.note.help':
+    'Kept on the transaction, so the reason survives with the correction.',
+  'accounts.adjust.preview.title': 'What will be recorded',
+  'accounts.adjust.preview.income': 'An income of {amount}, booked on {date}.',
+  'accounts.adjust.preview.expense':
+    'An expense of {amount}, booked on {date}.',
+  'accounts.adjust.preview.none':
+    'Nothing. The balance on {date} already reads {amount}.',
+  'accounts.adjust.preview.past':
+    'The difference is measured against the balance at the end of {date}, which is read as you save. You are shown exactly what was written.',
+  'accounts.adjust.action': 'Record the correction',
+  'accounts.adjust.result.title': 'Recorded',
+  'accounts.adjust.result.income':
+    'An income of {amount} was booked on {date}.',
+  'accounts.adjust.result.expense':
+    'An expense of {amount} was booked on {date}.',
+  'accounts.adjust.result.unchanged':
+    'Nothing was written — the balance on {date} already read {amount}.',
+  'accounts.adjust.error.title': 'The correction was not recorded',
+
   /* -- Transactions ------------------------------------------------------- */
   'transactions.title': 'Transactions',
   'transactions.create': 'New transaction',
@@ -327,6 +437,126 @@ const messages = {
   'transactions.noResults.title': 'No transactions match',
   'transactions.noResults.body': 'Try a wider date range or fewer filters.',
 
+  /* -- Transactions: the ledger surface ----------------------------------- */
+  'transactions.list.label': 'Transaction ledger',
+  'transactions.list.caption.all': 'All {count} transactions, {sort}.',
+  'transactions.list.caption.filtered':
+    '{count} transactions matching {filters}, {sort}.',
+  'transactions.list.caption.sort': 'sorted by {field}, {order}',
+  'transactions.sort.label': 'Sort by',
+  'transactions.sort.ascending': 'oldest first',
+  'transactions.sort.descending': 'newest first',
+  'transactions.column.description': 'Description',
+  'transactions.column.actions': 'Actions',
+  'transactions.day.net': 'Day total',
+  'transactions.loading': 'Loading transactions…',
+  'transactions.loadMore': 'Load more',
+  'transactions.loadingMore': 'Loading more transactions…',
+  'transactions.loadedOf': '{loaded} of {total} loaded',
+  'transactions.selectAllLoaded': 'Select every loaded transaction',
+  'transactions.excludedFromTotals': 'Outside totals',
+  'transactions.amount.income': 'Income of {amount}',
+  'transactions.amount.expense': 'Expense of {amount}',
+  'transactions.row.select': 'Select the {amount} transaction of {date}',
+  'transactions.row.actions': 'Actions for {name}',
+  'transactions.row.open': 'Open',
+  'transactions.totals.label': 'Totals for the filtered set',
+  'transactions.totals.currency': 'Totals in {currency}',
+  'transactions.bulk.label': 'Actions for the selected transactions',
+  'transactions.bulk.delete': 'Delete selected',
+  'transactions.bulk.confirm': {
+    one: 'Delete {count} transaction? This cannot be undone.',
+    other: 'Delete {count} transactions? This cannot be undone.',
+  },
+  'transactions.keyboard.hint':
+    'Arrow keys move between cells. E edits, D duplicates, Delete removes, Space selects, Enter opens.',
+
+  /* -- Transactions: filters ---------------------------------------------- */
+  'transactions.filter.description':
+    'Narrow the ledger. Everything set here stays in the address, so the view can be shared.',
+  'transactions.filter.activeLabel': 'Active filters',
+  'transactions.filter.remove': 'Remove {name}',
+  'transactions.filter.direction': 'Money in or out',
+  'transactions.filter.accountGroup': 'Account group',
+  'transactions.filter.dateRange': 'Date range',
+  'transactions.filter.openCalendar': 'Open calendar',
+  'transactions.filter.amountRange': 'Amount range',
+  'transactions.filter.amountMin': 'At least',
+  'transactions.filter.amountMax': 'At most',
+  'transactions.filter.receipt': 'Receipt',
+  'transactions.filter.noMatches': 'Nothing matches',
+  'transactions.filter.categoryPlaceholder': 'Find a category',
+  'transactions.filter.payeePlaceholder': 'Find a payee',
+  'transactions.filter.tagPlaceholder': 'Find a tag',
+  'transactions.chip.text': 'Text: {value}',
+  'transactions.chip.dates': 'Dates: {from} to {to}',
+  'transactions.chip.anyDate': 'any',
+  'transactions.chip.accounts': 'Account: {value}',
+  'transactions.chip.accountGroups': 'Group: {value}',
+  'transactions.chip.categories': 'Category: {value}',
+  'transactions.chip.payees': 'Payee: {value}',
+  'transactions.chip.tags': 'Tag: {value}',
+  'transactions.chip.direction': 'Direction: {value}',
+  'transactions.chip.paymentMethods': 'Paid by: {value}',
+  'transactions.chip.amount': 'Amount: {from} to {to}',
+  'transactions.chip.anyAmount': 'any',
+  'transactions.chip.withReceipt': 'With a receipt',
+  'transactions.chip.withoutReceipt': 'Without a receipt',
+
+  /* -- Transactions: the entry form --------------------------------------- */
+  'transactions.form.newTitle': 'New transaction',
+  'transactions.form.newSubtitle':
+    'The amount comes first. Everything below it is optional except the account and the date.',
+  'transactions.form.editTitle': 'Edit transaction',
+  'transactions.form.details': 'Details',
+  'transactions.form.moreDetails': 'More',
+  'transactions.form.saveAndNew': 'Save and add another',
+  'transactions.form.saveAndNewHint':
+    'Keeps the date, account and category so the next entry is only an amount away.',
+  'transactions.form.notePlaceholder': 'What was this for?',
+  'transactions.form.payeePlaceholder': 'Who was paid, or who paid you',
+  'transactions.form.categoryPlaceholder': 'Choose a category',
+  'transactions.form.noPayees': 'No payees yet',
+  'transactions.form.noCategories': 'No categories yet',
+  'transactions.form.conversionNote':
+    'Recorded in {currency} and converted to {base} at the rate for the booking date.',
+  'transactions.form.error.title': 'The transaction was not saved',
+  'transactions.form.error.amount': 'Enter an amount greater than zero.',
+  'transactions.form.error.account': 'Choose the account this belongs to.',
+  'transactions.form.error.date': 'Enter a date in the form {example}.',
+  'transactions.form.error.note': 'Keep the note to {max} characters or fewer.',
+  'transactions.form.noAccounts.title': 'An account comes first',
+  'transactions.form.noAccounts.body':
+    'A transaction has to belong to an account. Create one, then come back.',
+  'transactions.form.noAccounts.action': 'Create an account',
+  'transactions.saved': 'Transaction saved.',
+  'transactions.deleted': 'Transaction deleted.',
+  'transactions.deletedMany': {
+    one: '{count} transaction deleted.',
+    other: '{count} transactions deleted.',
+  },
+  'transactions.duplicated': 'Copied into a new entry. Nothing is saved yet.',
+
+  /* -- Transactions: the detail screen ------------------------------------ */
+  'transactions.detail.title': 'Transaction',
+  'transactions.detail.back': 'Back to transactions',
+  'transactions.detail.summary': 'Summary',
+  'transactions.detail.recordedAt': 'Recorded {datetime}',
+  'transactions.detail.rate': 'Converted at {rate}, the rate for {date}.',
+  'transactions.detail.identityRate':
+    'Recorded in the reporting currency, so no conversion was needed.',
+  'transactions.detail.noTags': 'No tags on this transaction.',
+  'transactions.detail.noAttachments': 'No receipt attached.',
+  'transactions.detail.noRefunds': 'No refund linked.',
+  'transactions.detail.notFound.title': 'That transaction is not here',
+  'transactions.detail.notFound.body':
+    'It may have been deleted, or the address may be wrong.',
+  'transactions.planned.title': 'Planned transactions',
+  'transactions.planned.subtitle':
+    'Entries booked for a date that has not happened yet. They stay out of your balances until you confirm them.',
+  'transactions.planned.empty.title': 'Nothing planned',
+  'transactions.planned.empty.body':
+    'Record a transaction with a future date and mark it planned to see it here.',
   /* -- Dashboard ---------------------------------------------------------- */
   'dashboard.title': 'Dashboard',
   'dashboard.greeting': 'Good to see you, {name}.',
@@ -353,6 +583,50 @@ const messages = {
   'dashboard.empty.body': 'Add the panels you want to see every day.',
   'dashboard.empty.action': 'Add a panel',
   'dashboard.chart.tableLabel': 'The same data as a table',
+
+  /* -- Dashboard: the slice ----------------------------------------------- */
+  'dashboard.period.last3Months': 'Last 3 months',
+  'dashboard.period.last12Months': 'Last 12 months',
+  'dashboard.period.showing': 'Showing {range}',
+  'dashboard.panels.label': 'Dashboard panels',
+  'dashboard.summary.label': 'This period at a glance',
+  'dashboard.chart.noData': 'No reading',
+  'dashboard.netWorth.help':
+    'Counted in {currency}, at the rate stored with each account.',
+  'dashboard.netWorth.empty.title': 'Nothing to add up yet',
+  'dashboard.netWorth.empty.body':
+    'Add an account and its balance becomes the first figure here.',
+  'dashboard.cashFlow.month': 'Month',
+  'dashboard.cashFlow.surplus': 'You kept {amount}',
+  'dashboard.cashFlow.deficit': 'You spent {amount} more than came in',
+  'dashboard.cashFlow.balanced': 'Money in and money out matched exactly',
+  'dashboard.cashFlow.empty.title': 'No money moved in this period',
+  'dashboard.cashFlow.empty.body':
+    'Record a transaction, or pick a longer period.',
+  'dashboard.spending.other': 'Everything else',
+  'dashboard.spending.showOther': 'Show the smaller categories',
+  'dashboard.spending.hideOther': 'Hide the smaller categories',
+  'dashboard.spending.share': 'Share',
+  'dashboard.spending.empty.title': 'No categorised spending yet',
+  'dashboard.spending.empty.body':
+    'Give an expense a category and its share of the period shows up here.',
+  'dashboard.accounts.viewAll': 'All accounts',
+  'dashboard.accounts.owed': 'Owed',
+  'dashboard.recent.viewAll': 'All transactions',
+  'dashboard.firstRun.title':
+    'Welcome. Three steps and the numbers start working.',
+  'dashboard.firstRun.body':
+    'Nothing here is filled with sample figures. Everything you see will be yours.',
+  'dashboard.firstRun.steps.label': 'Getting started',
+  'dashboard.firstRun.step.account.title': 'Add an account',
+  'dashboard.firstRun.step.account.body':
+    'A current account, a wallet, a card — whatever you want to follow.',
+  'dashboard.firstRun.step.transaction.title': 'Record a transaction',
+  'dashboard.firstRun.step.transaction.body':
+    'One is enough for the cash-flow chart to have something to draw.',
+  'dashboard.firstRun.step.review.title': 'Come back here',
+  'dashboard.firstRun.step.review.body':
+    'The panels below fill in as soon as there is something to show.',
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budgets',
@@ -477,6 +751,57 @@ const messages = {
     'Add one account, import a statement, and see where the money actually went.',
   'marketing.cta.action': 'Create a free workspace',
   'marketing.footer.legal': 'All rights reserved.',
+
+  /* -- The authenticated shell -------------------------------------------- */
+  'app.nav.more': 'More',
+  'app.nav.moreLabel': 'More destinations',
+  'app.nav.section.money': 'Money',
+  'app.nav.section.plan': 'Planning',
+  'app.nav.section.insight': 'Insight',
+  'app.signedInAs': 'Signed in as {email}',
+  'app.workspace.current': 'Current workspace',
+  'app.workspace.role.owner': 'Owner',
+  'app.workspace.role.admin': 'Admin',
+  'app.workspace.role.member': 'Member',
+  'app.shell.pending': 'Loading this page…',
+  'app.shell.error.body':
+    'This part of the app did not load. Everything around it still works.',
+
+  /* -- The auth screens --------------------------------------------------- */
+  'auth.aside.title': 'Every figure, down to the minor unit.',
+  'auth.aside.body':
+    'Amounts are held as whole minor units and converted at the rate of the day they were booked, so last March still adds up the way last March did.',
+  'auth.aside.point.privacy':
+    'No bank connectors. Nothing is read that you did not enter or import.',
+  'auth.aside.point.currency':
+    'Accounts in several currencies, reported against one base currency.',
+  'auth.aside.point.export':
+    'The whole workspace exports as CSV or JSON whenever you ask for it.',
+  'auth.continueWith': 'or',
+  'auth.provider.google': 'Continue with Google',
+  'auth.provider.apple': 'Continue with Apple',
+  'auth.backToSignIn': 'Back to sign in',
+  'auth.password.help': {
+    one: 'At least {count} character. Pasting from a password manager is welcome.',
+    other:
+      'At least {count} characters. Pasting from a password manager is welcome.',
+  },
+  'auth.forgot.sentTitle': 'Check your inbox',
+  'auth.forgot.tryAnother': 'Use a different address',
+  'auth.reset.subtitle':
+    'Pick something you have not already used on this account.',
+  'auth.reset.invalid.title': 'This link cannot be used',
+  'auth.reset.invalid.body':
+    'A reset link works once and expires after an hour. Ask for a fresh one and it arrives in a moment.',
+  'auth.reset.requestNew': 'Send me a new link',
+  'auth.reset.continue': 'Continue to sign in',
+  'auth.error.title': 'That did not work',
+  'auth.error.generic': 'We could not complete that just now. Try again.',
+  'auth.error.network':
+    'We could not reach the server. Check your connection and try again.',
+  'auth.error.invalidToken': 'That link has expired or has already been used.',
+  'auth.error.weakPassword':
+    'That password is too easy to guess. Try a longer one.',
 } as const satisfies MessageCatalogueSource
 
 export default messages

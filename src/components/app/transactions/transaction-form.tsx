@@ -1,0 +1,463 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { getLocalTimeZone, parseDate, today } from '@internationalized/date'
+import { TriangleAlert } from 'lucide-react'
+
+import {
+  Button,
+  Checkbox,
+  ComboBox,
+  ComboBoxItem,
+  DatePicker,
+  Form,
+  FormActions,
+  FormSection,
+  Radio,
+  RadioGroup,
+  Select,
+  SelectItem,
+  TextAreaField,
+} from '#/components/ui'
+import { useLocale, useTranslate } from '#/lib/i18n'
+import { currencyName } from '#/lib/money'
+
+import { AmountField } from './amount-field'
+import { PAYMENT_METHOD_KEY } from './filter-chips'
+import { LEDGER_PAYMENT_METHODS } from './types'
+
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { DateValue } from 'react-aria-components'
+import type { Translate } from '#/lib/i18n'
+import type { CurrencyCode, Minor } from '#/lib/money'
+import type {
+  LedgerDirection,
+  LedgerPaymentMethod,
+  TransactionReference,
+} from './types'
+
+/**
+ * The entry form — the single most-repeated action in the product, so the design brief is
+ * keystrokes rather than completeness.
+ *
+ * ## Amount first, and focused
+ *
+ * Every entry starts with a number, so the amount is the first control in the DOM and takes focus
+ * on mount when {@link TransactionFormProps.autoFocusAmount} is set. It is a React Aria
+ * `NumberField` through {@link AmountField}, which means the decimal separator is the reader's own
+ * (`12,50` in Polish, `12.50` in English) and `inputmode="decimal"` brings up the numeric keypad on
+ * a phone. The value it emits is `Minor` — branded integer minor units — so
+ * {@link TransactionFormProps.onSubmit} cannot be handed a float even by accident.
+ *
+ * ## The currency is the account's, and is never a separate question
+ *
+ * A transaction is recorded in the currency of the account it belongs to. Asking for both is asking
+ * the reader to keep two fields consistent, and the answer they give when the two disagree is wrong
+ * in a way nothing downstream can detect. Changing the account changes the amount field's scale —
+ * five thousand yen stays five thousand yen and does not become fifty.
+ *
+ * ## Repeat entry
+ *
+ * `Save and add another` keeps the date, account, category and payment method and clears the amount,
+ * the payee and the note, then returns focus to the amount. Somebody entering a shoebox of receipts
+ * types a number, presses Enter, types a number — which is the whole job. `Ctrl`/`⌘ + Enter` does
+ * the same from anywhere in the form.
+ *
+ * ## Errors
+ *
+ * Validation is a pure function ({@link validateForm}) rather than a hook, so the rules are testable
+ * without a render. Nothing is shown until the field has been left or the form submitted — a form
+ * that reports "enter an amount" on the first keystroke is a form that is wrong more often than the
+ * person filling it in. Entered values survive a server error; the panel is `role="alert"` and the
+ * fields keep what they held.
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Values                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** What the form holds. Money is `Minor`; there is no string or float anywhere in this shape. */
+export interface TransactionFormValues {
+  readonly direction: LedgerDirection
+  readonly amountMinor: Minor | null
+  readonly accountId: string
+  /** `YYYY-MM-DD`, the calendar date the person chose. */
+  readonly bookedOn: string
+  readonly categoryId: string | null
+  readonly payeeId: string | null
+  readonly paymentMethod: LedgerPaymentMethod | null
+  readonly note: string
+  readonly isPlanned: boolean
+}
+
+/** Per-field messages, keyed by the field they belong under. Absent means valid. */
+export type TransactionFormErrors = Partial<
+  Record<'amountMinor' | 'accountId' | 'bookedOn' | 'note', string>
+>
+
+const NOTE_MAX = 500
+
+/** A blank entry for today, on the account the reader is most likely to mean. */
+export function emptyFormValues(
+  accountId: string,
+  bookedOn: string,
+): TransactionFormValues {
+  return {
+    direction: 'expense',
+    amountMinor: null,
+    accountId,
+    bookedOn,
+    categoryId: null,
+    payeeId: null,
+    paymentMethod: null,
+    note: '',
+    isPlanned: false,
+  }
+}
+
+/**
+ * Everything that would make the server refuse, checked here so it is said beside the field.
+ *
+ * The amount rule is the same one the schema states: a **positive integer**, because the sign lives
+ * in `direction`. Zero is a rejection rather than a silently-dropped row.
+ */
+export function validateForm(
+  values: TransactionFormValues,
+  t: Translate,
+): TransactionFormErrors {
+  const errors: TransactionFormErrors = {}
+
+  if (values.amountMinor === null || values.amountMinor <= 0) {
+    errors.amountMinor = t('transactions.form.error.amount')
+  }
+  if (values.accountId.trim() === '') {
+    errors.accountId = t('transactions.form.error.account')
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(values.bookedOn)) {
+    errors.bookedOn = t('transactions.form.error.date', {
+      example: '2026-03-15',
+    })
+  }
+  if (values.note.length > NOTE_MAX) {
+    errors.note = t('transactions.form.error.note', { max: NOTE_MAX })
+  }
+
+  return errors
+}
+
+/* -------------------------------------------------------------------------- */
+/* The form                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export interface TransactionFormProps {
+  readonly values: TransactionFormValues
+  readonly onChange: (values: TransactionFormValues) => void
+  readonly reference: TransactionReference
+  /** Save. `addAnother` asks the caller to keep the form open and reset it for the next entry. */
+  readonly onSubmit: (options: { readonly addAnother: boolean }) => void
+  readonly onCancel: () => void
+  readonly isSubmitting: boolean
+  /** A failure from the server, kept beside the values that produced it. */
+  readonly serverError?: string
+  /** Offer `Save and add another`. Off when editing — there is nothing to add another of. */
+  readonly allowRepeat?: boolean
+  readonly submitLabel: string
+  readonly autoFocusAmount?: boolean
+  /** Bumped by the caller after a repeat save, to pull focus back to the amount. */
+  readonly resetToken?: number
+}
+
+export function TransactionForm({
+  values,
+  onChange,
+  reference,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  serverError,
+  allowRepeat = false,
+  submitLabel,
+  autoFocusAmount = false,
+  resetToken = 0,
+}: TransactionFormProps) {
+  const t = useTranslate()
+  const locale = useLocale()
+  const [touched, setTouched] = useState(false)
+  const amountRef = useRef<HTMLDivElement>(null)
+
+  const errors = useMemo(() => validateForm(values, t), [t, values])
+  const shown: TransactionFormErrors = touched ? errors : {}
+
+  // After a repeat save the amount is the only thing left to type, so the caret goes back to it.
+  // Focusing the wrapper's input rather than remounting the field keeps the account and the date
+  // exactly as they were, which is the point of the whole interaction.
+  useEffect(() => {
+    if (resetToken === 0) {
+      return
+    }
+    amountRef.current?.querySelector('input')?.focus()
+  }, [resetToken])
+
+  const account = reference.accounts.find(
+    (entry) => entry.id === values.accountId,
+  )
+  const currencyCode: CurrencyCode =
+    account?.currencyCode ?? reference.baseCurrencyCode
+  const showsConversion = currencyCode !== reference.baseCurrencyCode
+
+  const patch = (next: Partial<TransactionFormValues>) =>
+    onChange({ ...values, ...next })
+
+  const submit = (addAnother: boolean) => {
+    setTouched(true)
+    if (Object.keys(errors).length > 0) {
+      return
+    }
+    onSubmit({ addAnother })
+  }
+
+  return (
+    <div
+      onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
+        // The repeat-entry accelerator. Bound on the wrapper rather than on the button so it fires
+        // from the note box too, where a bare Enter has to keep inserting a newline. React Aria's
+        // `Form` does not forward key handlers, hence the wrapper rather than a prop.
+        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault()
+          submit(allowRepeat)
+        }
+      }}
+    >
+      <Form
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit(false)
+        }}
+        className="flex flex-col gap-6"
+      >
+        {serverError === undefined ? null : (
+          <div
+            role="alert"
+            className="flex items-start gap-3 rounded-lg border border-negative/40 bg-negative-soft px-4 py-3"
+          >
+            <TriangleAlert
+              aria-hidden="true"
+              className="mt-0.5 size-5 shrink-0 text-negative"
+            />
+            <div className="min-w-0">
+              <p className="text-label font-semibold text-ink">
+                {t('transactions.form.error.title')}
+              </p>
+              <p className="mt-0.5 text-body text-ink-2">{serverError}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ---- The three things every entry needs -------------------------- */}
+        <div className="flex flex-col gap-4">
+          <RadioGroup
+            label={t('transactions.filter.direction')}
+            orientation="horizontal"
+            value={values.direction}
+            onChange={(value) => patch({ direction: value as LedgerDirection })}
+          >
+            <Radio value="expense">{t('transactions.direction.expense')}</Radio>
+            <Radio value="income">{t('transactions.direction.income')}</Radio>
+          </RadioGroup>
+
+          <div ref={amountRef}>
+            <AmountField
+              label={t('transactions.field.amount')}
+              value={values.amountMinor}
+              currencyCode={currencyCode}
+              onChange={(amountMinor) => patch({ amountMinor })}
+              errorMessage={shown.amountMinor}
+              isRequired
+              isDisabled={isSubmitting}
+              autoFocus={autoFocusAmount}
+              description={
+                showsConversion
+                  ? t('transactions.form.conversionNote', {
+                      currency: currencyName(currencyCode, locale),
+                      base: currencyName(reference.baseCurrencyCode, locale),
+                    })
+                  : undefined
+              }
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DatePicker
+              label={t('transactions.field.date')}
+              calendarLabel={t('transactions.filter.openCalendar')}
+              isRequired
+              isDisabled={isSubmitting}
+              errorMessage={shown.bookedOn}
+              value={safeParseDate(values.bookedOn)}
+              maxValue={today(getLocalTimeZone()).add({ years: 10 })}
+              onChange={(value: DateValue | null) => {
+                if (value !== null) {
+                  patch({ bookedOn: value.toString() })
+                }
+              }}
+            />
+
+            <Select
+              label={t('transactions.field.account')}
+              isRequired
+              isDisabled={isSubmitting}
+              errorMessage={shown.accountId}
+              selectedKey={values.accountId === '' ? null : values.accountId}
+              onSelectionChange={(key) => patch({ accountId: String(key) })}
+            >
+              {reference.accounts.map((option) => (
+                <SelectItem
+                  key={option.id}
+                  id={option.id}
+                  textValue={`${option.name} · ${option.currencyCode}`}
+                >
+                  {option.name} · {option.currencyCode}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        {/* ---- Everything else --------------------------------------------- */}
+        <FormSection legend={t('transactions.form.details')}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {reference.categories.length === 0 ? null : (
+              <ComboBox
+                label={t('transactions.field.category')}
+                placeholder={t('transactions.form.categoryPlaceholder')}
+                emptyState={t('transactions.filter.noMatches')}
+                isDisabled={isSubmitting}
+                items={reference.categories}
+                selectedKey={values.categoryId}
+                onSelectionChange={(key) =>
+                  patch({ categoryId: key === null ? null : String(key) })
+                }
+              >
+                {(option: { id: string; name: string }) => (
+                  <ComboBoxItem id={option.id} textValue={option.name}>
+                    {option.name}
+                  </ComboBoxItem>
+                )}
+              </ComboBox>
+            )}
+
+            {reference.payees.length === 0 ? null : (
+              <ComboBox
+                label={t('transactions.field.payee')}
+                placeholder={t('transactions.form.payeePlaceholder')}
+                emptyState={t('transactions.filter.noMatches')}
+                isDisabled={isSubmitting}
+                items={reference.payees}
+                selectedKey={values.payeeId}
+                onSelectionChange={(key) =>
+                  patch({ payeeId: key === null ? null : String(key) })
+                }
+              >
+                {(option: { id: string; name: string }) => (
+                  <ComboBoxItem id={option.id} textValue={option.name}>
+                    {option.name}
+                  </ComboBoxItem>
+                )}
+              </ComboBox>
+            )}
+
+            <Select
+              label={t('transactions.field.paymentMethod')}
+              isDisabled={isSubmitting}
+              selectedKey={values.paymentMethod ?? 'none'}
+              onSelectionChange={(key) =>
+                patch({
+                  paymentMethod:
+                    key === 'none' ? null : (key as LedgerPaymentMethod),
+                })
+              }
+            >
+              <SelectItem id="none" textValue={t('common.none')}>
+                {t('common.none')}
+              </SelectItem>
+              {LEDGER_PAYMENT_METHODS.map((method) => (
+                <SelectItem
+                  key={method}
+                  id={method}
+                  textValue={t(PAYMENT_METHOD_KEY[method])}
+                >
+                  {t(PAYMENT_METHOD_KEY[method])}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
+
+          <TextAreaField
+            label={t('transactions.field.note')}
+            placeholder={t('transactions.form.notePlaceholder')}
+            rows={3}
+            isDisabled={isSubmitting}
+            errorMessage={shown.note}
+            value={values.note}
+            onChange={(note) => patch({ note })}
+          />
+
+          {/*
+          A checkbox rather than a switch: this is a value the form will submit, not a setting that
+          takes effect the moment it is flipped. The distinction is audible — a screen reader says
+          "switch, on" for one and "checkbox, checked" for the other — so getting it wrong tells
+          somebody the transaction has already been marked planned when it has not.
+        */}
+          <Checkbox
+            isSelected={values.isPlanned}
+            isDisabled={isSubmitting}
+            onChange={(isPlanned) => patch({ isPlanned })}
+            description={t('transactions.planned.help')}
+          >
+            {t('transactions.planned')}
+          </Checkbox>
+        </FormSection>
+
+        <FormActions>
+          <Button variant="ghost" isDisabled={isSubmitting} onPress={onCancel}>
+            {t('action.cancel')}
+          </Button>
+          {allowRepeat ? (
+            <Button
+              variant="secondary"
+              isPending={isSubmitting}
+              onPress={() => submit(true)}
+            >
+              {t('transactions.form.saveAndNew')}
+            </Button>
+          ) : null}
+          <Button type="submit" variant="primary" isPending={isSubmitting}>
+            {submitLabel}
+          </Button>
+        </FormActions>
+
+        {allowRepeat ? (
+          <p className="-mt-3 text-end text-caption text-ink-2">
+            {t('transactions.form.saveAndNewHint')}
+          </p>
+        ) : null}
+      </Form>
+    </div>
+  )
+}
+
+/**
+ * The stored date as a calendar value, or `null` when it is not one.
+ *
+ * `parseDate` throws on anything that is not `YYYY-MM-DD`, and the one place that can happen is a
+ * value carried in from a URL. An empty date field plus the visible validation message is a better
+ * answer than a blank screen.
+ */
+function safeParseDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null
+  }
+  try {
+    return parseDate(value)
+  } catch {
+    return null
+  }
+}

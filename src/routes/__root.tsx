@@ -1,8 +1,10 @@
 import {
   HeadContent,
+  Link,
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
 
 import {
   DEFAULT_LOCALE,
@@ -10,8 +12,13 @@ import {
   loadCatalogue,
   useTranslate,
 } from '#/lib/i18n'
+import { EmptyState, buttonVariants } from '#/components/ui'
 import { themeBootstrapScript } from '#/lib/theme'
-import { negotiateRequestLocale } from '#/server/fns/locale'
+import {
+  LOCALE_COOKIE,
+  readLocaleCookieValue,
+} from '#/components/app/shell/locale-cookie'
+import { MAIN_CONTENT_ID } from '#/components/app/shell/main-content'
 
 import appCss from '../styles/app.css?url'
 
@@ -40,8 +47,13 @@ const FAVICON_SVG =
 
 const FAVICON_HREF = `data:image/svg+xml,${encodeURIComponent(FAVICON_SVG)}`
 
-/** The anchor the skip link jumps to. Every page layout owns an element with this id. */
-export const MAIN_CONTENT_ID = 'main-content'
+/**
+ * The anchor the skip link jumps to. Every page layout owns an element with this id.
+ *
+ * Re-exported rather than declared, so the skip link here and the `<main>` in each layout read the
+ * same constant. It is defined in its own module because those layouts must not import this one.
+ */
+export { MAIN_CONTENT_ID }
 
 /** What the shell needs before it can write a single byte of the document. */
 interface ShellData {
@@ -49,6 +61,37 @@ interface ShellData {
   readonly dir: Direction
   readonly messages: Catalogue
 }
+
+/**
+ * The negotiation chain, run against this request.
+ *
+ * `src/server/fns/locale.ts` owns the chain itself — user setting, then workspace setting, then
+ * `Accept-Language`, then English. What this adds is the first link: until `user_preferences` is a
+ * table, the reader's choice from the header's language picker lives in a cookie, and it has to be
+ * read **here**, on the server, before a byte is written. A choice applied after hydration is a
+ * document whose `<html lang>` states the previous language, which is what a screen reader picks
+ * its voice from.
+ *
+ * The cookie is client-writable, so its value is narrowed to a shipped tag rather than trusted;
+ * anything else falls through to the header exactly as an absent cookie does.
+ *
+ * Dynamic imports for the same reason every other route module uses them: this file is compiled
+ * into the browser bundle too, and `@tanstack/react-start/server` has no meaning there.
+ */
+const negotiateDocumentLocale = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<{ locale: Locale; dir: Direction }> => {
+    const [{ negotiateLocaleFrom }, { getCookie, getRequestHeader }] =
+      await Promise.all([
+        import('#/server/fns/locale'),
+        import('@tanstack/react-start/server'),
+      ])
+
+    return negotiateLocaleFrom({
+      storedLocale: () => readLocaleCookieValue(getCookie(LOCALE_COOKIE)),
+      acceptLanguage: () => getRequestHeader('accept-language') ?? null,
+    })
+  },
+)
 
 /** The language every request falls back to when negotiation cannot answer. */
 const SOURCE_LANGUAGE: ShellData = {
@@ -77,7 +120,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
    */
   loader: async (): Promise<ShellData> => {
     try {
-      const { locale, dir } = await negotiateRequestLocale()
+      const { locale, dir } = await negotiateDocumentLocale()
       return { locale, dir, messages: await loadCatalogue(locale) }
     } catch {
       return SOURCE_LANGUAGE
@@ -126,7 +169,48 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
+  notFoundComponent: NotFound,
 })
+
+/**
+ * What an unknown address renders.
+ *
+ * Without this the router falls back to a bare `<p>Not Found</p>` outside every stylesheet and
+ * every translation — which is what six of the nine rail destinations reached, because
+ * `components/app/nav/destinations.ts` deliberately links to routes later plans still own and
+ * "404s until then" was the stated behaviour. 404ing is fine; 404ing into an unstyled English
+ * fragment, in a product whose entire shell is translated, is not.
+ *
+ * It sits on the **root** route rather than on `_app`, so it also covers a mistyped marketing or
+ * auth URL. It deliberately does not render the app rail: a reader who is not signed in must not
+ * be shown a workspace navigation, and the one link out is the one that works from either state.
+ *
+ * The keys already existed — `empty.notFound.*` in both catalogues — and were never wired to
+ * anything. No new string, and therefore no new parity risk.
+ */
+function NotFound() {
+  const t = useTranslate()
+  return (
+    <main id={MAIN_CONTENT_ID} className="mx-auto w-full max-w-2xl px-4 py-24">
+      <EmptyState
+        headingLevel={2}
+        title={t('empty.notFound.title')}
+        description={t('empty.notFound.body')}
+        action={
+          // A real link painted as a button, the pattern `(auth)/reset-password.tsx` already uses:
+          // this navigates, so it must be an `<a>` — a `<Button>` here would give it no href, no
+          // middle-click and no place in a screen reader's link list.
+          <Link
+            to="/dashboard"
+            className={buttonVariants({ variant: 'primary', size: 'lg' })}
+          >
+            {t('empty.notFound.action')}
+          </Link>
+        }
+      />
+    </main>
+  )
+}
 
 function RootDocument({ children }: { children: ReactNode }) {
   // The shell renders outside `matchContext`, so the route-relative `useLoaderData()` has no
@@ -138,7 +222,19 @@ function RootDocument({ children }: { children: ReactNode }) {
     // hydrates, which is exactly the mismatch we want to allow. `lang` and `dir` are *not* in
     // that category: they are server-rendered from the negotiated locale and must match byte for
     // byte after hydration.
-    <html lang={locale} dir={dir} suppressHydrationWarning>
+    /*
+      `scroll-pt-16` and `scroll-pb-28` are WCAG 2.2 §2.4.11 and §2.4.12, expressed once for the
+      whole document: both layouts reserve the top 64px for a sticky header and the guarded shell
+      reserves the bottom for its mobile navigation bar, so anything the browser scrolls to — a
+      focused control, a fragment target — must come to rest inside those edges rather than
+      underneath them. The bottom reservation is dropped at `lg`, where the bar is not on screen.
+    */
+    <html
+      lang={locale}
+      dir={dir}
+      className="scroll-pt-16 scroll-pb-28 lg:scroll-pb-0"
+      suppressHydrationWarning
+    >
       <head>
         {/* First thing in <head>: commits the right palette with frame one. */}
         <script
