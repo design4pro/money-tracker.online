@@ -132,7 +132,7 @@ confirm the surface matches the description, and edit this file in the same PR a
 | `/analytics/net-worth`         | Net-worth history line                                     | `(confirm)`                                            |
 | `/analytics/spending`          | Category donut with drill-down                             | `(confirm)`                                            |
 | `/settings/categories`         | Editable two-level category tree                           | `(confirm)`                                            |
-| `/settings/data/import`        | Import mapping step of a file import                       | `(confirm)`                                            |
+| `/settings/data/import`        | Import mapping step of a file import                       | `/settings/data-management/import/csv`                 |
 | `/settings/billing`            | Current plan, usage, invoices                              | `(confirm)`                                            |
 
 **No equivalent surface is a valid answer.** These have no counterpart worth pairing, and a capture

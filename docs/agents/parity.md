@@ -126,6 +126,12 @@ place where our defining constraint is most exposed.
 **Natural owner.** `19-import.md`. Blocked on `OPEN-3` in `99-boundaries-and-blockers.md` if the
 implementation is a model call; not blocked if it is a parser.
 
+**Observed 2026-09-02, pixels only.** Their import surface is organised by _where the data comes
+from_, not by file format, in two groups - loose files and text, then migrations out of other
+products - and the unstructured path is the first entry of the first group, above delimited text.
+Ours is organised by format, which puts the weakest-signal case last. Ranking this gap first was
+independent of that round and the round agrees with it.
+
 ### 2. Every import format the ADR promised and no row mints
 
 **What it does.** Reading the two banking interchange formats, and migrating a person's history out
@@ -140,6 +146,11 @@ for any migration from another product. We are publishing a promise the row set 
 
 **Natural owner.** `19-import.md`, with an amendment to `99-boundaries-and-blockers.md` so `BND-30`
 and the ADR stop disagreeing.
+
+**Observed 2026-09-02, pixels only.** The two banking interchange formats have no entry on their
+import surface at all; the migrations out of other products do. So this gap is narrower than written:
+the interchange formats are a promise we made to _ourselves_ in the ADR and owe ourselves regardless,
+and the migrations are the part where a person moving between products can tell the difference.
 
 ### 3. Assisted classification as a reviewable batch over history
 
