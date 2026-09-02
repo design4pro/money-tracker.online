@@ -10,7 +10,8 @@ export interface AppHeaderProps {
 }
 
 /**
- * The one bar across the top of every guarded screen: which workspace, and who you are.
+ * The one bar across the top of every guarded screen: the viewer's own controls, and — only while
+ * there is no rail to hold it — which workspace they are in.
  *
  * ## What is not in it
  *
@@ -33,13 +34,16 @@ export function AppHeader({ shell }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-nav border-b border-border-subtle bg-canvas">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8">
-        <div className="min-w-0 flex-1">
+        {/* Only while there is no rail to hold it. From `lg` the household is pinned to the foot
+            of the rail instead, which leaves this bar to the three controls below and gives the
+            screen's own `<h1>` an uncontested first line. */}
+        <div className="min-w-0 flex-1 lg:hidden">
           <WorkspaceSwitcher shell={shell} />
         </div>
 
         {/* Three icon controls, 44px each including their grown hit areas. At 360px they occupy
             132px beside a switcher that truncates rather than wraps. */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5 lg:ms-auto">
           <ThemeMenu />
           <LocaleSwitcher />
           <UserMenu user={shell.user} />

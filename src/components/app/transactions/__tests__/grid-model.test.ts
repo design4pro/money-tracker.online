@@ -5,10 +5,13 @@ import { asCurrencyCode, asMinor, asRateE10 } from '#/lib/money'
 import {
   COLUMN_COUNT,
   COLUMN_INDEX,
+  DAY_HEADER_HEIGHT_PX,
   HEADER_ROW,
+  ROW_HEIGHT_PX,
   groupByDay,
   nextPosition,
   samePosition,
+  virtualItemHeight,
 } from '../grid-model'
 
 import type { CellPosition } from '../grid-model'
@@ -126,6 +129,13 @@ describe('samePosition', () => {
   })
 })
 
+describe('virtualItemHeight', () => {
+  it('adds the day heading to the row that opens a day, and to no other', () => {
+    expect(virtualItemHeight(false)).toBe(ROW_HEIGHT_PX)
+    expect(virtualItemHeight(true)).toBe(ROW_HEIGHT_PX + DAY_HEADER_HEIGHT_PX)
+  })
+})
+
 describe('groupByDay', () => {
   it('marks the first row of each day', () => {
     const rows = [
@@ -147,6 +157,30 @@ describe('groupByDay', () => {
     const { netByDay } = groupByDay({ rows, sort: BY_DATE, hasMore: false })
     expect(netByDay.get('2026-03-04')).toBe(1500)
     expect(netByDay.get('2026-03-03')).toBe(-700)
+  })
+
+  /**
+   * The regression this exists for: a heading that says `Day total` over a run of rows, printing a
+   * figure that is the first row's amount rather than that day's. Every day in a loaded page gets
+   * its own total, and each total is the sum of that day's rows and of nothing else.
+   */
+  it('gives every loaded day a total of its own rows only', () => {
+    const rows = [
+      row('a', '2026-03-04', 1000),
+      row('b', '2026-03-03', 2000),
+      row('c', '2026-03-03', 500),
+      row('d', '2026-03-01', 300, true),
+    ]
+    const { startsDay, netByDay } = groupByDay({
+      rows,
+      sort: BY_DATE,
+      hasMore: false,
+    })
+    expect(startsDay).toEqual([true, true, false, true])
+    expect(netByDay.size).toBe(3)
+    expect(netByDay.get('2026-03-04')).toBe(-1000)
+    expect(netByDay.get('2026-03-03')).toBe(-2500)
+    expect(netByDay.get('2026-03-01')).toBe(300)
   })
 
   it('omits the last day while another page is still to come', () => {

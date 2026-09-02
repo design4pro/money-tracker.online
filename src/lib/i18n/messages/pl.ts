@@ -293,6 +293,7 @@ const messages = {
   },
   'accounts.overview.excluded':
     'Konta zarchiwizowane oraz pomijane w raportach nie wchodzą do tych kwot.',
+  'accounts.overview.excluded.label': 'Co obejmują te kwoty',
   'accounts.byCurrency.title': 'Środki według waluty',
   'accounts.byCurrency.help':
     'Każda waluta sumuje się we własnych jednostkach. Nic nie jest tu przeliczane.',
@@ -330,6 +331,8 @@ const messages = {
   'accounts.detail.danger': 'Archiwizacja i usuwanie',
   'accounts.credit.title': 'Wykorzystany limit',
   'accounts.credit.valueText': 'wykorzystano {used} z {limit}, czyli {percent}',
+  'accounts.credit.ofLimit': '{used} z {limit}',
+  'accounts.credit.percentUsed': 'wykorzystano {percent}',
   'accounts.credit.within': 'W granicach limitu',
   'accounts.credit.approaching': 'Limit na wyczerpaniu',
   'accounts.credit.over': 'Limit przekroczony',
@@ -499,8 +502,23 @@ const messages = {
     many: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
     other: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
   },
-  'transactions.keyboard.hint':
-    'Strzałki przenoszą między komórkami. E edytuje, D duplikuje, Delete usuwa, spacja zaznacza, Enter otwiera.',
+  'transactions.keyboard.title': 'Skróty klawiszowe',
+  'transactions.keyboard.column.key': 'Klawisz',
+  'transactions.keyboard.column.action': 'Działanie',
+  'transactions.keyboard.keys.arrows': 'Strzałki',
+  'transactions.keyboard.keys.enter': 'Enter',
+  'transactions.keyboard.keys.space': 'Spacja',
+  'transactions.keyboard.keys.edit': 'E',
+  'transactions.keyboard.keys.duplicate': 'D',
+  'transactions.keyboard.keys.delete': 'Delete',
+  'transactions.keyboard.keys.help': '?',
+  'transactions.keyboard.move': 'Przechodzenie między komórkami',
+  'transactions.keyboard.open': 'Otwarcie transakcji',
+  'transactions.keyboard.select': 'Zaznaczenie wiersza',
+  'transactions.keyboard.edit': 'Edycja transakcji',
+  'transactions.keyboard.duplicate': 'Skopiowanie do nowego wpisu',
+  'transactions.keyboard.remove': 'Usunięcie transakcji',
+  'transactions.keyboard.help': 'Wyświetlenie tej listy',
 
   /* -- Transactions: filters ---------------------------------------------- */
   'transactions.filter.description':
@@ -510,6 +528,7 @@ const messages = {
   'transactions.filter.direction': 'Wpływy czy wydatki',
   'transactions.filter.accountGroup': 'Grupa kont',
   'transactions.filter.dateRange': 'Zakres dat',
+  'transactions.filter.anyDate': 'Dowolna data',
   'transactions.filter.openCalendar': 'Otwórz kalendarz',
   'transactions.filter.amountRange': 'Zakres kwot',
   'transactions.filter.amountMin': 'Co najmniej',
@@ -781,6 +800,9 @@ const messages = {
   'dashboard.cashFlow.surplus': 'Zostało Ci {amount}',
   'dashboard.cashFlow.deficit': 'Wydatki przewyższyły wpływy o {amount}',
   'dashboard.cashFlow.balanced': 'Wpływy i wydatki wyszły dokładnie na zero',
+  'dashboard.cashFlow.shareOfIncome': '{share} z {amount} wpływów',
+  'dashboard.cashFlow.context':
+    'Wybrany okres: {month}. Wcześniejsze miesiące to kontekst.',
   'dashboard.cashFlow.empty.title': 'W tym okresie nic się nie wydarzyło',
   'dashboard.cashFlow.empty.body':
     'Zapisz transakcję albo wybierz dłuższy okres.',

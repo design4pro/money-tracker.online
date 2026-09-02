@@ -133,6 +133,63 @@ describe('BarChart', () => {
     expect(cells).toEqual(['¥150,000', '¥120,000', '¥270,000'])
   })
 
+  it('names the unit the y axis counts in, once, rather than on every tick', () => {
+    const { container } = render(
+      <BarChart
+        locale="en"
+        currencyCode={PLN}
+        copy={copy}
+        series={[seriesOf('rent', 'Rent', [150000, 120000])]}
+      />,
+    )
+
+    // A dashboard can show two currencies at once, so a bare `12,000` on a plot is a number
+    // without a unit. Once, above the top tick — not suffixed onto five ticks, which is noise,
+    // and not into the tick gutter, which would take its width out of the plot.
+    const labels = [...container.querySelectorAll('text')].map(
+      (node) => node.textContent,
+    )
+    expect(labels.filter((label) => label === 'zł')).toHaveLength(1)
+  })
+
+  it('marks a category with a band squared to the plot, under the gridlines', () => {
+    const { container } = render(
+      <BarChart
+        locale="en"
+        currencyCode={PLN}
+        copy={copy}
+        layout="grouped"
+        emphasis={[false, true]}
+        series={[
+          seriesOf('in', 'Money in', [500000, 480000]),
+          seriesOf('out', 'Money out', [310000, 402000]),
+        ]}
+      />,
+    )
+
+    const band = container.querySelector('rect.fill-chart-emphasis')
+    expect(band).not.toBeNull()
+
+    // Gridlines are drawn from the zero tick upwards, so the first is the baseline and the last
+    // is the top of the domain.
+    const gridlines = [
+      ...container.querySelectorAll('line.stroke-border-subtle'),
+    ]
+    const y = Number(band?.getAttribute('y'))
+    const height = Number(band?.getAttribute('height'))
+
+    // Top of the domain to the baseline, and not a pixel past either. The band used to start half
+    // a gutter *above* the top gridline, which drew a box whose top edge claimed a value no bar
+    // in it reached.
+    expect(y).toBe(Number(gridlines.at(-1)?.getAttribute('y1')))
+    expect(y + height).toBe(Number(gridlines.at(0)?.getAttribute('y1')))
+
+    // And under the gridlines in paint order — only readable at all because the fill is an alpha
+    // rather than the opaque well it used to be, which hid every line that crossed it.
+    const order = band?.compareDocumentPosition(gridlines[0]) ?? 0
+    expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('draws a designed empty state instead of an empty table', () => {
     render(
       <BarChart

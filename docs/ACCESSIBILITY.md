@@ -188,6 +188,8 @@ conformance claim in §1) or are one of the five claimed in §3.
 and 2560px, in both locales. The gate:
 
 - Any violation at **`serious` or `critical` fails the build.** There is no waiver list for these.
+  §5.5 is not one: it records the single case where axe reports a defect **in itself**, and it
+  substitutes a stronger assertion rather than lowering the bar.
 - A `moderate` violation must be named and justified in the stage's Verification block, or it fails.
 - The tolerance list for console messages is fixed and **no stage may append to it to green its own
   run**. React hydration mismatches are never tolerated.
@@ -224,6 +226,103 @@ Every stage's Verification block owes, and an auditor checks:
 
 These three gaps are the honest limit of what §1 claims, and they are listed here rather than
 omitted. When any of them is done, this section is updated first and the claim second.
+
+### 5.5 Corrections applied to the tool, and the one on record
+
+A testing tool can be wrong. When it is, the answer is neither to believe it and damage the product
+nor to switch the rule off — it is to establish what a reader actually gets, correct the tool by the
+narrowest possible amount, and assert the behaviour the correction claims. This section is the whole
+list. It has one entry.
+
+#### axe-core 4.13.0 · `aria-allowed-attr` · the credit meter on `/accounts`
+
+|                 |                                                                                                                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Reported**    | `critical` · `aria-allowed-attr` — "ARIA attributes are not allowed: `aria-valuenow`, `aria-valuemin`, `aria-valuemax`, `aria-valuetext`", on the credit-utilisation meter, in both themes and both locales (four scans). |
+| **Element**     | `src/components/ui/meter.tsx`, used by `src/components/app/accounts/credit-utilisation.tsx`.                                                                                                                              |
+| **Verdict**     | **False positive. A defect in axe-core, not in the product.**                                                                                                                                                             |
+| **Decided**     | 2026-09-02                                                                                                                                                                                                                |
+| **Re-check by** | **2027-03-01**, or the next axe-core upgrade, whichever comes first.                                                                                                                                                      |
+
+**What the markup does.** React Aria's `Meter` renders `role="meter progressbar"`. ARIA 1.2 reads
+`role` as a space-separated _list_ of role tokens and requires the agent to use the first one it
+supports, which makes the list the standard way to ship a newer role with an older one behind it.
+`@react-aria/meter` emits it deliberately; its own comment names Chromium bug 944542 and Firefox bug
+1460378 as the reason. Both are long closed — Firefox shipped the ARIA `meter` role in **Firefox 93,
+October 2021** — so the second token is now vestigial for every engine this product is tested in.
+All four attributes axe names are allowed on `meter`.
+
+**What axe does wrong.** In `axe-core@4.13.0`, `ariaAllowedAttrEvaluate` calls `getRole(vNode)`
+**without** `{ fallback: true }`, and `getExplicitRole` then evaluates
+`const roleList = fallback ? tokenList(roleAttr) : [roleAttr]` — so `"meter progressbar"` is looked
+up as though it were one role name, nothing matches, and the element resolves to _no role at all_.
+A role-less element is allowed only the global attributes, so every value attribute on it is
+flagged. axe owns the token-list splitter; this one check does not ask for it. Reproduced on a
+minimal fixture: 4.13.0 flags `role="meter progressbar"` **and** `role="progressbar meter"`, and
+does not flag `role="meter"` — token order makes no difference, which is the signature of a
+resolution failure rather than a judgement about `meter`.
+
+**What a reader actually gets.** Chrome's own accessibility tree, dumped over CDP on this page,
+computes the node as `role: "meter"`, `name: "zł 1,692.11 of zł 10,000.00 used, 17%"`,
+`value: 0.169…`, `valuemin: 0`, `valuemax: 1` — byte for byte the tree it computes for a
+hand-written `role="meter"` carrying the same attributes. WebKit resolves the list to `meter` as
+well. The role is right, the name is the whole sentence rather than a bare percentage, and the
+value is exposed.
+
+**The two routes considered.**
+
+1. _Force a single `role="meter"` onto the node with a ref after mount._ Rejected — but not
+   dismissed, and the case for it is real: the second token buys nothing in any engine we test in,
+   and Adobe's own newer system, Spectrum Web Components 2nd generation, is replacing
+   `role="meter progressbar"` with `role="meter"` for exactly that reason. What is rejected is doing
+   it _here, at runtime_. It writes to the DOM behind React's back on a server-rendered document, so
+   the streamed markup and the hydrated markup disagree for the length of the hydration; it has to
+   be re-applied whenever React rewrites the attribute; and it changes correct, working markup in a
+   vendored component to please a tool that admits it is wrong about it. The right place for that
+   change is upstream in `@react-aria/meter`, whose stated reason for the fallback (no `meter` in
+   Firefox) expired in 2021 — **raise it there** rather than patching the symptom in this
+   repository. Forking `Meter` onto our own `useMeter()` call would also work and is the fallback
+   plan if this correction ever has to be removed before axe is fixed.
+2. _Correct the tool, narrowly, in the spec that runs it._ **Chosen.** Cheapest to reverse, changes
+   nothing a reader receives, and leaves the product markup matching what the library ships.
+
+**How narrow, exactly.** `e2e/accessibility.spec.ts` drops an `aria-allowed-attr` node only when all
+three of these hold:
+
+- the rule is `aria-allowed-attr` — every other rule is untouched;
+- the **live** element's `role` attribute is exactly `meter progressbar` — read from the DOM, not
+  from axe's truncated HTML snippet;
+- **every** attribute axe flagged is one of `aria-valuenow`, `aria-valuemin`, `aria-valuemax`,
+  `aria-valuetext`.
+
+The rule stays enabled, on this page and on every node of it. Nothing is excluded from the scan and
+no rule is disabled. Verified by injecting faults: adding a fifth attribute (`aria-checked`) to that
+same meter fails the build, and an unrelated role-less element carrying `aria-valuenow` fails the
+build, both reported in full.
+
+**What replaces the dropped finding.** `the credit meter on accounts announces as a meter, with its
+whole sentence as the name` in the same spec asserts, positively, that the fallback list is present,
+that every one of them resolves to `meter` and none to `progressbar`, that the accessible name is
+the sentence, and — on Chromium, over CDP — that the browser's own accessibility tree agrees. That
+is a stronger claim than the rule it stands in for, which only ever checked an attribute list.
+`src/components/ui/__tests__/meter.test.tsx` pins the role string the correction is scoped to, so a
+React Aria upgrade that changes it fails in unit tests rather than silently un-scoping the
+correction.
+
+**How this entry is removed.** When `aria-allowed-attr` passes `{ fallback: true }` to `getRole`,
+delete `isMeterFallbackRoleArtefact` and `withoutKnownAxeDefects` from the spec and delete this
+subsection. Tracking: <https://github.com/dequelabs/axe-core/issues/3768> — "Support fallback roles",
+open, milestoned for axe-core **5.0**, no date, and reported there against this exact component
+("We noticed this on the Adobe React Spectrum meter component", December 2024). Note that axe-core
+4.11 taught **only** `aria-prohibited-attr` to split the list
+(<https://github.com/dequelabs/axe-core/pull/4325>, whose author says plainly "At this time, I do not
+plan to add fallback roles support for other checks"), so a patch-level upgrade will not clear this
+and the re-check must actually re-read the check rather than assume.
+
+Adding a **second** entry to this section requires the same evidence this one carries — the
+browser's own accessibility tree, the mechanism inside the tool, both routes weighed, and a re-check
+date — and an ADR, because a list of tool corrections that grows without one is a waiver list
+wearing a different hat.
 
 ---
 

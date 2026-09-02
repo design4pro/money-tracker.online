@@ -6,6 +6,7 @@ import {
   monthRange,
   monthsIn,
   periodRange,
+  trailingMonths,
 } from '../period'
 
 /**
@@ -109,3 +110,29 @@ describe('isDashboardPeriod', () => {
     expect(isDashboardPeriod(3)).toBe(false)
   })
 })
+
+describe('trailingMonths', () => {
+  it('ends at the month it was given and walks back by calendar months', () => {
+    expect(trailingMonths('2026-03-01', 6)).toEqual([
+      '2025-10-01',
+      '2025-11-01',
+      '2025-12-01',
+      '2026-01-01',
+      '2026-02-01',
+      '2026-03-01',
+    ])
+  })
+
+  it('crosses a year boundary as a calendar does, not as 30-day steps do', () => {
+    expect(trailingMonths('2026-01-01', 3)).toEqual([
+      '2025-11-01',
+      '2025-12-01',
+      '2026-01-01',
+    ])
+  })
+
+  it('answers the month itself when asked for one', () => {
+    expect(trailingMonths('2026-03-14', 1)).toEqual(['2026-03-01'])
+  })
+})
+

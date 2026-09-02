@@ -159,9 +159,19 @@ export function SeriesMarker({
   }
 }
 
-/** The strokes that make one pattern tile, drawn over a tinted ground of the same hue. */
-function patternStrokes(slot: number, colour: string): ReactNode {
-  const stroke = { stroke: colour, strokeWidth: 2, fill: 'none' } as const
+/**
+ * The strokes that make one pattern tile, drawn over a tinted ground of the same hue.
+ *
+ * The geometry is authored on an 8-unit grid whatever the tile is actually drawn at:
+ * {@link useChartPatterns} scales it, and divides `strokeWidth` back out so the *drawn* stroke is
+ * the width the caller asked for at any pitch.
+ */
+function patternStrokes(
+  slot: number,
+  colour: string,
+  strokeWidth: number,
+): ReactNode {
+  const stroke = { stroke: colour, strokeWidth, fill: 'none' } as const
   switch (slot) {
     case 0:
       return null
@@ -191,16 +201,39 @@ export interface ChartPatterns {
   readonly patternIdFor: (index: number) => string
 }
 
+/** How coarse a chart's fill patterns are drawn. */
+export interface ChartPatternOptions {
+  /**
+   * The tile's edge in user units — the pattern's pitch. 8 by default, which puts a diagonal
+   * about 5.7px from its neighbour: right for a bar, where a segment is a wide flat shape.
+   *
+   * **A donut wants a coarser tile.** On a ring the strokes follow the arc, so their spacing
+   * changes with the radius and a tight pitch beats against the curve — visible moiré at the
+   * inner edge, where the tile is most compressed. The pattern stops reading as a *distinguishing
+   * mark* and starts reading as texture noise, which is the one job it has. 12 puts the diagonals
+   * ~8.5px apart and the beating disappears.
+   */
+  readonly tile?: number
+  /** The drawn stroke width, whatever the tile is scaled to. 2 by default; 1 for a coarse tile. */
+  readonly strokeWidth?: number
+}
+
 /**
  * Instance-local `<pattern>` definitions for `count` series.
  *
- * The tile is 8×8 in user space, so a pattern reads the same whether it fills a 4px bar segment
- * or a 120px donut ring.
+ * The tile geometry is authored on an 8-unit grid and scaled to `tile`, so one set of paths serves
+ * every pitch and the strokes stay the width they were asked for — `strokeWidth` is divided by the
+ * scale before it is drawn.
  */
-export function useChartPatterns(count: number): ChartPatterns {
+export function useChartPatterns(
+  count: number,
+  options: ChartPatternOptions = {},
+): ChartPatterns {
+  const { tile = 8, strokeWidth = 2 } = options
   const prefix = useId()
   const slots = Array.from({ length: count }, (_, index) => seriesSlot(index))
   const unique = [...new Set(slots)]
+  const scale = tile / 8
 
   const idFor = (index: number): string =>
     `${prefix}pattern-${seriesSlot(index)}`
@@ -219,12 +252,14 @@ export function useChartPatterns(count: number): ChartPatterns {
               <pattern
                 key={slot}
                 id={`${prefix}pattern-${slot}`}
-                width={8}
-                height={8}
+                width={tile}
+                height={tile}
                 patternUnits="userSpaceOnUse"
               >
-                <rect width={8} height={8} fill={colour} opacity={0.3} />
-                {patternStrokes(slot, colour)}
+                <g transform={`scale(${scale})`}>
+                  <rect width={8} height={8} fill={colour} opacity={0.3} />
+                  {patternStrokes(slot, colour, strokeWidth / scale)}
+                </g>
               </pattern>
             )
           })}

@@ -26,6 +26,17 @@ import type { DashboardTransaction } from './types'
  *
  * Formatted in UTC from `YYYY-MM-DD` and never given a timezone — a booked date that shifts by a
  * day because the reader is in Auckland is a bug people never report and never trust again.
+ *
+ * ## Three columns, and the list owns the tracks
+ *
+ * The type word and the amount used to flow right against each other, so `Expense` and `Income`
+ * started at two different x positions and their arrows did too — six rows of a ragged edge in
+ * the middle of the panel, and no column of money to read down. The **list** is the grid now and
+ * each row is `grid-cols-subgrid` across it, which is the only arrangement that makes the tracks
+ * shared: a per-row grid sizes its own columns and aligns with nothing above it. The two content
+ * tracks are `auto`, so they take the widest type word and the widest amount in *this* list, in
+ * whatever language and currencies it happens to be in, rather than a hard-coded px width that a
+ * Polish label or a seven-figure amount overflows.
  */
 export interface RecentTransactionsWidgetProps {
   readonly transactions: ReadonlyArray<DashboardTransaction>
@@ -58,12 +69,12 @@ export function RecentTransactionsWidget({
     <div className="flex flex-col gap-3">
       <ul
         role="list"
-        className="flex list-none flex-col divide-y divide-border-subtle"
+        className="grid list-none grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4"
       >
         {transactions.map((entry) => (
           <li
             key={entry.id}
-            className="flex items-start justify-between gap-3 py-2.5"
+            className="col-span-full grid grid-cols-subgrid items-baseline border-t border-border-subtle py-2.5 first:border-t-0"
           >
             <div className="min-w-0">
               <p className="truncate text-body text-ink">{entry.title}</p>
@@ -72,7 +83,7 @@ export function RecentTransactionsWidget({
               </p>
             </div>
             <DirectionalAmount
-              className="shrink-0"
+              layout="cells"
               locale={locale}
               direction={entry.direction}
               amountMinor={entry.amountMinor}

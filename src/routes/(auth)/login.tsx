@@ -115,51 +115,67 @@ function SignInScreen() {
         </>
       }
     >
-      <Form
-        onSubmit={(event) => void submit(event)}
-        validationErrors={fieldErrors}
-        className="gap-6"
-      >
-        {failure === null ? null : <FormError message={failure} />}
-
-        <TextField
-          name="email"
-          type="email"
-          size="lg"
-          label={t('auth.field.email')}
-          autoComplete="email"
-          autoCorrect="off"
-          spellCheck="false"
-          isRequired
+      {/* One block, so the 32px the provider group sets above its rule is also the gap below it. */}
+      <div className="flex flex-col gap-8">
+        <SocialProviders
+          providers={authConfig.providers}
+          callbackURL={target}
         />
 
-        <PasswordField
-          name="password"
-          label={t('auth.field.password')}
-          autoComplete="current-password"
-          isRequired
-          labelAction={
-            <Link
-              to="/forgot-password"
-              className={linkVariants({ size: 'sm' })}
-            >
-              {t('auth.forgot.link')}
-            </Link>
-          }
-        />
-
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          block
-          isPending={isPending}
+        <Form
+          onSubmit={(event) => void submit(event)}
+          validationErrors={fieldErrors}
+          className="gap-6"
         >
-          {t('auth.signIn.submit')}
-        </Button>
-      </Form>
+          {failure === null ? null : <FormError message={failure} />}
 
-      <SocialProviders providers={authConfig.providers} callbackURL={target} />
+          <TextField
+            name="email"
+            type="email"
+            size="lg"
+            label={t('auth.field.email')}
+            autoComplete="email"
+            autoCorrect="off"
+            spellCheck="false"
+            isRequired
+          />
+
+          <PasswordField
+            name="password"
+            label={t('auth.field.password')}
+            autoComplete="current-password"
+            isRequired
+            labelAction={
+              /*
+              `md` (13px), not the 12px `sm` this row would default to: this is the second-most
+              used control on the screen and it was the smallest type on it. `target-min` grows the
+              hit area to 44px (WCAG 2.2 §2.5.5) with a pseudo-element, so the label row keeps its
+              baseline — the field below is later in the DOM and therefore still wins the few
+              pixels where the two overlap.
+            */
+              <Link
+                to="/forgot-password"
+                className={linkVariants({
+                  size: 'md',
+                  className: 'target-min',
+                })}
+              >
+                {t('auth.forgot.link')}
+              </Link>
+            }
+          />
+
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            block
+            isPending={isPending}
+          >
+            {t('auth.signIn.submit')}
+          </Button>
+        </Form>
+      </div>
     </AuthCard>
   )
 }

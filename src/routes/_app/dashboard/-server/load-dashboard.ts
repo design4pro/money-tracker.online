@@ -8,6 +8,7 @@ import {
   monthRange,
   monthsIn,
   periodRange,
+  trailingMonths,
 } from '#/components/app/dashboard'
 import { createTranslator, loadCatalogue } from '#/lib/i18n'
 import { asCurrencyCode, asMinor, subtractMinor, sumMinor } from '#/lib/money'
@@ -56,7 +57,8 @@ import type { TransactionPolicies } from '#/server/repos/transactions'
  *
  * ## The header cannot disagree with the chart
  *
- * The period totals are not queried. They are `sumMinor` over the month buckets the chart draws,
+ * The period totals are not queried. They are `sumMinor` over the month buckets the chart draws —
+ * the ones marked `inPeriod`, since a one-month period is drawn against trailing context months —
  * so the two are the same integers by construction rather than by two queries agreeing. The
  * periods are all month-aligned, which is what makes that sound.
  *
@@ -93,6 +95,15 @@ const LEDGER_POLICIES: TransactionPolicies = {
 
 /** How many rows the recent panel holds. Small on purpose: it is a glance, not the ledger. */
 const RECENT_LIMIT = 6
+
+/**
+ * How many months the cash-flow chart draws when the period is a single month.
+ *
+ * Six: enough for a reader to see a normal month and an unusual one apart, short enough that every
+ * bar still has a width worth reading at a panel's size, and cheap enough that the extra aggregates
+ * stay inside one round of concurrency.
+ */
+const CONTEXT_MONTHS = 6
 
 /**
  * How many named slices the donut draws before the rest is folded into "Other".
@@ -145,8 +156,11 @@ export const loadDashboard = createServerFn({ method: 'GET' })
       payees.map(({ payee }) => [payee.id, payee.name]),
     )
 
-    const incomeMinor = sumMinor(buckets.map((bucket) => bucket.incomeMinor))
-    const expenseMinor = sumMinor(buckets.map((bucket) => bucket.expenseMinor))
+    // The selected period alone. The chart may also carry trailing context months, and counting
+    // those in the header would report six months of spending under a heading that says March.
+    const selected = buckets.filter((bucket) => bucket.inPeriod)
+    const incomeMinor = sumMinor(selected.map((bucket) => bucket.incomeMinor))
+    const expenseMinor = sumMinor(selected.map((bucket) => bucket.expenseMinor))
 
     return {
       baseCurrencyCode,
@@ -230,16 +244,27 @@ async function spendingSlices(
   ]
 }
 
-/** One `sumTransactions` per month in the range, concurrently. See the note on the known cost. */
+/**
+ * One `sumTransactions` per month drawn, concurrently. See the note on the known cost.
+ *
+ * **A one-month period is drawn against its trailing months.** `thisMonth` and `lastMonth` resolve
+ * to a single bucket, and a single bucket is not a chart: two bars alone in a plot answer "how much"
+ * and cannot answer "is that a lot", which is the only question anyone brings to a cash-flow panel.
+ * The extra months are marked `inPeriod: false` and every total on the screen ignores them, so the
+ * context costs five more concurrent aggregates and changes no figure the header states.
+ */
 async function cashFlowBuckets(
   scope: TenantScope,
   range: { readonly from: string; readonly to: string },
   baseCurrencyCode: DashboardData['baseCurrencyCode'],
 ): Promise<ReadonlyArray<CashFlowBucket>> {
   const months = monthsIn(range)
+  const selected = new Set(months)
+  const drawn =
+    months.length === 1 ? trailingMonths(months[0], CONTEXT_MONTHS) : months
 
   return Promise.all(
-    months.map(async (firstDay): Promise<CashFlowBucket> => {
+    drawn.map(async (firstDay): Promise<CashFlowBucket> => {
       const month = monthRange(firstDay)
       const totals = await sumTransactions({
         scope,
@@ -254,6 +279,7 @@ async function cashFlowBuckets(
         incomeMinor: totals.incomeMinor,
         expenseMinor: totals.expenseMinor,
         netMinor: totals.netMinor,
+        inPeriod: selected.has(firstDay),
       }
     }),
   )

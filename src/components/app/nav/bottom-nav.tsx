@@ -66,6 +66,11 @@ interface BottomTabProps {
 /**
  * One tab. The current one is marked three ways — `aria-current`, a 3px rule along the top edge,
  * and a weight-plus-colour change — for the reason spelled out in `nav-link.tsx`.
+ *
+ * The rule is painted in `ink`, not in the brand blue. A single saturated hue on the one active
+ * tab was the only chromatic mark in a warm-monochrome system, and it read as an unstyled
+ * framework default rather than as a decision; `negative` on an overdrawn balance is the one
+ * chromatic event the surface is allowed.
  */
 function BottomTab({ destination, isActive, label }: BottomTabProps) {
   const { href, Icon } = destination
@@ -85,7 +90,7 @@ function BottomTab({ destination, isActive, label }: BottomTabProps) {
       {isActive ? (
         <span
           aria-hidden="true"
-          className="absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-brand"
+          className="absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-ink"
         />
       ) : null}
       <Icon className="size-5 shrink-0" />

@@ -108,56 +108,64 @@ function SignUpScreen() {
         </>
       }
     >
-      <Form
-        onSubmit={(event) => void submit(event)}
-        validationErrors={fieldErrors}
-        className="gap-6"
-      >
-        {failure === null ? null : <FormError message={failure} />}
-
-        <TextField
-          name="name"
-          size="lg"
-          label={t('auth.field.name')}
-          autoComplete="name"
-          isRequired
+      {/* One block, so the 32px the provider group sets above its rule is also the gap below it. */}
+      <div className="flex flex-col gap-8">
+        <SocialProviders
+          providers={authConfig.providers}
+          callbackURL={target}
         />
 
-        <TextField
-          name="email"
-          type="email"
-          size="lg"
-          label={t('auth.field.email')}
-          autoComplete="email"
-          autoCorrect="off"
-          spellCheck="false"
-          isRequired
-        />
-
-        <PasswordField
-          name="password"
-          label={t('auth.field.password')}
-          autoComplete="new-password"
-          // The rule is stated *before* it is broken. WCAG 2.2 §3.3.2: a requirement a reader can
-          // only discover by failing is a requirement that was not labelled.
-          description={t('auth.password.help', { count: MIN_PASSWORD_LENGTH })}
-          isRequired
-        />
-
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          block
-          isPending={isPending}
+        <Form
+          onSubmit={(event) => void submit(event)}
+          validationErrors={fieldErrors}
+          className="gap-6"
         >
-          {t('auth.signUp.submit')}
-        </Button>
+          {failure === null ? null : <FormError message={failure} />}
 
-        <p className="text-caption text-ink-2">{t('auth.signUp.terms')}</p>
-      </Form>
+          <TextField
+            name="name"
+            size="lg"
+            label={t('auth.field.name')}
+            autoComplete="name"
+            isRequired
+          />
 
-      <SocialProviders providers={authConfig.providers} callbackURL={target} />
+          <TextField
+            name="email"
+            type="email"
+            size="lg"
+            label={t('auth.field.email')}
+            autoComplete="email"
+            autoCorrect="off"
+            spellCheck="false"
+            isRequired
+          />
+
+          <PasswordField
+            name="password"
+            label={t('auth.field.password')}
+            autoComplete="new-password"
+            // The rule is stated *before* it is broken. WCAG 2.2 §3.3.2: a requirement a reader can
+            // only discover by failing is a requirement that was not labelled.
+            description={t('auth.password.help', {
+              count: MIN_PASSWORD_LENGTH,
+            })}
+            isRequired
+          />
+
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            block
+            isPending={isPending}
+          >
+            {t('auth.signUp.submit')}
+          </Button>
+
+          <p className="text-caption text-ink-2">{t('auth.signUp.terms')}</p>
+        </Form>
+      </div>
     </AuthCard>
   )
 }

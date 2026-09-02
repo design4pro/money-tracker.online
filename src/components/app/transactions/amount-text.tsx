@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Repeat } from 'lucide-react'
+import { Repeat } from 'lucide-react'
 
 import { amountReading } from '#/components/app/money'
 import { cn } from '#/lib/cn'
@@ -13,16 +13,23 @@ import type { LedgerRow } from './types'
  *
  * ## The reading is not the drawing
  *
- * The visible figure is `−20,00 zł`: a sign, tabular figures, a narrow symbol, a direction arrow
- * and one of the reserved amount hues. That is four channels for a sighted reader and none at all
- * for somebody listening, because a narrow symbol is announced inconsistently and a minus sign in
- * front of a number is not the same sentence as "an expense".
+ * The visible figure is `−20,00 zł`: a sign, tabular figures, a narrow symbol and one of the
+ * reserved amount hues. That is three channels for a sighted reader and none at all for somebody
+ * listening, because a narrow symbol is announced inconsistently and a minus sign in front of a
+ * number is not the same sentence as "an expense".
+ *
+ * There used to be a fourth: an up or down arrow in front of every figure. It was removed because
+ * the sign already says the same thing at the same glance, and because a glyph in front of a
+ * right-aligned number gives the column two left edges — one for the arrow, one for the digits —
+ * so nothing in it lines up. The transfer mark stays, and only that one: a transfer is drawn in the
+ * muted hue and carries a minus like an expense, so with no glyph the *only* thing separating the
+ * two would be colour, which `docs/ACCESS` does not allow.
  *
  * So the cell carries two strings: the drawing, marked `aria-hidden`, and a full sentence in an
  * `sr-only` span — _"Expense of 20.00 Polish zlotys"_ — built with `currencyDisplay: 'name'`, which
  * is the one display mode that reads correctly in both locales this product ships. `docs/ACCESS`'s
- * colour rule is satisfied twice over: the sign and the arrow are both non-colour channels, and the
- * screen-reader sentence names the direction in words.
+ * colour rule is satisfied twice over: the sign is a non-colour channel, and the screen-reader
+ * sentence names the direction in words.
  *
  * ## No arithmetic happens here
  *
@@ -55,14 +62,19 @@ function toneOf(
   return row.direction === 'income' ? 'income' : 'expense'
 }
 
+/**
+ * The transfer mark, and nothing else.
+ *
+ * Income and expense are told apart by their sign, so an arrow beside them is a third statement of
+ * the same fact and a ragged left edge on a right-aligned column. A transfer has no sign of its own
+ * — it is drawn muted and minus-prefixed — so this glyph is the non-colour channel that keeps it
+ * from being "an expense in a different grey".
+ */
 function GlyphFor({ tone }: { tone: AmountTone }) {
   if (tone === 'transfer') {
     return <Repeat aria-hidden="true" className="size-3.5 shrink-0" />
   }
-  if (tone === 'income') {
-    return <ArrowDownLeft aria-hidden="true" className="size-3.5 shrink-0" />
-  }
-  return <ArrowUpRight aria-hidden="true" className="size-3.5 shrink-0" />
+  return null
 }
 
 export interface AmountTextProps {
@@ -71,13 +83,13 @@ export interface AmountTextProps {
   readonly direction: LedgerRow['direction']
   readonly isPlanned?: boolean
   readonly transferKind?: LedgerRow['transferKind']
-  /** Drop the arrow — for a footer figure that already sits under a worded label. */
+  /** Drop the transfer mark too — for a footer figure that already sits under a worded label. */
   readonly hideGlyph?: boolean
   readonly className?: string
 }
 
 /**
- * A transaction amount: sign, arrow, hue, and a spoken sentence that names the currency in full.
+ * A transaction amount: sign, hue, and a spoken sentence that names the currency in full.
  */
 export function AmountText({
   amountMinor,

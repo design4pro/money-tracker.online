@@ -74,10 +74,19 @@ export function Label({
       {isRequired ? (
         /**
          * Decorative. The asterisk is a convention, not an announcement — the
-         * control already carries `aria-required` from its RAC container, and a
-         * screen reader reading "asterisk" after every label is noise.
+         * control already carries the requirement from its RAC container (the
+         * HTML `required` attribute by default, `aria-required` when validation
+         * is delegated to ARIA), and a screen reader reading "asterisk" after
+         * every label is noise.
+         *
+         * It is not red. Red in this product means *a thing has gone wrong*,
+         * and spending it on the resting state of a field that has not been
+         * filled in yet leaves nothing to say the field was rejected. It also
+         * sits a full space away from the label's last letter and a size step
+         * below it, because at 13px an asterisk set flush against a terminal
+         * "s" reads as a typo rather than as a marker.
          */
-        <span className="ms-0.5 text-negative" aria-hidden="true">
+        <span className="ms-1 text-[0.85em] text-ink-2" aria-hidden="true">
           *
         </span>
       ) : null}

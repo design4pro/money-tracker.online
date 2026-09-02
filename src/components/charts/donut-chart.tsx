@@ -139,7 +139,9 @@ export function DonutChart({
     })
   })()
 
-  const patterns = useChartPatterns(drawn.length)
+  // Coarser than the bar chart's. See `ChartPatternOptions.tile` for the measurement: on an arc a
+  // tight pitch beats against the curve and the pattern stops being a distinguishing mark.
+  const patterns = useChartPatterns(drawn.length, { tile: 12, strokeWidth: 1 })
   const focused = drawn.find((slice) => slice.id === focusedId) ?? null
 
   return (
@@ -250,10 +252,14 @@ function DonutRing({
   const outer = Math.max(Math.min(size, width) / 2 - 10, 8)
   const inner = outer * 0.6
 
+  // The gap between two slices is the card's own ground showing through, and it is what makes the
+  // boundary between them a *shape* rather than a change in pattern density. 0.012 rad was under a
+  // pixel at this radius — a hairline the pattern swallowed. 0.03 is ~3px at the outer edge and
+  // still leaves the smallest slice the donut draws (1%) most of its arc.
   const shape = arc<DrawnSlice>()
     .innerRadius(inner)
     .outerRadius(outer)
-    .padAngle(drawn.length > 1 ? 0.012 : 0)
+    .padAngle(drawn.length > 1 ? 0.03 : 0)
     .startAngle((slice) => slice.startAngle)
     .endAngle((slice) => slice.endAngle)
 

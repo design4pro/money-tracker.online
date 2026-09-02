@@ -44,6 +44,19 @@ export interface FormatMoneyOptions {
   readonly grouping?: boolean
   /** `'auto'` hides the sign on positives; `'always'` shows it. */
   readonly signDisplay?: 'auto' | 'always' | 'exceptZero' | 'never'
+  /**
+   * Overrides how many fraction digits are *drawn*. The amount is still scaled
+   * by the currency's own `digits` — this changes the rendering, never the
+   * arithmetic.
+   *
+   * It exists for one caller: a chart axis, whose ticks are whole major units
+   * by construction and for which `12 000,00` is four characters of precision
+   * nobody reads. **Passing a value smaller than the currency's scale to
+   * anything that is not a whole major unit rounds the drawn figure**, so the
+   * axis checks that before it asks (`components/charts/format.ts`). Nothing
+   * that shows a real balance may use it.
+   */
+  readonly fractionDigits?: number
 }
 
 interface FormatterKeyParts extends FormatMoneyOptions {
@@ -152,9 +165,113 @@ export function formatMoney(
     ...options,
     locale,
     currencyCode: amount.currencyCode,
-    digits,
+    digits: options.fractionDigits ?? digits,
   }).format(majorOf(amount.amountMinor, digits))
   return withTypographicMinus(locale, formatted, amount.amountMinor < 0)
+}
+
+/**
+ * One piece of a drawn figure. `value` is the text; `kind` is what it is for.
+ *
+ * `integer` carries its group separators and `fraction` carries its decimal
+ * separator, because neither is ever styled or measured apart from the digits
+ * it belongs to. `literal` is CLDR's own spacing between a symbol and a number.
+ */
+export interface MoneySegment {
+  readonly kind: 'sign' | 'currency' | 'integer' | 'fraction' | 'literal'
+  readonly value: string
+}
+
+/**
+ * The same figure, cut where a typographer needs to cut it.
+ *
+ * Two compositions need the pieces rather than the string, and both are about
+ * the *drawing* only:
+ *
+ * - a headline figure sets its currency mark smaller and lighter than its
+ *   digits, so `zł` stops competing with the number it belongs to;
+ * - a column of mixed-currency balances aligns on the decimal separator, which
+ *   cannot be done while `zł 72 328,33` and `$7 785,32` are two opaque strings
+ *   whose digits begin at different offsets.
+ *
+ * Joining the values back together yields **exactly** what {@link formatMoney}
+ * returns for the same arguments — the same formatter, the same U+2212, the
+ * same CLDR spacing and the same order, which is why the segments are a list
+ * rather than a record of named sides: some locales put the sign inside the
+ * currency's own spacing, and a record would silently reorder them.
+ *
+ * The sign is its own segment and is never restyled by a caller. It is one of
+ * the three channels that carry direction (`docs/ACCESSIBILITY.md` §1), so it
+ * is drawn at the digits' own size and weight wherever the figure appears.
+ */
+export function formatMoneySegments(
+  locale: Locale,
+  amount: Money,
+  options: FormatMoneyOptions = {},
+): ReadonlyArray<MoneySegment> {
+  const digits = minorUnitDigits(amount.currencyCode)
+  const parts = formatterFor({
+    ...options,
+    locale,
+    currencyCode: amount.currencyCode,
+    digits: options.fractionDigits ?? digits,
+  }).formatToParts(majorOf(amount.amountMinor, digits))
+
+  const segments: Array<MoneySegment> = []
+  const push = (kind: MoneySegment['kind'], value: string): void => {
+    const last = segments.at(-1)
+    if (last?.kind === kind) {
+      segments[segments.length - 1] = { kind, value: last.value + value }
+      return
+    }
+    segments.push({ kind, value })
+  }
+
+  for (const part of parts) {
+    switch (part.type) {
+      case 'integer':
+      case 'group':
+        push('integer', part.value)
+        break
+      case 'decimal':
+      case 'fraction':
+        push('fraction', part.value)
+        break
+      case 'currency':
+        push('currency', part.value)
+        break
+      case 'minusSign':
+        push('sign', MINUS)
+        break
+      case 'plusSign':
+        push('sign', part.value)
+        break
+      default:
+        push('literal', part.value)
+    }
+  }
+
+  return segments
+}
+
+/** {@link formatMoneySegments} for {@link formatSignedMoney}'s string. */
+export function formatSignedMoneySegments(
+  locale: Locale,
+  amount: Money,
+  options: FormatMoneyOptions = {},
+): ReadonlyArray<MoneySegment> {
+  const magnitude = formatMoneySegments(
+    locale,
+    { ...amount, amountMinor: Math.abs(amount.amountMinor) as Minor },
+    options,
+  )
+  if (amount.amountMinor === 0) {
+    return magnitude
+  }
+  return [
+    { kind: 'sign', value: amount.amountMinor > 0 ? '+' : MINUS },
+    ...magnitude,
+  ]
 }
 
 /** The same figure with no currency at all, for a column that already names it. */

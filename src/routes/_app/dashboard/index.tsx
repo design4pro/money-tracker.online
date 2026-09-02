@@ -85,6 +85,12 @@ function DashboardRoute() {
       {data.hasData ? null : <FirstRunPanel />}
 
       <WidgetGrid label={t('dashboard.panels.label')}>
+        {/*
+          Stretched, not `height="content"`. The net-worth panel is one grid column beside a
+          two-column chart, and letting it end where its text ends left ~150px of page ground
+          under it — an unfilled grid cell rather than deliberate space. The panel now takes the
+          row's height and composes it (`NetWorthWidget`: hero at the top, the pair on the floor).
+        */}
         <WidgetFrame title={t('dashboard.widget.netWorth')}>
           <NetWorthWidget
             baseCurrencyCode={data.baseCurrencyCode}

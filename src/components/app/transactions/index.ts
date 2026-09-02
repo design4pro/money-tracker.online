@@ -60,6 +60,8 @@ export type {
   TransactionsEmptyProps,
 } from './list-states'
 
+export { KeyboardShortcuts } from './keyboard-shortcuts'
+
 export { ListSummary } from './list-summary'
 export type { ListSummaryProps } from './list-summary'
 

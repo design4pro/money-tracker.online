@@ -1,4 +1,4 @@
-import { formatMoney, money } from '#/lib/money'
+import { formatMoney, minorUnitDigits, money } from '#/lib/money'
 
 import type { Locale } from '#/lib/i18n'
 import type { CurrencyCode, Minor } from '#/lib/money'
@@ -30,14 +30,29 @@ export function chartAmount(
  *
  * Same function, same digits, no symbol — repeating `zł` down eight gridlines is noise, and the
  * one place the reader looks for the currency is the caption above them.
+ *
+ * **A tick that is a whole major unit drops its fraction.** `12 000,00` states two digits of
+ * precision that no gridline has: an axis is a ruler, and nobody reads a balance off one. The
+ * decimals are worth ~40px of the gutter the plot could be using instead, on every money chart in
+ * the product.
+ *
+ * The condition is the whole safety argument, and it is checked rather than assumed. Ticks come
+ * from a nice'd domain and are whole major units in every real case, but a chart whose readings
+ * are all under a złoty gets ticks at 0,25 and 0,50 — and dropping *their* fraction would draw two
+ * gridlines both labelled `0` above one labelled `1`. An axis that rounds is an axis that lies, so
+ * a tick that is not a whole unit keeps every digit the currency has.
  */
 export function chartAxisAmount(
   locale: Locale,
   currencyCode: CurrencyCode,
   amountMinor: Minor,
 ): string {
+  const scale = 10 ** minorUnitDigits(currencyCode)
+  const isWholeUnit = amountMinor % scale === 0
+
   return formatMoney(locale, money(amountMinor, currencyCode), {
     display: 'none',
+    ...(isWholeUnit ? { fractionDigits: 0 } : {}),
   })
 }
 

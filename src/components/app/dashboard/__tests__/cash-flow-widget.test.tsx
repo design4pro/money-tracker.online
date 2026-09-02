@@ -11,12 +11,18 @@ import type { CashFlowBucket } from '../types'
 
 const PLN = asCurrencyCode('PLN')
 
-function bucket(key: string, income: number, expense: number): CashFlowBucket {
+function bucket(
+  key: string,
+  income: number,
+  expense: number,
+  inPeriod = true,
+): CashFlowBucket {
   return {
     key,
     incomeMinor: asMinor(income),
     expenseMinor: asMinor(expense),
     netMinor: asMinor(income - expense),
+    inPeriod,
   }
 }
 
@@ -88,6 +94,46 @@ describe('CashFlowWidget', () => {
         .getAllByRole('rowheader')
         .map((node) => node.textContent),
     ).toEqual(['Jan 2026', 'Feb 2026', 'Mar 2026'])
+  })
+
+  it('says which month is the selected one when it also draws context months', () => {
+    renderWidget(
+      <CashFlowWidget
+        baseCurrencyCode={PLN}
+        buckets={[
+          bucket('2026-01-01', 500000, 400000, false),
+          bucket('2026-02-01', 600000, 450000, false),
+          bucket('2026-03-01', 820000, 534050),
+        ]}
+      />,
+    )
+
+    // The context is named in words, not left to a band a reader has to infer.
+    expect(
+      screen.getByText(
+        'Selected period: Mar 2026. Earlier months are context.',
+      ),
+    ).toBeTruthy()
+    // And the months it borrowed are real readings, in the table like every other reading.
+    expect(
+      within(screen.getByRole('table'))
+        .getAllByRole('rowheader')
+        .map((node) => node.textContent),
+    ).toEqual(['Jan 2026', 'Feb 2026', 'Mar 2026'])
+  })
+
+  it('says nothing about context when every month drawn is in the period', () => {
+    renderWidget(
+      <CashFlowWidget
+        baseCurrencyCode={PLN}
+        buckets={[
+          bucket('2026-01-01', 820000, 534050),
+          bucket('2026-02-01', 790000, 611000),
+        ]}
+      />,
+    )
+
+    expect(screen.queryByText(/selected period/)).toBeNull()
   })
 
   it('draws a designed empty state when nothing moved in the whole period', () => {

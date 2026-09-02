@@ -52,6 +52,26 @@ describe('niceDomain', () => {
   })
 })
 
+describe('ticksFor', () => {
+  it('draws no more intervals than it was asked for', () => {
+    // d3 answers a 0–12 000 domain asked for four ticks with seven, because it rounds the step to
+    // the nearest 1/2/5. Seven gridlines behind two bars is ruled paper, not a scale.
+    const ticks = ticksFor([0, 12000], 4)
+    expect(ticks).toEqual([0, 4000, 8000, 12000])
+  })
+
+  it('keeps the top of the domain, which is the line a bar is read against', () => {
+    const domain = niceDomain([0, 10300])
+    const ticks = ticksFor(domain, 4)
+    expect(ticks.at(-1)).toBe(domain[1])
+    expect(ticks.at(0)).toBe(0)
+  })
+
+  it('leaves a range that already fits alone', () => {
+    expect(ticksFor([0, 4], 4)).toEqual([0, 1, 2, 3, 4])
+  })
+})
+
 describe('linearProjector', () => {
   it('maps the domain onto an inverted pixel range', () => {
     const project = linearProjector([0, 100], [200, 0])

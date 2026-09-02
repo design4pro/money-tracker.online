@@ -150,8 +150,14 @@ function AccountsListRoute() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      {/*
+        Deliberately not `flex-wrap`. Wrapping put "New account" on a row of its own on a phone,
+        and that row plus the overview card was enough to push every single account below the
+        fold on the screen whose subject is the accounts. It is a 40px icon-and-label button
+        opposite the title at every width; the title block shrinks instead.
+      */}
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-title font-bold text-ink">
             {t('accounts.title')}
           </h1>
@@ -191,7 +197,9 @@ function AccountsListRoute() {
             ) : null}
           </div>
 
-          <div className="max-w-xs">
+          {/* Full width to the page gutters on a phone: a 320px control under a full-bleed
+              card left a ragged right edge against every row below it. */}
+          <div className="w-full sm:max-w-xs">
             <Select
               label={t('accounts.filter.label')}
               selectedKey={status}
@@ -212,7 +220,10 @@ function AccountsListRoute() {
           {accounts.length === 0 ? (
             <FilteredEmpty status={status} />
           ) : (
-            <div className="flex flex-col gap-8">
+            /* 24px between groups, and nothing between the rows inside one. The caps heading
+               owns its block because of the space above it, not because each row beneath it
+               floats on its own sheet. */
+            <div className="flex flex-col gap-6">
               {sections.map((section) => (
                 <section
                   key={section.id}
@@ -220,11 +231,17 @@ function AccountsListRoute() {
                 >
                   <h2
                     id={`group-${section.id}`}
-                    className="mb-3 text-micro tracking-label uppercase text-ink-2"
+                    className="mb-2 text-micro tracking-label uppercase text-ink-2"
                   >
                     {section.name}
                   </h2>
-                  <ul className="flex flex-col gap-3">
+                  {/*
+                    One card per group, with the rows divided by a hairline they draw themselves
+                    (`border-t` on every row but the first). No `overflow-hidden`: a focus ring in
+                    this product is an `outline`, and nothing may clip one — the rows round their
+                    own first and last corners instead.
+                  */}
+                  <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
                     {section.accounts.map((account) => (
                       <AccountCard
                         key={account.id}

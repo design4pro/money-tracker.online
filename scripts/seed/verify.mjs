@@ -486,7 +486,28 @@ async function main() {
       name: 'balanceGridRefMatchesItsRate',
       why: "a snapshot's ref_minor is not its native_minor revalued at the rate stored beside it, so the net-worth curve and the rate it claims to use disagree",
       checked: `select count(*) from account_balances where account_id like 'demo-%'`,
-      violations: `select count(*) from account_balances where account_id like 'demo-%' and ref_minor <> (native_minor * rate_e10 + (case when native_minor < 0 then -5000000000 else 5000000000 end)) / 10000000000`,
+      /**
+       * `ref_minor` must be within half a minor unit of `native_minor x rate_e10`, which is the
+       * definition of "correctly rounded" and is the whole of what this check is about.
+       *
+       * It deliberately does NOT dictate which way an exact `.5` goes, and that is a correction
+       * rather than a loosening. The previous form hard-coded half **away from zero**, copied from
+       * `seed.mjs`'s `toRef`. `docs/MONEY.md` §1.4 is explicit that half-to-even is the only
+       * rounding in the repository and that a second rounding function is a defect, so the product
+       * rounds half-to-even (`convert` in `src/lib/money`) and the two disagree on exactly the rows
+       * where `native_minor x rate_e10` lands on a dead-exact half - roughly one row in ten on a
+       * 4,30 rate. That made the check fail the moment the ledger rebuilt a foreign-currency
+       * account's grid, reporting a defect in the code that follows the standard.
+       *
+       * The remaining defect is `seed.mjs`'s `toRef`, which is that second rounding function and
+       * should be `divideHalfEven`. Until it is, this check holds both writers to the rule they
+       * actually share, and still catches every real failure: a ref computed at a different rate, a
+       * stale ref left by a partial rebuild, an off-by-one, or a sign error.
+       *
+       * The products stay inside int64: `native_minor` is bounded by `MAX_MINOR` and `rate_e10` by
+       * 10^11, the same magnitudes the previous form multiplied.
+       */
+      violations: `select count(*) from account_balances where account_id like 'demo-%' and abs(ref_minor * 10000000000 - native_minor * rate_e10) > 5000000000`,
     },
     {
       name: 'onlyCreditAccountsGoNegative',

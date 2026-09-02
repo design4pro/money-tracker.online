@@ -4,8 +4,10 @@ import {
   asRateE10,
   formatMoney,
   formatMoneyPlain,
+  formatMoneySegments,
   formatRateE10,
   formatSignedMoney,
+  formatSignedMoneySegments,
   makeMoney,
   parseMoney,
   toAmountInputValue,
@@ -317,3 +319,63 @@ describe('formatRateE10', () => {
     )
   })
 })
+
+describe('formatMoneySegments', () => {
+  it('joins back into exactly what formatMoney drew', () => {
+    for (const locale of ['en', 'pl'] as const) {
+      for (const amount of [makeMoney(7_232_833, 'PLN'), makeMoney(-169_211, 'PLN'), makeMoney(500_000, 'JPY')]) {
+        expect(
+          formatMoneySegments(locale, amount)
+            .map((segment) => segment.value)
+            .join(''),
+        ).toBe(formatMoney(locale, amount))
+      }
+    }
+  })
+
+  it('cuts the currency out of the digits, whichever side the locale puts it on', () => {
+    const english = formatMoneySegments('en', makeMoney(7_232_833, 'PLN'))
+    const polish = formatMoneySegments('pl', makeMoney(7_232_833, 'PLN'))
+
+    expect(english.findIndex((s) => s.kind === 'currency')).toBeLessThan(
+      english.findIndex((s) => s.kind === 'integer'),
+    )
+    expect(polish.findIndex((s) => s.kind === 'currency')).toBeGreaterThan(
+      polish.findIndex((s) => s.kind === 'integer'),
+    )
+  })
+
+  it('keeps the sign its own segment, so a column can hang it outside the digits', () => {
+    const segments = formatMoneySegments('en', makeMoney(-169_211, 'PLN'))
+    expect(segments[0]).toEqual({ kind: 'sign', value: '\u2212' })
+  })
+
+  it('carries the group separators with the integer and the decimal with the fraction', () => {
+    const segments = formatMoneySegments('en', makeMoney(7_232_833, 'PLN'))
+    expect(segments.find((s) => s.kind === 'integer')?.value).toBe('72,328')
+    expect(segments.find((s) => s.kind === 'fraction')?.value).toBe('.33')
+  })
+
+  it('signs a delta the way formatSignedMoney does', () => {
+    for (const minor of [285_950, -120_000, 0]) {
+      const amount = makeMoney(minor, 'PLN')
+      expect(
+        formatSignedMoneySegments('en', amount)
+          .map((segment) => segment.value)
+          .join(''),
+      ).toBe(formatSignedMoney('en', amount))
+    }
+  })
+})
+
+describe('fractionDigits', () => {
+  it('draws fewer digits than the currency has without rescaling the amount', () => {
+    expect(
+      formatMoney('en', makeMoney(1_200_000, 'PLN'), {
+        display: 'none',
+        fractionDigits: 0,
+      }),
+    ).toBe('12,000')
+  })
+})
+

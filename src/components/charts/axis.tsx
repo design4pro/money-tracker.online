@@ -28,6 +28,18 @@ export interface YAxisProps {
   readonly format: (value: number) => string
   /** Whether the domain crosses zero and therefore needs the emphasised baseline. */
   readonly showZeroRule?: boolean
+  /**
+   * The unit the ticks are counted in — `zł`, `$` — drawn once, above the top tick.
+   *
+   * The ticks themselves stay bare. Repeating the mark down five gridlines is noise, and
+   * suffixing only the top one (the other obvious answer) widens the gutter by the width of the
+   * mark for every chart in the product, taking those pixels out of the plot. An axis title costs
+   * nothing horizontally and is where a reader of a scientific chart already looks for the unit.
+   *
+   * It matters on this product specifically: a workspace can hold accounts in several currencies,
+   * so "12 000" on a plot beside a list showing two currency marks is a number without a unit.
+   */
+  readonly unit?: string
 }
 
 export function YAxis({
@@ -36,9 +48,20 @@ export function YAxis({
   project,
   format,
   showZeroRule = false,
+  unit,
 }: YAxisProps) {
   return (
     <g aria-hidden="true">
+      {unit === undefined || unit === '' ? null : (
+        <text
+          x={plot.left - 8}
+          y={plot.top - 8}
+          textAnchor="end"
+          className="fill-ink-2 text-[11px]"
+        >
+          {unit}
+        </text>
+      )}
       {ticks.map((tick) => {
         const y = project(tick)
         return (
@@ -83,9 +106,23 @@ export interface XAxisProps {
   readonly centre: (index: number) => number
   /** How many labels fit. The first and the last always survive the thinning. */
   readonly maxLabels?: number
+  /**
+   * Which categories the chart is about, when the rest are only context — one flag per label.
+   *
+   * The marked label is **promoted**: primary ink at a heavier weight, against the secondary ink
+   * the others already carry. The context labels are not touched, because they are text and text
+   * in this product clears 7:1 whatever job it is doing on the plot.
+   */
+  readonly emphasis?: ReadonlyArray<boolean>
 }
 
-export function XAxis({ plot, labels, centre, maxLabels = 7 }: XAxisProps) {
+export function XAxis({
+  plot,
+  labels,
+  centre,
+  maxLabels = 7,
+  emphasis,
+}: XAxisProps) {
   const kept = thinIndices(labels.length, maxLabels)
   return (
     <g aria-hidden="true">
@@ -103,7 +140,11 @@ export function XAxis({ plot, labels, centre, maxLabels = 7 }: XAxisProps) {
           x={centre(index)}
           y={plot.bottom + 16}
           textAnchor="middle"
-          className="fill-ink-2 text-[11px]"
+          className={
+            emphasis?.[index] === true
+              ? 'fill-ink text-[11px] font-semibold'
+              : 'fill-ink-2 text-[11px]'
+          }
         >
           {labels[index]}
         </text>

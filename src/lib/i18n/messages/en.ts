@@ -283,6 +283,7 @@ const messages = {
   },
   'accounts.overview.excluded':
     'Archived accounts, and accounts left out of reports, are not in these figures.',
+  'accounts.overview.excluded.label': 'What these figures include',
   'accounts.byCurrency.title': 'Held by currency',
   'accounts.byCurrency.help':
     'Each currency is totalled in its own units. Nothing is converted here.',
@@ -318,6 +319,8 @@ const messages = {
   'accounts.detail.danger': 'Archiving and deleting',
   'accounts.credit.title': 'Credit used',
   'accounts.credit.valueText': '{used} of {limit} used, {percent}',
+  'accounts.credit.ofLimit': '{used} of {limit}',
+  'accounts.credit.percentUsed': '{percent} used',
   'accounts.credit.within': 'Within limit',
   'accounts.credit.approaching': 'Approaching limit',
   'accounts.credit.over': 'Over limit',
@@ -477,8 +480,23 @@ const messages = {
     one: 'Delete {count} transaction? This cannot be undone.',
     other: 'Delete {count} transactions? This cannot be undone.',
   },
-  'transactions.keyboard.hint':
-    'Arrow keys move between cells. E edits, D duplicates, Delete removes, Space selects, Enter opens.',
+  'transactions.keyboard.title': 'Keyboard shortcuts',
+  'transactions.keyboard.column.key': 'Key',
+  'transactions.keyboard.column.action': 'Action',
+  'transactions.keyboard.keys.arrows': 'Arrow keys',
+  'transactions.keyboard.keys.enter': 'Enter',
+  'transactions.keyboard.keys.space': 'Space',
+  'transactions.keyboard.keys.edit': 'E',
+  'transactions.keyboard.keys.duplicate': 'D',
+  'transactions.keyboard.keys.delete': 'Delete',
+  'transactions.keyboard.keys.help': '?',
+  'transactions.keyboard.move': 'Move between cells',
+  'transactions.keyboard.open': 'Open the transaction',
+  'transactions.keyboard.select': 'Select the row',
+  'transactions.keyboard.edit': 'Edit the transaction',
+  'transactions.keyboard.duplicate': 'Copy into a new entry',
+  'transactions.keyboard.remove': 'Delete the transaction',
+  'transactions.keyboard.help': 'Show this list',
 
   /* -- Transactions: filters ---------------------------------------------- */
   'transactions.filter.description':
@@ -488,6 +506,7 @@ const messages = {
   'transactions.filter.direction': 'Money in or out',
   'transactions.filter.accountGroup': 'Account group',
   'transactions.filter.dateRange': 'Date range',
+  'transactions.filter.anyDate': 'Any date',
   'transactions.filter.openCalendar': 'Open calendar',
   'transactions.filter.amountRange': 'Amount range',
   'transactions.filter.amountMin': 'At least',
@@ -753,6 +772,9 @@ const messages = {
   'dashboard.cashFlow.surplus': 'You kept {amount}',
   'dashboard.cashFlow.deficit': 'You spent {amount} more than came in',
   'dashboard.cashFlow.balanced': 'Money in and money out matched exactly',
+  'dashboard.cashFlow.shareOfIncome': '{share} of the {amount} that came in',
+  'dashboard.cashFlow.context':
+    'Selected period: {month}. Earlier months are context.',
   'dashboard.cashFlow.empty.title': 'No money moved in this period',
   'dashboard.cashFlow.empty.body':
     'Record a transaction, or pick a longer period.',

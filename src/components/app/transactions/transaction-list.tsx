@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -17,16 +18,18 @@ import { NetAmount } from './amount-text'
 import {
   COLUMN_COUNT,
   COLUMN_INDEX,
+  DAY_HEADER_HEIGHT_PX,
   HEADER_ROW,
-  ROW_HEIGHT_PX,
   groupByDay,
   nextPosition,
   samePosition,
+  virtualItemHeight,
 } from './grid-model'
-import { TransactionRow } from './transaction-row'
+import { DESCRIPTION_TRACKS, TransactionRow } from './transaction-row'
 import { nameIndex } from './types'
 
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { CurrencyCode, Minor } from '#/lib/money'
 import type { CellPosition } from './grid-model'
 import type { TransactionRowActions } from './transaction-row'
 import type { LedgerRow, LedgerSort, TransactionReference } from './types'
@@ -87,18 +90,102 @@ export interface TransactionListProps {
 }
 
 /**
- * The column headings, pinned directly beneath the day bar.
+ * The column headings, pinned directly beneath the app header.
  *
- * The offset composes the shell's chrome rather than restating a number: `top-9` alone pinned this
- * row at 36px from the *viewport*, which is inside the 64px app header — same `z-nav`, later in the
+ * The offset composes the shell's chrome rather than restating a number: `top-0` alone pinned this
+ * row at the *viewport* top, which is inside the 64px app header — same `z-nav`, later in the
  * document, so the ledger painted over the product header and the headings sat on top of the
- * workspace switcher. `--nav-h` plus the day bar's own `h-9` puts it where it belongs.
+ * workspace switcher.
+ *
+ * There used to be a second sticky bar above this one, naming the day of whichever row happened to
+ * be at the top of the window and printing that day's net beside it. It read as a group header
+ * presiding over everything below it — eight rows spanning eight different days — while its figure
+ * summed only one of them. A total that does not add up the rows under it is the one mistake a
+ * ledger may not make, so the running bar is gone and each day now has a real heading of its own,
+ * immediately above the rows it is the total of.
  */
 const HEADER_CELL =
-  'sticky top-[calc(var(--nav-h)+var(--impersonation-h)+2.25rem)] z-nav bg-surface-sunken px-2 py-2 text-micro font-semibold tracking-label uppercase text-ink-2 outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
+  'sticky top-[calc(var(--nav-h)+var(--impersonation-h))] z-nav bg-surface-sunken px-2 py-2 text-micro font-semibold tracking-label uppercase text-ink-2 outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
 
 function positionKey(position: CellPosition): string {
   return `${position.row}:${position.column}`
+}
+
+interface DayHeadingProps {
+  readonly label: string
+  /** The day's signed net, or `null` while some of its rows are still to be paged in. */
+  readonly netMinor: Minor | null
+  readonly currencyCode: CurrencyCode
+  readonly netLabel: string
+}
+
+/**
+ * The heading that opens one calendar day, immediately above that day's rows.
+ *
+ * Two properties it does not get to break:
+ *
+ * - **It presides over exactly the rows beneath it.** Every row under this heading and above the
+ *   next one shares its date, because the rows are ordered by date and the heading is emitted at
+ *   each boundary.
+ * - **The figure is the sum of those rows.** `groupByDay` nets the day, and it withholds the total
+ *   for a day that is still half loaded rather than printing a number that would grow as somebody
+ *   read it. A finance product that prints a total which does not add up the rows under it has
+ *   failed at the only thing it is for.
+ *
+ * It is a `<tr aria-hidden>` rather than a row of the grid — like the two virtualiser spacers — so
+ * `aria-rowcount` and `aria-rowindex` keep describing transactions and only transactions. Nothing
+ * is lost to a listener: every row speaks its own full date, and the totals under the list are the
+ * authority on any sum.
+ *
+ * ## The total shares a right edge with the amounts it sums
+ *
+ * The heading spans all five columns, so `justify-between` alone parked its figure at the table's
+ * own padding edge while every row amount stopped 44px short of it — the width of the actions
+ * column, which the heading does not have. A subtotal that does not line up with its addends breaks
+ * the one vertical scan a ledger exists for, so the heading carries the actions column back as a
+ * trailing spacer: `pe-13` is 8px of cell padding plus the 44px (`w-11`) actions track. Change one
+ * of the two and this must change with it.
+ *
+ * ## It is the recessed band, not another page-coloured one
+ *
+ * `bg-canvas` put the band 1.10:1 from the row beneath it in dark and 1.02:1 in light — a grouping
+ * that is invisible on the theme half the product is read in. The band is now `surface-sunken`, the
+ * darkest ground in both themes, so the ledger reads band → page → row as three distinct planes.
+ * Two near-black fills cannot be pushed past ~1.24:1 without dropping the band's own label below
+ * the 7:1 text floor, so the separation is not asked to come from tone alone: the top rule is a
+ * full-strength `border-strong` hairline (3.6:1 in dark, 3.9:1 in light) rather than a 45%-opacity
+ * one, and that rule is what survives a dim laptop screen.
+ */
+function DayHeading({
+  label,
+  netMinor,
+  currencyCode,
+  netLabel,
+}: DayHeadingProps) {
+  return (
+    <tr aria-hidden="true">
+      <td colSpan={COLUMN_COUNT} className="p-0">
+        <div
+          style={{ height: DAY_HEADER_HEIGHT_PX }}
+          className="flex items-center justify-between gap-3 border-t border-t-border-strong bg-surface-sunken ps-2 pe-13"
+        >
+          <span className="truncate text-caption font-semibold text-ink">
+            {label}
+          </span>
+          {netMinor === null ? null : (
+            <span className="flex shrink-0 items-center gap-1.5 text-caption text-ink-2">
+              <span>{netLabel}</span>
+              <NetAmount
+                amountMinor={netMinor}
+                currencyCode={currencyCode}
+                className="text-caption"
+              />
+            </span>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
 }
 
 export function TransactionList({
@@ -139,9 +226,18 @@ export function TransactionList({
     setScrollMargin(containerRef.current?.offsetTop ?? 0)
   }, [rows.length])
 
+  const grouping = useMemo(
+    () => groupByDay({ rows, sort, hasMore }),
+    [rows, sort, hasMore],
+  )
+
   const virtualizer = useWindowVirtualizer({
     count: rows.length,
-    estimateSize: () => ROW_HEIGHT_PX,
+    // Still arithmetic rather than measurement — see `ROW_HEIGHT_PX` — but no longer one constant:
+    // the row that opens a day carries that day's heading, so its virtual item is taller by exactly
+    // the heading. Nothing is measured, so the scrollbar stays honest at ten thousand rows.
+    estimateSize: (index) =>
+      virtualItemHeight(grouping.startsDay[index] === true),
     overscan: 10,
     scrollMargin,
     // Without a rect the server renders an empty tbody and the first paint has no ledger in it.
@@ -163,11 +259,6 @@ export function TransactionList({
     () => new Map(reference.categories.map((entry) => [entry.id, entry])),
     [reference.categories],
   )
-  const grouping = useMemo(
-    () => groupByDay({ rows, sort, hasMore }),
-    [rows, sort, hasMore],
-  )
-
   /* ---- Selection --------------------------------------------------------- */
 
   const toggleSelect = useCallback(
@@ -400,11 +491,6 @@ export function TransactionList({
           0,
         )
 
-  const topRow = rows.at(virtualItems.at(0)?.index ?? 0)
-  const contextDay = topRow === undefined ? null : topRow.bookedOn
-  const contextNet =
-    contextDay === null ? undefined : grouping.netByDay.get(contextDay)
-
   const headerCellProps = (column: number) => ({
     role: 'columnheader' as const,
     scope: 'col' as const,
@@ -427,32 +513,6 @@ export function TransactionList({
 
   return (
     <div ref={containerRef} className="relative">
-      {/*
-        The running context: which day the reader is inside, and that day's net once every row of
-        it has arrived. Decorative — the date is spoken on every row and the totals under the list
-        are the authority — so it is hidden from assistive technology rather than repeated to it.
-      */}
-      <div
-        aria-hidden="true"
-        className="sticky top-chrome z-nav flex h-9 items-center justify-between gap-3 border-b border-border-subtle bg-canvas/95 px-2 text-caption text-ink-2 backdrop-blur-sm"
-      >
-        <span className="truncate font-medium text-ink">
-          {contextDay === null
-            ? ''
-            : formatCalendarDate(locale, contextDay, 'long')}
-        </span>
-        {contextNet === undefined ? null : (
-          <span className="flex shrink-0 items-center gap-1.5">
-            <span>{t('transactions.day.net')}</span>
-            <NetAmount
-              amountMinor={contextNet}
-              currencyCode={reference.baseCurrencyCode}
-              className="text-caption"
-            />
-          </span>
-        )}
-      </div>
-
       <table
         role="grid"
         aria-label={t('transactions.list.label')}
@@ -464,11 +524,18 @@ export function TransactionList({
         className="w-full table-fixed border-collapse border-separate border-spacing-0"
       >
         <caption className="sr-only">{caption}</caption>
+        {/*
+          The date track is sized for the string it actually holds. `w-16` was 64px against a
+          ten-character `31.12.2025` set in 12px tabular figures — about 68px of glyphs — so every
+          date in the ledger printed straight over the payee beside it. Below `sm` the row prints
+          the day of the month alone, which fits 44px with room to spare; from `sm` up it prints the
+          whole date and gets 96px to do it in.
+        */}
         <colgroup>
           <col className="w-10 sm:w-12" />
-          <col className="w-11 sm:w-16" />
+          <col className="w-9 sm:w-24" />
           <col />
-          <col className="w-26 sm:w-36" />
+          <col className="w-28 sm:w-40" />
           <col className="w-11" />
         </colgroup>
 
@@ -508,14 +575,32 @@ export function TransactionList({
                   )
                 }
               >
-                {t('transactions.field.date')}
+                {/* Below `sm` the date column is 36px wide — room for `29`, and none for the word
+                    beside an arrow. The heading keeps its accessible name and drops to the sort
+                    arrow alone; the 44px hit area is the button's own and does not shrink with it. */}
+                <span className="sr-only sm:not-sr-only">
+                  {t('transactions.field.date')}
+                </span>
               </Button>
             </th>
+            {/*
+              One heading cell, three labels — the mirror of the row's own description cell. The
+              column still holds the description, the category and the account; from `lg` up they
+              are drawn on tracks instead of stacked, and this is what they line up under.
+            */}
             <th
               {...headerCellProps(COLUMN_INDEX.description)}
               className={cn(HEADER_CELL, 'text-start')}
             >
-              {t('transactions.column.description')}
+              <div className={DESCRIPTION_TRACKS}>
+                <span>{t('transactions.column.description')}</span>
+                <span className="hidden lg:block">
+                  {t('transactions.field.category')}
+                </span>
+                <span className="hidden lg:block">
+                  {t('transactions.field.account')}
+                </span>
+              </div>
             </th>
             <th
               {...headerCellProps(COLUMN_INDEX.amount)}
@@ -551,34 +636,39 @@ export function TransactionList({
                 ? undefined
                 : categories.get(row.categoryId)
             const gridRow = item.index + 1
+            const opensDay = grouping.startsDay[item.index] === true
             return (
-              <TransactionRow
-                key={row.id}
-                row={row}
-                rowIndex={gridRow}
-                ariaRowIndex={item.index + 2}
-                isSelected={selectedIds.has(row.id)}
-                activeColumn={active.row === gridRow ? active.column : null}
-                isMenuOpen={openMenuId === row.id}
-                startsDay={grouping.startsDay[item.index] === true}
-                showDate={
-                  sort.field !== 'bookedOn' ||
-                  grouping.startsDay[item.index] === true
-                }
-                accountName={
-                  accountNames.get(row.accountId) ?? t('common.unknown')
-                }
-                categoryName={category?.name ?? null}
-                categoryColor={category?.color ?? null}
-                payeeName={
-                  row.payeeId === null
-                    ? null
-                    : (payeeNames.get(row.payeeId) ?? null)
-                }
-                registerCell={registerCell}
-                onCellFocus={onCellFocus}
-                actions={actions}
-              />
+              <Fragment key={row.id}>
+                {opensDay ? (
+                  <DayHeading
+                    label={formatCalendarDate(locale, row.bookedOn, 'long')}
+                    netMinor={grouping.netByDay.get(row.bookedOn) ?? null}
+                    currencyCode={reference.baseCurrencyCode}
+                    netLabel={t('transactions.day.net')}
+                  />
+                ) : null}
+                <TransactionRow
+                  row={row}
+                  rowIndex={gridRow}
+                  ariaRowIndex={item.index + 2}
+                  isSelected={selectedIds.has(row.id)}
+                  activeColumn={active.row === gridRow ? active.column : null}
+                  isMenuOpen={openMenuId === row.id}
+                  accountName={
+                    accountNames.get(row.accountId) ?? t('common.unknown')
+                  }
+                  categoryName={category?.name ?? null}
+                  categoryColor={category?.color ?? null}
+                  payeeName={
+                    row.payeeId === null
+                      ? null
+                      : (payeeNames.get(row.payeeId) ?? null)
+                  }
+                  registerCell={registerCell}
+                  onCellFocus={onCellFocus}
+                  actions={actions}
+                />
+              </Fragment>
             )
           })}
 

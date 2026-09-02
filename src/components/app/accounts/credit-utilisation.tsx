@@ -1,4 +1,7 @@
+import { AlertTriangle, TrendingUp } from 'lucide-react'
+
 import { Meter } from '#/components/ui'
+import { cn } from '#/lib/cn'
 import { formatPercent, useLocale, useTranslate } from '#/lib/i18n'
 import {
   ZERO_MINOR,
@@ -26,12 +29,27 @@ import type { Minor } from '#/lib/money'
  * is a float, it drives a bar's width and a label, and it is never multiplied back into an
  * amount.
  *
+ * ## One line, and each fact stated once
+ *
+ * Everything the block has to say sits on a single 12px line at the bar's origin, directly above
+ * the track: *how much of how much · what share that is · what is left*. It used to say the same
+ * thing three times in three registers — the sentence, a percentage set flush right a row-width
+ * away from the fill that encodes it, and a verdict underneath — and the one number the bar
+ * exists to communicate was the one orphaned furthest from it.
+ *
+ * ## Green is not the colour of debt
+ *
+ * The fill is `tone="neutral"`: the foreground token while the balance is within its limit, amber
+ * from 80%, negative past 100%. Credit drawn is not an achievement, and the palette's only
+ * positive colour is worth more held back for a figure that is actually good news.
+ *
  * ## Three channels, and the colour is the last of them
  *
- * The threshold colours are paired with a **word** (`Within limit` / `Approaching limit` /
- * `Over limit`) and with the meter's own state icon, and the accessible name is the whole
- * sentence — "1 200,00 zł of 5 000,00 zł used, 24%". The percentage is never the only channel
- * and neither is the hue.
+ * A colour change is always a word change too. Within the limit the line is figures only; at 80%
+ * a warning triangle and **Approaching limit** join it, past 100% a rising arrow and **Over
+ * limit**. So the amber and the negative are reinforcement for readers who can see them, never
+ * the channel the meaning travels on — and the accessible name carries the same verdict in the
+ * same order, "Approaching limit · 4 000,00 zł of 5 000,00 zł used, 80%".
  *
  * ## Over the limit
  *
@@ -116,6 +134,20 @@ const STATE_KEYS = {
   over: 'accounts.credit.over',
 } as const
 
+/**
+ * The glyph that rides with each verdict.
+ *
+ * `within` deliberately has none: it is the resting state, and a tick beside every ordinary card
+ * is a congratulation nobody asked for. What matters for §1.4.1 is that the two states which
+ * *change* the fill colour also change what is written — an icon appears and a word appears with
+ * it — so the escalation survives greyscale and forced colours.
+ */
+const STATE_ICONS = {
+  within: null,
+  approaching: AlertTriangle,
+  over: TrendingUp,
+} as const
+
 export interface CreditUtilisationProps {
   balanceMinor: Minor
   limitMinor: Minor | null
@@ -138,11 +170,23 @@ export function CreditUtilisation({
     return <p className="text-body text-ink-2">{t('accounts.credit.none')}</p>
   }
 
-  const sentence = t('accounts.credit.valueText', {
-    used: formatMoney(locale, makeMoney(utilisation.usedMinor, currencyCode)),
-    limit: formatMoney(locale, makeMoney(limitMinor, currencyCode)),
-    percent: formatPercent(locale, utilisation.fraction),
-  })
+  const used = formatMoney(
+    locale,
+    makeMoney(utilisation.usedMinor, currencyCode),
+  )
+  const limit = formatMoney(locale, makeMoney(limitMinor, currencyCode))
+  const percent = formatPercent(locale, utilisation.fraction)
+  const verdict = t(STATE_KEYS[utilisation.state])
+  const StateIcon = STATE_ICONS[utilisation.state]
+
+  const sentence = t('accounts.credit.valueText', { used, limit, percent })
+  /**
+   * The verdict goes in **front** of the sentence rather than after it. A reader who has to act
+   * hears "Over limit" first, and the sentence keeps its shape — which is also what
+   * `e2e/accessibility.spec.ts` asserts the name ends with.
+   */
+  const accessibleName =
+    utilisation.state === 'within' ? sentence : `${verdict} · ${sentence}`
 
   return (
     <div className={className}>
@@ -150,10 +194,18 @@ export function CreditUtilisation({
         {t('accounts.credit.title')}
       </p>
       <Meter
-        className="mt-2"
+        // `gap-2` puts 8px of clearance between the sentence and the track it describes, and the
+        // track runs the full width of the row so the fill's stopping point is read against the
+        // card's own edge rather than against an arbitrary measure.
+        className="mt-2 gap-2"
         // The accessible name is the whole sentence: a meter announced as "24%" alone tells a
-        // reader nothing about what is being measured or against what.
-        label={sentence}
+        // reader nothing about what is being measured or against what. It is `aria-label` rather
+        // than a visible `<Label>` because the caption below already writes it out — two visible
+        // copies of one sentence is the defect this block was rebuilt to remove.
+        aria-label={accessibleName}
+        showValue={false}
+        tone="neutral"
+        captionPlacement="above"
         value={utilisation.fraction}
         minValue={0}
         maxValue={1}
@@ -162,8 +214,24 @@ export function CreditUtilisation({
         formatOptions={{ style: 'percent', maximumFractionDigits: 0 }}
         caption={
           <>
+            {StateIcon === null ? null : (
+              <span
+                className={cn(
+                  'me-1 inline-flex items-center gap-1 font-semibold',
+                  utilisation.state === 'over'
+                    ? 'text-negative'
+                    : 'text-warning',
+                )}
+              >
+                <StateIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                {verdict}
+                {' ·'}
+              </span>
+            )}
+            {t('accounts.credit.ofLimit', { used, limit })}
+            {' · '}
             <span className="font-semibold text-ink">
-              {t(STATE_KEYS[utilisation.state])}
+              {t('accounts.credit.percentUsed', { percent })}
             </span>
             {' · '}
             {t('accounts.credit.available', {
