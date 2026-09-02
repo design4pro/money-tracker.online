@@ -148,6 +148,28 @@ describe('materializePeriods', () => {
     ])
   })
 
+  it('walks a weekly budget week by week, and the check constraint lets it', async () => {
+    // The cadence the `budgets_period_check` widening in `0003` was written for. Worth a real
+    // database rather than only the pure test: a CHECK that still reads the old four-value list
+    // fails here at the INSERT and nowhere else.
+    const budget = await januaryBudget({ period: 'weekly' })
+    const periods = await materializePeriods(scope, {
+      budgetId: budget.id,
+      today: TODAY,
+    })
+    // 1 Jan to 15 Mar is 73 days, so today sits in period 10 and there are eleven of them.
+    expect(periods.length).toBe(11)
+    expect(periods.at(0)).toMatchObject({
+      periodStart: '2026-01-01',
+      periodEnd: '2026-01-07',
+    })
+    expect(periods.at(-1)).toMatchObject({
+      periodStart: '2026-03-12',
+      periodEnd: '2026-03-18',
+      closedAt: null,
+    })
+  })
+
   it('gives a one_off budget exactly one period', async () => {
     const budget = await januaryBudget({
       period: 'one_off',

@@ -283,7 +283,7 @@ export interface SeedBudgetInput {
   readonly name?: string
   readonly kind?: 'category' | 'manual'
   readonly status?: 'active' | 'archived'
-  readonly period?: 'one_off' | 'monthly' | 'quarterly' | 'yearly'
+  readonly period?: 'one_off' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
   readonly startDate?: string
   readonly endDate?: string | null
   readonly limitMinor?: number

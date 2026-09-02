@@ -842,6 +842,7 @@ const messages = {
 
   'budgets.period.label': 'Billing period',
   'budgets.period.one_off': 'One-off',
+  'budgets.period.weekly': 'Weekly',
   'budgets.period.monthly': 'Monthly',
   'budgets.period.quarterly': 'Quarterly',
   'budgets.period.yearly': 'Yearly',

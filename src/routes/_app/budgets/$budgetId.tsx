@@ -97,6 +97,7 @@ type Pending =
 
 const PERIOD_LABELS: Record<string, MessageKey> = {
   one_off: 'budgets.period.one_off',
+  weekly: 'budgets.period.weekly',
   monthly: 'budgets.period.monthly',
   quarterly: 'budgets.period.quarterly',
   yearly: 'budgets.period.yearly',
