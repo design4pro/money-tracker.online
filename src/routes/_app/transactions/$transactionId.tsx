@@ -17,6 +17,7 @@ import { deleteTransaction, updateTransaction } from '#/server/fns/transactions'
 import { useDataRefresh } from '../-lib/refresh'
 import { toLedgerRow } from './-lib/rows'
 import { TransactionFormSkeleton } from './-ui/form-skeleton'
+import { SplitEditor } from './-ui/split-editor'
 import { loadTransactionDetail } from './-server/detail'
 import { loadTransactionReference } from './-server/list'
 
@@ -25,7 +26,7 @@ import type {
   TransactionReference,
 } from '#/components/app/transactions'
 import type { Minor } from '#/lib/money'
-import type { Transaction } from '#/server/db/types'
+import type { Transaction, TransactionSplit } from '#/server/db/types'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 
 /**
@@ -124,6 +125,7 @@ function TransactionDetailRoute() {
     <TransactionDetailScreen
       transaction={detailQuery.data.transaction}
       accountName={detailQuery.data.accountName}
+      splits={detailQuery.data.splits}
       reference={referenceQuery.data}
       isEditing={mode === 'edit'}
       onRefresh={() => void detailQuery.refetch()}
@@ -152,6 +154,7 @@ function toFormValues(row: Transaction): TransactionFormValues {
 interface ScreenProps {
   readonly transaction: Transaction
   readonly accountName: string
+  readonly splits: ReadonlyArray<TransactionSplit>
   readonly reference: TransactionReference
   readonly isEditing: boolean
   readonly onRefresh: () => void
@@ -160,6 +163,7 @@ interface ScreenProps {
 function TransactionDetailScreen({
   transaction,
   accountName,
+  splits,
   reference,
   isEditing,
   onRefresh,
@@ -313,14 +317,32 @@ function TransactionDetailScreen({
           submitLabel={t('action.saveChanges')}
         />
       ) : (
-        <DetailSummary
-          row={row}
-          accountName={accountName}
-          categoryName={category?.name ?? null}
-          payeeName={payee?.name ?? null}
-          createdAtMs={transaction.createdAt.getTime()}
-          timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}
-        />
+        <>
+          <DetailSummary
+            row={row}
+            accountName={accountName}
+            categoryName={category?.name ?? null}
+            payeeName={payee?.name ?? null}
+            createdAtMs={transaction.createdAt.getTime()}
+            timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}
+          />
+          {/*
+            Keyed on the stored set's ids, not on the transaction's. The panel seeds its rows once
+            and deliberately has no synchronising effect, so a save that replaces the set has to
+            arrive as a remount or the editor goes on showing the figures it was opened with. Every
+            saved line gets a fresh id, so the key changes exactly when the stored set does.
+          */}
+          <SplitEditor
+            key={splits.map((split) => split.id).join(',')}
+            transactionId={transaction.id}
+            amountMinor={transaction.amountMinor}
+            currencyCode={transaction.currencyCode}
+            splits={splits}
+            categories={reference.categories}
+            isTransferLeg={transaction.transferKind !== 'none'}
+            onSaved={onRefresh}
+          />
+        </>
       )}
 
       <ConfirmDeleteDialog

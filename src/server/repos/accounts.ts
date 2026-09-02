@@ -53,6 +53,7 @@ import {
   sumMinor,
 } from '#/lib/money'
 import { isLiabilityCategory } from '#/server/catalog/account-types'
+import { serverToday } from '#/server/clock'
 import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
 import {
@@ -368,11 +369,6 @@ function toAccount(row: typeof accounts.$inferSelect): Account {
   return row as Account
 }
 
-/** Today, as a UTC calendar date. Day bucketing is UTC; the reader's zone is applied at render. */
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 /**
  * The day an account's opening balance belongs to.
  *
@@ -542,7 +538,7 @@ export async function createAccount(
   const existing = await accountRepo.count(scope)
   await assertWithinLimit(scope, 'accounts', existing + 1)
 
-  const openedOn = parsed.openedOn ?? todayUtc()
+  const openedOn = parsed.openedOn ?? serverToday()
   const initialBalanceMinor = asMinor(parsed.initialBalanceMinor)
   const refInitialBalanceMinor = await toBase(
     initialBalanceMinor,

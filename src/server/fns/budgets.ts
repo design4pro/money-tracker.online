@@ -18,10 +18,11 @@
  * a budget started writing money or somebody added it defensively, and both are worth catching in
  * review.
  *
- * **`today` is decided here, once.** The repositories take it as a parameter and never read a
- * clock, which is what makes a period boundary testable at a pinned date. It is the UTC calendar
- * day, matching `booked_on`'s own definition in `docs/MONEY.md` §6.1; the reader's timezone is
- * applied at render and only there.
+ * **`today` enters here, once per call, from `#/server/clock`.** The repositories take it as a
+ * parameter and never read a clock, which is what makes a period boundary testable at a pinned
+ * date. `serverToday()` owns what the day *is* - the UTC calendar day, matching `booked_on`'s own
+ * definition in `docs/MONEY.md` §6.1, and pinnable by header under `pnpm dev` so the browser suite
+ * photographs the same product twice. The reader's timezone is applied at render and only there.
  *
  * Reads are `GET` so the router can cache and prefetch them; every write is `POST`.
  */
@@ -30,6 +31,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
+import { serverToday } from '#/server/clock'
 import { calendarOf, periodContaining } from '#/server/budgets/period'
 import {
   rolloverLedger,
@@ -76,11 +78,6 @@ const listInputSchema = z.strictObject({
   includeArchived: z.boolean().default(false),
 })
 
-/** The UTC calendar day. See the module docblock for why it is decided here and only here. */
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 /* -------------------------------------------------------------------------- */
 /* Reads                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -98,7 +95,7 @@ export const loadBudgets = createServerFn({ method: 'GET' })
     const scope = await requireOrg()
     return summariseBudgets({
       scope,
-      today: todayUtc(),
+      today: serverToday(),
       conversion: await conversionContextFor(scope),
       includeArchived: data.includeArchived,
     })
@@ -123,7 +120,7 @@ export const loadBudgetDetail = createServerFn({ method: 'GET' })
   .inputValidator(budgetIdSchema)
   .handler(async ({ data }): Promise<BudgetDetail> => {
     const scope = await requireOrg()
-    const today = todayUtc()
+    const today = serverToday()
     const budget = await getBudgetRow(scope, data.budgetId)
     const [periods, allCategoryRefs, conversion] = await Promise.all([
       listPeriodsRow(scope, budget.id),
@@ -181,7 +178,7 @@ export const createBudget = createServerFn({ method: 'POST' })
     const budget = await createBudgetRow(scope, data)
     await materializePeriodsRow(scope, {
       budgetId: budget.id,
-      today: todayUtc(),
+      today: serverToday(),
     })
     return { budgetId: budget.id }
   })
@@ -203,7 +200,7 @@ export const updateBudget = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await updateBudgetRow(scope, data.budgetId, data.patch)
-    const today = todayUtc()
+    const today = serverToday()
     await materializePeriodsRow(scope, { budgetId: data.budgetId, today })
     await recomputeOpenPeriodRow(scope, data.budgetId, today)
   })
@@ -238,7 +235,7 @@ export const setBudgetCategories = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await setBudgetCategoriesRow(scope, data)
-    await recomputeOpenPeriodRow(scope, data.budgetId, todayUtc())
+    await recomputeOpenPeriodRow(scope, data.budgetId, serverToday())
   })
 
 /** Puts transactions into a `manual` budget. A `category` budget is refused. */
@@ -247,7 +244,7 @@ export const addBudgetTransactions = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ readonly added: number }> => {
     const scope = await requireOrg()
     const added = await addBudgetTransactionsRow(scope, data)
-    await recomputeOpenPeriodRow(scope, data.budgetId, todayUtc())
+    await recomputeOpenPeriodRow(scope, data.budgetId, serverToday())
     return { added }
   })
 
@@ -257,7 +254,7 @@ export const removeBudgetTransactions = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ readonly removed: number }> => {
     const scope = await requireOrg()
     const removed = await removeBudgetTransactionsRow(scope, data)
-    await recomputeOpenPeriodRow(scope, data.budgetId, todayUtc())
+    await recomputeOpenPeriodRow(scope, data.budgetId, serverToday())
     return { removed }
   })
 
@@ -282,7 +279,7 @@ export const refreshBudgetPeriods = createServerFn({ method: 'POST' })
   .inputValidator(budgetIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
-    const today = todayUtc()
+    const today = serverToday()
     await materializePeriodsRow(scope, { budgetId: data.budgetId, today })
     await recomputeOpenPeriodRow(scope, data.budgetId, today)
   })

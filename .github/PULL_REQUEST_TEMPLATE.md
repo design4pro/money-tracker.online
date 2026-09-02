@@ -52,8 +52,9 @@ has drifted.
 <!--
 If this changes rendered output on purpose, say so here AND add the `visual-change-expected`
 label - that label is what tells the loop a screenshot diff is intended rather than a regression.
-Refresh both baselines: `pnpm e2e:update` for `-darwin`, the update-snapshots workflow for
-`-linux`.
+Refresh the baselines with `pnpm sandcastle:baselines` or the "Update e2e baselines" workflow.
+There is one set and it is `-linux`, because Linux is what the gate runs on; `pnpm e2e:update` on
+a Mac records nothing, because the frames skip off Linux.
 -->
 
 - [ ] No visual change

@@ -51,12 +51,21 @@ try {
   }
 
   await run('e2e environment', 'bash .sandcastle/setup-e2e.sh')
-  // Scoped to visual.spec.ts: that is the only file that owns baselines. The
-  // i18n runtime-parity spec is a functional cross-runtime assertion — a red
-  // there is a real finding, but it must not abort a baseline recording.
+  // Scoped to `e2e/visual.spec.ts`: that is the only file that owns baselines.
+  // The i18n runtime-parity spec is a functional cross-runtime assertion — a
+  // red there is a real finding, but it must not abort a baseline recording.
+  // The path is anchored rather than left as a bare `visual.spec.ts`, because
+  // Playwright matches the argument as a substring of the file path and six
+  // sibling files are named `*.visual.spec.ts`, none of which takes a frame.
+  //
+  // One worker, not four. All of them share a single Vite dev server that
+  // compiles routes on demand, so parallelism here does not divide the work,
+  // it queues four page loads behind one compiler and times them out: a
+  // two-worker recording of this file finished 40 of 58 frames, the same run
+  // at one worker finished 57.
   await run(
     'record baselines (both projects, both themes)',
-    `PLAYWRIGHT_BASE_URL=http://localhost:3010 pnpm exec playwright test visual.spec.ts --update-snapshots --workers=${process.env.E2E_WORKERS ?? '4'} --reporter=line`,
+    `PLAYWRIGHT_BASE_URL=http://localhost:3010 pnpm exec playwright test e2e/visual.spec.ts --update-snapshots --workers=${process.env.E2E_WORKERS ?? '1'} --reporter=line`,
   )
   await run(
     'commit',

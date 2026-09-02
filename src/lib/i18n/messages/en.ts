@@ -579,6 +579,35 @@ const messages = {
   'transactions.detail.notFound.title': 'That transaction is not here',
   'transactions.detail.notFound.body':
     'It may have been deleted, or the address may be wrong.',
+  /* -- Transactions: the split editor -------------------------------------- */
+  'splits.title': 'Split this transaction',
+  'splits.description':
+    'Divide one payment across several categories. The lines have to add up to the transaction before the split can be saved.',
+  'splits.lines.label': 'Split lines',
+  'splits.row.legend': 'Line {position}',
+  'splits.row.category': 'Category',
+  'splits.row.category.none': 'No category',
+  'splits.row.amount': 'Amount',
+  'splits.row.note': 'Note',
+  'splits.row.remove': 'Remove line {position}',
+  'splits.row.moveUp': 'Move line {position} up',
+  'splits.row.moveDown': 'Move line {position} down',
+  'splits.add': 'Add a line',
+  'splits.assigned': 'Assigned {assigned} of {total}.',
+  'splits.remaining': '{amount} left to assign.',
+  'splits.over': '{amount} more than the transaction.',
+  'splits.balanced': 'Everything is assigned.',
+  'splits.assignRemainder': 'Assign the remainder',
+  'splits.save': 'Save the split',
+  'splits.clear': 'Remove the split',
+  'splits.saved': 'Split saved.',
+  'splits.cleared': 'Split removed.',
+  'splits.error.title': 'The split was not saved',
+  'splits.error.amounts': 'Every line needs an amount greater than zero.',
+  'splits.transfer.title': 'A transfer leg cannot be split',
+  'splits.transfer.body':
+    'Its amount belongs to the movement between the two accounts, not to a breakdown by category.',
+
   'transactions.planned.title': 'Planned transactions',
   'transactions.planned.subtitle':
     'Entries booked for a date that has not happened yet. They stay out of your balances until you confirm them.',
