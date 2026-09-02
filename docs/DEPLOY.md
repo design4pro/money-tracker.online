@@ -314,7 +314,7 @@ match**; keeping two sets straight is what `POLAR_SERVER` exists for.
 
 ### 9.2 The webhook
 
-Endpoint `https://money-tracker.online/api/polar/webhook` (and the staging equivalent). Copy the
+Endpoint `https://money-tracker.online/api/webhooks/polar` (and the staging equivalent). Copy the
 signing secret into `POLAR_WEBHOOK_SECRET`.
 
 The handler verifies a Standard Webhooks HMAC-SHA256 over `${id}.${timestamp}.${raw}` with a 300s
@@ -404,7 +404,7 @@ curl -s -o /dev/null -w '%{http_code} /\n'                        "$BASE/"
 curl -s -o /dev/null -w '%{http_code} /api/health\n'              "$BASE/api/health"
 curl -s -o /dev/null -w '%{http_code} /api/auth/get-session\n'    "$BASE/api/auth/get-session"
 curl -s -o /dev/null -w '%{http_code} /pricing\n'                 "$BASE/pricing"
-curl -s -o /dev/null -w '%{http_code} GET webhook (405)\n'        "$BASE/api/polar/webhook"
+curl -s -o /dev/null -w '%{http_code} GET webhook (405)\n'        "$BASE/api/webhooks/polar"
 curl -s -o /dev/null -w '%{http_code} /api/sandcastle/ping (503)\n' "$BASE/api/sandcastle/ping"
 ```
 
@@ -464,3 +464,23 @@ still exist.
 - [ ] §11's smoke check returns `200 200 200 200 405 503`
 - [ ] `/api/health` reports the version just built
 - [ ] If the release touches billing: §9.6's matrix is walked on staging first
+
+## Appendix: email sender domain
+
+Resend verifies `money-tracker.online` (the apex) only. Resend does **not** cover subdomains under a
+verified parent, so a `From:` at `staging.money-tracker.online` would be rejected at send time even
+though the parent shows `verified`.
+
+Staging therefore sends as `no-reply@money-tracker.online` and distinguishes itself in the display
+name, not in the domain. The alternative - adding `staging.money-tracker.online` as a second Resend
+domain with its own DKIM and SPF records on the zone - is deliberately not taken: a second sending
+domain is a second reputation to warm and a second set of records to keep correct, for no benefit
+beyond a cosmetic sender address on an environment no customer receives mail from.
+
+A DMARC record already exists on the apex and is a leftover from another provider:
+
+    _dmarc  TXT  "v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com"
+
+It is `p=none`, so it does not block Resend, but its aggregate reports go to a provider this project
+does not use. Repoint `rua` before tightening the policy to `quarantine` or `reject`; tightening it
+while the reports go elsewhere means failures become invisible exactly when they start mattering.
