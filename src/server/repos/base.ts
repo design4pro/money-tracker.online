@@ -40,7 +40,7 @@
  * generic, they are confined to this file, and each is annotated where it sits.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks'
+import * as asyncHooks from 'node:async_hooks'
 
 import { and, asc, count, desc, eq, inArray, lt, sum } from 'drizzle-orm'
 
@@ -274,7 +274,37 @@ export async function assertWithinLimit(
  * Because the store is per-context there is nothing to install and nothing to uninstall, so no
  * `finally` anywhere can take away a collector that belongs to somebody else.
  */
-const ledgerCollector = new AsyncLocalStorage<Set<string>>()
+let collector: asyncHooks.AsyncLocalStorage<Set<string>> | null = null
+
+/**
+ * The store, constructed on first use rather than when the module loads.
+ *
+ * **This is about the dev server, not about the runtime.** Several route modules import values from
+ * the repository layer, so `base.ts` is in the client module graph. A production build shakes it
+ * out and the browser never sees it; `vite dev` does no such shaking, so the module is evaluated
+ * in the browser, where `node:async_hooks` is externalised to a stub that throws the moment
+ * anything is read off it.
+ *
+ * **Hence the namespace import, which is load-bearing and must not be tidied into a named one.**
+ * Vite rewrites `import { AsyncLocalStorage } from 'node:async_hooks'` into a property read at
+ * module scope - `const AsyncLocalStorage = __vite__cjsImport0_node_async_hooks['AsyncLocalStorage']`
+ * - which trips the stub while the module is still being evaluated, breaking hydration on every
+ * page and taking the whole e2e suite with it. `import * as` compiles to a bare binding, so the
+ * only read of the namespace happens below, inside a function no browser ever calls.
+ *
+ * Constructing on first use rather than at module scope is the same argument one step later.
+ *
+ * None of this is the real repair. A client route should not be importing repository values at
+ * all; that is a layering problem older than this line, which this line only made fatal, and it is
+ * not settled here.
+ *
+ * The `let` is per-isolate and request-independent - the same category as `ports` in
+ * `../ledger/batch.ts`, and not the category that caused the bug this store exists to fix.
+ */
+function ledgerStore(): asyncHooks.AsyncLocalStorage<Set<string>> {
+  collector ??= new asyncHooks.AsyncLocalStorage<Set<string>>()
+  return collector
+}
 
 /**
  * Runs `work` with `collector` gathering touched account ids for the whole of its async context.
@@ -288,12 +318,12 @@ export function runWithLedgerCollector<T>(
   collector: Set<string>,
   work: () => T,
 ): T {
-  return ledgerCollector.run(collector, work)
+  return ledgerStore().run(collector, work)
 }
 
 /** The collector open in this async context, or `null` when the caller is outside a batch. */
 export function currentLedgerCollector(): ReadonlySet<string> | null {
-  return ledgerCollector.getStore() ?? null
+  return ledgerStore().getStore() ?? null
 }
 
 /**
@@ -306,7 +336,7 @@ export function currentLedgerCollector(): ReadonlySet<string> | null {
  * write path that ran outside a batch.
  */
 export function touchLedgerAccount(accountId: string): void {
-  ledgerCollector.getStore()?.add(accountId)
+  ledgerStore().getStore()?.add(accountId)
 }
 
 /* -------------------------------------------------------------------------- */

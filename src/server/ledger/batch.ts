@@ -81,7 +81,7 @@ let ports: LedgerBatchPorts = {
  * **That reasoning holds for the binding and for nothing else in this file.** The batch itself used
  * to sit beside it in a module variable, borrowing a justification that does not transfer: a
  * binding is request-independent, a batch is the most request-dependent thing here. It lives in an
- * `AsyncLocalStorage` in `repos/base.ts` now — see the note on `ledgerCollector` there.
+ * `AsyncLocalStorage` in `repos/base.ts` now — see the note on `ledgerStore` there.
  */
 export function setLedgerBatchPorts(next: LedgerBatchPorts | null): void {
   ports = next ?? { namespace: () => null }
