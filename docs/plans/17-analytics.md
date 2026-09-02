@@ -38,7 +38,7 @@ this plan depends on 09. Budget context comes from plan 12, and the charts come 
 - `src/server/repos/__tests__/analytics.test.ts` — new
 - `src/lib/period.ts` — new
 - `src/lib/__tests__/period.test.ts` — new
-- `src/server/functions/analytics.ts` — new
+- `src/server/fns/analytics.ts` — new
 
 ### Data and migration
 
@@ -240,8 +240,8 @@ None.
 - `src/server/repos/saved-views.ts` — new
 - `src/server/repos/__tests__/saved-views.test.ts` — new
 - `src/routes/_app/reports/-ui/saved-views-menu.tsx` — new
-- `src/server/lib/report-csv.ts` — new
-- `src/server/lib/__tests__/report-csv.test.ts` — new
+- `src/server/analytics/report-csv.ts` — new
+- `src/server/analytics/__tests__/report-csv.test.ts` — new
 
 ### Data and migration
 

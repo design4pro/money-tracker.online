@@ -36,7 +36,7 @@ Three structural commitments:
 
 - `src/server/repos/dashboard.ts` — new
 - `src/server/repos/__tests__/dashboard.test.ts` — new
-- `src/server/functions/dashboard.ts` — new
+- `src/server/fns/dashboard.ts` — new
 - `src/routes/_app/index.tsx` — new
 - `src/routes/_app/-ui/widget-grid.tsx` — new
 - `src/routes/_app/-ui/widget-catalog.ts` — new

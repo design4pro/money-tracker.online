@@ -90,6 +90,10 @@ the whole decision set, not a server-paginated scan a person walks through a pag
 - `src/server/repos/__tests__/imports.test.ts` — new
 - `src/server/import/types.ts` — new
 - `src/server/import/registry.ts` — new
+- `src/server/import/amount.ts` — new
+- `src/server/import/__tests__/amount.test.ts` — new
+- `src/server/import/upload.ts` — new
+- `src/server/import/csv/scan.ts` — new
 - `src/server/import/csv/parse.ts` — new
 - `src/server/import/csv/sniff.ts` — new
 - `src/server/import/csv/__tests__/parse.test.ts` — new
@@ -132,7 +136,8 @@ and already migrated — `00-S9`'s row, landed in `drizzle/0001_nosy_magneto.sql
   in workerd, handle quoted newlines, escaped quotes and a ragged final line, and stop at the row cap
   without buffering the whole file. It returns `{ headers, rows, warnings }` where a warning is a
   ragged row or a re-encoded byte, never a thrown error — a single bad line must not lose the file.
-- **The format seam.** `types.ts` declares `interface ImportParser { source, sniff, parse }` over the
+- **The format seam.** `types.ts` declares
+  `interface ImportParser { source, sniff, parse, suggestedMapping? }` over the
   `ImportSource` ids the schema already exports, so the list of formats has exactly one home and it
   is the schema. It sits under `src/server/` and not under `src/lib/` because the interface takes a
   byte stream and returns parsed rows: it is server-only, and `src/lib/` is reachable from the client
@@ -141,6 +146,36 @@ and already migrated — `00-S9`'s row, landed in `drizzle/0001_nosy_magneto.sql
   edit. A format is therefore a new directory and no edit to a file another stage owns, which is what
   lets `19-S4` and `19-S5` run in this wave beside `19-S2` and `19-S3`. A `source` with no module is
   a typed failure at resolution, never a silent fallback to CSV.
+- **`suggestedMapping` is offered, never applied.** A format that names its own fields - the
+  interchange formats do, a delimited file does not - knows which of its columns are the date, the
+  amount and the row id, so it may carry a mapping the step in `19-S2` **pre-fills**. It goes through
+  the same door a fingerprint-matched preset goes through and obeys the same rule: a person confirms
+  it. The member exists here rather than arriving with `19-S4` because a stage in this wave may not
+  edit a file another stage owns, and this is that file. `csv` leaves it undefined.
+- **The seam copies a pattern this repo already runs.** `src/lib/i18n/` splits exactly this way:
+  `types.ts` carries the type surface and `catalogue.ts` carries an `import.meta.glob` over a
+  literal pattern, one lazy thunk per matched file. `registry.ts` is that file for parsers, and the
+  reason its pattern must be a literal is the one `catalogue.ts` already documents: a specifier built
+  from a variable makes the bundler emit the whole source tree, so ``import(`./${source}/parse.ts`)``
+  is not an option. Two files rather than one is house style here, not structure invented for this
+  stage.
+- **Amount conversion has one owner.** `amount.ts` is the only module that turns a source cell into
+  `Minor`, and it sits beside the seam rather than inside `csv/` because `19-S4` and `19-S5` convert
+  the same cells from different files. Every money case below is a case of its tests, which live
+  beside it and not in a format's test file - a later format adding a case must not have to edit a
+  file this stage owns.
+- **Bytes, records and rows are three jobs, not one.** `scan.ts` decodes and yields records,
+  `sniff.ts` reads a sample of them to guess encoding, delimiter and header, and `parse.ts` assembles
+  rows and exports the parser. The order is what keeps the graph acyclic: sniffing needs a scanner
+  and parsing needs a sniff, so a scanner that lived in `parse.ts` would close the loop.
+- **Multipart reading has one owner too.** `upload.ts` reads the request and enforces the byte cap
+  **before** the body is materialised, so an oversized file is refused rather than buffered. It is
+  the same split `fns/attachments` uses, for the same reason: a server function should not also be
+  a parser of wire formats.
+- **The batch is not bound to an account yet.** `import_batches` has no account column, so the
+  uploaded `accountId` is validated through the scoped read - a foreign one is a not-found, never a
+  forbidden - and returned to the caller for the mapping step to carry. `19-S2` stores it, with the
+  rest of the confirmed mapping.
 - **Zod.** `uploadSchema` (accountId, file size and type), `mappingSchema` (see `19-S2`).
 
 ### UI (route, components)
@@ -248,7 +283,7 @@ the file's own text, comma decimal separator and all, and no repository reads it
   the sample cannot distinguish DMY from MDY), `amount` (required, in one of two shapes: a single
   signed column, or a debit column plus a credit column), `decimalSeparator`, `thousandsSeparator`,
   `accountingNegatives`, and optional `description`, `payee`, `category`, `reference`, `notes`,
-  `currency`. It is stored on `import_batches.mapping` once confirmed, and it is the second half of
+  `currency`, `sourceRef`. It is stored on `import_batches.mapping` once confirmed, and it is the second half of
   what the preview and the commit both parse from.
 - **The DMY/MDY rejection is the point.** If every sampled day is ≤ 12, the mapping step **requires an
   explicit choice** rather than defaulting. Defaulting here silently misdates up to 12/31 of a
@@ -258,8 +293,34 @@ the file's own text, comma decimal separator and all, and no repository reads it
   **certain** duplicate; a match on (`booked_on`, `amount_minor`) alone is a **probable** one. Certain
   duplicates default to `skip_duplicate`; probable ones default to `create` **and are flagged**, on
   the principle that a missing transaction is more discoverable than a silently dropped one. It also
-  dedupes **within the file**, because banks re-export overlapping ranges. The rule is the same for
-  every format: a parser hands it normalised rows, never format-specific fields.
+  dedupes **within the file**, because banks re-export overlapping ranges.
+- **A row the source itself identifies skips the scoring entirely.** `sourceRef` is a mapping target
+  like any other, pointed at a column whose values the file's own producer promises are stable per
+  row. When the confirmed mapping fills it, `import_source_hash` is a hash of `<source>:<value>`
+  rather than of the normalised line, and a row whose hash already exists on a transaction in the target account is a **certain**
+  duplicate on that alone - no date window, no amount comparison, no description normalisation. The
+  column and its index are already in `schema.ts`, so this requisitions nothing.
+
+  The reason to spend a clause on it: heuristic scoring is a guess about whether two rows are the
+  same event, and an institution that stamps its own row id has already answered the question. Score
+  by date and amount and a bank that rewords a memo between two exports gives us a row that is
+  neither a certain duplicate (the description moved) nor safe to drop, so the person re-imports it.
+  Hash the whole source line and the reworded memo breaks the hash the same way. Hash the id and it
+  survives, which is the one thing the interchange formats hand us for free and a large part of why
+  `19-S4` is worth building.
+
+  Making it a mapping target rather than a field a parser decides is what keeps the seam honest.
+  `dedupe.ts` never learns what OFX is and neither does the parser layer: a parser still returns
+  text and still refuses to say what a column means. A format that carries a native row id ships a
+  **default mapping** naming the column it lives in - `19-S4` does that for OFX, QIF ships none
+  because QIF has no such id - so nobody maps it by hand and no consumer of the seam changes. A
+  delimited file gets one only if a person points the mapping at a column themselves, which is the
+  right bar: we have no promise about a column we did not recognise.
+
+  A value that turns out not to be unique in the wild degrades to the existing scorer for that file
+  rather than dropping rows, because a false certain duplicate is silent data loss and that is the
+  one failure this area may not have.
+
 - **Preview.** `previewBatch` re-reads the batch's object from R2, parses it with the confirmed
   mapping through the parser `registry.ts` resolved, scores every row, and returns the whole decision
   set in one response — the counts, the per-row decision and the errors. It persists only the
@@ -327,7 +388,10 @@ _The preview's numbers are the numbers that will be written._ Cases in `money-in
 
 - Command gate.
 - `dedupe.test.ts`: certain vs probable; the ±3-day window's edges; within-file duplicates; a
-  re-import of the same file marking every row `skip_duplicate`.
+  re-import of the same file marking every row `skip_duplicate`; a row carrying a `sourceRef`
+  matching an existing transaction marked `skip_duplicate` **with a changed description and a date
+  two days off**, which is the case the scorer alone gets wrong; and the same `sourceRef` value under
+  two different sources not colliding.
 - `e2e/import.spec.ts`: upload a `;`-delimited windows-1250 fixture with Polish diacritics, map it,
   hit the DMY/MDY disambiguation, preview, and assert the summary — **without committing**, which is
   `19-S3`'s test.
@@ -516,8 +580,10 @@ CSV's do, and the `row_index` is the record's ordinal in the file — the `STMTT
   entirely: no investment statements and no balance reconciliation, which is scope BND-30 fixed
   deliberately and this stage does not widen. `DTPOSTED` is `YYYYMMDD` with an optional time and an
   optional bracketed offset; only the date survives, because `booked_on` is a calendar date. `FITID`
-  is carried into the row's `reference` field; duplicate detection stays the one rule `19-S2` owns,
-  scored on date, amount and description for every format alike.
+  is carried into the row's **`sourceRef`**, which is what makes it worth reading: `19-S2`'s dedupe
+  treats a row whose source stamped its own id as a certain duplicate without scoring it, so a bank
+  that rewords a memo between two exports stops producing a row a person has to judge by hand. It is
+  still the one rule `19-S2` owns - this stage sets a field, it does not write a comparison.
 - **QIF.** Line-per-field records terminated by `^`, in the `!Type:Bank` and `!Type:CCard` subset:
   `D` date, `T` amount, `P` payee, `M` memo, `N` reference, `L` category. `!Type:Invst`, `!Account`
   blocks and `!Type:Cat` lists are skipped with a stated count rather than parsed, and a `S`/`E`/`$`

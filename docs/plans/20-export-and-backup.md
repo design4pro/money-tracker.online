@@ -37,11 +37,11 @@ and restore drill.
 
 ### Owned paths
 
-- `src/server/lib/export/schema.ts` — new
-- `src/server/lib/export/serialize.ts` — new
-- `src/server/lib/export/zip.ts` — new
-- `src/server/lib/export/__tests__/serialize.test.ts` — new
-- `src/server/lib/export/__tests__/zip.test.ts` — new
+- `src/server/export/schema.ts` — new
+- `src/server/export/serialize.ts` — new
+- `src/server/export/zip.ts` — new
+- `src/server/export/__tests__/serialize.test.ts` — new
+- `src/server/export/__tests__/zip.test.ts` — new
 
 ### Data and migration
 

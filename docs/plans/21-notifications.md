@@ -37,7 +37,7 @@ resolution and deduplication.
 - `src/server/notify/dispatch.ts` — new
 - `src/server/notify/kinds.ts` — new
 - `src/server/notify/__tests__/dispatch.test.ts` — new
-- `src/server/functions/notifications.ts` — new
+- `src/server/fns/notifications.ts` — new
 
 ### Data and migration
 
