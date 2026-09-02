@@ -194,6 +194,30 @@ components:
 
 # Design System: money-tracker.online
 
+> **Every colour value in this document is historical. `src/styles/tokens.css` is the source of
+> truth, and where the two disagree, the stylesheet wins.**
+>
+> The divergence is not small and not confined to the front matter above. This document describes a
+> deep-teal brand on cool grey paper (`brand: #0a4a42`, `canvas: #f7f7f5`, `ink: #111310`, Inter
+> Tight); what ships is a blue brand on warm paper (`#064f89`, `#fbf9f5`, `#23201a`, Bricolage
+> Grotesque over Inter). It also names grounds and edges that were never registered as tokens at
+> all: `surface-2` **5 times** and `edge-strong` **10 times**, as ordinary vocabulary rather than as
+> anything marked provisional.
+>
+> That is the reason this notice exists rather than a footnote. `docs/SPEC.md` §4 makes this
+> document the owner of the visual language, so an author reaching for `bg-surface-2` or
+> `border-edge-strong` was reading the owning document correctly and still shipping a class that
+> resolves to nothing. Two of them did, and the classes sat in five components until
+> `src/styles/__tests__/token-classes.test.ts` was written to catch them. That gate catches the
+> symptom after the fact; this notice is aimed at the cause.
+>
+> **What remains authoritative here is structure, not value.** The composition of the ledger row,
+> the budget meter's reading order, the chip and chart vocabulary, the motion rules - those are
+> what the source files citing this document actually rely on, and they still hold. Read it for
+> what a component is made of; never for what colour it is.
+>
+> Reconciling the two documents is a task of its own and has not been done.
+
 ## Overview
 
 **Creative North Star: "The Set Table."**
