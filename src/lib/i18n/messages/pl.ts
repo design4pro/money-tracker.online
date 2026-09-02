@@ -633,6 +633,134 @@ const messages = {
   'splits.transfer.body':
     'Jej kwota należy do przepływu między dwoma kontami, a nie do podziału na kategorie.',
 
+  /* -- Transakcje: grupy (11-S2) ------------------------------------------- */
+  'groups.title': 'Grupy transakcji',
+  'groups.subtitle':
+    'Kilka transakcji czytanych jako jedna całość — wakacje, remont, przeprowadzka. Grupa to sposób czytania wierszy; jej usunięcie nigdy nie usuwa transakcji.',
+  'groups.create': 'Nowa grupa',
+  'groups.loading': 'Wczytywanie grup transakcji…',
+  'groups.error.title': 'Nie udało się wczytać grup transakcji',
+  'groups.empty.title': 'Nie masz jeszcze żadnej grupy',
+  'groups.empty.body':
+    'Grupa zbiera transakcje, które chcesz czytać razem — wszystkie płatności za wakacje albo wszystkie faktury za remont. Suma grupy jest wyliczana z jej transakcji przy każdym otwarciu i nigdy nie jest zapisywana.',
+  'groups.table.label': 'Grupy transakcji',
+  'groups.table.summary': {
+    one: '{count} grupa. Każda suma poniżej jest w walucie {currency}.',
+    few: '{count} grupy. Każda suma poniżej jest w walucie {currency}.',
+    many: '{count} grup. Każda suma poniżej jest w walucie {currency}.',
+    other: '{count} grupy. Każda suma poniżej jest w walucie {currency}.',
+  },
+  'groups.column.name': 'Grupa',
+  'groups.column.members': 'Transakcje',
+  'groups.column.total': 'Suma',
+  'groups.column.actions': 'Akcje',
+  'groups.members': {
+    one: '{count} transakcja',
+    few: '{count} transakcje',
+    many: '{count} transakcji',
+    other: '{count} transakcji',
+  },
+  'groups.total.summary': {
+    one: '{name} — {count} transakcja, {amount}',
+    few: '{name} — {count} transakcje, {amount}',
+    many: '{name} — {count} transakcji, {amount}',
+    other: '{name} — {count} transakcji, {amount}',
+  },
+  'groups.actions.label': 'Akcje dla grupy {name}',
+  'groups.rename': 'Zmień nazwę',
+  'groups.delete': 'Usuń',
+  'groups.form.title.create': 'Nowa grupa',
+  'groups.form.title.rename': 'Zmień nazwę grupy',
+  'groups.form.name': 'Nazwa',
+  'groups.form.note': 'Notatka',
+  'groups.form.note.help':
+    'Do czego służy ta grupa. Później nie da się tego zmienić.',
+  'groups.delete.title': 'Usunąć grupę {name}?',
+  'groups.delete.body':
+    'Znika sama grupa. Transakcje, które zawierała, zostają dokładnie tam, gdzie były.',
+  'groups.toast.created': 'Utworzono grupę {name}.',
+  'groups.toast.renamed': 'Zmieniono nazwę na {name}.',
+  'groups.toast.deleted': 'Usunięto grupę {name}.',
+  'groups.panel.title': 'Grupy',
+  'groups.panel.description':
+    'Grupy, w ramach których czytana jest ta transakcja. Każda suma jest w Twojej walucie raportowania.',
+  'groups.panel.empty': 'Ta transakcja nie należy do żadnej grupy.',
+  'groups.panel.add.label': 'Dodaj do grupy',
+  'groups.panel.add.placeholder': 'Wybierz grupę',
+  'groups.panel.add.action': 'Dodaj',
+  'groups.panel.add.none': 'Nie ma jeszcze innej grupy, do której można dodać.',
+  'groups.panel.remove': 'Usuń z grupy {name}',
+  'groups.panel.added': 'Dodano do grupy {name}.',
+  'groups.panel.removed': 'Usunięto z grupy {name}.',
+  'groups.panel.dissolved':
+    'Grupa {name} miała tylko dwie transakcje, więc usunięcie jednej rozwiązało grupę.',
+  'groups.panel.error.title': 'Grupa nie została zmieniona',
+
+  /* -- Transakcje: szablony (11-S2) ---------------------------------------- */
+  'templates.picker.title': 'Zacznij od szablonu',
+  'templates.picker.description':
+    'Szablon wypełnia ten formularz. Nic nie zostaje zapisane, dopóki sam nie zapiszesz, a kurs wymiany jest z wybranej przez Ciebie daty.',
+  'templates.picker.label': 'Szablony',
+  'templates.picker.noAmount': 'Kwotę wpisujesz sam',
+  'templates.picker.error.title': 'Nie udało się zastosować szablonu',
+  'templates.applied':
+    'Formularz został wypełniony z szablonu {name}. Nic nie zostało jeszcze zapisane.',
+
+  /* -- Transakcje: zwroty -------------------------------------------------- */
+  'refunds.title': 'Zwroty',
+  'refunds.description':
+    'Pieniądze, które wróciły za tę transakcję. Powiązanie zwrotu nigdy nie zmienia tego, co zapłaciliśmy pierwotnie; zmienia to, ile ostatecznie kosztowało.',
+  'refunds.effective':
+    'Pierwotnie {original}, zwrócono {refunded}, ostatecznie {effective}.',
+  'refunds.empty': 'Nie powiązano żadnego zwrotu.',
+  'refunds.loading': 'Wczytujemy zwroty…',
+  'refunds.error.title': 'Nie wczytaliśmy zwrotów',
+  'refunds.list.label': 'Zwroty tej transakcji',
+  'refunds.column.date': 'Data',
+  'refunds.column.amount': 'Kwota',
+  'refunds.column.origin': 'Dotyczy',
+  'refunds.column.actions': 'Działania',
+  'refunds.origin.whole': 'Całej transakcji',
+  'refunds.origin.line': 'Jednego wiersza podziału',
+  'refunds.unlink': 'Odepnij',
+  'refunds.unlink.label': 'Odepnij zwrot {amount} z dnia {date}',
+  'refunds.unlinked': 'Usunęliśmy powiązanie zwrotu.',
+  'refunds.linked': 'Powiązaliśmy zwrot.',
+  'refunds.given.title': 'Czego dotyczy ten zwrot',
+  'refunds.given.transaction': 'Oddaje część kwoty {amount} zapłaconej {date}.',
+  'refunds.given.external':
+    'Dotyczy zakupu spoza tego obszaru roboczego, więc liczy się jak zwykły przychód i nie jest z niczym saldowany.',
+  'refunds.given.unlink': 'Usuń to powiązanie zwrotu',
+  'refunds.link': 'Zapisz to jako zwrot',
+  'refunds.dialog.title': 'Czego dotyczy ta transakcja?',
+  'refunds.dialog.description':
+    'Zwrot oddaje pieniądze, które wcześniej wyszły. Wskaż, czego dotyczy, aby przy pierwotnej transakcji było widać, ile ostatecznie kosztowała.',
+  'refunds.dialog.field': 'Czego dotyczy ten zwrot',
+  'refunds.dialog.ranking':
+    'Najpierw najbliższe kwotą, potem najbliższe datą. Przy każdej propozycji piszemy, dlaczego tu jest.',
+  'refunds.dialog.external': 'Czegoś spoza tego obszaru roboczego',
+  'refunds.dialog.external.help':
+    'Tego zakupu nigdy tu nie zapisaliśmy. Pieniądze i tak wróciły i liczą się jak zwykły przychód.',
+  'refunds.dialog.option': '{amount} z dnia {date}',
+  'refunds.dialog.submit': 'Powiąż zwrot',
+  'refunds.dialog.cancel': 'Anuluj',
+  'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
+  'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
+  'refunds.suggest.empty':
+    'Żadna transakcja tego samego kontrahenta z ostatnich 90 dni nie jest dość duża, aby to był jej zwrot.',
+  'refunds.suggest.reason.exact':
+    'Ten sam kontrahent, dokładnie ta kwota, {when}.',
+  'refunds.suggest.reason.larger':
+    'Ten sam kontrahent, o {surplus} więcej niż ten zwrot, {when}.',
+  'refunds.suggest.when.sameDay': 'zaksięgowana tego samego dnia',
+  'refunds.suggest.when.earlier': {
+    one: 'zaksięgowana 1 dzień wcześniej',
+    few: 'zaksięgowana {count} dni wcześniej',
+    many: 'zaksięgowana {count} dni wcześniej',
+    other: 'zaksięgowana {count} dni wcześniej',
+  },
+  'refunds.suggest.alreadyRefunded': 'Zwrócono już z tego {amount}.',
+
   'transactions.planned.title': 'Transakcje planowane',
   'transactions.planned.subtitle':
     'Wpisy zaksięgowane na datę, która jeszcze nie nadeszła. Nie wchodzą do sald, dopóki ich nie potwierdzisz.',
@@ -1813,6 +1941,263 @@ const messages = {
   'goals.toast.recomputed': 'Postęp przeliczony',
   'goals.toast.reached': 'Cel {name} jest w pełni sfinansowany',
   'goals.toast.failed': 'Nie udało się',
+  /* -- Reguły · baner wstrzymanej reguły ------------------------------------ */
+  'rules.paused.badge': 'Wstrzymana',
+  'rules.paused.title': 'Reguła „{name}” jest wstrzymana',
+  'rules.paused.body':
+    'Element, którego potrzebowała ta reguła, został usunięty, więc przestała działać. Wybierz zamiennik, aby włączyć ją z powrotem, albo usuń regułę.',
+  'rules.paused.at': 'Wstrzymano {when}.',
+  'rules.paused.missing.account': 'Usunięte konto: „{label}”',
+  'rules.paused.missing.accountGroup': 'Usunięta grupa kont: „{label}”',
+  'rules.paused.missing.category': 'Usunięta kategoria: „{label}”',
+  'rules.paused.missing.payee': 'Usunięty kontrahent: „{label}”',
+  'rules.paused.missing.tag': 'Usunięty tag: „{label}”',
+  'rules.paused.replace.label': 'Zamiennik dla reguły „{name}”',
+  'rules.paused.replace.placeholder': 'Wybierz zamiennik',
+  'rules.paused.replace.empty':
+    'Nie ma na co przełączyć. Najpierw utwórz zamiennik albo usuń tę regułę.',
+  'rules.paused.delete': 'Usuń tę regułę',
+
+  /* -- Reguły: silnik automatyzacji ---------------------------------------- */
+  'rules.title': 'Reguły',
+  'rules.subtitle':
+    'Reguły działają od góry do dołu na każdej transakcji, która uruchamia ich wyzwalacz. Wykonują się wszystkie pasujące, a późniejsza reguła nadpisuje to, co ustawiła wcześniejsza.',
+  'rules.new': 'Nowa reguła',
+  'rules.list.label': 'Reguły w kolejności działania',
+  'rules.back': 'Wróć do reguł',
+  'rules.error.title': 'Nie udało się wczytać reguł',
+  'rules.error.body':
+    'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli będzie się powtarzać, prześlij nam szczegóły poniżej.',
+  'rules.error.locked':
+    'Reguły nie wchodzą w skład tego planu, więc nic nie zapisano.',
+
+  'rules.empty.title': 'Nie ma jeszcze żadnej reguły',
+  'rules.empty.body':
+    'Reguła wypatruje transakcji, które opiszesz, i zmienia je za Ciebie — nadaje kategorię sklepowi, do którego chodzisz co tydzień, albo tag subskrypcji, o której ciągle zapominasz.',
+  'rules.empty.locked.title': 'Automatyzacja nie wchodzi w skład tego planu',
+  'rules.empty.locked.body':
+    'Reguły nadają kategorie, tagi i nazwy transakcjom w chwili, gdy się pojawiają. Zmiana planu je włącza; nic z tego, co już wprowadziłeś, się nie zmienia.',
+  'rules.empty.locked.action': 'Zobacz plany',
+
+  'rules.row.actions': 'Działania dla {name}',
+  'rules.row.active': 'Aktywna: {name}',
+  'rules.row.position': 'Kolejność {position} z {count}',
+  'rules.row.matches': 'Dopasowania: {count}',
+  'rules.row.inert': 'Nie ma wyzwalacza',
+  'rules.row.paused': 'Wstrzymana',
+  'rules.row.off': 'Wyłączona',
+  'rules.drag.label': 'Zmień kolejność: {name}',
+  'rules.move.top': 'Przenieś na górę',
+  'rules.move.bottom': 'Przenieś na dół',
+
+  'rules.confirm.delete.title': 'Usunąć tę regułę?',
+  'rules.confirm.delete.body':
+    'Od tej chwili przestaje działać. Nic, co już wpisała w transakcje, nie zostaje cofnięte.',
+  'rules.confirm.delete.action': 'Usuń',
+
+  'rules.toast.reordered': 'Kolejność zapisana',
+  'rules.toast.activated': 'Reguła włączona',
+  'rules.toast.deactivated': 'Reguła wyłączona',
+  'rules.toast.created': 'Reguła utworzona',
+  'rules.toast.saved': 'Reguła zapisana',
+  'rules.toast.deleted': 'Reguła usunięta',
+  'rules.toast.failed': 'Nie udało się',
+
+  /* -- Edytor --------------------------------------------------------------- */
+  'rules.editor.new.title': 'Nowa reguła',
+  'rules.editor.edit.title': 'Edytuj regułę',
+  'rules.editor.name': 'Nazwa',
+  'rules.editor.name.description':
+    'To, jak nazwiesz tę regułę, przeglądając listę.',
+  'rules.editor.matchMode': 'Dopasowanie',
+  'rules.editor.matchMode.all': 'Każdy warunek',
+  'rules.editor.matchMode.any': 'Dowolny warunek',
+  'rules.editor.when': 'Gdy',
+  'rules.editor.then': 'Wtedy',
+  'rules.editor.conditions.label': 'Warunki',
+  'rules.editor.actions.label': 'Działania',
+  'rules.editor.addCondition': 'Dodaj warunek',
+  'rules.editor.addAction': 'Dodaj działanie',
+  'rules.editor.addRange': 'Dodaj przedział kwoty',
+  'rules.editor.addRange.description':
+    'Dodaje dwa warunki — co najmniej i co najwyżej. Przedział jest przedziałem tylko wtedy, gdy muszą zachodzić wszystkie warunki, więc najpierw ustaw Dopasowanie na „Każdy warunek”.',
+  'rules.editor.conditions.full': 'Reguła mieści najwyżej {count} warunków.',
+  'rules.editor.actions.full': 'Reguła mieści najwyżej {count} działań.',
+  'rules.editor.runOn': 'Uruchamiaj tę regułę',
+  'rules.editor.runOn.manual_create': 'Gdy dodaję transakcję',
+  'rules.editor.runOn.import': 'Gdy importuję plik',
+  'rules.editor.runOn.edit': 'Gdy edytuję transakcję',
+  'rules.editor.runOn.none':
+    'Ta reguła nie uruchamia się w żadnej sytuacji, więc nigdy nie zmieni transakcji. Mimo to można ją zapisać.',
+  'rules.editor.sentence.label': 'Co robi ta reguła',
+  'rules.editor.save': 'Zapisz regułę',
+  'rules.editor.delete': 'Usuń tę regułę',
+  'rules.editor.error.title': 'Reguła nie została zapisana',
+
+  /* -- Wiersz warunku ------------------------------------------------------- */
+  'rules.condition.legend': 'Warunek {position}',
+  'rules.condition.field': 'Pole',
+  'rules.condition.operator': 'Porównanie',
+  'rules.condition.remove': 'Usuń warunek {position}',
+  'rules.condition.moveUp': 'Przenieś warunek {position} w górę',
+  'rules.condition.moveDown': 'Przenieś warunek {position} w dół',
+  'rules.condition.keywords': 'Słowa kluczowe',
+  'rules.condition.keywords.description':
+    'Po jednym w wierszu. Wielkość liter i polskie znaki są pomijane, więc „Żabka” znajdzie „ZABKA 4471”.',
+  'rules.condition.values': 'Wartości',
+  'rules.condition.values.add': 'Dodaj wartość',
+  'rules.condition.values.toggle': 'Pokaż opcje',
+  'rules.condition.values.remove': 'Usuń {name}',
+  'rules.condition.values.none': 'Nic jeszcze nie wybrano.',
+  'rules.condition.values.empty': 'Nie ma tu jeszcze czego wybierać.',
+  'rules.condition.values.noMatch': 'Nic nie pasuje.',
+  'rules.condition.values.full': 'Najwyżej {count} naraz.',
+  'rules.condition.days': 'Dni',
+  'rules.condition.days.description':
+    'Liczby całkowite od 1 do 31, oddzielone przecinkami. Miesiąc trzydziestodniowy nigdy nie pasuje do 31.',
+  'rules.condition.days.invalid': 'Tylko liczby całkowite od 1 do 31.',
+  'rules.condition.amount': 'Kwota',
+  'rules.condition.currency': 'Waluta',
+  'rules.condition.currency.description':
+    'Kwotę porównuje się w jednej walucie i nigdy nie przelicza, więc transakcja w innej walucie nie pasuje.',
+  'rules.condition.direction': 'Kierunek',
+  'rules.condition.direction.income': 'Wpływ',
+  'rules.condition.direction.expense': 'Wydatek',
+
+  'rules.field.note': 'Notatka',
+  'rules.field.payee': 'Odbiorca',
+  'rules.field.account': 'Konto',
+  'rules.field.account_group': 'Grupa kont',
+  'rules.field.amount': 'Kwota',
+  'rules.field.direction': 'Kierunek',
+  'rules.field.day_of_month': 'Dzień miesiąca',
+  'rules.field.tag': 'Tag',
+  'rules.field.category': 'Kategoria',
+
+  'rules.operator.contains': 'zawiera',
+  'rules.operator.not_contains': 'nie zawiera',
+  'rules.operator.is_any_of': 'jest jednym z',
+  'rules.operator.is_none_of': 'nie jest żadnym z',
+  'rules.operator.eq': 'wynosi dokładnie',
+  'rules.operator.gt': 'jest większa niż',
+  'rules.operator.gte': 'wynosi co najmniej',
+  'rules.operator.lt': 'jest mniejsza niż',
+  'rules.operator.lte': 'wynosi co najwyżej',
+
+  /* -- Wiersz działania ----------------------------------------------------- */
+  'rules.action.legend': 'Działanie {position}',
+  'rules.action.kind': 'Zrób to',
+  'rules.action.remove': 'Usuń działanie {position}',
+  'rules.action.moveUp': 'Przenieś działanie {position} w górę',
+  'rules.action.moveDown': 'Przenieś działanie {position} w dół',
+  'rules.action.set_category': 'Ustaw kategorię',
+  'rules.action.set_payee': 'Ustaw odbiorcę',
+  'rules.action.add_tag': 'Dodaj tag',
+  'rules.action.remove_tag': 'Usuń tag',
+  'rules.action.set_note': 'Ustaw notatkę',
+  'rules.action.set_payment_method': 'Ustaw sposób płatności',
+  'rules.action.mark_planned': 'Oznacz jako planowaną',
+  'rules.action.set_excluded': 'Wyłącz ze statystyk',
+  'rules.action.value.category': 'Kategoria',
+  'rules.action.value.payee': 'Odbiorca',
+  'rules.action.value.tag': 'Tag',
+  'rules.action.value.note': 'Notatka',
+  'rules.action.value.paymentMethod': 'Sposób płatności',
+  'rules.action.value.planned': 'Planowana',
+  'rules.action.value.excluded': 'Wyłączona ze statystyk',
+  'rules.action.value.empty': 'Nie ma tu jeszcze czego wybierać.',
+
+  /* -- Podgląd na żywo ------------------------------------------------------ */
+  'rules.preview.title': 'Podgląd',
+  'rules.preview.counts': 'Pasuje {matched} z ostatnich {scanned} transakcji.',
+  'rules.preview.empty': 'Brak dopasowań wśród ostatnich {scanned} transakcji.',
+  'rules.preview.incomplete':
+    'Dodaj warunek i działanie, a podgląd pojawi się tutaj.',
+  'rules.preview.loading': 'Sprawdzam…',
+  'rules.preview.samples.label': 'Pasujące transakcje',
+  'rules.preview.samples.shown': 'Wypisano pierwsze {shown}.',
+  'rules.preview.scanCap':
+    'Sprawdzanych jest tylko {limit} najnowszych transakcji, więc to próbka Twojej księgi, a nie całość.',
+  'rules.preview.error.title': 'Nie udało się wykonać podglądu',
+  'rules.preview.error.body':
+    'Nic nie zostało zmienione — podgląd nigdy nie zapisuje. Reguła nadal czeka na zapisanie lub edycję.',
+
+  /* -- Reguła odczytana jako zdanie ----------------------------------------- */
+  'rules.sentence.template': 'Gdy {when}, {then}.',
+  'rules.sentence.and': ' i ',
+  'rules.sentence.or': ' lub ',
+  'rules.sentence.listSeparator': ', ',
+  'rules.sentence.quoted': '„{value}”',
+  'rules.sentence.unknownReference': 'coś, czego już nie ma',
+  'rules.sentence.noConditions':
+    'Dodaj warunek, a reguła zostanie tu odczytana zdaniem.',
+  'rules.sentence.noActions':
+    'Dodaj działanie, a reguła zostanie tu odczytana zdaniem.',
+
+  'rules.clause.note.contains': 'notatka zawiera {values}',
+  'rules.clause.note.notContains': 'notatka nie zawiera {values}',
+  'rules.clause.payee.contains': 'odbiorca zawiera {values}',
+  'rules.clause.payee.notContains': 'odbiorca nie zawiera {values}',
+  'rules.clause.account.isAnyOf': 'kontem jest {values}',
+  'rules.clause.account.isNoneOf': 'kontem nie jest {values}',
+  'rules.clause.accountGroup.isAnyOf': 'grupą kont jest {values}',
+  'rules.clause.accountGroup.isNoneOf': 'grupą kont nie jest {values}',
+  'rules.clause.category.isAnyOf': 'kategorią jest {values}',
+  'rules.clause.category.isNoneOf': 'kategorią nie jest {values}',
+  'rules.clause.tag.isAnyOf': 'ma tag {values}',
+  'rules.clause.tag.isNoneOf': 'nie ma tagu {values}',
+  'rules.clause.dayOfMonth.isAnyOf': 'dniem miesiąca jest {values}',
+  'rules.clause.dayOfMonth.isNoneOf': 'dniem miesiąca nie jest {values}',
+  'rules.clause.amount.eq': 'kwota wynosi dokładnie {amount}',
+  'rules.clause.amount.gt': 'kwota jest większa niż {amount}',
+  'rules.clause.amount.gte': 'kwota wynosi co najmniej {amount}',
+  'rules.clause.amount.lt': 'kwota jest mniejsza niż {amount}',
+  'rules.clause.amount.lte': 'kwota wynosi co najwyżej {amount}',
+  'rules.clause.direction.income': 'pieniądze wpływają',
+  'rules.clause.direction.expense': 'pieniądze wypływają',
+  'rules.clause.setCategory': 'ustaw kategorię na {value}',
+  'rules.clause.setPayee': 'ustaw odbiorcę na {value}',
+  'rules.clause.addTag': 'dodaj tag {value}',
+  'rules.clause.removeTag': 'usuń tag {value}',
+  'rules.clause.setNote': 'ustaw notatkę na „{value}”',
+  'rules.clause.setPaymentMethod': 'ustaw sposób płatności na {value}',
+  'rules.clause.markPlanned': 'oznacz ją jako planowaną',
+  'rules.clause.markNotPlanned': 'oznacz ją jako nieplanowaną',
+  'rules.clause.exclude': 'pomiń ją w statystykach',
+  'rules.clause.include': 'uwzględnij ją w statystykach',
+
+  /* -- Attachments (11-S3) -------------------------------------------------- */
+  'attachments.title': 'Paragony',
+  'attachments.description':
+    'Zdjęcia i pliki PDF przechowywane przy tej transakcji. Otworzą je tylko osoby z tej przestrzeni.',
+  'attachments.list.label': 'Załączone paragony',
+  'attachments.link': '{name} · {size} · {kind}',
+  'attachments.remove': 'Usuń {name}',
+  'attachments.empty.title': 'Brak załączonych paragonów',
+  'attachments.empty.body':
+    'Trzymaj paragon, fakturę lub potwierdzenie przelewu razem z transakcją, której dotyczą.',
+  'attachments.attach': 'Załącz paragon',
+  'attachments.dropzone.label': 'Upuść tutaj paragony, aby je załączyć',
+  'attachments.dropzone.hint': 'Upuść pliki tutaj albo je wybierz:',
+  'attachments.dropzone.limits':
+    'JPEG, PNG, WebP, HEIC lub PDF, każdy do 10 MB.',
+  'attachments.progress.label': 'Trwające przesyłanie',
+  'attachments.progress.file': 'Przesyłanie {name}',
+  'attachments.error.file': 'Nie załączono {name}: {reason}',
+  'attachments.error.size': 'plik jest większy niż 10 MB',
+  'attachments.error.type': 'ten typ pliku nie jest przyjmowany',
+  'attachments.error.failed': 'przesyłanie nie powiodło się',
+  'attachments.type.jpeg': 'Obraz JPEG',
+  'attachments.type.png': 'Obraz PNG',
+  'attachments.type.webp': 'Obraz WebP',
+  'attachments.type.heic': 'Obraz HEIC',
+  'attachments.type.pdf': 'Dokument PDF',
+  'attachments.type.other': 'Plik',
+  'attachments.confirm.title': 'Usunąć ten paragon?',
+  'attachments.confirm.body':
+    'Plik {name} zostanie usunięty na stałe. Sama transakcja pozostanie bez zmian.',
+  'attachments.confirm.action': 'Usuń',
+  'attachments.toast.deleted': 'Paragon usunięty',
 } satisfies TranslationOf<typeof En>
 
 export default messages

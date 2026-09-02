@@ -608,6 +608,128 @@ const messages = {
   'splits.transfer.body':
     'Its amount belongs to the movement between the two accounts, not to a breakdown by category.',
 
+  /* -- Transactions: groups (11-S2) ---------------------------------------- */
+  'groups.title': 'Transaction groups',
+  'groups.subtitle':
+    'Several transactions read as one thing — a holiday, a renovation, a move. A group is a way of reading rows; deleting it never deletes them.',
+  'groups.create': 'New group',
+  'groups.loading': 'Loading your transaction groups…',
+  'groups.error.title': 'Transaction groups could not be loaded',
+  'groups.empty.title': 'No groups yet',
+  'groups.empty.body':
+    'A group holds transactions you want to read together — every payment for a holiday, or every invoice for a renovation. Its total is worked out from the members each time you look, and is never stored.',
+  'groups.table.label': 'Transaction groups',
+  'groups.table.summary': {
+    one: '{count} group. Every total below is in {currency}.',
+    other: '{count} groups. Every total below is in {currency}.',
+  },
+  'groups.column.name': 'Group',
+  'groups.column.members': 'Transactions',
+  'groups.column.total': 'Total',
+  'groups.column.actions': 'Actions',
+  'groups.members': {
+    one: '{count} transaction',
+    other: '{count} transactions',
+  },
+  'groups.total.summary': {
+    one: '{name} — {count} transaction, {amount}',
+    other: '{name} — {count} transactions, {amount}',
+  },
+  'groups.actions.label': 'Actions for {name}',
+  'groups.rename': 'Rename',
+  'groups.delete': 'Delete',
+  'groups.form.title.create': 'New group',
+  'groups.form.title.rename': 'Rename group',
+  'groups.form.name': 'Name',
+  'groups.form.note': 'Note',
+  'groups.form.note.help':
+    'What this group is for. It cannot be changed later.',
+  'groups.delete.title': 'Delete {name}?',
+  'groups.delete.body':
+    'The group goes. The transactions in it stay exactly where they are.',
+  'groups.toast.created': '{name} created.',
+  'groups.toast.renamed': 'Renamed to {name}.',
+  'groups.toast.deleted': '{name} deleted.',
+  'groups.panel.title': 'Groups',
+  'groups.panel.description':
+    'The groups this transaction is read as part of. Every total is in your reporting currency.',
+  'groups.panel.empty': 'This transaction is not in any group.',
+  'groups.panel.add.label': 'Add to a group',
+  'groups.panel.add.placeholder': 'Choose a group',
+  'groups.panel.add.action': 'Add',
+  'groups.panel.add.none': 'There is no other group to add this to yet.',
+  'groups.panel.remove': 'Remove from {name}',
+  'groups.panel.added': 'Added to {name}.',
+  'groups.panel.removed': 'Removed from {name}.',
+  'groups.panel.dissolved':
+    '{name} had only two transactions, so removing one dissolved the group.',
+  'groups.panel.error.title': 'The group was not changed',
+
+  /* -- Transactions: templates (11-S2) ------------------------------------- */
+  'templates.picker.title': 'Start from a template',
+  'templates.picker.description':
+    'A template fills this form in. Nothing is saved until you save it, and the exchange rate is the one for the date you pick.',
+  'templates.picker.label': 'Templates',
+  'templates.picker.noAmount': 'You type the amount',
+  'templates.picker.error.title': 'The template could not be applied',
+  'templates.applied':
+    'The form is filled in from {name}. Nothing is saved yet.',
+
+  /* -- Transactions: refunds ---------------------------------------------- */
+  // The effective amount is the reason this feature exists, so it is one
+  // sentence with all three figures in it rather than three chips a reader has
+  // to subtract for themselves.
+  'refunds.title': 'Refunds',
+  'refunds.description':
+    'Money that came back for this transaction. Linking a refund never changes what was originally paid; it changes what it ended up costing.',
+  'refunds.effective':
+    'Original {original}, refunded {refunded}, effective {effective}.',
+  'refunds.empty': 'No refunds linked.',
+  'refunds.loading': 'Loading the refunds…',
+  'refunds.error.title': 'The refunds did not load',
+  'refunds.list.label': 'Refunds of this transaction',
+  'refunds.column.date': 'Date',
+  'refunds.column.amount': 'Amount',
+  'refunds.column.origin': 'Refunds',
+  'refunds.column.actions': 'Actions',
+  'refunds.origin.whole': 'The whole transaction',
+  'refunds.origin.line': 'One line of the split',
+  'refunds.unlink': 'Unlink',
+  'refunds.unlink.label': 'Unlink the refund of {amount} from {date}',
+  'refunds.unlinked': 'Refund link removed.',
+  'refunds.linked': 'Refund linked.',
+  'refunds.given.title': 'What this transaction refunds',
+  'refunds.given.transaction': 'It gives back part of {amount} paid on {date}.',
+  'refunds.given.external':
+    'It refunds something bought outside this workspace, so it counts as ordinary income and is netted against nothing.',
+  'refunds.given.unlink': 'Remove this refund link',
+  'refunds.link': 'Record this as a refund',
+  'refunds.dialog.title': 'What does this transaction refund?',
+  'refunds.dialog.description':
+    'A refund gives back money that went out earlier. Pick what it gives back, so the original shows what it ended up costing.',
+  'refunds.dialog.field': 'What this transaction refunds',
+  'refunds.dialog.ranking':
+    'Closest in amount first, then closest in date. Every option says why it is here.',
+  'refunds.dialog.external': 'Something outside this workspace',
+  'refunds.dialog.external.help':
+    'The purchase was never recorded here. The money still arrived, and it is counted as ordinary income.',
+  'refunds.dialog.option': '{amount} on {date}',
+  'refunds.dialog.submit': 'Link the refund',
+  'refunds.dialog.cancel': 'Cancel',
+  'refunds.dialog.error.title': 'The refund was not linked',
+  'refunds.suggest.loading': 'Looking for what this refunds…',
+  'refunds.suggest.empty':
+    'Nothing with the same payee in the last 90 days is large enough to be what this refunds.',
+  'refunds.suggest.reason.exact': 'Same payee, exactly this amount, {when}.',
+  'refunds.suggest.reason.larger':
+    'Same payee, {surplus} larger than this refund, {when}.',
+  'refunds.suggest.when.sameDay': 'booked the same day',
+  'refunds.suggest.when.earlier': {
+    one: 'booked 1 day earlier',
+    other: 'booked {count} days earlier',
+  },
+  'refunds.suggest.alreadyRefunded': '{amount} of it is already refunded.',
+
   'transactions.planned.title': 'Planned transactions',
   'transactions.planned.subtitle':
     'Entries booked for a date that has not happened yet. They stay out of your balances until you confirm them.',
@@ -1752,6 +1874,278 @@ const messages = {
   'goals.toast.recomputed': 'Progress rechecked',
   'goals.toast.reached': '{name} is fully funded',
   'goals.toast.failed': 'That did not go through',
+  /* -- Rules · the paused banner -------------------------------------------- */
+  // A rule pauses when something it names is deleted. The banner has to say *what*
+  // broke, so the reason carries the deleted row's name — by the time this is read
+  // the row is gone and its id resolves to nothing. One message per kind rather
+  // than a shared sentence with the kind slotted in: Polish inflects the adjective
+  // for it, and a sentence built by concatenation cannot.
+  'rules.paused.badge': 'Paused',
+  'rules.paused.title': '“{name}” is paused',
+  'rules.paused.body':
+    'Something this rule needed was deleted, so it stopped running. Pick a replacement to switch it back on, or delete the rule.',
+  'rules.paused.at': 'Paused on {when}.',
+  'rules.paused.missing.account': 'Deleted account: “{label}”',
+  'rules.paused.missing.accountGroup': 'Deleted account group: “{label}”',
+  'rules.paused.missing.category': 'Deleted category: “{label}”',
+  'rules.paused.missing.payee': 'Deleted payee: “{label}”',
+  'rules.paused.missing.tag': 'Deleted tag: “{label}”',
+  'rules.paused.replace.label': 'Replacement for “{name}”',
+  'rules.paused.replace.placeholder': 'Pick a replacement',
+  'rules.paused.replace.empty':
+    'There is nothing to switch to. Create a replacement first, or delete this rule.',
+  'rules.paused.delete': 'Delete this rule',
+
+  /* -- Rules: the automation engine ---------------------------------------- */
+  // Order is the whole model here, so the subtitle states it rather than leaving
+  // somebody to discover it: every matching rule runs, top to bottom, and the
+  // last write to a field wins. See `src/server/rules/apply.ts`.
+  'rules.title': 'Rules',
+  'rules.subtitle':
+    'Rules run top to bottom on every transaction that fires their trigger. All of the matching ones run, and a later rule overwrites what an earlier one set.',
+  'rules.new': 'New rule',
+  'rules.list.label': 'Rules, in the order they run',
+  'rules.back': 'Back to the rules',
+  'rules.error.title': 'The rules could not be loaded',
+  'rules.error.body':
+    'Nothing was changed. Try again, and if it keeps happening the detail below is what to send us.',
+  'rules.error.locked':
+    'Rules are not part of this plan, so nothing was saved.',
+
+  'rules.empty.title': 'No rules yet',
+  'rules.empty.body':
+    'A rule watches for transactions you describe and changes them for you — categorising the shop you visit every week, or tagging the subscription you keep forgetting about.',
+  'rules.empty.locked.title': 'Automation is not part of this plan',
+  'rules.empty.locked.body':
+    'Rules categorise, tag and rename transactions as they arrive. Upgrading switches them on; nothing you have already entered changes.',
+  'rules.empty.locked.action': 'See the plans',
+
+  'rules.row.actions': 'Actions for {name}',
+  'rules.row.active': 'Active for {name}',
+  'rules.row.position': 'Runs {position} of {count}',
+  'rules.row.matches': 'Matches: {count}',
+  'rules.row.inert': 'Runs on nothing',
+  'rules.row.paused': 'Paused',
+  'rules.row.off': 'Off',
+  'rules.drag.label': 'Reorder {name}',
+  'rules.move.top': 'Move to the top',
+  'rules.move.bottom': 'Move to the bottom',
+
+  'rules.confirm.delete.title': 'Delete this rule?',
+  'rules.confirm.delete.body':
+    'It stops running from now on. Nothing it has already written to a transaction is undone.',
+  'rules.confirm.delete.action': 'Delete',
+
+  'rules.toast.reordered': 'Order saved',
+  'rules.toast.activated': 'Rule switched on',
+  'rules.toast.deactivated': 'Rule switched off',
+  'rules.toast.created': 'Rule created',
+  'rules.toast.saved': 'Rule saved',
+  'rules.toast.deleted': 'Rule deleted',
+  'rules.toast.failed': 'That did not go through',
+
+  /* -- The editor ----------------------------------------------------------- */
+  'rules.editor.new.title': 'New rule',
+  'rules.editor.edit.title': 'Edit rule',
+  'rules.editor.name': 'Name',
+  'rules.editor.name.description':
+    'What you would call this rule when scanning the list.',
+  'rules.editor.matchMode': 'Match',
+  'rules.editor.matchMode.all': 'Every condition',
+  'rules.editor.matchMode.any': 'Any condition',
+  'rules.editor.when': 'When',
+  'rules.editor.then': 'Then',
+  'rules.editor.conditions.label': 'Conditions',
+  'rules.editor.actions.label': 'Actions',
+  'rules.editor.addCondition': 'Add a condition',
+  'rules.editor.addAction': 'Add an action',
+  'rules.editor.addRange': 'Add an amount range',
+  // There is no `between` operator on purpose — a range is two conditions. The
+  // button is the convenience; the sentence explains what it produced, so nobody
+  // is surprised to find two rows where they pressed one button.
+  'rules.editor.addRange.description':
+    'Adds two conditions — at least, and at most. A range only means a range when every condition has to hold, so set Match to “Every condition” first.',
+  'rules.editor.conditions.full': 'A rule holds at most {count} conditions.',
+  'rules.editor.actions.full': 'A rule holds at most {count} actions.',
+  'rules.editor.runOn': 'Run this rule',
+  'rules.editor.runOn.manual_create': 'When I add a transaction',
+  'rules.editor.runOn.import': 'When I import a file',
+  'rules.editor.runOn.edit': 'When I edit a transaction',
+  'rules.editor.runOn.none':
+    'This rule runs on nothing, so it will never change a transaction. It still saves.',
+  'rules.editor.sentence.label': 'What this rule does',
+  'rules.editor.save': 'Save the rule',
+  'rules.editor.delete': 'Delete this rule',
+  'rules.editor.error.title': 'The rule was not saved',
+
+  /* -- One condition row ---------------------------------------------------- */
+  'rules.condition.legend': 'Condition {position}',
+  'rules.condition.field': 'Field',
+  'rules.condition.operator': 'Comparison',
+  'rules.condition.remove': 'Remove condition {position}',
+  'rules.condition.moveUp': 'Move condition {position} up',
+  'rules.condition.moveDown': 'Move condition {position} down',
+  'rules.condition.keywords': 'Keywords',
+  'rules.condition.keywords.description':
+    'One per line. Capitals and Polish diacritics are ignored, so “Żabka” finds “ZABKA 4471”.',
+  'rules.condition.values': 'Values',
+  'rules.condition.values.add': 'Add a value',
+  'rules.condition.values.toggle': 'Show the options',
+  'rules.condition.values.remove': 'Remove {name}',
+  'rules.condition.values.none': 'Nothing chosen yet.',
+  'rules.condition.values.empty': 'There is nothing to pick here yet.',
+  'rules.condition.values.noMatch': 'Nothing matches.',
+  'rules.condition.values.full': 'At most {count} of these at a time.',
+  'rules.condition.days': 'Days',
+  'rules.condition.days.description':
+    'Whole numbers from 1 to 31, separated by commas. A 30-day month never matches 31.',
+  'rules.condition.days.invalid': 'Only whole numbers from 1 to 31.',
+  'rules.condition.amount': 'Amount',
+  'rules.condition.currency': 'Currency',
+  // The evaluator refuses to convert rather than reaching for a rate on a day
+  // nobody chose (`src/server/rules/evaluate.ts`), so the editor says so here
+  // instead of letting somebody discover it from an empty preview.
+  'rules.condition.currency.description':
+    'An amount is compared in one currency and never converted, so a transaction in any other currency does not match.',
+  'rules.condition.direction': 'Direction',
+  'rules.condition.direction.income': 'Money in',
+  'rules.condition.direction.expense': 'Money out',
+
+  'rules.field.note': 'Note',
+  'rules.field.payee': 'Payee',
+  'rules.field.account': 'Account',
+  'rules.field.account_group': 'Account group',
+  'rules.field.amount': 'Amount',
+  'rules.field.direction': 'Direction',
+  'rules.field.day_of_month': 'Day of the month',
+  'rules.field.tag': 'Tag',
+  'rules.field.category': 'Category',
+
+  'rules.operator.contains': 'contains',
+  'rules.operator.not_contains': 'does not contain',
+  'rules.operator.is_any_of': 'is any of',
+  'rules.operator.is_none_of': 'is none of',
+  'rules.operator.eq': 'is exactly',
+  'rules.operator.gt': 'is over',
+  'rules.operator.gte': 'is at least',
+  'rules.operator.lt': 'is under',
+  'rules.operator.lte': 'is at most',
+
+  /* -- One action row ------------------------------------------------------- */
+  'rules.action.legend': 'Action {position}',
+  'rules.action.kind': 'Do this',
+  'rules.action.remove': 'Remove action {position}',
+  'rules.action.moveUp': 'Move action {position} up',
+  'rules.action.moveDown': 'Move action {position} down',
+  'rules.action.set_category': 'Set the category',
+  'rules.action.set_payee': 'Set the payee',
+  'rules.action.add_tag': 'Add a tag',
+  'rules.action.remove_tag': 'Remove a tag',
+  'rules.action.set_note': 'Set the note',
+  'rules.action.set_payment_method': 'Set the payment method',
+  'rules.action.mark_planned': 'Mark as planned',
+  'rules.action.set_excluded': 'Exclude from statistics',
+  'rules.action.value.category': 'Category',
+  'rules.action.value.payee': 'Payee',
+  'rules.action.value.tag': 'Tag',
+  'rules.action.value.note': 'Note',
+  'rules.action.value.paymentMethod': 'Payment method',
+  'rules.action.value.planned': 'Planned',
+  'rules.action.value.excluded': 'Excluded from statistics',
+  'rules.action.value.empty': 'There is nothing to pick here yet.',
+
+  /* -- The live preview ----------------------------------------------------- */
+  // Both counts, always. "12 matches" is not a fact somebody can act on; "12 of
+  // the last 2 000" is. See `-server/preview.ts`.
+  'rules.preview.title': 'Preview',
+  'rules.preview.counts': '{matched} of the last {scanned} transactions match.',
+  'rules.preview.empty': 'No matches in the last {scanned} transactions.',
+  'rules.preview.incomplete':
+    'Add a condition and an action, and the preview appears here.',
+  'rules.preview.loading': 'Checking…',
+  'rules.preview.samples.label': 'Matching transactions',
+  'rules.preview.samples.shown': 'The first {shown} are listed.',
+  'rules.preview.scanCap':
+    'Only the {limit} most recent transactions are checked, so this is a sample of your ledger rather than all of it.',
+  'rules.preview.error.title': 'The preview could not run',
+  'rules.preview.error.body':
+    'Nothing was changed — a preview never writes. The rule itself is still here to save or edit.',
+
+  /* -- The rule, read back as a sentence ------------------------------------ */
+  'rules.sentence.template': 'When {when}, {then}.',
+  'rules.sentence.and': ' and ',
+  'rules.sentence.or': ' or ',
+  'rules.sentence.listSeparator': ', ',
+  'rules.sentence.quoted': '“{value}”',
+  'rules.sentence.unknownReference': 'something that no longer exists',
+  'rules.sentence.noConditions':
+    'Add a condition, and this rule reads back here.',
+  'rules.sentence.noActions': 'Add an action, and this rule reads back here.',
+
+  'rules.clause.note.contains': 'the note contains {values}',
+  'rules.clause.note.notContains': 'the note does not contain {values}',
+  'rules.clause.payee.contains': 'the payee contains {values}',
+  'rules.clause.payee.notContains': 'the payee does not contain {values}',
+  'rules.clause.account.isAnyOf': 'the account is {values}',
+  'rules.clause.account.isNoneOf': 'the account is not {values}',
+  'rules.clause.accountGroup.isAnyOf': 'the account group is {values}',
+  'rules.clause.accountGroup.isNoneOf': 'the account group is not {values}',
+  'rules.clause.category.isAnyOf': 'the category is {values}',
+  'rules.clause.category.isNoneOf': 'the category is not {values}',
+  'rules.clause.tag.isAnyOf': 'it is tagged {values}',
+  'rules.clause.tag.isNoneOf': 'it is not tagged {values}',
+  'rules.clause.dayOfMonth.isAnyOf': 'the day of the month is {values}',
+  'rules.clause.dayOfMonth.isNoneOf': 'the day of the month is not {values}',
+  'rules.clause.amount.eq': 'the amount is exactly {amount}',
+  'rules.clause.amount.gt': 'the amount is over {amount}',
+  'rules.clause.amount.gte': 'the amount is at least {amount}',
+  'rules.clause.amount.lt': 'the amount is under {amount}',
+  'rules.clause.amount.lte': 'the amount is at most {amount}',
+  'rules.clause.direction.income': 'the money is coming in',
+  'rules.clause.direction.expense': 'the money is going out',
+  'rules.clause.setCategory': 'set the category to {value}',
+  'rules.clause.setPayee': 'set the payee to {value}',
+  'rules.clause.addTag': 'add the tag {value}',
+  'rules.clause.removeTag': 'remove the tag {value}',
+  'rules.clause.setNote': 'set the note to “{value}”',
+  'rules.clause.setPaymentMethod': 'set the payment method to {value}',
+  'rules.clause.markPlanned': 'mark it as planned',
+  'rules.clause.markNotPlanned': 'mark it as not planned',
+  'rules.clause.exclude': 'leave it out of the statistics',
+  'rules.clause.include': 'count it in the statistics',
+
+  /* -- Attachments (11-S3) -------------------------------------------------- */
+  'attachments.title': 'Receipts',
+  'attachments.description':
+    'Photos and PDFs kept with this transaction. Only people in this workspace can open them.',
+  'attachments.list.label': 'Attached receipts',
+  'attachments.link': '{name} · {size} · {kind}',
+  'attachments.remove': 'Remove {name}',
+  'attachments.empty.title': 'No receipts attached',
+  'attachments.empty.body':
+    'Keep the till slip, the invoice or the transfer confirmation with the transaction it belongs to.',
+  'attachments.attach': 'Attach a receipt',
+  'attachments.dropzone.label': 'Drop receipts here to attach them',
+  'attachments.dropzone.hint': 'Drop files here, or choose them:',
+  'attachments.dropzone.limits':
+    'JPEG, PNG, WebP, HEIC or PDF, up to 10 MB each.',
+  'attachments.progress.label': 'Uploads in progress',
+  'attachments.progress.file': 'Uploading {name}',
+  'attachments.error.file': '{name} was not attached: {reason}',
+  'attachments.error.size': 'the file is larger than 10 MB',
+  'attachments.error.type': 'that file type is not accepted',
+  'attachments.error.failed': 'the upload did not go through',
+  'attachments.type.jpeg': 'JPEG image',
+  'attachments.type.png': 'PNG image',
+  'attachments.type.webp': 'WebP image',
+  'attachments.type.heic': 'HEIC image',
+  'attachments.type.pdf': 'PDF document',
+  'attachments.type.other': 'File',
+  'attachments.confirm.title': 'Remove this receipt?',
+  'attachments.confirm.body':
+    '{name} is deleted for good. The transaction itself is untouched.',
+  'attachments.confirm.action': 'Remove',
+  'attachments.toast.deleted': 'Receipt removed',
 } as const satisfies MessageCatalogueSource
 
 export default messages
