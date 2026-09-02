@@ -604,6 +604,35 @@ const messages = {
   'transactions.detail.notFound.title': 'Nie ma takiej transakcji',
   'transactions.detail.notFound.body':
     'Mogła zostać usunięta albo adres jest nieprawidłowy.',
+  /* -- Transakcje: podział transakcji -------------------------------------- */
+  'splits.title': 'Podziel tę transakcję',
+  'splits.description':
+    'Rozdziel jedną płatność na kilka kategorii. Zanim zapiszemy podział, wiersze muszą sumować się do kwoty transakcji.',
+  'splits.lines.label': 'Wiersze podziału',
+  'splits.row.legend': 'Wiersz {position}',
+  'splits.row.category': 'Kategoria',
+  'splits.row.category.none': 'Bez kategorii',
+  'splits.row.amount': 'Kwota',
+  'splits.row.note': 'Notatka',
+  'splits.row.remove': 'Usuń wiersz {position}',
+  'splits.row.moveUp': 'Przenieś wiersz {position} w górę',
+  'splits.row.moveDown': 'Przenieś wiersz {position} w dół',
+  'splits.add': 'Dodaj wiersz',
+  'splits.assigned': 'Przypisano {assigned} z {total}.',
+  'splits.remaining': 'Do przypisania zostało {amount}.',
+  'splits.over': '{amount} ponad kwotę transakcji.',
+  'splits.balanced': 'Cała kwota jest przypisana.',
+  'splits.assignRemainder': 'Przypisz resztę',
+  'splits.save': 'Zapisz podział',
+  'splits.clear': 'Usuń podział',
+  'splits.saved': 'Zapisaliśmy podział.',
+  'splits.cleared': 'Usunęliśmy podział.',
+  'splits.error.title': 'Nie zapisaliśmy podziału',
+  'splits.error.amounts': 'Każdy wiersz potrzebuje kwoty większej od zera.',
+  'splits.transfer.title': 'Nogi transferu nie da się podzielić',
+  'splits.transfer.body':
+    'Jej kwota należy do przepływu między dwoma kontami, a nie do podziału na kategorie.',
+
   'transactions.planned.title': 'Transakcje planowane',
   'transactions.planned.subtitle':
     'Wpisy zaksięgowane na datę, która jeszcze nie nadeszła. Nie wchodzą do sald, dopóki ich nie potwierdzisz.',
