@@ -35,10 +35,19 @@ and the plan is amended to say so.
 
 **Stages inside a wave may run in parallel. A stage never depends on another stage in its own wave.**
 
-That is the whole contract, and two properties enforce it:
+That is the whole contract, and three properties enforce it:
 
 1. **Owned paths are disjoint within a wave.** Two stages in one wave may not name the same file.
 2. **The eight shared paths belong to `00-foundations.md` and to nothing else**, in any wave.
+3. **No stage runs a tree-wide git operation while another stage is open.** Stashing, discarding
+   the whole working tree, or resetting it hard respects no path ownership whatsoever: stashing
+   with `-u` in particular removes every untracked file in the repository, so a stage that has
+   written a new test but not yet committed it watches that file vanish and return underneath
+   itself. The damage is not the lost work — popping the stash restores the bytes — it is that
+   **every gate run inside that window lies, in both directions**: green against deleted tests,
+   red against code from before a fix. To compare the working tree against `HEAD` while another
+   stage is open, use a separate `git worktree`, or say so and wait. A gate result is evidence
+   only if the files did not move under it; checksum them before and after if there is any doubt.
 
 Waves are sequential: wave _n+1_ opens when wave _n_ is closed. A wave-0 stage owning a file that a
 wave-3 stage later edits is fine — disjointness is a _within-wave_ rule.
