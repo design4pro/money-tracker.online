@@ -183,6 +183,50 @@ describe('runWithLedgerBatch', () => {
     expect(enqueued).toEqual(['acc-ok'])
   })
 
+  /**
+   * One isolate serves many requests, and workerd interleaves their handlers at every `await`. A
+   * second request that opens a batch while the first is suspended is **not** a nested call: it is
+   * its own unit of work, with its own accounts to enqueue and its own settling point.
+   *
+   * The failure this pins down is the silent one. If the two scopes share one collector, the first
+   * to settle tears the collector down while the second is still writing, and every account the
+   * second touches after that moment is dropped with no error anywhere — a committed write whose
+   * balance history is never rebuilt, which `docs/MONEY.md` §5.5 rules out in as many words: a
+   * person who edits a transaction and refreshes must see a correct chart immediately.
+   */
+  it('keeps two concurrent units of work in separate batches, each enqueuing its own', async () => {
+    const enqueued = installRecording()
+    const tick = (): Promise<void> =>
+      new Promise((resolve) => setTimeout(resolve, 0))
+
+    const first = runWithLedgerBatch(async () => {
+      touchLedgerAccount('acc-first')
+      await tick()
+      await tick()
+      await tick()
+    })
+
+    // The second request arrives while the first is suspended at an await.
+    await tick()
+
+    const second = runWithLedgerBatch(async () => {
+      touchLedgerAccount('acc-second-early')
+      await tick()
+      await tick()
+      await tick()
+      // By now the first unit of work has settled and flushed.
+      touchLedgerAccount('acc-second-late')
+    })
+
+    await Promise.all([first, second])
+
+    expect([...enqueued].sort()).toEqual([
+      'acc-first',
+      'acc-second-early',
+      'acc-second-late',
+    ])
+  })
+
   it('reports the accounts collected so far, and nothing outside a batch', async () => {
     installRecording()
     expect(currentLedgerBatch()).toBeNull()

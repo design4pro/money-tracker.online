@@ -26,7 +26,7 @@ import {
   seedCategory,
   seedTransaction,
 } from './budget-harness'
-import { setLedgerTouchSink, setLimitResolver } from '../base'
+import { setLimitResolver } from '../base'
 import { createRule } from '../rules'
 import {
   RULE_PREVIEW_SCAN_LIMIT,
@@ -48,7 +48,6 @@ beforeEach(async () => {
   scope = world.scope
   otherScope = world.otherScope
   setLimitResolver(null)
-  setLedgerTouchSink(null)
   await seedCategory(db, { id: 'cat-groceries', name: 'Groceries' })
 })
 

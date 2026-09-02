@@ -40,6 +40,8 @@
  * generic, they are confined to this file, and each is annotated where it sits.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { and, asc, count, desc, eq, inArray, lt, sum } from 'drizzle-orm'
 
 import {
@@ -255,35 +257,56 @@ export async function assertWithinLimit(
 /* Seam: the ledger batch (the collector is 09-S2)                            */
 /* -------------------------------------------------------------------------- */
 
-/** Collects the accounts whose balance history a unit of work has invalidated. */
-export type LedgerTouchSink = (accountId: string) => void
-
-let ledgerTouchSink: LedgerTouchSink | null = null
+/**
+ * The accounts whose balance history the unit of work running **in this async context** has
+ * invalidated (plan `09-S2`, `docs/MONEY.md` §5.4).
+ *
+ * **`AsyncLocalStorage`, not a module variable, and the distinction is the whole point.** The
+ * namespace binding beside it in `../ledger/batch.ts` may live on the module because a binding is
+ * request-independent: every request in the isolate wants the same one. A *collector* is the most
+ * request-dependent thing in this file. One isolate serves many requests and workerd interleaves
+ * their handlers at every `await`, so a module variable cannot tell this request's collector from
+ * the one a request currently suspended mid-`await` installed — and the loser is silent: the
+ * request that settles first tears the collector down while the other is still writing, and every
+ * account touched after that moment is dropped with no error anywhere. `docs/MONEY.md` §5.5 rules
+ * that out in as many words.
+ *
+ * Because the store is per-context there is nothing to install and nothing to uninstall, so no
+ * `finally` anywhere can take away a collector that belongs to somebody else.
+ */
+const ledgerCollector = new AsyncLocalStorage<Set<string>>()
 
 /**
- * Installs the collector `runWithLedgerBatch` (plan `09-S2`) opens around a unit of work.
+ * Runs `work` with `collector` gathering touched account ids for the whole of its async context.
  *
  * Balance history is rebuilt wholesale through the `LEDGER` Durable Object, never accumulated, and
  * the rebuild is enqueued **once per touched account** after the work settles — including when it
- * throws, because by then the rows are committed. The seam exists here so that no repository has to
- * be edited later to gain it.
+ * throws, because by then the rows are committed. Settling and enqueuing are `runWithLedgerBatch`'s
+ * (`../ledger/batch.ts`); this seam is here so that no repository has to be edited later to gain it.
  */
-export function setLedgerTouchSink(sink: LedgerTouchSink | null): void {
-  ledgerTouchSink = sink
+export function runWithLedgerCollector<T>(
+  collector: Set<string>,
+  work: () => T,
+): T {
+  return ledgerCollector.run(collector, work)
+}
+
+/** The collector open in this async context, or `null` when the caller is outside a batch. */
+export function currentLedgerCollector(): ReadonlySet<string> | null {
+  return ledgerCollector.getStore() ?? null
 }
 
 /**
  * Records that `accountId`'s balance history is stale.
  *
- * **A no-op when no batch is open, and that is the designed behaviour rather than an oversight.**
- * `runWithLedgerBatch` wraps every server-function invocation, cron body and queue-handler body, so
- * in the running product a sink is installed wherever a write happens; and the nightly rebuild cron
- * re-derives every qualifying account regardless, which is what heals a write path that ran outside
- * a batch. A throwing sink would turn a committed write into a failed request, so the collector
- * owns its own error handling and this function does not guard it.
+ * **A no-op when no batch is open in this context, and that is the designed behaviour rather than
+ * an oversight.** `runWithLedgerBatch` wraps every server-function invocation, cron body and
+ * queue-handler body, so in the running product a collector is open wherever a write happens; and
+ * the nightly rebuild cron re-derives every qualifying account regardless, which is what heals a
+ * write path that ran outside a batch.
  */
 export function touchLedgerAccount(accountId: string): void {
-  ledgerTouchSink?.(accountId)
+  ledgerCollector.getStore()?.add(accountId)
 }
 
 /* -------------------------------------------------------------------------- */
