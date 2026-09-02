@@ -116,6 +116,33 @@ describe('rateTimeline', () => {
     expect(backwards.reverse()).toEqual(forwards)
   })
 
+  /**
+   * `catalogue` is documented as arriving in any order, so the module sorts it before walking. A
+   * timeline that depended on row order would answer differently for the same day depending on
+   * which index the query planner happened to use.
+   */
+  it('answers the same rate whichever order the repository handed the rows in', () => {
+    const reference = timelineOf()
+    const days = [
+      '2026-03-12',
+      '2026-03-13',
+      '2026-03-15',
+      '2026-03-16',
+      '2026-03-17',
+      '2026-03-20',
+    ]
+    const expected = days.map(reference)
+
+    for (const order of [
+      [CATALOGUE[2], CATALOGUE[1], CATALOGUE[0]],
+      [CATALOGUE[1], CATALOGUE[2], CATALOGUE[0]],
+      [CATALOGUE[2], CATALOGUE[0], CATALOGUE[1]],
+    ]) {
+      const timeline = timelineOf({ catalogue: order })
+      expect(days.map(timeline)).toEqual(expected)
+    }
+  })
+
   it('refuses rather than inventing a rate when the pair has none anywhere', () => {
     expect(() =>
       rateTimeline({
