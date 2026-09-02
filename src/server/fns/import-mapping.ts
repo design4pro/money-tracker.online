@@ -221,7 +221,10 @@ export interface ImportPreviewSummary {
   readonly duplicates: number
   readonly invalid: number
   readonly flagged: number
-  /** The sum of `amount_minor` over the rows that will be created. Integer minor units. */
+  /**
+   * What the balance would change by if the rows to create were written. Integer minor units,
+   * **signed**: expenses subtract and income adds. See {@link netAmountMinor}.
+   */
   readonly createAmountMinor: number
 }
 
@@ -248,6 +251,35 @@ export interface ImportPreviewResult {
   readonly sourceRefUsed: boolean
   /** Non-null when committing would take the workspace past its plan. A warning, not a refusal. */
   readonly quota: ImportQuotaWarning | null
+}
+
+/**
+ * What the balance would change by, in integer minor units.
+ *
+ * `amountMinor` is strictly positive by the schema decision `import/map.ts` states - the sign of a
+ * row lives in `direction`. So a sum that does not read `direction` adds three magnitudes and
+ * answers with a figure no account will ever move by: a file of `-45,00`, `-12,50` and `+1500,00`
+ * comes out at `1557,50` where the balance would move by `1442,50`.
+ *
+ * Integer addition over integer minor units, and the negation is integer too. Nothing here
+ * divides, scales or formats — the scale is the account currency's and belongs to the surface.
+ *
+ * Exported for its own test: this is the one line of the preview a person decides on.
+ */
+export function netAmountMinor(rows: ReadonlyArray<SignedRow>): number {
+  return rows.reduce((sum, row) => sum + signedAmountMinor(row), 0)
+}
+
+/** The two fields the sign rule reads. Both the row list and one row are described by it. */
+type SignedRow = Pick<ImportPreviewRow, 'direction' | 'amountMinor'>
+
+/**
+ * One row as a signed integer of minor units.
+ *
+ * The sign rule stated once, so the preview's total and the preview's rows cannot drift apart.
+ */
+export function signedAmountMinor(row: SignedRow): number {
+  return row.direction === 'expense' ? -row.amountMinor : row.amountMinor
 }
 
 /** `'2026-01-02'` shifted by whole days, staying a calendar date throughout. */
@@ -367,11 +399,7 @@ export const previewImportBatch = createServerFn({ method: 'POST' })
       duplicates: rows.length - creating.length,
       invalid: errors.length,
       flagged: rows.filter((row) => row.flagged).length,
-      // Integer addition over integer minor units. Nothing here divides, scales or formats.
-      createAmountMinor: creating.reduce(
-        (sum, row) => sum + row.amountMinor,
-        0,
-      ),
+      createAmountMinor: netAmountMinor(creating),
     }
 
     await replaceImportRowErrors(scope, {

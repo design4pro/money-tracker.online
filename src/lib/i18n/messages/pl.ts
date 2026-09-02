@@ -2221,6 +2221,250 @@ const messages = {
     'Ten wiersz ma jednocześnie obciążenie i uznanie, więc nie jest jedną transakcją.',
   'import.error.row_currency_mismatch':
     'Ten wiersz jest w innej walucie niż konto, do którego miałby trafić.',
+
+  /* -- Import: ekran wejściowy, kreator, mapowanie i podgląd (19-S2) -------- */
+  'import.title': 'Import',
+  'import.lead':
+    'Wczytaj wyciąg albo eksport z innego programu. Nic nie zostanie zapisane, zanim nie zobaczysz, co ten plik by zrobił.',
+
+  'import.group.file.title': 'Z banku albo z arkusza',
+  'import.group.file.body':
+    'Wyciąg pobrany z banku albo arkusz, który prowadzisz sam. Format rozpoznajemy z pliku - nie ma tu listy skrótów do wyboru.',
+  'import.group.migration.title': 'Z innego programu',
+  'import.group.migration.body':
+    'Eksport z aplikacji, w której trzymałeś finanse wcześniej.',
+  'import.group.empty':
+    'Nic tutaj nie jest jeszcze czytane. Gdy format się pojawi, sam znajdzie się w tej grupie.',
+
+  'import.upload.account.label': 'Importuj do',
+  'import.upload.account.placeholder': 'Wybierz konto',
+  'import.upload.file.label': 'Plik',
+  'import.upload.dropzone': 'Upuść tutaj plik, aby go wczytać',
+  'import.upload.choose': 'Wybierz plik',
+  'import.upload.accepts': 'Przyjmujemy tutaj: {extensions}. Do {size}.',
+  'import.upload.selected': 'Wybrano: {name}',
+  'import.upload.submit': 'Wczytaj ten plik',
+  'import.upload.state.uploading': 'Wysyłanie {name}…',
+  'import.upload.state.sniffing': 'Ustalamy, czym jest ten plik…',
+  'import.upload.noAccounts':
+    'Najpierw załóż konto - zaimportowana transakcja musi gdzieś trafić.',
+  'import.upload.error.account':
+    'Wybierz konto, do którego należą te transakcje.',
+  'import.upload.error.file': 'Wybierz plik do zaimportowania.',
+  'import.upload.error.extension':
+    'Plik {name} nie ma rozszerzenia, które umiemy tu odczytać, więc nie ma dla niego parsera.',
+  'import.upload.error.tooLarge':
+    'Plik {name} jest większy niż {size}. Wyeksportuj krótszy okres i wczytaj go w dwóch plikach.',
+  'import.upload.error.failed': 'Nie udało się wczytać pliku: {reason}',
+
+  'import.history.title': 'Historia importów',
+  'import.history.body':
+    'Każdy plik wczytany w tej przestrzeni, od najnowszego.',
+  'import.history.empty.title': 'Nie było jeszcze importu',
+  'import.history.empty.body':
+    'Wczytany plik zostaje tutaj razem z tym, co zrobił, więc import da się odnaleźć także po miesiącach.',
+  'import.history.table': 'Importy, od najnowszego',
+  'import.history.column.file': 'Plik',
+  'import.history.column.status': 'Stan',
+  'import.history.column.rows': 'Wiersze',
+  'import.history.column.created': 'Rozpoczęto',
+  'import.history.open': 'Otwórz import pliku {name}',
+  'import.history.rows': '{imported} z {total}',
+
+  'import.source.csv': 'Arkusz albo CSV',
+  'import.source.ofx': 'Wyciąg OFX',
+  'import.source.qif': 'Wyciąg QIF',
+  'import.source.ynab': 'Eksport z YNAB',
+  'import.source.wallet': 'Eksport z Wallet',
+  'import.source.json_backup': 'Kopia Money Trackera',
+
+  'import.status.queued': 'Oczekuje',
+  'import.status.parsing': 'Odczyt',
+  'import.status.mapping': 'Do zmapowania',
+  'import.status.previewing': 'Po podglądzie',
+  'import.status.running': 'Importowanie',
+  'import.status.completed': 'Zaimportowany',
+  'import.status.failed': 'Niepowodzenie',
+  'import.status.reverted': 'Cofnięty',
+
+  'import.stepper.label': 'Kroki importu',
+  'import.step.upload': 'Wczytanie',
+  'import.step.map': 'Mapowanie kolumn',
+  'import.step.review': 'Przegląd',
+  'import.step.done': 'Import',
+  'import.step.position': 'Krok {position} z {total}: {name}',
+  'import.step.current': 'Jesteś tutaj',
+  'import.step.back': 'Wstecz: {name}',
+  'import.step.next': 'Dalej: {name}',
+  'import.step.locked': 'Ten krok otworzy się po zakończeniu poprzedniego.',
+
+  'import.file.title': 'Plik',
+  'import.file.rows': 'Z pliku {name} odczytano {rows} wierszy.',
+  'import.file.account': 'Trafiłyby na konto {account}.',
+  'import.file.truncated':
+    'Odczytano tylko pierwsze {rows} wierszy - plik ma ich więcej, niż mieści jeden import.',
+  'import.warnings.title': 'Co warto wiedzieć o tym pliku',
+  'import.warning.ragged_row':
+    'Część wierszy ma inną liczbę pól niż wiersz nagłówka. Nic nie zostało pominięte.',
+  'import.warning.re_encoded':
+    'Plik nie jest w UTF-8 i został odczytany kodowaniem zapasowym, więc sprawdź poniżej znaki diakrytyczne.',
+  'import.warning.replacement_character':
+    'Części znaków nie dało się zdekodować, co zwykle oznacza źle odgadnięte kodowanie.',
+  'import.warning.row_cap_reached':
+    'Plik ma więcej wierszy, niż mieści jeden import, więc reszta nie została odczytana.',
+
+  'import.resume.pending': 'Ponowny odczyt zapisanego pliku…',
+  'import.resume.title': 'Nie udało się ponownie odczytać zapisanego pliku',
+  'import.resume.body':
+    'Ta karta nie ma już kolumn pliku, a odczyt zapisanej kopii się nie powiódł. Nic nie zostało zapisane, a poprzednie wysłanie nadal jest w historii - wyślij plik ponownie, aby go zmapować.',
+  'import.resume.action': 'Zacznij od nowa',
+
+  'import.mapping.title': 'Zmapuj kolumny',
+  'import.mapping.body':
+    'Powiedz, co zawiera każda kolumna pliku. Przy każdej pokazujemy trzy pierwsze wartości, żeby wybór opierał się na danych, a nie na nazwie nagłówka.',
+  'import.mapping.table': 'Kolumny pliku i to, co zawierają',
+  'import.mapping.column.header': 'Kolumna',
+  'import.mapping.column.samples': 'Pierwsze wartości',
+  'import.mapping.column.target': 'Zawiera',
+  'import.mapping.column.empty': '(pusto)',
+  'import.mapping.target.label': 'Co zawiera kolumna „{column}”',
+  'import.mapping.target.ignore': 'Pomiń tę kolumnę',
+  'import.mapping.target.date': 'Data',
+  'import.mapping.target.amount': 'Kwota z własnym znakiem',
+  'import.mapping.target.debit': 'Obciążenie',
+  'import.mapping.target.credit': 'Uznanie',
+  'import.mapping.target.description': 'Opis',
+  'import.mapping.target.payee': 'Odbiorca',
+  'import.mapping.target.category': 'Kategoria',
+  'import.mapping.target.reference': 'Numer referencyjny',
+  'import.mapping.target.notes': 'Notatka',
+  'import.mapping.target.currency': 'Waluta',
+  'import.mapping.target.sourceRef': 'Własny identyfikator wiersza z banku',
+
+  'import.mapping.preset.title': 'Wstawiliśmy zapisane wcześniej mapowanie',
+  'import.mapping.preset.body':
+    'Zapamiętaliśmy je dla pliku dokładnie z tymi kolumnami. Sprawdź każdy wiersz, zanim przejdziesz dalej: bank, który zamienia kolumny miejscami, zostawia te same nazwy nagłówków.',
+  'import.mapping.preset.named': 'Nazwałeś je „{label}”.',
+
+  'import.mapping.numbers.title': 'Jak zapisane są liczby',
+  'import.mapping.decimal.label': 'Separator dziesiętny',
+  'import.mapping.decimal.dot': 'Kropka - 1234.56',
+  'import.mapping.decimal.comma': 'Przecinek - 1234,56',
+  'import.mapping.thousands.label': 'Separator tysięcy',
+  'import.mapping.thousands.dot': 'Kropka - 1.234,56',
+  'import.mapping.thousands.comma': 'Przecinek - 1,234.56',
+  'import.mapping.thousands.space': 'Spacja - 1 234,56',
+  'import.mapping.thousands.none': 'Brak - 1234,56',
+  'import.mapping.accounting.label': 'Wydatki zapisane w nawiasach',
+  'import.mapping.accounting.description':
+    'Część eksportów zapisuje wydatek jako (45,00), a nie −45,00.',
+
+  'import.mapping.date.label': 'Format daty',
+  'import.mapping.date.iso': 'Najpierw rok - 2026-04-03',
+  'import.mapping.date.dmySlash': 'Najpierw dzień - 03/04/2026',
+  'import.mapping.date.mdySlash': 'Najpierw miesiąc - 04/03/2026',
+  'import.mapping.date.dmyDot': 'Najpierw dzień - 03.04.2026',
+  'import.mapping.date.ambiguous.title':
+    'W której kolejności zapisane są te daty?',
+  'import.mapping.date.ambiguous.body':
+    'Każdą z próbek da się odczytać na dwa sposoby - {sample} jest jedną z nich. Plik nie mówi, co ma na myśli, a zgadywanie przestawia datę nawet w dwunastu wierszach na trzydzieści jeden i przez miesiące nikt tego nie zauważy.',
+  'import.mapping.date.ambiguous.legend': 'Jak ten plik zapisuje daty',
+  'import.mapping.date.ambiguous.required':
+    'Zanim przejdziesz dalej, wybierz, jak ten plik zapisuje daty.',
+  'import.mapping.date.unrecognised':
+    'Wartości w kolumnie „{column}” nie są zapisane w żadnym formacie daty, który tu czytamy. Wyeksportuj plik ze zwykłą kolumną daty.',
+  'import.mapping.date.checking': 'Odczytujemy daty w tej kolumnie…',
+
+  'import.mapping.save.label': 'Nazwij to mapowanie',
+  'import.mapping.save.description':
+    'Zapamiętamy je dla kolejnego pliku z tymi samymi kolumnami i następnym razem tylko je zaproponujemy. Nazwa jest tym, jak sam nazywasz ten bank.',
+  'import.mapping.save.placeholder': 'Mój bank, konto osobiste',
+
+  'import.mapping.problems': 'Zanim przejdziesz dalej',
+  'import.mapping.error.account':
+    'Wybierz konto, do którego trafią te wiersze.',
+  'import.mapping.error.date': 'Wskaż kolumnę z datą.',
+  'import.mapping.error.amount':
+    'Wskaż kolumnę z kwotą albo jedną z obciążeniami i jedną z uznaniami.',
+  'import.mapping.error.amountShapes':
+    'Wybierz albo jedną kolumnę kwoty ze znakiem, albo parę obciążenie i uznanie - nie oba naraz.',
+  'import.mapping.error.creditMissing':
+    'Kolumna obciążeń potrzebuje obok kolumny uznań.',
+  'import.mapping.error.debitMissing':
+    'Kolumna uznań potrzebuje obok kolumny obciążeń.',
+  'import.mapping.error.separators':
+    'Separator dziesiętny i separator tysięcy muszą być różnymi znakami.',
+  'import.mapping.submit': 'Zapisz mapowanie i pokaż podgląd',
+  'import.mapping.pending': 'Zapisywanie mapowania…',
+  'import.mapping.failed': 'Nie zapisano mapowania: {reason}',
+
+  'import.preview.title': 'Sprawdź, co się wydarzy',
+  'import.preview.body':
+    'Nic nie zostało zapisane. Każdy wiersz poniżej to transakcja w takiej postaci, w jakiej zostałaby utworzona, a kwoty są dokładnie tymi, które trafiłyby do bazy.',
+  'import.preview.pending': 'Ustalamy, co zrobiłby ten plik…',
+  'import.preview.failed.title': 'Podgląd się nie wykonał',
+  'import.preview.failed.body':
+    'Nic nie zostało zapisane. Wróć do mapowania, sprawdź kolumny i spróbuj ponownie.',
+  'import.preview.retry': 'Spróbuj podglądu ponownie',
+
+  'import.preview.summary.label': 'Co zrobiłby ten plik',
+  'import.preview.count.total': 'Odczytane wiersze',
+  'import.preview.count.toCreate': 'Do utworzenia',
+  'import.preview.count.duplicates': 'Pominięte duplikaty',
+  'import.preview.count.invalid': 'Odrzucone',
+  'import.preview.count.flagged': 'Do obejrzenia',
+  'import.preview.count.amount': 'Zmiana salda',
+
+  'import.preview.filter.label': 'Pokaż',
+  'import.preview.filter.all': 'Wszystkie wiersze',
+  'import.preview.filter.create': 'Wiersze do utworzenia',
+  'import.preview.filter.duplicate': 'Wiersze do pominięcia',
+  'import.preview.filter.flagged': 'Możliwe duplikaty',
+
+  'import.preview.table': 'Wiersze, które utworzyłby ten plik',
+  'import.preview.column.date': 'Data',
+  'import.preview.column.description': 'Opis',
+  'import.preview.column.amount': 'Kwota',
+  'import.preview.column.match': 'Dopasowanie',
+  'import.preview.column.decision': 'Co się stanie',
+  'import.preview.decision.label': 'Co stanie się z wierszem {date}, {amount}',
+  'import.preview.decision.create': 'Utwórz',
+  'import.preview.decision.skip': 'Pomiń',
+  'import.preview.match.certain': 'Duplikat',
+  'import.preview.match.probable': 'Możliwy duplikat',
+  'import.preview.match.none': 'Nowa',
+  'import.preview.reason.source_ref':
+    'Identyfikator wiersza z tego pliku jest już przy transakcji na tym koncie.',
+  'import.preview.reason.exact_match':
+    'Ten sam dzień, ta sama kwota i ten sam opis.',
+  'import.preview.reason.amount_and_date':
+    'Ta sama kwota w ciągu trzech dni, ale dzień albo opis się zmienił.',
+  'import.preview.reason.within_file':
+    'Wcześniejszy wiersz tego samego pliku mówi to samo.',
+  'import.preview.empty': 'Żaden wiersz nie pasuje do tego filtra.',
+  'import.preview.sourceRef.used':
+    'Ten plik stempluje własne identyfikatory wierszy, więc duplikaty dopasowaliśmy po nich, a nie po przypuszczeniach.',
+  'import.preview.quota':
+    'Zaimportowanie tych wierszy przekroczyłoby limit {limit} transakcji w Twoim planie o {excess}.',
+  'import.preview.decisions.note':
+    'To, co wybierzesz przy poszczególnych wierszach, żyje w tej przeglądarce. Zapis wierszy pojawi się razem z ostatnim krokiem tego przepływu.',
+
+  'import.preview.invalid.title': 'Odrzucone wiersze',
+  'import.preview.invalid.body':
+    'Te wiersze nie zostaną zaimportowane. Cytujemy własny tekst pliku, żebyś zobaczył, co w nim było.',
+  'import.preview.invalid.row': 'Wiersz {row}',
+  'import.preview.invalid.raw': 'W pliku jest: {raw}',
+  'import.preview.allInvalid.title':
+    'Nie dało się odczytać ani jednego wiersza',
+  'import.preview.allInvalid.body':
+    'Odrzucono wszystkie wiersze ({count}), co niemal zawsze oznacza kolumnę wskazaną na złe pole. Trzy pierwsze mówią dlaczego:',
+  'import.preview.allInvalid.remap': 'Wróć do mapowania',
+  'import.preview.allInvalid.restart': 'Zacznij od nowa z innym plikiem',
+
+  'import.done.title': 'Zaimportuj wiersze',
+  'import.done.body':
+    'Nic jeszcze nie zostało zapisane. Zapis sprawdzonego importu do księgi nie jest tu jeszcze dostępny, więc podgląd powyżej możesz spokojnie zostawić otwarty albo wrócić do niego później.',
+  'import.done.back': 'Wróć do przeglądu',
 } satisfies TranslationOf<typeof En>
 
 export default messages

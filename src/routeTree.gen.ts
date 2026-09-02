@@ -25,6 +25,8 @@ import { Route as AppCategoriesIndexRouteImport } from './routes/_app/categories
 import { Route as AppDashboardIndexRouteImport } from './routes/_app/dashboard/index'
 import { Route as AppGoalsIndexRouteImport } from './routes/_app/goals/index'
 import { Route as AppGoalsGoalIdRouteImport } from './routes/_app/goals/$goalId'
+import { Route as AppImportIndexRouteImport } from './routes/_app/import/index'
+import { Route as AppImportBatchIdRouteImport } from './routes/_app/import/$batchId'
 import { Route as AppPayeesIndexRouteImport } from './routes/_app/payees/index'
 import { Route as AppPayeesPayeeIdRouteImport } from './routes/_app/payees/$payeeId'
 import { Route as AppRecurringIndexRouteImport } from './routes/_app/recurring/index'
@@ -118,6 +120,16 @@ const AppGoalsIndexRoute = AppGoalsIndexRouteImport.update({
 const AppGoalsGoalIdRoute = AppGoalsGoalIdRouteImport.update({
   id: '/goals/$goalId',
   path: '/goals/$goalId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppImportIndexRoute = AppImportIndexRouteImport.update({
+  id: '/import/',
+  path: '/import/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppImportBatchIdRoute = AppImportBatchIdRouteImport.update({
+  id: '/import/$batchId',
+  path: '/import/$batchId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPayeesIndexRoute = AppPayeesIndexRouteImport.update({
@@ -214,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
+  '/import/$batchId': typeof AppImportBatchIdRoute
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -228,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/categories/': typeof AppCategoriesIndexRoute
   '/dashboard/': typeof AppDashboardIndexRoute
   '/goals/': typeof AppGoalsIndexRoute
+  '/import/': typeof AppImportIndexRoute
   '/payees/': typeof AppPayeesIndexRoute
   '/recurring/': typeof AppRecurringIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -246,6 +260,7 @@ export interface FileRoutesByTo {
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
+  '/import/$batchId': typeof AppImportBatchIdRoute
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -260,6 +275,7 @@ export interface FileRoutesByTo {
   '/categories': typeof AppCategoriesIndexRoute
   '/dashboard': typeof AppDashboardIndexRoute
   '/goals': typeof AppGoalsIndexRoute
+  '/import': typeof AppImportIndexRoute
   '/payees': typeof AppPayeesIndexRoute
   '/recurring': typeof AppRecurringIndexRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -281,6 +297,7 @@ export interface FileRoutesById {
   '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/_app/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/_app/goals/$goalId': typeof AppGoalsGoalIdRoute
+  '/_app/import/$batchId': typeof AppImportBatchIdRoute
   '/_app/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/_app/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/_app/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -295,6 +312,7 @@ export interface FileRoutesById {
   '/_app/categories/': typeof AppCategoriesIndexRoute
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_app/goals/': typeof AppGoalsIndexRoute
+  '/_app/import/': typeof AppImportIndexRoute
   '/_app/payees/': typeof AppPayeesIndexRoute
   '/_app/recurring/': typeof AppRecurringIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -315,6 +333,7 @@ export interface FileRouteTypes {
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
+    | '/import/$batchId'
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
@@ -329,6 +348,7 @@ export interface FileRouteTypes {
     | '/categories/'
     | '/dashboard/'
     | '/goals/'
+    | '/import/'
     | '/payees/'
     | '/recurring/'
     | '/settings/'
@@ -347,6 +367,7 @@ export interface FileRouteTypes {
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
+    | '/import/$batchId'
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
@@ -361,6 +382,7 @@ export interface FileRouteTypes {
     | '/categories'
     | '/dashboard'
     | '/goals'
+    | '/import'
     | '/payees'
     | '/recurring'
     | '/settings'
@@ -381,6 +403,7 @@ export interface FileRouteTypes {
     | '/_app/accounts/$accountId'
     | '/_app/budgets/$budgetId'
     | '/_app/goals/$goalId'
+    | '/_app/import/$batchId'
     | '/_app/payees/$payeeId'
     | '/_app/recurring/$seriesId'
     | '/_app/recurring/candidates'
@@ -395,6 +418,7 @@ export interface FileRouteTypes {
     | '/_app/categories/'
     | '/_app/dashboard/'
     | '/_app/goals/'
+    | '/_app/import/'
     | '/_app/payees/'
     | '/_app/recurring/'
     | '/_app/settings/'
@@ -525,6 +549,20 @@ declare module '@tanstack/react-router' {
       path: '/goals/$goalId'
       fullPath: '/goals/$goalId'
       preLoaderRoute: typeof AppGoalsGoalIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/import/': {
+      id: '/_app/import/'
+      path: '/import'
+      fullPath: '/import/'
+      preLoaderRoute: typeof AppImportIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/import/$batchId': {
+      id: '/_app/import/$batchId'
+      path: '/import/$batchId'
+      fullPath: '/import/$batchId'
+      preLoaderRoute: typeof AppImportBatchIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/payees/': {
@@ -664,6 +702,7 @@ interface AppRouteChildren {
   AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
   AppBudgetsBudgetIdRoute: typeof AppBudgetsBudgetIdRoute
   AppGoalsGoalIdRoute: typeof AppGoalsGoalIdRoute
+  AppImportBatchIdRoute: typeof AppImportBatchIdRoute
   AppPayeesPayeeIdRoute: typeof AppPayeesPayeeIdRoute
   AppRecurringSeriesIdRoute: typeof AppRecurringSeriesIdRoute
   AppRecurringCandidatesRoute: typeof AppRecurringCandidatesRoute
@@ -676,6 +715,7 @@ interface AppRouteChildren {
   AppCategoriesIndexRoute: typeof AppCategoriesIndexRoute
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
   AppGoalsIndexRoute: typeof AppGoalsIndexRoute
+  AppImportIndexRoute: typeof AppImportIndexRoute
   AppPayeesIndexRoute: typeof AppPayeesIndexRoute
   AppRecurringIndexRoute: typeof AppRecurringIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
@@ -689,6 +729,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,
   AppBudgetsBudgetIdRoute: AppBudgetsBudgetIdRoute,
   AppGoalsGoalIdRoute: AppGoalsGoalIdRoute,
+  AppImportBatchIdRoute: AppImportBatchIdRoute,
   AppPayeesPayeeIdRoute: AppPayeesPayeeIdRoute,
   AppRecurringSeriesIdRoute: AppRecurringSeriesIdRoute,
   AppRecurringCandidatesRoute: AppRecurringCandidatesRoute,
@@ -701,6 +742,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCategoriesIndexRoute: AppCategoriesIndexRoute,
   AppDashboardIndexRoute: AppDashboardIndexRoute,
   AppGoalsIndexRoute: AppGoalsIndexRoute,
+  AppImportIndexRoute: AppImportIndexRoute,
   AppPayeesIndexRoute: AppPayeesIndexRoute,
   AppRecurringIndexRoute: AppRecurringIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
