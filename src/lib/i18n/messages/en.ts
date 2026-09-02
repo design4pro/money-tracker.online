@@ -2147,6 +2147,30 @@ const messages = {
     '{name} is deleted for good. The transaction itself is untouched.',
   'attachments.confirm.action': 'Remove',
   'attachments.toast.deleted': 'Receipt removed',
+  /* -- Why an import refused a row (19-S2) ---------------------------------- */
+  // One key per `import_row_errors.code`. The row is written once and read back
+  // in whatever language the person is using then, so the column stores the key
+  // and this is where the sentence lives. Each one says what the file contained
+  // and what to do, because "invalid row" is not something anybody can act on.
+  'import.error.date_empty': 'The date column is empty on this row.',
+  'import.error.date_unparseable':
+    'This date is not written the way the chosen date format describes.',
+  'import.error.date_impossible': 'This date does not exist in the calendar.',
+  'import.error.amount_empty': 'The amount column is empty on this row.',
+  'import.error.amount_unparseable':
+    'This amount could not be read with the chosen decimal separator.',
+  'import.error.amount_currency_mismatch':
+    'This amount names a different currency from the account it would be imported into.',
+  'import.error.amount_too_precise':
+    'This amount has more decimal places than the currency has, so it was not rounded.',
+  'import.error.amount_out_of_range': 'This amount is too large to store.',
+  'import.error.amount_zero': 'An imported transaction cannot be for zero.',
+  'import.error.amount_both_empty':
+    'Neither the debit nor the credit column has a figure on this row.',
+  'import.error.amount_debit_and_credit':
+    'This row has both a debit and a credit, so it is not one transaction.',
+  'import.error.row_currency_mismatch':
+    'This row is in a different currency from the account it would be imported into.',
 } as const satisfies MessageCatalogueSource
 
 export default messages

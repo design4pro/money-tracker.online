@@ -259,8 +259,14 @@ None.
 ### Owned paths
 
 - `src/server/import/map.ts` — new
+- `src/server/import/__tests__/map.test.ts` — new
 - `src/server/import/dedupe.ts` — new
 - `src/server/import/__tests__/dedupe.test.ts` — new
+- `src/server/repos/import-preview.ts` — new
+- `src/server/repos/__tests__/import-preview.test.ts` — new
+- `src/server/repos/import-presets.ts` — new
+- `src/server/repos/__tests__/import-presets.test.ts` — new
+- `src/server/fns/import-mapping.ts` — new
 - `src/routes/_app/import/index.tsx` — new
 - `src/routes/_app/import/$batchId.tsx` — new
 - `src/routes/_app/import/-ui/mapping-step.tsx` — new
@@ -276,7 +282,14 @@ on `(organization_id, last_used_at)`. The ceiling of **20 presets per workspace*
 invariant rather than a `CHECK`, because it is a product number and a `CHECK` is a migration
 (`00-S9`). On upload, a preset whose `fingerprint` matches the file's headers is **offered**,
 pre-filling the mapping — it is never applied silently, because a bank that reorders its columns
-would otherwise import everything into the wrong fields.
+would otherwise import everything into the wrong fields. It is the same door, and the same rule,
+that `19-S1`'s `suggestedMapping` goes through.
+
+Two properties of the fingerprint are deliberate. It is taken over the **normalised** header row, so
+case and stray whitespace do not miss a preset; and **order is significant**, so a bank that moves
+its columns does not match its old one. Reaching the ceiling **evicts the least recently used
+preset** rather than refusing to save a new one - somebody mapping their twenty-first institution
+should not meet a wall.
 
 The preview persists no parsed row. What it persists is `import_row_errors`: one row per rejected
 line, with `row_index`, `code`, an i18n-keyed `message` and the truncated `raw` source text. `raw` is
@@ -284,6 +297,10 @@ the file's own text, comma decimal separator and all, and no repository reads it
 
 ### Server (repo, server function, Zod)
 
+- **Why this stage mints its own server-function and repository files.** `fns/imports.ts` and
+  `repos/imports.ts` belong to `19-S1`, and a stage may not edit a file another stage in its wave
+  owns. The split is also the honest one: `19-S1` owns _a batch arriving_, this stage owns _what the
+  file turns out to say_, and `import_row_errors` is written by nothing before this stage exists.
 - **`mappingSchema`.** `date` (required, plus a `dateFormat` from an enum of named patterns —
   `YYYY-MM-DD`, `DD/MM/YYYY`, `MM/DD/YYYY`, `DD.MM.YYYY`, and an explicit "ambiguous" rejection when
   the sample cannot distinguish DMY from MDY), `amount` (required, in one of two shapes: a single
@@ -295,8 +312,13 @@ the file's own text, comma decimal separator and all, and no repository reads it
   explicit choice** rather than defaulting. Defaulting here silently misdates up to 12/31 of a
   person's rows and nobody notices for months.
 - **Dedupe.** `dedupe.ts` scores an incoming row against existing transactions in the target
-  account within ±3 days: exact match on (`booked_on`, `amount_minor`, normalised description) is a
-  **certain** duplicate; a match on (`booked_on`, `amount_minor`) alone is a **probable** one. Certain
+  account within ±3 days. **The window is how candidates are fetched and how far `probable` reaches;
+  it is never how `certain` is reached.** `certain` needs the date to be equal to the day, along with
+  the amount and the normalised description; anything the window turns up that is not same-day is
+  `probable`. That line is load-bearing: `certain` skips the row, so a same-amount same-payee pattern
+  a few days apart - a twice-weekly top-up, two identical coffees, a standing weekly payment - would
+  otherwise vanish without ever being shown. A match on (`booked_on`, `amount_minor`) alone is a
+  **probable** one. Certain
   duplicates default to `skip_duplicate`; probable ones default to `create` **and are flagged**, on
   the principle that a missing transaction is more discoverable than a silently dropped one. It also
   dedupes **within the file**, because banks re-export overlapping ranges.
@@ -305,7 +327,10 @@ the file's own text, comma decimal separator and all, and no repository reads it
   row. When the confirmed mapping fills it, `import_source_hash` is a hash of `<source>:<value>`
   rather than of the normalised line, and a row whose hash already exists on a transaction in the target account is a **certain**
   duplicate on that alone - no date window, no amount comparison, no description normalisation. The
-  column and its index are already in `schema.ts`, so this requisitions nothing.
+  column and its index are already in `schema.ts`, so this requisitions nothing, and the probe is a
+  lookup **by the incoming rows' hashes** rather than a scan of the account's hashed history: that
+  uses the index, has no ceiling above which a match is silently missed, and returns the handful of
+  real hits instead of materialising tens of thousands of rows in an isolate.
 
   The reason to spend a clause on it: heuristic scoring is a guess about whether two rows are the
   same event, and an institution that stamps its own row id has already answered the question. Score
@@ -330,8 +355,13 @@ the file's own text, comma decimal separator and all, and no repository reads it
 - **Preview.** `previewBatch` re-reads the batch's object from R2, parses it with the confirmed
   mapping through the parser `registry.ts` resolved, scores every row, and returns the whole decision
   set in one response — the counts, the per-row decision and the errors. It persists only the
-  rejected rows, replacing that batch's previous `import_row_errors` in one D1 batch (delete-range
-  then insert) so a re-preview after a mapping change is idempotent, the same pattern `09-S1` uses.
+  rejected rows, replacing that batch's previous `import_row_errors` delete-range then insert, so a
+  re-preview after a mapping change is idempotent. **Not one atomic `db.batch()`**, and the earlier
+  text claiming otherwise was wrong about our own layer: batching needs statement builders, while the
+  tenant-scoped base executes, and hand-composing statements would mean hand-stamping the tenant
+  column - which the fork guard forbids and which is the whole point of the base. `account-balances`
+  and `splits` resolved the same pair the same way. The worst case of the window between the two
+  writes is a correct state: an empty error report on a batch that wrote nothing.
   The commit re-runs this same parse over the same bytes, which is why the preview cannot promise a
   number the commit does not write.
 
@@ -432,6 +462,7 @@ None.
 
 ### Owned paths
 
+- `src/server/fns/import-run.ts` — new
 - `src/server/queue/handlers/import-commit.ts` — new
 - `src/server/queue/handlers/__tests__/import-commit.test.ts` — new
 - `src/routes/_app/import/-ui/commit-step.tsx` — new

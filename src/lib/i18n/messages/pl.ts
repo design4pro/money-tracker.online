@@ -2199,6 +2199,28 @@ const messages = {
     'Plik {name} zostanie usunięty na stałe. Sama transakcja pozostanie bez zmian.',
   'attachments.confirm.action': 'Usuń',
   'attachments.toast.deleted': 'Paragon usunięty',
+  /* -- Why an import refused a row (19-S2) ---------------------------------- */
+  'import.error.date_empty': 'Kolumna daty jest pusta w tym wierszu.',
+  'import.error.date_unparseable':
+    'Ta data nie jest zapisana w sposób opisany przez wybrany format daty.',
+  'import.error.date_impossible': 'Taka data nie istnieje w kalendarzu.',
+  'import.error.amount_empty': 'Kolumna kwoty jest pusta w tym wierszu.',
+  'import.error.amount_unparseable':
+    'Nie udało się odczytać tej kwoty przy wybranym separatorze dziesiętnym.',
+  'import.error.amount_currency_mismatch':
+    'Ta kwota wskazuje inną walutę niż konto, do którego miałaby trafić.',
+  'import.error.amount_too_precise':
+    'Ta kwota ma więcej miejsc po przecinku niż waluta, więc nie została zaokrąglona.',
+  'import.error.amount_out_of_range':
+    'Ta kwota jest zbyt duża, aby ją zapisać.',
+  'import.error.amount_zero':
+    'Importowana transakcja nie może opiewać na zero.',
+  'import.error.amount_both_empty':
+    'W tym wierszu nie ma kwoty ani w kolumnie obciążeń, ani uznań.',
+  'import.error.amount_debit_and_credit':
+    'Ten wiersz ma jednocześnie obciążenie i uznanie, więc nie jest jedną transakcją.',
+  'import.error.row_currency_mismatch':
+    'Ten wiersz jest w innej walucie niż konto, do którego miałby trafić.',
 } satisfies TranslationOf<typeof En>
 
 export default messages
