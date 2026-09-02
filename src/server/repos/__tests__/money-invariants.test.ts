@@ -59,6 +59,12 @@ import {
   materializePeriods,
   periodCorrections,
 } from '../budget-periods'
+import {
+  OverRefundError,
+  RefundCurrencyError,
+  linkRefund,
+  listRefundsFor,
+} from '../refunds'
 import { createScope } from '../scope'
 import { assertSplitSum, setSplits } from '../splits'
 import {
@@ -1189,5 +1195,173 @@ describe('12 — a split allocates the parent’s figures and never re-converts'
     const columns = Object.keys(transactionSplits)
     expect(columns).not.toContain('rateE10')
     expect(columns).toContain('refAmountMinor')
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 13 — refunds                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The refund invariants named by `docs/plans/10-transfers-and-refunds.md`.
+ *
+ * The scenario coverage — the direction refusal, the external origin, the suggestion ranking, the
+ * unlink and the isolation cases — lives in `repos/__tests__/refunds.test.ts`. What is restated
+ * here is the arithmetic contract, which is rules 1 and 7 applied to a figure that is **derived on
+ * read** rather than stored:
+ *
+ * - the original's `amount_minor` and `ref_amount_minor` are what they were, because the effective
+ *   amount is a subtraction and never a rewrite;
+ * - that subtraction happens in the **original's own currency**, so the ceiling that bounds it is
+ *   in that currency too — a refund can be larger than its original in euro while being smaller in
+ *   zloty, and it is the euro that decides;
+ * - two currencies are never netted at all: that would need a rate on a date nobody chose, and the
+ *   answer would move every time the catalogue was corrected;
+ * - and a line-level refund leaves `Σ splits = parent` exactly where section 12 left it.
+ */
+describe('13 — a refund is subtracted on read and never written to the original', () => {
+  /** 123,45 € booked at 4,3218 — the same parent section 12 splits, so 533,53 zł. */
+  const MARCH_AND_APRIL = () =>
+    conversionOf('PLN', [
+      [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
+      [`EUR:PLN:${LATER}`, 40_000_000_000],
+    ])
+
+  async function eurExpense() {
+    return createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: MARCH_AND_APRIL(),
+      input: { ...INPUT, currencyCode: 'EUR' },
+    })
+  }
+
+  async function eurIncome(amountMinor: number, bookedOn: string) {
+    return createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: MARCH_AND_APRIL(),
+      input: {
+        ...INPUT,
+        direction: 'income',
+        currencyCode: 'EUR',
+        amountMinor,
+        bookedOn,
+      },
+    })
+  }
+
+  it('leaves both of the original’s figures alone, and resolves no rate', async () => {
+    const original = await eurExpense()
+    expect(original.amountMinor).toBe(12_345)
+    // 123,45 × 4,3218 = 533,5262…, half-even to 533,53 zł.
+    expect(original.refAmountMinor).toBe(53_353)
+
+    // 40,00 € back, at March's rate: 40,00 × 4,3218 = 172,872 → 172,87 zł. Its own figures, on its
+    // own row; nothing about the original is re-converted to make room for it.
+    const refund = await eurIncome(4_000, BOOKED_ON)
+    expect(refund.refAmountMinor).toBe(17_287)
+
+    executed.length = 0
+    await linkRefund(scope, {
+      target: 'transaction',
+      refundTransactionId: refund.id,
+      originalTransactionId: original.id,
+    })
+
+    const reread = await getTransaction({
+      scope,
+      policies: EVERYTHING,
+      id: original.id,
+    })
+    expect(reread.amountMinor).toBe(12_345)
+    expect(reread.refAmountMinor).toBe(53_353)
+    expect(reread.rateE10).toBe(43_218_000_000)
+
+    // 12 345 − 4 000 = 8 345 minor units, in euro: the effective amount is in the transaction's
+    // own currency and no reference figure is netted against another.
+    const summary = await listRefundsFor(scope, {
+      transactionId: original.id,
+    })
+    expect(summary.currencyCode).toBe('EUR')
+    expect(summary.refundedMinor).toBe(4_000)
+    expect(summary.effectiveMinor).toBe(8_345)
+
+    expect(executed.length).toBeGreaterThan(0)
+    for (const query of executed) {
+      expect(query).not.toContain('exchange_rates')
+      expect(query).not.toContain('organization_exchange_rates')
+    }
+  })
+
+  it('checks the ceiling in the original’s currency and not in base', async () => {
+    const original = await eurExpense()
+    // 124,00 € back in April, when 1 € is 4,0000 zł: 124,00 × 4 = 496,00 zł.
+    const refund = await eurIncome(12_400, LATER)
+    expect(refund.refAmountMinor).toBe(49_600)
+
+    // In base this refund is *smaller* than the purchase — 496,00 zł against 533,53 zł — so a
+    // ceiling checked on `ref_amount_minor` would wave it through. In the currency the money
+    // actually moved in it is 12 400 against 12 345, which is 55 minor units more than was paid.
+    const error = await linkRefund(scope, {
+      target: 'transaction',
+      refundTransactionId: refund.id,
+      originalTransactionId: original.id,
+    }).catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(OverRefundError)
+    expect((error as OverRefundError).message).toContain('55')
+  })
+
+  it('refuses to net two currencies at all, and names both', async () => {
+    const original = await eurExpense()
+    const refund = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: MARCH_AND_APRIL(),
+      input: { ...INPUT, direction: 'income', amountMinor: 4_000 },
+    })
+    expect(refund.currencyCode).toBe('PLN')
+
+    const error = await linkRefund(scope, {
+      target: 'transaction',
+      refundTransactionId: refund.id,
+      originalTransactionId: original.id,
+    }).catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(RefundCurrencyError)
+    expect((error as RefundCurrencyError).message).toContain('PLN')
+    expect((error as RefundCurrencyError).message).toContain('EUR')
+  })
+
+  it('composes with section 12: the lines still add up to the parent', async () => {
+    const parent = await eurExpense()
+    const lines = await setSplits(scope, {
+      transactionId: parent.id,
+      splits: [
+        { categoryId: null, amountMinor: 4_000 },
+        { categoryId: null, amountMinor: 8_345 },
+      ],
+    })
+    const refund = await eurIncome(1_000, BOOKED_ON)
+
+    await linkRefund(scope, {
+      target: 'split',
+      refundTransactionId: refund.id,
+      splitId: lines[0].id,
+    })
+
+    const reread = await getTransaction({
+      scope,
+      policies: EVERYTHING,
+      id: parent.id,
+    })
+    const summary = await listRefundsFor(scope, { transactionId: parent.id })
+
+    // 4 000 + 8 345 = 12 345, before the refund and after it: refunding a line writes to no split
+    // row. 12 345 − 1 000 = 11 345 effective on the receipt.
+    expect(reread.amountMinor).toBe(12_345)
+    expect(summary.refundedMinor).toBe(1_000)
+    expect(summary.effectiveMinor).toBe(11_345)
   })
 })

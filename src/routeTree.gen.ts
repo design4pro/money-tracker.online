@@ -33,9 +33,14 @@ import { Route as AppRecurringCandidatesRouteImport } from './routes/_app/recurr
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppTransactionsIndexRouteImport } from './routes/_app/transactions/index'
 import { Route as AppTransactionsTransactionIdRouteImport } from './routes/_app/transactions/$transactionId'
+import { Route as AppTransactionsGroupsRouteImport } from './routes/_app/transactions/groups'
 import { Route as AppTransactionsNewRouteImport } from './routes/_app/transactions/new'
 import { Route as AppTransactionsPlannedRouteImport } from './routes/_app/transactions/planned'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiFilesIdRouteImport } from './routes/api/files/$id'
+import { Route as AppTransactionsRulesIndexRouteImport } from './routes/_app/transactions/rules/index'
+import { Route as AppTransactionsRulesRuleIdRouteImport } from './routes/_app/transactions/rules/$ruleId'
+import { Route as AppTransactionsRulesNewRouteImport } from './routes/_app/transactions/rules/new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -156,6 +161,11 @@ const AppTransactionsTransactionIdRoute =
     path: '/transactions/$transactionId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppTransactionsGroupsRoute = AppTransactionsGroupsRouteImport.update({
+  id: '/transactions/groups',
+  path: '/transactions/groups',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTransactionsNewRoute = AppTransactionsNewRouteImport.update({
   id: '/transactions/new',
   path: '/transactions/new',
@@ -170,6 +180,28 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFilesIdRoute = ApiFilesIdRouteImport.update({
+  id: '/api/files/$id',
+  path: '/api/files/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppTransactionsRulesIndexRoute =
+  AppTransactionsRulesIndexRouteImport.update({
+    id: '/transactions/rules/',
+    path: '/transactions/rules/',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppTransactionsRulesRuleIdRoute =
+  AppTransactionsRulesRuleIdRouteImport.update({
+    id: '/transactions/rules/$ruleId',
+    path: '/transactions/rules/$ruleId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppTransactionsRulesNewRoute = AppTransactionsRulesNewRouteImport.update({
+  id: '/transactions/rules/new',
+  path: '/transactions/rules/new',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -186,9 +218,11 @@ export interface FileRoutesByFullPath {
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
+  '/transactions/groups': typeof AppTransactionsGroupsRoute
   '/transactions/new': typeof AppTransactionsNewRoute
   '/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/$id': typeof ApiFilesIdRoute
   '/accounts/': typeof AppAccountsIndexRoute
   '/budgets/': typeof AppBudgetsIndexRoute
   '/categories/': typeof AppCategoriesIndexRoute
@@ -198,6 +232,9 @@ export interface FileRoutesByFullPath {
   '/recurring/': typeof AppRecurringIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/transactions/': typeof AppTransactionsIndexRoute
+  '/transactions/rules/$ruleId': typeof AppTransactionsRulesRuleIdRoute
+  '/transactions/rules/new': typeof AppTransactionsRulesNewRoute
+  '/transactions/rules/': typeof AppTransactionsRulesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -213,9 +250,11 @@ export interface FileRoutesByTo {
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
+  '/transactions/groups': typeof AppTransactionsGroupsRoute
   '/transactions/new': typeof AppTransactionsNewRoute
   '/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/$id': typeof ApiFilesIdRoute
   '/accounts': typeof AppAccountsIndexRoute
   '/budgets': typeof AppBudgetsIndexRoute
   '/categories': typeof AppCategoriesIndexRoute
@@ -225,6 +264,9 @@ export interface FileRoutesByTo {
   '/recurring': typeof AppRecurringIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/transactions': typeof AppTransactionsIndexRoute
+  '/transactions/rules/$ruleId': typeof AppTransactionsRulesRuleIdRoute
+  '/transactions/rules/new': typeof AppTransactionsRulesNewRoute
+  '/transactions/rules': typeof AppTransactionsRulesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -243,9 +285,11 @@ export interface FileRoutesById {
   '/_app/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/_app/recurring/candidates': typeof AppRecurringCandidatesRoute
   '/_app/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
+  '/_app/transactions/groups': typeof AppTransactionsGroupsRoute
   '/_app/transactions/new': typeof AppTransactionsNewRoute
   '/_app/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/files/$id': typeof ApiFilesIdRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
   '/_app/budgets/': typeof AppBudgetsIndexRoute
   '/_app/categories/': typeof AppCategoriesIndexRoute
@@ -255,6 +299,9 @@ export interface FileRoutesById {
   '/_app/recurring/': typeof AppRecurringIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/transactions/': typeof AppTransactionsIndexRoute
+  '/_app/transactions/rules/$ruleId': typeof AppTransactionsRulesRuleIdRoute
+  '/_app/transactions/rules/new': typeof AppTransactionsRulesNewRoute
+  '/_app/transactions/rules/': typeof AppTransactionsRulesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -272,9 +319,11 @@ export interface FileRouteTypes {
     | '/recurring/$seriesId'
     | '/recurring/candidates'
     | '/transactions/$transactionId'
+    | '/transactions/groups'
     | '/transactions/new'
     | '/transactions/planned'
     | '/api/auth/$'
+    | '/api/files/$id'
     | '/accounts/'
     | '/budgets/'
     | '/categories/'
@@ -284,6 +333,9 @@ export interface FileRouteTypes {
     | '/recurring/'
     | '/settings/'
     | '/transactions/'
+    | '/transactions/rules/$ruleId'
+    | '/transactions/rules/new'
+    | '/transactions/rules/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -299,9 +351,11 @@ export interface FileRouteTypes {
     | '/recurring/$seriesId'
     | '/recurring/candidates'
     | '/transactions/$transactionId'
+    | '/transactions/groups'
     | '/transactions/new'
     | '/transactions/planned'
     | '/api/auth/$'
+    | '/api/files/$id'
     | '/accounts'
     | '/budgets'
     | '/categories'
@@ -311,6 +365,9 @@ export interface FileRouteTypes {
     | '/recurring'
     | '/settings'
     | '/transactions'
+    | '/transactions/rules/$ruleId'
+    | '/transactions/rules/new'
+    | '/transactions/rules'
   id:
     | '__root__'
     | '/'
@@ -328,9 +385,11 @@ export interface FileRouteTypes {
     | '/_app/recurring/$seriesId'
     | '/_app/recurring/candidates'
     | '/_app/transactions/$transactionId'
+    | '/_app/transactions/groups'
     | '/_app/transactions/new'
     | '/_app/transactions/planned'
     | '/api/auth/$'
+    | '/api/files/$id'
     | '/_app/accounts/'
     | '/_app/budgets/'
     | '/_app/categories/'
@@ -340,6 +399,9 @@ export interface FileRouteTypes {
     | '/_app/recurring/'
     | '/_app/settings/'
     | '/_app/transactions/'
+    | '/_app/transactions/rules/$ruleId'
+    | '/_app/transactions/rules/new'
+    | '/_app/transactions/rules/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -348,6 +410,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   ApiHealthRoute: typeof ApiHealthRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiFilesIdRoute: typeof ApiFilesIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -520,6 +583,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTransactionsTransactionIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/transactions/groups': {
+      id: '/_app/transactions/groups'
+      path: '/transactions/groups'
+      fullPath: '/transactions/groups'
+      preLoaderRoute: typeof AppTransactionsGroupsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/transactions/new': {
       id: '/_app/transactions/new'
       path: '/transactions/new'
@@ -540,6 +610,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/files/$id': {
+      id: '/api/files/$id'
+      path: '/api/files/$id'
+      fullPath: '/api/files/$id'
+      preLoaderRoute: typeof ApiFilesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/transactions/rules/': {
+      id: '/_app/transactions/rules/'
+      path: '/transactions/rules'
+      fullPath: '/transactions/rules/'
+      preLoaderRoute: typeof AppTransactionsRulesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/transactions/rules/$ruleId': {
+      id: '/_app/transactions/rules/$ruleId'
+      path: '/transactions/rules/$ruleId'
+      fullPath: '/transactions/rules/$ruleId'
+      preLoaderRoute: typeof AppTransactionsRulesRuleIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/transactions/rules/new': {
+      id: '/_app/transactions/rules/new'
+      path: '/transactions/rules/new'
+      fullPath: '/transactions/rules/new'
+      preLoaderRoute: typeof AppTransactionsRulesNewRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
@@ -570,6 +668,7 @@ interface AppRouteChildren {
   AppRecurringSeriesIdRoute: typeof AppRecurringSeriesIdRoute
   AppRecurringCandidatesRoute: typeof AppRecurringCandidatesRoute
   AppTransactionsTransactionIdRoute: typeof AppTransactionsTransactionIdRoute
+  AppTransactionsGroupsRoute: typeof AppTransactionsGroupsRoute
   AppTransactionsNewRoute: typeof AppTransactionsNewRoute
   AppTransactionsPlannedRoute: typeof AppTransactionsPlannedRoute
   AppAccountsIndexRoute: typeof AppAccountsIndexRoute
@@ -581,6 +680,9 @@ interface AppRouteChildren {
   AppRecurringIndexRoute: typeof AppRecurringIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppTransactionsIndexRoute: typeof AppTransactionsIndexRoute
+  AppTransactionsRulesRuleIdRoute: typeof AppTransactionsRulesRuleIdRoute
+  AppTransactionsRulesNewRoute: typeof AppTransactionsRulesNewRoute
+  AppTransactionsRulesIndexRoute: typeof AppTransactionsRulesIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -591,6 +693,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppRecurringSeriesIdRoute: AppRecurringSeriesIdRoute,
   AppRecurringCandidatesRoute: AppRecurringCandidatesRoute,
   AppTransactionsTransactionIdRoute: AppTransactionsTransactionIdRoute,
+  AppTransactionsGroupsRoute: AppTransactionsGroupsRoute,
   AppTransactionsNewRoute: AppTransactionsNewRoute,
   AppTransactionsPlannedRoute: AppTransactionsPlannedRoute,
   AppAccountsIndexRoute: AppAccountsIndexRoute,
@@ -602,6 +705,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppRecurringIndexRoute: AppRecurringIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppTransactionsIndexRoute: AppTransactionsIndexRoute,
+  AppTransactionsRulesRuleIdRoute: AppTransactionsRulesRuleIdRoute,
+  AppTransactionsRulesNewRoute: AppTransactionsRulesNewRoute,
+  AppTransactionsRulesIndexRoute: AppTransactionsRulesIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -612,6 +718,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   ApiHealthRoute: ApiHealthRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiFilesIdRoute: ApiFilesIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

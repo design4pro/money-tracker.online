@@ -8,8 +8,11 @@ separate blind critic will look at the directory you produce and nothing else.
 Ours: the local dev server, `http://localhost:3010` (already running and seeded — the
 validation ladder started it; if it does not answer, run
 `bash .sandcastle/setup-e2e.sh --if-needed` first).
-Reference: the public demo `https://demo.moneymatter.app` (sample data, reset hourly —
-read-only exhibit, do not try to mutate anything there).
+Reference: the public demo. **`docs/agents/reference.md` holds its address and how to reach it,
+and that file is the single place either is recorded — do not carry a host or a path in your head
+from a previous round.** The demo sits one click behind an entry control on the marketing host; the
+click is navigation and nothing else. Read-only exhibit: do not sign up, do not create data, do not
+press anything that changes what the next visitor sees.
 
 ## The clean-room rule, and it is not negotiable
 
@@ -60,11 +63,19 @@ expected.
 Photograph the reference with the same script — it is generic Playwright underneath:
 
     node scripts/visual/capture.mjs \
-      --url https://demo.moneymatter.app/<path> \
+      --url <the demo host from docs/agents/reference.md>/<path> \
       --out {{SHOTS_DIR}} \
       --label {{REF_LABEL}} \
       --viewports 1440x900,360x800 \
-      --themes light,dark
+      --themes light,dark \
+      --enter '<entry-control selector>'
+
+`--enter` clicks the demo's entry control once, waits for the page to settle and photographs where
+it lands — without it every authenticated reference surface captures the front door instead. The
+selector is deliberately **not** recorded in this repo: clause 5 forbids copying a name and a CSS
+selector is a name, so read it off the page yourself and pass it on the command line. One click, and
+only a click that navigates. If the control never appears the script files no frame and warns
+instead — report that as `skippedReason` and move on, exactly like any other wall.
 
 No `--auth` and no `--state` — those flags encode OUR app's seams. The script switches theme via
 `prefers-color-scheme`; if the reference does not react to it (its dark frames come out identical

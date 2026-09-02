@@ -49,6 +49,12 @@ const PROPER_NOUNS: ReadonlyArray<string> = [
   'transactions.keyboard.keys.delete',
   'transactions.keyboard.keys.edit',
   'transactions.keyboard.keys.duplicate',
+  // Polish took the English noun for this one and kept it: the sidebar already
+  // reads `Tagi`, and these two are its singular. `rules.clause.addTag` and
+  // `rules.clause.removeTag` are whole clauses and are translated, which is why
+  // only the two bare labels are here.
+  'rules.field.tag',
+  'rules.action.value.tag',
 ]
 
 const TOKEN = /\{([A-Za-z0-9_]+)\}/g

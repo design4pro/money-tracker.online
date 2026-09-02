@@ -61,6 +61,7 @@ import {
   transactions,
 } from '#/server/db/schema'
 import { newId } from '#/server/db/ids'
+import { pauseRulesReferencing } from '#/server/rules/integrity'
 
 import { assertScopedWrite, createTenantRepository, tenantFilter } from './base'
 import { ConflictError, ForbiddenError, NotFoundError } from './errors'
@@ -648,6 +649,15 @@ export async function deleteCategory(
   if (usageCount > 0) throw new CategoryInUseError(id, usageCount)
 
   await categoryRepo.requireRemove(scope, id)
+
+  // `14-S3`: the deleting operation writes the pause itself, carrying the name the row had a
+  // statement ago — after this line there is nowhere left to read it from.
+  await pauseRulesReferencing({
+    scope,
+    refType: 'category',
+    refId: id,
+    label: row.name,
+  })
 }
 
 /** How many rows would lose their classification. Transactions and splits both count. */

@@ -17,7 +17,12 @@
  *     mid-count-up and text is never caught at 20% opacity;
  *   - `--auth` is refused outright for a screen only a signed-out visitor can see, because the frame
  *     would be of the wrong screen under the right filename. Which screens and why:
- *     ./anonymous-only.mjs.
+ *     ./anonymous-only.mjs;
+ *   - `--enter` takes the one click that a public demo puts between a visitor and the surface worth
+ *     photographing, for a reference that no longer sits at a URL of its own. One rule governs it:
+ *     the click must be one that NAVIGATES, never one that MUTATES what the next visitor sees. It is
+ *     somebody else's shop window — a control that signs up, saves, deletes or submits is not an
+ *     entry point and is never what this flag is pointed at.
  *
  * CLEAN ROOM. This script points a browser at a URL and photographs what it paints. That is the
  * whole of its contract with anything that is not ours: it never reads the reference product's DOM,
@@ -36,7 +41,8 @@
  *     --viewports 1440x900,360x800 \
  *     --themes light,dark \
  *     [--auth] [--state hover-row] \
- *     [--hover 'selector'] [--click 'selector'] [--settle 800]
+ *     [--hover 'selector'] [--click 'selector'] [--settle 800] \
+ *     [--enter 'selector']
  *
  * Prints one JSON object on stdout: `{ requestedUrl, files, console, warnings, captureValid }`. Each
  * file records the URL the browser actually landed on, so a redirect the refusal list does not know
@@ -226,6 +232,20 @@ async function settle(page) {
 
 async function main() {
   const wantsAuth = flag('auth')
+  const enter = typeof opt.enter === 'string' ? opt.enter : undefined
+
+  // The two flags belong to opposite sides of the pair. `--auth` replays OUR app's cached session;
+  // an entry click is how somebody else's public demo lets an anonymous visitor in. Asking for both
+  // in one run means the caller has lost track of which side is being photographed, and either flag
+  // aimed at the other side's host does something nobody wants.
+  if (enter && wantsAuth) {
+    console.error(
+      "capture: --enter and --auth cannot be combined. --auth replays our own app's cached " +
+        "session; --enter clicks the entry control on somebody else's public demo. One run " +
+        'photographs one side — drop whichever flag is not the side of this URL.',
+    )
+    process.exit(2)
+  }
 
   // Both refusals come before anything is created or launched: once a frame exists there is
   // nothing left downstream to tell a redirect target apart from the product. Which screens are
@@ -281,6 +301,16 @@ async function main() {
   })
 
   const files = []
+  /**
+   * An entry control that never appeared is a property of the run, not of one frame.
+   *
+   * There is no viewport and no theme for which it would suddenly be there, so the run stops at the
+   * first miss rather than spending another seven fifteen-second waits on the same answer. No frame
+   * is filed: the warning travels in the JSON and the capture is reported as skipped, because this
+   * stage is advisory and a photograph of the front door filed under the dashboard's name is worse
+   * than no photograph at all.
+   */
+  let entryMissing = false
 
   for (const vp of viewports) {
     await page.setViewportSize({ width: vp.w, height: vp.h })
@@ -300,6 +330,30 @@ async function main() {
       }
 
       await settle(page)
+
+      // Exactly one click, and then the same wait the first navigation got, because the click is a
+      // navigation: the destination is where every frame of this run is taken. It is not a login,
+      // not a form and not a route — a surface two clicks in is a different conversation.
+      if (enter) {
+        const entered = await page
+          .locator(enter)
+          .first()
+          .click({ timeout: 15_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        if (!entered) {
+          warnings.push(
+            `--enter '${enter}' never appeared on ${url} within 15s — the entry control is gone, ` +
+              `renamed, or behind something else; no frame filed`,
+          )
+          entryMissing = true
+          break
+        }
+        await settle(page)
+      }
+
       await quiesce(page)
 
       if (typeof opt.hover === 'string') {
@@ -343,7 +397,8 @@ async function main() {
         )
       }
       // Read back at the shutter rather than at the response, so a redirect the app makes after
-      // hydration — and a `--click` that navigates — is the URL reported for this frame.
+      // hydration, and an `--enter` or `--click` that navigates — is the URL reported for this
+      // frame.
       files.push({
         viewport: vp.name,
         theme,
@@ -352,6 +407,7 @@ async function main() {
         bytes: size,
       })
     }
+    if (entryMissing) break
   }
 
   await context.close()
