@@ -3,9 +3,10 @@ import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
 import { getAccount } from '#/server/repos/accounts'
+import { listSplits } from '#/server/repos/splits'
 import { getTransaction } from '#/server/repos/transactions'
 
-import type { Transaction } from '#/server/db/types'
+import type { Transaction, TransactionSplit } from '#/server/db/types'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 
 /**
@@ -44,6 +45,8 @@ const inputSchema = z.strictObject({
 export interface TransactionDetail {
   readonly transaction: Transaction
   readonly accountName: string
+  /** Empty for a transaction filed under its own category. Never `null`: absent is a set of none. */
+  readonly splits: ReadonlyArray<TransactionSplit>
 }
 
 export const loadTransactionDetail = createServerFn({ method: 'GET' })
@@ -59,7 +62,13 @@ export const loadTransactionDetail = createServerFn({ method: 'GET' })
       id: data.transactionId,
     })
 
-    const account = await getAccount(scope, transaction.accountId)
+    // Both of these are reads the summary and the split panel print together, so they go together
+    // rather than one after the other. They run only once the transaction has been found, which is
+    // the ordering the docblock above exists to protect.
+    const [account, splits] = await Promise.all([
+      getAccount(scope, transaction.accountId),
+      listSplits(scope, { transactionId: transaction.id }),
+    ])
 
-    return { transaction, accountName: account.name }
+    return { transaction, accountName: account.name, splits }
   })

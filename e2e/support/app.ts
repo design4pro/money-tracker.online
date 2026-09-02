@@ -142,22 +142,43 @@ export async function useTheme(page: Page, theme: AppTheme): Promise<void> {
  * this application offers — nothing writes a `data-hydrated` attribute — and it is a private React
  * field, so a future React that drops it makes this helper time out loudly rather than quietly
  * pass a page that was never hydrated.
+ *
+ * `timeout` is a *budget*, not a tolerance: nothing that fails to hydrate is accepted, it is only
+ * given longer to say so. The default is what every spec here has always used. The reason it is
+ * adjustable at all is that hydration is gated on the client module graph, and under `pnpm dev`
+ * Vite compiles that graph per route on first visit - so the first test to open a screen pays a
+ * cost the twentieth does not, and a spec that opens seven screens once each pays it seven times.
  */
-export async function waitForHydration(page: Page): Promise<void> {
+export async function waitForHydration(
+  page: Page,
+  timeout = 20_000,
+): Promise<void> {
   await page.waitForFunction(
     () => {
+      // `document.body` is null until the parser reaches it, and `waitForFunction` propagates a
+      // throw instead of retrying past it - so an unguarded `Object.keys(null)` here does not
+      // wait, it fails the test outright with "Cannot convert undefined or null to object". That
+      // is a race against how early the first poll lands, which is why it shows up as an
+      // occasional inexplicable red rather than as a broken helper.
       const element = document.querySelector('main') ?? document.body
+      // `lib.dom` types `document.body` as non-nullable, which is the assumption that fails here.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (element === null) return false
       return Object.keys(element).some((key) => key.startsWith('__reactFiber$'))
     },
     undefined,
-    { timeout: 20_000 },
+    { timeout },
   )
 }
 
 /** `page.goto`, and then the wait every interaction in this suite depends on. */
-export async function gotoApp(page: Page, path: string): Promise<void> {
+export async function gotoApp(
+  page: Page,
+  path: string,
+  hydrationTimeout?: number,
+): Promise<void> {
   await page.goto(path)
-  await waitForHydration(page)
+  await waitForHydration(page, hydrationTimeout)
 }
 
 /**

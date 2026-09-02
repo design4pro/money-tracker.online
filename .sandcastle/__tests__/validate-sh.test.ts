@@ -24,7 +24,14 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+// Every case below builds a scratch git repo and runs a shell script in it, so a case costs
+// several process spawns rather than a few microseconds of JavaScript. Vitest's 5 s default is a
+// bound calibrated on an idle laptop: on a busy machine — or a two-core CI runner — the spawns
+// alone can outrun it, and the suite then goes red for a reason that has nothing to do with
+// `validate.sh`. The generous bound is not a performance claim; it is the absence of one.
+vi.setConfig({ testTimeout: 60_000 })
 
 const VALIDATE_SH = join(
   dirname(fileURLToPath(import.meta.url)),

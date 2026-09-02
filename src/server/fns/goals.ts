@@ -17,9 +17,10 @@
  * absent from this file; if it ever appears, either a goal started writing money or somebody added
  * it defensively, and both are worth catching in review.
  *
- * **`today` is decided here, once.** The repository and the projection take it as a parameter and
- * never read a clock, which is what makes a projected date testable at a pinned day. It is the UTC
- * calendar day, matching `booked_on`'s own definition in `docs/MONEY.md` §6.1.
+ * **`today` enters here, once per call, from `#/server/clock`.** The repository and the projection
+ * take it as a parameter and never read a clock, which is what makes a projected date testable at a
+ * pinned day. `serverToday()` owns what the day *is*: the UTC calendar day, matching `booked_on`'s
+ * own definition in `docs/MONEY.md` §6.1.
  *
  * **`goal.reached` is dispatched here, not in the repository.** The repository sets the status in
  * the same `UPDATE` as `contributed_minor` and *reports* the transition; delivering a notification
@@ -33,6 +34,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
+import { serverToday } from '#/server/clock'
 import { monthlyContributionSeries } from '#/server/goals/history'
 import { dispatchGoalReached } from '#/server/goals/reached'
 import { projectCompletion } from '#/server/goals/project'
@@ -70,11 +72,6 @@ const listInputSchema = z.strictObject({
   includeArchived: z.boolean().default(false),
 })
 
-/** The UTC calendar day. See the module docblock for why it is decided here and only here. */
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 /* -------------------------------------------------------------------------- */
 /* Reads                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -92,7 +89,7 @@ export const loadGoals = createServerFn({ method: 'GET' })
     const scope = await requireOrg()
     return summariseGoals({
       scope,
-      today: todayUtc(),
+      today: serverToday(),
       conversion: await conversionContextFor(scope),
       includeArchived: data.includeArchived,
     })
@@ -124,7 +121,7 @@ export const loadGoalDetail = createServerFn({ method: 'GET' })
   .inputValidator(goalIdSchema)
   .handler(async ({ data }): Promise<GoalDetail> => {
     const scope = await requireOrg()
-    const today = todayUtc()
+    const today = serverToday()
     // The goal is loaded first and on its own: a foreign id must fail here, before anything else
     // is read, so no partial payload can be assembled around a row the caller may not see.
     const goal = await getGoalRow(scope, data.goalId)

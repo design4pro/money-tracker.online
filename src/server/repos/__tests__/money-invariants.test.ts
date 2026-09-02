@@ -36,8 +36,14 @@ import { projectCompletion } from '#/server/goals/project'
 import { medianOf } from '#/server/recurring/detect'
 import { matchesPeriod } from '#/server/recurring/match'
 import { organization, user } from '#/server/db/auth-schema'
-import { accounts, budgetCategories, currencies } from '#/server/db/schema'
+import {
+  accounts,
+  budgetCategories,
+  currencies,
+  transactionSplits,
+} from '#/server/db/schema'
 import { rolloverChain } from '#/server/budgets/rollover'
+import { transferRefAmounts } from '#/server/transfers/ref-amount-cases'
 import {
   NOOP_ALERT_DISPATCHER,
   createMemoryMarkerStore,
@@ -54,6 +60,7 @@ import {
   periodCorrections,
 } from '../budget-periods'
 import { createScope } from '../scope'
+import { assertSplitSum, setSplits } from '../splits'
 import {
   executed as budgetExecuted,
   createBudgetWorld,
@@ -1011,5 +1018,176 @@ describe('10 — a goal projection is integer arithmetic over integers it was gi
         today: '2026-03-20',
       }),
     ).toEqual({ kind: 'reached' })
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 11 — transfers                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The transfer invariants named by `docs/plans/10-transfers-and-refunds.md`.
+ *
+ * Held here for the reason `8 —` gives. The four cases of `docs/MONEY.md` §4.2 are worked through
+ * one row at a time, on hand-computed integers, in `transfers/__tests__/ref-amount-cases.test.ts`;
+ * the two-leg write path is in `repos/__tests__/transfers.test.ts`. What is restated here is the
+ * single claim a reader of the money boundary should be able to check without opening either:
+ * **moving money between two of your own accounts does not change what you are worth.**
+ *
+ * That claim is one signed integer. `netMinor` is `destination − source` in base minor units, so
+ * a pair that leaves net worth alone is a pair whose `netMinor` is `0` — and the one case that may
+ * legitimately be non-zero returns the residual instead of burying it.
+ */
+describe('11 — an internal transfer does not move net worth', () => {
+  const DAY = '2026-03-15'
+
+  const leg = (amountMinor: number, currencyCode: string) => ({
+    amountMinor: asMinor(amountMinor),
+    currencyCode: asCurrencyCode(currencyCode),
+  })
+
+  it.each([
+    ['1 — the source is in base', leg(10_000, 'PLN'), leg(2_500, 'EUR')],
+    ['2 — the destination is in base', leg(2_500, 'EUR'), leg(10_000, 'PLN')],
+    ['3 — both are in base', leg(10_000, 'PLN'), leg(10_000, 'PLN')],
+  ])('case %s nets to exactly zero', async (_name, source, destination) => {
+    // No rate is in the book, and none is needed: a leg already in base *is* the truth, and the
+    // other leg is told to match it. A resolver that is never called is the strongest form of
+    // "this path does not consult the catalogue".
+    const result = await transferRefAmounts({
+      source,
+      destination,
+      bookedOn: DAY,
+      conversion: {
+        baseCurrencyCode: asCurrencyCode('PLN'),
+        resolveRate: () => {
+          throw new Error('a base-currency leg must not resolve a rate')
+        },
+      },
+    })
+
+    expect(result.netMinor).toBe(0)
+    expect(result.source.refAmountMinor).toBe(result.destination.refAmountMinor)
+    expect(Number.isInteger(result.netMinor)).toBe(true)
+  })
+
+  it('reports the residual between two foreign legs rather than hiding it', async () => {
+    // Base PLN, and neither leg is in it, so each converts on its own.
+    //   source:      100,00 € at 4,3000 → 10 000 × 4,3 = 43 000 = 430,00 zł
+    //   destination: ¥15 000 at 0,02870 → 15 000 × 0,0287 × 10^(2−0) = 43 050 = 430,50 zł
+    // The 0,50 zł between them is a real difference between two published conversions on the same
+    // day. Forcing one leg onto the other would invent an EUR/JPY rate nobody published.
+    const result = await transferRefAmounts({
+      source: leg(10_000, 'EUR'),
+      destination: leg(15_000, 'JPY'),
+      bookedOn: DAY,
+      conversion: conversionOf('PLN', [
+        [`EUR:PLN:${DAY}`, 43_000_000_000],
+        [`JPY:PLN:${DAY}`, 287_000_000],
+      ]),
+    })
+
+    expect(result.appliedCase).toBe(4)
+    expect(result.source.refAmountMinor).toBe(43_000)
+    expect(result.destination.refAmountMinor).toBe(43_050)
+    expect(result.netMinor).toBe(50)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 12 — splits                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The split invariants named by `docs/plans/11-splits-groups-attachments.md`.
+ *
+ * The scenario coverage — the refusals, the reorder, the transfer leg, the guard on the parent's
+ * amount — lives in `repos/__tests__/splits.test.ts`. What is restated here is the arithmetic
+ * contract, which is rules 1, 2 and 3 applied to a row that is *derived* from another row rather
+ * than converted on its own:
+ *
+ * - the lines add up to the whole, in integer minor units;
+ * - their reference figures **allocate** the parent's single figure, so they sum to it exactly and
+ *   there is no per-line rounding residue to leak into a category report;
+ * - a line has nowhere to put a rate of its own, because `transaction_splits` has no `rate_e10`
+ *   column. Rule 3 as structure: the conversion travels on the parent, once.
+ */
+describe('12 — a split allocates the parent’s figures and never re-converts', () => {
+  /** The parent every case below splits: 123,45 € booked at 4,3218, so 533,53 zł. */
+  async function eurParent() {
+    return createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: conversionOf('PLN', [
+        [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
+      ]),
+      input: { ...INPUT, currencyCode: 'EUR' },
+    })
+  }
+
+  it('sums the lines to the parent in both currencies, in integers', async () => {
+    const parent = await eurParent()
+    expect(parent.refAmountMinor).toBe(53_353)
+
+    // Three lines that divide neither figure evenly, which is where a per-line conversion would
+    // leave the reference total one minor unit short of the parent.
+    const written = await setSplits(scope, {
+      transactionId: parent.id,
+      splits: [
+        { categoryId: null, amountMinor: 4_000 },
+        { categoryId: null, amountMinor: 4_000 },
+        { categoryId: null, amountMinor: 4_345 },
+      ],
+    })
+
+    const sum = (pick: (line: (typeof written)[number]) => number) =>
+      written.reduce((total, line) => total + pick(line), 0)
+
+    expect(sum((line) => line.amountMinor)).toBe(parent.amountMinor)
+    expect(sum((line) => line.refAmountMinor)).toBe(parent.refAmountMinor)
+    for (const line of written) {
+      expect(Number.isInteger(line.refAmountMinor)).toBe(true)
+      expect(line.currencyCode).toBe(parent.currencyCode)
+      expect(line.refCurrencyCode).toBe(parent.refCurrencyCode)
+    }
+  })
+
+  it('resolves no rate while splitting, and names no rate catalogue', async () => {
+    const parent = await eurParent()
+    executed.length = 0
+
+    await setSplits(scope, {
+      transactionId: parent.id,
+      splits: [
+        { categoryId: null, amountMinor: 6_000 },
+        { categoryId: null, amountMinor: 6_345 },
+      ],
+    })
+
+    expect(executed.length).toBeGreaterThan(0)
+    for (const query of executed) {
+      expect(query).not.toContain('exchange_rates')
+    }
+  })
+
+  it('refuses a set that does not add up, and says by how much', async () => {
+    // The rule stated on its own, without a database: the message carries both figures and the
+    // difference, because the person reading it is doing arithmetic.
+    expect(() =>
+      assertSplitSum(asMinor(12_345), [
+        { amountMinor: 6_000 },
+        { amountMinor: 6_344 },
+      ]),
+    ).toThrow(
+      /12345.*1 minor units are unassigned|1 minor units are unassigned/,
+    )
+  })
+
+  it('gives a line no column to carry its own conversion in', () => {
+    // Rule 3 as structure rather than as behaviour. If a `rate_e10` ever appears here, a line can
+    // disagree with its parent about what the money was worth, and nothing above would catch it.
+    const columns = Object.keys(transactionSplits)
+    expect(columns).not.toContain('rateE10')
+    expect(columns).toContain('refAmountMinor')
   })
 })

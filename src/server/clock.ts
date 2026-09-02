@@ -1,0 +1,73 @@
+/**
+ * What day the server thinks it is, and the one place that decides.
+ *
+ * Every date-driven answer this product gives is a comparison between a stored day and *today*:
+ * which budget period is open and how far through it we are, whether a recurring period is
+ * upcoming or overdue, which month the dashboard opens on, what an account's balance is as of.
+ * Before this module there were four identical `new Date().toISOString().slice(0, 10)` helpers -
+ * in `fns/budgets`, `fns/goals`, `fns/recurring` and `repos/accounts` - each with a docblock
+ * claiming that `today` was decided there and only there. Four owners of one concept is the
+ * failure `docs/SPEC.md` §8 names, and the second implementation is the defect, not the duplicate.
+ *
+ * The day is UTC, matching `booked_on`'s own definition in `docs/MONEY.md` §6.1. The reader's
+ * timezone is applied at render and only there: a day bucket that shifted with the viewer would
+ * put the same transaction in two different months for two people looking at one workspace.
+ *
+ * ## The development-only pin, and why the browser suite cannot work without it
+ *
+ * The seed is anchored to a constant (`ANCHOR` in `scripts/seed/seed.mjs`) and reads no clock, so
+ * the fixture itself never moves. The *comparison* does. Left to the wall clock, the relationship
+ * between the fixture and today advances every midnight, and with it every budget bar, every due
+ * badge and the month the dashboard lands on - so a screenshot baseline recorded one evening is
+ * photographing a different application the next morning. No tolerance absorbs that: a row leaving
+ * a list moves everything below it.
+ *
+ * So a development request may name the day, and `x-mt-server-today` is how. Both browser projects
+ * in `playwright.config.ts` send it on every request their context makes - the SSR document and the
+ * server-function RPCs that follow it - so the whole render agrees about the day. This is the
+ * contract `docs/plans/98-verification-protocol.md` §2.4 has specified all along.
+ *
+ * The guard is `import.meta.env.DEV`, which the production build folds to `false` and drops the
+ * branch behind, so the header is inert against anything but a dev server. That is deliberate and
+ * load-bearing rather than defensive: a header that could move the server's idea of today in
+ * production is a header that can be used to read a budget period that has not opened yet.
+ */
+
+import { getRequestHeader } from '@tanstack/react-start/server'
+
+/** The header a development request may pin the day with. Mirrored in `playwright.config.ts`. */
+const SERVER_TODAY_HEADER = 'x-mt-server-today'
+
+/** `YYYY-MM-DD`, and nothing else. A malformed pin is ignored rather than trusted. */
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Today, as a UTC calendar date.
+ *
+ * Under `pnpm dev` an `x-mt-server-today` header wins; everywhere else, and always in production,
+ * this is the wall clock.
+ */
+export function serverToday(): string {
+  if (import.meta.env.DEV) {
+    const pinned = pinnedDay()
+    if (pinned !== null) return pinned
+  }
+  return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * The pinned day, when there is a request carrying one.
+ *
+ * The `try` is not defensive padding. `getRequestHeader` reads an async-local store that only
+ * exists while a request is being served, and this module is reached from paths where there is no
+ * request at all - the cron handler, and any unit test that imports a repository. Letting it throw
+ * would turn "nobody pinned anything" into a failed job.
+ */
+function pinnedDay(): string | null {
+  try {
+    const value = getRequestHeader(SERVER_TODAY_HEADER)
+    return value !== undefined && ISO_DAY.test(value) ? value : null
+  } catch {
+    return null
+  }
+}

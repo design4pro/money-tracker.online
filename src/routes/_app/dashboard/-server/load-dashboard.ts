@@ -1,4 +1,3 @@
-import { today } from '@internationalized/date'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader } from '@tanstack/react-start/server'
 import { z } from 'zod'
@@ -13,6 +12,7 @@ import {
 import { createTranslator, loadCatalogue } from '#/lib/i18n'
 import { asCurrencyCode, asMinor, subtractMinor, sumMinor } from '#/lib/money'
 import { requireOrg } from '#/server/auth/guards'
+import { serverToday } from '#/server/clock'
 import { isLiabilityCategory } from '#/server/catalog/account-types'
 import { negotiateLocaleFrom } from '#/server/fns/locale'
 import { listAccounts } from '#/server/repos/accounts'
@@ -121,9 +121,10 @@ export const loadDashboard = createServerFn({ method: 'GET' })
   .inputValidator(inputSchema)
   .handler(async ({ data }): Promise<DashboardData> => {
     const scope = await requireOrg()
-    // The clock is read once, here, in UTC — the frame `booked_on` is stored in. A date supplied
-    // by the caller would let a bookmark decide what "this month" means.
-    const range = periodRange(data.period, today('UTC').toString())
+    // The clock is read once, here, through the module that owns it — in UTC, the frame
+    // `booked_on` is stored in. A date supplied by the caller would let a bookmark decide what
+    // "this month" means; reading it through `serverToday()` is what lets the browser suite pin it.
+    const range = periodRange(data.period, serverToday())
 
     // Archived and excluded accounts come back too: the recent list may name one, and a row whose
     // account has been archived must still say which account it was on.
