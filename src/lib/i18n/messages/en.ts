@@ -1895,6 +1895,7 @@ const messages = {
   'rules.paused.replace.empty':
     'There is nothing to switch to. Create a replacement first, or delete this rule.',
   'rules.paused.delete': 'Delete this rule',
+  'rules.paused.resumed': 'Rule resumed',
 
   /* -- Rules: the automation engine ---------------------------------------- */
   // Order is the whole model here, so the subtitle states it rather than leaving

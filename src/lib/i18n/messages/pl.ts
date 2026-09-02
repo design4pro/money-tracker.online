@@ -1957,6 +1957,7 @@ const messages = {
   'rules.paused.replace.empty':
     'Nie ma na co przełączyć. Najpierw utwórz zamiennik albo usuń tę regułę.',
   'rules.paused.delete': 'Usuń tę regułę',
+  'rules.paused.resumed': 'Reguła znów działa',
 
   /* -- Reguły: silnik automatyzacji ---------------------------------------- */
   'rules.title': 'Reguły',

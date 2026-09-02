@@ -34,14 +34,21 @@ import {
   loadRules,
   reorderRules,
   setRuleActive,
+  updateRule,
 } from '#/server/fns/rules'
+import {
+  readPausedReason,
+  replaceRuleReference,
+} from '#/server/rules/integrity'
 
 import { useDataRefresh } from '../../-lib/refresh'
 import { ConfirmDialog } from '../../accounts/-ui/confirm-dialog'
 import { loadTransactionReference } from '../-server/list'
 import { ruleSentence } from './-lib/sentence'
+import { PausedBanner } from './-ui/paused-banner'
 
 import type { Rule } from '#/server/repos/rules'
+import type { PausedRefType } from './-ui/paused-banner'
 
 /**
  * `/transactions/rules` — every rule, in the order it runs.
@@ -121,8 +128,73 @@ function RulesListRoute() {
   const refreshCaches = useDataRefresh()
 
   const [pendingDelete, setPendingDelete] = useState<Rule | null>(null)
+  const [busyRuleId, setBusyRuleId] = useState<string | null>(null)
 
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
+
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  /** The live rows a paused reference can be pointed at, by the kind it was. */
+  function replacementsFor(refType: PausedRefType) {
+    switch (refType) {
+      case 'account':
+        return reference.accounts
+      case 'account_group':
+        return reference.accountGroups
+      case 'category':
+        return reference.categories
+      case 'tag':
+        return reference.tags
+      case 'payee':
+        return reference.payees
+    }
+  }
+
+  async function repair(
+    rule: Rule,
+    refType: PausedRefType,
+    fromId: string,
+    toId: string,
+  ) {
+    setBusyRuleId(rule.id)
+    try {
+      const next = replaceRuleReference(
+        {
+          name: rule.name,
+          matchMode: rule.matchMode,
+          // `Rule` holds these frozen; `RuleDefinition` wants them mutable. Copying is the
+          // honest conversion — casting the readonly away would let a later edit mutate the row
+          // this list is still rendering from.
+          conditions: [...rule.conditions],
+          actions: [...rule.actions],
+          runOn: [...rule.runOn],
+        },
+        refType,
+        fromId,
+        toId,
+      )
+      await updateRule({ data: { ruleId: rule.id, patch: next } })
+      toast.success(t('rules.paused.resumed'))
+      refresh()
+    } catch {
+      toast.error(t('rules.toast.failed'))
+    } finally {
+      setBusyRuleId(null)
+    }
+  }
+
+  async function removePaused(ruleId: string) {
+    setBusyRuleId(ruleId)
+    try {
+      await deleteRule({ data: { ruleId } })
+      toast.success(t('rules.toast.deleted'))
+      refresh()
+    } catch {
+      toast.error(t('rules.toast.failed'))
+    } finally {
+      setBusyRuleId(null)
+    }
+  }
 
   const names = {
     accounts: new Map(reference.accounts.map((o) => [o.id, o.name])),
@@ -177,41 +249,42 @@ function RulesListRoute() {
       </header>
 
       {/*
-        14-S3 SLOT - the paused-rule banner renders here, above the list and below the heading,
-        so a person meets the explanation before the row it is about.
+        The paused-rule banners sit above the list and below the heading, so a person meets the
+        explanation before the row it is about. One banner per paused rule rather than one summary:
+        each pause has its own cause and its own repair, and a combined banner could only link to
+        the list it is already sitting on.
 
-        `-ui/paused-banner.tsx` (14-S3) landed as a presentational component that renders ONE
-        paused rule rather than a list, and takes its own vocabulary rather than this route's
-        `TransactionReference`. Wiring it is one `map` over the rules this route already holds:
+        Replacing is one write. `updateRule` clears `paused_reason` unconditionally, because the
+        edit that rewrote the dead reference *is* the resolution — so this does not clear the pause
+        itself, and there is no window where the reference is fixed and the warning still shows.
 
-          {rules
-            .filter((rule) => rule.pausedReason !== null)
-            .map((rule) => (
-              <PausedBanner
-                key={rule.id}
-                ruleId={rule.id}
-                ruleName={rule.name}
-                refType={...}      // off rule.pausedReason
-                label={...}        // off rule.pausedReason
-                pausedAt={...}     // off rule.pausedReason
-                timeZone={timeZone}
-                locale={locale}
-                t={t}
-                replacements={...} // the live rows of refType, off `reference`
-                isBusy={isBusy}
-                onReplace={...}    // updateRule, then refresh()
-                onDelete={...}     // deleteRule, then refresh()
-              />
-            ))}
-
-        Everything on the left of that list is already in scope here: `rules` is
-        `ReadonlyArray<Rule>` from `#/server/repos/rules`, carrying `pausedReason` verbatim;
-        `reference` is this route's `TransactionReference`, which holds the live accounts, account
-        groups, categories and payees a replacement can be chosen from; `refresh` reloads the list.
-        The one thing this route does not have is the parse of `pausedReason` into
-        `{ refType, label, at }`. 14-S3 owns that shape, so the wiring belongs to whoever lands
-        last rather than to a second parser written here.
+        `readPausedReason` and `replaceRuleReference` both come from `server/rules/integrity`, which
+        owns the stored blob's shape and knows where an id can hide in a definition. Neither is
+        re-implemented here; a second parser or a second traversal is a second thing to get wrong.
       */}
+      {rules.map((rule) => {
+        const paused = readPausedReason(rule.pausedReason)
+        if (paused === null) return null
+        return (
+          <PausedBanner
+            key={rule.id}
+            ruleId={rule.id}
+            ruleName={rule.name}
+            refType={paused.ref_type}
+            label={paused.label}
+            pausedAt={paused.at}
+            timeZone={timeZone}
+            locale={locale}
+            t={t}
+            replacements={replacementsFor(paused.ref_type)}
+            isBusy={busyRuleId === rule.id}
+            onReplace={(_ruleId, replacementId) => {
+              void repair(rule, paused.ref_type, paused.ref_id, replacementId)
+            }}
+            onDelete={(ruleId) => void removePaused(ruleId)}
+          />
+        )
+      })}
 
       {rules.length === 0 ? (
         <EmptyState

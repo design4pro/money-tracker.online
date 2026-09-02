@@ -3,10 +3,16 @@ import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
 import { getAccount } from '#/server/repos/accounts'
+import { listAttachments } from '#/server/repos/attachments'
+import { listRefundsFor } from '#/server/repos/refunds'
 import { listSplits } from '#/server/repos/splits'
+import { listGroups } from '#/server/repos/transaction-groups'
 import { getTransaction } from '#/server/repos/transactions'
 
+import type { AttachmentRow } from '#/server/db/schema'
 import type { Transaction, TransactionSplit } from '#/server/db/types'
+import type { RefundSummary } from '#/server/repos/refunds'
+import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 
 /**
@@ -22,6 +28,20 @@ import type { TransactionPolicies } from '#/server/repos/transactions'
  * just clicked" into a not-found for the exact rows a person most often wants to inspect. The
  * narrower policies belong to the list, which is choosing what to show; this is showing one thing
  * that was already chosen.
+ *
+ * ## Why every optional concern is read here rather than by the panel that shows it
+ *
+ * Splits, refunds, group membership and attachments are each *sometimes* present, so the detail
+ * screen collapses them into disclosure sections. A collapsed section states its own count — the
+ * point of that layout is that collapsing hides nothing — and a count has to be known before the
+ * section renders, which is before the panel inside it would have mounted and fetched. Four panels
+ * that each load themselves also means four round trips and four moments where the page reflows
+ * under a reader.
+ *
+ * The cost is stated plainly: any one of these failing fails the screen, where a self-loading panel
+ * could have degraded on its own. That was already true of the account and the splits, so this is
+ * the file's existing bargain extended, not a new one — but if a read here proves flaky in
+ * production, the answer is to move *that* read back out with evidence, not to guess now.
  *
  * ## An id from another workspace is a `NotFoundError`
  *
@@ -47,6 +67,14 @@ export interface TransactionDetail {
   readonly accountName: string
   /** Empty for a transaction filed under its own category. Never `null`: absent is a set of none. */
   readonly splits: ReadonlyArray<TransactionSplit>
+  /** The refund tally. Always present: a transaction with no refunds has one reading zero. */
+  readonly refunds: RefundSummary
+  /** Empty for a transaction in no group. Never `null`. */
+  readonly groups: ReadonlyArray<TransactionGroupSummary>
+  /** Every group in the workspace — what the panel can add this transaction *to*. */
+  readonly allGroups: ReadonlyArray<TransactionGroupSummary>
+  /** Empty for a transaction with no receipts. Never `null`. */
+  readonly attachments: ReadonlyArray<AttachmentRow>
 }
 
 export const loadTransactionDetail = createServerFn({ method: 'GET' })
@@ -62,13 +90,26 @@ export const loadTransactionDetail = createServerFn({ method: 'GET' })
       id: data.transactionId,
     })
 
-    // Both of these are reads the summary and the split panel print together, so they go together
-    // rather than one after the other. They run only once the transaction has been found, which is
-    // the ordering the docblock above exists to protect.
-    const [account, splits] = await Promise.all([
-      getAccount(scope, transaction.accountId),
-      listSplits(scope, { transactionId: transaction.id }),
-    ])
+    // Everything the screen prints, together rather than one after the other. They run only once
+    // the transaction has been found, which is the ordering the docblock above exists to protect —
+    // a read added here must stay inside this block and never race `getTransaction`.
+    const [account, splits, refunds, groups, allGroups, attachments] =
+      await Promise.all([
+        getAccount(scope, transaction.accountId),
+        listSplits(scope, { transactionId: transaction.id }),
+        listRefundsFor(scope, { transactionId: transaction.id }),
+        listGroups(scope, { transactionId: transaction.id }),
+        listGroups(scope, {}),
+        listAttachments(scope, { transactionId: transaction.id }),
+      ])
 
-    return { transaction, accountName: account.name, splits }
+    return {
+      transaction,
+      accountName: account.name,
+      splits,
+      refunds,
+      groups,
+      allGroups,
+      attachments,
+    }
   })
