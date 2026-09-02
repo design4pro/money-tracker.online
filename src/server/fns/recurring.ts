@@ -17,10 +17,12 @@
  * If `runWithLedgerBatch` ever appears here, either a screen started minting transactions or
  * somebody added it defensively; both are worth catching in review.
  *
- * **`today` is decided here, once per call.** Every module below takes the day as a parameter and
- * reads no clock, which is what makes a due date, an overdue derivation and a reminder testable at
- * a pinned date. It is the UTC calendar day, matching `booked_on`'s definition in `docs/MONEY.md`
- * §6.1; the reader's timezone is applied at render and only there.
+ * **`today` enters here, once per call, from `#/server/clock`.** Every module below takes the day
+ * as a parameter and reads no clock, which is what makes a due date, an overdue derivation and a
+ * reminder testable at a pinned date. `serverToday()` owns what the day *is* - the UTC calendar
+ * day, matching `booked_on`'s definition in `docs/MONEY.md` §6.1 - and is pinnable by header under
+ * `pnpm dev`, which is the only reason an "overdue" badge can be photographed twice and match. The
+ * reader's timezone is applied at render and only there.
  *
  * Reads are `GET` so the router can cache and prefetch them; every write is `POST`.
  */
@@ -30,6 +32,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
+import { serverToday } from '#/server/clock'
 import { confidenceBand, detectCandidates } from '#/server/recurring/detect'
 import { materializeSeries } from '#/server/recurring/materialize'
 import {
@@ -84,11 +87,6 @@ const AHEAD = 3
 /** How far back the detector reads. Eighteen months is enough for an annual series to show thrice. */
 const DETECTION_MONTHS = 18
 
-/** The UTC calendar day. See the module docblock for why it is decided here and only here. */
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 /* -------------------------------------------------------------------------- */
 /* Reads                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -123,7 +121,7 @@ export const loadRecurring = createServerFn({ method: 'GET' })
   .inputValidator(listInputSchema)
   .handler(async ({ data }): Promise<RecurringOverview> => {
     const scope = await requireOrg()
-    const today = todayUtc()
+    const today = serverToday()
 
     const series = await listSeriesRow(scope, {
       includeInactive: data.includeInactive,
@@ -181,7 +179,7 @@ export const loadSeriesDetail = createServerFn({ method: 'GET' })
   .inputValidator(seriesIdSchema)
   .handler(async ({ data }): Promise<SeriesDetail> => {
     const scope = await requireOrg()
-    const today = todayUtc()
+    const today = serverToday()
     const series = await getSeriesRow(scope, data.seriesId)
     if (series.isActive) {
       await materializeSeries(scope, {
@@ -246,7 +244,7 @@ export const createSeries = createServerFn({ method: 'POST' })
     const series = await createSeriesRow(scope, data)
     await materializeSeries(scope, {
       seriesId: series.id,
-      today: todayUtc(),
+      today: serverToday(),
       ahead: AHEAD,
     })
     return { seriesId: series.id }
@@ -273,7 +271,7 @@ export const updateSeries = createServerFn({ method: 'POST' })
     await updateSeriesRow(scope, data.seriesId, data.patch)
     await materializeSeries(scope, {
       seriesId: data.seriesId,
-      today: todayUtc(),
+      today: serverToday(),
       ahead: AHEAD,
     })
   })
@@ -294,7 +292,7 @@ export const resumeSeries = createServerFn({ method: 'POST' })
     await resumeSeriesRow(scope, data.seriesId)
     await materializeSeries(scope, {
       seriesId: data.seriesId,
-      today: todayUtc(),
+      today: serverToday(),
       ahead: AHEAD,
     })
   })
@@ -385,7 +383,7 @@ export const detectRecurring = createServerFn({ method: 'POST' })
   .inputValidator(z.strictObject({}))
   .handler(async (): Promise<DetectionReport> => {
     const scope = await requireOrg()
-    const today = todayUtc()
+    const today = serverToday()
     const from = monthsBefore(today, DETECTION_MONTHS)
 
     const [rows, series, dismissed] = await Promise.all([
@@ -467,7 +465,7 @@ export const acceptCandidate = createServerFn({ method: 'POST' })
     })
     await materializeSeries(scope, {
       seriesId: series.id,
-      today: todayUtc(),
+      today: serverToday(),
       ahead: AHEAD,
     })
     return { seriesId: series.id }

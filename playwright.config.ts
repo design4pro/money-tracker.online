@@ -67,23 +67,35 @@ const clockPin = { [SERVER_TODAY_HEADER]: BASELINE_DAY }
  *   most likely to disagree about `:focus-visible` — the criterion the whole keyboard story
  *   rests on.
  *
- * Screenshot baselines are per project and per theme, and are compared with animations disabled
- * so a mid-transition frame can never fail a run.
+ * Screenshot baselines are per project, per theme and per locale, and are compared with
+ * animations disabled so a mid-transition frame can never fail a run. They are recorded for
+ * `chromium` and `mobile-safari` only, because those are the two projects `ci.yml` runs; a
+ * `webkit` run skips them rather than failing for want of files. `e2e/visual.spec.ts` owns the
+ * frames and `e2e/support/visual.ts` owns that rule.
  */
 export default defineConfig({
   testDir: './e2e',
   snapshotDir: './e2e/__screenshots__',
   /**
-   * `{platform}` is in the path because font rasterisation is not portable.
+   * `{platform}` is in the path because a frame is only comparable to one taken on the same OS —
+   * and one platform, Linux, is the only one recorded.
    *
-   * The same correct page, rendered by the same browser build, antialiases text differently on
-   * macOS and on Linux. At the 0.2% tolerance below that is enough to fail nearly every frame
-   * carrying a paragraph — a difference in where the pixels came from, not in what the design
-   * says. Recording one set per platform is what lets the gate run both on a laptop and in CI
-   * without either being a second-class approximation of the other.
+   * The reason is stronger than antialiasing. This product loads **no web font at all**:
+   * `src/styles/app.css` says so, there is no `@font-face` and no `public/` directory. So
+   * `--font-sans` falls past `'Inter'` and `'Inter Fallback'` to `-apple-system` on macOS and to
+   * `ui-sans-serif` on Linux, which are different typefaces with different metrics, breaking lines
+   * in different places. No tolerance absorbs that and no un-suffixed baseline can serve both.
    *
-   * `-darwin` is recorded locally; `-linux` by the `Update e2e baselines` workflow, which runs
-   * in the same container image the gate does. A design change needs both refreshed.
+   * Only `-linux` is recorded, because Linux is what the gate in `ci.yml` runs. A second `-darwin`
+   * set would buy a laptop a green run and cost the project a second set of PNGs to refresh in
+   * lockstep, by whoever owns a Mac, or the gate starts disagreeing with itself. So the frames are
+   * *skipped* off Linux rather than recorded there, and `e2e/support/visual.ts` owns that rule and
+   * states it in the skip reason. Keeping `{platform}` in the filename is what makes an accidental
+   * `--update-snapshots` on a Mac unable to overwrite the set CI compares against.
+   *
+   * `-linux` is recorded by `pnpm sandcastle:baselines`, or by the `Update e2e baselines` workflow
+   * (`.github/workflows/update-snapshots.yml`), both of which run in the same container image the
+   * gate does.
    */
   snapshotPathTemplate:
     '{snapshotDir}/{testFileName}/{arg}-{projectName}-{platform}{ext}',
@@ -98,7 +110,15 @@ export default defineConfig({
   // Playwright's default (half the cores) applies.
   workers: isCI ? 1 : undefined,
   timeout: 30_000,
-  globalTimeout: isCI ? 10 * 60_000 : undefined,
+  // A wall-clock ceiling on the whole run, not a per-test one, and not a tolerance: nothing that
+  // fails is accepted, the job is only allowed to take longer to find out. It was ten minutes
+  // until `e2e/visual.spec.ts` landed. That file adds 28 frames per project, each of which opens a
+  // screen the run has not opened before and waits for a development server to compile it, and it
+  // measured 5.1 minutes for `chromium` alone on a quiet 16-core machine - so on the two-core
+  // runner the comment above is about, the old ceiling was no longer a safety net but a scheduled
+  // failure. Twenty-five sits inside the `timeout-minutes: 30` that ci.yml puts on the job, so the
+  // job's own limit stays the outer bound and this one still cuts a hung run short.
+  globalTimeout: isCI ? 25 * 60_000 : undefined,
   reporter: [
     ['line'],
     ['json', { outputFile: 'test-results/results.json' }],
@@ -108,8 +128,10 @@ export default defineConfig({
   expect: {
     timeout: 5_000,
     toHaveScreenshot: {
-      // ~0.2% of a 1440x900 viewport: absorbs font antialiasing across platforms without hiding
-      // a shifted card or a wrong colour.
+      // ~0.2% of a 1440x900 viewport. Baselines are single-platform (see `snapshotPathTemplate`),
+      // so this is not absorbing a cross-OS font difference — it is headroom for the last-pixel
+      // disagreement a GPU or a subpixel rounding can produce between two runs on the same image,
+      // and it is far too tight to hide a shifted card or a wrong colour.
       maxDiffPixelRatio: 0.002,
       threshold: 0.2,
       animations: 'disabled',
