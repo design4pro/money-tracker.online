@@ -110,6 +110,13 @@ The pairing is by **what the screen is**, not by what it is called. Our route is
 reference path is whatever its own visible navigation leads to for that surface, recorded here the
 first time a capture round confirms it so the next round does not re-derive it.
 
+Where the two products file a surface differently, **our route is ours and the difference is not
+an error to correct**. Import is the clearest case: theirs sits under a data-management branch of
+settings, ours is top-level at `/import`. That is a consequence of `docs/adr/0008-no-bank-connectors.md`,
+not an imitation of anything - with no connectors, importing a file is not one way data arrives, it
+is the way, and the only path into the product does not belong behind two levels of settings. The
+pairing still holds, because the pairing is by what the screen is.
+
 `(confirm)` means nobody has recorded a path yet — navigate the demo's own top-level navigation,
 confirm the surface matches the description, and edit this file in the same PR as the capture.
 
@@ -132,7 +139,7 @@ confirm the surface matches the description, and edit this file in the same PR a
 | `/analytics/net-worth`         | Net-worth history line                                     | `(confirm)`                                            |
 | `/analytics/spending`          | Category donut with drill-down                             | `(confirm)`                                            |
 | `/settings/categories`         | Editable two-level category tree                           | `(confirm)`                                            |
-| `/settings/data/import`        | Import mapping step of a file import                       | `/settings/data-management/import/csv`                 |
+| `/import`                      | Import mapping step of a file import                       | `/settings/data-management/import/csv`                 |
 | `/settings/billing`            | Current plan, usage, invoices                              | `(confirm)`                                            |
 
 **No equivalent surface is a valid answer.** These have no counterpart worth pairing, and a capture
