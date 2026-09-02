@@ -1,7 +1,10 @@
 import {
   ArrowLeftRight,
   LayoutDashboard,
+  PiggyBank,
+  RefreshCw,
   Settings,
+  Target,
   WalletMinimal,
 } from 'lucide-react'
 
@@ -60,6 +63,27 @@ const TRANSACTIONS: Destination = {
   Icon: ArrowLeftRight,
 }
 
+const BUDGETS: Destination = {
+  id: 'budgets',
+  href: '/budgets',
+  label: 'nav.budgets',
+  Icon: PiggyBank,
+}
+
+const RECURRING: Destination = {
+  id: 'recurring',
+  href: '/recurring',
+  label: 'nav.recurring',
+  Icon: RefreshCw,
+}
+
+const GOALS: Destination = {
+  id: 'goals',
+  href: '/goals',
+  label: 'nav.goals',
+  Icon: Target,
+}
+
 export const SETTINGS: Destination = {
   id: 'settings',
   href: '/settings',
@@ -79,6 +103,9 @@ export const PRIMARY_DESTINATIONS: ReadonlyArray<Destination> = [
   DASHBOARD,
   ACCOUNTS,
   TRANSACTIONS,
+  BUDGETS,
+  RECURRING,
+  GOALS,
 ]
 
 /** Every destination, in the order both navigations draw them. */
@@ -86,6 +113,25 @@ export const ALL_DESTINATIONS: ReadonlyArray<Destination> = [
   ...PRIMARY_DESTINATIONS,
   SETTINGS,
 ]
+
+/**
+ * How many destinations the phone's bottom bar draws as tabs before the rest move into its
+ * overflow sheet.
+ *
+ * Three, so the bar is always four cells wide — three tabs and *More*. The measurement behind the
+ * number is in `bottom-nav.tsx`: at 360px four cells get 90px each, which is the narrowest a
+ * 12px label survives whole in Polish (`Transakcje`, `Ustawienia`), and a fifth cell takes that to
+ * 72px, where it does not.
+ */
+export const BOTTOM_BAR_TAB_COUNT = 3
+
+/** The tabs the bottom bar draws directly. */
+export const BOTTOM_BAR_DESTINATIONS: ReadonlyArray<Destination> =
+  ALL_DESTINATIONS.slice(0, BOTTOM_BAR_TAB_COUNT)
+
+/** Everything the bottom bar puts behind *More*, in the same order the rail draws it. */
+export const BOTTOM_BAR_OVERFLOW: ReadonlyArray<Destination> =
+  ALL_DESTINATIONS.slice(BOTTOM_BAR_TAB_COUNT)
 
 /**
  * Which destination a pathname is inside.

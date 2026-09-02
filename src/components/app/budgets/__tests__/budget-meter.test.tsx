@@ -1,0 +1,140 @@
+import { describe, expect, it } from 'vitest'
+import { screen } from '@testing-library/react'
+
+import { asMinor } from '#/lib/money'
+
+import { BudgetMeter } from '../budget-meter'
+import { renderBudget } from './harness'
+
+import type { BudgetMeterProps } from '../budget-meter'
+
+/**
+ * The one component on this surface where being wrong costs somebody money.
+ *
+ * The assertions are the design bar written down: *how much is left* has to be the headline, and
+ * an overspend has to be unmistakable to a reader who cannot see the colour it is drawn in.
+ */
+
+function meter(over: Partial<BudgetMeterProps> = {}) {
+  renderBudget(
+    <BudgetMeter
+      name="Groceries"
+      availableMinor={asMinor(2_000_00)}
+      spentMinor={asMinor(1_200_00)}
+      remainingMinor={asMinor(800_00)}
+      ratio={0.6}
+      state="under"
+      thresholds={[50, 80, 100]}
+      currencyCode="PLN"
+      {...over}
+    />,
+  )
+  return screen.getByRole('meter')
+}
+
+describe('BudgetMeter', () => {
+  it('leads with the remainder, not with what was spent', () => {
+    meter()
+    // "800.00 zł left" — the figure somebody standing in a shop needs, at the largest step.
+    expect(screen.getByText(/800[.,]00.*left/i)).toBeTruthy()
+    // The spend is present, but as a caption rather than the headline.
+    expect(screen.getByText(/1,200\.00.*of.*2,000\.00/i)).toBeTruthy()
+  })
+
+  it('names what it measures, because five unnamed meters announce identically', () => {
+    meter()
+    // `role="meter"` with no accessible name is an `aria-meter-name` failure (WCAG 4.1.2), and a
+    // list of budgets is precisely where that costs a reader the ability to tell them apart.
+    expect(
+      screen.getByRole('meter', { name: 'Budget used: Groceries' }),
+    ).toBeTruthy()
+  })
+
+  it('states both amounts and the percentage in its accessible value', () => {
+    const track = meter()
+    const valueText = track.getAttribute('aria-valuetext') ?? ''
+    expect(valueText).toContain('1,200.00')
+    expect(valueText).toContain('2,000.00')
+    expect(valueText).toContain('60%')
+    expect(track.getAttribute('aria-valuenow')).toBe('60')
+    expect(track.getAttribute('aria-valuemin')).toBe('0')
+    expect(track.getAttribute('aria-valuemax')).toBe('100')
+  })
+
+  it('signals an overspend in words and in an icon as well as in a colour', () => {
+    const track = meter({
+      spentMinor: asMinor(2_320_00),
+      remainingMinor: asMinor(-320_00),
+      ratio: 1.16,
+      state: 'over',
+    })
+
+    // 1. the word.
+    expect(screen.getByText('Over budget')).toBeTruthy()
+    // 2. the figure flips to an over-by, so the sign is not the only cue.
+    expect(screen.getByText(/320[.,]00.*over/i)).toBeTruthy()
+    // 3. the accessible value leads with the verdict rather than the number.
+    expect(track.getAttribute('aria-valuetext')).toMatch(/^Over budget/)
+    // 4. an icon rides with the word — decorative to a screen reader, a second channel to an eye.
+    expect(track.parentElement?.querySelector('svg')).toBeTruthy()
+  })
+
+  it('stops the fill at the end of the track while the sentence keeps counting', () => {
+    const track = meter({
+      spentMinor: asMinor(2_320_00),
+      remainingMinor: asMinor(-320_00),
+      ratio: 1.16,
+      state: 'over',
+    })
+    const fill = track.firstElementChild as HTMLElement
+
+    expect(fill.style.width).toBe('100%')
+    expect(track.getAttribute('aria-valuenow')).toBe('100')
+    // A bar that overflows its own track says nothing a full bar does not; the percentage does.
+    expect(screen.getByText('116%')).toBeTruthy()
+  })
+
+  it('says it cannot tell rather than drawing 0% when nothing was available', () => {
+    meter({
+      availableMinor: asMinor(0),
+      spentMinor: asMinor(0),
+      remainingMinor: asMinor(0),
+      ratio: null,
+      state: 'under',
+    })
+    expect(screen.getAllByText('Utilisation unavailable').length).toBe(1)
+    expect(screen.queryByText('0%')).toBeNull()
+  })
+
+  it('states every mark on the track in words, because a notch alone reads as nothing', () => {
+    const track = meter()
+    const marks =
+      track.parentElement?.querySelector('.sr-only')?.textContent ?? ''
+
+    expect(marks).toContain('Alert at 50%')
+    expect(marks).toContain('Alert at 80%')
+    // The tick at the line names the amount it stands for, not just the percentage.
+    expect(marks).toMatch(/100% of .*2,000\.00/)
+    // 100 is in the ladder and is drawn as the end tick, never as a notch inside the track.
+    expect(marks).not.toContain('Alert at 100%')
+  })
+
+  it('formats money and percentages in the reader’s locale', () => {
+    renderBudget(
+      <BudgetMeter
+        name="Groceries"
+        availableMinor={asMinor(2_000_00)}
+        spentMinor={asMinor(1_200_00)}
+        remainingMinor={asMinor(800_00)}
+        ratio={0.6}
+        state="under"
+        thresholds={[80]}
+        currencyCode="PLN"
+      />,
+      'pl',
+    )
+    // "Pozostało 800,00 zł" — the financial term, with the space-grouped Polish thousands.
+    expect(screen.getByText(/Pozostało .*800,00/)).toBeTruthy()
+    expect(screen.getByText('60%')).toBeTruthy()
+  })
+})

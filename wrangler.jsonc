@@ -205,7 +205,7 @@
         "APP_NAME": "money-tracker.online (staging)",
         "APP_URL": "https://staging.money-tracker.online",
         "LOG_LEVEL": "debug",
-        "EMAIL_FROM": "money-tracker staging <no-reply@staging.money-tracker.online>",
+        "EMAIL_FROM": "money-tracker.online (staging) <no-reply@money-tracker.online>",
         "EMAIL_API_URL": "https://api.resend.com/emails",
         "FX_PRIMARY": "fawaz",
         "FX_FALLBACK": "frankfurter",

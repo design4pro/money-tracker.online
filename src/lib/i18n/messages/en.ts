@@ -806,6 +806,7 @@ const messages = {
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budgets',
+  'budgets.subtitle': 'What is left, envelope by envelope.',
   'budgets.spentOf': '{spent} of {limit}',
   'budgets.remaining': '{amount} left',
   'budgets.overspent': '{amount} over',
@@ -813,6 +814,187 @@ const messages = {
     one: '{count} day left in this period',
     other: '{count} days left in this period',
   },
+
+  // The meter. The accessible name states the amounts and then the percentage,
+  // because a meter announced as "62%" alone says nothing about of what.
+  'budgets.meter.label': 'Budget used: {name}',
+  'budgets.meter.valueText': '{spent} of {available} spent, {percent}',
+  'budgets.meter.tick': '100% of {available}',
+  'budgets.meter.notch': 'Alert at {percent}',
+  'budgets.meter.unavailable': 'Utilisation unavailable',
+  'budgets.meter.noRate':
+    'No exchange rate for {currency} on this date, so this budget cannot be measured against your reporting currency yet.',
+  'budgets.state.under': 'On track',
+  'budgets.state.approaching': 'Close to the limit',
+  'budgets.state.over': 'Over budget',
+  'budgets.carriedIn': '{amount} carried in',
+  'budgets.carriedInNegative': '{amount} carried in from an overspend',
+  'budgets.notStarted': 'Starts {date}',
+  'budgets.ended': 'Ended {date}',
+
+  'budgets.kind.label': 'What it follows',
+  'budgets.kind.category': 'Categories',
+  'budgets.kind.category.help':
+    'Counts every transaction filed in the categories you choose, and their subcategories.',
+  'budgets.kind.manual': 'Chosen by hand',
+  'budgets.kind.manual.help':
+    'Counts only the transactions you put in it yourself. For a trip, a renovation, a one-off.',
+
+  'budgets.period.label': 'Billing period',
+  'budgets.period.one_off': 'One-off',
+  'budgets.period.monthly': 'Monthly',
+  'budgets.period.quarterly': 'Quarterly',
+  'budgets.period.yearly': 'Yearly',
+
+  'budgets.rollover.label': 'What happens to what is left',
+  'budgets.rollover.none': 'Start each period clean',
+  'budgets.rollover.none.help':
+    'Whatever is left, or overspent, is forgotten when the period rolls.',
+  'budgets.rollover.carry_surplus': 'Carry the surplus forward',
+  'budgets.rollover.carry_surplus.help':
+    'Money left over is added to the next period. An overspend is absorbed, and the ledger says so.',
+  'budgets.rollover.carry_all': 'Carry the whole balance forward',
+  'budgets.rollover.carry_all.help':
+    'The next period opens with what is left — or in the red, if you overspent.',
+
+  'budgets.status.archived': 'Archived',
+  'budgets.status.closed': 'Closed',
+  'budgets.status.open': 'Open',
+  'budgets.autoInclude': 'Counts new transactions automatically',
+  'budgets.categories.count': {
+    one: '{count} category',
+    other: '{count} categories',
+  },
+  'budgets.categories.none': 'No categories yet',
+  'budgets.limitIn': 'Limit set in {currency}',
+
+  'budgets.filter.label': 'Show',
+  'budgets.filter.active': 'Active',
+  'budgets.filter.archived': 'Archived',
+  'budgets.filter.all': 'All',
+
+  'budgets.new': 'New budget',
+  'budgets.list.loading': 'Loading your budgets…',
+  'budgets.detail.loading': 'Loading this budget…',
+  'budgets.error.title': 'Budgets could not be loaded',
+  'budgets.error.body':
+    'The list did not come back. Nothing has been changed — try again.',
+  'budgets.detail.error.title': 'This budget could not be loaded',
+  'budgets.detail.error.body':
+    'Its periods did not come back. Nothing has been changed — try again.',
+
+  'budgets.empty.title': 'No budgets yet',
+  'budgets.empty.body':
+    'A budget is an envelope with a limit and a period. Follow a set of categories and it fills itself, or put transactions in by hand for a one-off.',
+  'budgets.empty.action': 'Create your first budget',
+  'budgets.empty.archived.title': 'Nothing archived',
+  'budgets.empty.archived.body':
+    'Archived budgets keep every period they closed. None have been archived yet.',
+
+  'budgets.detail.back': 'All budgets',
+  'budgets.detail.thisPeriod': 'This period',
+  'budgets.detail.spentGross': 'Spent',
+  'budgets.detail.credited': 'Came back in the same categories',
+  'budgets.detail.refunded': 'Refunded elsewhere',
+  'budgets.detail.net': 'Counted against the budget',
+
+  'budgets.ledger.title': 'Rollover ledger',
+  'budgets.ledger.caption':
+    'Every period of this budget: what it opened with, what it spent, and what it handed on.',
+  'budgets.ledger.col.period': 'Period',
+  'budgets.ledger.col.limit': 'Limit',
+  'budgets.ledger.col.carriedIn': 'Carried in',
+  'budgets.ledger.col.spent': 'Spent',
+  'budgets.ledger.col.carriedOut': 'Carried out',
+  'budgets.ledger.col.status': 'Status',
+  'budgets.ledger.overBy': 'over by {amount}',
+  'budgets.ledger.empty':
+    'This budget has one period so far, and it is still open. The ledger fills in as periods close.',
+
+  'budgets.timeline.title': 'Spending against the limit, period by period',
+  'budgets.timeline.categoryHeader': 'Period',
+  'budgets.timeline.spent': 'Spent',
+  'budgets.timeline.available': 'Available',
+  'budgets.timeline.empty.title': 'One period so far',
+  'budgets.timeline.empty.body':
+    'The timeline draws a bar per period once this budget has closed one.',
+  'budgets.timeline.noData': 'No reading',
+
+  'budgets.corrections.title': 'Corrections',
+  'budgets.corrections.body':
+    'These closed periods no longer match what their dates add up to today — something inside them was edited after they closed. The closed figures stay as they were; the difference is shown here.',
+  'budgets.corrections.row': '{period}: stored {stored}, now {actual}',
+  'budgets.corrections.delta': 'Difference {amount}',
+
+  'budgets.allocation.title': 'Categories in this budget',
+  'budgets.allocation.body':
+    'Every transaction filed in one of these, or in one of their subcategories, counts against the limit.',
+  'budgets.allocation.manual':
+    'This budget counts only the transactions you put in it by hand.',
+  'budgets.allocation.edit': 'Change categories',
+  'budgets.transactions.title': 'What counted this period',
+  'budgets.transactions.empty': 'Nothing has counted against this budget yet.',
+
+  'budgets.actions.label': 'Actions for {name}',
+  'budgets.actions.edit': 'Edit budget',
+  'budgets.actions.archive': 'Archive',
+  'budgets.actions.restore': 'Restore',
+  'budgets.actions.delete': 'Delete',
+  'budgets.actions.closePeriod': 'Close this period',
+  'budgets.actions.reopenPeriod': 'Reopen',
+  'budgets.actions.refresh': 'Recalculate periods',
+
+  'budgets.form.create.title': 'New budget',
+  'budgets.form.edit.title': 'Edit budget',
+  'budgets.form.name': 'Name',
+  'budgets.form.name.placeholder': 'Groceries',
+  'budgets.form.limit': 'Limit per period',
+  'budgets.form.currency': 'Currency',
+  'budgets.form.startDate': 'Starts',
+  'budgets.form.startDate.help':
+    'Periods run from this day — a budget started on the 12th runs the 12th to the 11th.',
+  'budgets.form.endDate': 'Ends',
+  'budgets.form.endDate.help': 'Leave empty to run until you archive it.',
+  'budgets.form.categories': 'Categories',
+  'budgets.form.categories.help':
+    'Subcategories are included automatically. Choose the parent and you are done.',
+  'budgets.form.thresholds': 'Warn me at',
+  'budgets.form.thresholds.help':
+    'Percentages of what is available. 100% and over are allowed — some people want to know at 150%.',
+  'budgets.form.thresholds.pending':
+    'Thresholds are recorded here and delivered once notifications ship. Nothing is being sent yet.',
+  'budgets.form.submit.create': 'Create budget',
+  'budgets.form.submit.save': 'Save changes',
+  'budgets.form.cancel': 'Cancel',
+  'budgets.form.error':
+    'The budget could not be saved. Nothing has been changed.',
+
+  'budgets.confirm.archive.title': 'Archive this budget?',
+  'budgets.confirm.archive.body':
+    'It leaves the list and keeps every period it closed. You can restore it at any time.',
+  'budgets.confirm.archive.action': 'Archive budget',
+  'budgets.confirm.delete.title': 'Delete this budget?',
+  'budgets.confirm.delete.body':
+    'This cannot be undone. A budget that has closed a period cannot be deleted — archive it instead.',
+  'budgets.confirm.delete.action': 'Delete budget',
+  'budgets.confirm.closePeriod.title': 'Close this period?',
+  'budgets.confirm.closePeriod.body':
+    'Its figures are frozen from then on, and the next period opens with whatever this budget carries.',
+  'budgets.confirm.closePeriod.action': 'Close period',
+  'budgets.confirm.reopenPeriod.title': 'Reopen this period?',
+  'budgets.confirm.reopenPeriod.body':
+    'Its figures start moving again, and the period after it opens with nothing carried in until this one closes.',
+  'budgets.confirm.reopenPeriod.action': 'Reopen period',
+
+  'budgets.toast.created': 'Budget created.',
+  'budgets.toast.saved': 'Budget saved.',
+  'budgets.toast.archived': 'Budget archived.',
+  'budgets.toast.restored': 'Budget restored.',
+  'budgets.toast.deleted': 'Budget deleted.',
+  'budgets.toast.periodClosed': 'Period closed.',
+  'budgets.toast.periodReopened': 'Period reopened.',
+  'budgets.toast.refreshed': 'Periods recalculated.',
+  'budgets.toast.failed': 'That did not work. Nothing has been changed.',
 
   /* -- Money and currency ------------------------------------------------- */
   'money.baseCurrency.label': 'Reporting currency',
@@ -1008,6 +1190,538 @@ const messages = {
   'auth.error.invalidToken': 'That link has expired or has already been used.',
   'auth.error.weakPassword':
     'That password is too easy to guess. Try a longer one.',
+
+  /* -- Recurring ---------------------------------------------------------- */
+  /* -- The list ----------------------------------------------------------- */
+  'recurring.title': 'Recurring',
+  'recurring.subtitle':
+    'What comes round again — subscriptions, bills, instalments and regular income.',
+  'recurring.new': 'New series',
+  'recurring.list.loading': 'Loading your recurring series…',
+  'recurring.detail.loading': 'Loading this series…',
+  'recurring.detail.back': 'All recurring series',
+
+  'recurring.filter.label': 'Show',
+  'recurring.filter.active': 'Active',
+  'recurring.filter.all': 'All, including paused',
+
+  'recurring.error.title': 'Recurring series could not be loaded',
+  'recurring.error.body':
+    'The list did not come back. Nothing has been changed — try again.',
+  'recurring.detail.error.title': 'This series could not be loaded',
+  'recurring.detail.error.body':
+    'It may have been deleted, or the request did not come back. Nothing has been changed.',
+
+  'recurring.empty.title': 'Nothing recurring yet',
+  'recurring.empty.body':
+    'A series is a plan: an amount, how often it comes round, and when it starts. It records nothing on its own until you tell it to.',
+  'recurring.empty.action': 'Create your first series',
+  'recurring.empty.detect': 'Or look through what you already recorded',
+  'recurring.empty.filtered.title': 'Nothing here',
+  'recurring.empty.filtered.body':
+    'No series matches this filter. Try a different one.',
+
+  /* -- Status, which is a word before it is a colour ----------------------- */
+  'recurring.status.upcoming': 'Upcoming',
+  'recurring.status.paid': 'Paid',
+  'recurring.status.overdue': 'Overdue',
+  'recurring.status.skipped': 'Skipped',
+
+  'recurring.series.active': 'Active',
+  'recurring.series.paused': 'Paused',
+  'recurring.series.completed': 'Finished',
+
+  /* -- What is due, in words ---------------------------------------------- */
+  'recurring.due.today': 'Due today',
+  'recurring.due.on': 'Due {date}',
+  'recurring.due.in': {
+    one: 'Due tomorrow',
+    other: 'Due in {count} days',
+  },
+  'recurring.due.late': {
+    one: '{count} day overdue',
+    other: '{count} days overdue',
+  },
+  'recurring.due.none': 'Nothing outstanding',
+  'recurring.due.overdueCount': {
+    one: '{count} overdue period',
+    other: '{count} overdue periods',
+  },
+
+  'recurring.upcoming.title': 'Due soon',
+  'recurring.upcoming.caption':
+    'Every unsettled period in the next month, plus everything already late.',
+  'recurring.upcoming.empty': 'Nothing is due in the next month.',
+
+  /* -- How often ----------------------------------------------------------- */
+  'recurring.frequency.label': 'How often',
+  'recurring.frequency.weekly': 'Weekly',
+  'recurring.frequency.biweekly': 'Every two weeks',
+  'recurring.frequency.monthly': 'Monthly',
+  'recurring.frequency.quarterly': 'Quarterly',
+  'recurring.frequency.semi_annual': 'Twice a year',
+  'recurring.frequency.annual': 'Yearly',
+
+  /* -- What kind ------------------------------------------------------------ */
+  'recurring.kind.label': 'Kind',
+  'recurring.kind.subscription': 'Subscription',
+  'recurring.kind.bill': 'Bill',
+  'recurring.kind.installment': 'Instalment',
+  'recurring.kind.income': 'Income',
+
+  'recurring.direction.label': 'Direction',
+  'recurring.direction.expense': 'Money out',
+  'recurring.direction.income': 'Money in',
+
+  /* -- The period table ----------------------------------------------------- */
+  'recurring.periods.title': 'Period history',
+  'recurring.periods.caption':
+    'Every period this series has produced, oldest first, with what settled it.',
+  'recurring.periods.empty':
+    'No periods yet. The first one appears once the start date arrives.',
+  'recurring.periods.col.due': 'Due',
+  'recurring.periods.col.expected': 'Expected',
+  'recurring.periods.col.settled': 'Settled',
+  'recurring.periods.col.variance': 'Difference',
+  'recurring.periods.col.status': 'Status',
+  'recurring.periods.col.actions': 'Actions',
+  'recurring.periods.variance.none': 'Same as expected',
+  'recurring.periods.variance.unavailable': 'Different currency',
+  'recurring.periods.variance.over': '{amount} more than expected',
+  'recurring.periods.variance.under': '{amount} less than expected',
+  'recurring.periods.notSettled': 'Not settled',
+
+  'recurring.period.markPaid': 'Mark paid',
+  'recurring.period.markPaid.for': 'Mark the period due {date} as paid',
+  'recurring.period.skip': 'Skip',
+  'recurring.period.skip.for': 'Skip the period due {date}',
+  'recurring.period.revert': 'Undo',
+  'recurring.period.revert.for': 'Undo the period due {date}',
+
+  /* -- Mark paid ------------------------------------------------------------ */
+  'recurring.markPaid.title': 'Mark this period paid',
+  'recurring.markPaid.body':
+    'Pick the transaction that settled it. Nothing here creates a transaction — if the payment is not recorded yet, record it first.',
+  'recurring.markPaid.field': 'The transaction that settled it',
+  'recurring.markPaid.placeholder': 'Search your transactions',
+  'recurring.markPaid.empty':
+    'No transaction in this window matches. Record the payment first, then come back.',
+  'recurring.markPaid.confirm': 'Link it',
+  'recurring.markPaid.never':
+    'Marking a period paid never creates a transaction.',
+
+  /* -- Automation ----------------------------------------------------------- */
+  'recurring.automation.label': 'Automation',
+  'recurring.automation.none': 'Off — you record each one yourself',
+  'recurring.automation.none.help':
+    'The series reminds you and tracks what is outstanding. Nothing is written without you.',
+  'recurring.automation.auto': 'Record it for me',
+  'recurring.automation.auto.help':
+    'On the due date, a transaction is written for the expected amount into the chosen account. You can edit it afterwards like any other.',
+  'recurring.automation.match': 'Match what I record',
+  'recurring.automation.match.help':
+    'Nothing is written. A transaction you record that fits the rule below is linked to the period it settles.',
+  'recurring.automation.exclusive':
+    'A series either records for you or matches what you record. It cannot do both — an automatic entry has nothing left to match.',
+  'recurring.automation.needsAccount':
+    'Recording for you needs an account to write into.',
+  'recurring.automation.badge.auto': 'Records automatically',
+  'recurring.automation.badge.match': 'Matches what you record',
+
+  'recurring.match.payee': 'Words in the payee or note',
+  'recurring.match.payee.help':
+    'Any one of them is enough. Case does not matter.',
+  'recurring.match.account': 'Only in this account',
+  'recurring.match.account.any': 'Any account',
+  'recurring.match.tolerance': 'Allow the amount to differ by',
+  'recurring.match.tolerance.help':
+    'A bill that varies a little still matches. Zero means the amount must be exact.',
+  'recurring.match.window': 'Allow the date to differ by',
+  'recurring.match.window.days': {
+    one: '{count} day',
+    other: '{count} days',
+  },
+
+  /* -- Reminders ------------------------------------------------------------ */
+  'recurring.reminders.label': 'Remind me',
+  'recurring.reminders.help':
+    'Up to three. Leave them all off for no reminder.',
+  'recurring.reminders.none': 'No reminders',
+  'recurring.reminders.max': 'Three reminders is the most a series can have.',
+  'recurring.reminders.0d': 'On the day',
+  'recurring.reminders.1d': 'A day before',
+  'recurring.reminders.2d': 'Two days before',
+  'recurring.reminders.3d': 'Three days before',
+  'recurring.reminders.5d': 'Five days before',
+  'recurring.reminders.1w': 'A week before',
+  'recurring.reminders.2w': 'Two weeks before',
+  'recurring.reminders.1m': 'A month before',
+  'recurring.reminders.email': 'Also send these by email',
+  'recurring.reminders.pending':
+    'Reminders are decided here and delivered once notifications ship. Nothing is being sent yet.',
+
+  /* -- The form ------------------------------------------------------------- */
+  'recurring.form.create.title': 'New recurring series',
+  'recurring.form.edit.title': 'Edit series',
+  'recurring.form.error': 'This series could not be saved',
+  'recurring.form.name': 'Name',
+  'recurring.form.name.placeholder': 'Rent, Netflix, salary…',
+  'recurring.form.amount': 'Expected amount',
+  'recurring.form.currency': 'Currency',
+  'recurring.form.currency.locked':
+    'The currency is fixed once a series exists. Every period already expected is denominated in it.',
+  'recurring.form.direction.locked':
+    'The direction is fixed once a series exists. Reversing it would claim every past period moved the other way.',
+  'recurring.form.startDate': 'First due date',
+  'recurring.form.startDate.help':
+    'Periods before today are created too, so a backdated series shows its history at once.',
+  'recurring.form.anchorDay': 'Day of the month',
+  'recurring.form.anchorDay.help':
+    'A day past the end of a short month falls back to its last day, and the month after is anchored again rather than drifting.',
+  'recurring.form.anchorDay.auto': 'Same day as the first due date',
+  'recurring.form.account': 'Account',
+  'recurring.form.account.none': 'No account',
+  'recurring.form.category': 'Category',
+  'recurring.form.category.none': 'No category',
+  'recurring.form.payee': 'Payee',
+  'recurring.form.payee.none': 'No payee',
+  'recurring.form.widget': 'Show on the dashboard',
+
+  'recurring.termination.label': 'When it ends',
+  'recurring.termination.open': 'It does not — keep going',
+  'recurring.termination.endDate': 'On a date',
+  'recurring.termination.endDate.field': 'Last day',
+  'recurring.termination.endDate.help':
+    'A period due on this exact day still counts.',
+  'recurring.termination.maxOccurrences': 'After a number of times',
+  'recurring.termination.maxOccurrences.field': 'How many times',
+  'recurring.termination.maxOccurrences.help':
+    'Counted inclusively: twelve means twelve periods, the last one included.',
+
+  'recurring.preview.title': 'The next few dates',
+  'recurring.preview.help':
+    'What this schedule produces, so you can see it before you save it.',
+
+  /* -- Actions -------------------------------------------------------------- */
+  'recurring.actions.menu': 'Actions for {name}',
+  'recurring.actions.edit': 'Edit',
+  'recurring.actions.pause': 'Pause',
+  'recurring.actions.resume': 'Resume',
+  'recurring.actions.complete': 'Finish',
+  'recurring.actions.delete': 'Delete',
+
+  'recurring.confirm.pause.title': 'Pause this series?',
+  'recurring.confirm.pause.body':
+    'Nothing further is created or recorded while it is paused. Its history and its outstanding periods stay exactly as they are.',
+  'recurring.confirm.complete.title': 'Finish this series?',
+  'recurring.confirm.complete.body':
+    'It stops for good. Nothing further is ever created. Its history stays.',
+  'recurring.confirm.delete.title': 'Delete this series?',
+  'recurring.confirm.delete.body':
+    'This cannot be undone. A series that has settled a period cannot be deleted — finish it instead, so its history survives.',
+
+  'recurring.toast.created': 'Series created',
+  'recurring.toast.saved': 'Series saved',
+  'recurring.toast.paused': 'Series paused',
+  'recurring.toast.resumed': 'Series resumed',
+  'recurring.toast.completed': 'Series finished',
+  'recurring.toast.deleted': 'Series deleted',
+  'recurring.toast.failed': 'That did not work',
+  'recurring.toast.periodPaid': 'Period marked paid',
+  'recurring.toast.periodSkipped': 'Period skipped',
+  'recurring.toast.periodReverted': 'Period reopened',
+  'recurring.toast.unlinked': 'Transaction unlinked',
+
+  /* -- Linked transactions --------------------------------------------------- */
+  'recurring.links.title': 'Linked transactions',
+  'recurring.links.caption':
+    'What this series has adopted, and how each link came about.',
+  'recurring.links.empty': 'Nothing linked yet.',
+  'recurring.links.source.manual': 'You linked it',
+  'recurring.links.source.rule': 'Matched a rule',
+  'recurring.links.source.auto': 'Recorded automatically',
+  'recurring.links.unlink': 'Unlink',
+  'recurring.links.unlinked': 'Unlinked',
+
+  /* -- Candidates ------------------------------------------------------------ */
+  'recurring.candidates.title': 'Series we noticed',
+  'recurring.candidates.subtitle':
+    'Patterns in what you already recorded. Each one is a suggestion, not something we did.',
+  'recurring.candidates.loading': 'Looking through your transactions…',
+  'recurring.candidates.detect': 'Look again',
+  'recurring.candidates.detecting': 'Looking…',
+  'recurring.candidates.link': 'Series we noticed',
+  'recurring.candidates.pending': {
+    one: '{count} suggestion',
+    other: '{count} suggestions',
+  },
+  'recurring.candidates.empty.title': 'Nothing to suggest',
+  'recurring.candidates.empty.body':
+    'We look for the same payee, at roughly the same interval, for roughly the same amount, at least three times. Nothing in the last eighteen months fits.',
+  'recurring.candidates.found': {
+    one: 'Found {count} suggestion',
+    other: 'Found {count} suggestions',
+  },
+  'recurring.candidates.error.title': 'Suggestions could not be loaded',
+  'recurring.candidates.error.body':
+    'The list did not come back. Nothing has been changed — try again.',
+
+  'recurring.candidate.confidence.label': 'Confidence',
+  'recurring.candidate.confidence.high': 'High',
+  'recurring.candidate.confidence.medium': 'Medium',
+  'recurring.candidate.confidence.low': 'Low',
+  'recurring.candidate.evidence': {
+    one: 'From {count} transaction',
+    other: 'From {count} transactions',
+  },
+  'recurring.candidate.because.occurrences':
+    'Confidence is held back by how few times this has happened.',
+  'recurring.candidate.because.regularity':
+    'Confidence is held back by how much the dates move about.',
+  'recurring.candidate.because.amount':
+    'Confidence is held back by how much the amount varies.',
+  'recurring.candidate.accept': 'Set it up',
+  'recurring.candidate.dismiss': 'Not a series',
+  'recurring.candidate.dismiss.for': 'Dismiss the suggestion for {name}',
+  'recurring.candidate.accept.for': 'Set up a series for {name}',
+  'recurring.candidate.creates':
+    'Setting it up creates the plan only. None of the transactions it was found from is changed.',
+  'recurring.candidate.toast.dismissed': 'Suggestion dismissed',
+  'recurring.candidate.toast.accepted': 'Series created from the suggestion',
+
+  /* -- Savings goals ------------------------------------------------------ */
+  /* -- The list ----------------------------------------------------------- */
+  'goals.title': 'Savings goals',
+  'goals.subtitle':
+    'What you are putting money aside for, and how it is going.',
+  'goals.new': 'New goal',
+  'goals.list.loading': 'Loading your savings goals…',
+  'goals.detail.loading': 'Loading this goal…',
+  'goals.detail.back': 'All savings goals',
+
+  'goals.filter.label': 'Show',
+  'goals.filter.active': 'In progress',
+  'goals.filter.reached': 'Reached',
+  'goals.filter.archived': 'Archived',
+  'goals.filter.all': 'All',
+
+  'goals.error.title': 'Savings goals could not be loaded',
+  'goals.error.body':
+    'The list did not come back. Nothing has been changed — try again.',
+  'goals.detail.error.title': 'This goal could not be loaded',
+  'goals.detail.error.body':
+    'It may have been deleted, or the request did not come back. Nothing has been changed.',
+
+  'goals.empty.title': 'No savings goals yet',
+  'goals.empty.body':
+    'A goal is a target amount and, if you want one, a date. Progress comes from transactions you already recorded — nothing here creates money or moves it.',
+  'goals.empty.action': 'Create your first goal',
+  'goals.empty.filtered.title': 'Nothing here',
+  'goals.empty.filtered.body':
+    'No goal matches this filter. Try a different one.',
+
+  /* -- Status, which is a word before it is a colour ----------------------- */
+  'goals.status.active': 'Saving',
+  'goals.status.reached': 'Reached',
+  'goals.status.archived': 'Archived',
+  'goals.status.overdue': 'Past its date',
+
+  /* -- The meter ---------------------------------------------------------- */
+  // The accessible name states both amounts before the percentage: "62%" alone says nothing about
+  // of what, and this is the one figure a reader may act on.
+  'goals.meter.label': 'Saved towards {name}',
+  'goals.meter.valueText': '{contributed} of {target} saved, {percent}',
+  'goals.meter.tick': 'The target, {target}',
+  'goals.meter.unavailable': 'Progress unavailable',
+  'goals.progress.remaining': '{amount} to go',
+  'goals.progress.complete': 'Fully funded',
+  'goals.progress.of': '{contributed} of {target}',
+  'goals.progress.base': '{contributed} of {target} in {currency}',
+  'goals.progress.baseHelp':
+    'The secondary figure. Each contribution was converted on the day it happened; the target is converted at today’s rate.',
+
+  /* -- Dates -------------------------------------------------------------- */
+  'goals.target.none': 'No target date',
+  'goals.target.by': 'By {date}',
+  'goals.target.daysLeft': {
+    one: '{count} day to the target date',
+    other: '{count} days to the target date',
+  },
+  'goals.target.overdue': {
+    one: '{count} day past the target date',
+    other: '{count} days past the target date',
+  },
+
+  /* -- Accounts ----------------------------------------------------------- */
+  'goals.accounts.from': 'Funded from {name}',
+  'goals.accounts.held': 'Held in {name}',
+  'goals.accounts.unset': 'Not set',
+
+  /* -- The detail figures -------------------------------------------------- */
+  'goals.detail.saved': 'Saved',
+  'goals.detail.target': 'Target',
+  'goals.detail.remaining': 'Left to save',
+  'goals.detail.pace': 'Typical month',
+  'goals.reached.title': 'This goal is fully funded',
+  'goals.reached.body':
+    'Nothing more needs to go in. Archive it to take it off the list, or raise the target if the plan has grown.',
+
+  /* -- The projection, which is the honest part ---------------------------- */
+  'goals.projection.heading': 'Projected completion',
+  'goals.projection.disclaimer':
+    'A projection, not a promise. It assumes the last six months repeat.',
+  'goals.projection.reached': 'Reached. There is nothing left to project.',
+  'goals.projection.onTrack': 'On course to get there by {date}.',
+  'goals.projection.onTrackBeforeTarget':
+    'On course to get there by {date}, ahead of the {target} target.',
+  'goals.projection.behind':
+    'At this pace, not before {date} — {late} after the target.',
+  'goals.projection.late': {
+    one: '{count} day',
+    other: '{count} days',
+  },
+  'goals.projection.rate': 'Based on a typical {amount} a month.',
+  'goals.projection.months': {
+    one: 'from {count} month of contributions',
+    other: 'from {count} months of contributions',
+  },
+
+  'goals.projection.confidence.label': 'How much to trust this',
+  'goals.projection.confidence.low': 'Rough guess',
+  'goals.projection.confidence.low.help':
+    'The contributions so far vary by more than they average, so read the date as a direction rather than a plan.',
+  'goals.projection.confidence.medium': 'Fair estimate',
+  'goals.projection.confidence.medium.help':
+    'Half a year of contributions at a recognisable pace. Enough for planning, not enough to commit to.',
+  'goals.projection.confidence.high': 'Steady pattern',
+  'goals.projection.confidence.high.help':
+    'A year or more of contributions at a steady pace. As good as a projection from this data gets.',
+
+  'goals.projection.insufficient.title': 'Not enough history to project',
+  'goals.projection.insufficient.none':
+    'Nothing has been contributed yet, so there is no pace to project from.',
+  'goals.projection.insufficient.tooFew': {
+    one: 'One month of contributions is not a pace. A projected date needs at least {needed} months behind it.',
+    other:
+      '{count} months of contributions is not yet a pace. A projected date needs at least {needed} months behind it.',
+  },
+  'goals.projection.insufficient.stale':
+    'The last contribution was over six months ago. Whatever pace there was has stopped, and projecting from it would invent one.',
+
+  /* -- The chart ----------------------------------------------------------- */
+  'goals.chart.title': 'Contributions, month by month',
+  'goals.chart.category': 'Month',
+  'goals.chart.series.monthly': 'Added that month',
+  'goals.chart.empty.title': 'Nothing to plot yet',
+  'goals.chart.empty.body':
+    'Count a transaction towards this goal and its history appears here.',
+  'goals.chart.noData': 'Nothing',
+  'goals.chart.zeroNote':
+    'A month with no bar is a month nothing went in — a real zero, not a missing reading.',
+
+  /* -- Contributions ------------------------------------------------------- */
+  'goals.contributions.heading': 'Contribution history',
+  'goals.contributions.count': {
+    one: '{count} contribution',
+    other: '{count} contributions',
+  },
+  'goals.contributions.empty.title': 'No contributions yet',
+  'goals.contributions.empty.body':
+    'A contribution points at a transaction you already recorded. Nothing new is created and no money moves.',
+  'goals.contributions.column.date': 'Date',
+  'goals.contributions.column.amount': 'Amount',
+  'goals.contributions.column.detail': 'Transaction',
+  'goals.contributions.column.actions': 'Actions',
+  'goals.contributions.linkedOn': 'Counted on {date}',
+  'goals.contributions.remove': 'Remove {amount} from this goal',
+  'goals.contributions.add': 'Count a transaction',
+
+  /* -- Suggestions, which are offers and never links ----------------------- */
+  'goals.suggestions.heading': 'Transfers that look like contributions',
+  'goals.suggestions.body':
+    'Nothing below has been counted. Each one left the funding account and arrived in the account this goal is held in — you decide whether it was for this goal.',
+  'goals.suggestions.count': {
+    one: '{count} transfer to review',
+    other: '{count} transfers to review',
+  },
+  'goals.suggestions.accept': 'Count it: {amount} towards this goal',
+  'goals.suggestions.from': 'From {account}',
+
+  /* -- The form ------------------------------------------------------------ */
+  'goals.form.create.title': 'New savings goal',
+  'goals.form.edit.title': 'Edit savings goal',
+  'goals.form.description':
+    'A target amount, a currency it is measured in, and — if it has a deadline — a date.',
+  'goals.form.name': 'What it is for',
+  'goals.form.name.placeholder': 'Emergency fund',
+  'goals.form.target': 'Target amount',
+  'goals.form.currency': 'Currency',
+  'goals.form.currency.help':
+    'A goal is measured in one currency and keeps it. Contributions in any other currency are refused rather than converted at a rate nobody chose.',
+  'goals.form.currency.locked': 'Set when the goal was created',
+  'goals.form.targetDate': 'Target date',
+  'goals.form.targetDate.help':
+    'Optional. Without one the goal still has a pace — it simply has no deadline to be behind.',
+  'goals.form.fromAccount': 'Funded from',
+  'goals.form.fromAccount.help':
+    'Where the money comes from. Used to spot transfers that look like contributions.',
+  'goals.form.heldAccount': 'Held in',
+  'goals.form.heldAccount.help':
+    'Where the money sits. Both accounts are optional; set both and this goal can suggest contributions.',
+  'goals.form.cancel': 'Cancel',
+  'goals.form.submit.create': 'Create goal',
+  'goals.form.submit.save': 'Save changes',
+  'goals.form.error': 'The goal could not be saved',
+
+  /* -- The contribution flow ------------------------------------------------ */
+  'goals.contribute.title': 'Count a transaction towards {name}',
+  'goals.contribute.description':
+    'Pick a transaction that already happened. It stays exactly as it is — this only records what it was for.',
+  'goals.contribute.field': 'Transaction',
+  'goals.contribute.field.help':
+    'Only transactions in {currency} can be counted, because the goal is measured in {currency}.',
+  'goals.contribute.option': '{date} · {amount}',
+  'goals.contribute.empty':
+    'No unlinked {currency} transaction is available to count. Record one first, or change the account this goal is held in.',
+  'goals.contribute.submit': 'Count it',
+  'goals.contribute.cancel': 'Cancel',
+  'goals.contribute.error': 'The transaction could not be counted',
+  'goals.contribute.error.currency':
+    'That transaction is in {transaction} and this goal is in {goal}. Converting it would need a rate nobody chose, so it is refused rather than guessed.',
+  'goals.contribute.error.direction':
+    'This goal is funded by {expected} transactions, and that one is {received}. Counting it would reduce the progress instead of adding to it.',
+
+  /* -- Actions and confirmations -------------------------------------------- */
+  'goals.actions.label': 'Actions for {name}',
+  'goals.actions.edit': 'Edit',
+  'goals.actions.archive': 'Archive',
+  'goals.actions.restore': 'Restore',
+  'goals.actions.delete': 'Delete',
+  'goals.actions.recompute': 'Recheck the progress',
+
+  'goals.confirm.archive.title': 'Archive this goal?',
+  'goals.confirm.archive.body':
+    'It leaves the list and keeps every contribution it holds. You can restore it at any time.',
+  'goals.confirm.archive.action': 'Archive',
+  'goals.confirm.delete.title': 'Delete this goal?',
+  'goals.confirm.delete.body':
+    'The goal and its record of which transactions counted towards it are removed for good. The transactions themselves are untouched.',
+  'goals.confirm.delete.action': 'Delete',
+  'goals.confirm.remove.title': 'Remove this contribution?',
+  'goals.confirm.remove.body':
+    'The transaction stays exactly as it is. Only the note that it was for this goal is removed, and the progress drops by that amount.',
+  'goals.confirm.remove.action': 'Remove',
+
+  'goals.toast.created': 'Goal created',
+  'goals.toast.saved': 'Goal saved',
+  'goals.toast.archived': 'Goal archived',
+  'goals.toast.restored': 'Goal restored',
+  'goals.toast.deleted': 'Goal deleted',
+  'goals.toast.contributed': 'Counted towards this goal',
+  'goals.toast.uncontributed': 'Removed from this goal',
+  'goals.toast.recomputed': 'Progress rechecked',
+  'goals.toast.reached': '{name} is fully funded',
+  'goals.toast.failed': 'That did not go through',
 } as const satisfies MessageCatalogueSource
 
 export default messages

@@ -125,6 +125,12 @@ describe('NumberField', () => {
     expect(onChange).toHaveBeenLastCalledWith(100)
     expect(input.value).toBe('100')
 
+    // The click is not decoration: the press above left focus on the stepper, and `clear()` only
+    // focuses the input synchronously — React Aria's press handling can hand focus back to the
+    // button a tick later, at which point the digits below are typed into a button and the field
+    // blurs empty. Moving focus with a real click first is what makes the next three lines
+    // deterministic under load; without it this test fails roughly one run in three.
+    await user.click(input)
     await user.clear(input)
     await user.keyboard('250')
     await user.tab()

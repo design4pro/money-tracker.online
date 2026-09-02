@@ -1847,6 +1847,149 @@ function transactionRow(tx, org, userId) {
   ]
 }
 
+/* -------------------------------------------------------------------------- */
+/* The budget figures, derived in SQL                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The category set one period's budget covers: the ones it names, **and their children**.
+ *
+ * The same two-deep resolution `coveredCategoryIds` does, correlated on the period row so it
+ * follows `budget_categories` rather than a copy of the list in this file. A budget whose category
+ * set is edited here therefore moves its own figures, which is the only way the fixture can be
+ * wrong in one place instead of two.
+ */
+const COVERED_CATEGORIES = `select \`bc\`.\`category_id\` from \`budget_categories\` \`bc\`
+          where \`bc\`.\`organization_id\` = \`p\`.\`organization_id\` and \`bc\`.\`budget_id\` = \`p\`.\`budget_id\`
+        union
+        select \`c\`.\`id\` from \`categories\` \`c\`
+          where \`c\`.\`organization_id\` = \`p\`.\`organization_id\` and \`c\`.\`parent_id\` in (
+            select \`bc\`.\`category_id\` from \`budget_categories\` \`bc\`
+            where \`bc\`.\`organization_id\` = \`p\`.\`organization_id\` and \`bc\`.\`budget_id\` = \`p\`.\`budget_id\`)`
+
+/** The four policy predicates `BUDGET_POLICIES` puts on a row: settled, real, not a transfer leg. */
+const COUNTS_TOWARDS_A_BUDGET = `\`t\`.\`is_planned\` = 0
+        and \`t\`.\`is_balance_adjustment\` = 0
+        and \`t\`.\`transfer_kind\` = 'none'
+        and \`t\`.\`exclude_from_stats\` = 0
+        and not exists (
+          select 1 from \`accounts\` \`a\`
+          where \`a\`.\`organization_id\` = \`t\`.\`organization_id\`
+            and \`a\`.\`id\` = \`t\`.\`account_id\`
+            and \`a\`.\`exclude_from_stats\` = 1)`
+
+/** `SUM(ref_amount_minor)` over parent rows in one direction, split receipts excluded. */
+function parentRowsTerm(direction) {
+  return `coalesce((
+      select sum(\`t\`.\`ref_amount_minor\`) from \`transactions\` \`t\`
+      where \`t\`.\`organization_id\` = \`p\`.\`organization_id\`
+        and ${COUNTS_TOWARDS_A_BUDGET}
+        and \`t\`.\`direction\` = '${direction}'
+        and \`t\`.\`booked_on\` between \`p\`.\`period_start\` and \`p\`.\`period_end\`
+        and \`t\`.\`category_id\` in (
+        ${COVERED_CATEGORIES})
+        and not exists (
+          select 1 from \`transaction_splits\` \`s\`
+          where \`s\`.\`organization_id\` = \`t\`.\`organization_id\`
+            and \`s\`.\`transaction_id\` = \`t\`.\`id\`)), 0)`
+}
+
+/** `SUM(ref_amount_minor)` over the split **lines** filed in a covered category. */
+function splitLinesTerm(direction) {
+  return `coalesce((
+      select sum(\`s\`.\`ref_amount_minor\`) from \`transaction_splits\` \`s\`
+      where \`s\`.\`organization_id\` = \`p\`.\`organization_id\`
+        and \`s\`.\`category_id\` in (
+        ${COVERED_CATEGORIES})
+        and exists (
+          select 1 from \`transactions\` \`t\`
+          where \`t\`.\`organization_id\` = \`p\`.\`organization_id\`
+            and \`t\`.\`id\` = \`s\`.\`transaction_id\`
+            and ${COUNTS_TOWARDS_A_BUDGET}
+            and \`t\`.\`direction\` = '${direction}'
+            and \`t\`.\`booked_on\` between \`p\`.\`period_start\` and \`p\`.\`period_end\`)), 0)`
+}
+
+/** Linked refunds of this budget's transactions that were booked **outside** it. */
+const EXTERNAL_REFUNDS_TERM = `coalesce((
+      select sum(\`t\`.\`ref_amount_minor\`) from \`transactions\` \`t\`
+      where \`t\`.\`organization_id\` = \`p\`.\`organization_id\`
+        and ${COUNTS_TOWARDS_A_BUDGET}
+        and \`t\`.\`direction\` = 'income'
+        and \`t\`.\`booked_on\` between \`p\`.\`period_start\` and \`p\`.\`period_end\`
+        and \`t\`.\`category_id\` not in (
+        ${COVERED_CATEGORIES})
+        and exists (
+          select 1 from \`refunds\` \`r\`
+          where \`r\`.\`organization_id\` = \`t\`.\`organization_id\`
+            and \`r\`.\`refund_transaction_id\` = \`t\`.\`id\`
+            and \`r\`.\`original_transaction_id\` in (
+              select \`o\`.\`id\` from \`transactions\` \`o\`
+              where \`o\`.\`organization_id\` = \`t\`.\`organization_id\`
+                and \`o\`.\`category_id\` in (
+                ${COVERED_CATEGORIES})))), 0)`
+
+/**
+ * Every period's `spent_minor`, recounted from the ledger this same file writes.
+ *
+ * The figure is **derived, never declared**. An earlier version of this fixture wrote a literal
+ * `0` into all 27 rows, which left the period chart flat, the rollover ledger empty and every
+ * closed period showing up in the Corrections panel as drift against transactions the seed itself
+ * had put in those categories - a fixture that libelled the application it exists to demonstrate.
+ *
+ * The recount is the five terms of `budgetSpend()`, in the same order and with the same policy
+ * set: gross expense on parent rows, plus the expense split lines, minus income credits on both,
+ * minus refunds of this budget's transactions that were booked outside it. Doing it in SQL rather
+ * than over the in-memory ledger is the point - a second JavaScript implementation of the same
+ * predicate is a second thing to keep in step, and this one cannot drift from the rows because it
+ * reads them.
+ *
+ * The open period is recounted too. `recomputeOpenPeriod` keeps it live for exactly as long as it
+ * is open, so a zero there would be a bar the product would never draw.
+ */
+const BUDGET_SPENT_SQL = `update \`budget_periods\` as \`p\` set \`spent_minor\` =
+    ${parentRowsTerm('expense')}
+    + ${splitLinesTerm('expense')}
+    - ${parentRowsTerm('income')}
+    - ${splitLinesTerm('income')}
+    - ${EXTERNAL_REFUNDS_TERM}
+  where \`p\`.\`budget_id\` like 'demo-%';`
+
+/**
+ * Every period's `carried_in_minor`, chained forward under the budget's own `rollover_policy`.
+ *
+ * `carriedIn(n + 1) = carriedOut(n)` and `carriedOut` is `rolloverOf`'s switch over
+ * `limit + carriedIn - spent`, so the chain is recursive and is written as a recursive CTE rather
+ * than unrolled: `carry_surplus` floors at zero, which is what stops the chain being a subtraction
+ * anybody could do with a window function. It runs **after** {@link BUDGET_SPENT_SQL}, because
+ * every link reads the spend that statement just wrote.
+ *
+ * `none` carries nothing, so the two budgets that use it keep a column of zeroes - that is the
+ * policy working, not the bug this replaced.
+ */
+const BUDGET_CARRIED_IN_SQL = `with \`ordered\` as (
+    select \`bp\`.\`budget_id\` \`bid\`, \`bp\`.\`period_start\` \`ps\`, \`bp\`.\`limit_minor\` \`lim\`,
+      \`bp\`.\`spent_minor\` \`spent\`, \`b\`.\`rollover_policy\` \`pol\`,
+      row_number() over (partition by \`bp\`.\`budget_id\` order by \`bp\`.\`period_start\`) \`rn\`
+    from \`budget_periods\` \`bp\` join \`budgets\` \`b\` on \`b\`.\`id\` = \`bp\`.\`budget_id\`
+    where \`bp\`.\`budget_id\` like 'demo-%'),
+  \`chain\` as (
+    select \`bid\`, \`ps\`, \`rn\`, \`pol\`, \`lim\`, \`spent\`, 0 as \`carried_in\`
+    from \`ordered\` where \`rn\` = 1
+    union all
+    select \`o\`.\`bid\`, \`o\`.\`ps\`, \`o\`.\`rn\`, \`o\`.\`pol\`, \`o\`.\`lim\`, \`o\`.\`spent\`,
+      case \`c\`.\`pol\`
+        when 'carry_all' then \`c\`.\`lim\` + \`c\`.\`carried_in\` - \`c\`.\`spent\`
+        when 'carry_surplus' then max(0, \`c\`.\`lim\` + \`c\`.\`carried_in\` - \`c\`.\`spent\`)
+        else 0 end
+    from \`chain\` \`c\` join \`ordered\` \`o\`
+      on \`o\`.\`bid\` = \`c\`.\`bid\` and \`o\`.\`rn\` = \`c\`.\`rn\` + 1)
+  update \`budget_periods\` set \`carried_in_minor\` = (
+    select \`chain\`.\`carried_in\` from \`chain\`
+    where \`chain\`.\`bid\` = \`budget_periods\`.\`budget_id\`
+      and \`chain\`.\`ps\` = \`budget_periods\`.\`period_start\`)
+  where \`budget_id\` like 'demo-%';`
+
 function buildSql(organizationId, userId) {
   const out = []
   const org = organizationId
@@ -2585,6 +2728,12 @@ function buildSql(organizationId, userId) {
       periodRows,
     ),
   )
+
+  // The two figures above went in as zeroes because the columns are `not null` and the rows have
+  // to exist before anything can count against them. They are filled in here, from the ledger this
+  // same file wrote, in the order the arithmetic needs: the spend first, then the carry that reads
+  // it.
+  out.push(BUDGET_SPENT_SQL, BUDGET_CARRIED_IN_SQL)
 
   return {
     sql: `${out.filter(Boolean).join('\n\n')}\n`,

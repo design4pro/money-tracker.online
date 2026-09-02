@@ -32,10 +32,36 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { asCurrencyCode, asMinor, asRateE10 } from '#/lib/money'
+import { projectCompletion } from '#/server/goals/project'
+import { medianOf } from '#/server/recurring/detect'
+import { matchesPeriod } from '#/server/recurring/match'
 import { organization, user } from '#/server/db/auth-schema'
-import { accounts, currencies } from '#/server/db/schema'
+import { accounts, budgetCategories, currencies } from '#/server/db/schema'
+import { rolloverChain } from '#/server/budgets/rollover'
+import {
+  NOOP_ALERT_DISPATCHER,
+  createMemoryMarkerStore,
+  setBudgetAlertDispatcher,
+  sweepBudgetThresholds,
+} from '#/server/budgets/thresholds'
+import { hasReachedThreshold } from '#/server/budgets/utilisation'
 
+import { budgetSpend, getBudget } from '../budgets'
+import { periodVarianceMinor } from '../recurring'
+import {
+  listPeriods,
+  materializePeriods,
+  periodCorrections,
+} from '../budget-periods'
 import { createScope } from '../scope'
+import {
+  executed as budgetExecuted,
+  createBudgetWorld,
+  seedBudget,
+  seedCategory,
+  seedPeriod,
+  seedTransaction,
+} from './budget-harness'
 import {
   countTransactions,
   pageTransactions,
@@ -49,7 +75,10 @@ import {
 } from '../transactions'
 
 import type { RateE10 } from '#/lib/money'
+import type { MatchSubject } from '#/server/recurring/match'
+import type { BudgetWorld, TestDb } from './budget-harness'
 import type * as BaseModule from '../base'
+import type { MatchingRules, PeriodView } from '../recurring'
 import type { TenantScope } from '../scope'
 import type { ConversionContext, TransactionPolicies } from '../transactions'
 
@@ -514,5 +543,473 @@ describe('7 — no float touches the path', () => {
         ),
       ).rejects.toThrow()
     }
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 8 — budgets                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The budget invariants named by `docs/plans/12-budgets.md`, held here because `docs/MONEY.md` §9
+ * makes this file the default home for them.
+ *
+ * The scenario coverage — six MONEY.md spend cases, three rollover policies across a boundary in
+ * both directions, twenty-two threshold cases — lives beside the code it exercises, in
+ * `repos/__tests__/budgets.test.ts`, `repos/__tests__/budget-periods.test.ts` and
+ * `budgets/__tests__/`. What is restated here is the *arithmetic contract*: the four claims a
+ * reader of the money boundary should be able to check without opening the budget module.
+ */
+describe('8 — budget utilisation and rollover are integer arithmetic', () => {
+  let world: BudgetWorld
+  let db: TestDb
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    db = world.db
+    await seedCategory(db, { id: 'cat-food', name: 'Food' })
+  })
+
+  it('sums spend in SQL, in integers, rather than reducing a page in JavaScript', async () => {
+    await seedBudget(db, { id: 'bud-a' })
+    await db.insert(budgetCategories).values({
+      organizationId: 'org-a',
+      budgetId: 'bud-a',
+      categoryId: 'cat-food',
+    })
+    for (const [index, amount] of [333_33, 12_345, 1].entries()) {
+      await seedTransaction(db, {
+        id: `tx-${index}`,
+        categoryId: 'cat-food',
+        refAmountMinor: amount,
+        bookedOn: '2026-03-10',
+      })
+    }
+
+    const budget = await getBudget(world.scope, 'bud-a')
+    const mark = budgetExecuted.length
+    const spend = await budgetSpend(world.scope, budget, {
+      from: '2026-03-01',
+      to: '2026-03-31',
+    })
+    const sql = budgetExecuted.slice(mark).join('\n').toLowerCase()
+
+    expect(spend.spentMinor).toBe(333_33 + 12_345 + 1)
+    expect(Number.isInteger(spend.spentMinor)).toBe(true)
+    // The aggregate happened in the database. A `SELECT` of the rows themselves would mean the
+    // total was reduced in JavaScript, which is where a float creeps into a column of money.
+    expect(sql).toContain('sum(')
+    expect(sql).not.toContain('limit ?')
+  })
+
+  it('excludes both legs of a transfer from the envelope', async () => {
+    await seedBudget(db, { id: 'bud-a' })
+    await db.insert(budgetCategories).values({
+      organizationId: 'org-a',
+      budgetId: 'bud-a',
+      categoryId: 'cat-food',
+    })
+    await seedTransaction(db, {
+      id: 'tx-spend',
+      categoryId: 'cat-food',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-03-10',
+    })
+    // Moving your own money between your own accounts is not spending, in either direction.
+    await seedTransaction(db, {
+      id: 'tx-out',
+      categoryId: 'cat-food',
+      refAmountMinor: 900_00,
+      bookedOn: '2026-03-11',
+      transferKind: 'internal',
+      transferId: 'trf-1',
+    })
+    await seedTransaction(db, {
+      id: 'tx-in',
+      categoryId: 'cat-food',
+      refAmountMinor: 900_00,
+      bookedOn: '2026-03-11',
+      direction: 'income',
+      transferKind: 'internal',
+      transferId: 'trf-1',
+    })
+
+    const budget = await getBudget(world.scope, 'bud-a')
+    const spend = await budgetSpend(world.scope, budget, {
+      from: '2026-03-01',
+      to: '2026-03-31',
+    })
+    expect(spend.spentMinor).toBe(100_00)
+  })
+
+  it('leaves a closed period alone when a transaction inside it is edited, and reports the difference instead', async () => {
+    await seedBudget(db, { id: 'bud-a', rolloverPolicy: 'carry_all' })
+    await db.insert(budgetCategories).values({
+      organizationId: 'org-a',
+      budgetId: 'bud-a',
+      categoryId: 'cat-food',
+    })
+    await seedTransaction(db, {
+      id: 'tx-jan',
+      categoryId: 'cat-food',
+      refAmountMinor: 1_500_00,
+      bookedOn: '2026-01-10',
+    })
+    // Materialisation closes every period that has elapsed, so January is frozen by the time
+    // March is the open one.
+    await materializePeriods(world.scope, {
+      budgetId: 'bud-a',
+      today: '2026-03-15',
+    })
+
+    // A receipt turns up in February for something bought in January.
+    await seedTransaction(db, {
+      id: 'tx-jan-late',
+      categoryId: 'cat-food',
+      refAmountMinor: 120_00,
+      bookedOn: '2026-01-20',
+    })
+    await materializePeriods(world.scope, {
+      budgetId: 'bud-a',
+      today: '2026-03-15',
+    })
+
+    const budget = await getBudget(world.scope, 'bud-a')
+    const periods = await listPeriods(world.scope, 'bud-a')
+    const january = periods.find((row) => row.periodStart === '2026-01-01')
+
+    // Frozen. Not 1 620,00.
+    expect(january?.spentMinor).toBe(1_500_00)
+    expect(january?.carriedInMinor).toBe(0)
+
+    const corrections = await periodCorrections(world.scope, budget, periods)
+    expect(corrections).toEqual([
+      {
+        periodStart: '2026-01-01',
+        periodEnd: '2026-01-31',
+        storedSpentMinor: 1_500_00,
+        actualSpentMinor: 1_620_00,
+        deltaMinor: 120_00,
+      },
+    ])
+  })
+
+  it('telescopes the carry chain over six periods with no rounding step anywhere', () => {
+    const outcomes = [
+      { limitMinor: asMinor(2_000_00), spentMinor: asMinor(1_333_33) },
+      { limitMinor: asMinor(2_000_00), spentMinor: asMinor(2_400_01) },
+      { limitMinor: asMinor(1_950_00), spentMinor: asMinor(1_000_00) },
+      { limitMinor: asMinor(2_000_00), spentMinor: asMinor(1_999_99) },
+      { limitMinor: asMinor(2_000_00), spentMinor: asMinor(3_000_00) },
+      { limitMinor: asMinor(2_000_00), spentMinor: asMinor(7) },
+    ]
+    const chain = rolloverChain('carry_all', outcomes)
+
+    const totalLimit = outcomes.reduce((sum, row) => sum + row.limitMinor, 0)
+    const totalSpent = outcomes.reduce((sum, row) => sum + row.spentMinor, 0)
+
+    // Σlimit − Σspent, exactly. Every link is one addition and one subtraction of integers.
+    expect(chain.at(-1)?.carriedOutMinor).toBe(totalLimit - totalSpent)
+    for (const [index, row] of chain.entries()) {
+      expect(Number.isInteger(row.carriedOutMinor)).toBe(true)
+      expect(row.carriedOutMinor).toBe(
+        row.limitMinor + row.carriedInMinor - row.spentMinor,
+      )
+      if (index + 1 < chain.length) {
+        expect(chain[index + 1].carriedInMinor).toBe(row.carriedOutMinor)
+      }
+    }
+  })
+
+  it('crosses a threshold on an integer comparison, multiplying before dividing', () => {
+    // 80% of 2 000,00 is 1 600,00 to the grosz. A `spent / available >= 0.8` in floats agrees
+    // here and disagrees on limits that are not round; multiplying first cannot disagree at all.
+    expect(hasReachedThreshold(1_599_99, 2_000_00, 80)).toBe(false)
+    expect(hasReachedThreshold(1_600_00, 2_000_00, 80)).toBe(true)
+
+    // A limit with no exact percentage: 33% of 1 000,03 is 330,0099, so 330,00 is short and
+    // 330,01 is over. A division-first comparison rounds 330,0099 to 330,01 and fires early.
+    expect(hasReachedThreshold(330_00, 1_000_03, 33)).toBe(false)
+    expect(hasReachedThreshold(330_01, 1_000_03, 33)).toBe(true)
+  })
+
+  it('fires each threshold once per period, and only after the dispatch succeeded', async () => {
+    await seedBudget(db, { id: 'bud-a', alertThresholds: [50, 80, 100] })
+    await seedPeriod(db, {
+      budgetId: 'bud-a',
+      periodStart: '2026-03-01',
+      periodEnd: '2026-03-31',
+      spentMinor: 2_400_00,
+    })
+
+    const markers = createMemoryMarkerStore()
+    const dispatched: Array<number> = []
+
+    setBudgetAlertDispatcher(async () => {
+      throw new Error('the queue was down')
+    })
+    await expect(
+      sweepBudgetThresholds({
+        scope: world.scope,
+        today: '2026-03-15',
+        markers,
+      }),
+    ).rejects.toThrow('the queue was down')
+    // Nothing was recorded, so the next sweep retries rather than swallowing the alert.
+    expect(markers.keys.size).toBe(0)
+
+    setBudgetAlertDispatcher(async (_scope, crossings) => {
+      dispatched.push(...crossings.map((crossing) => crossing.threshold))
+    })
+    await sweepBudgetThresholds({
+      scope: world.scope,
+      today: '2026-03-15',
+      markers,
+    })
+    await sweepBudgetThresholds({
+      scope: world.scope,
+      today: '2026-03-15',
+      markers,
+    })
+
+    expect(dispatched).toEqual([50, 80, 100])
+    setBudgetAlertDispatcher(NOOP_ALERT_DISPATCHER)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 9 — recurring                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The recurring invariants named by `docs/plans/13-recurring.md`.
+ *
+ * Held here for the reason `8 —` gives: `docs/MONEY.md` §9 makes this file the money boundary's
+ * index, and a stage that moves an amount and adds nothing here has not finished. The scenario
+ * coverage — idempotent auto-record, the due-date rate, the earliest-unpaid-period choice — lives
+ * beside the code it exercises in `recurring/__tests__/` and `repos/__tests__/recurring.test.ts`.
+ * What is restated here is the *arithmetic contract*: the claims a reader of the money boundary
+ * should be able to check without opening the recurring module.
+ */
+describe('9 — an expected amount is a plan, and the two are never conflated', () => {
+  const period: PeriodView = {
+    seriesId: 'ser-a',
+    periodStart: '2026-03-01',
+    dueOn: '2026-03-01',
+    status: 'paid',
+    derivedStatus: 'paid',
+    expectedAmountMinor: asMinor(129_99),
+    expectedCurrencyCode: asCurrencyCode('PLN'),
+    settledTransactionId: 'tx-1',
+    settledAmountMinor: asMinor(134_50),
+    settledCurrencyCode: asCurrencyCode('PLN'),
+    settledOn: '2026-03-03',
+  }
+
+  it('computes the variance as an integer subtraction and stores nothing', () => {
+    // 134,50 − 129,99 = 4,51, exactly, with no rate and no rounding step in between.
+    expect(periodVarianceMinor(period)).toBe(4_51)
+    expect(Number.isInteger(periodVarianceMinor(period))).toBe(true)
+  })
+
+  it('refuses a variance across two currencies rather than implying it is zero', () => {
+    // 43 EUR settled against 43 PLN expected is not a difference of nothing, and a subtraction
+    // here would say it was. `null` is the only honest answer without a rate the person chose.
+    expect(
+      periodVarianceMinor({
+        ...period,
+        settledCurrencyCode: asCurrencyCode('EUR'),
+      }),
+    ).toBeNull()
+  })
+
+  it('has no variance at all until something settles', () => {
+    expect(
+      periodVarianceMinor({
+        ...period,
+        status: 'upcoming',
+        derivedStatus: 'upcoming',
+        settledTransactionId: null,
+        settledAmountMinor: null,
+        settledCurrencyCode: null,
+        settledOn: null,
+      }),
+    ).toBeNull()
+  })
+
+  it('makes the match tolerance an integer window in minor units, inclusive at its edge', () => {
+    const series = {
+      id: 'ser-a',
+      accountId: null,
+      payeeId: null,
+      direction: 'expense' as const,
+      expectedAmountMinor: asMinor(129_99),
+      expectedCurrencyCode: asCurrencyCode('PLN'),
+    }
+    const rules: MatchingRules = {
+      payee: [],
+      accountId: null,
+      amountToleranceMinor: 500,
+      dayWindow: 3,
+    }
+    const subject: MatchSubject = {
+      accountId: 'acc-a',
+      payeeId: null,
+      payeeName: null,
+      note: null,
+      direction: 'expense' as const,
+      amountMinor: asMinor(134_99),
+      currencyCode: asCurrencyCode('PLN'),
+      bookedOn: '2026-03-01',
+    }
+
+    // Exactly 5,00 zł out: inside the window, because the tolerance is a bound and not a strict
+    // inequality. A percentage tolerance is what this deliberately is not — 10% of a 12 000 zł
+    // instalment would match a completely unrelated 1 200 zł payment.
+    const args = { series, rules, transaction: subject, dueOn: '2026-03-01' }
+    expect(matchesPeriod(args).matched).toBe(true)
+    expect(
+      matchesPeriod({
+        ...args,
+        transaction: { ...subject, amountMinor: asMinor(135_00) },
+      }),
+    ).toEqual({ matched: false, because: 'amount' })
+  })
+
+  it('never proposes an amount the person has not actually paid', () => {
+    // The median of an even count is the lower of the two middle values, not their mean: a mean
+    // invents a figure that never occurred and moves with the rounding rule chosen to flatten it.
+    expect(medianOf([100_00, 110_00, 120_00, 130_00])).toBe(110_00)
+    expect(medianOf([100_00, 100_01])).toBe(100_00)
+    expect(Number.isInteger(medianOf([1, 2, 4]))).toBe(true)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 10 — savings goals                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The goal invariants named by `docs/plans/15-goals.md`.
+ *
+ * The cache-versus-links cases — `contributed_minor` after an add, after a remove and after
+ * `recomputeContributed`, and the cross-currency refusal — need a database and live in
+ * `repos/__tests__/goals.test.ts`. What is restated here is the projection's arithmetic, which is
+ * the one place on this surface where a division appears at all.
+ */
+describe('10 — a goal projection is integer arithmetic over integers it was given', () => {
+  const monthly = (month: number, amountMinor: number) => ({
+    bookedOn: `2026-${String(month).padStart(2, '0')}-10`,
+    amountMinor: asMinor(amountMinor),
+  })
+
+  it('takes an integer median of integer monthly sums, deterministic on an even count', () => {
+    const projection = projectCompletion({
+      goal: {
+        targetMinor: asMinor(20_000_00),
+        contributedMinor: asMinor(4_000_00),
+        targetDate: null,
+        status: 'active',
+      },
+      contributions: [
+        monthly(1, 1_000_00),
+        monthly(2, 1_000_01),
+        monthly(3, 1_000_00),
+        monthly(4, 1_000_01),
+      ],
+      today: '2026-04-20',
+    })
+
+    expect(projection.kind).toBe('on_track')
+    if (projection.kind !== 'on_track') return
+    // The lower middle of 1 000,00 / 1 000,00 / 1 000,01 / 1 000,01, and an integer.
+    expect(projection.monthlyRateMinor).toBe(1_000_00)
+    expect(Number.isInteger(projection.monthlyRateMinor)).toBe(true)
+    // 16 000,00 remaining at 1 000,00 a month is 16 months, by integer ceiling division and not
+    // by `Math.ceil` over a float quotient of two amounts.
+    expect(projection.monthsRemaining).toBe(16)
+  })
+
+  it('rounds the months up, so a projected date is never earlier than the money allows', () => {
+    const projection = projectCompletion({
+      goal: {
+        targetMinor: asMinor(1_000_00),
+        contributedMinor: asMinor(0),
+        targetDate: null,
+        status: 'active',
+      },
+      // 300,00 a month against 1 000,00 outstanding: three months leaves 100,00 short.
+      contributions: [
+        monthly(1, 300_00),
+        monthly(2, 300_00),
+        monthly(3, 300_00),
+      ],
+      today: '2026-03-20',
+    })
+    expect(projection.kind).toBe('on_track')
+    if (projection.kind !== 'on_track') return
+    expect(projection.monthsRemaining).toBe(4)
+    expect(projection.projectedDate).toBe('2026-07-31')
+  })
+
+  it('gives no date at all below three contribution months, and the type carries the absence', () => {
+    const projection = projectCompletion({
+      goal: {
+        targetMinor: asMinor(10_000_00),
+        contributedMinor: asMinor(500_00),
+        targetDate: null,
+        status: 'active',
+      },
+      contributions: [monthly(1, 250_00), monthly(2, 250_00)],
+      today: '2026-03-20',
+    })
+    expect(projection).toEqual({
+      kind: 'insufficient_data',
+      reason: 'too_few_months',
+      monthsObserved: 2,
+    })
+    // `projectedDate` is not merely absent: it is not a property of this branch of the union, so
+    // a screen cannot read one. That is the invariant, expressed as a type rather than a check.
+    expect('projectedDate' in projection).toBe(false)
+  })
+
+  it('never invents progress: the inputs come back untouched', () => {
+    const goal = Object.freeze({
+      targetMinor: asMinor(5_000_00),
+      contributedMinor: asMinor(1_000_00),
+      targetDate: null,
+      status: 'active',
+    })
+    const contributions = Object.freeze([
+      Object.freeze(monthly(1, 500_00)),
+      Object.freeze(monthly(2, 500_00)),
+      Object.freeze(monthly(3, 500_00)),
+    ])
+
+    projectCompletion({ goal, contributions, today: '2026-03-20' })
+
+    expect(goal.contributedMinor).toBe(1_000_00)
+    expect(contributions.map((entry) => entry.amountMinor)).toEqual([
+      500_00, 500_00, 500_00,
+    ])
+  })
+
+  it('projects nothing past the finish line', () => {
+    expect(
+      projectCompletion({
+        goal: {
+          targetMinor: asMinor(5_000_00),
+          contributedMinor: asMinor(5_000_00),
+          targetDate: '2027-01-01',
+          status: 'active',
+        },
+        contributions: [
+          monthly(1, 2_000_00),
+          monthly(2, 2_000_00),
+          monthly(3, 1_000_00),
+        ],
+        today: '2026-03-20',
+      }),
+    ).toEqual({ kind: 'reached' })
   })
 })
