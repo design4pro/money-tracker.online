@@ -294,6 +294,46 @@ binding in that list means the emitted config is not the one you think it is —
 `workers_dev` and `preview_urls` are **false in both environments**. A `*.workers.dev` hostname
 serving a real session cookie is an authentication surface nobody is watching.
 
+### 8.1 Production sits behind Cloudflare Access until launch
+
+Production is deployed but not public. A self-hosted Access application named
+`money-tracker.online` covers both production hostnames and carries the account's existing reusable
+policy `team` (Allow, `Emails ending in design4.pro`) - the same policy the `planned.travel`
+applications use, so there is one definition of who the team is rather than three.
+
+|              |                                                             |
+| ------------ | ----------------------------------------------------------- |
+| Application  | `money-tracker.online` (self-hosted, Public DNS)            |
+| Destinations | `money-tracker.online`, `www.money-tracker.online`, no path |
+| Policy       | `team` - Allow, include `Emails ending in design4.pro`      |
+| Policy id    | `62767633-cc32-48d1-bb80-6d9d8f9d78cc`                      |
+
+Verify from a machine with no Access session:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://money-tracker.online/
+# 302, redirecting to design4pro.cloudflareaccess.com/cdn-cgi/access/login/...
+```
+
+A `200` here means the application was removed or its destinations no longer match, and production
+is public again.
+
+**Staging is deliberately _not_ behind Access.** The browser suites and the sandcastle loop drive it
+unattended, and an interactive login in front of them turns every run into a redirect to an identity
+provider.
+
+**Access breaks the production smoke check, and that is not yet fixed.** `deploy-production.yml`
+asserts `/api/health` answers exactly `200`; behind Access it answers `302`, so the production
+deploy job fails on a healthy deploy. §11 has the detail and the two ways out. Staging is
+unaffected.
+
+**Before plan 22 ships billing, Polar's webhook needs its own bypass application.** Access is
+default-deny, so a `POST` from Polar to `/api/webhooks/polar` gets the 302 above and the webhook
+fails silently. `planned.travel` solves this with a separate application scoped to the webhook path
+carrying a `Bypass` policy, ordered ahead of the site-wide one; mirror that rather than widening the
+site policy. This is written down here because the failure looks like "Polar is not sending
+webhooks", not like an access-control problem.
+
 ---
 
 ## 9. Polar
@@ -409,6 +449,23 @@ curl -s -o /dev/null -w '%{http_code} /api/sandcastle/ping (503)\n' "$BASE/api/s
 ```
 
 Expected: `200 200 200 200 405 503`. Anything else is a failed deploy.
+
+**Against production this currently returns `302` six times**, because §8.1 put the site behind
+Cloudflare Access and Access is default-deny. The check is not wrong; it is unauthenticated. Two
+ways out, and the first is the one to take:
+
+1. **A service token.** Mint one in Zero Trust → Access → Service credentials, add a `Service Auth`
+   policy to the `money-tracker.online` application ordered _above_ `team`, store the pair as the
+   `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` repository secrets §10 already lists, and send
+   them as `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers here and in
+   `deploy-production.yml`. This is what `planned.travel` does - its policy is called
+   `ci-smoke-production`.
+2. **A bypass application on `/api/health` alone.** Cheaper, and it puts the version string and the
+   environment name back on the public internet. Take this only if the deploy has to go out before
+   somebody can mint a token.
+
+Until one of them is done, run the check against staging, and read a production deploy's smoke
+failure as "unauthenticated", not as "unhealthy".
 
 Then, by hand, once:
 

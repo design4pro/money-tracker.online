@@ -54,6 +54,24 @@ describe('what it proposes', () => {
     expect(candidate.sampleTransactionIds).toHaveLength(6)
   })
 
+  it('names a note-derived group the way the note was typed, but groups case-blind', () => {
+    // Four charges with no payee, whose notes disagree only in capitalisation. They must land in
+    // one bucket - two buckets of two would each fall under the three-occurrence floor - and the
+    // name offered back must not be the folded key the bucketing used.
+    const noted = ['2025-12-11', '2026-01-11', '2026-02-11', '2026-03-11'].map(
+      (bookedOn, index) =>
+        row({
+          bookedOn,
+          payeeId: null,
+          payeeName: null,
+          note: index % 2 === 0 ? 'Karnet siłownia' : 'karnet siłownia',
+        }),
+    )
+    const [candidate] = detectCandidates(noted)
+    expect(candidate.sampleTransactionIds).toHaveLength(4)
+    expect(candidate.suggestedName).toBe('Karnet siłownia')
+  })
+
   it('finds a weekly series', () => {
     const weekly = ['2026-02-02', '2026-02-09', '2026-02-16', '2026-02-23'].map(
       (bookedOn) => row({ bookedOn }),

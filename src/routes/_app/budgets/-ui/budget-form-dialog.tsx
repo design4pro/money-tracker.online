@@ -422,6 +422,10 @@ export function BudgetFormDialog({
                   ))}
                 </CheckboxGroup>
 
+                <p className="text-caption text-ink-2">
+                  {t('budgets.form.thresholds.pending')}
+                </p>
+
                 {draft.kind === 'category' ? (
                   <>
                     <CheckboxGroup

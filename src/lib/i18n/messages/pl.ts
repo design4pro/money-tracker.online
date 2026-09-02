@@ -993,6 +993,8 @@ const messages = {
   'budgets.form.thresholds': 'Ostrzegaj przy',
   'budgets.form.thresholds.help':
     'Procent kwoty do dyspozycji. 100% i więcej jest dozwolone — czasem chce się wiedzieć przy 150%.',
+  'budgets.form.thresholds.pending':
+    'Progi zapisujesz tutaj, a docierać będą, gdy ruszą powiadomienia. Na razie nic nie jest wysyłane.',
   'budgets.form.submit.create': 'Utwórz budżet',
   'budgets.form.submit.save': 'Zapisz zmiany',
   'budgets.form.cancel': 'Anuluj',

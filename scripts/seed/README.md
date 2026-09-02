@@ -190,7 +190,7 @@ the balance grid is the one place the current valuation is the right answer.
 
 ## What `verify.mjs` checks
 
-Counts and span, then forty-five invariants. Each publishes **how many rows it examined** as well as
+Counts and span, then forty-seven invariants. Each publishes **how many rows it examined** as well as
 how many broke it, and a check that examined zero rows **fails** — a query that has lost its subject
 looks exactly like a passing check unless the count is published, and that is how a fixture rots
 without anybody noticing. Both halves run as scalar subqueries of one statement, so an invariant
@@ -243,6 +243,8 @@ costs one round trip.
 | `everyTagIsUsed`                       | a tag nothing carries, which reads as a broken screen                                      |
 | `payeeAliasesResolve`                  | an alias points at a payee that does not exist                                             |
 | `everyExpenseCategoryIsUsed`           | a category no row uses, which is an empty slice in the donut                               |
+| `budgetPeriodsMatchTheirLedger`        | a period's `spent_minor` disagrees with the transactions inside its own range              |
+| `budgetCarryFollowsItsPolicy`          | an opening balance is not what the previous period's rollover policy produced              |
 
 ### What is still not asserted
 

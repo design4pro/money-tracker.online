@@ -961,6 +961,8 @@ const messages = {
   'budgets.form.thresholds': 'Warn me at',
   'budgets.form.thresholds.help':
     'Percentages of what is available. 100% and over are allowed — some people want to know at 150%.',
+  'budgets.form.thresholds.pending':
+    'Thresholds are recorded here and delivered once notifications ship. Nothing is being sent yet.',
   'budgets.form.submit.create': 'Create budget',
   'budgets.form.submit.save': 'Save changes',
   'budgets.form.cancel': 'Cancel',

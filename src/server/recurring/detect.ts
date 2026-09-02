@@ -127,12 +127,31 @@ export function detectCandidates(
   )
 }
 
-/** What a group is called. `null` for a row with neither a payee nor a usable note. */
+/**
+ * What a group is called for **bucketing**. `null` for a row with neither a payee nor a usable note.
+ *
+ * Case-folded, because "Karnet siłownia" and "karnet siłownia" are one subscription and splitting
+ * them would put four occurrences into two buckets of two, below {@link MINIMUM_OCCURRENCES}.
+ */
 function groupLabel(row: DetectionRow): string | null {
   const named = row.payeeName?.trim() ?? ''
   if (named !== '') return named
   const noted = row.note?.trim() ?? ''
   return noted === '' ? null : noted.toLowerCase().slice(0, 60)
+}
+
+/**
+ * What a group is *shown* as, and what the create form pre-fills.
+ *
+ * The same string as {@link groupLabel} except that a note keeps the capitalisation the person
+ * typed. Folding case is right for deciding that two rows belong together and wrong for putting a
+ * name in front of them: nobody wrote "karnet siłownia".
+ */
+function displayLabel(row: DetectionRow): string | null {
+  const named = row.payeeName?.trim() ?? ''
+  if (named !== '') return named
+  const noted = row.note?.trim() ?? ''
+  return noted === '' ? null : noted.slice(0, 60)
 }
 
 /** Turns one group into a proposal, or into nothing. */
@@ -178,7 +197,7 @@ function proposeFrom(
   if (first === undefined) return null
 
   return {
-    suggestedName: groupLabel(first) ?? first.accountId,
+    suggestedName: displayLabel(first) ?? first.accountId,
     payeeId: first.payeeId,
     expectedAmountMinor: median,
     expectedCurrencyCode: first.currencyCode,

@@ -192,6 +192,88 @@ async function main() {
     where id like 'demo-%' and transfer_kind = 'internal'
     group by transfer_id`
 
+  /**
+   * Every budget period beside a fresh recount of the ledger behind it.
+   *
+   * `seed.mjs` derives `spent_minor` in SQL rather than declaring it, and this is the other half of
+   * that bargain: a derivation nothing re-checks is a declaration with extra steps. The recount is
+   * deliberately written the *other* way round from the one that wrote the column - one `union all`
+   * of signed contributions joined to the periods, where the seed uses five correlated scalar
+   * subqueries, and `not in` where the seed uses `not exists`. A check that copies the statement it
+   * is checking agrees with it by construction and proves nothing.
+   *
+   * The three streams are `budgetSpend()`'s five terms, signed and collapsed: an unsplit parent row
+   * contributes its own reference amount, a split receipt contributes line by line so the parent is
+   * never also counted whole, income in a covered category contributes negatively as a credit, and
+   * a refund of one of this budget's transactions that was booked *outside* it is subtracted once.
+   */
+  const BUDGET_PERIOD_SPEND = `
+    with cov as (
+      select bc.budget_id bid, bc.category_id cid from budget_categories bc
+      where bc.budget_id like 'demo-%'
+      union
+      select bc.budget_id, c.id from budget_categories bc
+      join categories c on c.parent_id = bc.category_id
+      where bc.budget_id like 'demo-%'),
+    countable as (
+      select t.id, t.booked_on, t.direction, t.category_id, t.ref_amount_minor
+      from transactions t
+      where t.is_planned = 0 and t.is_balance_adjustment = 0
+        and t.transfer_kind = 'none' and t.exclude_from_stats = 0
+        and t.account_id not in (select id from accounts where exclude_from_stats = 1)),
+    line as (
+      select cov.bid bid, t.booked_on day,
+        case when t.direction = 'expense' then t.ref_amount_minor else -t.ref_amount_minor end v
+      from countable t join cov on cov.cid = t.category_id
+      where t.id not in (select transaction_id from transaction_splits)
+      union all
+      select cov.bid, t.booked_on,
+        case when t.direction = 'expense' then s.ref_amount_minor else -s.ref_amount_minor end
+      from transaction_splits s
+      join countable t on t.id = s.transaction_id
+      join cov on cov.cid = s.category_id
+      union all
+      select b.bid, t.booked_on, -t.ref_amount_minor
+      from countable t, (select distinct bid from cov) b
+      where t.direction = 'income'
+        and t.category_id not in (select cid from cov where cov.bid = b.bid)
+        and exists (
+          select 1 from refunds r
+          join transactions o on o.id = r.original_transaction_id
+          join cov c2 on c2.cid = o.category_id and c2.bid = b.bid
+          where r.refund_transaction_id = t.id))
+    select p.spent_minor stored,
+      coalesce((select sum(line.v) from line
+        where line.bid = p.budget_id
+          and line.day between p.period_start and p.period_end), 0) recounted
+    from budget_periods p where p.budget_id like 'demo-%'`
+
+  /**
+   * Every period's opening balance beside the one link of the chain that produced it.
+   *
+   * One link rather than the whole chain, because the chain is what `seed.mjs` walks and re-walking
+   * it here would be the same statement twice. `carriedIn(n + 1) = carriedOut(n)` is the rule
+   * `#/server/budgets/rollover` states, and it holds pairwise, so checking the pair checks every
+   * link without ever reproducing the recursion.
+   */
+  const BUDGET_PERIOD_CARRY = `
+    select p.carried_in_minor stored,
+      coalesce((
+        select case
+          when prev.closed_at is null then 0
+          when b.rollover_policy = 'carry_all'
+            then prev.limit_minor + prev.carried_in_minor - prev.spent_minor
+          when b.rollover_policy = 'carry_surplus'
+            then max(0, prev.limit_minor + prev.carried_in_minor - prev.spent_minor)
+          else 0 end
+        from budget_periods prev
+        where prev.budget_id = p.budget_id
+          and prev.period_start = (
+            select max(q.period_start) from budget_periods q
+            where q.budget_id = p.budget_id and q.period_start < p.period_start)), 0) expected
+    from budget_periods p join budgets b on b.id = p.budget_id
+    where p.budget_id like 'demo-%'`
+
   /* ---- Counts ----------------------------------------------------------- */
 
   const counts = {
@@ -604,6 +686,18 @@ async function main() {
       why: 'a category no transaction uses is an empty slice in the donut, which reads as a rendering fault rather than as an unused category',
       checked: `select count(*) from categories where id like 'demo-%' and parent_id is not null`,
       violations: `select count(*) from categories c where c.id like 'demo-%' and c.parent_id is not null and not exists (select 1 from transactions t where t.category_id = c.id) and not exists (select 1 from transaction_splits s where s.category_id = c.id)`,
+    },
+    {
+      name: 'budgetPeriodsMatchTheirLedger',
+      why: "a period's stored `spent_minor` disagrees with the transactions inside its range, so every closed period arrives on the detail screen as a correction and the period chart is drawing a number nothing produced",
+      checked: `select count(*) from (${BUDGET_PERIOD_SPEND})`,
+      violations: `select count(*) from (${BUDGET_PERIOD_SPEND}) where stored <> recounted`,
+    },
+    {
+      name: 'budgetCarryFollowsItsPolicy',
+      why: "an opening balance is not what the previous period's policy produced, so the rollover ledger's arithmetic does not add up in the one column it exists to show",
+      checked: `select count(*) from (${BUDGET_PERIOD_CARRY})`,
+      violations: `select count(*) from (${BUDGET_PERIOD_CARRY}) where stored <> expected`,
     },
   ]
 
