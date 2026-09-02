@@ -274,7 +274,7 @@ export async function assertWithinLimit(
  * Because the store is per-context there is nothing to install and nothing to uninstall, so no
  * `finally` anywhere can take away a collector that belongs to somebody else.
  */
-let collector: asyncHooks.AsyncLocalStorage<Set<string>> | null = null
+let store: asyncHooks.AsyncLocalStorage<Set<string>> | null = null
 
 /**
  * The store, constructed on first use rather than when the module loads.
@@ -302,8 +302,8 @@ let collector: asyncHooks.AsyncLocalStorage<Set<string>> | null = null
  * `../ledger/batch.ts`, and not the category that caused the bug this store exists to fix.
  */
 function ledgerStore(): asyncHooks.AsyncLocalStorage<Set<string>> {
-  collector ??= new asyncHooks.AsyncLocalStorage<Set<string>>()
-  return collector
+  store ??= new asyncHooks.AsyncLocalStorage<Set<string>>()
+  return store
 }
 
 /**
