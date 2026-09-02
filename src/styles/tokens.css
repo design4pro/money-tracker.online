@@ -481,9 +481,11 @@
      local fallback *immediately* after the web face, so a heading does not
      resize when the web font lands.
 
-     `--font-numeric` is the same text face pinned to tabular figures. Every
-     number that can change is set in it — a re-rendered total must not shift
-     the row it sits in, and a column of money must align on the decimal.
+     There is no third face for numbers. A number that can change keeps the
+     face it inherits and changes only its figures, through the `.tabular`
+     rule in `app.css` — `font-variant-numeric: tabular-nums`. That is what
+     stops a re-rendered total shifting the row it sits in and what makes a
+     column of money align on the decimal.
      --------------------------------------------------------------------- */
   --font-display:
     'Bricolage Grotesque', 'Bricolage Grotesque Fallback', 'Avenir Next',
