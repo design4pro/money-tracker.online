@@ -1,14 +1,26 @@
-import { ArrowDownLeft, ArrowUpRight, Equal } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Equal,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react'
 
 import { Amount } from '#/components/app/accounts'
-import { cn } from '#/lib/cn'
-import { formatCalendarDateRange, useLocale, useTranslate } from '#/lib/i18n'
+import { Card } from '#/components/ui'
+import {
+  formatCalendarDateRange,
+  formatPercent,
+  useLocale,
+  useTranslate,
+} from '#/lib/i18n'
 import {
   absMinor,
   formatMoney,
   isNegativeMinor,
   isZeroMinor,
   money,
+  ratioOfMinor,
 } from '#/lib/money'
 
 import type { ReactNode } from 'react'
@@ -35,6 +47,20 @@ import type { PeriodRange } from './period'
  * An icon, a word, and the locale's own minus sign — colour arrives fourth and carries no meaning
  * of its own. `docs/ACCESSIBILITY.md` §1: a surplus and a shortfall have to be distinguishable in
  * greyscale, in a forced-colours theme, and by a reader with deuteranopia.
+ *
+ * ## No glyph means two things
+ *
+ * Money in and money out own the two arrows, and they own them everywhere — the same pair the
+ * transaction rows draw. The difference therefore takes a **trend** pair instead: a surplus that
+ * borrowed money-in's arrow taught a reader that the arrow means nothing, which costs the whole
+ * icon channel on the row where it is doing the most work. Three states, three glyphs, and none
+ * of them shared with another tile.
+ *
+ * ## The tiles are cards, like everything under them
+ *
+ * They used to be borderless grey chips above a grid of bordered white panels — two card idioms
+ * on one screen, and the reader has to learn both before deciding which is the important one.
+ * One token now: `Card`, the same fill, hairline and radius the widget frames use.
  */
 export interface DashboardHeaderProps {
   readonly baseCurrencyCode: CurrencyCode
@@ -80,7 +106,8 @@ export function DashboardHeader({
         move around a page. It is visually hidden because the figures below already say it.
       */}
       <h2 className="sr-only">{t('dashboard.summary.label')}</h2>
-      <dl className="grid gap-3 sm:grid-cols-3">
+      {/* `gap-4` is the widget grid's gap: the strip and the panels below it are one rhythm. */}
+      <dl className="grid gap-4 sm:grid-cols-3">
         <Figure
           icon={<ArrowDownLeft aria-hidden="true" className="size-4" />}
           label={t('dashboard.income')}
@@ -108,13 +135,19 @@ export function DashboardHeader({
             isZeroMinor(netMinor) ? (
               <Equal aria-hidden="true" className="size-4" />
             ) : isNegativeMinor(netMinor) ? (
-              <ArrowUpRight aria-hidden="true" className="size-4" />
+              <TrendingDown aria-hidden="true" className="size-4" />
             ) : (
-              <ArrowDownLeft aria-hidden="true" className="size-4" />
+              <TrendingUp aria-hidden="true" className="size-4" />
             )
           }
           label={t('dashboard.net')}
-          detail={netSentence(t, locale, netMinor, baseCurrencyCode)}
+          detail={netSentence(
+            t,
+            locale,
+            netMinor,
+            incomeMinor,
+            baseCurrencyCode,
+          )}
         >
           <Amount
             locale={locale}
@@ -131,18 +164,34 @@ export function DashboardHeader({
 }
 
 /**
- * The sentence beside the difference — the word that says which way the period went.
+ * The line beside the difference — what the figure above it *means*, not what it says again.
  *
- * The magnitude is formatted from `absMinor`, never from a subtraction: the direction is already
- * carried by the message, and a second minus sign inside "You spent −120,00 zł more than came in"
- * is how a sentence stops meaning what it says.
+ * It used to read "You kept zł 6 387,38" under a tile already showing `+zł 6 387,38`: a second
+ * rendering of one number, which teaches a reader that the second line is never worth reading, and
+ * the only three-line tile in a row of three. The share is the reading the figure does not carry —
+ * six thousand kept out of ten thousand in is a different month from six thousand out of sixty —
+ * and it fits on one line, so the row keeps its rhythm.
+ *
+ * With nothing coming in there is no share to take, and the sentence falls back to the word for
+ * the direction. The magnitude there is formatted from `absMinor`, never from a subtraction: the
+ * direction is already carried by the message, and a second minus sign inside "You spent −120,00 zł
+ * more than came in" is how a sentence stops meaning what it says.
  */
 function netSentence(
   t: Translate,
   locale: Locale,
   netMinor: Minor,
+  incomeMinor: Minor,
   currencyCode: CurrencyCode,
 ): string {
+  const share = ratioOfMinor(netMinor, incomeMinor)
+  if (share !== null) {
+    return t('dashboard.cashFlow.shareOfIncome', {
+      share: formatPercent(locale, share),
+      amount: formatMoney(locale, money(incomeMinor, currencyCode)),
+    })
+  }
+
   if (isZeroMinor(netMinor)) return t('dashboard.cashFlow.balanced')
 
   const amount = formatMoney(locale, money(absMinor(netMinor), currencyCode))
@@ -160,7 +209,7 @@ interface FigureProps {
 
 function Figure({ icon, label, detail, children }: FigureProps) {
   return (
-    <div className={cn('rounded-lg bg-surface-sunken px-4 py-3')}>
+    <Card padding="sm">
       <dt className="flex items-center gap-2 text-micro tracking-label uppercase text-ink-2">
         <span className="text-ink-2">{icon}</span>
         {label}
@@ -173,6 +222,6 @@ function Figure({ icon, label, detail, children }: FigureProps) {
           </span>
         )}
       </dd>
-    </div>
+    </Card>
   )
 }

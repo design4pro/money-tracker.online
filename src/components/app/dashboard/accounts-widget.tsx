@@ -17,6 +17,14 @@ import type { DashboardAccount } from './types'
  * the two currencies differ — repeating the same number twice teaches a reader to stop looking
  * at the second line.
  *
+ * ## The column aligns on the decimal separator, not on its right edge
+ *
+ * Flush right is not aligned: `zł 72 328,33`, `$7 785,32` and `−zł 1 692,11` put their digits at
+ * three different offsets, because the two currency marks are different widths and the minus adds
+ * a fourth. `align="decimal"` cuts each figure after its integer digits and reserves a fixed
+ * measure for what follows, so the separator lands at one x for every row and the sign hangs to
+ * the left of the column instead of pushing the digits sideways.
+ *
  * ## "Owed" is a word, not a colour
  *
  * A credit card and a current account are told apart by a badge that says so and by the sign the
@@ -75,6 +83,7 @@ export function AccountsWidget({
                 amountMinor={account.balanceMinor}
                 currencyCode={account.currencyCode}
                 tone="value"
+                align="decimal"
               />
               {account.currencyCode === baseCurrencyCode ? null : (
                 <span className="mt-0.5 block text-caption text-ink-2">

@@ -30,8 +30,15 @@ export interface ComboBoxProps<T extends object> extends Omit<
   errorMessage?: FieldErrorMessage
   size?: FieldSize
   placeholder?: string
-  /** Accessible name for the disclosure button. Localised by the caller. */
-  toggleLabel?: string
+  /**
+   * Accessible name for the disclosure button.
+   *
+   * Required, and deliberately so. It used to default to the English `'Show suggestions'`, which
+   * is not a design-system decision at all: this module holds no catalogue, so the default was
+   * simply the one string no caller could see itself failing to pass, and it reached the Polish
+   * UI on all three of them. A required prop turns that silent leak into a compile error.
+   */
+  toggleLabel: string
   children: ReactNode | ((item: T) => ReactNode)
   items?: Iterable<T>
   className?: string
@@ -63,7 +70,7 @@ export function ComboBox<T extends object>({
   errorMessage,
   size = 'md',
   placeholder,
-  toggleLabel = 'Show suggestions',
+  toggleLabel,
   children,
   items,
   className,

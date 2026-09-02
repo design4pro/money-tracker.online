@@ -193,6 +193,10 @@ export function TransactionForm({
     if (resetToken === 0) {
       return
     }
+    // The next entry is a fresh form, so it starts untouched. Without this the cleared amount is
+    // still measured against the rules the *previous* entry satisfied, and a blank box that
+    // nobody has typed into yet opens reading "enter an amount greater than zero".
+    setTouched(false)
     amountRef.current?.querySelector('input')?.focus()
   }, [resetToken])
 
@@ -214,6 +218,33 @@ export function TransactionForm({
     onSubmit({ addAnother })
   }
 
+  /*
+    `Ctrl`/`⌘ + Enter` cannot submit in the same tick it is pressed.
+
+    React Aria's number field holds what is being typed as *text* and only parses it into a value
+    when the field is left — or on a bare Enter, which is how the ordinary submit path always
+    receives a committed amount. The accelerator `preventDefault()`s that Enter, so a number typed
+    and never left was still uncommitted when the old code validated: the form refused with "enter
+    an amount greater than zero" beside a box that visibly contained one, and the receipt was lost.
+
+    So the accelerator blurs the focused field to force the parse, restores the caret, and records
+    that a submit is owed. The blur's `onChange` and this flag land in one React batch, so the
+    effect below runs on the first render that has the committed value.
+  */
+  const [pendingSubmit, setPendingSubmit] = useState<{
+    readonly addAnother: boolean
+  } | null>(null)
+
+  useEffect(() => {
+    if (pendingSubmit === null) {
+      return
+    }
+    setPendingSubmit(null)
+    // `submit` closes over this render's `values`, which is the committed one by now, so the
+    // flag is the only dependency this effect may take: re-running it on `values` would resubmit.
+    submit(pendingSubmit.addAnother)
+  }, [pendingSubmit])
+
   return (
     <div
       onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -222,7 +253,14 @@ export function TransactionForm({
         // `Form` does not forward key handlers, hence the wrapper rather than a prop.
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
           event.preventDefault()
-          submit(allowRepeat)
+          const active = document.activeElement
+          if (active instanceof HTMLElement) {
+            // Blur parses whatever the field is holding; focus puts the caret straight back, so
+            // the round trip is invisible to the person typing.
+            active.blur()
+            active.focus()
+          }
+          setPendingSubmit({ addAnother: allowRepeat })
         }
       }}
     >
@@ -327,6 +365,7 @@ export function TransactionForm({
             {reference.categories.length === 0 ? null : (
               <ComboBox
                 label={t('transactions.field.category')}
+                toggleLabel={t('a11y.showSuggestions')}
                 placeholder={t('transactions.form.categoryPlaceholder')}
                 emptyState={t('transactions.filter.noMatches')}
                 isDisabled={isSubmitting}
@@ -347,6 +386,7 @@ export function TransactionForm({
             {reference.payees.length === 0 ? null : (
               <ComboBox
                 label={t('transactions.field.payee')}
+                toggleLabel={t('a11y.showSuggestions')}
                 placeholder={t('transactions.form.payeePlaceholder')}
                 emptyState={t('transactions.filter.noMatches')}
                 isDisabled={isSubmitting}

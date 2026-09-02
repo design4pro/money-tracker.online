@@ -81,6 +81,48 @@
   --color-surface-raised: #ffffff;
   --color-surface-sunken: #f1eee9;
 
+  /* `surface-panel` is the fifth ground and the only one whose *direction*
+     flips between themes. It is for a plane that fills a whole region of the
+     composition — the auth rail, a half-screen split — and whose only job is to
+     read as a second plane beside `canvas`.
+
+     `surface-sunken` cannot do that job. A well is defined by going darker than
+     the page, which in light is a 1.10 luminance step away from `canvas` and in
+     dark is a 1.04 step *towards* black — a split that structures a whole
+     desktop layout and is then invisible on the theme half the product is read
+     in. So light recesses this plane and dark lifts it:
+
+       light  #f1eee9 on #fbf9f5 → 1.10 : 1
+       dark   #22201c on #12110f → 1.16 : 1
+
+     The two steps are deliberately *not* equal, and the asymmetry is forced by
+     the contrast contract rather than chosen for looks. In light this plane is
+     the darkest ground text lands on, and `positive` already sits at 7.01:1 on
+     it — one more step of recession drops a chromatic token below AAA, so 1.10
+     is the whole budget. In dark the plane is lifted away from text-bearing
+     black and has 8.2:1 of headroom, and it *needs* the larger step: near black
+     a 1.10 ratio is a couple of display codes, which reads as a rendering seam
+     beside a form rather than as a second plane. So dark spends the headroom
+     light does not have.
+
+     Tone is therefore not the only channel. `--color-border-panel` below draws
+     the same boundary as a rule, so the split survives a theme in which the
+     tonal step is at its weakest — the same not-by-one-channel-alone rule this
+     file applies to money direction, applied to layout.
+
+     The light value coincides with `surface-sunken` by construction, not by
+     accident: this token names the *role*, so a later change to that one cannot
+     silently flatten the split. */
+  --color-surface-panel: #f1eee9; /* ink 14.03:1 · ink-2 7.15:1 */
+
+  /* The one edge of that plane. Decorative — it separates two grounds, not two
+     controls — so it carries no 3:1 claim; what it does carry is a floor of
+     1.5:1 against *both* grounds it divides, in both themes, which is what
+     makes the boundary stated rather than implied. `border-subtle` cannot do
+     this job: at 1.32:1 against the dark panel it disappears exactly where the
+     tonal step is weakest. */
+  --color-border-panel: #c5c0b7; /* 1.72:1 on canvas, 1.57:1 on panel */
+
   /* ------------------------------------------------------------------------
      TEXT — two tiers, both AAA.
 
@@ -178,6 +220,19 @@
   --color-skeleton: #ece8e2;
   --color-skeleton-sheen: rgb(255 255 255 / 0.75);
 
+  /* The band behind the categories a chart is *about*, when it also draws
+     categories that are only context. An **alpha** over the plot rather than an
+     opaque well: the gridlines that pass under it stay visible through it, and
+     an opaque fill hid them exactly inside the one group the reader had been
+     sent to — a scale that stops being readable where it matters most.
+
+     Decorative, and it carries no contrast claim, because it is never the only
+     channel: the marked category is also stated by its axis label at the
+     primary ink and a heavier weight, and by the note under the legend. Neutral
+     rather than chromatic (`accent`'s own ink, at 6%), so it recesses in light
+     and lifts in dark without inventing a ninth hue beside the series ramp. */
+  --color-chart-emphasis: rgb(35 32 26 / 0.06);
+
   /* ------------------------------------------------------------------------
      FOCUS (WCAG 2.2 §2.4.11 / §2.4.13, and §2.4.12 AAA "not obscured")
 
@@ -264,12 +319,14 @@
     --color-surface: #1d1b18;
     --color-surface-raised: #272622;
     --color-surface-sunken: #0b0b09;
+    --color-surface-panel: #22201c; /* ink 13.05:1 · ink-2 8.23:1 */
 
     --color-ink: #e9e6df; /* 12.15:1 on raised, 14.98:1 on canvas */
     --color-ink-2: #bcb8b0; /* 7.66:1 on raised, 9.45:1 on canvas */
     --color-on-accent: #23201a; /* 13.03:1 on accent, 10.25:1 on accent-hover */
 
     --color-border-subtle: #33312d;
+    --color-border-panel: #494640; /* 2.01:1 on canvas, 1.73:1 on panel */
     --color-border-strong: #7e7b75; /* 3.59:1 on raised, 4.41:1 on canvas */
 
     --color-accent: #e9e6df; /* ink on it: 13.03:1 */
@@ -303,6 +360,7 @@
     --color-scrim: rgb(6 6 5 / 0.68);
     --color-skeleton: #262421;
     --color-skeleton-sheen: rgb(233 230 223 / 0.08);
+    --color-chart-emphasis: rgb(233 230 223 / 0.07);
 
     --color-focus: #75b8fc; /* 7.22:1 on raised, 8.90:1 on canvas */
     --color-focus-gap: #12110f;
@@ -343,12 +401,14 @@
   --color-surface: #1d1b18;
   --color-surface-raised: #272622;
   --color-surface-sunken: #0b0b09;
+  --color-surface-panel: #22201c; /* ink 13.05:1 · ink-2 8.23:1 */
 
   --color-ink: #e9e6df; /* 12.15:1 on raised, 14.98:1 on canvas */
   --color-ink-2: #bcb8b0; /* 7.66:1 on raised, 9.45:1 on canvas */
   --color-on-accent: #23201a; /* 13.03:1 on accent */
 
   --color-border-subtle: #33312d;
+  --color-border-panel: #494640; /* 2.01:1 on canvas, 1.73:1 on panel */
   --color-border-strong: #7e7b75; /* 3.59:1 on raised */
 
   --color-accent: #e9e6df;
@@ -382,6 +442,7 @@
   --color-scrim: rgb(6 6 5 / 0.68);
   --color-skeleton: #262421;
   --color-skeleton-sheen: rgb(233 230 223 / 0.08);
+  --color-chart-emphasis: rgb(233 230 223 / 0.07);
 
   --color-focus: #75b8fc;
   --color-focus-gap: #12110f;

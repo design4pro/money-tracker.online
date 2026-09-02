@@ -28,9 +28,15 @@ import type { Locale } from './locales'
  */
 
 /** The date styles the product uses. */
-export type DateStyle = 'short' | 'medium' | 'long' | 'full'
+export type DateStyle = 'day' | 'short' | 'medium' | 'long' | 'full'
 
 const DATE_OPTIONS: Readonly<Record<DateStyle, Intl.DateTimeFormatOptions>> = {
+  /**
+   * `31` — the day of the month alone, for a column that already sits under a
+   * heading naming the month. Narrow enough to survive a 360px ledger, which a
+   * ten-character `short` date is not.
+   */
+  day: { day: 'numeric' },
   /** `31/12/2025` — dense tables and chart axes. */
   short: { year: 'numeric', month: '2-digit', day: '2-digit' },
   /** `31 Dec 2025` — transaction rows, where the month must not be misread. */

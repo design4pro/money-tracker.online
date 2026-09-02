@@ -29,6 +29,16 @@ import type { CashFlowBucket } from './types'
  *
  * The buckets come from the period, not from the transactions, so a month with nothing in it is a
  * visible zero rather than a month the axis silently skips.
+ *
+ * ## A single month is drawn against the months before it
+ *
+ * When the period resolves to one bucket the loader sends the trailing months with it, marked
+ * `inPeriod: false`. Two bars alone in an empty plot answer "how much" and cannot answer "is that
+ * a lot" — which is the only question anyone brings to this panel. The selected month is
+ * **promoted** rather than the context dimmed: a recessed band behind it, its axis label at the
+ * primary ink and a heavier weight, and a sentence under the legend saying which month the panel
+ * is about. Dimming the context bars to a third would have been the cheaper drawing and would have
+ * put real data below the 3:1 floor a graphical object is held to.
  */
 export interface CashFlowWidgetProps {
   readonly baseCurrencyCode: CurrencyCode
@@ -79,6 +89,10 @@ export function CashFlowWidget({
     },
   ]
 
+  const emphasis = buckets.map((bucket) => bucket.inPeriod)
+  const context = buckets.filter((bucket) => !bucket.inPeriod).length > 0
+  const selected = buckets.find((bucket) => bucket.inPeriod)
+
   return (
     <BarChart
       locale={locale}
@@ -87,6 +101,14 @@ export function CashFlowWidget({
       copy={copy}
       layout="grouped"
       height={220}
+      emphasis={emphasis}
+      footnote={
+        context && selected !== undefined
+          ? t('dashboard.cashFlow.context', {
+              month: monthLabel(locale, selected.key),
+            })
+          : undefined
+      }
     />
   )
 }

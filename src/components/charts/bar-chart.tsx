@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { focusRing } from '#/components/ui'
 import { cn } from '#/lib/cn'
-import { asMinor, sumMinor } from '#/lib/money'
+import { asMinor, currencySymbol, sumMinor } from '#/lib/money'
 
 import { XAxis, YAxis } from './axis'
 import { ChartFrame } from './chart-frame'
@@ -14,6 +14,7 @@ import { readingsOf } from './readings'
 import { bandLayout, linearProjector, niceDomain, ticksFor } from './scales'
 import { useRovingFocus } from './use-roving-focus'
 
+import type { ReactNode } from 'react'
 import type { BandLayout } from './scales'
 import type { ChartCopy, ChartSeries } from './types'
 import type { Locale } from '#/lib/i18n'
@@ -37,9 +38,21 @@ import type { CurrencyCode, Minor } from '#/lib/money'
  * looking at the segment's share of the column.
  */
 
-const AXIS_GUTTER = 62
+/**
+ * The gutter the y-axis labels sit in.
+ *
+ * 50 rather than 62 because the ticks no longer carry a fraction (`chartAxisAmount`): `12 000` is
+ * four glyphs narrower than `12 000,00`, and the twelve pixels go to the plot, where they are
+ * bar width instead of trailing zeroes.
+ */
+const AXIS_GUTTER = 50
 const RIGHT_GUTTER = 14
-const TOP_GUTTER = 14
+/**
+ * Headroom above the top gridline. 22 rather than 14 because the y axis now states its unit in
+ * that space (`YAxis`'s `unit`), and a label drawn above the plot needs its own line rather than
+ * the 11px of slack a bar needed.
+ */
+const TOP_GUTTER = 22
 const LABEL_GUTTER = 26
 
 export interface BarChartProps {
@@ -56,6 +69,20 @@ export interface BarChartProps {
   readonly totalLabel?: string
   readonly height?: number
   readonly showLegend?: boolean
+  /**
+   * Which categories the chart is *about*, when it also draws categories that are only context —
+   * one flag per category, in the spine's order. Omitted, or all `true`, and nothing is marked.
+   *
+   * The marked categories get a recessed band behind them **and** their axis label at the primary
+   * ink and a heavier weight. Two channels, deliberately: the band alone is a ground change of
+   * about 1.05:1 in light, which is a hint rather than information, and de-emphasising the context
+   * instead — the obvious alternative — would push a real bar and a real axis label below the 3:1
+   * and 7:1 floors those two things are held to. Nothing is dimmed here; the marked thing is
+   * promoted instead.
+   */
+  readonly emphasis?: ReadonlyArray<boolean>
+  /** A note under the legend. The place to say what the context categories are. */
+  readonly footnote?: ReactNode
   readonly className?: string
 }
 
@@ -68,6 +95,8 @@ export function BarChart({
   totalLabel,
   height = 240,
   showLegend = true,
+  emphasis,
+  footnote,
   className,
 }: BarChartProps) {
   const [readout, setReadout] = useState<string | null>(null)
@@ -98,6 +127,10 @@ export function BarChart({
         )
   const domain = niceDomain(domainValues, { baseline: 'zero' })
   const ticks = ticksFor(domain, 4)
+  // Nothing to mark when every category is marked: an emphasis that covers the whole plot is a
+  // band behind the whole plot, which says nothing and costs a ground change.
+  const marked =
+    emphasis === undefined || emphasis.every(Boolean) ? undefined : emphasis
 
   return (
     <ChartFrame
@@ -106,6 +139,7 @@ export function BarChart({
       isEmpty={isEmpty}
       className={className}
       readout={readout ?? ''}
+      footnote={footnote}
       legend={
         showLegend && !isEmpty ? (
           <ChartLegend
@@ -164,6 +198,33 @@ export function BarChart({
         return (
           <>
             {patterns.defs}
+            {marked === undefined
+              ? null
+              : marked.map((isMarked, index) =>
+                  !isMarked ? null : (
+                    <rect
+                      key={spine[index]?.key ?? index}
+                      aria-hidden="true"
+                      // Centred on the band and squared to the plot: the two bars of a grouped
+                      // category fill `[at, at + band]` exactly, so half the inter-band gap on
+                      // each side is the only padding that keeps the highlight symmetrical
+                      // whatever `paddingInner` is set to. Fractions of the *bandwidth* — what
+                      // this used to use — are symmetrical only by coincidence and drift the
+                      // moment the padding changes.
+                      x={
+                        plot.left + band.at(index) - (band.step - band.band) / 2
+                      }
+                      width={band.band + (band.step - band.band)}
+                      // Top of the domain to the axis, and not a pixel past either. It used to
+                      // start half a gutter *above* the top gridline and end at the baseline,
+                      // which read as a box whose top edge claimed a value no bar reached.
+                      y={plot.top}
+                      height={plot.bottom - plot.top}
+                      rx={4}
+                      className="fill-chart-emphasis"
+                    />
+                  ),
+                )}
             <YAxis
               plot={plot}
               ticks={ticks}
@@ -176,12 +237,14 @@ export function BarChart({
                 )
               }
               showZeroRule={domain[0] < 0}
+              unit={currencySymbol(currencyCode)}
             />
             <XAxis
               plot={plot}
               labels={spine.map((point) => point.label)}
               centre={(index) => plot.left + band.centre(index)}
               maxLabels={Math.max(2, Math.floor((plot.right - plot.left) / 64))}
+              emphasis={marked}
             />
             {isEmpty
               ? null

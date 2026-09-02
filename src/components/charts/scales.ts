@@ -78,9 +78,31 @@ export function niceDomain(
   return [niceLow, niceHigh]
 }
 
-/** The round values a gridline should be drawn at, inside `domain`. */
+/**
+ * The round values a gridline should be drawn at, inside `domain` — **at most `count` intervals**.
+ *
+ * `d3.ticks` treats its count as a hint and rounds the step to the nearest 1/2/5, so a 0–12 000
+ * domain asked for four ticks answers with seven. Seven gridlines behind two bars is a plot that
+ * reads as ruled paper: the lines stop being a scale and start being texture, and each one costs a
+ * label on the axis gutter. Thinning at an even stride keeps every drawn line on the same round
+ * step and keeps the **top** of the domain, which is the one line the eye uses to judge how full a
+ * bar is; the zero line is kept too when the stride would otherwise drop it.
+ */
 export function ticksFor(domain: Domain, count = 4): ReadonlyArray<number> {
-  return scaleLinear().domain([domain[0], domain[1]]).ticks(count)
+  const all = scaleLinear().domain([domain[0], domain[1]]).ticks(count)
+  if (all.length <= count + 1 || count < 1) {
+    return all
+  }
+
+  const stride = Math.ceil((all.length - 1) / count)
+  const kept: Array<number> = []
+  for (let index = all.length - 1; index >= 0; index -= stride) {
+    kept.unshift(all[index])
+  }
+  if (kept[0] !== all[0]) {
+    kept.unshift(all[0])
+  }
+  return kept
 }
 
 /**
@@ -118,6 +140,14 @@ export interface BandLayout {
  * `paddingInner` is the share of a step given to the gap between two bands. At the default the
  * bars stay visibly separate down to about twenty categories, past which a bar chart is the wrong
  * form anyway.
+ *
+ * **The outer margin is half the inner gap, and that ratio is load-bearing.** With no outer
+ * padding the first band starts on the y-axis rule and the last one ends on the plot's right
+ * edge, so anything drawn *around* a band — the highlight the bar chart puts behind a selected
+ * category, which pads by half a gap on each side to stay centred on the bars — spills out of the
+ * plot on the first and last category and reads as a box that is off-centre. At exactly
+ * `paddingInner / 2` the step becomes `width / count` and that highlight lands flush with the
+ * plot's own edges instead, with no clamping and no per-category special case.
  */
 export function bandLayout(
   count: number,
@@ -129,6 +159,7 @@ export function bandLayout(
     .domain(indices)
     .range([0, width])
     .paddingInner(paddingInner)
+    .paddingOuter(paddingInner / 2)
 
   const at = (index: number): number => scale(index) ?? 0
   return {

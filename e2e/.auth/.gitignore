@@ -1,0 +1,4 @@
+# Live session cookies for the e2e fixtures, minted by `auth.setup.ts` on every run.
+# They are credentials, and they are regenerated, so they are never committed.
+*
+!.gitignore

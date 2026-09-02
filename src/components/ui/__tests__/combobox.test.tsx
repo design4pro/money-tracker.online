@@ -6,7 +6,12 @@ import { ComboBox, ComboBoxItem } from '../combobox'
 
 function Example(props: Record<string, unknown> = {}) {
   return (
-    <ComboBox label="Payee" emptyState="No matching payees." {...props}>
+    <ComboBox
+      label="Payee"
+      toggleLabel="Show suggestions"
+      emptyState="No matching payees."
+      {...props}
+    >
       <ComboBoxItem id="biedronka">Biedronka</ComboBoxItem>
       <ComboBoxItem id="lidl">Lidl</ComboBoxItem>
       <ComboBoxItem id="orlen">Orlen</ComboBoxItem>

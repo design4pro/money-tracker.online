@@ -19,7 +19,11 @@ import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-pas
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
 import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
+import { Route as AppCategoriesIndexRouteImport } from './routes/_app/categories/index'
 import { Route as AppDashboardIndexRouteImport } from './routes/_app/dashboard/index'
+import { Route as AppPayeesIndexRouteImport } from './routes/_app/payees/index'
+import { Route as AppPayeesPayeeIdRouteImport } from './routes/_app/payees/$payeeId'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppTransactionsIndexRouteImport } from './routes/_app/transactions/index'
 import { Route as AppTransactionsTransactionIdRouteImport } from './routes/_app/transactions/$transactionId'
 import { Route as AppTransactionsNewRouteImport } from './routes/_app/transactions/new'
@@ -74,9 +78,29 @@ const AppAccountsAccountIdRoute = AppAccountsAccountIdRouteImport.update({
   path: '/accounts/$accountId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCategoriesIndexRoute = AppCategoriesIndexRouteImport.update({
+  id: '/categories/',
+  path: '/categories/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardIndexRoute = AppDashboardIndexRouteImport.update({
   id: '/dashboard/',
   path: '/dashboard/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPayeesIndexRoute = AppPayeesIndexRouteImport.update({
+  id: '/payees/',
+  path: '/payees/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPayeesPayeeIdRoute = AppPayeesPayeeIdRouteImport.update({
+  id: '/payees/$payeeId',
+  path: '/payees/$payeeId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppTransactionsIndexRoute = AppTransactionsIndexRouteImport.update({
@@ -114,12 +138,16 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/transactions/new': typeof AppTransactionsNewRoute
   '/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/accounts/': typeof AppAccountsIndexRoute
+  '/categories/': typeof AppCategoriesIndexRoute
   '/dashboard/': typeof AppDashboardIndexRoute
+  '/payees/': typeof AppPayeesIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
   '/transactions/': typeof AppTransactionsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -130,12 +158,16 @@ export interface FileRoutesByTo {
   '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/transactions/new': typeof AppTransactionsNewRoute
   '/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/accounts': typeof AppAccountsIndexRoute
+  '/categories': typeof AppCategoriesIndexRoute
   '/dashboard': typeof AppDashboardIndexRoute
+  '/payees': typeof AppPayeesIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
   '/transactions': typeof AppTransactionsIndexRoute
 }
 export interface FileRoutesById {
@@ -149,12 +181,16 @@ export interface FileRoutesById {
   '/(auth)/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
   '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/_app/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/_app/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/_app/transactions/new': typeof AppTransactionsNewRoute
   '/_app/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
+  '/_app/categories/': typeof AppCategoriesIndexRoute
   '/_app/dashboard/': typeof AppDashboardIndexRoute
+  '/_app/payees/': typeof AppPayeesIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/transactions/': typeof AppTransactionsIndexRoute
 }
 export interface FileRouteTypes {
@@ -167,12 +203,16 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/api/health'
     | '/accounts/$accountId'
+    | '/payees/$payeeId'
     | '/transactions/$transactionId'
     | '/transactions/new'
     | '/transactions/planned'
     | '/api/auth/$'
     | '/accounts/'
+    | '/categories/'
     | '/dashboard/'
+    | '/payees/'
+    | '/settings/'
     | '/transactions/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -183,12 +223,16 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/api/health'
     | '/accounts/$accountId'
+    | '/payees/$payeeId'
     | '/transactions/$transactionId'
     | '/transactions/new'
     | '/transactions/planned'
     | '/api/auth/$'
     | '/accounts'
+    | '/categories'
     | '/dashboard'
+    | '/payees'
+    | '/settings'
     | '/transactions'
   id:
     | '__root__'
@@ -201,12 +245,16 @@ export interface FileRouteTypes {
     | '/(auth)/reset-password'
     | '/api/health'
     | '/_app/accounts/$accountId'
+    | '/_app/payees/$payeeId'
     | '/_app/transactions/$transactionId'
     | '/_app/transactions/new'
     | '/_app/transactions/planned'
     | '/api/auth/$'
     | '/_app/accounts/'
+    | '/_app/categories/'
     | '/_app/dashboard/'
+    | '/_app/payees/'
+    | '/_app/settings/'
     | '/_app/transactions/'
   fileRoutesById: FileRoutesById
 }
@@ -290,11 +338,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsAccountIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/categories/': {
+      id: '/_app/categories/'
+      path: '/categories'
+      fullPath: '/categories/'
+      preLoaderRoute: typeof AppCategoriesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard/': {
       id: '/_app/dashboard/'
       path: '/dashboard'
       fullPath: '/dashboard/'
       preLoaderRoute: typeof AppDashboardIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/payees/': {
+      id: '/_app/payees/'
+      path: '/payees'
+      fullPath: '/payees/'
+      preLoaderRoute: typeof AppPayeesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/payees/$payeeId': {
+      id: '/_app/payees/$payeeId'
+      path: '/payees/$payeeId'
+      fullPath: '/payees/$payeeId'
+      preLoaderRoute: typeof AppPayeesPayeeIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/transactions/': {
@@ -355,21 +431,29 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
+  AppPayeesPayeeIdRoute: typeof AppPayeesPayeeIdRoute
   AppTransactionsTransactionIdRoute: typeof AppTransactionsTransactionIdRoute
   AppTransactionsNewRoute: typeof AppTransactionsNewRoute
   AppTransactionsPlannedRoute: typeof AppTransactionsPlannedRoute
   AppAccountsIndexRoute: typeof AppAccountsIndexRoute
+  AppCategoriesIndexRoute: typeof AppCategoriesIndexRoute
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
+  AppPayeesIndexRoute: typeof AppPayeesIndexRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppTransactionsIndexRoute: typeof AppTransactionsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,
+  AppPayeesPayeeIdRoute: AppPayeesPayeeIdRoute,
   AppTransactionsTransactionIdRoute: AppTransactionsTransactionIdRoute,
   AppTransactionsNewRoute: AppTransactionsNewRoute,
   AppTransactionsPlannedRoute: AppTransactionsPlannedRoute,
   AppAccountsIndexRoute: AppAccountsIndexRoute,
+  AppCategoriesIndexRoute: AppCategoriesIndexRoute,
   AppDashboardIndexRoute: AppDashboardIndexRoute,
+  AppPayeesIndexRoute: AppPayeesIndexRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppTransactionsIndexRoute: AppTransactionsIndexRoute,
 }
 

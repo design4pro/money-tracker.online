@@ -3,6 +3,7 @@ import { BottomNav, SidebarNav } from '#/components/app/nav'
 import { useTranslate } from '#/lib/i18n'
 import { AppHeader } from './app-header'
 import { Wordmark } from './brand-mark'
+import { WorkspaceSwitcher } from './workspace-switcher'
 import { MAIN_CONTENT_ID } from './main-content'
 
 import type { ReactNode } from 'react'
@@ -22,7 +23,8 @@ export interface AppShellProps {
  *
  * Below 1024px there is no rail at all: the header carries identity, the bottom bar carries
  * navigation, and the content well runs edge to edge with 16px of padding. At 1024px and above a
- * 248px rail appears, the bottom bar disappears, and the content well takes the remaining width up
+ * 220px rail appears carrying the destinations *and* the household, the bottom bar disappears, the
+ * header is left with the viewer's own controls, and the content well takes the remaining width up
  * to 1280px. The two are separate compositions that happen to share components — a rail collapsed
  * to icons on a phone would put nine 44px targets down the side of a 360px screen and leave 200px
  * for a ledger row.
@@ -53,16 +55,33 @@ export function AppShell({ shell, pathname, children }: AppShellProps) {
     <div className="min-h-dvh bg-canvas">
       {/* The rail. `aria-hidden` is deliberately absent below `lg`: it is `display: none` there, so
           it is out of the accessibility tree already, and the bottom bar carries the same links. */}
-      <div className="fixed inset-y-0 start-0 z-nav hidden w-62 flex-col border-e border-border-subtle bg-surface-sunken lg:flex">
+      <div className="fixed inset-y-0 start-0 z-nav hidden w-55 flex-col border-e border-border-subtle bg-surface-sunken lg:flex">
         <div className="flex h-16 shrink-0 items-center px-5">
           <Wordmark name={t('app.name')} />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-8 focus-safe">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 focus-safe">
           <SidebarNav pathname={pathname} />
+        </div>
+
+        {/*
+          The household, pinned to the foot of the rail.
+
+          It used to sit in the top bar, where it was the first thing on the line and took the
+          first fixation from the page's own `<h1>` — two identities competing for the same
+          opening, and the one that never changes winning. Down here it is where a reader looks
+          for "which account am I in", it fills the rail's own dead space, and the top bar is left
+          with the three controls that genuinely belong to the *viewer* rather than to the screen.
+
+          Below `lg` the rail is `display: none`, so `AppHeader` keeps drawing the switcher there
+          — the same component, one instance visible at a time, which is the arrangement the rail
+          and the bottom bar already use for navigation.
+        */}
+        <div className="shrink-0 border-t border-border-subtle p-3">
+          <WorkspaceSwitcher shell={shell} />
         </div>
       </div>
 
-      <div className="flex min-h-dvh flex-col lg:ps-62">
+      <div className="flex min-h-dvh flex-col lg:ps-55">
         <AppHeader shell={shell} />
 
         <main
@@ -108,14 +127,14 @@ export function AppShellFallback({ children }: AppShellFallbackProps) {
     <div className="min-h-dvh bg-canvas">
       <div
         aria-hidden="true"
-        className="fixed inset-y-0 start-0 z-nav hidden w-62 flex-col border-e border-border-subtle bg-surface-sunken lg:flex"
+        className="fixed inset-y-0 start-0 z-nav hidden w-55 flex-col border-e border-border-subtle bg-surface-sunken lg:flex"
       >
         <div className="flex h-16 shrink-0 items-center px-5">
           <Wordmark name={t('app.name')} />
         </div>
       </div>
 
-      <div className="flex min-h-dvh flex-col lg:ps-62">
+      <div className="flex min-h-dvh flex-col lg:ps-55">
         <div
           aria-hidden="true"
           className="sticky top-0 z-nav h-16 shrink-0 border-b border-border-subtle bg-canvas"

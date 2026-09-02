@@ -25,8 +25,13 @@ import type { LedgerRow, LedgerSort } from './types'
  * Hiding a column below a breakpoint was the obvious alternative and is the wrong one: a column
  * removed by CSS is removed from the accessibility tree too, so `aria-colcount` and the roving
  * tab stop would have to be recomputed from a media query and would disagree with the server-
- * rendered markup for one frame. The account and the category live on the description cell's
- * second line instead — which is what `DESIGN.md`'s ledger row asks for anyway.
+ * rendered markup for one frame. The account and the category live inside the description cell
+ * instead — which is what `DESIGN.md`'s ledger row asks for anyway.
+ *
+ * From `lg` up they are still inside that one cell, but laid on two fixed tracks of a CSS grid so
+ * they read as columns and line up under their own headings. That is a drawing decision taken
+ * entirely in CSS: the DOM, `aria-colcount` and the keyboard map do not know it happened, which is
+ * exactly why it is safe.
  */
 export const COLUMN_INDEX = {
   select: 0,
@@ -48,8 +53,30 @@ export const HEADER_ROW = 0
  * it costs a `ResizeObserver` per visible row plus a scroll-position correction every time one
  * settles. A fixed height also makes the scrollbar honest at ten thousand rows, which a measured
  * list only becomes after the reader has scrolled past everything once.
+ *
+ * It was 72px, which is the tallest case (a two-line row on a phone) plus 30px of nothing. Because
+ * the cells were also top-padded and baseline-aligned, that slack all fell *below* the type: every
+ * amount sat in the top 40% of its own band and a 900px desktop viewport held five transactions out
+ * of six hundred. 56px is the same worst case — a 20px title over a 20px meta line, or a 20px
+ * amount over its 16px converted equivalent — with symmetric air around it, and the cells now
+ * centre in it rather than hanging from the top. That is a third more of the ledger per screen at
+ * exactly the same type size.
  */
-export const ROW_HEIGHT_PX = 72
+export const ROW_HEIGHT_PX = 56
+
+/**
+ * The day heading that opens each group, in the same fixed-height arithmetic.
+ *
+ * The heading is not a row of the grid — it is drawn inside the first virtual item of its day — so
+ * the item that carries one is this much taller and {@link virtualItemHeight} is what the
+ * virtualiser is told.
+ */
+export const DAY_HEADER_HEIGHT_PX = 36
+
+/** How tall the virtual item at an index is: a row, plus the day heading when it opens one. */
+export function virtualItemHeight(opensDay: boolean): number {
+  return opensDay ? ROW_HEIGHT_PX + DAY_HEADER_HEIGHT_PX : ROW_HEIGHT_PX
+}
 
 /** How many rows a Page Up / Page Down moves. */
 const PAGE_ROWS = 10

@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { TransactionsEmpty } from '#/components/app/transactions'
+import {
+  KeyboardShortcuts,
+  TransactionsEmpty,
+} from '#/components/app/transactions'
 import { useTranslate } from '#/lib/i18n'
 
 import { transactionSearchSchema } from './-lib/filters'
@@ -50,17 +53,16 @@ function TransactionsIndexRoute() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
+      {/*
+        The keyboard contract used to be printed here as a subtitle, which spent the best line on
+        the page on reference material. It now lives behind the `?` beside the heading — a button,
+        and the `?` key — so it is still one gesture away and no longer in front of the ledger.
+      */}
+      <header className="flex items-center gap-1">
         <h1 className="text-title font-semibold text-ink">
           {t('transactions.title')}
         </h1>
-        {/*
-          The keyboard contract, written down where somebody can find it. A grid whose shortcuts are
-          only discoverable by pressing keys at random is a grid with no shortcuts.
-        */}
-        <p className="text-caption text-ink-2">
-          {t('transactions.keyboard.hint')}
-        </p>
+        <KeyboardShortcuts />
       </header>
 
       <TransactionsScreen

@@ -40,6 +40,15 @@ const PROPER_NOUNS: ReadonlyArray<string> = [
   // Polish uses the same word for the noun. `action.import` is the verb and is
   // `Importuj`, which is why only this one is listed.
   'nav.import',
+  // Key caps, not copy. A shortcut sheet has to print what is engraved on the
+  // key the reader is being asked to press, and a Polish keyboard is engraved
+  // `Enter`, `Delete`, `E` and `D`. The rest of the sheet — `Strzałki`,
+  // `Spacja`, and every action beside it — is translated, which is why only
+  // these four are here.
+  'transactions.keyboard.keys.enter',
+  'transactions.keyboard.keys.delete',
+  'transactions.keyboard.keys.edit',
+  'transactions.keyboard.keys.duplicate',
 ]
 
 const TOKEN = /\{([A-Za-z0-9_]+)\}/g

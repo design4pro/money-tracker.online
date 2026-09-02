@@ -74,14 +74,26 @@ export interface SocialProvidersProps {
 }
 
 /**
- * The "continue with…" block, under a labelled rule.
+ * The "continue with…" block, above a labelled rule.
  *
  * ## Ordering
  *
- * Below the password form, never above it. This product's own credentials are its primary path;
- * a reader who has an account here should not have to look past two provider buttons to find the
- * field they came for. The rule between them is a real `role="separator"` carrying the word "or",
- * so the alternative is announced as an alternative rather than as a stray syllable.
+ * Above the password form, and it used to be below it. The old argument was that a returning reader
+ * should not have to look past two provider buttons to reach the field they came for. That reading
+ * optimises for the reader who is already an account holder *and* signed up with a password — and
+ * it costs the first-run reader the fastest path on the screen, who has to read the whole form
+ * before discovering they never needed to fill it in. One-tap first, credentials under the rule.
+ *
+ * The rule between the two is a real `role="separator"` carrying the word "or", so the alternative
+ * is announced as an alternative rather than as a stray syllable, and it interrupts the hairline
+ * rather than sitting on top of it.
+ *
+ * ## The labels share a left edge
+ *
+ * `justify-start`, not the button's centred default. Centring an icon-plus-label pair as a group
+ * centres the *pair*, so a stack of providers whose names differ in length has a different left
+ * edge on every row. Pinning the icon to the padding gives the marks one left edge and the words
+ * another, which is the only arrangement that survives a third provider being configured.
  *
  * ## Pending is per button
  *
@@ -117,12 +129,13 @@ export function SocialProviders({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Separator>{t('auth.continueWith')}</Separator>
-
+    // 32px between the provider stack and the rule, and the caller sets the same 32px between the
+    // rule and the first field, so the "or" sits in a symmetrical band rather than drifting towards
+    // whichever neighbour happened to own the larger margin.
+    <div className="flex flex-col gap-8">
       {failure === null ? null : <FormError message={failure} />}
 
-      <div className="flex flex-col gap-2.5">
+      <div className="grid gap-2.5">
         {providers.map((provider) => {
           const Mark = PROVIDER_MARK[provider]
           return (
@@ -131,6 +144,7 @@ export function SocialProviders({
               variant="secondary"
               size="lg"
               block
+              className="justify-start"
               icon={<Mark />}
               isPending={pending === provider}
               isDisabled={pending !== null && pending !== provider}
@@ -141,6 +155,8 @@ export function SocialProviders({
           )
         })}
       </div>
+
+      <Separator>{t('auth.continueWith')}</Separator>
     </div>
   )
 }

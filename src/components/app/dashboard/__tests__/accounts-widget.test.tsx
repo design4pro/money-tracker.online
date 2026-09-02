@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import { drawn, reading } from '#/components/app/money/__tests__/channels'
 import { plain } from '#/components/charts/__tests__/plain'
 import { asCurrencyCode, asMinor } from '#/lib/money'
 
@@ -69,10 +70,13 @@ describe('AccountsWidget', () => {
     const rows = screen.getAllByRole('listitem')
     expect(within(rows[0]).queryByText('Owed')).toBeNull()
     expect(within(rows[1]).getByText('Owed')).toBeTruthy()
-    // The sign is the second non-colour channel, and it is whichever minus this locale uses —
-    // `en` writes a hyphen-minus, `pl` a U+2212 — so it comes from the formatter, never from a
-    // string this file composed.
-    expect(plain(rows[1].textContent)).toContain('-zł 890.50')
+    // The sign is the second non-colour channel. It is U+2212 in every locale, because the
+    // formatter normalises it — `en` and `pl` both hand out a hyphen and a ledger column set in
+    // one and a balance set in the other stopped matching.
+    expect(drawn(rows[1])).toContain('\u2212zł 890.50')
+    // Spoken, the same fact is a word, since U+2212 is announced as nothing at all by several
+    // screen readers.
+    expect(reading(rows[1])).toContain('negative 890.50 Polish zlotys')
   })
 
   it('offers a way to all of them', async () => {

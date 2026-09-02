@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CalendarClock } from 'lucide-react'
 
+import { KeyboardShortcuts } from '#/components/app/transactions'
 import { EmptyState } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
@@ -48,9 +49,12 @@ function PlannedTransactionsRoute() {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="text-title font-semibold text-ink">
-          {t('transactions.planned.title')}
-        </h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-title font-semibold text-ink">
+            {t('transactions.planned.title')}
+          </h1>
+          <KeyboardShortcuts />
+        </div>
         <p className="max-w-prose text-caption text-ink-2">
           {t('transactions.planned.subtitle')}
         </p>

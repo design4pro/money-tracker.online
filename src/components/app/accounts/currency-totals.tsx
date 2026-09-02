@@ -107,8 +107,10 @@ export function CurrencyTotalsCard({
             <dt className="min-w-0">
               <span className="text-label font-medium text-ink">
                 {total.currencyCode}
-              </span>
-              <span className="ms-2 text-caption text-ink-2">
+              </span>{' '}
+              {/* A real space, not only the margin: `ms-2` is CSS, and CSS is not
+                  in the accessibility tree — without it a reader hears "PLN3 accounts". */}
+              <span className="ms-1 text-caption text-ink-2">
                 {t('accounts.count', { count: total.accountCount })}
               </span>
             </dt>

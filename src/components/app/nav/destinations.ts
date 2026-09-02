@@ -1,12 +1,7 @@
 import {
   ArrowLeftRight,
-  CalendarClock,
-  ChartNoAxesCombined,
-  FileUp,
   LayoutDashboard,
-  PiggyBank,
   Settings,
-  Wallet,
   WalletMinimal,
 } from 'lucide-react'
 
@@ -16,16 +11,24 @@ import type { MessageKey } from '#/lib/i18n'
 /**
  * The product's destinations, in one table.
  *
- * The rail, the bottom bar and the overflow drawer all read this list, so the three of them cannot
- * disagree about what exists or what it is called — the failure mode being a route reachable from
- * a phone and invisible on a laptop.
+ * The rail and the bottom bar both read this list, so the two of them cannot disagree about what
+ * exists or what it is called — the failure mode being a route reachable from a phone and invisible
+ * on a laptop.
+ *
+ * ## Only routes that exist are listed
+ *
+ * This table earlier carried the whole eventual product — budgets, recurring, goals, reports,
+ * import — as anchors that resolved to nothing, on the theory that an honest 404 was better than a
+ * hidden feature. It is not: a reader cannot tell "not built" from "broken", and six of nine rows
+ * ending in the browser's error page reads as an application that has fallen over rather than one
+ * that is early. The rule now is the plain one — **a row exists here when its route exists** — and
+ * each later plan adds its own row in the same commit that adds its screen.
  *
  * `href` is a plain string and the navigation components render a real `<a>` rather than the
- * router's typed `Link`. That is a deliberate, temporary shape: these destinations are owned by
- * later plans and do not exist in `routeTree.gen.ts` yet, so a typed `Link` would not compile and a
- * cast to make it compile would only hide the same fact. A real anchor is honest — it resolves when
- * the route lands and 404s until then — and swapping one to a typed `Link` is a one-line change per
- * row once the route exists.
+ * router's typed `Link`, which costs a document load per navigation. That is not about these rows:
+ * `src/components/ui/link.tsx` routes through React Aria's `RouterProvider` and no provider is
+ * mounted in the app yet (see `src/components/app/dashboard/widget-link.tsx`, which says the same
+ * thing). When it is, these become typed links.
  */
 export interface Destination {
   /** Stable key. Used for React lists and for the switcher's selection state. */
@@ -36,24 +39,11 @@ export interface Destination {
   readonly Icon: ComponentType<{ className?: string }>
 }
 
-export interface NavSection {
-  readonly id: string
-  readonly label: MessageKey
-  readonly items: ReadonlyArray<Destination>
-}
-
 const DASHBOARD: Destination = {
   id: 'dashboard',
   href: '/dashboard',
   label: 'nav.dashboard',
   Icon: LayoutDashboard,
-}
-
-const TRANSACTIONS: Destination = {
-  id: 'transactions',
-  href: '/transactions',
-  label: 'nav.transactions',
-  Icon: ArrowLeftRight,
 }
 
 const ACCOUNTS: Destination = {
@@ -63,11 +53,11 @@ const ACCOUNTS: Destination = {
   Icon: WalletMinimal,
 }
 
-const BUDGETS: Destination = {
-  id: 'budgets',
-  href: '/budgets',
-  label: 'nav.budgets',
-  Icon: Wallet,
+const TRANSACTIONS: Destination = {
+  id: 'transactions',
+  href: '/transactions',
+  label: 'nav.transactions',
+  Icon: ArrowLeftRight,
 }
 
 export const SETTINGS: Destination = {
@@ -77,70 +67,23 @@ export const SETTINGS: Destination = {
   Icon: Settings,
 }
 
-/** The rail's groups. Three of them, because a flat list of nine is a list nobody scans. */
-export const NAV_SECTIONS: ReadonlyArray<NavSection> = [
-  {
-    id: 'money',
-    label: 'app.nav.section.money',
-    items: [DASHBOARD, ACCOUNTS, TRANSACTIONS],
-  },
-  {
-    id: 'plan',
-    label: 'app.nav.section.plan',
-    items: [
-      BUDGETS,
-      {
-        id: 'recurring',
-        href: '/recurring',
-        label: 'nav.recurring',
-        Icon: CalendarClock,
-      },
-      {
-        id: 'goals',
-        href: '/goals',
-        label: 'nav.goals',
-        Icon: PiggyBank,
-      },
-    ],
-  },
-  {
-    id: 'insight',
-    label: 'app.nav.section.insight',
-    items: [
-      {
-        id: 'reports',
-        href: '/reports',
-        label: 'nav.reports',
-        Icon: ChartNoAxesCombined,
-      },
-      {
-        id: 'import',
-        href: '/import',
-        label: 'nav.import',
-        Icon: FileUp,
-      },
-    ],
-  },
-]
-
 /**
- * The four tabs the bottom bar shows, plus a fifth "More" slot the bar adds itself.
+ * The product's screens, in reading order.
  *
- * Four rather than five destinations: at 360 px a five-tab bar leaves 72 px per tab, and a label
- * under an icon in that width truncates in Polish (`Płatności cykliczne`) before it truncates in
- * English — which is exactly the kind of layout that passes review in one language and ships broken
- * in the other. Four tabs plus overflow keeps every label whole in both.
+ * Settings is deliberately not one of them: it is the place a product is configured rather than a
+ * place money is looked at, and the rail sets it below a rule for that reason. Grouping headings
+ * ("Money", "Planning", "Insight") return when there are enough rows to need them again — over
+ * three links a heading is furniture, not structure.
  */
-export const BOTTOM_BAR_DESTINATIONS: ReadonlyArray<Destination> = [
+export const PRIMARY_DESTINATIONS: ReadonlyArray<Destination> = [
   DASHBOARD,
   ACCOUNTS,
   TRANSACTIONS,
-  BUDGETS,
 ]
 
-/** Every destination, flattened — what the overflow drawer lists. */
+/** Every destination, in the order both navigations draw them. */
 export const ALL_DESTINATIONS: ReadonlyArray<Destination> = [
-  ...NAV_SECTIONS.flatMap((section) => section.items),
+  ...PRIMARY_DESTINATIONS,
   SETTINGS,
 ]
 
@@ -151,12 +94,9 @@ export const ALL_DESTINATIONS: ReadonlyArray<Destination> = [
  * current destination. The boundary check (`/` or end of string) is what stops `/accounts` from
  * claiming `/accounts-archive`.
  */
-export function activeDestinationId(
-  pathname: string,
-  destinations: ReadonlyArray<Destination> = ALL_DESTINATIONS,
-): string | null {
+export function activeDestinationId(pathname: string): string | null {
   let best: Destination | null = null
-  for (const destination of destinations) {
+  for (const destination of ALL_DESTINATIONS) {
     const matches =
       pathname === destination.href ||
       pathname.startsWith(`${destination.href}/`)

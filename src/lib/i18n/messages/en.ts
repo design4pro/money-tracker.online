@@ -17,6 +17,15 @@ import type { MessageCatalogueSource } from '../types'
  * them and a sentence built by concatenation cannot have four.
  */
 const messages = {
+  /* -- The document itself ------------------------------------------------ */
+  // `<title>` and the description meta. They are catalogue keys rather than
+  // constants because the negotiated locale decides them: a Polish reader whose
+  // page is Polish must not be handed an English tab, an English share card or
+  // an English search result.
+  'meta.title': 'Money Tracker — know where your money goes',
+  'meta.description':
+    'A personal finance tracker for accounts, transactions, budgets, recurring bills and multi-currency reporting. Manual entry and file import only — no bank connectors, ever.',
+
   /* -- The shell ---------------------------------------------------------- */
   'app.name': 'Money Tracker',
   'app.tagline': 'Know where your money goes.',
@@ -274,6 +283,7 @@ const messages = {
   },
   'accounts.overview.excluded':
     'Archived accounts, and accounts left out of reports, are not in these figures.',
+  'accounts.overview.excluded.label': 'What these figures include',
   'accounts.byCurrency.title': 'Held by currency',
   'accounts.byCurrency.help':
     'Each currency is totalled in its own units. Nothing is converted here.',
@@ -309,6 +319,8 @@ const messages = {
   'accounts.detail.danger': 'Archiving and deleting',
   'accounts.credit.title': 'Credit used',
   'accounts.credit.valueText': '{used} of {limit} used, {percent}',
+  'accounts.credit.ofLimit': '{used} of {limit}',
+  'accounts.credit.percentUsed': '{percent} used',
   'accounts.credit.within': 'Within limit',
   'accounts.credit.approaching': 'Approaching limit',
   'accounts.credit.over': 'Over limit',
@@ -468,8 +480,23 @@ const messages = {
     one: 'Delete {count} transaction? This cannot be undone.',
     other: 'Delete {count} transactions? This cannot be undone.',
   },
-  'transactions.keyboard.hint':
-    'Arrow keys move between cells. E edits, D duplicates, Delete removes, Space selects, Enter opens.',
+  'transactions.keyboard.title': 'Keyboard shortcuts',
+  'transactions.keyboard.column.key': 'Key',
+  'transactions.keyboard.column.action': 'Action',
+  'transactions.keyboard.keys.arrows': 'Arrow keys',
+  'transactions.keyboard.keys.enter': 'Enter',
+  'transactions.keyboard.keys.space': 'Space',
+  'transactions.keyboard.keys.edit': 'E',
+  'transactions.keyboard.keys.duplicate': 'D',
+  'transactions.keyboard.keys.delete': 'Delete',
+  'transactions.keyboard.keys.help': '?',
+  'transactions.keyboard.move': 'Move between cells',
+  'transactions.keyboard.open': 'Open the transaction',
+  'transactions.keyboard.select': 'Select the row',
+  'transactions.keyboard.edit': 'Edit the transaction',
+  'transactions.keyboard.duplicate': 'Copy into a new entry',
+  'transactions.keyboard.remove': 'Delete the transaction',
+  'transactions.keyboard.help': 'Show this list',
 
   /* -- Transactions: filters ---------------------------------------------- */
   'transactions.filter.description':
@@ -479,6 +506,7 @@ const messages = {
   'transactions.filter.direction': 'Money in or out',
   'transactions.filter.accountGroup': 'Account group',
   'transactions.filter.dateRange': 'Date range',
+  'transactions.filter.anyDate': 'Any date',
   'transactions.filter.openCalendar': 'Open calendar',
   'transactions.filter.amountRange': 'Amount range',
   'transactions.filter.amountMin': 'At least',
@@ -557,6 +585,150 @@ const messages = {
   'transactions.planned.empty.title': 'Nothing planned',
   'transactions.planned.empty.body':
     'Record a transaction with a future date and mark it planned to see it here.',
+  /* -- Colours (the eight measured category hues) ------------------------- */
+  'colour.blue': 'Blue',
+  'colour.teal': 'Teal',
+  'colour.green': 'Green',
+  'colour.olive': 'Olive',
+  'colour.gold': 'Gold',
+  'colour.orange': 'Orange',
+  'colour.crimson': 'Crimson',
+  'colour.violet': 'Violet',
+
+  /* -- Categories --------------------------------------------------------- */
+  'categories.title': 'Categories',
+  'categories.subtitle':
+    'The vocabulary your spending is grouped by. Two levels deep, in whatever order suits you.',
+  'categories.create': 'Add a category',
+  'categories.createChild': 'Add a subcategory',
+  'categories.edit': 'Edit category',
+  'categories.loading': 'Loading categories',
+  'categories.tree.label': 'Categories, in display order',
+  'categories.tree.childOf': '{name}, inside {parent}',
+  'categories.actions.label': 'Actions for {name}',
+  'categories.drag.label': 'Reorder {name}',
+  'categories.badge.system': 'Built in',
+  'categories.kind.expense': 'Money out',
+  'categories.kind.income': 'Money in',
+  'categories.kind.both': 'Either way',
+  'categories.parent.none': 'Top level',
+  'categories.move.top': 'Move to top',
+  'categories.move.bottom': 'Move to bottom',
+  'categories.move.refused': 'That move was not made',
+  'categories.move.refused.body':
+    'Categories go two levels deep. A category that already holds subcategories cannot be filed inside another one.',
+  'categories.filter.showArchived': 'Show archived categories',
+  'categories.field.kind': 'Used for',
+  'categories.field.kind.help':
+    'Which side of the ledger this category is offered on.',
+  'categories.field.parent': 'Inside',
+  'categories.field.parent.help':
+    'Leave it at the top level, or file it under an existing category.',
+  'categories.field.colour.help':
+    'Shown as a dot beside the name, never as the row behind it.',
+  'categories.form.create.body':
+    'A name is all it needs. Everything else can change later.',
+  'categories.form.edit.body':
+    'Renaming a category renames it everywhere it has been used.',
+  'categories.form.error.title': 'The category was not saved',
+  'categories.error.title': 'Could not load your categories',
+  'categories.empty.title': 'No categories yet',
+  'categories.empty.body':
+    'A category is how a transaction answers "what was this for". Add the first one and the reports have something to group by.',
+  'categories.archive.title': 'Archive {name}?',
+  'categories.archive.body':
+    'It stops being offered on new transactions, and anything already filed under it keeps its label. Subcategories are archived with it. You can restore it at any time.',
+  'categories.delete.title': 'Delete {name}?',
+  'categories.delete.body':
+    'This cannot be undone. A category that has ever been used cannot be deleted — archive it instead.',
+  'categories.delete.refused': 'That category cannot be deleted',
+  'categories.delete.refused.body':
+    'It is already on transactions, and deleting it would leave them without a label. Archive it instead: it disappears from the pickers and keeps its history.',
+  'categories.toast.created': '{name} added.',
+  'categories.toast.updated': '{name} saved.',
+  'categories.toast.archived': '{name} archived.',
+  'categories.toast.restored': 'Category restored.',
+  'categories.toast.deleted': '{name} deleted.',
+
+  /* -- Payees ------------------------------------------------------------- */
+  'payees.title': 'Payees',
+  'payees.subtitle':
+    'Who you pay and who pays you, and the statement text that should match each one.',
+  'payees.create': 'Add a payee',
+  'payees.edit': 'Edit payee',
+  'payees.loading': 'Loading payees',
+  'payees.list.label': 'Payees',
+  'payees.actions.label': 'Actions for {name}',
+  'payees.search.label': 'Search payees',
+  'payees.search.placeholder': 'Part of a name',
+  'payees.error.title': 'Could not load your payees',
+  'payees.empty.title': 'No payees yet',
+  'payees.empty.body':
+    'A payee turns "ZABKA NANO 4471" on a statement into a name you recognise. Add the first one, or let an import create them for you.',
+  'payees.noMatches.title': 'Nothing matches that',
+  'payees.noMatches.body': 'Try a shorter piece of the name.',
+  'payees.defaultCategory.summary': 'Suggests {name}',
+  'payees.detail.back': 'Back to payees',
+  'payees.detail.noCategory': 'Suggests no category',
+  'payees.detail.notFound.title': 'That payee is not here',
+  'payees.detail.notFound.body':
+    'It may have been deleted or merged into another one, or the address may be wrong.',
+  'payees.field.name.help': 'The name you want to read in the ledger.',
+  'payees.field.defaultCategory': 'Suggested category',
+  'payees.field.defaultCategory.help':
+    'What a new transaction with this payee is filed under.',
+  'payees.field.mode': 'How firmly to apply it',
+  'payees.field.logoDomain': 'Website',
+  'payees.field.logoDomain.help':
+    'A domain such as zabka.pl — not a full link.',
+  'payees.mode.off': 'Suggest nothing',
+  'payees.mode.off.help': 'This payee never touches the category field.',
+  'payees.mode.hint': 'Pre-fill it',
+  'payees.mode.hint.help':
+    'New transactions start with the suggested category, and you can change it.',
+  'payees.mode.enforce': 'Always use it',
+  'payees.mode.enforce.help':
+    'New transactions take the suggested category, and saving this re-files the ones already recorded under this payee.',
+  'payees.form.create.body':
+    'A name is all it needs. The suggestion settings can wait.',
+  'payees.form.edit.body':
+    'Renaming a payee renames it on every transaction it appears on.',
+  'payees.form.error.title': 'The payee was not saved',
+  'payees.aliases.title': 'Statement text',
+  'payees.aliases.body':
+    'The strings a bank uses for this payee. Each one is stored in its matched form — lower case, without accents, and with reference numbers stripped — because that is what an import actually compares.',
+  'payees.aliases.count': {
+    one: '{count} alias',
+    other: '{count} aliases',
+  },
+  'payees.aliases.add': 'Add statement text',
+  'payees.aliases.add.help': 'Paste it exactly as it appears on the statement.',
+  'payees.aliases.added': 'Statement text added.',
+  'payees.aliases.remove': 'Remove {name}',
+  'payees.aliases.empty': 'Nothing but the payee’s own name matches it yet.',
+  'payees.aliases.failed': 'That text was not added',
+  'payees.ignored.title': 'Text that is never a payee',
+  'payees.ignored.body':
+    'Strings an import must not turn into a payee — "CARD PAYMENT", "SEPA DD" and anything else your bank writes on every line.',
+  'payees.ignored.add': 'Add text to ignore',
+  'payees.ignored.remove': 'Stop ignoring {name}',
+  'payees.ignored.empty': 'Nothing is being ignored.',
+  'payees.ignored.failed': 'That text was not added',
+  'payees.merge.action': 'Merge into another payee',
+  'payees.merge.title': 'Merge {name}',
+  'payees.merge.into': 'Keep this payee',
+  'payees.merge.body':
+    'Every transaction, alias and tag on {from} moves to {into}, and “{from}” is kept as statement text so future imports still match it. This cannot be undone.',
+  'payees.merge.noTargets': 'There is no other payee to merge into.',
+  'payees.merge.failed': 'The payees were not merged',
+  'payees.delete.title': 'Delete {name}?',
+  'payees.delete.body':
+    'This cannot be undone. Transactions keep their amounts and dates and simply lose the payee’s name.',
+  'payees.toast.created': '{name} added.',
+  'payees.toast.updated': '{name} saved.',
+  'payees.toast.deleted': '{name} deleted.',
+  'payees.toast.merged': '{from} merged into {into}.',
+
   /* -- Dashboard ---------------------------------------------------------- */
   'dashboard.title': 'Dashboard',
   'dashboard.greeting': 'Good to see you, {name}.',
@@ -600,6 +772,9 @@ const messages = {
   'dashboard.cashFlow.surplus': 'You kept {amount}',
   'dashboard.cashFlow.deficit': 'You spent {amount} more than came in',
   'dashboard.cashFlow.balanced': 'Money in and money out matched exactly',
+  'dashboard.cashFlow.shareOfIncome': '{share} of the {amount} that came in',
+  'dashboard.cashFlow.context':
+    'Selected period: {month}. Earlier months are context.',
   'dashboard.cashFlow.empty.title': 'No money moved in this period',
   'dashboard.cashFlow.empty.body':
     'Record a transaction, or pick a longer period.',
@@ -607,6 +782,7 @@ const messages = {
   'dashboard.spending.showOther': 'Show the smaller categories',
   'dashboard.spending.hideOther': 'Hide the smaller categories',
   'dashboard.spending.share': 'Share',
+  'dashboard.spending.uncategorised': 'Not categorised',
   'dashboard.spending.empty.title': 'No categorised spending yet',
   'dashboard.spending.empty.body':
     'Give an expense a category and its share of the period shows up here.',
@@ -647,6 +823,11 @@ const messages = {
   'money.exchangeRate.automatic': 'Updated daily',
   'money.convertedAt': 'Converted at {rate}',
   'money.amountIn': 'Amount in {currency}',
+  // The spoken form of a signed figure. The drawn form uses U+2212, which
+  // several screen readers announce as nothing at all, so the sign is a word
+  // here and the currency is named in full rather than by its symbol.
+  'money.spoken.negative': 'negative {amount}',
+  'money.spoken.positive': 'positive {amount}',
   'money.currency.search': 'Search currencies',
   'money.currency.zeroDecimal': 'This currency has no minor unit.',
 
@@ -710,6 +891,12 @@ const messages = {
 
   /* -- Accessibility ------------------------------------------------------ */
   'a11y.skipToContent': 'Skip to main content',
+  /*
+    The accessible name of a combo box's disclosure button. `components/ui` takes it as a prop
+    rather than translating it itself — the design system holds no catalogue — so every call site
+    passes this key. Its English default in `combobox.tsx` used to reach the Polish UI unchanged.
+  */
+  'a11y.showSuggestions': 'Show suggestions',
 
   /* -- Marketing (public pages) ------------------------------------------- */
   'marketing.nav.features': 'Features',
@@ -766,6 +953,25 @@ const messages = {
   'app.shell.pending': 'Loading this page…',
   'app.shell.error.body':
     'This part of the app did not load. Everything around it still works.',
+
+  /* -- Settings ----------------------------------------------------------- */
+  'settings.subtitle':
+    'How the product reads for you, and what this workspace holds. Each card says whose setting it is.',
+  'settings.scope.you': 'Yours alone',
+  'settings.scope.workspace': 'Shared with the workspace',
+  'settings.appearance.description':
+    'Light, dark, or whatever this device is set to. Kept on the device, so a phone and a laptop can differ.',
+  'settings.language.description':
+    'Every screen, label and date is written in this language. Choosing one reloads the page, because the server picks the words.',
+  'settings.account.title': 'Your account',
+  'settings.account.description': 'From the account you signed in with.',
+  'settings.workspace.description':
+    'The books everyone here shares. These two lists are what a transaction is filed against.',
+  'settings.workspace.name': 'Workspace name',
+  'settings.categories.description':
+    'The two-level tree every transaction is filed under.',
+  'settings.payees.description':
+    'Who the money went to, and the names an import should fold into them.',
 
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Every figure, down to the minor unit.',

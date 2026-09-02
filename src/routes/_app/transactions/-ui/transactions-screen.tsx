@@ -193,11 +193,6 @@ export function TransactionsScreen({
     [onSearchChange, search],
   )
 
-  const onFiltersChange = useCallback(
-    (next: LedgerFilters) => applyView(next, sort),
-    [applyView, sort],
-  )
-
   const onSortChange = useCallback(
     (next: LedgerSort) => applyView(filters, next),
     [applyView, filters],
@@ -271,9 +266,8 @@ export function TransactionsScreen({
   const bar = (
     <FilterBar
       filters={filters}
-      onFiltersChange={onFiltersChange}
       sort={sort}
-      onSortChange={onSortChange}
+      onViewChange={applyView}
       reference={reference}
       onCreate={goToNew}
     />

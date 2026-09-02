@@ -129,6 +129,20 @@ export function ChartFrame({
 
       {legend}
 
+      {/* A `div` rather than a `p`: a footnote is sometimes a disclosure with a button and a
+          list inside it, and a list inside a paragraph is invalid markup the browser silently
+          reparents, taking the styling with it.
+
+          It sits directly under the legend, and the readout goes last. A footnote explains a
+          *drawing* decision — which categories are context, what a gap means — so it belongs
+          with the key that explains the other drawing decisions. The readout is transient text
+          that appears only under a pointer or a focus ring, and it reserves a line whether or not
+          anything is focused: with the readout in between, a two-line explanation was left
+          floating three rows below the thing it explains, in card space that read as empty. */}
+      {footnote === undefined ? null : (
+        <div className="text-caption text-ink-2">{footnote}</div>
+      )}
+
       {readout === undefined ? null : (
         <p
           aria-hidden="true"
@@ -136,13 +150,6 @@ export function ChartFrame({
         >
           {readout}
         </p>
-      )}
-
-      {/* A `div` rather than a `p`: a footnote is sometimes a disclosure with a button and a
-          list inside it, and a list inside a paragraph is invalid markup the browser silently
-          reparents, taking the styling with it. */}
-      {footnote === undefined ? null : (
-        <div className="text-caption text-ink-2">{footnote}</div>
       )}
 
       {isEmpty ? null : dataTable}

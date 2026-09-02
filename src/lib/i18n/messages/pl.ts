@@ -25,6 +25,11 @@ import type { TranslationOf } from '../types'
  * which is the register a Polish product uses with an individual user.
  */
 const messages = {
+  /* -- Dokument ----------------------------------------------------------- */
+  'meta.title': 'Money Tracker — wiedz, dokąd trafiają Twoje pieniądze',
+  'meta.description':
+    'Osobisty menedżer finansów: konta, transakcje, budżety, płatności cykliczne i raportowanie wielowalutowe. Wyłącznie ręczne wprowadzanie danych i import plików — nigdy integracje bankowe.',
+
   /* -- The shell ---------------------------------------------------------- */
   'app.name': 'Money Tracker',
   'app.tagline': 'Wiedz, dokąd trafiają Twoje pieniądze.',
@@ -288,6 +293,7 @@ const messages = {
   },
   'accounts.overview.excluded':
     'Konta zarchiwizowane oraz pomijane w raportach nie wchodzą do tych kwot.',
+  'accounts.overview.excluded.label': 'Co obejmują te kwoty',
   'accounts.byCurrency.title': 'Środki według waluty',
   'accounts.byCurrency.help':
     'Każda waluta sumuje się we własnych jednostkach. Nic nie jest tu przeliczane.',
@@ -325,6 +331,8 @@ const messages = {
   'accounts.detail.danger': 'Archiwizacja i usuwanie',
   'accounts.credit.title': 'Wykorzystany limit',
   'accounts.credit.valueText': 'wykorzystano {used} z {limit}, czyli {percent}',
+  'accounts.credit.ofLimit': '{used} z {limit}',
+  'accounts.credit.percentUsed': 'wykorzystano {percent}',
   'accounts.credit.within': 'W granicach limitu',
   'accounts.credit.approaching': 'Limit na wyczerpaniu',
   'accounts.credit.over': 'Limit przekroczony',
@@ -494,8 +502,23 @@ const messages = {
     many: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
     other: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
   },
-  'transactions.keyboard.hint':
-    'Strzałki przenoszą między komórkami. E edytuje, D duplikuje, Delete usuwa, spacja zaznacza, Enter otwiera.',
+  'transactions.keyboard.title': 'Skróty klawiszowe',
+  'transactions.keyboard.column.key': 'Klawisz',
+  'transactions.keyboard.column.action': 'Działanie',
+  'transactions.keyboard.keys.arrows': 'Strzałki',
+  'transactions.keyboard.keys.enter': 'Enter',
+  'transactions.keyboard.keys.space': 'Spacja',
+  'transactions.keyboard.keys.edit': 'E',
+  'transactions.keyboard.keys.duplicate': 'D',
+  'transactions.keyboard.keys.delete': 'Delete',
+  'transactions.keyboard.keys.help': '?',
+  'transactions.keyboard.move': 'Przechodzenie między komórkami',
+  'transactions.keyboard.open': 'Otwarcie transakcji',
+  'transactions.keyboard.select': 'Zaznaczenie wiersza',
+  'transactions.keyboard.edit': 'Edycja transakcji',
+  'transactions.keyboard.duplicate': 'Skopiowanie do nowego wpisu',
+  'transactions.keyboard.remove': 'Usunięcie transakcji',
+  'transactions.keyboard.help': 'Wyświetlenie tej listy',
 
   /* -- Transactions: filters ---------------------------------------------- */
   'transactions.filter.description':
@@ -505,6 +528,7 @@ const messages = {
   'transactions.filter.direction': 'Wpływy czy wydatki',
   'transactions.filter.accountGroup': 'Grupa kont',
   'transactions.filter.dateRange': 'Zakres dat',
+  'transactions.filter.anyDate': 'Dowolna data',
   'transactions.filter.openCalendar': 'Otwórz kalendarz',
   'transactions.filter.amountRange': 'Zakres kwot',
   'transactions.filter.amountMin': 'Co najmniej',
@@ -586,6 +610,153 @@ const messages = {
   'transactions.planned.empty.title': 'Nic nie jest zaplanowane',
   'transactions.planned.empty.body':
     'Zapisz transakcję z przyszłą datą i oznacz ją jako planowaną, aby zobaczyć ją tutaj.',
+  /* -- Kolory (osiem zmierzonych barw kategorii) -------------------------- */
+  'colour.blue': 'Niebieski',
+  'colour.teal': 'Morski',
+  'colour.green': 'Zielony',
+  'colour.olive': 'Oliwkowy',
+  'colour.gold': 'Złoty',
+  'colour.orange': 'Pomarańczowy',
+  'colour.crimson': 'Karmazynowy',
+  'colour.violet': 'Fioletowy',
+
+  /* -- Kategorie ---------------------------------------------------------- */
+  'categories.title': 'Kategorie',
+  'categories.subtitle':
+    'Słownik, według którego grupujemy Twoje wydatki. Dwa poziomy i dowolna kolejność.',
+  'categories.create': 'Dodaj kategorię',
+  'categories.createChild': 'Dodaj podkategorię',
+  'categories.edit': 'Edytuj kategorię',
+  'categories.loading': 'Wczytujemy kategorie',
+  'categories.tree.label': 'Kategorie w kolejności wyświetlania',
+  'categories.tree.childOf': '{name}, wewnątrz {parent}',
+  'categories.actions.label': 'Działania dla: {name}',
+  'categories.drag.label': 'Zmień kolejność: {name}',
+  'categories.badge.system': 'Wbudowana',
+  'categories.kind.expense': 'Wydatki',
+  'categories.kind.income': 'Wpływy',
+  'categories.kind.both': 'Wpływy i wydatki',
+  'categories.parent.none': 'Poziom główny',
+  'categories.move.top': 'Przenieś na początek',
+  'categories.move.bottom': 'Przenieś na koniec',
+  'categories.move.refused': 'Nie udało się przenieść kategorii',
+  'categories.move.refused.body':
+    'Kategorie mają dwa poziomy. Kategorii, która ma już podkategorie, nie można umieścić wewnątrz innej.',
+  'categories.filter.showArchived': 'Pokaż zarchiwizowane kategorie',
+  'categories.field.kind': 'Stosowana do',
+  'categories.field.kind.help':
+    'Po której stronie księgi ta kategoria będzie proponowana.',
+  'categories.field.parent': 'Wewnątrz',
+  'categories.field.parent.help':
+    'Zostaw na poziomie głównym albo umieść wewnątrz istniejącej kategorii.',
+  'categories.field.colour.help':
+    'Pokazujemy go jako kropkę obok nazwy, nigdy jako tło wiersza.',
+  'categories.form.create.body':
+    'Wystarczy nazwa. Resztę możesz zmienić później.',
+  'categories.form.edit.body':
+    'Zmiana nazwy kategorii zmienia ją wszędzie tam, gdzie była użyta.',
+  'categories.form.error.title': 'Nie zapisaliśmy kategorii',
+  'categories.error.title': 'Nie udało się wczytać kategorii',
+  'categories.empty.title': 'Nie masz jeszcze kategorii',
+  'categories.empty.body':
+    'Kategoria to odpowiedź transakcji na pytanie „na co to było”. Dodaj pierwszą, a raporty będą miały według czego grupować.',
+  'categories.archive.title': 'Zarchiwizować kategorię {name}?',
+  'categories.archive.body':
+    'Przestaniemy ją proponować przy nowych transakcjach, a wszystko, co już do niej przypisano, zachowa swoją etykietę. Podkategorie archiwizują się razem z nią. Możesz ją przywrócić w każdej chwili.',
+  'categories.delete.title': 'Usunąć kategorię {name}?',
+  'categories.delete.body':
+    'Tej operacji nie da się cofnąć. Kategorii, która była kiedykolwiek użyta, nie można usunąć - zarchiwizuj ją zamiast tego.',
+  'categories.delete.refused': 'Tej kategorii nie można usunąć',
+  'categories.delete.refused.body':
+    'Jest już przypisana do transakcji, a usunięcie zostawiłoby je bez etykiety. Zarchiwizuj ją: zniknie z list wyboru i zachowa historię.',
+  'categories.toast.created': 'Dodaliśmy kategorię {name}.',
+  'categories.toast.updated': 'Zapisaliśmy kategorię {name}.',
+  'categories.toast.archived': 'Zarchiwizowaliśmy kategorię {name}.',
+  'categories.toast.restored': 'Przywróciliśmy kategorię.',
+  'categories.toast.deleted': 'Usunęliśmy kategorię {name}.',
+
+  /* -- Kontrahenci -------------------------------------------------------- */
+  'payees.title': 'Kontrahenci',
+  'payees.subtitle':
+    'Komu płacisz i kto płaci Tobie - oraz opisy z wyciągu, które mają się z nimi zgadzać.',
+  'payees.create': 'Dodaj kontrahenta',
+  'payees.edit': 'Edytuj kontrahenta',
+  'payees.loading': 'Wczytujemy kontrahentów',
+  'payees.list.label': 'Kontrahenci',
+  'payees.actions.label': 'Działania dla: {name}',
+  'payees.search.label': 'Szukaj kontrahentów',
+  'payees.search.placeholder': 'Fragment nazwy',
+  'payees.error.title': 'Nie udało się wczytać kontrahentów',
+  'payees.empty.title': 'Nie masz jeszcze kontrahentów',
+  'payees.empty.body':
+    'Kontrahent zamienia „ZABKA NANO 4471” z wyciągu w nazwę, którą rozpoznajesz. Dodaj pierwszego albo pozwól, żeby import utworzył ich za Ciebie.',
+  'payees.noMatches.title': 'Nic nie pasuje',
+  'payees.noMatches.body': 'Spróbuj krótszego fragmentu nazwy.',
+  'payees.defaultCategory.summary': 'Podpowiada: {name}',
+  'payees.detail.back': 'Wróć do kontrahentów',
+  'payees.detail.noCategory': 'Nie podpowiada żadnej kategorii',
+  'payees.detail.notFound.title': 'Nie ma tu tego kontrahenta',
+  'payees.detail.notFound.body':
+    'Mógł zostać usunięty albo scalony z innym, albo adres jest błędny.',
+  'payees.field.name.help': 'Nazwa, którą chcesz widzieć w księdze.',
+  'payees.field.defaultCategory': 'Podpowiadana kategoria',
+  'payees.field.defaultCategory.help':
+    'Do niej trafi nowa transakcja z tym kontrahentem.',
+  'payees.field.mode': 'Jak stanowczo ją stosować',
+  'payees.field.logoDomain': 'Strona internetowa',
+  'payees.field.logoDomain.help':
+    'Domena, na przykład zabka.pl - nie pełny odnośnik.',
+  'payees.mode.off': 'Nic nie podpowiadaj',
+  'payees.mode.off.help': 'Ten kontrahent nigdy nie rusza pola kategorii.',
+  'payees.mode.hint': 'Wypełnij wstępnie',
+  'payees.mode.hint.help':
+    'Nowe transakcje zaczynają od podpowiadanej kategorii, a Ty możesz ją zmienić.',
+  'payees.mode.enforce': 'Zawsze stosuj',
+  'payees.mode.enforce.help':
+    'Nowe transakcje przyjmą podpowiadaną kategorię, a zapis przypisze do niej także te już zarejestrowane u tego kontrahenta.',
+  'payees.form.create.body':
+    'Wystarczy nazwa. Ustawienia podpowiedzi mogą poczekać.',
+  'payees.form.edit.body':
+    'Zmiana nazwy kontrahenta zmienia ją w każdej transakcji, w której występuje.',
+  'payees.form.error.title': 'Nie zapisaliśmy kontrahenta',
+  'payees.aliases.title': 'Opisy z wyciągu',
+  'payees.aliases.body':
+    'Ciągi znaków, których bank używa dla tego kontrahenta. Każdy zapisujemy w postaci porównywanej - małymi literami, bez znaków diakrytycznych i bez numerów referencyjnych - bo właśnie to porównuje import.',
+  'payees.aliases.count': {
+    one: '{count} alias',
+    few: '{count} aliasy',
+    many: '{count} aliasów',
+    other: '{count} aliasu',
+  },
+  'payees.aliases.add': 'Dodaj opis z wyciągu',
+  'payees.aliases.add.help': 'Wklej go dokładnie tak, jak widnieje na wyciągu.',
+  'payees.aliases.added': 'Dodaliśmy opis z wyciągu.',
+  'payees.aliases.remove': 'Usuń {name}',
+  'payees.aliases.empty':
+    'Na razie pasuje tylko własna nazwa tego kontrahenta.',
+  'payees.aliases.failed': 'Nie dodaliśmy tego opisu',
+  'payees.ignored.title': 'Opisy, które nigdy nie są kontrahentem',
+  'payees.ignored.body':
+    'Ciągi znaków, z których import nie może zrobić kontrahenta - „PŁATNOŚĆ KARTĄ”, „POLECENIE ZAPŁATY” i wszystko inne, co bank dopisuje do każdej pozycji.',
+  'payees.ignored.add': 'Dodaj opis do pominięcia',
+  'payees.ignored.remove': 'Przestań pomijać {name}',
+  'payees.ignored.empty': 'Nie pomijamy żadnego opisu.',
+  'payees.ignored.failed': 'Nie dodaliśmy tego opisu',
+  'payees.merge.action': 'Scal z innym kontrahentem',
+  'payees.merge.title': 'Scal kontrahenta {name}',
+  'payees.merge.into': 'Zachowaj tego kontrahenta',
+  'payees.merge.body':
+    'Wszystkie transakcje, aliasy i etykiety kontrahenta {from} przejdą do {into}, a „{from}” zachowamy jako opis z wyciągu, żeby kolejne importy nadal go rozpoznawały. Tej operacji nie da się cofnąć.',
+  'payees.merge.noTargets': 'Nie ma innego kontrahenta, z którym można scalić.',
+  'payees.merge.failed': 'Nie scaliliśmy kontrahentów',
+  'payees.delete.title': 'Usunąć kontrahenta {name}?',
+  'payees.delete.body':
+    'Tej operacji nie da się cofnąć. Transakcje zachowają kwoty i daty, stracą tylko nazwę kontrahenta.',
+  'payees.toast.created': 'Dodaliśmy kontrahenta {name}.',
+  'payees.toast.updated': 'Zapisaliśmy kontrahenta {name}.',
+  'payees.toast.deleted': 'Usunęliśmy kontrahenta {name}.',
+  'payees.toast.merged': 'Scaliliśmy {from} z {into}.',
+
   /* -- Dashboard ---------------------------------------------------------- */
   'dashboard.title': 'Pulpit',
   'dashboard.greeting': 'Dobrze Cię widzieć, {name}.',
@@ -629,6 +800,9 @@ const messages = {
   'dashboard.cashFlow.surplus': 'Zostało Ci {amount}',
   'dashboard.cashFlow.deficit': 'Wydatki przewyższyły wpływy o {amount}',
   'dashboard.cashFlow.balanced': 'Wpływy i wydatki wyszły dokładnie na zero',
+  'dashboard.cashFlow.shareOfIncome': '{share} z {amount} wpływów',
+  'dashboard.cashFlow.context':
+    'Wybrany okres: {month}. Wcześniejsze miesiące to kontekst.',
   'dashboard.cashFlow.empty.title': 'W tym okresie nic się nie wydarzyło',
   'dashboard.cashFlow.empty.body':
     'Zapisz transakcję albo wybierz dłuższy okres.',
@@ -636,6 +810,7 @@ const messages = {
   'dashboard.spending.showOther': 'Pokaż mniejsze kategorie',
   'dashboard.spending.hideOther': 'Ukryj mniejsze kategorie',
   'dashboard.spending.share': 'Udział',
+  'dashboard.spending.uncategorised': 'Bez kategorii',
   'dashboard.spending.empty.title': 'Brak wydatków z kategorią',
   'dashboard.spending.empty.body':
     'Przypisz wydatkowi kategorię, a jego udział w okresie pojawi się tutaj.',
@@ -677,6 +852,8 @@ const messages = {
   'money.exchangeRate.automatic': 'Aktualizowany codziennie',
   'money.convertedAt': 'Przeliczono po kursie {rate}',
   'money.amountIn': 'Kwota w walucie {currency}',
+  'money.spoken.negative': 'minus {amount}',
+  'money.spoken.positive': 'plus {amount}',
   'money.currency.search': 'Szukaj waluty',
   'money.currency.zeroDecimal': 'Ta waluta nie ma jednostki podrzędnej.',
 
@@ -747,6 +924,7 @@ const messages = {
 
   /* -- Accessibility ------------------------------------------------------ */
   'a11y.skipToContent': 'Przejdź do treści głównej',
+  'a11y.showSuggestions': 'Pokaż podpowiedzi',
 
   /* -- Marketing (public pages) ------------------------------------------- */
   'marketing.nav.features': 'Funkcje',
@@ -803,6 +981,25 @@ const messages = {
   'app.shell.pending': 'Wczytujemy tę stronę…',
   'app.shell.error.body':
     'Tej części aplikacji nie udało się wczytać. Reszta działa dalej.',
+
+  /* -- Settings ----------------------------------------------------------- */
+  'settings.subtitle':
+    'Jak produkt wygląda dla Ciebie i co zawiera ta przestrzeń. Każda karta wskazuje, czyje jest dane ustawienie.',
+  'settings.scope.you': 'Tylko Twoje',
+  'settings.scope.workspace': 'Wspólne dla przestrzeni',
+  'settings.appearance.description':
+    'Jasny, ciemny albo zgodny z ustawieniem tego urządzenia. Zapisujemy go lokalnie, więc telefon i laptop mogą mieć różne motywy.',
+  'settings.language.description':
+    'W tym języku opisany jest każdy ekran, każda etykieta i każda data. Zmiana przeładowuje stronę, bo teksty dobiera serwer.',
+  'settings.account.title': 'Twoje konto',
+  'settings.account.description': 'Dane konta, z którego korzystasz.',
+  'settings.workspace.description':
+    'Wspólne księgi tej przestrzeni. Do tych dwóch list przypisywana jest każda transakcja.',
+  'settings.workspace.name': 'Nazwa przestrzeni',
+  'settings.categories.description':
+    'Dwupoziomowe drzewo, do którego trafia każda transakcja.',
+  'settings.payees.description':
+    'Komu trafiły pieniądze oraz nazwy, które import ma z nimi scalać.',
 
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Każda kwota co do grosza.',

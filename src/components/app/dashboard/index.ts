@@ -36,6 +36,7 @@ export {
   monthRange,
   monthsIn,
   periodRange,
+  trailingMonths,
 } from './period'
 export type { DashboardPeriod, PeriodRange } from './period'
 

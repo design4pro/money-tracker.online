@@ -1,5 +1,6 @@
-import { ArrowDownLeft, ArrowUpRight, Repeat } from 'lucide-react'
+import { Repeat } from 'lucide-react'
 
+import { amountReading } from '#/components/app/money'
 import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, money } from '#/lib/money'
@@ -12,16 +13,23 @@ import type { LedgerRow } from './types'
  *
  * ## The reading is not the drawing
  *
- * The visible figure is `−20,00 zł`: a sign, tabular figures, a narrow symbol, a direction arrow
- * and one of the reserved amount hues. That is four channels for a sighted reader and none at all
- * for somebody listening, because a narrow symbol is announced inconsistently and a minus sign in
- * front of a number is not the same sentence as "an expense".
+ * The visible figure is `−20,00 zł`: a sign, tabular figures, a narrow symbol and one of the
+ * reserved amount hues. That is three channels for a sighted reader and none at all for somebody
+ * listening, because a narrow symbol is announced inconsistently and a minus sign in front of a
+ * number is not the same sentence as "an expense".
+ *
+ * There used to be a fourth: an up or down arrow in front of every figure. It was removed because
+ * the sign already says the same thing at the same glance, and because a glyph in front of a
+ * right-aligned number gives the column two left edges — one for the arrow, one for the digits —
+ * so nothing in it lines up. The transfer mark stays, and only that one: a transfer is drawn in the
+ * muted hue and carries a minus like an expense, so with no glyph the *only* thing separating the
+ * two would be colour, which `docs/ACCESS` does not allow.
  *
  * So the cell carries two strings: the drawing, marked `aria-hidden`, and a full sentence in an
  * `sr-only` span — _"Expense of 20.00 Polish zlotys"_ — built with `currencyDisplay: 'name'`, which
  * is the one display mode that reads correctly in both locales this product ships. `docs/ACCESS`'s
- * colour rule is satisfied twice over: the sign and the arrow are both non-colour channels, and the
- * screen-reader sentence names the direction in words.
+ * colour rule is satisfied twice over: the sign is a non-colour channel, and the screen-reader
+ * sentence names the direction in words.
  *
  * ## No arithmetic happens here
  *
@@ -54,14 +62,19 @@ function toneOf(
   return row.direction === 'income' ? 'income' : 'expense'
 }
 
+/**
+ * The transfer mark, and nothing else.
+ *
+ * Income and expense are told apart by their sign, so an arrow beside them is a third statement of
+ * the same fact and a ragged left edge on a right-aligned column. A transfer has no sign of its own
+ * — it is drawn muted and minus-prefixed — so this glyph is the non-colour channel that keeps it
+ * from being "an expense in a different grey".
+ */
 function GlyphFor({ tone }: { tone: AmountTone }) {
   if (tone === 'transfer') {
     return <Repeat aria-hidden="true" className="size-3.5 shrink-0" />
   }
-  if (tone === 'income') {
-    return <ArrowDownLeft aria-hidden="true" className="size-3.5 shrink-0" />
-  }
-  return <ArrowUpRight aria-hidden="true" className="size-3.5 shrink-0" />
+  return null
 }
 
 export interface AmountTextProps {
@@ -70,13 +83,13 @@ export interface AmountTextProps {
   readonly direction: LedgerRow['direction']
   readonly isPlanned?: boolean
   readonly transferKind?: LedgerRow['transferKind']
-  /** Drop the arrow — for a footer figure that already sits under a worded label. */
+  /** Drop the transfer mark too — for a footer figure that already sits under a worded label. */
   readonly hideGlyph?: boolean
   readonly className?: string
 }
 
 /**
- * A transaction amount: sign, arrow, hue, and a spoken sentence that names the currency in full.
+ * A transaction amount: sign, hue, and a spoken sentence that names the currency in full.
  */
 export function AmountText({
   amountMinor,
@@ -96,7 +109,7 @@ export function AmountText({
   // of the plus beside it and the column stops reading as a column.
   const sign = direction === 'income' ? '+' : '−'
   const drawn = `${sign}${formatMoney(locale, value, { display: 'narrowSymbol' })}`
-  const spokenAmount = formatMoney(locale, value, { display: 'name' })
+  const spokenAmount = amountReading(t, locale, value)
   const spoken =
     direction === 'income'
       ? t('transactions.amount.income', { amount: spokenAmount })
@@ -137,27 +150,14 @@ export function ConvertedAmount({
 }: ConvertedAmountProps) {
   const locale = useLocale()
   const t = useTranslate()
-  const formatted = formatMoney(
-    locale,
-    money(refAmountMinor, refCurrencyCode),
-    {
-      display: 'narrowSymbol',
-    },
-  )
+  const value = money(refAmountMinor, refCurrencyCode)
+  const formatted = formatMoney(locale, value, { display: 'narrowSymbol' })
 
   return (
     <span className={cn('block tabular text-caption text-ink-2', className)}>
       <span aria-hidden="true">{formatted}</span>
       <span className="sr-only">
-        {t('money.amountIn', {
-          currency: formatMoney(
-            locale,
-            money(refAmountMinor, refCurrencyCode),
-            {
-              display: 'name',
-            },
-          ),
-        })}
+        {t('money.amountIn', { currency: amountReading(t, locale, value) })}
       </span>
     </span>
   )
@@ -181,13 +181,15 @@ export function NetAmount({
   className,
 }: NetAmountProps) {
   const locale = useLocale()
+  const t = useTranslate()
+  const value = money(amountMinor, currencyCode)
   const magnitude = Math.abs(amountMinor) as Minor
   const formatted = formatMoney(locale, money(magnitude, currencyCode), {
     display: 'narrowSymbol',
   })
-  const spoken = formatMoney(locale, money(magnitude, currencyCode), {
-    display: 'name',
-  })
+  // The sign is a word rather than the glyph beside it: U+2212 is announced as
+  // nothing at all by several screen readers, and `+` fares little better.
+  const spoken = amountReading(t, locale, value, { signed: true })
 
   if (amountMinor === 0) {
     return (
@@ -208,7 +210,7 @@ export function NetAmount({
       )}
     >
       <span aria-hidden="true">{`${positive ? '+' : '−'}${formatted}`}</span>
-      <span className="sr-only">{`${positive ? '+' : '−'} ${spoken}`}</span>
+      <span className="sr-only">{spoken}</span>
     </span>
   )
 }

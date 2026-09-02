@@ -26,6 +26,15 @@ export interface CashFlowBucket {
   readonly expenseMinor: Minor
   /** Income less expense. Signed, and the only figure here that may be negative. */
   readonly netMinor: Minor
+  /**
+   * Whether this month is inside the **selected** period.
+   *
+   * A period that resolves to one month is drawn against its trailing months so the reader can see
+   * whether it is a normal one; those context months are `false`. Every total on the screen sums
+   * the `true` ones alone, which is what keeps the header and the chart the same set of integers
+   * even though the chart draws more bars than the header counts.
+   */
+  readonly inPeriod: boolean
 }
 
 /** One account, as the balances widget shows it. */

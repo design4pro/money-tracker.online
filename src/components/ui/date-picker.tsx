@@ -61,6 +61,21 @@ export function DateInput({ className, ...props }: DateInputProps) {
   )
 }
 
+/**
+ * The calendar trigger.
+ *
+ * It stays a real `Button` wherever it is placed rather than becoming decoration: the calendar has
+ * to be reachable without a mouse, so it keeps a 44px hit area (`target-min`) inside a 40px shell,
+ * its own focus ring and a hover repaint. A bare 16px icon would be neither a target nor a stop.
+ *
+ * {@link DatePicker} trails it and {@link DateRangePicker} leads with it, and the split is about
+ * where each control lives rather than a drift in the system. The single picker is a *form* field
+ * sitting under a visible label beside text and number fields, all of which put their adornments at
+ * the end — and DOM order is tab order, so leading would cost one extra Tab before the segments in
+ * the one form somebody fills in twenty times a sitting. The range picker is a label-less *filter*
+ * standing next to a search pill; there it has to open with a 16px stroked icon exactly as the
+ * search field opens with its magnifier, or it reads as the one control on the bar nobody drew.
+ */
 const triggerButton = cn(
   'grid w-9 shrink-0 place-items-center self-stretch text-ink-2 cursor-pointer target-min',
   transitionBase,
@@ -139,6 +154,16 @@ export interface DateRangePickerProps<T extends DateValue> extends Omit<
   errorMessage?: FieldErrorMessage
   size?: FieldSize
   calendarLabel?: string
+  /**
+   * What the field says instead of two rows of empty segments while it holds no
+   * range and nobody is in it — "Any date", "All time". Decorative: it is
+   * `aria-hidden`, the field keeps its own name, and the segments keep theirs.
+   *
+   * Pass it only where an unset range genuinely means *unset*. A control that
+   * says "Any date" while half a range is in force is worse than one that says
+   * nothing.
+   */
+  placeholder?: string
   className?: string
 }
 
@@ -149,6 +174,20 @@ export interface DateRangePickerProps<T extends DateValue> extends Omit<
  * announces as "Period, start date" / "Period, end date" rather than as two
  * unrelated fields, and a rule like "end must not precede start" is validated
  * on the group where it belongs.
+ *
+ * ## The resting state is a sentence, not six empty segments
+ *
+ * `mm / dd / yyyy – mm / dd / yyyy` beside a drawn search pill is the one thing
+ * on a filter bar that reads as unfinished chrome, and it is eleven glyph
+ * groups spent saying "nothing is set". With a `placeholder` the empty field
+ * rests as one muted phrase instead.
+ *
+ * It is drawn *over* the segments rather than replacing them: the segments stay
+ * mounted, keep their accessible names and their spinbutton semantics, and are
+ * merely transparent, while the phrase above them is `pointer-events-none`. So
+ * a click lands on the segment it looks like it landed on, focus reveals the
+ * real control, and typing a date is still the fastest path — which swapping
+ * the DOM for a button-and-popover would have taken away.
  */
 export function DateRangePicker<T extends DateValue>({
   label,
@@ -156,10 +195,14 @@ export function DateRangePicker<T extends DateValue>({
   errorMessage,
   size = 'md',
   calendarLabel = 'Open calendar',
+  placeholder,
   className,
   isRequired,
   ...props
 }: DateRangePickerProps<T>) {
+  const isResting =
+    placeholder !== undefined && !props.value && !props.defaultValue
+
   return (
     <RACDateRangePicker
       {...props}
@@ -170,15 +213,34 @@ export function DateRangePicker<T extends DateValue>({
         <Label isRequired={isRequired}>{label}</Label>
       )}
 
-      <FieldGroup className={cn(fieldSizes[size], 'gap-1 pe-0')}>
-        <DateInput slot="start" />
-        <span aria-hidden="true" className="shrink-0 text-ink-2">
-          –
-        </span>
-        <DateInput slot="end" />
+      <FieldGroup
+        className={cn(fieldSizes[size], 'group/range relative gap-1 ps-0')}
+      >
         <RACButton aria-label={calendarLabel} className={triggerButton}>
           <CalendarDays />
         </RACButton>
+        <span
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-1',
+            transitionBase,
+            isResting &&
+              'opacity-0 group-focus-within/range:opacity-100 group-data-[focus-within]/range:opacity-100',
+          )}
+        >
+          <DateInput slot="start" />
+          <span aria-hidden="true" className="shrink-0 text-ink-2">
+            –
+          </span>
+          <DateInput slot="end" />
+        </span>
+        {isResting ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 start-10 flex items-center text-ink-2 group-focus-within/range:hidden group-data-[focus-within]/range:hidden"
+          >
+            {placeholder}
+          </span>
+        ) : null}
       </FieldGroup>
 
       <Description>{description}</Description>

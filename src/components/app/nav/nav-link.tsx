@@ -8,13 +8,11 @@ export interface NavLinkProps {
   isActive: boolean
   /** Already translated. The label is passed in so this file holds no message key. */
   label: string
-  /** Called after activation, so a drawer or a menu that contains the link can close itself. */
-  onNavigate?: () => void
   className?: string
 }
 
 /**
- * One row in the rail or in the overflow drawer.
+ * One row in the rail.
  *
  * ## Three channels for one meaning
  *
@@ -26,13 +24,16 @@ export interface NavLinkProps {
  *
  * The bar is an absolutely-positioned span rather than a `border-inline-start`, because a border
  * would move the label 3px when the row becomes current and the whole rail would twitch on every
- * navigation.
+ * navigation. It is painted in `ink` so the rail and the phone's tab bar mark *current* with the
+ * same mark, and so the product's one accent hue stays reserved for money that is negative.
+ *
+ * Losing the hue costs nothing here: the ground, the weight and `aria-current` all still say
+ * current, which is one channel more than the colour ever carried on its own.
  */
 export function NavLink({
   destination,
   isActive,
   label,
-  onNavigate,
   className,
 }: NavLinkProps) {
   const { href, Icon } = destination
@@ -41,7 +42,6 @@ export function NavLink({
     <Link
       href={href}
       variant="unstyled"
-      onPress={onNavigate}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
         'target-min-h relative flex w-full items-center gap-3 rounded-md py-2 pe-3 ps-4 text-label',
@@ -54,7 +54,7 @@ export function NavLink({
       {isActive ? (
         <span
           aria-hidden="true"
-          className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-brand"
+          className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-ink"
         />
       ) : null}
       <Icon className="size-[1.125rem] shrink-0" />

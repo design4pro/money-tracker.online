@@ -107,6 +107,25 @@ export function monthsIn(range: PeriodRange): ReadonlyArray<string> {
   return months
 }
 
+/**
+ * The `count` months ending at `firstDay` inclusive, in order.
+ *
+ * A period that resolves to a single month gives the cash-flow chart one category to draw, and one
+ * category is not a chart: two bars in the middle of an empty plot say nothing about whether this
+ * month is a normal month, which is the only question a reader has when they look at it. The
+ * trailing months are drawn as **context** — the selected month is marked, and the header's totals
+ * still count the selected period alone.
+ */
+export function trailingMonths(
+  firstDay: string,
+  count: number,
+): ReadonlyArray<string> {
+  const last = startOfMonth(parseDate(firstDay))
+  return Array.from({ length: Math.max(count, 1) }, (_, index) =>
+    last.subtract({ months: Math.max(count, 1) - 1 - index }).toString(),
+  )
+}
+
 /** The closed range of one month, from its first day. */
 export function monthRange(firstDay: string): PeriodRange {
   const day = parseDate(firstDay)

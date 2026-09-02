@@ -55,16 +55,18 @@ export function AccountListSkeleton() {
         </Card>
       </div>
 
-      <ul className="flex flex-col gap-3">
+      {/* One card, four 64px rows, hairlines between them — the shape the list actually has,
+          so nothing jumps when the data lands. */}
+      <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
         {[0, 1, 2, 3].map((row) => (
           <li
             key={row}
-            className="flex items-start gap-3 rounded-xl border border-border-subtle bg-surface p-4"
+            className="flex min-h-16 items-center gap-3 border-t border-border-subtle px-4 py-3 first:border-t-0"
           >
             <Skeleton shape="block" className="size-10 shrink-0 rounded-lg" />
             <div className="flex-1">
               <Skeleton shape="text" className="h-4 w-40" />
-              <Skeleton shape="text" className="mt-2 h-3 w-24" />
+              <Skeleton shape="text" className="mt-1 h-3 w-24" />
             </div>
             <Skeleton shape="block" className="h-6 w-28 rounded-sm" />
           </li>
