@@ -56,6 +56,7 @@ import { isLiabilityCategory } from '#/server/catalog/account-types'
 import { serverToday } from '#/server/clock'
 import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
+import { pauseRulesReferencing } from '#/server/rules/integrity'
 import {
   ACCOUNT_CATEGORIES,
   accountGroupMembers,
@@ -716,7 +717,7 @@ export async function deleteAccount(
 ): Promise<void> {
   const id = idSchema.parse(accountId)
   await assertMayAdminister(scope, 'delete an account')
-  await accountRepo.requireById(scope, id)
+  const row = await accountRepo.requireById(scope, id)
 
   const rows = await scope.db
     .select({ value: count() })
@@ -728,6 +729,15 @@ export async function deleteAccount(
   }
 
   await accountRepo.requireRemove(scope, id)
+
+  // `14-S3`: the deleting operation writes the pause itself, carrying the name the row had a
+  // statement ago — after this line there is nowhere left to read it from.
+  await pauseRulesReferencing({
+    scope,
+    refType: 'account',
+    refId: id,
+    label: row.name,
+  })
 }
 
 /**
@@ -976,10 +986,19 @@ export async function deleteAccountGroup(
 ): Promise<void> {
   const id = idSchema.parse(groupId)
   await assertMayAdminister(scope, 'delete an account group')
-  await groupRepo.requireById(scope, id)
+  const row = await groupRepo.requireById(scope, id)
 
   await membershipRepo.removeWhere(scope, eq(accountGroupMembers.groupId, id))
   await groupRepo.requireRemove(scope, id)
+
+  // `14-S3`: the deleting operation writes the pause itself, carrying the name the row had a
+  // statement ago — after this line there is nowhere left to read it from.
+  await pauseRulesReferencing({
+    scope,
+    refType: 'account_group',
+    refId: id,
+    label: row.name,
+  })
 }
 
 /**

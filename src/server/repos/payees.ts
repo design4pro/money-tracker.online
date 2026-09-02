@@ -36,6 +36,7 @@ import { and, count, eq, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { newId } from '#/server/db/ids'
+import { pauseRulesReferencing } from '#/server/rules/integrity'
 import {
   PAYEE_CATEGORIZATION_MODES,
   payeeAliases,
@@ -352,8 +353,7 @@ export async function listPayees(
   const needle = search === undefined ? null : normalizePayeeName(search)
   const rows = [...all]
     .filter(
-      (row) =>
-        needle === null || normalizePayeeName(row.name).includes(needle),
+      (row) => needle === null || normalizePayeeName(row.name).includes(needle),
     )
     .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -604,7 +604,18 @@ export async function deletePayee(
   payeeId: string,
 ): Promise<void> {
   const id = idSchema.parse(payeeId)
+  // Read before the delete, for its name only: `14-S3`'s pause reason carries the human label,
+  // and a statement later there is nowhere left to read it from. `requireRemove` would raise the
+  // same `NotFoundError` on the same id, so this adds a read, not a behaviour.
+  const row = await payeeRepo.requireById(scope, id)
   await payeeRepo.requireRemove(scope, id)
+
+  await pauseRulesReferencing({
+    scope,
+    refType: 'payee',
+    refId: id,
+    label: row.name,
+  })
 }
 
 /**

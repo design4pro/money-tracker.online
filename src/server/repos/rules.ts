@@ -276,6 +276,105 @@ function referencedIds(
   return { accountIds, groupIds, categoryIds, tagIds, payeeIds }
 }
 
+/**
+ * The five kinds of row a rule may name — the vocabulary `14-S3` pauses against.
+ *
+ * It lives here rather than in `#/server/rules/schema` because the only thing that distinguishes
+ * one member from another is **which table answers for it**, and that table is a repository
+ * concern. {@link REFERENCE_TABLES} beside it is the whole definition; a sixth member would not
+ * compile without one.
+ */
+export const RULE_REFERENCE_TYPES = [
+  'account',
+  'account_group',
+  'category',
+  'tag',
+  'payee',
+] as const
+export type RuleReferenceType = (typeof RULE_REFERENCE_TYPES)[number]
+
+const REFERENCE_TABLES: Readonly<Record<RuleReferenceType, KeyedTenantTable>> =
+  {
+    account: accounts,
+    account_group: accountGroups,
+    category: categories,
+    tag: tags,
+    payee: payees,
+  }
+
+/**
+ * Which of `ids` this workspace still holds, for one kind of referenced row.
+ *
+ * The **positive** answer — the ids that exist — because the caller
+ * (`#/server/rules/integrity`) wants the complement over the whole rule set at once, and asking
+ * "is this one gone?" per id would be a query per condition.
+ *
+ * Chunked at D1's bound-parameter ceiling rather than sent as one `IN (…)`: the schema allows a
+ * hundred rules of ten conditions naming twenty ids each, so the id list this is handed has no
+ * small upper bound and a single statement would be rejected by the driver on exactly the
+ * workspace that most needs the sweep.
+ */
+export async function listExistingReferenceIds(
+  scope: TenantScope,
+  refType: RuleReferenceType,
+  ids: ReadonlyArray<string>,
+): Promise<Set<string>> {
+  const table = REFERENCE_TABLES[z.enum(RULE_REFERENCE_TYPES).parse(refType)]
+  const unique = z.array(idSchema).parse([...new Set(ids)])
+  const found = new Set<string>()
+
+  // One bind is spent on the tenant predicate; the rest of the statement's budget is ids.
+  const perStatement = D1_MAX_BOUND_PARAMETERS - 1
+  for (let index = 0; index < unique.length; index += perStatement) {
+    const chunk = unique.slice(index, index + perStatement)
+    const rows = await scope.db
+      .select({ id: table.id })
+      .from(table)
+      .where(tenantFilter(scope, table, inArray(table.id, chunk)))
+    // `table.id` is the generic `SQLiteColumn` this helper is written against, so its value
+    // arrives untyped; every `id` column in the schema is `text`.
+    for (const row of rows) found.add(String(row.id))
+  }
+
+  return found
+}
+
+/**
+ * Writes one pause reason onto every named rule, in **one** `UPDATE`.
+ *
+ * **A rule that is already paused keeps the reason it has.** The stored reason names what broke
+ * *first*, and first is the one a person can act on: `updateRule` re-checks every reference a
+ * rule names, so an edit cannot clear a pause while a second reference is still dangling. Without
+ * the `IS NULL` guard a banner would rewrite its own story between two deletions nobody had got
+ * round to fixing yet.
+ *
+ * `updated_at` **is** moved, unlike {@link recordMatches}: a pause changes what the rule does,
+ * which is an edit to the rule in every sense except who made it. A counter bump is not.
+ *
+ * Returns how many rules this call actually paused.
+ */
+export async function pauseRules(
+  scope: TenantScope,
+  ruleIds: ReadonlyArray<string>,
+  pausedReason: string,
+): Promise<number> {
+  const ids = z
+    .array(idSchema)
+    .min(1)
+    .max(MAX_RULES_PER_WORKSPACE)
+    .parse([...new Set(ruleIds)])
+
+  const rows = await ruleRepo.updateWhere(
+    scope,
+    allOf(inArray(rules.id, ids), isNull(rules.pausedReason)),
+    {
+      pausedReason: z.string().min(1).parse(pausedReason),
+      updatedAt: new Date(),
+    },
+  )
+  return rows.length
+}
+
 async function requireOwnedReferences(
   scope: TenantScope,
   conditions: ReadonlyArray<RuleCondition>,
