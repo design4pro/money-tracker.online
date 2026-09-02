@@ -101,13 +101,13 @@ export function ImportHistory({ batches }: ImportHistoryProps) {
                     {t(`import.status.${batch.status}` as MessageKey)}
                   </Badge>
                 </Cell>
-                <Cell align="end">
+                <Cell align="end" numeric>
                   {t('import.history.rows', {
                     imported: batch.importedCount,
                     total: batch.rowCount,
                   })}
                 </Cell>
-                <Cell>
+                <Cell numeric>
                   {formatCalendarDate(
                     locale,
                     batch.createdAt.toISOString().slice(0, 10),

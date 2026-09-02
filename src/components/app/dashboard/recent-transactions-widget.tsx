@@ -78,7 +78,7 @@ export function RecentTransactionsWidget({
           >
             <div className="min-w-0">
               <p className="truncate text-body text-ink">{entry.title}</p>
-              <p className="text-caption text-ink-2">
+              <p className="text-caption tabular text-ink-2">
                 {formatCalendarDate(locale, entry.bookedOn)}
               </p>
             </div>

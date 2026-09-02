@@ -319,7 +319,7 @@ export function PreviewStep({
                         : 'max-md:grid max-md:gap-2 max-md:py-3'
                     }
                   >
-                    <Cell className="whitespace-nowrap max-md:block">
+                    <Cell numeric className="whitespace-nowrap max-md:block">
                       {drawnDate}
                     </Cell>
                     <Cell className="max-md:block">

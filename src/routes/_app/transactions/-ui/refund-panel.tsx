@@ -200,7 +200,7 @@ export function RefundPanel({
               <TableBody>
                 {summary.received.map(({ link, transaction }) => (
                   <Row key={link.id}>
-                    <Cell>{day(transaction.bookedOn)}</Cell>
+                    <Cell numeric>{day(transaction.bookedOn)}</Cell>
                     <Cell align="end" numeric>
                       {money(link.amountMinor, link.currencyCode)}
                     </Cell>
