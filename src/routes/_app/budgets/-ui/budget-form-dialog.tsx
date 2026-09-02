@@ -80,6 +80,7 @@ export interface BudgetFormDialogProps {
 }
 
 const PERIODS: ReadonlyArray<BudgetPeriod> = [
+  'weekly',
   'monthly',
   'quarterly',
   'yearly',

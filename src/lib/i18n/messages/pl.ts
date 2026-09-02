@@ -871,6 +871,7 @@ const messages = {
 
   'budgets.period.label': 'Okres rozliczeniowy',
   'budgets.period.one_off': 'Jednorazowy',
+  'budgets.period.weekly': 'Tygodniowy',
   'budgets.period.monthly': 'Miesięczny',
   'budgets.period.quarterly': 'Kwartalny',
   'budgets.period.yearly': 'Roczny',

@@ -13,9 +13,9 @@ import {
   OPEN_ENDED_END,
   periodAfter,
   periodBoundsAt,
+  periodCadence,
   periodContaining,
   periodIndexFor,
-  periodLengthMonths,
   periodsThrough,
 } from '../period'
 
@@ -24,12 +24,19 @@ import type { BudgetCalendar } from '../period'
 const monthly = (startDate: string, endDate: string | null = null) =>
   ({ period: 'monthly', startDate, endDate }) satisfies BudgetCalendar
 
-describe('periodLengthMonths', () => {
-  it('knows the three cadences and refuses to give one_off a length', () => {
-    expect(periodLengthMonths('monthly')).toBe(1)
-    expect(periodLengthMonths('quarterly')).toBe(3)
-    expect(periodLengthMonths('yearly')).toBe(12)
-    expect(periodLengthMonths('one_off')).toBeNull()
+describe('periodCadence', () => {
+  it('knows the four cadences and refuses to give one_off a length', () => {
+    expect(periodCadence('weekly')).toEqual({ unit: 'week', count: 1 })
+    expect(periodCadence('monthly')).toEqual({ unit: 'month', count: 1 })
+    expect(periodCadence('quarterly')).toEqual({ unit: 'month', count: 3 })
+    expect(periodCadence('yearly')).toEqual({ unit: 'month', count: 12 })
+    expect(periodCadence('one_off')).toBeNull()
+  })
+
+  it('keeps weeks in weeks rather than rounding them to a month', () => {
+    // The whole reason the cadence carries a unit. Four weeks is not a month, and calling it one
+    // would drift a weekly budget's boundary by two to three days every period.
+    expect(periodCadence('weekly')?.unit).toBe('week')
   })
 })
 
@@ -79,6 +86,35 @@ describe('periodBoundsAt', () => {
     })
   })
 
+  it('runs a weekly budget seven days at a time, from its anchor', () => {
+    const weekly = {
+      period: 'weekly',
+      startDate: '2026-01-08',
+      endDate: null,
+    } satisfies BudgetCalendar
+    expect(periodBoundsAt(weekly, 0)).toEqual({
+      periodStart: '2026-01-08',
+      periodEnd: '2026-01-14',
+    })
+    // Period 8 crosses a month end, which is exactly where a "add a month, divide by four"
+    // shortcut would put the boundary on the wrong day.
+    expect(periodBoundsAt(weekly, 8)).toEqual({
+      periodStart: '2026-03-05',
+      periodEnd: '2026-03-11',
+    })
+  })
+
+  it('carries a weekly budget over a leap day without a stutter', () => {
+    // 2024-02-26 + 7 days is 2024-03-04 because February has 29 days that year. A weekly cadence
+    // must not inherit the end-of-month clamp that months need.
+    expect(
+      periodBoundsAt(
+        { period: 'weekly', startDate: '2024-02-26', endDate: null },
+        0,
+      ),
+    ).toEqual({ periodStart: '2024-02-26', periodEnd: '2024-03-03' })
+  })
+
   it('gives a one_off budget a single period, open ended when it has no end', () => {
     const calendar = {
       period: 'one_off',
@@ -122,6 +158,19 @@ describe('periodIndexFor', () => {
     expect(
       periodIndexFor(monthly('2026-01-01', '2026-03-31'), '2026-04-01'),
     ).toBeNull()
+  })
+
+  it('divides by exact days for weekly, across a month end and a leap day', () => {
+    const weekly = {
+      period: 'weekly',
+      startDate: '2024-02-26',
+      endDate: null,
+    } satisfies BudgetCalendar
+    expect(periodIndexFor(weekly, '2024-02-26')).toBe(0)
+    expect(periodIndexFor(weekly, '2024-03-03')).toBe(0)
+    expect(periodIndexFor(weekly, '2024-03-04')).toBe(1)
+    // 371 days later is exactly 53 weeks, leap day included.
+    expect(periodIndexFor(weekly, '2025-03-03')).toBe(53)
   })
 
   it('divides by the cadence for quarterly and yearly', () => {
@@ -213,6 +262,32 @@ describe('periodsThrough', () => {
         next,
       )
       // The end of one period is the day before the next begins.
+      expect(
+        Date.parse(`${next.periodStart}T00:00:00Z`) -
+          Date.parse(`${period.periodEnd}T00:00:00Z`),
+      ).toBe(86_400_000)
+    }
+  })
+
+  it('tiles a weekly budget without a gap or an overlap across a month end', () => {
+    // The same property the month-end anchor case proves, for the cadence whose periods do not
+    // line up with the calendar at all.
+    const weekly = {
+      period: 'weekly',
+      startDate: '2026-01-29',
+      endDate: null,
+    } satisfies BudgetCalendar
+    const periods = periodsThrough(weekly, '2026-04-01')
+    expect(periods.length).toBe(9)
+    expect(periods.at(0)?.periodStart).toBe('2026-01-29')
+    expect(periods.at(-1)).toEqual({
+      periodStart: '2026-03-26',
+      periodEnd: '2026-04-01',
+    })
+    for (let index = 0; index < periods.length - 1; index += 1) {
+      const period = periods[index]
+      const next = periods[index + 1]
+      expect(periodAfter(weekly, period.periodStart)).toEqual(next)
       expect(
         Date.parse(`${next.periodStart}T00:00:00Z`) -
           Date.parse(`${period.periodEnd}T00:00:00Z`),

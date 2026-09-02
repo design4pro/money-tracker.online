@@ -89,7 +89,7 @@ export interface BudgetSummary {
   readonly name: string
   readonly kind: BudgetKind
   readonly status: BudgetStatus
-  /** The cadence: `one_off | monthly | quarterly | yearly`. */
+  /** The cadence: `one_off | weekly | monthly | quarterly | yearly`. */
   readonly period: BudgetPeriodCadence
   readonly startDate: string
   readonly endDate: string | null

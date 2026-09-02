@@ -2330,6 +2330,7 @@ export type BudgetStatus = (typeof BUDGET_STATUSES)[number]
 /** How often the envelope refills. */
 export const BUDGET_PERIODS = [
   'one_off',
+  'weekly',
   'monthly',
   'quarterly',
   'yearly',
