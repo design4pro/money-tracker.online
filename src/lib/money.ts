@@ -127,9 +127,15 @@ export type { ConversionInput } from './money/convert'
 export {
   formatMoney,
   formatMoneyPlain,
+  formatMoneySegments,
   formatRateE10,
   formatSignedMoney,
+  formatSignedMoneySegments,
   parseMoney,
   toAmountInputValue,
 } from './money/format'
-export type { CurrencyDisplay, FormatMoneyOptions } from './money/format'
+export type {
+  CurrencyDisplay,
+  FormatMoneyOptions,
+  MoneySegment,
+} from './money/format'

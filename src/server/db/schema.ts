@@ -35,14 +35,41 @@
  * table carries `organization_id`, and it is the leading column of every composite index on that
  * table** — a tenant-scoped query that cannot use the index is a tenant-scoped table scan.
  *
+ * **Amounts carry their currency.** Every table with an `amount_minor` column also has a
+ * `currency_code` column, even where the currency could be reached by a join — an amount with no
+ * currency is not an amount, and a report that has to join to learn the scale will one day format
+ * a yen figure with two decimals.
+ *
+ * **Conversions are historical, never recomputed.** Any row whose amount crosses the workspace
+ * base currency stores *both* the `rate_e10` it used *and* the resulting `ref_amount_minor`. A
+ * March expense is worth March's rate forever; recomputing it from today's catalog is the defect
+ * this pair of columns exists to make impossible (§3.5, `docs/MONEY.md` §3).
+ *
  * ---------------------------------------------------------------------------
- * SCOPE OF THIS FILE TODAY
+ * SCOPE OF THIS FILE
  * ---------------------------------------------------------------------------
- * The SaaS layer's own table (`subscriptions`, the Polar mirror) and the two global catalog
- * tables the money path reads (`currencies`, `exchange_rates`). The finance domain — accounts,
- * transactions, budgets, recurring series, rules, goals, import and export — is built on top of
- * this in a later plan; it is absent rather than sketched, because a half-declared table
- * generates a migration that has to be reverted.
+ * The SaaS layer's own table (`subscriptions`, the Polar mirror), the global catalog tables the
+ * money path reads (`currencies`, `exchange_rates`, `brand_logos`), and the **whole finance
+ * domain**: the workspace currency layer, accounts and their groups and daily balance grid,
+ * transactions with the double-entry transfer model, classification (categories, tags, payees),
+ * budgets, recurring series, rules, goals, and import/export.
+ *
+ * The remaining SaaS-layer tables named in the blueprint's §3.2 — `organization_settings`,
+ * `user_preferences`, `notifications`, `notification_preferences`, `audit_log`,
+ * `platform_audit_log`, `dashboard_layouts`, `impersonation_sessions` — are **deliberately not
+ * here**: they belong to the tenancy, notification and console plans, and a table sketched by the
+ * wrong owner generates a migration that has to be reverted.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IS A `CHECK` AND WHAT IS A REPOSITORY INVARIANT
+ * ---------------------------------------------------------------------------
+ * A `CHECK` encodes a rule that is true of **one row in isolation** and is never allowed to be
+ * false, in any code path, including the import path. Anything that needs to read a second row —
+ * `Σ transaction_splits.amount_minor = transactions.amount_minor`, the two-level category depth
+ * cap, "a transaction with splits cannot become a transfer", "at most one of `end_date` and
+ * `max_occurrences`" — is a **repository** invariant, asserted on every write, and is called out
+ * in the docblock of the table it constrains. A cross-row rule written as a SQL trigger would be
+ * a second implementation of business logic in a language with no tests.
  */
 
 import { sql } from 'drizzle-orm'
@@ -59,7 +86,7 @@ import {
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { SQL } from 'drizzle-orm'
 
-import { organization } from './auth-schema'
+import { organization, user } from './auth-schema'
 
 /* -------------------------------------------------------------------------- */
 /* Shared column and constraint helpers                                       */
@@ -76,6 +103,76 @@ const updatedAt = () =>
 
 /** An ISO-4217 alphabetic code. Three characters, upper case, always. */
 const currencyCode = (name: string) => text(name, { length: 3 })
+
+/**
+ * The tenant column.
+ *
+ * Every tenant-owned table in this file declares it with this helper and nothing else, so
+ * "does this table have `organization_id`" is a grep rather than a reading. `onDelete: 'cascade'`
+ * means deleting a workspace takes its data with it in one statement; a soft-delete flag would
+ * leave rows a tenant-scoped query still has to remember to exclude.
+ */
+const organizationId = () =>
+  text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' })
+
+/** A UTC calendar date, `YYYY-MM-DD`. Never an instant, never a local date. */
+const calendarDate = (name: string) => text(name, { length: 10 })
+
+/**
+ * A `#rrggbb` colour, lower case, seven characters including the hash.
+ *
+ * Stored as text rather than as an integer because it is round-tripped through a colour input and
+ * an OKLCH contrast check, both of which speak hex.
+ */
+const colorHex = (name: string) => text(name, { length: 7 })
+
+/** A `CHECK` asserting a nullable text column, when present, is exactly `length` characters. */
+function fixedLengthCheck(
+  constraintName: string,
+  column: AnySQLiteColumn,
+  length: number,
+): ReturnType<typeof check> {
+  return check(
+    constraintName,
+    sql`length(${column}) = ${sql.raw(String(length))}`,
+  )
+}
+
+/** A `CHECK` asserting a text column, when present, is at most `length` characters. */
+function maxLengthCheck(
+  constraintName: string,
+  column: AnySQLiteColumn,
+  length: number,
+): ReturnType<typeof check> {
+  return check(
+    constraintName,
+    sql`length(${column}) <= ${sql.raw(String(length))}`,
+  )
+}
+
+/**
+ * A `CHECK` asserting an amount column holds a strictly positive number of minor units.
+ *
+ * **The sign of a transaction lives in `direction`, never in the amount.** One representation of
+ * "spent 20" is the whole point: two representations means every consumer has to normalise, and
+ * one of them will forget.
+ */
+function positiveMinorCheck(
+  constraintName: string,
+  column: AnySQLiteColumn,
+): ReturnType<typeof check> {
+  return check(constraintName, sql`${column} > 0`)
+}
+
+/** A `CHECK` asserting a counter or an ordering position is not negative. */
+function nonNegativeCheck(
+  constraintName: string,
+  column: AnySQLiteColumn,
+): ReturnType<typeof check> {
+  return check(constraintName, sql`${column} >= 0`)
+}
 
 /**
  * A `CHECK` constraint restricting a column to one tuple of literals.
@@ -333,3 +430,2402 @@ export const exchangeRates = sqliteTable(
 )
 
 export type ExchangeRateRow = typeof exchangeRates.$inferSelect
+
+/**
+ * A cached brand mark for a payee or an account, keyed by domain.
+ *
+ * Global like `currencies`: "what colour is the monzo.com logo" is a fact about the world, and
+ * fetching it once per workspace would be the same request many times over. There is no
+ * `organization_id` here on purpose, and `src/server/catalog` is the only writer.
+ *
+ * A row is a **fallback, not an image**: `initials` and `color` render a monogram when no logo is
+ * available, which is why they are stored rather than derived — a monogram that changes colour
+ * between two renders of the same payee looks like a bug.
+ */
+export const brandLogos = sqliteTable(
+  'brand_logos',
+  {
+    /** Registrable domain, lower case, no scheme and no `www.` — `monzo.com`. */
+    domain: text('domain').primaryKey(),
+    /** One or two letters for the monogram fallback. */
+    initials: text('initials', { length: 4 }),
+    /** `#rrggbb` background for the monogram fallback. */
+    color: colorHex('color'),
+    fetchedAt: integer('fetched_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('brand_logos_fetched_at_idx').on(table.fetchedAt),
+    fixedLengthCheck('brand_logos_color_check', table.color, 7),
+  ],
+)
+
+export type BrandLogoRow = typeof brandLogos.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Workspace currency layer                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The currencies one workspace has switched on, and which of them is the base.
+ *
+ * **Exactly one row per organization has `is_base = true`**, enforced by a partial unique index
+ * rather than by application code, because `ref_amount_minor` on every transaction in the
+ * workspace is denominated against that one currency (§3.5). Two base currencies would make
+ * "net worth" a question with two answers.
+ *
+ * `live_rate_update = false` means this workspace prices the pair from its own
+ * `organization_exchange_rates` range instead of the daily catalog — a household that settles at
+ * a fixed internal rate wants that rate, not the market's.
+ */
+export const organizationCurrencies = sqliteTable(
+  'organization_currencies',
+  {
+    organizationId: organizationId(),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    isBase: integer('is_base', { mode: 'boolean' }).notNull().default(false),
+    liveRateUpdate: integer('live_rate_update', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    addedAt: integer('added_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'organization_currencies_pk',
+      columns: [table.organizationId, table.currencyCode],
+    }),
+    // The invariant of §3.5 as a constraint rather than as a convention: one base per workspace.
+    uniqueIndex('organization_currencies_one_base_per_org_unique')
+      .on(table.organizationId)
+      .where(sql`${table.isBase} = 1`),
+  ],
+)
+
+export type OrganizationCurrencyRow = typeof organizationCurrencies.$inferSelect
+
+/**
+ * A workspace's own rate for a pair, valid over a **range of days**.
+ *
+ * The reference product stored a single point and left a TODO where the range should have been,
+ * so a manual rate silently applied to all of history. Here `effective_from` and `effective_to`
+ * bound it, `effective_to IS NULL` means "still in force", and the resolver picks the range that
+ * contains `booked_on` — never the newest row.
+ *
+ * Ranges are non-overlapping per `(organization, base, quote)`. That is a two-row rule and so a
+ * repository invariant, not a `CHECK`.
+ */
+export const organizationExchangeRates = sqliteTable(
+  'organization_exchange_rates',
+  {
+    organizationId: organizationId(),
+    baseCode: currencyCode('base_code')
+      .notNull()
+      .references(() => currencies.code),
+    quoteCode: currencyCode('quote_code')
+      .notNull()
+      .references(() => currencies.code),
+    effectiveFrom: calendarDate('effective_from').notNull(),
+    /** `NULL` = open-ended, still the rate in force today. */
+    effectiveTo: calendarDate('effective_to'),
+    rateE10: integer('rate_e10').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'organization_exchange_rates_pk',
+      columns: [
+        table.organizationId,
+        table.baseCode,
+        table.quoteCode,
+        table.effectiveFrom,
+      ],
+    }),
+    // "Which of this workspace's ranges contains this day" — the only read this table serves.
+    index('organization_exchange_rates_lookup_idx').on(
+      table.organizationId,
+      table.quoteCode,
+      table.effectiveFrom,
+    ),
+    check(
+      'organization_exchange_rates_rate_e10_check',
+      sql`${table.rateE10} > 0`,
+    ),
+    check(
+      'organization_exchange_rates_pair_check',
+      sql`${table.baseCode} <> ${table.quoteCode}`,
+    ),
+    // An inverted range would be a rate that is never in force, and it would resolve to nothing
+    // rather than to an error — the worst shape of wrong.
+    check(
+      'organization_exchange_rates_range_check',
+      sql`${table.effectiveTo} is null or ${table.effectiveTo} >= ${table.effectiveFrom}`,
+    ),
+    fixedLengthCheck(
+      'organization_exchange_rates_effective_from_check',
+      table.effectiveFrom,
+      10,
+    ),
+    fixedLengthCheck(
+      'organization_exchange_rates_effective_to_check',
+      table.effectiveTo,
+      10,
+    ),
+  ],
+)
+
+export type OrganizationExchangeRateRow =
+  typeof organizationExchangeRates.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Classification — categories, tags, payees                                  */
+/* -------------------------------------------------------------------------- */
+
+/** What a category may be applied to. `both` exists for the refund/reimbursement case. */
+export const CATEGORY_KINDS = ['expense', 'income', 'both'] as const
+export type CategoryKind = (typeof CATEGORY_KINDS)[number]
+
+/**
+ * A two-level category tree.
+ *
+ * **Depth is capped at 2 by a repository invariant, not by SQL**, because the cap is a product
+ * decision and a `CHECK` on it would be a migration every time the product changed its mind. What
+ * the schema does guarantee is that `parent_id` points inside the same workspace and that deleting
+ * a parent does not orphan a child into an unreachable third level (`set null` promotes it).
+ *
+ * `color` is `NOT NULL` — a child inherits its parent's colour at creation time and stores it,
+ * rather than resolving it on read. A stored colour survives the parent being recoloured, which is
+ * what a reader expects of a chart they printed last month.
+ *
+ * `is_system` rows may be renamed and recoloured but not deleted: the import mappers and the rule
+ * engine address them by `slug`, and a missing slug is a silently mis-categorised import.
+ */
+export const categories = sqliteTable(
+  'categories',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 100 }).notNull(),
+    /** Stable machine name. Unique per workspace; what rules and importers reference. */
+    slug: text('slug', { length: 100 }).notNull(),
+    icon: text('icon', { length: 50 }),
+    color: colorHex('color').notNull(),
+    kind: text('kind').notNull().default('expense'),
+    parentId: text('parent_id').references(
+      (): AnySQLiteColumn => categories.id,
+      {
+        onDelete: 'set null',
+      },
+    ),
+    isSystem: integer('is_system', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    position: integer('position').notNull().default(0),
+    /** Archived, not deleted: historical transactions keep pointing at it. */
+    archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex('categories_organization_id_slug_unique').on(
+      table.organizationId,
+      table.slug,
+    ),
+    // The picker's query: this workspace's live categories, in display order.
+    index('categories_organization_id_position_idx').on(
+      table.organizationId,
+      table.position,
+    ),
+    // "Give me the children of this parent", which is how the two-level tree is rendered.
+    index('categories_organization_id_parent_id_idx').on(
+      table.organizationId,
+      table.parentId,
+    ),
+    index('categories_organization_id_archived_at_idx').on(
+      table.organizationId,
+      table.archivedAt,
+    ),
+    enumCheck('categories_kind_check', table.kind, CATEGORY_KINDS),
+    fixedLengthCheck('categories_color_check', table.color, 7),
+    nonNegativeCheck('categories_position_check', table.position),
+    // A category that is its own parent is a cycle the repository's depth walk would not
+    // terminate on. The one-row half of that rule is free to state here.
+    check(
+      'categories_parent_self_check',
+      sql`${table.parentId} <> ${table.id}`,
+    ),
+  ],
+)
+
+export type CategoryRow = typeof categories.$inferSelect
+export type CategoryInsert = typeof categories.$inferInsert
+
+/** A free-form label. Flat by design — tags are the escape hatch categories deliberately are not. */
+export const tags = sqliteTable(
+  'tags',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 100 }).notNull(),
+    color: colorHex('color'),
+    icon: text('icon', { length: 50 }),
+    description: text('description', { length: 500 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex('tags_organization_id_name_unique').on(
+      table.organizationId,
+      table.name,
+    ),
+    fixedLengthCheck('tags_color_check', table.color, 7),
+    maxLengthCheck('tags_description_check', table.description, 500),
+  ],
+)
+
+export type TagRow = typeof tags.$inferSelect
+
+/** What a tag reminder watches. */
+export const TAG_REMINDER_KINDS = ['amount_threshold', 'absence'] as const
+export type TagReminderKind = (typeof TAG_REMINDER_KINDS)[number]
+
+/** How often a reminder is evaluated. `immediate` fires on the write that triggers it. */
+export const TAG_REMINDER_FREQUENCIES = [
+  'daily',
+  'weekly',
+  'monthly',
+  'quarterly',
+  'yearly',
+  'immediate',
+] as const
+export type TagReminderFrequency = (typeof TAG_REMINDER_FREQUENCIES)[number]
+
+/**
+ * "Tell me when I spend more than X on this tag", or "tell me when I have not used it".
+ *
+ * `threshold_minor` carries its own `currency_code` because a threshold is an amount and an
+ * amount with no currency is not an amount — the workspace base is the usual value, but storing
+ * it means changing the base later does not silently reinterpret every threshold.
+ */
+export const tagReminders = sqliteTable(
+  'tag_reminders',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tagId: text('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    thresholdMinor: integer('threshold_minor'),
+    currencyCode: currencyCode('currency_code').references(
+      () => currencies.code,
+    ),
+    frequency: text('frequency').notNull(),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    lastNotifiedAt: integer('last_notified_at', { mode: 'timestamp_ms' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('tag_reminders_organization_id_tag_id_idx').on(
+      table.organizationId,
+      table.tagId,
+    ),
+    // The cron's query: every live reminder of this cadence, across the workspace.
+    index('tag_reminders_organization_id_is_active_frequency_idx').on(
+      table.organizationId,
+      table.isActive,
+      table.frequency,
+    ),
+    enumCheck('tag_reminders_kind_check', table.kind, TAG_REMINDER_KINDS),
+    enumCheck(
+      'tag_reminders_frequency_check',
+      table.frequency,
+      TAG_REMINDER_FREQUENCIES,
+    ),
+    // An `amount_threshold` with no threshold can never fire, and a reminder that can never fire
+    // is worse than no reminder: the reader believes they are being watched.
+    check(
+      'tag_reminders_threshold_required_check',
+      sql`${table.kind} <> 'amount_threshold' or (${table.thresholdMinor} is not null and ${table.currencyCode} is not null)`,
+    ),
+    check(
+      'tag_reminders_threshold_minor_check',
+      sql`${table.thresholdMinor} is null or ${table.thresholdMinor} > 0`,
+    ),
+  ],
+)
+
+export type TagReminderRow = typeof tagReminders.$inferSelect
+
+/**
+ * How hard a payee's default category is applied to a new transaction.
+ *
+ * `enforce` overwrites, `hint` pre-fills something the person may change, `off` does nothing.
+ * The three exist separately because a shop that is always Groceries and a shop that is usually
+ * Groceries are different facts.
+ */
+export const PAYEE_CATEGORIZATION_MODES = ['enforce', 'hint', 'off'] as const
+export type PayeeCategorizationMode =
+  (typeof PAYEE_CATEGORIZATION_MODES)[number]
+
+/** Where a payee's brand mark came from. `manual` is never overwritten by the fetcher. */
+export const PAYEE_LOGO_SOURCES = ['auto', 'manual'] as const
+export type PayeeLogoSource = (typeof PAYEE_LOGO_SOURCES)[number]
+
+/** Who was paid, or who paid. */
+export const payees = sqliteTable(
+  'payees',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 200 }).notNull(),
+    defaultCategoryId: text('default_category_id').references(
+      () => categories.id,
+      { onDelete: 'set null' },
+    ),
+    categorizationMode: text('categorization_mode').notNull().default('hint'),
+    logoDomain: text('logo_domain'),
+    logoInitials: text('logo_initials', { length: 4 }),
+    logoColor: colorHex('logo_color'),
+    /** `NULL` = no mark chosen yet, which is different from "the fetcher found nothing". */
+    logoSource: text('logo_source'),
+    note: text('note', { length: 500 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex('payees_organization_id_name_unique').on(
+      table.organizationId,
+      table.name,
+    ),
+    index('payees_organization_id_default_category_id_idx').on(
+      table.organizationId,
+      table.defaultCategoryId,
+    ),
+    enumCheck(
+      'payees_categorization_mode_check',
+      table.categorizationMode,
+      PAYEE_CATEGORIZATION_MODES,
+    ),
+    enumCheck('payees_logo_source_check', table.logoSource, PAYEE_LOGO_SOURCES),
+    fixedLengthCheck('payees_logo_color_check', table.logoColor, 7),
+    maxLengthCheck('payees_note_check', table.note, 500),
+  ],
+)
+
+export type PayeeRow = typeof payees.$inferSelect
+export type PayeeInsert = typeof payees.$inferInsert
+
+/**
+ * The strings an import or a bank description resolves to a payee.
+ *
+ * `normalized_name` is the lower-cased, punctuation-stripped form the matcher compares, and it is
+ * **unique per workspace across all payees** — one string cannot resolve to two payees, because
+ * the import would have no way to choose and would choose differently on each run.
+ */
+export const payeeAliases = sqliteTable(
+  'payee_aliases',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    payeeId: text('payee_id')
+      .notNull()
+      .references(() => payees.id, { onDelete: 'cascade' }),
+    normalizedName: text('normalized_name', { length: 200 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('payee_aliases_organization_id_normalized_name_unique').on(
+      table.organizationId,
+      table.normalizedName,
+    ),
+    index('payee_aliases_organization_id_payee_id_idx').on(
+      table.organizationId,
+      table.payeeId,
+    ),
+  ],
+)
+
+export type PayeeAliasRow = typeof payeeAliases.$inferSelect
+
+/**
+ * Strings that must **not** become a payee.
+ *
+ * Without it, every "CARD PAYMENT" and "SEPA DD" line in a statement mints a payee, and the payee
+ * list becomes unusable after one import. A row here is a person saying "stop asking".
+ */
+export const payeeIgnoredNames = sqliteTable(
+  'payee_ignored_names',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    normalizedName: text('normalized_name', { length: 200 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('payee_ignored_names_organization_id_name_unique').on(
+      table.organizationId,
+      table.normalizedName,
+    ),
+  ],
+)
+
+export type PayeeIgnoredNameRow = typeof payeeIgnoredNames.$inferSelect
+
+/** Tags applied to every transaction of a payee. */
+export const payeeTags = sqliteTable(
+  'payee_tags',
+  {
+    organizationId: organizationId(),
+    payeeId: text('payee_id')
+      .notNull()
+      .references(() => payees.id, { onDelete: 'cascade' }),
+    tagId: text('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({
+      name: 'payee_tags_pk',
+      columns: [table.payeeId, table.tagId],
+    }),
+    // The reverse lookup: "which payees carry this tag", for the tag detail screen.
+    index('payee_tags_organization_id_tag_id_idx').on(
+      table.organizationId,
+      table.tagId,
+    ),
+  ],
+)
+
+export type PayeeTagRow = typeof payeeTags.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Accounts                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What kind of place the money sits in.
+ *
+ * `loan` and `vehicle` have **no dedicated flow in v1** — `vehicle` is not even a value, and
+ * `loan` is an account with a balance, not an amortisation product. That is a scope decision
+ * (`99-boundaries-and-blockers.md` BND-11), recorded here so the absence reads as a choice.
+ */
+export const ACCOUNT_CATEGORIES = [
+  'general',
+  'cash',
+  'current',
+  'credit_card',
+  'savings',
+  'investment',
+  'loan',
+  'other',
+] as const
+export type AccountCategory = (typeof ACCOUNT_CATEGORIES)[number]
+
+/** An account is live or it is archived. There is no third state and no soft delete. */
+export const ACCOUNT_STATUSES = ['active', 'archived'] as const
+export type AccountStatus = (typeof ACCOUNT_STATUSES)[number]
+
+/**
+ * Where money sits.
+ *
+ * **There is no `type` column.** With no bank connectors every account in this product is manual,
+ * so the reference model's "external account, these fields are read-only" branch — and the whole
+ * editability matrix that hangs off it — does not exist. Nobody should re-add the column as an
+ * oversight; if connectors ever arrive, the column arrives with them and with the branch.
+ *
+ * **Four balance columns, in two pairs.** `initial_balance_minor` and `current_balance_minor` are
+ * in `currency_code`; `ref_initial_balance_minor` and `ref_current_balance_minor` are the same
+ * amounts in the workspace base currency. For an account already in the base currency the two
+ * halves of each pair are equal, which is the cheapest assertion the money tests have.
+ * `current_balance_minor` is a **cache** maintained by the ledger; `account_balances` is the
+ * history and the authority.
+ *
+ * `credit_limit_minor` is stored as a **positive** number for a credit card: it is a limit, not a
+ * balance, and a negative limit is not a thing. Whether the card is over it is arithmetic, not a
+ * column.
+ */
+export const accounts = sqliteTable(
+  'accounts',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 100 }).notNull(),
+    category: text('category').notNull().default('general'),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+
+    /** The balance on the day before the first transaction. Where an opening balance lives. */
+    initialBalanceMinor: integer('initial_balance_minor').notNull().default(0),
+    refInitialBalanceMinor: integer('ref_initial_balance_minor')
+      .notNull()
+      .default(0),
+    /** Cache of today's balance. `account_balances` is the authority; this is the fast read. */
+    currentBalanceMinor: integer('current_balance_minor').notNull().default(0),
+    refCurrentBalanceMinor: integer('ref_current_balance_minor')
+      .notNull()
+      .default(0),
+    /** Positive minor units. `NULL` for an account that has no limit. */
+    creditLimitMinor: integer('credit_limit_minor'),
+    refCreditLimitMinor: integer('ref_credit_limit_minor'),
+
+    status: text('status').notNull().default('active'),
+    /**
+     * Keep this account out of net worth, cash-flow and category totals.
+     *
+     * It is a **display and aggregation** flag, never a data flag: the transactions still exist,
+     * still appear in the list, and still rebuild a balance history. A flag that deleted data
+     * would be a different feature.
+     */
+    excludeFromStats: integer('exclude_from_stats', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    position: integer('position').notNull().default(0),
+
+    logoDomain: text('logo_domain'),
+    logoInitials: text('logo_initials', { length: 4 }),
+    logoColor: colorHex('logo_color'),
+    note: text('note', { length: 500 }),
+
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // The account list: this workspace's accounts, in the order the person dragged them into.
+    index('accounts_organization_id_position_idx').on(
+      table.organizationId,
+      table.position,
+    ),
+    // "Live accounts only", which every picker and every total asks for.
+    index('accounts_organization_id_status_idx').on(
+      table.organizationId,
+      table.status,
+    ),
+    // Net worth sums per currency before converting, so the grouping column is indexed.
+    index('accounts_organization_id_currency_code_idx').on(
+      table.organizationId,
+      table.currencyCode,
+    ),
+    enumCheck('accounts_category_check', table.category, ACCOUNT_CATEGORIES),
+    enumCheck('accounts_status_check', table.status, ACCOUNT_STATUSES),
+    nonNegativeCheck('accounts_position_check', table.position),
+    check(
+      'accounts_credit_limit_minor_check',
+      sql`${table.creditLimitMinor} is null or ${table.creditLimitMinor} >= 0`,
+    ),
+    check(
+      'accounts_ref_credit_limit_minor_check',
+      sql`${table.refCreditLimitMinor} is null or ${table.refCreditLimitMinor} >= 0`,
+    ),
+    // A limit in the native currency with no converted twin is an amount that cannot be summed
+    // into a workspace total — the pair travels together or not at all.
+    check(
+      'accounts_credit_limit_pair_check',
+      sql`(${table.creditLimitMinor} is null) = (${table.refCreditLimitMinor} is null)`,
+    ),
+    fixedLengthCheck('accounts_logo_color_check', table.logoColor, 7),
+    maxLengthCheck('accounts_note_check', table.note, 500),
+  ],
+)
+
+export type AccountRow = typeof accounts.$inferSelect
+export type AccountInsert = typeof accounts.$inferInsert
+
+/**
+ * A folder over accounts — "Joint", "Kids", "Business".
+ *
+ * Nestable one level for the same reason categories are: a tree a person cannot see the bottom of
+ * is a tree they stop trusting. The depth cap is a repository invariant.
+ */
+export const accountGroups = sqliteTable(
+  'account_groups',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 100 }).notNull(),
+    parentId: text('parent_id').references(
+      (): AnySQLiteColumn => accountGroups.id,
+      { onDelete: 'set null' },
+    ),
+    position: integer('position').notNull().default(0),
+    logoDomain: text('logo_domain'),
+    logoInitials: text('logo_initials', { length: 4 }),
+    logoColor: colorHex('logo_color'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('account_groups_organization_id_position_idx').on(
+      table.organizationId,
+      table.position,
+    ),
+    index('account_groups_organization_id_parent_id_idx').on(
+      table.organizationId,
+      table.parentId,
+    ),
+    nonNegativeCheck('account_groups_position_check', table.position),
+    fixedLengthCheck('account_groups_logo_color_check', table.logoColor, 7),
+    check(
+      'account_groups_parent_self_check',
+      sql`${table.parentId} <> ${table.id}`,
+    ),
+  ],
+)
+
+export type AccountGroupRow = typeof accountGroups.$inferSelect
+
+/**
+ * Which accounts are in which group, and in what order inside it.
+ *
+ * Many-to-many on purpose: an account can be both "Joint" and "Everyday", and forcing a single
+ * parent would make one of those two views wrong.
+ */
+export const accountGroupMembers = sqliteTable(
+  'account_group_members',
+  {
+    organizationId: organizationId(),
+    groupId: text('group_id')
+      .notNull()
+      .references(() => accountGroups.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      name: 'account_group_members_pk',
+      columns: [table.groupId, table.accountId],
+    }),
+    // "Which groups is this account in", for the account detail screen and the rule engine's
+    // `account_group` condition.
+    index('account_group_members_organization_id_account_id_idx').on(
+      table.organizationId,
+      table.accountId,
+    ),
+    nonNegativeCheck('account_group_members_position_check', table.position),
+  ],
+)
+
+export type AccountGroupMemberRow = typeof accountGroupMembers.$inferSelect
+
+/**
+ * The daily balance grid — one row per account per day that the balance *changed*.
+ *
+ * **Sparse by design.** A day that repeats the previous day's value is omitted; forward-fill
+ * happens on read and only on read. The first day of the grid and today always survive, so a
+ * reader always has both ends of the line.
+ *
+ * **A rebuild, never an accumulator** (§3.5): `balance[D] = native units held on D × rate on D`.
+ * Accumulating converted amounts produces the reference product's famous defect — a year-long gap
+ * followed by a €5 transaction posting a one-day €12 000 loss with no transaction behind it. The
+ * writer is `src/server/ledger` through the `LEDGER` Durable Object, as delete-range + insert in
+ * one D1 batch; a write from anywhere else is a defect, because a day a rebuild no longer emits
+ * must not survive as a phantom measurement.
+ *
+ * `rate_e10` is stored per row so a historical point on the chart can be explained without a
+ * join, exactly as a transaction stores the rate it used.
+ */
+export const accountBalances = sqliteTable(
+  'account_balances',
+  {
+    organizationId: organizationId(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** UTC calendar date, `YYYY-MM-DD`. Day bucketing is UTC everywhere. */
+    date: calendarDate('date').notNull(),
+    /** Units held on that day, in the account's own currency. */
+    nativeMinor: integer('native_minor').notNull(),
+    /** The same holding in the workspace base currency, at that day's rate. */
+    refMinor: integer('ref_minor').notNull(),
+    rateE10: integer('rate_e10').notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'account_balances_pk',
+      columns: [table.organizationId, table.accountId, table.date],
+    }),
+    // The net-worth chart scans every account of a workspace over a date range; without this the
+    // range predicate can only be satisfied by walking the primary key per account.
+    index('account_balances_organization_id_date_idx').on(
+      table.organizationId,
+      table.date,
+    ),
+    check('account_balances_rate_e10_check', sql`${table.rateE10} > 0`),
+    fixedLengthCheck('account_balances_date_check', table.date, 10),
+  ],
+)
+
+export type AccountBalanceRow = typeof accountBalances.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Recurring — the series. Its periods and links live below `transactions`.   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What sort of repeating thing this is. Presentation and grouping only — the engine treats all
+ * four identically, which is why `direction` is a separate column.
+ *
+ * **These tables are `recurring_*` and never `subscriptions`.** That name belongs to the Polar
+ * billing mirror at the top of this file, and one product having two unrelated "subscriptions"
+ * tables is a bug waiting for a tired reader.
+ */
+export const RECURRING_KINDS = [
+  'subscription',
+  'bill',
+  'installment',
+  'income',
+] as const
+export type RecurringKind = (typeof RECURRING_KINDS)[number]
+
+/** Which way the money moves. The same vocabulary as `transactions.direction`, deliberately. */
+export const TRANSACTION_DIRECTIONS = ['income', 'expense'] as const
+export type TransactionDirection = (typeof TRANSACTION_DIRECTIONS)[number]
+
+/** How often a series comes round. */
+export const RECURRING_FREQUENCIES = [
+  'weekly',
+  'biweekly',
+  'monthly',
+  'quarterly',
+  'semi_annual',
+  'annual',
+] as const
+export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number]
+
+/**
+ * A repeating expectation: a subscription, a bill, an installment, a salary.
+ *
+ * **`auto_record` and `matching_rules` may not coexist**, and that is a `CHECK` rather than a
+ * repository guard because both write paths — the UI and the import — would otherwise each have to
+ * remember it. They race for the same period: auto-record mints a transaction for the period at
+ * the same moment matching would have adopted the real one, and the reader ends up with two.
+ *
+ * `end_date` and `max_occurrences` are alternative terminations and at most one may be set; that
+ * is a repository invariant, because which of the two a person meant is a product question the
+ * form answers, not a row-level truth.
+ */
+export const recurringSeries = sqliteTable(
+  'recurring_series',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 200 }).notNull(),
+    kind: text('kind').notNull(),
+    direction: text('direction').notNull(),
+    expectedAmountMinor: integer('expected_amount_minor').notNull(),
+    expectedCurrencyCode: currencyCode('expected_currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    frequency: text('frequency').notNull(),
+    /** Day of month (1–31) or day of week (1–7), read according to `frequency`. */
+    anchorDay: integer('anchor_day'),
+    startDate: calendarDate('start_date').notNull(),
+    endDate: calendarDate('end_date'),
+    maxOccurrences: integer('max_occurrences'),
+
+    accountId: text('account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    categoryId: text('category_id').references(() => categories.id, {
+      onDelete: 'set null',
+    }),
+    payeeId: text('payee_id').references(() => payees.id, {
+      onDelete: 'set null',
+    }),
+
+    /** Mint the transaction without being asked. Mutually exclusive with `matching_rules`. */
+    autoRecord: integer('auto_record', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    /** JSON matcher adopting a real transaction into the period. Excludes `auto_record`. */
+    matchingRules: text('matching_rules'),
+    /** JSON array, at most 3, drawn from `0d|1d|2d|3d|5d|1w|2w|1m`. */
+    remindBefore: text('remind_before'),
+    notifyEmail: integer('notify_email', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    showInWidget: integer('show_in_widget', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+
+    logoDomain: text('logo_domain'),
+    logoInitials: text('logo_initials', { length: 4 }),
+    logoColor: colorHex('logo_color'),
+
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // The upcoming-bills widget and the nightly cron both ask for live series of a workspace.
+    index('recurring_series_organization_id_is_active_idx').on(
+      table.organizationId,
+      table.isActive,
+    ),
+    index('recurring_series_organization_id_account_id_idx').on(
+      table.organizationId,
+      table.accountId,
+    ),
+    index('recurring_series_organization_id_payee_id_idx').on(
+      table.organizationId,
+      table.payeeId,
+    ),
+    enumCheck('recurring_series_kind_check', table.kind, RECURRING_KINDS),
+    enumCheck(
+      'recurring_series_direction_check',
+      table.direction,
+      TRANSACTION_DIRECTIONS,
+    ),
+    enumCheck(
+      'recurring_series_frequency_check',
+      table.frequency,
+      RECURRING_FREQUENCIES,
+    ),
+    positiveMinorCheck(
+      'recurring_series_expected_amount_minor_check',
+      table.expectedAmountMinor,
+    ),
+    check(
+      'recurring_series_anchor_day_check',
+      sql`${table.anchorDay} is null or (${table.anchorDay} >= 1 and ${table.anchorDay} <= 31)`,
+    ),
+    check(
+      'recurring_series_max_occurrences_check',
+      sql`${table.maxOccurrences} is null or ${table.maxOccurrences} > 0`,
+    ),
+    check(
+      'recurring_series_end_date_check',
+      sql`${table.endDate} is null or ${table.endDate} >= ${table.startDate}`,
+    ),
+    // §3.3: the two mechanisms race for the same period. The database says no, so the import
+    // path cannot say yes.
+    check(
+      'recurring_series_auto_record_excludes_matching_rules_check',
+      sql`not (${table.autoRecord} = 1 and ${table.matchingRules} is not null)`,
+    ),
+    fixedLengthCheck('recurring_series_start_date_check', table.startDate, 10),
+    fixedLengthCheck(
+      'recurring_series_end_date_length_check',
+      table.endDate,
+      10,
+    ),
+  ],
+)
+
+export type RecurringSeriesRow = typeof recurringSeries.$inferSelect
+export type RecurringSeriesInsert = typeof recurringSeries.$inferInsert
+
+/* -------------------------------------------------------------------------- */
+/* Goals — the goal. Its contributions live below `transactions`.             */
+/* -------------------------------------------------------------------------- */
+
+/** A goal is being saved for, has been reached, or has been put away. */
+export const SAVINGS_GOAL_STATUSES = ['active', 'reached', 'archived'] as const
+export type SavingsGoalStatus = (typeof SAVINGS_GOAL_STATUSES)[number]
+
+/**
+ * "€4 000 for the deposit by June."
+ *
+ * Two nullable account links, and they mean different things: `account_id` is where contributions
+ * are **funded from**, `linked_account_id` is where the money is **held**. A goal held in a
+ * dedicated savings account can read its progress from that account's balance; a goal funded out
+ * of the current account cannot, and needs its contributions listed.
+ *
+ * `contributed_minor` is a **denormalised cache** recomputed from `savings_goal_contributions` in
+ * the same batch as every contribution write. The links are the authority; a repair function
+ * recomputes the column from scratch.
+ */
+export const savingsGoals = sqliteTable(
+  'savings_goals',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 200 }).notNull(),
+    targetMinor: integer('target_minor').notNull(),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    targetDate: calendarDate('target_date'),
+    /** Funded from. */
+    accountId: text('account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    /** Held in. */
+    linkedAccountId: text('linked_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    contributedMinor: integer('contributed_minor').notNull().default(0),
+    status: text('status').notNull().default('active'),
+    color: colorHex('color'),
+    icon: text('icon', { length: 50 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('savings_goals_organization_id_status_idx').on(
+      table.organizationId,
+      table.status,
+    ),
+    index('savings_goals_organization_id_target_date_idx').on(
+      table.organizationId,
+      table.targetDate,
+    ),
+    enumCheck(
+      'savings_goals_status_check',
+      table.status,
+      SAVINGS_GOAL_STATUSES,
+    ),
+    positiveMinorCheck('savings_goals_target_minor_check', table.targetMinor),
+    nonNegativeCheck(
+      'savings_goals_contributed_minor_check',
+      table.contributedMinor,
+    ),
+    fixedLengthCheck('savings_goals_color_check', table.color, 7),
+    fixedLengthCheck('savings_goals_target_date_check', table.targetDate, 10),
+  ],
+)
+
+export type SavingsGoalRow = typeof savingsGoals.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Import — the batch. Presets, row errors and export jobs are below.         */
+/* -------------------------------------------------------------------------- */
+
+/** What was uploaded. `json_backup` is this product's own export, read back. */
+export const IMPORT_SOURCES = [
+  'csv',
+  'ofx',
+  'qif',
+  'ynab',
+  'wallet',
+  'json_backup',
+] as const
+export type ImportSource = (typeof IMPORT_SOURCES)[number]
+
+/**
+ * Where a batch is in the pipeline.
+ *
+ * `reverted` is terminal and distinct from `failed`: a reverted batch ran correctly and was
+ * undone by a person, and the row survives so the history says so.
+ */
+export const IMPORT_STATUSES = [
+  'queued',
+  'parsing',
+  'mapping',
+  'previewing',
+  'running',
+  'completed',
+  'failed',
+  'reverted',
+] as const
+export type ImportStatus = (typeof IMPORT_STATUSES)[number]
+
+/**
+ * One upload.
+ *
+ * `transactions.import_batch_id` points back here, and that column is what makes undo exact: it
+ * deletes the transactions **this batch created and no others**, rather than everything inside a
+ * time window, which is the heuristic that eats a person's manual entries.
+ */
+export const importBatches = sqliteTable(
+  'import_batches',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    source: text('source').notNull(),
+    status: text('status').notNull().default('queued'),
+    fileR2Key: text('file_r2_key'),
+    rowCount: integer('row_count').notNull().default(0),
+    importedCount: integer('imported_count').notNull().default(0),
+    skippedCount: integer('skipped_count').notNull().default(0),
+    duplicateCount: integer('duplicate_count').notNull().default(0),
+    errorCount: integer('error_count').notNull().default(0),
+    /** JSON column map, as confirmed by the person on the mapping step. */
+    mapping: text('mapping'),
+    startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+    finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+    revertedAt: integer('reverted_at', { mode: 'timestamp_ms' }),
+    createdByUserId: text('created_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // The import history screen, newest first — `id` is time-sortable, so this is the whole sort.
+    index('import_batches_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    // The queue consumer's query: batches of this workspace still in flight.
+    index('import_batches_organization_id_status_idx').on(
+      table.organizationId,
+      table.status,
+    ),
+    enumCheck('import_batches_source_check', table.source, IMPORT_SOURCES),
+    enumCheck('import_batches_status_check', table.status, IMPORT_STATUSES),
+    nonNegativeCheck('import_batches_row_count_check', table.rowCount),
+    nonNegativeCheck(
+      'import_batches_imported_count_check',
+      table.importedCount,
+    ),
+    nonNegativeCheck('import_batches_skipped_count_check', table.skippedCount),
+    nonNegativeCheck(
+      'import_batches_duplicate_count_check',
+      table.duplicateCount,
+    ),
+    nonNegativeCheck('import_batches_error_count_check', table.errorCount),
+  ],
+)
+
+export type ImportBatchRow = typeof importBatches.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Transactions                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** How the money moved. Cash and card are the same money; the distinction is reporting. */
+export const PAYMENT_METHODS = [
+  'cash',
+  'card',
+  'transfer',
+  'direct_debit',
+  'standing_order',
+  'other',
+] as const
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
+
+/**
+ * Whether this row is a transfer, and how many legs the transfer has. **Nothing else.**
+ *
+ * The reference product's `transfer_nature` conflated "is this a transfer" with "what does this
+ * link to", so every consumer had to decode one column to answer two questions and the
+ * `isTwoLegTransfer()` helper had a branch that forgot `transfer_to_loan`. Here link targets are
+ * their own nullable foreign keys (`recurring_series_id`, `goal_id`) and this column answers only
+ * the first question.
+ *
+ * - `none` — an ordinary transaction.
+ * - `internal` — **the only two-leg kind**: an expense on the source account and an income on the
+ *   destination, sharing `transfer_id`. There is no third direction and no transfer entity.
+ * - `external_out` / `external_in` — one leg; money left or entered the tracked world with no
+ *   counter-account inside the workspace.
+ */
+export const TRANSFER_KINDS = [
+  'none',
+  'internal',
+  'external_out',
+  'external_in',
+] as const
+export type TransferKind = (typeof TRANSFER_KINDS)[number]
+
+/** Who chose the category. Kept so a wrong automatic guess is distinguishable from a person's. */
+export const CATEGORIZATION_SOURCES = [
+  'manual',
+  'payee_rule',
+  'automation',
+  'import_map',
+  'ai',
+] as const
+export type CategorizationSource = (typeof CATEGORIZATION_SOURCES)[number]
+
+/**
+ * The ledger row. Everything else in this file exists to describe, group or aggregate it.
+ *
+ * **The sign lives in `direction`, never in `amount_minor`.** One representation of "spent 20"
+ * means no consumer has to normalise and no consumer can forget to.
+ *
+ * **`ref_amount_minor` is history, not a derivation** (§3.5). It is `amount_minor` converted to
+ * the workspace base currency at the rate of `booked_on` — *that* day, not today — and it is
+ * never recomputed. `rate_e10` sits beside it so the conversion is auditable and reproducible
+ * without joining `exchange_rates`. A report that re-derives a historical conversion from a
+ * current rate is a defect, and these two columns are what make the correct thing the easy thing.
+ *
+ * **`booked_on` and `booked_at` are not the same clock.** `booked_on` is the calendar date the
+ * person chose, defaulted from their timezone, and is the only thing any day bucket ever reads.
+ * `booked_at` is epoch-ms and exists purely to order two transactions inside one day; no query
+ * truncates it to a date.
+ *
+ * The cross-row transfer rules of §3.4 — editing one leg propagates to the other, deleting one
+ * deletes the other, a transaction with splits cannot become a transfer and a transfer leg cannot
+ * gain splits, nature changes are unlink-first — live in `src/server/repos` because each needs a
+ * second row. What is enforced here is everything true of this row alone.
+ */
+export const transactions = sqliteTable(
+  'transactions',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'restrict' }),
+
+    direction: text('direction').notNull(),
+    /** Strictly positive minor units in `currency_code`. The sign is `direction`. */
+    amountMinor: integer('amount_minor').notNull(),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    /** The same amount in the workspace base currency, at `booked_on`'s rate. Never recomputed. */
+    refAmountMinor: integer('ref_amount_minor').notNull(),
+    refCurrencyCode: currencyCode('ref_currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    /** The rate actually used, × 10^10. Stored so no report needs a rate join. */
+    rateE10: integer('rate_e10').notNull(),
+
+    /** UTC calendar date. The only column any day bucket reads. */
+    bookedOn: calendarDate('booked_on').notNull(),
+    /** Epoch-ms, for intraday ordering only. Never truncated to a day. */
+    bookedAt: integer('booked_at', { mode: 'timestamp_ms' }).notNull(),
+
+    categoryId: text('category_id').references(() => categories.id, {
+      onDelete: 'set null',
+    }),
+    payeeId: text('payee_id').references(() => payees.id, {
+      onDelete: 'set null',
+    }),
+    /** The person overrode the payee; automations must not change it back. */
+    payeeLocked: integer('payee_locked', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    note: text('note', { length: 500 }),
+    paymentMethod: text('payment_method'),
+
+    transferKind: text('transfer_kind').notNull().default('none'),
+    /** Shared by the two legs of an `internal` transfer. Its own index finds the sibling. */
+    transferId: text('transfer_id'),
+
+    /** A future or forecast row. Excluded from actuals unless a policy says otherwise. */
+    isPlanned: integer('is_planned', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    /**
+     * A correction row.
+     *
+     * A balance adjustment is a **real transaction with its own filter policy**, never a silent
+     * overwrite of `accounts.current_balance_minor` (§3.4.8) — an unexplained jump in a balance
+     * chart with no row behind it is the single most common "your app lost my money" report.
+     */
+    isBalanceAdjustment: integer('is_balance_adjustment', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    /** Cached: a `refunds` row points at this transaction. Blocks deletion until unlinked. */
+    refundLinked: integer('refund_linked', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    /**
+     * Keep this single row out of totals.
+     *
+     * The account-level twin is `accounts.exclude_from_stats`; this is the row-level one, and it
+     * is what the rule engine's `set_excluded` action writes.
+     */
+    excludeFromStats: integer('exclude_from_stats', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+
+    importBatchId: text('import_batch_id').references(() => importBatches.id, {
+      onDelete: 'set null',
+    }),
+    /** Stable hash of the source line. Exact duplicate detection on a re-import. */
+    importSourceHash: text('import_source_hash'),
+    categorizationSource: text('categorization_source'),
+
+    /** Link targets, kept as their own columns rather than folded into `transfer_kind`. */
+    recurringSeriesId: text('recurring_series_id').references(
+      () => recurringSeries.id,
+      { onDelete: 'set null' },
+    ),
+    goalId: text('goal_id').references(() => savingsGoals.id, {
+      onDelete: 'set null',
+    }),
+
+    createdByUserId: text('created_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // The list's default sort and its keyset cursor: `booked_on`, then `booked_at`, then `id`.
+    // Every sort ends in `id` so the cursor is total; this index serves the whole tuple, which is
+    // what keeps pagination off `OFFSET`.
+    index('transactions_organization_id_booked_on_booked_at_id_idx').on(
+      table.organizationId,
+      table.bookedOn,
+      table.bookedAt,
+      table.id,
+    ),
+    // Filter by account, and the per-account statement view.
+    index('transactions_organization_id_account_id_booked_on_idx').on(
+      table.organizationId,
+      table.accountId,
+      table.bookedOn,
+    ),
+    // Filter by category, and the category-over-time aggregation of plan 17.
+    index('transactions_organization_id_category_id_booked_on_idx').on(
+      table.organizationId,
+      table.categoryId,
+      table.bookedOn,
+    ),
+    // Filter by payee, and the payee detail screen.
+    index('transactions_organization_id_payee_id_booked_on_idx').on(
+      table.organizationId,
+      table.payeeId,
+      table.bookedOn,
+    ),
+    // The income-vs-expense date-range scan the dashboard and the cash-flow chart run.
+    index('transactions_organization_id_booked_on_direction_idx').on(
+      table.organizationId,
+      table.bookedOn,
+      table.direction,
+    ),
+    // The planned/actual split, which every list applies before anything else.
+    index('transactions_organization_id_is_planned_booked_on_idx').on(
+      table.organizationId,
+      table.isPlanned,
+      table.bookedOn,
+    ),
+    // "Find the other leg." Without it, a paired edit or delete is a workspace-wide scan.
+    index('transactions_organization_id_transfer_id_idx').on(
+      table.organizationId,
+      table.transferId,
+    ),
+    // Exact undo: the rows this batch created and no others.
+    index('transactions_organization_id_import_batch_id_idx').on(
+      table.organizationId,
+      table.importBatchId,
+    ),
+    // Duplicate detection on re-import, which is an equality probe per source line.
+    index('transactions_organization_id_import_source_hash_idx').on(
+      table.organizationId,
+      table.importSourceHash,
+    ),
+    // The series detail screen and the recurring matcher.
+    index('transactions_organization_id_recurring_series_id_idx').on(
+      table.organizationId,
+      table.recurringSeriesId,
+    ),
+    // A goal's contributions, and the repair that recomputes `contributed_minor`.
+    index('transactions_organization_id_goal_id_idx').on(
+      table.organizationId,
+      table.goalId,
+    ),
+
+    enumCheck(
+      'transactions_direction_check',
+      table.direction,
+      TRANSACTION_DIRECTIONS,
+    ),
+    enumCheck(
+      'transactions_payment_method_check',
+      table.paymentMethod,
+      PAYMENT_METHODS,
+    ),
+    enumCheck(
+      'transactions_transfer_kind_check',
+      table.transferKind,
+      TRANSFER_KINDS,
+    ),
+    enumCheck(
+      'transactions_categorization_source_check',
+      table.categorizationSource,
+      CATEGORIZATION_SOURCES,
+    ),
+    positiveMinorCheck('transactions_amount_minor_check', table.amountMinor),
+    // The converted amount may round to zero for a very small amount in a very weak currency, so
+    // it is `>= 0` where the native amount is `> 0`. It may never be negative: the sign is
+    // `direction` on both sides of the conversion.
+    nonNegativeCheck(
+      'transactions_ref_amount_minor_check',
+      table.refAmountMinor,
+    ),
+    check('transactions_rate_e10_check', sql`${table.rateE10} > 0`),
+    fixedLengthCheck('transactions_booked_on_check', table.bookedOn, 10),
+    maxLengthCheck('transactions_note_check', table.note, 500),
+    // A row already in the base currency must be its own conversion: same amount, identity rate.
+    // This is the cheapest possible guard against a conversion being applied twice.
+    check(
+      'transactions_base_currency_identity_check',
+      sql`${table.currencyCode} <> ${table.refCurrencyCode} or (${table.rateE10} = 10000000000 and ${table.amountMinor} = ${table.refAmountMinor})`,
+    ),
+    // §3.4.2 as a row rule: `none` has no transfer id, `internal` must have one (it is the
+    // handle its sibling is found by), and a single-leg external transfer may have either.
+    check(
+      'transactions_transfer_id_check',
+      sql`(${table.transferKind} = 'none' and ${table.transferId} is null) or (${table.transferKind} = 'internal' and ${table.transferId} is not null) or ${table.transferKind} in ('external_out', 'external_in')`,
+    ),
+    // A correction is never a transfer leg: §3.4.8 makes it a real row of its own, and a leg of
+    // something else would give it two reasons to exist.
+    check(
+      'transactions_adjustment_not_transfer_check',
+      sql`${table.isBalanceAdjustment} = 0 or ${table.transferKind} = 'none'`,
+    ),
+  ],
+)
+
+export type TransactionRow = typeof transactions.$inferSelect
+export type TransactionInsert = typeof transactions.$inferInsert
+
+/**
+ * One line of a split receipt.
+ *
+ * **The primary key is a surrogate `id`, not `(transaction_id, category_id)`.** The reference
+ * product's composite key made a receipt with two "Groceries" lines — which is what a real receipt
+ * looks like when one line is for the household and one is for a guest — literally unstorable.
+ *
+ * `Σ amount_minor = transactions.amount_minor` is asserted **in the repository**, not by SQL: it
+ * is a rule about a set of rows, and a trigger enforcing it would be business logic in a language
+ * with no tests. `currency_code` and `ref_currency_code` mirror the parent's, so a split is a
+ * complete amount on its own row.
+ */
+export const transactionSplits = sqliteTable(
+  'transaction_splits',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    categoryId: text('category_id').references(() => categories.id, {
+      onDelete: 'set null',
+    }),
+    amountMinor: integer('amount_minor').notNull(),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    refAmountMinor: integer('ref_amount_minor').notNull(),
+    refCurrencyCode: currencyCode('ref_currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    note: text('note', { length: 140 }),
+    position: integer('position').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // Reading a transaction's splits in display order — the only way this table is ever read.
+    index('transaction_splits_organization_id_transaction_id_position_idx').on(
+      table.organizationId,
+      table.transactionId,
+      table.position,
+    ),
+    // Category analytics count split lines, not parent rows, for a split transaction.
+    index('transaction_splits_organization_id_category_id_idx').on(
+      table.organizationId,
+      table.categoryId,
+    ),
+    positiveMinorCheck(
+      'transaction_splits_amount_minor_check',
+      table.amountMinor,
+    ),
+    nonNegativeCheck(
+      'transaction_splits_ref_amount_minor_check',
+      table.refAmountMinor,
+    ),
+    nonNegativeCheck('transaction_splits_position_check', table.position),
+    maxLengthCheck('transaction_splits_note_check', table.note, 140),
+  ],
+)
+
+export type TransactionSplitRow = typeof transactionSplits.$inferSelect
+
+/** Tags on a transaction. */
+export const transactionTags = sqliteTable(
+  'transaction_tags',
+  {
+    organizationId: organizationId(),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    tagId: text('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({
+      name: 'transaction_tags_pk',
+      columns: [table.transactionId, table.tagId],
+    }),
+    // "Every transaction with this tag" — the tag filter of the list, which resolves to a set of
+    // transaction ids the outer query then pages over. Reversing the pair is why it exists.
+    index('transaction_tags_organization_id_tag_id_transaction_id_idx').on(
+      table.organizationId,
+      table.tagId,
+      table.transactionId,
+    ),
+  ],
+)
+
+export type TransactionTagRow = typeof transactionTags.$inferSelect
+
+/**
+ * A manual grouping of transactions — a holiday, a house move, a shared bill.
+ *
+ * **Auto-dissolved below two members**, in the repository: a group of one is a label, and this
+ * product already has labels.
+ */
+export const transactionGroups = sqliteTable(
+  'transaction_groups',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 200 }).notNull(),
+    note: text('note', { length: 500 }),
+    color: colorHex('color'),
+    icon: text('icon', { length: 50 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('transaction_groups_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    fixedLengthCheck('transaction_groups_color_check', table.color, 7),
+    maxLengthCheck('transaction_groups_note_check', table.note, 500),
+  ],
+)
+
+export type TransactionGroupRow = typeof transactionGroups.$inferSelect
+
+/** Membership of a manual group, in display order. */
+export const transactionGroupItems = sqliteTable(
+  'transaction_group_items',
+  {
+    organizationId: organizationId(),
+    groupId: text('group_id')
+      .notNull()
+      .references(() => transactionGroups.id, { onDelete: 'cascade' }),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      name: 'transaction_group_items_pk',
+      columns: [table.groupId, table.transactionId],
+    }),
+    // "Which groups is this transaction in", shown on the transaction detail screen.
+    index('transaction_group_items_organization_id_transaction_id_idx').on(
+      table.organizationId,
+      table.transactionId,
+    ),
+    nonNegativeCheck('transaction_group_items_position_check', table.position),
+  ],
+)
+
+export type TransactionGroupItemRow = typeof transactionGroupItems.$inferSelect
+
+/**
+ * "This income row gives back part of that expense row."
+ *
+ * `refund_transaction_id` is **unique**: one transaction is a refund of at most one thing. The
+ * reverse is deliberately not unique — one purchase can be refunded in parts, on different days.
+ *
+ * `original_transaction_id` is nullable, and `NULL` means *a refund of something outside the
+ * system*: a return of an item bought before the workspace existed is still money coming back,
+ * and forcing a fake original would be worse than admitting there is none.
+ *
+ * `split_id` narrows the refund to one line of a split receipt.
+ */
+export const refunds = sqliteTable(
+  'refunds',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    originalTransactionId: text('original_transaction_id').references(
+      () => transactions.id,
+      { onDelete: 'cascade' },
+    ),
+    refundTransactionId: text('refund_transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    splitId: text('split_id').references(() => transactionSplits.id, {
+      onDelete: 'cascade',
+    }),
+    amountMinor: integer('amount_minor').notNull(),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex('refunds_refund_transaction_id_unique').on(
+      table.refundTransactionId,
+    ),
+    // "How much of this purchase has come back", which is a sum over the non-unique side.
+    index('refunds_organization_id_original_transaction_id_idx').on(
+      table.organizationId,
+      table.originalTransactionId,
+    ),
+    index('refunds_organization_id_split_id_idx').on(
+      table.organizationId,
+      table.splitId,
+    ),
+    positiveMinorCheck('refunds_amount_minor_check', table.amountMinor),
+    // A refund of itself would make the pair's net effect zero and its display a loop.
+    check(
+      'refunds_distinct_transactions_check',
+      sql`${table.originalTransactionId} is null or ${table.originalTransactionId} <> ${table.refundTransactionId}`,
+    ),
+  ],
+)
+
+export type RefundRow = typeof refunds.$inferSelect
+
+/**
+ * A saved shape for a transaction somebody enters often.
+ *
+ * `amount_minor` is nullable: half the value of a template is "the rest of the fields, you type
+ * the number". It carries no `ref_amount_minor` and no rate, because a template is not an event —
+ * the conversion happens when the transaction it mints is booked, at that day's rate.
+ */
+export const transactionTemplates = sqliteTable(
+  'transaction_templates',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 200 }).notNull(),
+    accountId: text('account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    direction: text('direction').notNull(),
+    amountMinor: integer('amount_minor'),
+    currencyCode: currencyCode('currency_code').references(
+      () => currencies.code,
+    ),
+    categoryId: text('category_id').references(() => categories.id, {
+      onDelete: 'set null',
+    }),
+    payeeId: text('payee_id').references(() => payees.id, {
+      onDelete: 'set null',
+    }),
+    note: text('note', { length: 500 }),
+    paymentMethod: text('payment_method'),
+    position: integer('position').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('transaction_templates_organization_id_position_idx').on(
+      table.organizationId,
+      table.position,
+    ),
+    enumCheck(
+      'transaction_templates_direction_check',
+      table.direction,
+      TRANSACTION_DIRECTIONS,
+    ),
+    enumCheck(
+      'transaction_templates_payment_method_check',
+      table.paymentMethod,
+      PAYMENT_METHODS,
+    ),
+    check(
+      'transaction_templates_amount_minor_check',
+      sql`${table.amountMinor} is null or ${table.amountMinor} > 0`,
+    ),
+    // An amount with no currency is not an amount, even in a template.
+    check(
+      'transaction_templates_amount_currency_pair_check',
+      sql`${table.amountMinor} is null or ${table.currencyCode} is not null`,
+    ),
+    nonNegativeCheck('transaction_templates_position_check', table.position),
+    maxLengthCheck('transaction_templates_note_check', table.note, 500),
+  ],
+)
+
+export type TransactionTemplateRow = typeof transactionTemplates.$inferSelect
+
+/** Tags a template applies to every transaction it mints. */
+export const transactionTemplateTags = sqliteTable(
+  'transaction_template_tags',
+  {
+    organizationId: organizationId(),
+    templateId: text('template_id')
+      .notNull()
+      .references(() => transactionTemplates.id, { onDelete: 'cascade' }),
+    tagId: text('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({
+      name: 'transaction_template_tags_pk',
+      columns: [table.templateId, table.tagId],
+    }),
+    index('transaction_template_tags_organization_id_tag_id_idx').on(
+      table.organizationId,
+      table.tagId,
+    ),
+  ],
+)
+
+export type TransactionTemplateTagRow =
+  typeof transactionTemplateTags.$inferSelect
+
+/**
+ * A receipt or a document attached to a transaction.
+ *
+ * The bytes live in R2 under `attachments/<orgId>/<transactionId>/<attachmentId>` — the workspace
+ * id is the second segment so a tenant sweep is a prefix list. The object is served **only**
+ * through `/api/files/$id` after a tenant check; there is no public bucket URL, because a public
+ * URL is a permanent, unrevocable grant to anybody who has ever seen it.
+ */
+export const attachments = sqliteTable(
+  'attachments',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    r2Key: text('r2_key').notNull(),
+    contentType: text('content_type').notNull(),
+    byteSize: integer('byte_size').notNull(),
+    originalName: text('original_name', { length: 255 }).notNull(),
+    uploadedByUserId: text('uploaded_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('attachments_r2_key_unique').on(table.r2Key),
+    // The has-attachment filter and the transaction detail screen both start here.
+    index('attachments_organization_id_transaction_id_idx').on(
+      table.organizationId,
+      table.transactionId,
+    ),
+    // The storage quota sums `byte_size` per workspace.
+    index('attachments_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    check('attachments_byte_size_check', sql`${table.byteSize} > 0`),
+  ],
+)
+
+export type AttachmentRow = typeof attachments.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Recurring — periods, links and detected candidates                         */
+/* -------------------------------------------------------------------------- */
+
+/** Where one occurrence of a series stands. `skipped` is a person's decision, not a failure. */
+export const RECURRING_PERIOD_STATUSES = [
+  'upcoming',
+  'paid',
+  'overdue',
+  'skipped',
+] as const
+export type RecurringPeriodStatus = (typeof RECURRING_PERIOD_STATUSES)[number]
+
+/**
+ * One occurrence of a series, materialised.
+ *
+ * Materialised rather than computed on read for the same reason `budget_periods` is: "was the
+ * March bill paid" must have an auditable answer that does not change when the series is edited in
+ * April. `settled_transaction_id` is the receipt.
+ *
+ * The primary key is `(series_id, period_start)` — one series cannot have two occurrences starting
+ * on the same day, which is exactly the collision an idempotent generator needs the database to
+ * refuse.
+ */
+export const recurringPeriods = sqliteTable(
+  'recurring_periods',
+  {
+    organizationId: organizationId(),
+    seriesId: text('series_id')
+      .notNull()
+      .references(() => recurringSeries.id, { onDelete: 'cascade' }),
+    periodStart: calendarDate('period_start').notNull(),
+    /** The day the money is expected to move, which is not always the period's first day. */
+    dueOn: calendarDate('due_on').notNull(),
+    status: text('status').notNull().default('upcoming'),
+    expectedAmountMinor: integer('expected_amount_minor').notNull(),
+    expectedCurrencyCode: currencyCode('expected_currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    settledTransactionId: text('settled_transaction_id').references(
+      () => transactions.id,
+      { onDelete: 'set null' },
+    ),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'recurring_periods_pk',
+      columns: [table.seriesId, table.periodStart],
+    }),
+    // The upcoming-bills widget and the reminder cron both scan a workspace by due date.
+    index('recurring_periods_organization_id_due_on_status_idx').on(
+      table.organizationId,
+      table.dueOn,
+      table.status,
+    ),
+    enumCheck(
+      'recurring_periods_status_check',
+      table.status,
+      RECURRING_PERIOD_STATUSES,
+    ),
+    positiveMinorCheck(
+      'recurring_periods_expected_amount_minor_check',
+      table.expectedAmountMinor,
+    ),
+    // "Paid" with nothing to point at is a claim with no evidence, and it is how a series quietly
+    // stops chasing a bill that was never actually paid.
+    check(
+      'recurring_periods_paid_requires_transaction_check',
+      sql`${table.status} <> 'paid' or ${table.settledTransactionId} is not null`,
+    ),
+    fixedLengthCheck(
+      'recurring_periods_period_start_check',
+      table.periodStart,
+      10,
+    ),
+    fixedLengthCheck('recurring_periods_due_on_check', table.dueOn, 10),
+  ],
+)
+
+export type RecurringPeriodRow = typeof recurringPeriods.$inferSelect
+
+/** How a transaction came to be attached to a series. */
+export const RECURRING_MATCH_SOURCES = ['manual', 'rule', 'auto'] as const
+export type RecurringMatchSource = (typeof RECURRING_MATCH_SOURCES)[number]
+
+/** An `unlinked` row is kept, not deleted, so the matcher does not re-propose what was rejected. */
+export const RECURRING_LINK_STATUSES = ['active', 'unlinked'] as const
+export type RecurringLinkStatus = (typeof RECURRING_LINK_STATUSES)[number]
+
+/** Which transactions belong to which series, and who decided. */
+export const recurringLinks = sqliteTable(
+  'recurring_links',
+  {
+    organizationId: organizationId(),
+    seriesId: text('series_id')
+      .notNull()
+      .references(() => recurringSeries.id, { onDelete: 'cascade' }),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    matchSource: text('match_source').notNull().default('manual'),
+    status: text('status').notNull().default('active'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'recurring_links_pk',
+      columns: [table.seriesId, table.transactionId],
+    }),
+    // "Which series does this transaction belong to", asked once per row of the list.
+    index('recurring_links_organization_id_transaction_id_idx').on(
+      table.organizationId,
+      table.transactionId,
+    ),
+    enumCheck(
+      'recurring_links_match_source_check',
+      table.matchSource,
+      RECURRING_MATCH_SOURCES,
+    ),
+    enumCheck(
+      'recurring_links_status_check',
+      table.status,
+      RECURRING_LINK_STATUSES,
+    ),
+  ],
+)
+
+export type RecurringLinkRow = typeof recurringLinks.$inferSelect
+
+/** A proposal's fate. `dismissed` is remembered so it is not proposed again next month. */
+export const RECURRING_CANDIDATE_STATUSES = [
+  'pending',
+  'accepted',
+  'dismissed',
+] as const
+export type RecurringCandidateStatus =
+  (typeof RECURRING_CANDIDATE_STATUSES)[number]
+
+/**
+ * "These four rows look like a monthly subscription. Shall I make it one?"
+ *
+ * Detected from history, never acted on automatically. `sample_transaction_ids` is JSON so the
+ * proposal can show its evidence — a suggestion a person cannot check is a suggestion they will
+ * either accept blindly or dismiss blindly.
+ */
+export const recurringCandidates = sqliteTable(
+  'recurring_candidates',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    status: text('status').notNull().default('pending'),
+    /** 0–100. An integer, so two runs of the detector rank identically. */
+    confidence: integer('confidence').notNull().default(0),
+    /** JSON array of transaction ids: the evidence behind the proposal. */
+    sampleTransactionIds: text('sample_transaction_ids').notNull(),
+    suggestedName: text('suggested_name', { length: 200 }),
+    payeeId: text('payee_id').references(() => payees.id, {
+      onDelete: 'cascade',
+    }),
+    expectedAmountMinor: integer('expected_amount_minor'),
+    expectedCurrencyCode: currencyCode('expected_currency_code').references(
+      () => currencies.code,
+    ),
+    frequency: text('frequency'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // The proposals inbox: pending candidates of this workspace, best first.
+    index('recurring_candidates_organization_id_status_confidence_idx').on(
+      table.organizationId,
+      table.status,
+      table.confidence,
+    ),
+    enumCheck(
+      'recurring_candidates_status_check',
+      table.status,
+      RECURRING_CANDIDATE_STATUSES,
+    ),
+    enumCheck(
+      'recurring_candidates_frequency_check',
+      table.frequency,
+      RECURRING_FREQUENCIES,
+    ),
+    check(
+      'recurring_candidates_confidence_check',
+      sql`${table.confidence} >= 0 and ${table.confidence} <= 100`,
+    ),
+    check(
+      'recurring_candidates_expected_amount_currency_check',
+      sql`${table.expectedAmountMinor} is null or ${table.expectedCurrencyCode} is not null`,
+    ),
+  ],
+)
+
+export type RecurringCandidateRow = typeof recurringCandidates.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Budgets                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** `category` follows a set of categories; `manual` follows transactions added by hand. */
+export const BUDGET_KINDS = ['manual', 'category'] as const
+export type BudgetKind = (typeof BUDGET_KINDS)[number]
+
+/** `closed` stopped accruing; `archived` is out of the list. Neither deletes a period's history. */
+export const BUDGET_STATUSES = ['active', 'closed', 'archived'] as const
+export type BudgetStatus = (typeof BUDGET_STATUSES)[number]
+
+/** How often the envelope refills. */
+export const BUDGET_PERIODS = [
+  'one_off',
+  'weekly',
+  'monthly',
+  'quarterly',
+  'yearly',
+] as const
+export type BudgetPeriod = (typeof BUDGET_PERIODS)[number]
+
+/**
+ * What happens to the balance of an envelope when its period ends.
+ *
+ * - `none` — the envelope resets to its limit. What most budgeting tools do.
+ * - `carry_surplus` — an underspend rolls into the next period; an overspend does not.
+ * - `carry_all` — both roll, so the envelope tracks a true running balance.
+ *
+ * This column is the single largest addition over the reference product: envelope budgeting is the
+ * most-cited reason people stay on YNAB, and it is not expressible without it. The **arithmetic**
+ * of an overspent envelope is a product decision recorded as `OPEN-5`; the three values are the
+ * ones any answer to it needs.
+ */
+export const BUDGET_ROLLOVER_POLICIES = [
+  'none',
+  'carry_surplus',
+  'carry_all',
+] as const
+export type BudgetRolloverPolicy = (typeof BUDGET_ROLLOVER_POLICIES)[number]
+
+/** An envelope. */
+export const budgets = sqliteTable(
+  'budgets',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 200 }).notNull(),
+    kind: text('kind').notNull().default('category'),
+    status: text('status').notNull().default('active'),
+    period: text('period').notNull().default('monthly'),
+    startDate: calendarDate('start_date').notNull(),
+    endDate: calendarDate('end_date'),
+    limitMinor: integer('limit_minor').notNull(),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    /** Pull matching transactions in automatically, instead of waiting to be told. */
+    autoInclude: integer('auto_include', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    rolloverPolicy: text('rollover_policy').notNull().default('none'),
+    /** JSON array of percentages that raise a notification, e.g. `[50, 80, 100]`. */
+    alertThresholds: text('alert_thresholds').notNull().default('[50,80,100]'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('budgets_organization_id_status_idx').on(
+      table.organizationId,
+      table.status,
+    ),
+    // "Which budgets were live on this day", which is how a period is generated and how the
+    // dashboard picks what to show.
+    index('budgets_organization_id_start_date_idx').on(
+      table.organizationId,
+      table.startDate,
+    ),
+    enumCheck('budgets_kind_check', table.kind, BUDGET_KINDS),
+    enumCheck('budgets_status_check', table.status, BUDGET_STATUSES),
+    enumCheck('budgets_period_check', table.period, BUDGET_PERIODS),
+    enumCheck(
+      'budgets_rollover_policy_check',
+      table.rolloverPolicy,
+      BUDGET_ROLLOVER_POLICIES,
+    ),
+    positiveMinorCheck('budgets_limit_minor_check', table.limitMinor),
+    check(
+      'budgets_end_date_check',
+      sql`${table.endDate} is null or ${table.endDate} >= ${table.startDate}`,
+    ),
+    fixedLengthCheck('budgets_start_date_check', table.startDate, 10),
+    fixedLengthCheck('budgets_end_date_length_check', table.endDate, 10),
+  ],
+)
+
+export type BudgetRow = typeof budgets.$inferSelect
+export type BudgetInsert = typeof budgets.$inferInsert
+
+/** Which categories a `category` budget follows. */
+export const budgetCategories = sqliteTable(
+  'budget_categories',
+  {
+    organizationId: organizationId(),
+    budgetId: text('budget_id')
+      .notNull()
+      .references(() => budgets.id, { onDelete: 'cascade' }),
+    categoryId: text('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({
+      name: 'budget_categories_pk',
+      columns: [table.budgetId, table.categoryId],
+    }),
+    // "Which budgets does this category feed", asked once per transaction written.
+    index('budget_categories_organization_id_category_id_idx').on(
+      table.organizationId,
+      table.categoryId,
+    ),
+  ],
+)
+
+export type BudgetCategoryRow = typeof budgetCategories.$inferSelect
+
+/**
+ * Transactions put into a `manual` budget by hand.
+ *
+ * `added_by_user_id` is kept because in a household "who put this in the holiday budget" is a real
+ * question with a real answer.
+ */
+export const budgetTransactions = sqliteTable(
+  'budget_transactions',
+  {
+    organizationId: organizationId(),
+    budgetId: text('budget_id')
+      .notNull()
+      .references(() => budgets.id, { onDelete: 'cascade' }),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    addedByUserId: text('added_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'budget_transactions_pk',
+      columns: [table.budgetId, table.transactionId],
+    }),
+    // "Which budgets is this transaction in", shown on the transaction detail screen.
+    index('budget_transactions_organization_id_transaction_id_idx').on(
+      table.organizationId,
+      table.transactionId,
+    ),
+  ],
+)
+
+export type BudgetTransactionRow = typeof budgetTransactions.$inferSelect
+
+/**
+ * One materialised period of a budget.
+ *
+ * **This table is the reason rollover is auditable.** A carry computed on read changes
+ * retroactively when a past transaction is edited, so the number a person saw last month is not
+ * the number they see today and nothing records why. Here `carried_in_minor` is written once when
+ * the period opens and a closed period's carry never moves again — that immutability is `12-S2`'s
+ * headline test.
+ *
+ * The primary key is `(budget_id, period_start)` rather than the triple including `period_end`:
+ * one budget cannot have two periods starting on the same day, and keying on the triple would
+ * permit exactly the overlapping pair the key exists to forbid. `period_end` stays a `NOT NULL`
+ * column with its own ordering `CHECK`.
+ */
+export const budgetPeriods = sqliteTable(
+  'budget_periods',
+  {
+    organizationId: organizationId(),
+    budgetId: text('budget_id')
+      .notNull()
+      .references(() => budgets.id, { onDelete: 'cascade' }),
+    periodStart: calendarDate('period_start').notNull(),
+    periodEnd: calendarDate('period_end').notNull(),
+    /** The limit **as it was** for this period; editing the budget does not rewrite history. */
+    limitMinor: integer('limit_minor').notNull(),
+    /** Carried in from the previous period. Signed: an overspend under `carry_all` is negative. */
+    carriedInMinor: integer('carried_in_minor').notNull().default(0),
+    spentMinor: integer('spent_minor').notNull().default(0),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    /** Once set, `carried_in_minor` and `limit_minor` are frozen. */
+    closedAt: integer('closed_at', { mode: 'timestamp_ms' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'budget_periods_pk',
+      columns: [table.budgetId, table.periodStart],
+    }),
+    // "Which period of any budget covers today", for the dashboard and the threshold cron.
+    index('budget_periods_organization_id_period_start_idx').on(
+      table.organizationId,
+      table.periodStart,
+    ),
+    positiveMinorCheck('budget_periods_limit_minor_check', table.limitMinor),
+    check(
+      'budget_periods_range_check',
+      sql`${table.periodEnd} >= ${table.periodStart}`,
+    ),
+    fixedLengthCheck(
+      'budget_periods_period_start_check',
+      table.periodStart,
+      10,
+    ),
+    fixedLengthCheck('budget_periods_period_end_check', table.periodEnd, 10),
+  ],
+)
+
+export type BudgetPeriodRow = typeof budgetPeriods.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Goals — contributions                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Which transactions count towards a goal.
+ *
+ * **The links are the authority**; `savings_goals.contributed_minor` is a cache recomputed from
+ * this table in the same batch as every write. No amount column here: the amount is the
+ * transaction's, and copying it would give the pair two chances to disagree.
+ */
+export const savingsGoalContributions = sqliteTable(
+  'savings_goal_contributions',
+  {
+    organizationId: organizationId(),
+    goalId: text('goal_id')
+      .notNull()
+      .references(() => savingsGoals.id, { onDelete: 'cascade' }),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'savings_goal_contributions_pk',
+      columns: [table.goalId, table.transactionId],
+    }),
+    index('savings_goal_contributions_organization_id_transaction_id_idx').on(
+      table.organizationId,
+      table.transactionId,
+    ),
+  ],
+)
+
+export type SavingsGoalContributionRow =
+  typeof savingsGoalContributions.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Rules — the automation engine                                              */
+/* -------------------------------------------------------------------------- */
+
+/** Whether every condition must hold, or any one of them. */
+export const RULE_MATCH_MODES = ['all', 'any'] as const
+export type RuleMatchMode = (typeof RULE_MATCH_MODES)[number]
+
+/**
+ * A stored automation: match these conditions, apply these actions.
+ *
+ * `conditions`, `actions` and `run_on` are JSON, and their shapes are Zod-validated on the way in
+ * and on the way out. The condition field list is **closed at nine** — `note`, `payee`, `account`,
+ * `account_group`, `amount`, `direction`, `day_of_month`, `tag`, `category` — so the evaluator's
+ * type is exhaustive; a tenth is a schema change with a migration, not a JSON addition somebody
+ * ships on a Friday. (`bank_connection` from the reference is gone with the connectors.)
+ *
+ * The engine's ceilings — 100 rules, 10 conditions, 20 keywords of 64 characters, 20 ids, 4
+ * actions, a 200-character note — are repository invariants rather than `CHECK`s, because they are
+ * product numbers and a `CHECK` on a product number is a migration every time somebody
+ * reconsiders. They are load-bearing all the same: they are what stands between this table and a
+ * runaway rule engine.
+ *
+ * `paused_reason` is JSON `{ kind: 'missing_reference', ref_type, ref_id, label, at }` and it
+ * carries **`label`** — the human name of the thing that vanished, captured at pause time. By the
+ * time a person reads the banner the referenced row is gone and an id alone is unresolvable. A
+ * rule that silently stops matching because its category was deleted is the worst failure mode
+ * this feature has, and this column is the whole defence against it.
+ */
+export const rules = sqliteTable(
+  'rules',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 200 }).notNull(),
+    /** Rules run in this order; the first matching action for a field wins. */
+    position: integer('position').notNull().default(0),
+    matchMode: text('match_mode').notNull().default('all'),
+    /** JSON array of conditions over the nine closed fields. */
+    conditions: text('conditions').notNull(),
+    /** JSON array of actions. */
+    actions: text('actions').notNull(),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    /** JSON, or `NULL` when the rule is healthy. See the table docblock. */
+    pausedReason: text('paused_reason'),
+    matchCount: integer('match_count').notNull().default(0),
+    lastMatchedAt: integer('last_matched_at', { mode: 'timestamp_ms' }),
+    /** JSON subset of `['manual_create', 'import', 'edit']`. */
+    runOn: text('run_on').notNull().default('["manual_create","import"]'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // The engine's only read: this workspace's live rules, in order, on every write path.
+    index('rules_organization_id_is_active_position_idx').on(
+      table.organizationId,
+      table.isActive,
+      table.position,
+    ),
+    enumCheck('rules_match_mode_check', table.matchMode, RULE_MATCH_MODES),
+    nonNegativeCheck('rules_position_check', table.position),
+    nonNegativeCheck('rules_match_count_check', table.matchCount),
+  ],
+)
+
+export type RuleRow = typeof rules.$inferSelect
+export type RuleInsert = typeof rules.$inferInsert
+
+/* -------------------------------------------------------------------------- */
+/* Import and export                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A remembered column mapping, keyed by the shape of the file.
+ *
+ * `fingerprint` is a hash of the normalised header row, so the next statement from the same bank
+ * is recognised. The preset is **offered, never applied silently**: a bank that reorders its
+ * columns would otherwise import every amount into the date field. The ceiling of 20 per workspace
+ * is a repository invariant, not a `CHECK` — it is a product number.
+ */
+export const importMappingPresets = sqliteTable(
+  'import_mapping_presets',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    fingerprint: text('fingerprint').notNull(),
+    /** JSON column map. */
+    mapping: text('mapping').notNull(),
+    label: text('label', { length: 200 }),
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex('import_mapping_presets_organization_id_fingerprint_unique').on(
+      table.organizationId,
+      table.fingerprint,
+    ),
+    index('import_mapping_presets_organization_id_last_used_at_idx').on(
+      table.organizationId,
+      table.lastUsedAt,
+    ),
+  ],
+)
+
+export type ImportMappingPresetRow = typeof importMappingPresets.$inferSelect
+
+/**
+ * A row the importer could not take, and why.
+ *
+ * **`raw` is the only amount-shaped value in this schema that is not integer minor units**, and
+ * that is correct: it is the source file's own text, comma decimal separator and all. It is the
+ * *input*, not an amount. Nobody may "fix" it into a number, and no repository parses it back into
+ * the money path — `money-invariants.test.ts` asserts exactly that. It is truncated on write so
+ * one malformed file cannot fill the database.
+ */
+export const importRowErrors = sqliteTable(
+  'import_row_errors',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    batchId: text('batch_id')
+      .notNull()
+      .references(() => importBatches.id, { onDelete: 'cascade' }),
+    rowIndex: integer('row_index').notNull(),
+    code: text('code', { length: 100 }).notNull(),
+    /** An i18n key or a parser message; never a formatted sentence with data baked in. */
+    message: text('message', { length: 500 }),
+    /** JSON of the source row, truncated. Never read as an amount. */
+    raw: text('raw'),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    // The error report of one batch, in file order — the only read this table serves.
+    index('import_row_errors_organization_id_batch_id_row_index_idx').on(
+      table.organizationId,
+      table.batchId,
+      table.rowIndex,
+    ),
+    nonNegativeCheck('import_row_errors_row_index_check', table.rowIndex),
+  ],
+)
+
+export type ImportRowErrorRow = typeof importRowErrors.$inferSelect
+
+/** What an export produces. */
+export const EXPORT_FORMATS = ['json', 'csv'] as const
+export type ExportFormat = (typeof EXPORT_FORMATS)[number]
+
+/**
+ * Where an export stands. `expired` means the object is gone and the row is not — see the table.
+ */
+export const EXPORT_STATUSES = [
+  'queued',
+  'running',
+  'ready',
+  'failed',
+  'expired',
+] as const
+export type ExportStatus = (typeof EXPORT_STATUSES)[number]
+
+/**
+ * One request to take the data out.
+ *
+ * **The row outlives the object.** `expires_at` is `ready_at + 7 days`; the nightly prune deletes
+ * the R2 object and marks the row `expired` rather than deleting it, because an audit trail of who
+ * exported a household's finances is worth more than the bytes it points at.
+ */
+export const exportJobs = sqliteTable(
+  'export_jobs',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    format: text('format').notNull(),
+    /** JSON array naming which entity groups to include. */
+    groups: text('groups'),
+    dateFrom: calendarDate('date_from'),
+    dateTo: calendarDate('date_to'),
+    status: text('status').notNull().default('queued'),
+    r2Key: text('r2_key'),
+    byteSize: integer('byte_size'),
+    requestedByUserId: text('requested_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    readyAt: integer('ready_at', { mode: 'timestamp_ms' }),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // The export history screen, newest first.
+    index('export_jobs_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    // The prune cron's query: everything ready and past its expiry, across workspaces.
+    index('export_jobs_status_expires_at_idx').on(
+      table.status,
+      table.expiresAt,
+    ),
+    enumCheck('export_jobs_format_check', table.format, EXPORT_FORMATS),
+    enumCheck('export_jobs_status_check', table.status, EXPORT_STATUSES),
+    check(
+      'export_jobs_byte_size_check',
+      sql`${table.byteSize} is null or ${table.byteSize} >= 0`,
+    ),
+    check(
+      'export_jobs_date_range_check',
+      sql`${table.dateFrom} is null or ${table.dateTo} is null or ${table.dateTo} >= ${table.dateFrom}`,
+    ),
+  ],
+)
+
+export type ExportJobRow = typeof exportJobs.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Suggestions                                                                */
+/* -------------------------------------------------------------------------- */
+
+/** Which suggestion engine produced the proposal a person turned down. */
+export const SUGGESTION_KINDS = ['transfer_pair', 'duplicate'] as const
+export type SuggestionKind = (typeof SUGGESTION_KINDS)[number]
+
+/**
+ * "Stop suggesting this."
+ *
+ * Keyed on a **fingerprint** — a stable hash of the suggestion's participants — rather than on row
+ * ids, because re-importing the same file mints new ids and a dismissal that does not survive that
+ * is a dismissal that reappears every month.
+ */
+export const suggestionDismissals = sqliteTable(
+  'suggestion_dismissals',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    kind: text('kind').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    dismissedAt: integer('dismissed_at', { mode: 'timestamp_ms' }).notNull(),
+    dismissedByUserId: text('dismissed_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+  },
+  (table) => [
+    // Both the uniqueness rule and the lookup the suggestion engines run per candidate.
+    uniqueIndex(
+      'suggestion_dismissals_organization_id_kind_fingerprint_unique',
+    ).on(table.organizationId, table.kind, table.fingerprint),
+    enumCheck('suggestion_dismissals_kind_check', table.kind, SUGGESTION_KINDS),
+  ],
+)
+
+export type SuggestionDismissalRow = typeof suggestionDismissals.$inferSelect

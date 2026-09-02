@@ -1,0 +1,609 @@
+/**
+ * The tenant-scoped repository base — the deep module this codebase is built on.
+ *
+ * It exists so that **forgetting the tenant filter is not expressible**. Nothing outside this file
+ * calls `db.select()` on a tenant table: repositories are built from
+ * {@link createTenantRepository} / {@link createTenantTableAccess}, and every read and write path
+ * they expose begins with `WHERE organization_id = ?` taken from the {@link TenantScope} they were
+ * handed. Callers append predicates; there is no argument, option or overload that removes that one.
+ *
+ * The guarantee is layered, strongest first, because a guarantee resting on a single mechanism rests
+ * on that mechanism never being wrong:
+ *
+ * 1. **A scope is a required first parameter.** Every function below takes `scope: TenantScope`, and
+ *    `createScope` is its only constructor (`./scope`). A query written without a workspace does not
+ *    type-check; it has nothing to call.
+ * 2. **The predicate is composed here, not by the caller.** {@link tenantFilter} ANDs the tenant
+ *    equality with whatever the caller passes. A caller cannot pass a `where` that replaces it.
+ * 3. **The tenant column is stamped on write.** {@link TenantInsert} removes `organizationId` from
+ *    the payload type and {@link createTenantTableAccess} writes it from the scope *after* spreading
+ *    the payload, so an insert cannot be aimed at another workspace even by a caller who tries.
+ * 4. **A patch cannot move a row.** {@link TenantPatch} removes `organizationId`, `id` and
+ *    `createdAt` — by the type, not by a runtime check somebody can forget to add — and every
+ *    `UPDATE` re-checks the tenant column at runtime, for the caller who casts around the type.
+ * 5. **{@link assertScopedWrite} is the backstop** for the one case the types cannot see: a
+ *    dynamically assembled predicate list that collapses to nothing because every branch was
+ *    skipped. Every `UPDATE` and `DELETE` below passes through it, and the transaction repository's
+ *    policy predicates go through it explicitly.
+ *
+ * And the disclosure rule that makes all of the above observable rather than merely true: a foreign
+ * id answers {@link NotFoundError}, never `ForbiddenError`, and a foreign row is absent from counts
+ * and sums as well as from lists. See `./errors`.
+ *
+ * **Vocabulary.** `docs/plans/04-auth-and-tenancy.md` names the capabilities *get, list, page,
+ * insert, insertMany, update, remove*; the methods below spell the first two `findById` and
+ * `findMany`, which is what the repositories built on this base already call them. One name each,
+ * and this paragraph is the map between the two documents.
+ *
+ * The narrow `as` casts below are the price of one generic implementation over Drizzle's per-table
+ * generics. Every one of them widens a concrete row shape into the same shape expressed through a
+ * generic, they are confined to this file, and each is annotated where it sits.
+ */
+
+import { and, asc, count, desc, eq, inArray, lt, sum } from 'drizzle-orm'
+
+import {
+  ConflictError,
+  NotFoundError,
+  QuotaExceededError,
+  TenantIsolationError,
+  UnscopedWriteError,
+} from './errors'
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, clampPageSize } from './pagination'
+import { createScope, tenantContextSchema } from './scope'
+
+import type { SQL } from 'drizzle-orm'
+import type {
+  SQLiteColumn,
+  SQLiteInsertValue,
+  SQLiteTable,
+  SQLiteUpdateSetSource,
+} from 'drizzle-orm/sqlite-core'
+import type { CursorPage } from './pagination'
+import type { Database, TenantContext, TenantScope } from './scope'
+
+/**
+ * Re-exported so a repository imports its whole world from `./base`.
+ *
+ * The definitions live in `./scope`, which is binding-free and has no dependency on this module —
+ * the direction matters: the scope does not know what a repository is, and a repository cannot be
+ * written without a scope.
+ */
+export { createScope, tenantContextSchema }
+export type { Database, TenantContext, TenantScope }
+export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE }
+export type { CursorPage }
+
+/* -------------------------------------------------------------------------- */
+/* Table shapes                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** Any table carrying the tenant discriminator. */
+export type TenantTable = SQLiteTable & {
+  readonly organizationId: SQLiteColumn
+}
+
+/** A tenant table with a single-column `id` primary key — everything but the join tables. */
+export type KeyedTenantTable = TenantTable & { readonly id: SQLiteColumn }
+
+/** Column or expression usable in `ORDER BY`. */
+export type OrderTerm = SQL | SQLiteColumn
+
+/**
+ * An insert payload with the tenant column removed.
+ *
+ * Removed rather than optional: an optional field a caller may set is a field a caller will set, and
+ * the value it would carry is the one thing this layer exists to decide.
+ */
+export type TenantInsert<TTable extends TenantTable> = Omit<
+  TTable['$inferInsert'],
+  'organizationId'
+>
+
+/**
+ * A partial update: never the tenant column, never the primary key, never `createdAt`.
+ *
+ * Those three are exactly the fields whose mutation is a tenancy or identity change rather than an
+ * edit, so they are absent from the type. A patch carrying `organizationId` does not compile.
+ */
+export type TenantPatch<TTable extends TenantTable> = Partial<
+  Omit<TTable['$inferInsert'], 'organizationId' | 'id' | 'createdAt'>
+>
+
+export interface ListOptions {
+  /** Extra predicate, ANDed with — never instead of — the tenant filter. */
+  readonly where?: SQL
+  readonly orderBy?: ReadonlyArray<OrderTerm>
+  readonly limit?: number
+}
+
+export interface PageOptions {
+  readonly where?: SQL
+  readonly limit?: number
+  /** The `id` of the last row of the previous page. */
+  readonly cursor?: string | null
+}
+
+/* -------------------------------------------------------------------------- */
+/* Predicate composition                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The predicate for a tenant table: always `organization_id = <scope>`, ANDed with anything the
+ * caller adds. There is no code path in this module that produces a predicate without it.
+ */
+export function tenantFilter(
+  scope: TenantScope,
+  table: TenantTable,
+  ...extra: ReadonlyArray<SQL | undefined>
+): SQL {
+  const scoped = eq(table.organizationId, scope.ctx.organizationId)
+  const additional = extra.filter((part): part is SQL => part !== undefined)
+  if (additional.length === 0) return scoped
+  return and(scoped, ...additional) ?? scoped
+}
+
+/**
+ * ANDs predicates that are all optional except the first.
+ *
+ * Drizzle's `and()` widens to `SQL | undefined`, which the write paths below refuse to accept; this
+ * keeps the narrowing in one place instead of a `?? something` at every call site.
+ */
+export function allOf(
+  first: SQL,
+  ...rest: ReadonlyArray<SQL | undefined>
+): SQL {
+  return and(first, ...rest) ?? first
+}
+
+/**
+ * Refuses a write whose caller-supplied predicates all came out empty.
+ *
+ * The tenant filter would still be appended, so the statement would be scoped — and it would also
+ * rewrite or delete **every row the workspace owns**, which is not what a caller who built a filter
+ * dynamically meant by "no conditions matched". This is the assertion behind the message
+ * _"refusing to write to every row of `<entity>`"_.
+ *
+ * `entityName` is optional because most call sites are inside a repository that has already named
+ * its table in a hundred other places; the message degrades to "this table" rather than the call
+ * site degrading to not making the check.
+ */
+export function assertScopedWrite(
+  predicates: ReadonlyArray<SQL | undefined>,
+  entityName = 'this table',
+): void {
+  if (!predicates.some((predicate) => predicate !== undefined)) {
+    throw new UnscopedWriteError(entityName)
+  }
+}
+
+/**
+ * `IN (...)` over a readonly list. Drizzle renders an empty list as `false`, so an empty filter
+ * returns no rows rather than producing invalid SQL.
+ */
+export function inIds(
+  column: SQLiteColumn,
+  values: ReadonlyArray<string>,
+): SQL {
+  return inArray(column, [...values])
+}
+
+/* -------------------------------------------------------------------------- */
+/* Seam: plan quotas (the resolver is 22-S1)                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A metered resource name.
+ *
+ * A string alias deliberately: the metric vocabulary and its ceilings belong to the plan catalogue
+ * (`src/lib/plans.ts`, plan 22), which is browser-safe and must not be pulled into the data layer to
+ * satisfy a type. Plan `22-S1` narrows this alias to that union in one edit, and every call site
+ * below then has to name a metric the catalogue actually sells.
+ */
+export type QuotaMetric = string
+
+/** No ceiling. What {@link LimitResolver} returns for an uncapped metric. */
+export const UNLIMITED = Number.POSITIVE_INFINITY
+
+/** Answers "how many of `metric` may this workspace hold". Installed once per isolate. */
+export type LimitResolver = (
+  scope: TenantScope,
+  metric: QuotaMetric,
+) => Promise<number>
+
+/**
+ * Until `22-S1` installs the real resolver, nothing is capped.
+ *
+ * Stated rather than hidden: this is a **permissive** default, so the gap before billing lands looks
+ * like "no limit was enforced" rather than "every write failed". The moment the resolver is
+ * installed every {@link assertWithinLimit} call site starts enforcing without being edited — which
+ * is the whole reason for defining the seam here rather than promising it later.
+ */
+const unlimitedResolver: LimitResolver = async () => UNLIMITED
+
+let limitResolver: LimitResolver = unlimitedResolver
+
+/**
+ * Installs the plan-limit resolver. Module-level because the answer is request-independent and one
+ * isolate serves many requests; passing `null` restores the permissive default.
+ */
+export function setLimitResolver(resolver: LimitResolver | null): void {
+  limitResolver = resolver ?? unlimitedResolver
+}
+
+/**
+ * Throws {@link QuotaExceededError} when the workspace may not hold `requested` of `metric`.
+ *
+ * The call convention, and the whole reason this sits at the repository boundary: it is called
+ * **inside the repository, before the write**, with the count the workspace would end up at
+ * (`current + 1`). A check in a server function is one call site away from being skipped, and
+ * skipped is silent.
+ */
+export async function assertWithinLimit(
+  scope: TenantScope,
+  metric: QuotaMetric,
+  requested: number,
+): Promise<void> {
+  const limit = await limitResolver(scope, metric)
+  if (limit === UNLIMITED) return
+  if (requested > limit) {
+    throw new QuotaExceededError(metric, limit, Math.max(requested - 1, 0))
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Seam: the ledger batch (the collector is 09-S2)                            */
+/* -------------------------------------------------------------------------- */
+
+/** Collects the accounts whose balance history a unit of work has invalidated. */
+export type LedgerTouchSink = (accountId: string) => void
+
+let ledgerTouchSink: LedgerTouchSink | null = null
+
+/**
+ * Installs the collector `runWithLedgerBatch` (plan `09-S2`) opens around a unit of work.
+ *
+ * Balance history is rebuilt wholesale through the `LEDGER` Durable Object, never accumulated, and
+ * the rebuild is enqueued **once per touched account** after the work settles — including when it
+ * throws, because by then the rows are committed. The seam exists here so that no repository has to
+ * be edited later to gain it.
+ */
+export function setLedgerTouchSink(sink: LedgerTouchSink | null): void {
+  ledgerTouchSink = sink
+}
+
+/**
+ * Records that `accountId`'s balance history is stale.
+ *
+ * **A no-op when no batch is open, and that is the designed behaviour rather than an oversight.**
+ * `runWithLedgerBatch` wraps every server-function invocation, cron body and queue-handler body, so
+ * in the running product a sink is installed wherever a write happens; and the nightly rebuild cron
+ * re-derives every qualifying account regardless, which is what heals a write path that ran outside
+ * a batch. A throwing sink would turn a committed write into a failed request, so the collector
+ * owns its own error handling and this function does not guard it.
+ */
+export function touchLedgerAccount(accountId: string): void {
+  ledgerTouchSink?.(accountId)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Generic access for tables without a single-column primary key              */
+/* -------------------------------------------------------------------------- */
+
+export interface TenantTableAccess<TTable extends TenantTable> {
+  readonly table: TTable
+  readonly entityName: string
+  /** Every matching row in the workspace, in the requested order. The plan's *list*. */
+  findMany: (
+    scope: TenantScope,
+    options?: ListOptions,
+  ) => Promise<Array<TTable['$inferSelect']>>
+  findOne: (
+    scope: TenantScope,
+    where: SQL,
+  ) => Promise<TTable['$inferSelect'] | null>
+  count: (scope: TenantScope, where?: SQL) => Promise<number>
+  /**
+   * `SUM(column)` over the workspace's rows.
+   *
+   * On a `…_minor` column the result is a count of minor units and stays one: SQLite sums integers
+   * as integers, and no step of this function divides, multiplies or formats. Anything that wants a
+   * decimal goes through `src/lib/money`.
+   */
+  sumOf: (
+    scope: TenantScope,
+    column: SQLiteColumn,
+    where?: SQL,
+  ) => Promise<number>
+  insert: (
+    scope: TenantScope,
+    values: TenantInsert<TTable>,
+  ) => Promise<TTable['$inferSelect']>
+  insertMany: (
+    scope: TenantScope,
+    values: ReadonlyArray<TenantInsert<TTable>>,
+  ) => Promise<Array<TTable['$inferSelect']>>
+  updateWhere: (
+    scope: TenantScope,
+    where: SQL,
+    patch: TenantPatch<TTable>,
+  ) => Promise<Array<TTable['$inferSelect']>>
+  removeWhere: (scope: TenantScope, where: SQL) => Promise<number>
+}
+
+/**
+ * Refuses a patch that carries the tenant column.
+ *
+ * {@link TenantPatch} already removes it, so this fires only for a caller who cast around the type
+ * — and that is exactly the caller worth stopping. It throws rather than dropping the key silently,
+ * because an `UPDATE` that quietly ignores half of what it was asked to do is a bug that surfaces
+ * as missing data much later, and "this row now belongs to another workspace" is not a mistake to
+ * absorb quietly.
+ */
+function assertPatchCannotMoveRow(patch: object, entityName: string): void {
+  if (Object.hasOwn(patch, 'organizationId')) {
+    throw new TenantIsolationError(entityName)
+  }
+}
+
+export function createTenantTableAccess<TTable extends TenantTable>(
+  table: TTable,
+  entityName: string,
+): TenantTableAccess<TTable> {
+  type Row = TTable['$inferSelect']
+
+  async function findMany(
+    scope: TenantScope,
+    options: ListOptions = {},
+  ): Promise<Array<Row>> {
+    const query = scope.db
+      .select()
+      .from(table)
+      .where(tenantFilter(scope, table, options.where))
+      .$dynamic()
+
+    if (options.orderBy && options.orderBy.length > 0) {
+      query.orderBy(...options.orderBy)
+    }
+    if (options.limit !== undefined) {
+      query.limit(options.limit)
+    }
+
+    // `select()` with no field list selects every column of `table`, so the rows are `Row`.
+    return await query
+  }
+
+  async function findOne(scope: TenantScope, where: SQL): Promise<Row | null> {
+    const rows = await findMany(scope, { where, limit: 1 })
+    return rows[0] ?? null
+  }
+
+  async function countRows(scope: TenantScope, where?: SQL): Promise<number> {
+    const rows = await scope.db
+      .select({ value: count() })
+      .from(table)
+      .where(tenantFilter(scope, table, where))
+    return rows[0]?.value ?? 0
+  }
+
+  async function sumOf(
+    scope: TenantScope,
+    column: SQLiteColumn,
+    where?: SQL,
+  ): Promise<number> {
+    const rows = await scope.db
+      .select({ value: sum(column) })
+      .from(table)
+      .where(tenantFilter(scope, table, where))
+    const value = rows.at(0)?.value
+    // `SUM` over no rows is SQL NULL, which is zero of whatever unit the column counts.
+    return value === undefined || value === null ? 0 : Number(value)
+  }
+
+  async function insertMany(
+    scope: TenantScope,
+    values: ReadonlyArray<TenantInsert<TTable>>,
+  ): Promise<Array<Row>> {
+    if (values.length === 0) return []
+
+    // The tenant column is stamped from the scope and written *after* the caller's payload is
+    // spread, so a value smuggled in through a cast is overwritten rather than honoured.
+    const records = values.map(
+      (value) =>
+        ({
+          ...value,
+          organizationId: scope.ctx.organizationId,
+        }) as SQLiteInsertValue<TTable>,
+    )
+
+    return await scope.db.insert(table).values(records).returning()
+  }
+
+  async function insert(
+    scope: TenantScope,
+    values: TenantInsert<TTable>,
+  ): Promise<Row> {
+    const rows = await insertMany(scope, [values])
+    const row = rows.at(0)
+    if (row === undefined) {
+      // `RETURNING` came back empty, which on D1 means the statement did not execute. Not a
+      // `NotFoundError`: nothing was looked for.
+      throw new ConflictError(`Inserting a ${entityName} row returned nothing.`)
+    }
+    return row
+  }
+
+  async function updateWhere(
+    scope: TenantScope,
+    where: SQL,
+    patch: TenantPatch<TTable>,
+  ): Promise<Array<Row>> {
+    assertScopedWrite([where], entityName)
+    assertPatchCannotMoveRow(patch, entityName)
+
+    if (Object.keys(patch).length === 0) {
+      // An empty patch is a no-op, not an `UPDATE … SET` with nothing to set (which is a syntax
+      // error). Returning the matching rows keeps the caller's contract: "these are the rows".
+      return findMany(scope, { where })
+    }
+
+    return await scope.db
+      .update(table)
+      .set(patch as SQLiteUpdateSetSource<TTable>)
+      .where(tenantFilter(scope, table, where))
+      .returning()
+  }
+
+  async function removeWhere(scope: TenantScope, where: SQL): Promise<number> {
+    assertScopedWrite([where], entityName)
+
+    const rows = (await scope.db
+      .delete(table)
+      .where(tenantFilter(scope, table, where))
+      .returning()) as Array<Row>
+
+    return rows.length
+  }
+
+  return {
+    table,
+    entityName,
+    findMany,
+    findOne,
+    count: countRows,
+    sumOf,
+    insert,
+    insertMany,
+    updateWhere,
+    removeWhere,
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Generic access for tables keyed by a single `id` column                    */
+/* -------------------------------------------------------------------------- */
+
+export interface TenantRepository<
+  TTable extends KeyedTenantTable,
+> extends TenantTableAccess<TTable> {
+  /** The row, or `null`. A row in another workspace is `null` — it does not exist here. */
+  findById: (
+    scope: TenantScope,
+    id: string,
+  ) => Promise<TTable['$inferSelect'] | null>
+  /** The row, or {@link NotFoundError}. Never `ForbiddenError`: see `./errors`. */
+  requireById: (
+    scope: TenantScope,
+    id: string,
+  ) => Promise<TTable['$inferSelect']>
+  findByIds: (
+    scope: TenantScope,
+    ids: ReadonlyArray<string>,
+  ) => Promise<Array<TTable['$inferSelect']>>
+  exists: (scope: TenantScope, id: string) => Promise<boolean>
+  update: (
+    scope: TenantScope,
+    id: string,
+    patch: TenantPatch<TTable>,
+  ) => Promise<TTable['$inferSelect'] | null>
+  requireUpdate: (
+    scope: TenantScope,
+    id: string,
+    patch: TenantPatch<TTable>,
+  ) => Promise<TTable['$inferSelect']>
+  remove: (scope: TenantScope, id: string) => Promise<boolean>
+  requireRemove: (scope: TenantScope, id: string) => Promise<void>
+  /** Keyset pagination on the creation-sortable primary key, newest first. */
+  page: (
+    scope: TenantScope,
+    options?: PageOptions,
+  ) => Promise<CursorPage<TTable['$inferSelect']>>
+}
+
+export function createTenantRepository<TTable extends KeyedTenantTable>(
+  table: TTable,
+  entityName: string,
+): TenantRepository<TTable> {
+  type Row = TTable['$inferSelect']
+  const access = createTenantTableAccess(table, entityName)
+
+  async function findById(scope: TenantScope, id: string): Promise<Row | null> {
+    return access.findOne(scope, eq(table.id, id))
+  }
+
+  async function requireById(scope: TenantScope, id: string): Promise<Row> {
+    const row = await findById(scope, id)
+    if (!row) throw new NotFoundError(entityName, id)
+    return row
+  }
+
+  async function update(
+    scope: TenantScope,
+    id: string,
+    patch: TenantPatch<TTable>,
+  ): Promise<Row | null> {
+    const rows = await access.updateWhere(scope, eq(table.id, id), patch)
+    return rows[0] ?? null
+  }
+
+  async function remove(scope: TenantScope, id: string): Promise<boolean> {
+    return (await access.removeWhere(scope, eq(table.id, id))) > 0
+  }
+
+  async function page(
+    scope: TenantScope,
+    options: PageOptions = {},
+  ): Promise<CursorPage<Row>> {
+    const limit = clampPageSize(options.limit)
+    const cursorFilter = options.cursor
+      ? lt(table.id, options.cursor)
+      : undefined
+
+    // One row past the page, so "is there more" is answered by the same query rather than by a
+    // second `COUNT(*)` that can disagree with it under a concurrent insert.
+    const rows = await access.findMany(scope, {
+      where: and(options.where, cursorFilter),
+      orderBy: [desc(table.id)],
+      limit: limit + 1,
+    })
+
+    const hasMore = rows.length > limit
+    const items = hasMore ? rows.slice(0, limit) : rows
+    const last = items.at(-1)
+    // Every keyed tenant table has a text `id`; reading it off the generic row needs a widening.
+    const lastId =
+      last === undefined ? undefined : (last as Record<string, unknown>).id
+
+    return {
+      items,
+      nextCursor: hasMore && typeof lastId === 'string' ? lastId : null,
+    }
+  }
+
+  return {
+    ...access,
+    findById,
+    requireById,
+    async findByIds(scope, ids) {
+      if (ids.length === 0) return []
+      return access.findMany(scope, { where: inIds(table.id, ids) })
+    },
+    async exists(scope, id) {
+      return (await access.count(scope, eq(table.id, id))) > 0
+    },
+    update,
+    async requireUpdate(scope, id, patch) {
+      const row = await update(scope, id, patch)
+      if (!row) throw new NotFoundError(entityName, id)
+      return row
+    },
+    remove,
+    async requireRemove(scope, id) {
+      if (!(await remove(scope, id))) throw new NotFoundError(entityName, id)
+    },
+    page,
+  }
+}
+
+/** Ordering helpers re-exported so a repository imports from this module only. */
+export { asc, desc }

@@ -65,6 +65,7 @@ const GROUND_KEYS = [
   'color-surface',
   'color-surface-raised',
   'color-surface-sunken',
+  'color-surface-panel',
 ] as const
 
 /** Text tokens: must clear 7:1 on EVERY ground they can land on. */
@@ -110,6 +111,7 @@ describe.each([
       ...TEXT_KEYS,
       ...SERIES_KEYS,
       'color-border-strong',
+      'color-border-panel',
       'color-focus',
       ...FILL_PAIRS.flat(),
       ...SOFT_PAIRS.flat(),
@@ -168,6 +170,57 @@ describe.each([
 })
 
 describe('the two themes are separately designed', () => {
+  /*
+   * The panel plane is the one ground whose direction flips: light recesses it
+   * below `canvas`, dark lifts it above. Both themes have to state the split, or
+   * a two-column layout collapses to one field with nothing failing.
+   *
+   * The two steps are deliberately not equal. Light is capped at 1.10 by the
+   * contract itself — the panel is the darkest ground light text lands on and
+   * `positive` already sits at 7.01:1 on it, so one more step of recession puts
+   * a chromatic token below AAA. Dark both has the headroom and needs the larger
+   * step: near black a 1.10 ratio is a couple of display codes and reads as a
+   * rendering seam rather than as a second plane. Hence per-theme floors.
+   */
+  it('states the panel split by tone in both themes', () => {
+    const lightStep = contrast(
+      light['color-surface-panel'],
+      light['color-canvas'],
+    )
+    const darkStep = contrast(dark['color-surface-panel'], dark['color-canvas'])
+
+    expect(
+      lightStep,
+      `light panel step is ${lightStep.toFixed(3)}`,
+    ).toBeGreaterThanOrEqual(1.08)
+    expect(
+      darkStep,
+      `dark panel step is ${darkStep.toFixed(3)}`,
+    ).toBeGreaterThanOrEqual(1.15)
+  })
+
+  /*
+   * …and by a rule as well, in both themes, so tone is never the only channel
+   * carrying the layout's main structural idea. 1.5:1 is a design floor rather
+   * than a WCAG one: this edge divides two grounds, not two controls, so 1.4.11
+   * does not bind it — but below this the boundary is implied rather than
+   * stated, which is the defect the token was added to close.
+   */
+  it('draws the panel edge as a visible rule against both grounds it divides', () => {
+    for (const [themeName, tokens] of [
+      ['light', light],
+      ['dark', dark],
+    ] as const) {
+      for (const ground of ['color-canvas', 'color-surface-panel'] as const) {
+        const ratio = contrast(tokens['color-border-panel'], tokens[ground])
+        expect(
+          ratio,
+          `${themeName}: --color-border-panel on --${ground} is ${ratio.toFixed(2)}:1`,
+        ).toBeGreaterThanOrEqual(1.5)
+      }
+    }
+  })
+
   it('shares no ground value between light and dark', () => {
     for (const key of GROUND_KEYS) {
       expect(light[key], `--${key} was reused across themes`).not.toBe(

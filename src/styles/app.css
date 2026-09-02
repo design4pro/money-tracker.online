@@ -60,6 +60,7 @@
   --color-surface: var(--color-surface);
   --color-surface-raised: var(--color-surface-raised);
   --color-surface-sunken: var(--color-surface-sunken);
+  --color-surface-panel: var(--color-surface-panel);
 
   --color-ink: var(--color-ink);
   --color-ink-2: var(--color-ink-2);
@@ -67,6 +68,7 @@
 
   --color-border-subtle: var(--color-border-subtle);
   --color-border-strong: var(--color-border-strong);
+  --color-border-panel: var(--color-border-panel);
 
   --color-accent: var(--color-accent);
   --color-accent-hover: var(--color-accent-hover);
@@ -96,6 +98,7 @@
   --color-scrim: var(--color-scrim);
   --color-skeleton: var(--color-skeleton);
   --color-skeleton-sheen: var(--color-skeleton-sheen);
+  --color-chart-emphasis: var(--color-chart-emphasis);
 
   --color-focus: var(--color-focus);
   --color-focus-gap: var(--color-focus-gap);

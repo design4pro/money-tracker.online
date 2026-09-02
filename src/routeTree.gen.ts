@@ -10,43 +10,344 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as authRouteRouteImport } from './routes/(auth)/route'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
+import { Route as authLoginRouteImport } from './routes/(auth)/login'
+import { Route as authRegisterRouteImport } from './routes/(auth)/register'
+import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
+import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
+import { Route as AppBudgetsIndexRouteImport } from './routes/_app/budgets/index'
+import { Route as AppBudgetsBudgetIdRouteImport } from './routes/_app/budgets/$budgetId'
+import { Route as AppCategoriesIndexRouteImport } from './routes/_app/categories/index'
+import { Route as AppDashboardIndexRouteImport } from './routes/_app/dashboard/index'
+import { Route as AppGoalsIndexRouteImport } from './routes/_app/goals/index'
+import { Route as AppGoalsGoalIdRouteImport } from './routes/_app/goals/$goalId'
+import { Route as AppPayeesIndexRouteImport } from './routes/_app/payees/index'
+import { Route as AppPayeesPayeeIdRouteImport } from './routes/_app/payees/$payeeId'
+import { Route as AppRecurringIndexRouteImport } from './routes/_app/recurring/index'
+import { Route as AppRecurringSeriesIdRouteImport } from './routes/_app/recurring/$seriesId'
+import { Route as AppRecurringCandidatesRouteImport } from './routes/_app/recurring/candidates'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppTransactionsIndexRouteImport } from './routes/_app/transactions/index'
+import { Route as AppTransactionsTransactionIdRouteImport } from './routes/_app/transactions/$transactionId'
+import { Route as AppTransactionsNewRouteImport } from './routes/_app/transactions/new'
+import { Route as AppTransactionsPlannedRouteImport } from './routes/_app/transactions/planned'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const authRouteRoute = authRouteRouteImport.update({
+  id: '/(auth)',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authLoginRoute = authLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authRegisterRoute = authRegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authResetPasswordRoute = authResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
+  id: '/accounts/',
+  path: '/accounts/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAccountsAccountIdRoute = AppAccountsAccountIdRouteImport.update({
+  id: '/accounts/$accountId',
+  path: '/accounts/$accountId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBudgetsIndexRoute = AppBudgetsIndexRouteImport.update({
+  id: '/budgets/',
+  path: '/budgets/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBudgetsBudgetIdRoute = AppBudgetsBudgetIdRouteImport.update({
+  id: '/budgets/$budgetId',
+  path: '/budgets/$budgetId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCategoriesIndexRoute = AppCategoriesIndexRouteImport.update({
+  id: '/categories/',
+  path: '/categories/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardIndexRoute = AppDashboardIndexRouteImport.update({
+  id: '/dashboard/',
+  path: '/dashboard/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGoalsIndexRoute = AppGoalsIndexRouteImport.update({
+  id: '/goals/',
+  path: '/goals/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGoalsGoalIdRoute = AppGoalsGoalIdRouteImport.update({
+  id: '/goals/$goalId',
+  path: '/goals/$goalId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPayeesIndexRoute = AppPayeesIndexRouteImport.update({
+  id: '/payees/',
+  path: '/payees/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPayeesPayeeIdRoute = AppPayeesPayeeIdRouteImport.update({
+  id: '/payees/$payeeId',
+  path: '/payees/$payeeId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRecurringIndexRoute = AppRecurringIndexRouteImport.update({
+  id: '/recurring/',
+  path: '/recurring/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRecurringSeriesIdRoute = AppRecurringSeriesIdRouteImport.update({
+  id: '/recurring/$seriesId',
+  path: '/recurring/$seriesId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRecurringCandidatesRoute = AppRecurringCandidatesRouteImport.update({
+  id: '/recurring/candidates',
+  path: '/recurring/candidates',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTransactionsIndexRoute = AppTransactionsIndexRouteImport.update({
+  id: '/transactions/',
+  path: '/transactions/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTransactionsTransactionIdRoute =
+  AppTransactionsTransactionIdRouteImport.update({
+    id: '/transactions/$transactionId',
+    path: '/transactions/$transactionId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppTransactionsNewRoute = AppTransactionsNewRouteImport.update({
+  id: '/transactions/new',
+  path: '/transactions/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTransactionsPlannedRoute = AppTransactionsPlannedRouteImport.update({
+  id: '/transactions/planned',
+  path: '/transactions/planned',
+  getParentRoute: () => AppRoute,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/forgot-password': typeof authForgotPasswordRoute
+  '/login': typeof authLoginRoute
+  '/register': typeof authRegisterRoute
+  '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
+  '/goals/$goalId': typeof AppGoalsGoalIdRoute
+  '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
+  '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
+  '/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
+  '/transactions/new': typeof AppTransactionsNewRoute
+  '/transactions/planned': typeof AppTransactionsPlannedRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/accounts/': typeof AppAccountsIndexRoute
+  '/budgets/': typeof AppBudgetsIndexRoute
+  '/categories/': typeof AppCategoriesIndexRoute
+  '/dashboard/': typeof AppDashboardIndexRoute
+  '/goals/': typeof AppGoalsIndexRoute
+  '/payees/': typeof AppPayeesIndexRoute
+  '/recurring/': typeof AppRecurringIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
+  '/transactions/': typeof AppTransactionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof authForgotPasswordRoute
+  '/login': typeof authLoginRoute
+  '/register': typeof authRegisterRoute
+  '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
+  '/goals/$goalId': typeof AppGoalsGoalIdRoute
+  '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
+  '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
+  '/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
+  '/transactions/new': typeof AppTransactionsNewRoute
+  '/transactions/planned': typeof AppTransactionsPlannedRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/accounts': typeof AppAccountsIndexRoute
+  '/budgets': typeof AppBudgetsIndexRoute
+  '/categories': typeof AppCategoriesIndexRoute
+  '/dashboard': typeof AppDashboardIndexRoute
+  '/goals': typeof AppGoalsIndexRoute
+  '/payees': typeof AppPayeesIndexRoute
+  '/recurring': typeof AppRecurringIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
+  '/transactions': typeof AppTransactionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/(auth)': typeof authRouteRouteWithChildren
+  '/_app': typeof AppRouteWithChildren
+  '/(auth)/forgot-password': typeof authForgotPasswordRoute
+  '/(auth)/login': typeof authLoginRoute
+  '/(auth)/register': typeof authRegisterRoute
+  '/(auth)/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/_app/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
+  '/_app/goals/$goalId': typeof AppGoalsGoalIdRoute
+  '/_app/payees/$payeeId': typeof AppPayeesPayeeIdRoute
+  '/_app/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
+  '/_app/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/_app/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
+  '/_app/transactions/new': typeof AppTransactionsNewRoute
+  '/_app/transactions/planned': typeof AppTransactionsPlannedRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/_app/accounts/': typeof AppAccountsIndexRoute
+  '/_app/budgets/': typeof AppBudgetsIndexRoute
+  '/_app/categories/': typeof AppCategoriesIndexRoute
+  '/_app/dashboard/': typeof AppDashboardIndexRoute
+  '/_app/goals/': typeof AppGoalsIndexRoute
+  '/_app/payees/': typeof AppPayeesIndexRoute
+  '/_app/recurring/': typeof AppRecurringIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/transactions/': typeof AppTransactionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/health'
+  fullPaths:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/register'
+    | '/reset-password'
+    | '/api/health'
+    | '/accounts/$accountId'
+    | '/budgets/$budgetId'
+    | '/goals/$goalId'
+    | '/payees/$payeeId'
+    | '/recurring/$seriesId'
+    | '/recurring/candidates'
+    | '/transactions/$transactionId'
+    | '/transactions/new'
+    | '/transactions/planned'
+    | '/api/auth/$'
+    | '/accounts/'
+    | '/budgets/'
+    | '/categories/'
+    | '/dashboard/'
+    | '/goals/'
+    | '/payees/'
+    | '/recurring/'
+    | '/settings/'
+    | '/transactions/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/health'
-  id: '__root__' | '/' | '/api/health'
+  to:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/register'
+    | '/reset-password'
+    | '/api/health'
+    | '/accounts/$accountId'
+    | '/budgets/$budgetId'
+    | '/goals/$goalId'
+    | '/payees/$payeeId'
+    | '/recurring/$seriesId'
+    | '/recurring/candidates'
+    | '/transactions/$transactionId'
+    | '/transactions/new'
+    | '/transactions/planned'
+    | '/api/auth/$'
+    | '/accounts'
+    | '/budgets'
+    | '/categories'
+    | '/dashboard'
+    | '/goals'
+    | '/payees'
+    | '/recurring'
+    | '/settings'
+    | '/transactions'
+  id:
+    | '__root__'
+    | '/'
+    | '/(auth)'
+    | '/_app'
+    | '/(auth)/forgot-password'
+    | '/(auth)/login'
+    | '/(auth)/register'
+    | '/(auth)/reset-password'
+    | '/api/health'
+    | '/_app/accounts/$accountId'
+    | '/_app/budgets/$budgetId'
+    | '/_app/goals/$goalId'
+    | '/_app/payees/$payeeId'
+    | '/_app/recurring/$seriesId'
+    | '/_app/recurring/candidates'
+    | '/_app/transactions/$transactionId'
+    | '/_app/transactions/new'
+    | '/_app/transactions/planned'
+    | '/api/auth/$'
+    | '/_app/accounts/'
+    | '/_app/budgets/'
+    | '/_app/categories/'
+    | '/_app/dashboard/'
+    | '/_app/goals/'
+    | '/_app/payees/'
+    | '/_app/recurring/'
+    | '/_app/settings/'
+    | '/_app/transactions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  authRouteRoute: typeof authRouteRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +359,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(auth)': {
+      id: '/(auth)'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof authRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/forgot-password': {
+      id: '/(auth)/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof authForgotPasswordRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/login': {
+      id: '/(auth)/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof authLoginRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/register': {
+      id: '/(auth)/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof authRegisterRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/reset-password': {
+      id: '/(auth)/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof authResetPasswordRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -65,12 +408,210 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/accounts/': {
+      id: '/_app/accounts/'
+      path: '/accounts'
+      fullPath: '/accounts/'
+      preLoaderRoute: typeof AppAccountsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/accounts/$accountId': {
+      id: '/_app/accounts/$accountId'
+      path: '/accounts/$accountId'
+      fullPath: '/accounts/$accountId'
+      preLoaderRoute: typeof AppAccountsAccountIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/budgets/': {
+      id: '/_app/budgets/'
+      path: '/budgets'
+      fullPath: '/budgets/'
+      preLoaderRoute: typeof AppBudgetsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/budgets/$budgetId': {
+      id: '/_app/budgets/$budgetId'
+      path: '/budgets/$budgetId'
+      fullPath: '/budgets/$budgetId'
+      preLoaderRoute: typeof AppBudgetsBudgetIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/categories/': {
+      id: '/_app/categories/'
+      path: '/categories'
+      fullPath: '/categories/'
+      preLoaderRoute: typeof AppCategoriesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard/': {
+      id: '/_app/dashboard/'
+      path: '/dashboard'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof AppDashboardIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/goals/': {
+      id: '/_app/goals/'
+      path: '/goals'
+      fullPath: '/goals/'
+      preLoaderRoute: typeof AppGoalsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/goals/$goalId': {
+      id: '/_app/goals/$goalId'
+      path: '/goals/$goalId'
+      fullPath: '/goals/$goalId'
+      preLoaderRoute: typeof AppGoalsGoalIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/payees/': {
+      id: '/_app/payees/'
+      path: '/payees'
+      fullPath: '/payees/'
+      preLoaderRoute: typeof AppPayeesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/payees/$payeeId': {
+      id: '/_app/payees/$payeeId'
+      path: '/payees/$payeeId'
+      fullPath: '/payees/$payeeId'
+      preLoaderRoute: typeof AppPayeesPayeeIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/recurring/': {
+      id: '/_app/recurring/'
+      path: '/recurring'
+      fullPath: '/recurring/'
+      preLoaderRoute: typeof AppRecurringIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/recurring/$seriesId': {
+      id: '/_app/recurring/$seriesId'
+      path: '/recurring/$seriesId'
+      fullPath: '/recurring/$seriesId'
+      preLoaderRoute: typeof AppRecurringSeriesIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/recurring/candidates': {
+      id: '/_app/recurring/candidates'
+      path: '/recurring/candidates'
+      fullPath: '/recurring/candidates'
+      preLoaderRoute: typeof AppRecurringCandidatesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/transactions/': {
+      id: '/_app/transactions/'
+      path: '/transactions'
+      fullPath: '/transactions/'
+      preLoaderRoute: typeof AppTransactionsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/transactions/$transactionId': {
+      id: '/_app/transactions/$transactionId'
+      path: '/transactions/$transactionId'
+      fullPath: '/transactions/$transactionId'
+      preLoaderRoute: typeof AppTransactionsTransactionIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/transactions/new': {
+      id: '/_app/transactions/new'
+      path: '/transactions/new'
+      fullPath: '/transactions/new'
+      preLoaderRoute: typeof AppTransactionsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/transactions/planned': {
+      id: '/_app/transactions/planned'
+      path: '/transactions/planned'
+      fullPath: '/transactions/planned'
+      preLoaderRoute: typeof AppTransactionsPlannedRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface authRouteRouteChildren {
+  authForgotPasswordRoute: typeof authForgotPasswordRoute
+  authLoginRoute: typeof authLoginRoute
+  authRegisterRoute: typeof authRegisterRoute
+  authResetPasswordRoute: typeof authResetPasswordRoute
+}
+
+const authRouteRouteChildren: authRouteRouteChildren = {
+  authForgotPasswordRoute: authForgotPasswordRoute,
+  authLoginRoute: authLoginRoute,
+  authRegisterRoute: authRegisterRoute,
+  authResetPasswordRoute: authResetPasswordRoute,
+}
+
+const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
+  authRouteRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
+  AppBudgetsBudgetIdRoute: typeof AppBudgetsBudgetIdRoute
+  AppGoalsGoalIdRoute: typeof AppGoalsGoalIdRoute
+  AppPayeesPayeeIdRoute: typeof AppPayeesPayeeIdRoute
+  AppRecurringSeriesIdRoute: typeof AppRecurringSeriesIdRoute
+  AppRecurringCandidatesRoute: typeof AppRecurringCandidatesRoute
+  AppTransactionsTransactionIdRoute: typeof AppTransactionsTransactionIdRoute
+  AppTransactionsNewRoute: typeof AppTransactionsNewRoute
+  AppTransactionsPlannedRoute: typeof AppTransactionsPlannedRoute
+  AppAccountsIndexRoute: typeof AppAccountsIndexRoute
+  AppBudgetsIndexRoute: typeof AppBudgetsIndexRoute
+  AppCategoriesIndexRoute: typeof AppCategoriesIndexRoute
+  AppDashboardIndexRoute: typeof AppDashboardIndexRoute
+  AppGoalsIndexRoute: typeof AppGoalsIndexRoute
+  AppPayeesIndexRoute: typeof AppPayeesIndexRoute
+  AppRecurringIndexRoute: typeof AppRecurringIndexRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppTransactionsIndexRoute: typeof AppTransactionsIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,
+  AppBudgetsBudgetIdRoute: AppBudgetsBudgetIdRoute,
+  AppGoalsGoalIdRoute: AppGoalsGoalIdRoute,
+  AppPayeesPayeeIdRoute: AppPayeesPayeeIdRoute,
+  AppRecurringSeriesIdRoute: AppRecurringSeriesIdRoute,
+  AppRecurringCandidatesRoute: AppRecurringCandidatesRoute,
+  AppTransactionsTransactionIdRoute: AppTransactionsTransactionIdRoute,
+  AppTransactionsNewRoute: AppTransactionsNewRoute,
+  AppTransactionsPlannedRoute: AppTransactionsPlannedRoute,
+  AppAccountsIndexRoute: AppAccountsIndexRoute,
+  AppBudgetsIndexRoute: AppBudgetsIndexRoute,
+  AppCategoriesIndexRoute: AppCategoriesIndexRoute,
+  AppDashboardIndexRoute: AppDashboardIndexRoute,
+  AppGoalsIndexRoute: AppGoalsIndexRoute,
+  AppPayeesIndexRoute: AppPayeesIndexRoute,
+  AppRecurringIndexRoute: AppRecurringIndexRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppTransactionsIndexRoute: AppTransactionsIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  authRouteRoute: authRouteRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
   ApiHealthRoute: ApiHealthRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

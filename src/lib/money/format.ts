@@ -44,6 +44,19 @@ export interface FormatMoneyOptions {
   readonly grouping?: boolean
   /** `'auto'` hides the sign on positives; `'always'` shows it. */
   readonly signDisplay?: 'auto' | 'always' | 'exceptZero' | 'never'
+  /**
+   * Overrides how many fraction digits are *drawn*. The amount is still scaled
+   * by the currency's own `digits` — this changes the rendering, never the
+   * arithmetic.
+   *
+   * It exists for one caller: a chart axis, whose ticks are whole major units
+   * by construction and for which `12 000,00` is four characters of precision
+   * nobody reads. **Passing a value smaller than the currency's scale to
+   * anything that is not a whole major unit rounds the drawn figure**, so the
+   * axis checks that before it asks (`components/charts/format.ts`). Nothing
+   * that shows a real balance may use it.
+   */
+  readonly fractionDigits?: number
 }
 
 interface FormatterKeyParts extends FormatMoneyOptions {
@@ -97,6 +110,41 @@ function majorOf(amountMinor: Minor, digits: number): number {
   return amountMinor / 10 ** digits
 }
 
+/** U+2212 MINUS SIGN. The only minus this product draws. */
+const MINUS = '\u2212'
+
+/**
+ * Swaps the locale's own minus for U+2212 on the way out.
+ *
+ * CLDR gives both `en` and `pl` the ASCII hyphen-minus, which is a third of the
+ * width of the plus it has to pair with and half the width of the digits it
+ * sits in front of: a ledger column set in tabular figures stops reading as a
+ * column. `formatSignedMoney` has always drawn U+2212 and `Intl` never did, so
+ * the same balance read `−43,81 zł` in one place and `-43,81 zł` in another.
+ * Doing it **here** rather than at each call site is what stops that drifting
+ * apart again — every string this module hands out carries the same glyph.
+ *
+ * Only the first occurrence is replaced, and only on a negative value: the sign
+ * always precedes the digits, and `currencyDisplay: 'name'` puts the currency's
+ * words after them, so nothing inside a currency name is at risk.
+ *
+ * U+2212 is a *drawing*, not a *reading* — several screen readers announce it as
+ * nothing at all. Anything destined for an accessible name formats the
+ * magnitude and says the sign in words instead; see
+ * `src/components/app/money/amount-reading.ts`.
+ */
+function withTypographicMinus(
+  locale: Locale,
+  formatted: string,
+  isNegative: boolean,
+): string {
+  if (!isNegative) {
+    return formatted
+  }
+  const { minusSign } = separatorsOf(locale)
+  return minusSign === MINUS ? formatted : formatted.replace(minusSign, MINUS)
+}
+
 /**
  * `123400` minor EUR in `en` → `€1,234.00`; in `pl` → `1 234,00 €` with a
  * non-breaking space. `5000` JPY → `¥5,000`, because the yen has no minor unit.
@@ -113,12 +161,117 @@ export function formatMoney(
   options: FormatMoneyOptions = {},
 ): string {
   const digits = minorUnitDigits(amount.currencyCode)
-  return formatterFor({
+  const formatted = formatterFor({
     ...options,
     locale,
     currencyCode: amount.currencyCode,
-    digits,
+    digits: options.fractionDigits ?? digits,
   }).format(majorOf(amount.amountMinor, digits))
+  return withTypographicMinus(locale, formatted, amount.amountMinor < 0)
+}
+
+/**
+ * One piece of a drawn figure. `value` is the text; `kind` is what it is for.
+ *
+ * `integer` carries its group separators and `fraction` carries its decimal
+ * separator, because neither is ever styled or measured apart from the digits
+ * it belongs to. `literal` is CLDR's own spacing between a symbol and a number.
+ */
+export interface MoneySegment {
+  readonly kind: 'sign' | 'currency' | 'integer' | 'fraction' | 'literal'
+  readonly value: string
+}
+
+/**
+ * The same figure, cut where a typographer needs to cut it.
+ *
+ * Two compositions need the pieces rather than the string, and both are about
+ * the *drawing* only:
+ *
+ * - a headline figure sets its currency mark smaller and lighter than its
+ *   digits, so `zł` stops competing with the number it belongs to;
+ * - a column of mixed-currency balances aligns on the decimal separator, which
+ *   cannot be done while `zł 72 328,33` and `$7 785,32` are two opaque strings
+ *   whose digits begin at different offsets.
+ *
+ * Joining the values back together yields **exactly** what {@link formatMoney}
+ * returns for the same arguments — the same formatter, the same U+2212, the
+ * same CLDR spacing and the same order, which is why the segments are a list
+ * rather than a record of named sides: some locales put the sign inside the
+ * currency's own spacing, and a record would silently reorder them.
+ *
+ * The sign is its own segment and is never restyled by a caller. It is one of
+ * the three channels that carry direction (`docs/ACCESSIBILITY.md` §1), so it
+ * is drawn at the digits' own size and weight wherever the figure appears.
+ */
+export function formatMoneySegments(
+  locale: Locale,
+  amount: Money,
+  options: FormatMoneyOptions = {},
+): ReadonlyArray<MoneySegment> {
+  const digits = minorUnitDigits(amount.currencyCode)
+  const parts = formatterFor({
+    ...options,
+    locale,
+    currencyCode: amount.currencyCode,
+    digits: options.fractionDigits ?? digits,
+  }).formatToParts(majorOf(amount.amountMinor, digits))
+
+  const segments: Array<MoneySegment> = []
+  const push = (kind: MoneySegment['kind'], value: string): void => {
+    const last = segments.at(-1)
+    if (last?.kind === kind) {
+      segments[segments.length - 1] = { kind, value: last.value + value }
+      return
+    }
+    segments.push({ kind, value })
+  }
+
+  for (const part of parts) {
+    switch (part.type) {
+      case 'integer':
+      case 'group':
+        push('integer', part.value)
+        break
+      case 'decimal':
+      case 'fraction':
+        push('fraction', part.value)
+        break
+      case 'currency':
+        push('currency', part.value)
+        break
+      case 'minusSign':
+        push('sign', MINUS)
+        break
+      case 'plusSign':
+        push('sign', part.value)
+        break
+      default:
+        push('literal', part.value)
+    }
+  }
+
+  return segments
+}
+
+/** {@link formatMoneySegments} for {@link formatSignedMoney}'s string. */
+export function formatSignedMoneySegments(
+  locale: Locale,
+  amount: Money,
+  options: FormatMoneyOptions = {},
+): ReadonlyArray<MoneySegment> {
+  const magnitude = formatMoneySegments(
+    locale,
+    { ...amount, amountMinor: Math.abs(amount.amountMinor) as Minor },
+    options,
+  )
+  if (amount.amountMinor === 0) {
+    return magnitude
+  }
+  return [
+    { kind: 'sign', value: amount.amountMinor > 0 ? '+' : MINUS },
+    ...magnitude,
+  ]
 }
 
 /** The same figure with no currency at all, for a column that already names it. */
@@ -133,10 +286,10 @@ export function formatMoneyPlain(
 /**
  * A balance with its direction shown: `+1 234,00 zł`, `−1 234,00 zł`.
  *
- * The minus is U+2212, not a hyphen: at a dashboard's type sizes a hyphen is a
- * third the width of the plus beside it and the column stops reading as a
- * column. Zero is unsigned, because a settled balance is a fact rather than a
- * direction and `+0,00 zł` reads as a rounding artefact.
+ * The minus is U+2212, which is what {@link formatMoney} draws too — this
+ * function differs from it only by putting a `+` on a credit. Zero is unsigned,
+ * because a settled balance is a fact rather than a direction and `+0,00 zł`
+ * reads as a rounding artefact.
  */
 export function formatSignedMoney(
   locale: Locale,
@@ -151,7 +304,7 @@ export function formatSignedMoney(
   if (amount.amountMinor === 0) {
     return magnitude
   }
-  return `${amount.amountMinor > 0 ? '+' : '−'}${magnitude}`
+  return `${amount.amountMinor > 0 ? '+' : MINUS}${magnitude}`
 }
 
 /**

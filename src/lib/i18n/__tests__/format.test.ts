@@ -45,6 +45,17 @@ describe('calendar dates', () => {
     expect(formatCalendarDate('pl', '2025-12-31', 'short')).toBe('31.12.2025')
   })
 
+  /**
+   * The ledger's date column below `sm`: the day of the month alone, under a heading that has
+   * already named the month, because a ten-character date does not fit a 44px track without
+   * printing over the payee beside it.
+   */
+  it('writes the day of the month on its own for the narrowest column', () => {
+    expect(formatCalendarDate('pl', '2025-12-31', 'day')).toBe('31')
+    expect(formatCalendarDate('en', '2025-12-31', 'day')).toBe('31')
+    expect(formatCalendarDate('en', '2025-12-01', 'day')).toBe('1')
+  })
+
   it('names the month in the reader language for the styles that spell it out', () => {
     expect(formatCalendarDate('pl', '2025-12-31', 'long')).toContain('grudnia')
     expect(formatCalendarDate('en', '2025-12-31', 'long')).toContain('December')
