@@ -226,8 +226,13 @@ _Parsing produces integer minor units or it produces an error — never a float.
   warning and not a throw; the 20 000-row cap; a 5 MB file streaming without exceeding a memory
   assertion on chunk count.
 - `imports.test.ts`: the compensating delete on a post-R2 throw; the quota rejection; the status
-  transitions rejecting an illegal move (`completed → mapping` throws); `registry.ts` resolving
-  `csv` and failing a `source` whose module is absent.
+  transitions rejecting an illegal move (`completed → mapping` throws).
+- `registry.test.ts`: resolving `csv`; failing a `source` whose module is absent; and the laziness
+  the glob is there for - a missing source answered without evaluating anything, and two resolutions
+  of the same source evaluating once.
+- **Each test file sits beside the module it tests, and that is a rule here rather than tidiness.**
+  A later format adding a case must not have to edit a file this stage owns, which is the same
+  property the registry itself buys.
 - No browser evidence — this stage renders nothing.
 
 ### Definition of done
