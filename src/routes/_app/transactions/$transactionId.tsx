@@ -11,12 +11,17 @@ import {
   TransactionListError,
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
+import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 import { deleteTransaction, updateTransaction } from '#/server/fns/transactions'
 
 import { useDataRefresh } from '../-lib/refresh'
 import { toLedgerRow } from './-lib/rows'
+import { AttachmentDropzone } from './-ui/attachment-dropzone'
+import { AttachmentList } from './-ui/attachment-list'
 import { TransactionFormSkeleton } from './-ui/form-skeleton'
+import { GroupPanel } from './-ui/group-panel'
+import { RefundPanel } from './-ui/refund-panel'
 import { SplitEditor } from './-ui/split-editor'
 import { loadTransactionDetail } from './-server/detail'
 import { loadTransactionReference } from './-server/list'
@@ -26,7 +31,10 @@ import type {
   TransactionReference,
 } from '#/components/app/transactions'
 import type { Minor } from '#/lib/money'
+import type { AttachmentRow } from '#/server/db/schema'
 import type { Transaction, TransactionSplit } from '#/server/db/types'
+import type { RefundSummary } from '#/server/repos/refunds'
+import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 
 /**
@@ -45,6 +53,21 @@ import type { TransactionPolicies } from '#/server/repos/transactions'
  * The summary prints both. Recomputing either here would be a second opinion about a historical
  * fact, and on any day the rate has moved it would be a detail screen that disagrees with the list
  * it was opened from.
+ *
+ * ## Two columns, because five equal cards are a pile
+ *
+ * Read mode carries five concerns: the summary, splits, refunds, groups and receipts. Only the
+ * summary is true of every transaction; the other four are *sometimes*, and stacking five cards of
+ * equal weight makes a reader scan all five to find out which ones apply today.
+ *
+ * So the money goes in the primary column — the summary, and the splits that divide it — and the
+ * context goes in a narrower secondary one. Each of the four panels is already a self-contained
+ * `<Card as="section">` with its own heading, so this file arranges them and adds no chrome of its
+ * own; wrapping them in accordions would have put a second heading at an inverted level inside each
+ * one. Below `lg` the grid collapses and the order becomes the reading order.
+ *
+ * A panel with nothing in it is not hidden. It renders its own empty state carrying the action that
+ * fills it, which is why a transaction with no receipts still shows where receipts would go.
  *
  * ## A no-op save writes nothing new
  *
@@ -126,6 +149,10 @@ function TransactionDetailRoute() {
       transaction={detailQuery.data.transaction}
       accountName={detailQuery.data.accountName}
       splits={detailQuery.data.splits}
+      refunds={detailQuery.data.refunds}
+      groups={detailQuery.data.groups}
+      allGroups={detailQuery.data.allGroups}
+      attachments={detailQuery.data.attachments}
       reference={referenceQuery.data}
       isEditing={mode === 'edit'}
       onRefresh={() => void detailQuery.refetch()}
@@ -155,6 +182,10 @@ interface ScreenProps {
   readonly transaction: Transaction
   readonly accountName: string
   readonly splits: ReadonlyArray<TransactionSplit>
+  readonly refunds: RefundSummary
+  readonly groups: ReadonlyArray<TransactionGroupSummary>
+  readonly allGroups: ReadonlyArray<TransactionGroupSummary>
+  readonly attachments: ReadonlyArray<AttachmentRow>
   readonly reference: TransactionReference
   readonly isEditing: boolean
   readonly onRefresh: () => void
@@ -164,6 +195,10 @@ function TransactionDetailScreen({
   transaction,
   accountName,
   splits,
+  refunds,
+  groups,
+  allGroups,
+  attachments,
   reference,
   isEditing,
   onRefresh,
@@ -256,7 +291,13 @@ function TransactionDetailScreen({
   })
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    // The edit form stays at reading width; the read view needs room for its second column.
+    <div
+      className={cn(
+        'mx-auto flex w-full flex-col gap-6',
+        isEditing ? 'max-w-3xl' : 'max-w-5xl',
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" icon={<ArrowLeft />} onPress={goToList}>
           {t('transactions.detail.back')}
@@ -317,32 +358,70 @@ function TransactionDetailScreen({
           submitLabel={t('action.saveChanges')}
         />
       ) : (
-        <>
-          <DetailSummary
-            row={row}
-            accountName={accountName}
-            categoryName={category?.name ?? null}
-            payeeName={payee?.name ?? null}
-            createdAtMs={transaction.createdAt.getTime()}
-            timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}
-          />
-          {/*
-            Keyed on the stored set's ids, not on the transaction's. The panel seeds its rows once
-            and deliberately has no synchronising effect, so a save that replaces the set has to
-            arrive as a remount or the editor goes on showing the figures it was opened with. Every
-            saved line gets a fresh id, so the key changes exactly when the stored set does.
-          */}
-          <SplitEditor
-            key={splits.map((split) => split.id).join(',')}
-            transactionId={transaction.id}
-            amountMinor={transaction.amountMinor}
-            currencyCode={transaction.currencyCode}
-            splits={splits}
-            categories={reference.categories}
-            isTransferLeg={transaction.transferKind !== 'none'}
-            onSaved={onRefresh}
-          />
-        </>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+          {/* The money: what this row is, and how it divides. */}
+          <div className="flex min-w-0 flex-col gap-6">
+            <DetailSummary
+              row={row}
+              accountName={accountName}
+              categoryName={category?.name ?? null}
+              payeeName={payee?.name ?? null}
+              createdAtMs={transaction.createdAt.getTime()}
+              timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}
+            />
+            {/*
+              Keyed on the stored set's ids, not on the transaction's. The panel seeds its rows once
+              and deliberately has no synchronising effect, so a save that replaces the set has to
+              arrive as a remount or the editor goes on showing the figures it was opened with. Every
+              saved line gets a fresh id, so the key changes exactly when the stored set does.
+            */}
+            <SplitEditor
+              key={splits.map((split) => split.id).join(',')}
+              transactionId={transaction.id}
+              amountMinor={transaction.amountMinor}
+              currencyCode={transaction.currencyCode}
+              splits={splits}
+              categories={reference.categories}
+              isTransferLeg={transaction.transferKind !== 'none'}
+              onSaved={onRefresh}
+            />
+          </div>
+
+          {/* The context: what else is attached to this row. Each panel states its own emptiness. */}
+          <div className="flex min-w-0 flex-col gap-6">
+            {/*
+              `initialSummary` is the loader's read, spent on the first paint only — the panel's own
+              reads are the authority from then on. Passing it saves a round trip and stops the
+              column reflowing under a reader a moment after the rest of the screen has settled.
+            */}
+            <RefundPanel
+              transactionId={transaction.id}
+              initialSummary={refunds}
+              onChanged={onRefresh}
+            />
+            <GroupPanel
+              transactionId={transaction.id}
+              memberOf={groups}
+              allGroups={allGroups}
+              onChanged={onRefresh}
+            />
+            {/*
+              The dropzone is the list's action rather than a panel beside it: it renders inside the
+              empty state and below a filled one, so "no receipts yet" is the place you add the
+              first, not a card that says nothing and sits above the card that does.
+            */}
+            <AttachmentList
+              attachments={attachments}
+              onDeleted={onRefresh}
+              action={
+                <AttachmentDropzone
+                  transactionId={transaction.id}
+                  onUploaded={onRefresh}
+                />
+              }
+            />
+          </div>
+        </div>
       )}
 
       <ConfirmDeleteDialog
