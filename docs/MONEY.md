@@ -292,6 +292,54 @@ A refund reduces the effective spend of its target. Every aggregation that repor
 which of the two figures it is: **gross** (before refunds) or **net** (after). A screen that shows
 one and labels it the other is a defect, and the pivot report exposes the choice to the reader.
 
+### 4.5 Budget rollover
+
+A budget period has four integers: the `limit` it was given, what it `carriedIn` from the period
+before, what was `spent` against it, and the balance those three imply.
+
+```
+balance = limit + carriedIn - spent
+```
+
+`balance` is **signed**. Negative means the envelope was overspent. What happens to it at the
+period boundary is a per-budget setting, `budgets.rollover_policy`, and there are exactly three
+answers:
+
+| policy          | `carriedOut`      | an overspent envelope                                |
+| --------------- | ----------------- | ---------------------------------------------------- |
+| `none`          | `0`               | forgotten. Every period starts at its bare limit.    |
+| `carry_surplus` | `max(0, balance)` | **absorbed** — but reported, never silently dropped. |
+| `carry_all`     | `balance`         | **carried**, as a negative opening balance.          |
+
+A new budget defaults to `carry_surplus`: it is the policy that matches how most households
+actually behave — an underspent month leaves something over, an overspent one is settled out of
+the rest of the money and not held against next month — and it is the only one of the three that
+is forgiving in one direction without being forgetful in the other.
+
+**`carriedIn(n + 1) = carriedOut(n)`, always.** Two integer operations, no division, no rounding
+step, so the chain telescopes: under `carry_all`, `carriedIn` at period _n_ equals `Σ limit − Σ
+spent` over every period before it, exactly, and a reader can check a rollover ledger with a
+pencil. The moment a rounding step enters that chain the ledger stops adding up and the product
+has to choose which of two numbers to print.
+
+**An overspend is absorbed, never hidden.** Under `none` and `carry_surplus` the arithmetic floors
+at zero, and a policy that floors and reports nothing tells somebody their year balanced when it
+did not. The rollover therefore returns the absorbed amount alongside the carry, and the ledger
+prints both — _"0,00 zł · over by 400,00 zł"_. Under `carry_all` there is nothing to absorb,
+because the overspend is the opening balance: spending 2 400,00 zł from a 2 000,00 zł envelope
+means the next period opens at −400,00 zł and has 1 600,00 zł to spend.
+
+**A closed period is never rewritten.** `budget_periods` stores the limit, the carry and the spend
+_as they were_, and editing a budget's limit reaches the open period and every period after it and
+not one period before it. When a transaction inside a closed period is edited afterwards, the
+stored figure and what the dates now add up to diverge; that divergence is **reported as a
+correction** against the open period and never written back. Retroactively rewriting a closed
+period is the defect this table exists to make impossible.
+
+Every figure above is an integer number of minor units in the budget's own currency. The limit is
+converted to the workspace's base currency once, at the period's first day, for display only; the
+transactions are never converted a second time (§3.1).
+
 ---
 
 ## 5. Balance history

@@ -833,8 +833,9 @@ const messages = {
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budżety',
+  'budgets.subtitle': 'Ile zostało — koperta po kopercie.',
   'budgets.spentOf': '{spent} z {limit}',
-  'budgets.remaining': 'Zostało {amount}',
+  'budgets.remaining': 'Pozostało {amount}',
   'budgets.overspent': 'Przekroczono o {amount}',
   'budgets.daysLeft': {
     one: 'Został {count} dzień do końca okresu',
@@ -842,6 +843,188 @@ const messages = {
     many: 'Zostało {count} dni do końca okresu',
     other: 'Zostało {count} dnia do końca okresu',
   },
+
+  // Nazwa dostępna miernika podaje najpierw kwoty, potem procent — samo „62%”
+  // nie mówi, czego dotyczy.
+  'budgets.meter.label': 'Wykorzystanie budżetu: {name}',
+  'budgets.meter.valueText': 'Wydano {spent} z {available}, {percent}',
+  'budgets.meter.tick': '100% z {available}',
+  'budgets.meter.notch': 'Ostrzeżenie przy {percent}',
+  'budgets.meter.unavailable': 'Wykorzystanie niedostępne',
+  'budgets.meter.noRate':
+    'Brak kursu waluty {currency} na ten dzień, więc nie możemy jeszcze porównać tego budżetu z walutą raportowania.',
+  'budgets.state.under': 'Bez zagrożenia',
+  'budgets.state.approaching': 'Blisko limitu',
+  'budgets.state.over': 'Przekroczenie budżetu',
+  'budgets.carriedIn': 'Przeniesiono {amount}',
+  'budgets.carriedInNegative': 'Przeniesiono {amount} z przekroczenia',
+  'budgets.notStarted': 'Start {date}',
+  'budgets.ended': 'Zakończony {date}',
+
+  'budgets.kind.label': 'Co obejmuje',
+  'budgets.kind.category': 'Kategorie',
+  'budgets.kind.category.help':
+    'Liczy każdą transakcję z wybranych kategorii i ich podkategorii.',
+  'budgets.kind.manual': 'Wybrane ręcznie',
+  'budgets.kind.manual.help':
+    'Liczy tylko transakcje, które sam do niego dodasz. Na wyjazd, remont, jednorazowy wydatek.',
+
+  'budgets.period.label': 'Okres rozliczeniowy',
+  'budgets.period.one_off': 'Jednorazowy',
+  'budgets.period.monthly': 'Miesięczny',
+  'budgets.period.quarterly': 'Kwartalny',
+  'budgets.period.yearly': 'Roczny',
+
+  'budgets.rollover.label': 'Co dzieje się z resztą',
+  'budgets.rollover.none': 'Każdy okres zaczyna się od zera',
+  'budgets.rollover.none.help':
+    'To, co zostało albo zostało przekroczone, znika wraz z końcem okresu.',
+  'budgets.rollover.carry_surplus': 'Przenoś nadwyżkę',
+  'budgets.rollover.carry_surplus.help':
+    'Niewydane pieniądze doliczamy do kolejnego okresu. Przekroczenie nie przechodzi dalej, ale zapisujemy je w zestawieniu.',
+  'budgets.rollover.carry_all': 'Przenoś całe saldo',
+  'budgets.rollover.carry_all.help':
+    'Kolejny okres zaczyna się od tego, co zostało — albo na minusie, jeśli był przekroczony.',
+
+  'budgets.status.archived': 'Zarchiwizowany',
+  'budgets.status.closed': 'Zamknięty',
+  'budgets.status.open': 'Otwarty',
+  'budgets.autoInclude': 'Automatycznie liczy nowe transakcje',
+  'budgets.categories.count': {
+    one: '{count} kategoria',
+    few: '{count} kategorie',
+    many: '{count} kategorii',
+    other: '{count} kategorii',
+  },
+  'budgets.categories.none': 'Brak kategorii',
+  'budgets.limitIn': 'Limit ustawiony w walucie {currency}',
+
+  'budgets.filter.label': 'Pokaż',
+  'budgets.filter.active': 'Aktywne',
+  'budgets.filter.archived': 'Zarchiwizowane',
+  'budgets.filter.all': 'Wszystkie',
+
+  'budgets.new': 'Nowy budżet',
+  'budgets.list.loading': 'Wczytujemy Twoje budżety…',
+  'budgets.detail.loading': 'Wczytujemy ten budżet…',
+  'budgets.error.title': 'Nie udało się wczytać budżetów',
+  'budgets.error.body':
+    'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
+  'budgets.detail.error.title': 'Nie udało się wczytać tego budżetu',
+  'budgets.detail.error.body':
+    'Jego okresy nie wróciły. Nic nie zostało zmienione — spróbuj ponownie.',
+
+  'budgets.empty.title': 'Nie masz jeszcze budżetów',
+  'budgets.empty.body':
+    'Budżet to koperta z limitem i okresem. Podepnij pod niego kategorie, a wypełni się sam, albo dodawaj transakcje ręcznie — do jednorazowego wydatku.',
+  'budgets.empty.action': 'Utwórz pierwszy budżet',
+  'budgets.empty.archived.title': 'Nic nie jest zarchiwizowane',
+  'budgets.empty.archived.body':
+    'Zarchiwizowane budżety zachowują wszystkie zamknięte okresy. Na razie nie ma tu żadnego.',
+
+  'budgets.detail.back': 'Wszystkie budżety',
+  'budgets.detail.thisPeriod': 'Bieżący okres',
+  'budgets.detail.spentGross': 'Wydatki',
+  'budgets.detail.credited': 'Wróciło w tych samych kategoriach',
+  'budgets.detail.refunded': 'Zwroty poza budżetem',
+  'budgets.detail.net': 'Zaliczone do budżetu',
+
+  'budgets.ledger.title': 'Zestawienie przeniesień',
+  'budgets.ledger.caption':
+    'Wszystkie okresy tego budżetu: z czym się zaczęły, ile wydano i co przeszło dalej.',
+  'budgets.ledger.col.period': 'Okres',
+  'budgets.ledger.col.limit': 'Limit okresu',
+  'budgets.ledger.col.carriedIn': 'Przeniesione',
+  'budgets.ledger.col.spent': 'Wydano',
+  'budgets.ledger.col.carriedOut': 'Do przeniesienia',
+  'budgets.ledger.col.status': 'Stan',
+  'budgets.ledger.overBy': 'przekroczenie o {amount}',
+  'budgets.ledger.empty':
+    'Ten budżet ma na razie jeden okres i wciąż jest otwarty. Zestawienie wypełni się, gdy okresy zaczną się zamykać.',
+
+  'budgets.timeline.title': 'Wydatki wobec limitu, okres po okresie',
+  'budgets.timeline.categoryHeader': 'Okres',
+  'budgets.timeline.spent': 'Wydano',
+  'budgets.timeline.available': 'Do dyspozycji',
+  'budgets.timeline.empty.title': 'Na razie jeden okres',
+  'budgets.timeline.empty.body':
+    'Wykres narysuje słupek na okres, gdy ten budżet zamknie pierwszy z nich.',
+  'budgets.timeline.noData': 'Brak odczytu',
+
+  'budgets.corrections.title': 'Korekty',
+  'budgets.corrections.body':
+    'Te zamknięte okresy nie zgadzają się już z tym, co dziś wynika z ich dat — coś w środku zmieniono po zamknięciu. Zamknięte kwoty zostają bez zmian; różnicę pokazujemy tutaj.',
+  'budgets.corrections.row': '{period}: zapisano {stored}, obecnie {actual}',
+  'budgets.corrections.delta': 'Różnica {amount}',
+
+  'budgets.allocation.title': 'Kategorie w tym budżecie',
+  'budgets.allocation.body':
+    'Każda transakcja z tych kategorii i ich podkategorii pomniejsza limit.',
+  'budgets.allocation.manual':
+    'Ten budżet liczy tylko transakcje dodane do niego ręcznie.',
+  'budgets.allocation.edit': 'Zmień kategorie',
+  'budgets.transactions.title': 'Co zaliczyliśmy w tym okresie',
+  'budgets.transactions.empty':
+    'Nic jeszcze nie zostało zaliczone do tego budżetu.',
+
+  'budgets.actions.label': 'Działania: {name}',
+  'budgets.actions.edit': 'Edytuj budżet',
+  'budgets.actions.archive': 'Archiwizuj',
+  'budgets.actions.restore': 'Przywróć',
+  'budgets.actions.delete': 'Usuń',
+  'budgets.actions.closePeriod': 'Zamknij ten okres',
+  'budgets.actions.reopenPeriod': 'Otwórz ponownie',
+  'budgets.actions.refresh': 'Przelicz okresy',
+
+  'budgets.form.create.title': 'Nowy budżet',
+  'budgets.form.edit.title': 'Edycja budżetu',
+  'budgets.form.name': 'Nazwa',
+  'budgets.form.name.placeholder': 'Zakupy spożywcze',
+  'budgets.form.limit': 'Limit na okres',
+  'budgets.form.currency': 'Waluta',
+  'budgets.form.startDate': 'Początek',
+  'budgets.form.startDate.help':
+    'Okresy biegną od tego dnia — budżet zaczęty 12. trwa od 12. do 11.',
+  'budgets.form.endDate': 'Koniec',
+  'budgets.form.endDate.help': 'Zostaw puste, żeby trwał aż do archiwizacji.',
+  'budgets.form.categories': 'Kategorie',
+  'budgets.form.categories.help':
+    'Podkategorie wliczają się automatycznie. Wybierz kategorię nadrzędną i gotowe.',
+  'budgets.form.thresholds': 'Ostrzegaj przy',
+  'budgets.form.thresholds.help':
+    'Procent kwoty do dyspozycji. 100% i więcej jest dozwolone — czasem chce się wiedzieć przy 150%.',
+  'budgets.form.submit.create': 'Utwórz budżet',
+  'budgets.form.submit.save': 'Zapisz zmiany',
+  'budgets.form.cancel': 'Anuluj',
+  'budgets.form.error':
+    'Nie udało się zapisać budżetu. Nic nie zostało zmienione.',
+
+  'budgets.confirm.archive.title': 'Zarchiwizować ten budżet?',
+  'budgets.confirm.archive.body':
+    'Zniknie z listy i zachowa wszystkie zamknięte okresy. Możesz go przywrócić w każdej chwili.',
+  'budgets.confirm.archive.action': 'Archiwizuj budżet',
+  'budgets.confirm.delete.title': 'Usunąć ten budżet?',
+  'budgets.confirm.delete.body':
+    'Tej operacji nie da się cofnąć. Budżetu, który zamknął choć jeden okres, nie można usunąć — zarchiwizuj go zamiast tego.',
+  'budgets.confirm.delete.action': 'Usuń budżet',
+  'budgets.confirm.closePeriod.title': 'Zamknąć ten okres?',
+  'budgets.confirm.closePeriod.body':
+    'Jego kwoty zostaną zamrożone, a kolejny okres zacznie się od tego, co ten budżet przenosi.',
+  'budgets.confirm.closePeriod.action': 'Zamknij okres',
+  'budgets.confirm.reopenPeriod.title': 'Otworzyć ten okres ponownie?',
+  'budgets.confirm.reopenPeriod.body':
+    'Jego kwoty znów zaczną się zmieniać, a następny okres do czasu ponownego zamknięcia nie dostanie nic na start.',
+  'budgets.confirm.reopenPeriod.action': 'Otwórz okres',
+
+  'budgets.toast.created': 'Budżet utworzony.',
+  'budgets.toast.saved': 'Budżet zapisany.',
+  'budgets.toast.archived': 'Budżet zarchiwizowany.',
+  'budgets.toast.restored': 'Budżet przywrócony.',
+  'budgets.toast.deleted': 'Budżet usunięty.',
+  'budgets.toast.periodClosed': 'Okres zamknięty.',
+  'budgets.toast.periodReopened': 'Okres otwarty ponownie.',
+  'budgets.toast.refreshed': 'Okresy przeliczone.',
+  'budgets.toast.failed': 'Nie udało się. Nic nie zostało zmienione.',
 
   /* -- Money and currency ------------------------------------------------- */
   'money.baseCurrency.label': 'Waluta raportowania',
@@ -1039,6 +1222,565 @@ const messages = {
   'auth.error.invalidToken': 'Ten link wygasł albo został już użyty.',
   'auth.error.weakPassword':
     'To hasło jest zbyt łatwe do odgadnięcia. Wybierz dłuższe.',
+
+  /* -- Cykliczne ---------------------------------------------------------- */
+  /* -- Lista -------------------------------------------------------------- */
+  'recurring.title': 'Cykliczne',
+  'recurring.subtitle':
+    'To, co wraca regularnie — subskrypcje, rachunki, raty i stałe wpływy.',
+  'recurring.new': 'Nowa seria',
+  'recurring.list.loading': 'Wczytywanie serii cyklicznych…',
+  'recurring.detail.loading': 'Wczytywanie serii…',
+  'recurring.detail.back': 'Wszystkie serie cykliczne',
+
+  'recurring.filter.label': 'Pokaż',
+  'recurring.filter.active': 'Aktywne',
+  'recurring.filter.all': 'Wszystkie, łącznie z wstrzymanymi',
+
+  'recurring.error.title': 'Nie udało się wczytać serii cyklicznych',
+  'recurring.error.body':
+    'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
+  'recurring.detail.error.title': 'Nie udało się wczytać tej serii',
+  'recurring.detail.error.body':
+    'Mogła zostać usunięta albo żądanie nie wróciło. Nic nie zostało zmienione.',
+
+  'recurring.empty.title': 'Nie masz jeszcze nic cyklicznego',
+  'recurring.empty.body':
+    'Seria to plan: kwota, częstotliwość i data pierwszej płatności. Sama z siebie niczego nie zapisuje, dopóki jej o to nie poprosisz.',
+  'recurring.empty.action': 'Utwórz pierwszą serię',
+  'recurring.empty.detect': 'Albo przejrzyj to, co już masz zapisane',
+  'recurring.empty.filtered.title': 'Tu nic nie ma',
+  'recurring.empty.filtered.body':
+    'Żadna seria nie pasuje do tego filtra. Spróbuj innego.',
+
+  /* -- Status jest słowem, zanim stanie się kolorem ------------------------ */
+  'recurring.status.upcoming': 'Nadchodzi',
+  'recurring.status.paid': 'Opłacone',
+  'recurring.status.overdue': 'Po terminie',
+  'recurring.status.skipped': 'Pominięte',
+
+  'recurring.series.active': 'Aktywna',
+  'recurring.series.paused': 'Wstrzymana',
+  'recurring.series.completed': 'Zakończona',
+
+  /* -- Co jest do zapłaty, słowami ----------------------------------------- */
+  'recurring.due.today': 'Termin dzisiaj',
+  'recurring.due.on': 'Termin {date}',
+  'recurring.due.in': {
+    one: 'Termin jutro',
+    few: 'Termin za {count} dni',
+    many: 'Termin za {count} dni',
+    other: 'Termin za {count} dnia',
+  },
+  'recurring.due.late': {
+    one: '{count} dzień po terminie',
+    few: '{count} dni po terminie',
+    many: '{count} dni po terminie',
+    other: '{count} dnia po terminie',
+  },
+  'recurring.due.none': 'Nic nieuregulowanego',
+  'recurring.due.overdueCount': {
+    one: '{count} okres po terminie',
+    few: '{count} okresy po terminie',
+    many: '{count} okresów po terminie',
+    other: '{count} okresu po terminie',
+  },
+
+  'recurring.upcoming.title': 'Wkrótce',
+  'recurring.upcoming.caption':
+    'Każdy nieuregulowany okres z najbliższego miesiąca oraz wszystko, co jest już po terminie.',
+  'recurring.upcoming.empty': 'W najbliższym miesiącu nic nie wypada.',
+
+  /* -- Jak często ----------------------------------------------------------- */
+  'recurring.frequency.label': 'Jak często',
+  'recurring.frequency.weekly': 'Co tydzień',
+  'recurring.frequency.biweekly': 'Co dwa tygodnie',
+  'recurring.frequency.monthly': 'Co miesiąc',
+  'recurring.frequency.quarterly': 'Co kwartał',
+  'recurring.frequency.semi_annual': 'Dwa razy w roku',
+  'recurring.frequency.annual': 'Raz w roku',
+
+  /* -- Rodzaj --------------------------------------------------------------- */
+  'recurring.kind.label': 'Rodzaj',
+  'recurring.kind.subscription': 'Subskrypcja',
+  'recurring.kind.bill': 'Rachunek',
+  'recurring.kind.installment': 'Rata',
+  'recurring.kind.income': 'Wpływ',
+
+  'recurring.direction.label': 'Kierunek',
+  'recurring.direction.expense': 'Wydatek',
+  'recurring.direction.income': 'Wpływ',
+
+  /* -- Tabela okresów -------------------------------------------------------- */
+  'recurring.periods.title': 'Historia okresów',
+  'recurring.periods.caption':
+    'Wszystkie okresy tej serii, od najstarszego, wraz z tym, co je uregulowało.',
+  'recurring.periods.empty':
+    'Brak okresów. Pierwszy pojawi się, gdy nadejdzie data początkowa.',
+  'recurring.periods.col.due': 'Termin',
+  'recurring.periods.col.expected': 'Oczekiwana',
+  'recurring.periods.col.settled': 'Uregulowana',
+  'recurring.periods.col.variance': 'Różnica',
+  'recurring.periods.col.status': 'Stan',
+  'recurring.periods.col.actions': 'Działania',
+  'recurring.periods.variance.none': 'Zgodnie z oczekiwaniem',
+  'recurring.periods.variance.unavailable': 'Inna waluta',
+  'recurring.periods.variance.over': '{amount} więcej niż oczekiwano',
+  'recurring.periods.variance.under': '{amount} mniej niż oczekiwano',
+  'recurring.periods.notSettled': 'Nieuregulowany',
+
+  'recurring.period.markPaid': 'Oznacz jako opłacone',
+  'recurring.period.markPaid.for':
+    'Oznacz okres z terminem {date} jako opłacony',
+  'recurring.period.skip': 'Pomiń',
+  'recurring.period.skip.for': 'Pomiń okres z terminem {date}',
+  'recurring.period.revert': 'Cofnij',
+  'recurring.period.revert.for': 'Cofnij okres z terminem {date}',
+
+  /* -- Oznaczanie jako opłacone ---------------------------------------------- */
+  'recurring.markPaid.title': 'Oznacz ten okres jako opłacony',
+  'recurring.markPaid.body':
+    'Wskaż transakcję, która go uregulowała. Nic tutaj nie tworzy transakcji — jeśli płatność nie jest jeszcze zapisana, zapisz ją najpierw.',
+  'recurring.markPaid.field': 'Transakcja, która to uregulowała',
+  'recurring.markPaid.placeholder': 'Szukaj w transakcjach',
+  'recurring.markPaid.empty':
+    'Żadna transakcja z tego okna nie pasuje. Zapisz najpierw płatność i wróć tutaj.',
+  'recurring.markPaid.confirm': 'Połącz',
+  'recurring.markPaid.never':
+    'Oznaczenie okresu jako opłaconego nigdy nie tworzy transakcji.',
+
+  /* -- Automatyzacja --------------------------------------------------------- */
+  'recurring.automation.label': 'Automatyzacja',
+  'recurring.automation.none':
+    'Wyłączona — każdą płatność zapisujesz samodzielnie',
+  'recurring.automation.none.help':
+    'Seria przypomina i pilnuje, co jest nieuregulowane. Nic nie zostanie zapisane bez Ciebie.',
+  'recurring.automation.auto': 'Zapisuj za mnie',
+  'recurring.automation.auto.help':
+    'W dniu terminu na wskazanym koncie powstaje transakcja na oczekiwaną kwotę. Możesz ją potem edytować jak każdą inną.',
+  'recurring.automation.match': 'Dopasowuj to, co zapiszę',
+  'recurring.automation.match.help':
+    'Nic nie zostaje zapisane. Transakcja, którą wprowadzisz i która pasuje do poniższej reguły, zostanie połączona z okresem, który reguluje.',
+  'recurring.automation.exclusive':
+    'Seria albo zapisuje za Ciebie, albo dopasowuje to, co zapisujesz. Nie może robić obu naraz — automatyczny wpis nie ma już czego dopasowywać.',
+  'recurring.automation.needsAccount':
+    'Zapisywanie za Ciebie wymaga konta, na którym ma powstać transakcja.',
+  'recurring.automation.badge.auto': 'Zapisuje automatycznie',
+  'recurring.automation.badge.match': 'Dopasowuje Twoje wpisy',
+
+  'recurring.match.payee': 'Słowa w odbiorcy lub notatce',
+  'recurring.match.payee.help':
+    'Wystarczy jedno z nich. Wielkość liter nie ma znaczenia.',
+  'recurring.match.account': 'Tylko na tym koncie',
+  'recurring.match.account.any': 'Dowolne konto',
+  'recurring.match.tolerance': 'Dopuszczalna różnica kwoty',
+  'recurring.match.tolerance.help':
+    'Rachunek, który trochę się waha, nadal pasuje. Zero oznacza, że kwota musi się zgadzać co do grosza.',
+  'recurring.match.window': 'Dopuszczalna różnica daty',
+  'recurring.match.window.days': {
+    one: '{count} dzień',
+    few: '{count} dni',
+    many: '{count} dni',
+    other: '{count} dnia',
+  },
+
+  /* -- Przypomnienia ---------------------------------------------------------- */
+  'recurring.reminders.label': 'Przypomnij mi',
+  'recurring.reminders.help':
+    'Najwyżej trzy. Zostaw wszystkie wyłączone, jeśli nie chcesz przypomnień.',
+  'recurring.reminders.none': 'Bez przypomnień',
+  'recurring.reminders.max': 'Seria może mieć najwyżej trzy przypomnienia.',
+  'recurring.reminders.0d': 'W dniu terminu',
+  'recurring.reminders.1d': 'Dzień wcześniej',
+  'recurring.reminders.2d': 'Dwa dni wcześniej',
+  'recurring.reminders.3d': 'Trzy dni wcześniej',
+  'recurring.reminders.5d': 'Pięć dni wcześniej',
+  'recurring.reminders.1w': 'Tydzień wcześniej',
+  'recurring.reminders.2w': 'Dwa tygodnie wcześniej',
+  'recurring.reminders.1m': 'Miesiąc wcześniej',
+  'recurring.reminders.email': 'Wysyłaj je również e-mailem',
+  'recurring.reminders.pending':
+    'Przypomnienia są tutaj ustalane, a dostarczane będą wraz z powiadomieniami. Na razie nic nie jest wysyłane.',
+
+  /* -- Formularz -------------------------------------------------------------- */
+  'recurring.form.create.title': 'Nowa seria cykliczna',
+  'recurring.form.edit.title': 'Edytuj serię',
+  'recurring.form.error': 'Nie udało się zapisać tej serii',
+  'recurring.form.name': 'Nazwa',
+  'recurring.form.name.placeholder': 'Czynsz, Netflix, wypłata…',
+  'recurring.form.amount': 'Oczekiwana kwota',
+  'recurring.form.currency': 'Waluta',
+  'recurring.form.currency.locked':
+    'Waluta jest stała od chwili powstania serii. Każdy zaplanowany okres jest w niej wyrażony.',
+  'recurring.form.direction.locked':
+    'Kierunek jest stały od chwili powstania serii. Jego odwrócenie oznaczałoby, że cała historia przebiegła w drugą stronę.',
+  'recurring.form.startDate': 'Pierwszy termin',
+  'recurring.form.startDate.help':
+    'Okresy sprzed dzisiaj też powstaną, więc seria wstecz od razu pokaże swoją historię.',
+  'recurring.form.anchorDay': 'Dzień miesiąca',
+  'recurring.form.anchorDay.help':
+    'Dzień wykraczający poza koniec krótszego miesiąca cofa się do jego ostatniego dnia, a kolejny miesiąc znów trzyma się kotwicy, zamiast się przesuwać.',
+  'recurring.form.anchorDay.auto': 'Ten sam dzień co pierwszy termin',
+  'recurring.form.account': 'Konto',
+  'recurring.form.account.none': 'Bez konta',
+  'recurring.form.category': 'Kategoria',
+  'recurring.form.category.none': 'Bez kategorii',
+  'recurring.form.payee': 'Odbiorca',
+  'recurring.form.payee.none': 'Bez odbiorcy',
+  'recurring.form.widget': 'Pokazuj na pulpicie',
+
+  'recurring.termination.label': 'Kiedy się kończy',
+  'recurring.termination.open': 'Nie kończy się — trwa dalej',
+  'recurring.termination.endDate': 'W konkretnym dniu',
+  'recurring.termination.endDate.field': 'Ostatni dzień',
+  'recurring.termination.endDate.help':
+    'Okres z terminem dokładnie w tym dniu nadal się liczy.',
+  'recurring.termination.maxOccurrences': 'Po określonej liczbie razy',
+  'recurring.termination.maxOccurrences.field': 'Ile razy',
+  'recurring.termination.maxOccurrences.help':
+    'Liczone łącznie: dwanaście oznacza dwanaście okresów, razem z ostatnim.',
+
+  'recurring.preview.title': 'Najbliższe terminy',
+  'recurring.preview.help':
+    'To, co daje ten harmonogram — do obejrzenia przed zapisaniem.',
+
+  /* -- Działania -------------------------------------------------------------- */
+  'recurring.actions.menu': 'Działania dla {name}',
+  'recurring.actions.edit': 'Edytuj',
+  'recurring.actions.pause': 'Wstrzymaj',
+  'recurring.actions.resume': 'Wznów',
+  'recurring.actions.complete': 'Zakończ',
+  'recurring.actions.delete': 'Usuń',
+
+  'recurring.confirm.pause.title': 'Wstrzymać tę serię?',
+  'recurring.confirm.pause.body':
+    'Dopóki jest wstrzymana, nic nie powstaje ani nie jest zapisywane. Historia i nieuregulowane okresy zostają bez zmian.',
+  'recurring.confirm.complete.title': 'Zakończyć tę serię?',
+  'recurring.confirm.complete.body':
+    'Kończy się na dobre. Nic więcej już nie powstanie. Historia zostaje.',
+  'recurring.confirm.delete.title': 'Usunąć tę serię?',
+  'recurring.confirm.delete.body':
+    'Tego nie da się cofnąć. Serii, która uregulowała choć jeden okres, nie można usunąć — zakończ ją, żeby historia przetrwała.',
+
+  'recurring.toast.created': 'Seria utworzona',
+  'recurring.toast.saved': 'Seria zapisana',
+  'recurring.toast.paused': 'Seria wstrzymana',
+  'recurring.toast.resumed': 'Seria wznowiona',
+  'recurring.toast.completed': 'Seria zakończona',
+  'recurring.toast.deleted': 'Seria usunięta',
+  'recurring.toast.failed': 'Nie udało się',
+  'recurring.toast.periodPaid': 'Okres oznaczony jako opłacony',
+  'recurring.toast.periodSkipped': 'Okres pominięty',
+  'recurring.toast.periodReverted': 'Okres otwarty ponownie',
+  'recurring.toast.unlinked': 'Transakcja odłączona',
+
+  /* -- Połączone transakcje ---------------------------------------------------- */
+  'recurring.links.title': 'Połączone transakcje',
+  'recurring.links.caption':
+    'To, co ta seria przyjęła, i skąd wzięło się każde połączenie.',
+  'recurring.links.empty': 'Nic jeszcze nie jest połączone.',
+  'recurring.links.source.manual': 'Połączone przez Ciebie',
+  'recurring.links.source.rule': 'Dopasowane regułą',
+  'recurring.links.source.auto': 'Zapisane automatycznie',
+  'recurring.links.unlink': 'Odłącz',
+  'recurring.links.unlinked': 'Odłączone',
+
+  /* -- Propozycje --------------------------------------------------------------- */
+  'recurring.candidates.title': 'Zauważone serie',
+  'recurring.candidates.subtitle':
+    'Wzorce w tym, co masz już zapisane. Każdy z nich to propozycja, a nie coś, co zrobiliśmy.',
+  'recurring.candidates.loading': 'Przeglądanie transakcji…',
+  'recurring.candidates.detect': 'Poszukaj ponownie',
+  'recurring.candidates.detecting': 'Szukanie…',
+  'recurring.candidates.link': 'Zauważone serie',
+  'recurring.candidates.pending': {
+    one: '{count} propozycja',
+    few: '{count} propozycje',
+    many: '{count} propozycji',
+    other: '{count} propozycji',
+  },
+  'recurring.candidates.empty.title': 'Nie mamy czego zaproponować',
+  'recurring.candidates.empty.body':
+    'Szukamy tego samego odbiorcy, w mniej więcej równych odstępach, na zbliżoną kwotę, co najmniej trzy razy. Nic z ostatnich osiemnastu miesięcy nie pasuje.',
+  'recurring.candidates.found': {
+    one: 'Znaleziono {count} propozycję',
+    few: 'Znaleziono {count} propozycje',
+    many: 'Znaleziono {count} propozycji',
+    other: 'Znaleziono {count} propozycji',
+  },
+  'recurring.candidates.error.title': 'Nie udało się wczytać propozycji',
+  'recurring.candidates.error.body':
+    'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
+
+  'recurring.candidate.confidence.label': 'Pewność',
+  'recurring.candidate.confidence.high': 'Wysoka',
+  'recurring.candidate.confidence.medium': 'Średnia',
+  'recurring.candidate.confidence.low': 'Niska',
+  'recurring.candidate.evidence': {
+    one: 'Na podstawie {count} transakcji',
+    few: 'Na podstawie {count} transakcji',
+    many: 'Na podstawie {count} transakcji',
+    other: 'Na podstawie {count} transakcji',
+  },
+  'recurring.candidate.because.occurrences':
+    'Pewność obniża to, jak niewiele razy to się wydarzyło.',
+  'recurring.candidate.because.regularity':
+    'Pewność obniża to, jak bardzo przesuwają się daty.',
+  'recurring.candidate.because.amount':
+    'Pewność obniża to, jak bardzo waha się kwota.',
+  'recurring.candidate.accept': 'Utwórz serię',
+  'recurring.candidate.dismiss': 'To nie jest seria',
+  'recurring.candidate.dismiss.for': 'Odrzuć propozycję dla {name}',
+  'recurring.candidate.accept.for': 'Utwórz serię dla {name}',
+  'recurring.candidate.creates':
+    'Utworzenie serii tworzy wyłącznie plan. Żadna z transakcji, na podstawie których ją znaleziono, nie zostaje zmieniona.',
+  'recurring.candidate.toast.dismissed': 'Propozycja odrzucona',
+  'recurring.candidate.toast.accepted': 'Seria utworzona z propozycji',
+
+  /* -- Cele oszczędnościowe ----------------------------------------------- */
+  /* -- Lista --------------------------------------------------------------- */
+  'goals.title': 'Cele oszczędnościowe',
+  'goals.subtitle': 'Na co odkładasz pieniądze i jak Ci idzie.',
+  'goals.new': 'Nowy cel',
+  'goals.list.loading': 'Wczytywanie celów oszczędnościowych…',
+  'goals.detail.loading': 'Wczytywanie tego celu…',
+  'goals.detail.back': 'Wszystkie cele',
+
+  'goals.filter.label': 'Pokaż',
+  'goals.filter.active': 'W trakcie',
+  'goals.filter.reached': 'Osiągnięte',
+  'goals.filter.archived': 'Zarchiwizowane',
+  'goals.filter.all': 'Wszystkie',
+
+  'goals.error.title': 'Nie udało się wczytać celów',
+  'goals.error.body':
+    'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
+  'goals.detail.error.title': 'Nie udało się wczytać tego celu',
+  'goals.detail.error.body':
+    'Mógł zostać usunięty albo żądanie nie wróciło. Nic nie zostało zmienione.',
+
+  'goals.empty.title': 'Nie masz jeszcze żadnych celów',
+  'goals.empty.body':
+    'Cel to kwota docelowa i — jeśli chcesz — data. Postęp bierze się z transakcji, które masz już zapisane; nic tutaj nie tworzy pieniędzy ani ich nie przenosi.',
+  'goals.empty.action': 'Utwórz pierwszy cel',
+  'goals.empty.filtered.title': 'Tutaj nic nie ma',
+  'goals.empty.filtered.body':
+    'Żaden cel nie pasuje do tego filtra. Wybierz inny.',
+
+  /* -- Status, który jest słowem, zanim stanie się kolorem ------------------ */
+  'goals.status.active': 'Oszczędzasz',
+  'goals.status.reached': 'Osiągnięty',
+  'goals.status.archived': 'Zarchiwizowany',
+  'goals.status.overdue': 'Po terminie',
+
+  /* -- Wskaźnik ------------------------------------------------------------ */
+  'goals.meter.label': 'Odłożone na cel {name}',
+  'goals.meter.valueText': 'odłożone {contributed} z {target}, {percent}',
+  'goals.meter.tick': 'Cel, {target}',
+  'goals.meter.unavailable': 'Postęp niedostępny',
+  'goals.progress.remaining': 'brakuje {amount}',
+  'goals.progress.complete': 'Cel w pełni sfinansowany',
+  'goals.progress.of': '{contributed} z {target}',
+  'goals.progress.base': '{contributed} z {target} w {currency}',
+  'goals.progress.baseHelp':
+    'Kwota pomocnicza. Każda wpłata została przeliczona w dniu, w którym nastąpiła; cel przeliczamy po dzisiejszym kursie.',
+
+  /* -- Daty ---------------------------------------------------------------- */
+  'goals.target.none': 'Bez daty docelowej',
+  'goals.target.by': 'Do {date}',
+  'goals.target.daysLeft': {
+    one: '{count} dzień do daty docelowej',
+    few: '{count} dni do daty docelowej',
+    many: '{count} dni do daty docelowej',
+    other: '{count} dnia do daty docelowej',
+  },
+  'goals.target.overdue': {
+    one: '{count} dzień po dacie docelowej',
+    few: '{count} dni po dacie docelowej',
+    many: '{count} dni po dacie docelowej',
+    other: '{count} dnia po dacie docelowej',
+  },
+
+  /* -- Konta --------------------------------------------------------------- */
+  'goals.accounts.from': 'Finansowany z konta {name}',
+  'goals.accounts.held': 'Trzymany na koncie {name}',
+  'goals.accounts.unset': 'Nie ustawiono',
+
+  /* -- Liczby na stronie celu ---------------------------------------------- */
+  'goals.detail.saved': 'Odłożone',
+  'goals.detail.target': 'Cel',
+  'goals.detail.remaining': 'Zostało do odłożenia',
+  'goals.detail.pace': 'Typowy miesiąc',
+  'goals.reached.title': 'Ten cel jest w pełni sfinansowany',
+  'goals.reached.body':
+    'Nic więcej nie musi tu trafić. Zarchiwizuj go, aby zniknął z listy, albo podnieś kwotę docelową, jeśli plan urósł.',
+
+  /* -- Prognoza, czyli najuczciwsza część ---------------------------------- */
+  'goals.projection.heading': 'Prognozowane zakończenie',
+  'goals.projection.disclaimer':
+    'To prognoza, nie obietnica. Zakłada, że ostatnie sześć miesięcy się powtórzy.',
+  'goals.projection.reached': 'Osiągnięty. Nie ma już czego prognozować.',
+  'goals.projection.onTrack': 'Przy tym tempie osiągniesz go do {date}.',
+  'goals.projection.onTrackBeforeTarget':
+    'Przy tym tempie osiągniesz go do {date}, czyli przed terminem {target}.',
+  'goals.projection.behind':
+    'Przy tym tempie nie wcześniej niż {date}, czyli {late} po terminie.',
+  'goals.projection.late': {
+    one: '{count} dzień',
+    few: '{count} dni',
+    many: '{count} dni',
+    other: '{count} dnia',
+  },
+  'goals.projection.rate': 'Na podstawie typowej wpłaty {amount} miesięcznie.',
+  'goals.projection.months': {
+    one: 'z {count} miesiąca wpłat',
+    few: 'z {count} miesięcy wpłat',
+    many: 'z {count} miesięcy wpłat',
+    other: 'z {count} miesiąca wpłat',
+  },
+
+  'goals.projection.confidence.label': 'Na ile można temu ufać',
+  'goals.projection.confidence.low': 'Zgrubne oszacowanie',
+  'goals.projection.confidence.low.help':
+    'Dotychczasowe wpłaty różnią się od siebie bardziej, niż wynosi ich średnia, więc traktuj tę datę jako kierunek, a nie plan.',
+  'goals.projection.confidence.medium': 'Rozsądne oszacowanie',
+  'goals.projection.confidence.medium.help':
+    'Pół roku wpłat w rozpoznawalnym tempie. Wystarczy do planowania, za mało, by się zobowiązywać.',
+  'goals.projection.confidence.high': 'Stały rytm',
+  'goals.projection.confidence.high.help':
+    'Rok lub więcej wpłat w równym tempie. Lepszej prognozy z tych danych nie da się zrobić.',
+
+  'goals.projection.insufficient.title': 'Za mało historii, by prognozować',
+  'goals.projection.insufficient.none':
+    'Nie ma jeszcze żadnej wpłaty, więc nie ma tempa, z którego dałoby się prognozować.',
+  'goals.projection.insufficient.tooFew': {
+    one: 'Jeden miesiąc wpłat to jeszcze nie tempo. Prognozowana data potrzebuje co najmniej {needed} miesięcy za sobą.',
+    few: '{count} miesiące wpłat to jeszcze nie tempo. Prognozowana data potrzebuje co najmniej {needed} miesięcy za sobą.',
+    many: '{count} miesięcy wpłat to jeszcze nie tempo. Prognozowana data potrzebuje co najmniej {needed} miesięcy za sobą.',
+    other:
+      '{count} miesiąca wpłat to jeszcze nie tempo. Prognozowana data potrzebuje co najmniej {needed} miesięcy za sobą.',
+  },
+  'goals.projection.insufficient.stale':
+    'Ostatnia wpłata była ponad sześć miesięcy temu. Dawne tempo się zatrzymało, a prognozowanie z niego wymyśliłoby nowe.',
+
+  /* -- Wykres -------------------------------------------------------------- */
+  'goals.chart.title': 'Wpłaty miesiąc po miesiącu',
+  'goals.chart.category': 'Miesiąc',
+  'goals.chart.series.monthly': 'Wpłacone w tym miesiącu',
+  'goals.chart.empty.title': 'Nie ma jeszcze czego pokazać',
+  'goals.chart.empty.body':
+    'Zalicz transakcję na poczet tego celu, a jej historia pojawi się tutaj.',
+  'goals.chart.noData': 'Nic',
+  'goals.chart.zeroNote':
+    'Miesiąc bez słupka to miesiąc, w którym nic nie wpłynęło — prawdziwe zero, a nie brak danych.',
+
+  /* -- Wpłaty -------------------------------------------------------------- */
+  'goals.contributions.heading': 'Historia wpłat',
+  'goals.contributions.count': {
+    one: '{count} wpłata',
+    few: '{count} wpłaty',
+    many: '{count} wpłat',
+    other: '{count} wpłaty',
+  },
+  'goals.contributions.empty.title': 'Nie ma jeszcze wpłat',
+  'goals.contributions.empty.body':
+    'Wpłata wskazuje na transakcję, którą masz już zapisaną. Nic nowego nie powstaje i żadne pieniądze się nie przemieszczają.',
+  'goals.contributions.column.date': 'Data',
+  'goals.contributions.column.amount': 'Kwota',
+  'goals.contributions.column.detail': 'Transakcja',
+  'goals.contributions.column.actions': 'Działania',
+  'goals.contributions.linkedOn': 'Zaliczono {date}',
+  'goals.contributions.remove': 'Usuń {amount} z tego celu',
+  'goals.contributions.add': 'Zalicz transakcję',
+
+  /* -- Podpowiedzi: propozycje, nigdy automatyczne powiązania -------------- */
+  'goals.suggestions.heading': 'Przelewy, które wyglądają na wpłaty',
+  'goals.suggestions.body':
+    'Żaden z poniższych nie został zaliczony. Każdy wyszedł z konta finansującego i trafił na konto, na którym trzymasz ten cel — to Ty decydujesz, czy był na ten cel.',
+  'goals.suggestions.count': {
+    one: '{count} przelew do przejrzenia',
+    few: '{count} przelewy do przejrzenia',
+    many: '{count} przelewów do przejrzenia',
+    other: '{count} przelewu do przejrzenia',
+  },
+  'goals.suggestions.accept': 'Zalicz: {amount} na poczet tego celu',
+  'goals.suggestions.from': 'Z konta {account}',
+
+  /* -- Formularz ----------------------------------------------------------- */
+  'goals.form.create.title': 'Nowy cel oszczędnościowy',
+  'goals.form.edit.title': 'Edycja celu oszczędnościowego',
+  'goals.form.description':
+    'Kwota docelowa, waluta, w której cel jest liczony, oraz — jeśli ma termin — data.',
+  'goals.form.name': 'Na co odkładasz',
+  'goals.form.name.placeholder': 'Poduszka finansowa',
+  'goals.form.target': 'Kwota docelowa',
+  'goals.form.currency': 'Waluta',
+  'goals.form.currency.help':
+    'Cel jest liczony w jednej walucie i przy niej zostaje. Wpłaty w każdej innej walucie są odrzucane, zamiast przeliczane po kursie, którego nikt nie wybrał.',
+  'goals.form.currency.locked': 'Ustalona przy tworzeniu celu',
+  'goals.form.targetDate': 'Data docelowa',
+  'goals.form.targetDate.help':
+    'Opcjonalna. Bez niej cel nadal ma swoje tempo — po prostu nie ma terminu, po którym mógłby być opóźniony.',
+  'goals.form.fromAccount': 'Finansowany z',
+  'goals.form.fromAccount.help':
+    'Skąd pochodzą pieniądze. Służy do wychwytywania przelewów, które wyglądają na wpłaty.',
+  'goals.form.heldAccount': 'Trzymany na',
+  'goals.form.heldAccount.help':
+    'Gdzie leżą pieniądze. Oba konta są opcjonalne; ustaw oba, a cel będzie podpowiadał wpłaty.',
+  'goals.form.cancel': 'Anuluj',
+  'goals.form.submit.create': 'Utwórz cel',
+  'goals.form.submit.save': 'Zapisz zmiany',
+  'goals.form.error': 'Nie udało się zapisać celu',
+
+  /* -- Zaliczanie wpłaty ---------------------------------------------------- */
+  'goals.contribute.title': 'Zalicz transakcję na poczet celu {name}',
+  'goals.contribute.description':
+    'Wybierz transakcję, która już się wydarzyła. Zostaje dokładnie taka, jaka jest — zapisujemy tylko to, na co była.',
+  'goals.contribute.field': 'Transakcja',
+  'goals.contribute.field.help':
+    'Zaliczyć można wyłącznie transakcje w walucie {currency}, ponieważ cel jest liczony w {currency}.',
+  'goals.contribute.option': '{date} · {amount}',
+  'goals.contribute.empty':
+    'Nie ma niepowiązanej transakcji w walucie {currency}, którą można zaliczyć. Zapisz ją najpierw albo zmień konto, na którym trzymasz ten cel.',
+  'goals.contribute.submit': 'Zalicz',
+  'goals.contribute.cancel': 'Anuluj',
+  'goals.contribute.error': 'Nie udało się zaliczyć transakcji',
+  'goals.contribute.error.currency':
+    'Ta transakcja jest w walucie {transaction}, a cel w {goal}. Przeliczenie wymagałoby kursu, którego nikt nie wybrał, więc odrzucamy ją, zamiast zgadywać.',
+  'goals.contribute.error.direction':
+    'Ten cel jest finansowany transakcjami typu {expected}, a ta jest typu {received}. Zaliczenie jej zmniejszyłoby postęp, zamiast go zwiększyć.',
+
+  /* -- Akcje i potwierdzenia ------------------------------------------------ */
+  'goals.actions.label': 'Działania dla celu {name}',
+  'goals.actions.edit': 'Edytuj',
+  'goals.actions.archive': 'Zarchiwizuj',
+  'goals.actions.restore': 'Przywróć',
+  'goals.actions.delete': 'Usuń',
+  'goals.actions.recompute': 'Przelicz postęp ponownie',
+
+  'goals.confirm.archive.title': 'Zarchiwizować ten cel?',
+  'goals.confirm.archive.body':
+    'Zniknie z listy i zachowa wszystkie swoje wpłaty. W każdej chwili możesz go przywrócić.',
+  'goals.confirm.archive.action': 'Zarchiwizuj',
+  'goals.confirm.delete.title': 'Usunąć ten cel?',
+  'goals.confirm.delete.body':
+    'Cel i zapis o tym, które transakcje się na niego składały, znikną na dobre. Same transakcje pozostają nietknięte.',
+  'goals.confirm.delete.action': 'Usuń',
+  'goals.confirm.remove.title': 'Usunąć tę wpłatę?',
+  'goals.confirm.remove.body':
+    'Transakcja zostaje dokładnie taka, jaka jest. Znika tylko adnotacja, że była na ten cel, a postęp spada o tę kwotę.',
+  'goals.confirm.remove.action': 'Usuń',
+
+  'goals.toast.created': 'Cel utworzony',
+  'goals.toast.saved': 'Cel zapisany',
+  'goals.toast.archived': 'Cel zarchiwizowany',
+  'goals.toast.restored': 'Cel przywrócony',
+  'goals.toast.deleted': 'Cel usunięty',
+  'goals.toast.contributed': 'Zaliczono na poczet celu',
+  'goals.toast.uncontributed': 'Usunięto z celu',
+  'goals.toast.recomputed': 'Postęp przeliczony',
+  'goals.toast.reached': 'Cel {name} jest w pełni sfinansowany',
+  'goals.toast.failed': 'Nie udało się',
 } satisfies TranslationOf<typeof En>
 
 export default messages

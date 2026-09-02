@@ -39,7 +39,43 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { organization, user } from '#/server/db/auth-schema'
-import { accounts, currencies, payees } from '#/server/db/schema'
+import {
+  accounts,
+  budgetCategories,
+  currencies,
+  payees,
+} from '#/server/db/schema'
+import {
+  createMemoryMarkerStore,
+  sweepBudgetThresholds,
+} from '#/server/budgets/thresholds'
+
+import {
+  addBudgetTransactions,
+  archiveBudget,
+  budgetSpend,
+  deleteBudget,
+  getBudget,
+  listBudgets,
+  removeBudgetTransactions,
+  restoreBudget,
+  setBudgetCategories,
+  updateBudget,
+} from '../budgets'
+import {
+  closePeriod,
+  listPeriods,
+  materializePeriods,
+  recomputeOpenPeriod,
+  reopenPeriod,
+} from '../budget-periods'
+import {
+  createBudgetWorld,
+  seedBudget,
+  seedCategory,
+  seedPeriod,
+  seedTransaction,
+} from './budget-harness'
 
 import { createTenantRepository, tenantFilter } from '../base'
 import {
@@ -50,6 +86,7 @@ import {
 } from '../errors'
 import { createScope } from '../scope'
 
+import type { BudgetWorld } from './budget-harness'
 import type { TenantScope } from '../scope'
 
 /* -------------------------------------------------------------------------- */
@@ -660,5 +697,216 @@ describe('no repository forks the tenant predicate', () => {
     // tenant column by design — it also composes `tenantFilter` for everything that does, so it
     // is not an exemption here, it simply passes.
     expect(offenders.map((file) => file.name)).toEqual([])
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Budgets                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The budget repositories, held to the archetype above.
+ *
+ * A budget is an id in a URL that decides what a person is told about their own money, so the
+ * assertions are the hostile ones: A calls **every** exported write with B's id, and after each
+ * one B is re-read through B's own scope and compared. A write that matched no row but changed one
+ * anyway is the failure this shape catches and a return-value assertion does not.
+ *
+ * The fixture is `budget-harness.ts` — the same two workspaces, the same real SQLite built from
+ * `drizzle/*.sql` — rather than this file's `seedTwoWorkspaces`, because a budget needs categories,
+ * transactions and periods to be worth attacking.
+ */
+describe('budgets cannot be reached across a workspace boundary', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    await seedBudget(world.db, { id: 'bud-b', organizationId: 'org-b' })
+    await seedPeriod(world.db, {
+      budgetId: 'bud-b',
+      organizationId: 'org-b',
+      periodStart: '2026-01-01',
+      periodEnd: '2026-01-31',
+      spentMinor: 900_00,
+      closedAt: new Date('2026-02-01T00:00:00.000Z'),
+    })
+    await seedCategory(world.db, {
+      id: 'cat-b',
+      name: 'Food',
+      organizationId: 'org-b',
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-b',
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      categoryId: 'cat-b',
+      refAmountMinor: 750_00,
+      bookedOn: '2026-03-10',
+    })
+  })
+
+  /** B's row, as B sees it. The comparison target after every attack. */
+  async function budgetOfB() {
+    return getBudget(world.otherScope, 'bud-b')
+  }
+
+  it('refuses every budget write aimed at another workspace’s id, and leaves the row alone', async () => {
+    const before = await budgetOfB()
+
+    await expect(getBudget(world.scope, 'bud-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(
+      updateBudget(world.scope, 'bud-b', { limitMinor: 1 }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(archiveBudget(world.scope, 'bud-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(restoreBudget(world.scope, 'bud-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(deleteBudget(world.scope, 'bud-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(
+      setBudgetCategories(world.scope, {
+        budgetId: 'bud-b',
+        categoryIds: [],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      addBudgetTransactions(world.scope, {
+        budgetId: 'bud-b',
+        transactionIds: ['tx-b'],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      removeBudgetTransactions(world.scope, {
+        budgetId: 'bud-b',
+        transactionIds: ['tx-b'],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(await budgetOfB()).toEqual(before)
+    expect(await listBudgets(world.scope, { includeArchived: true })).toEqual(
+      [],
+    )
+  })
+
+  it('refuses another workspace’s category and transaction ids on a budget of its own', async () => {
+    await seedBudget(world.db, { id: 'bud-a', kind: 'category' })
+    await seedBudget(world.db, { id: 'bud-a-manual', kind: 'manual' })
+
+    // A owns the budget; the ids it is pointing at belong to B. The tenant predicate on the
+    // *referenced* rows is what makes this a `NotFoundError` rather than a foreign-key error at
+    // some later read.
+    await expect(
+      setBudgetCategories(world.scope, {
+        budgetId: 'bud-a',
+        categoryIds: ['cat-b'],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      addBudgetTransactions(world.scope, {
+        budgetId: 'bud-a-manual',
+        transactionIds: ['tx-b'],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+  })
+
+  it('never counts another workspace’s transaction, even under an identically named category', async () => {
+    // Same name, same slug, different workspace — the case a `WHERE name = ?` would get wrong.
+    await seedCategory(world.db, { id: 'cat-a', name: 'Food' })
+    await seedBudget(world.db, { id: 'bud-a' })
+    await world.db.insert(budgetCategories).values({
+      organizationId: 'org-a',
+      budgetId: 'bud-a',
+      categoryId: 'cat-a',
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-a',
+      categoryId: 'cat-a',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-03-10',
+    })
+
+    const spend = await budgetSpend(
+      world.scope,
+      await getBudget(world.scope, 'bud-a'),
+      {
+        from: '2026-03-01',
+        to: '2026-03-31',
+      },
+    )
+    // 100,00, not 850,00.
+    expect(spend.spentMinor).toBe(100_00)
+  })
+
+  it('refuses every period operation aimed at another workspace’s budget, and keeps its closed_at', async () => {
+    // Not an empty list: `listPeriods` resolves the budget through A's scope first, so an id
+    // belonging to B is indistinguishable from an id that does not exist.
+    await expect(listPeriods(world.scope, 'bud-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+
+    await expect(
+      closePeriod(world.scope, {
+        budgetId: 'bud-b',
+        periodStart: '2026-01-01',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      reopenPeriod(world.scope, {
+        budgetId: 'bud-b',
+        periodStart: '2026-01-01',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      recomputeOpenPeriod(world.scope, 'bud-b', '2026-03-15'),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      materializePeriods(world.scope, {
+        budgetId: 'bud-b',
+        today: '2026-03-15',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const january = (await listPeriods(world.otherScope, 'bud-b')).at(0)
+    expect(january?.closedAt).not.toBeNull()
+    expect(january?.spentMinor).toBe(900_00)
+  })
+
+  it('sweeps only the caller’s budgets, and one workspace’s marker cannot silence another’s', async () => {
+    // Two identical envelopes, one per workspace, both 45% over their 50% line.
+    await seedBudget(world.db, { id: 'bud-a', alertThresholds: [50] })
+    for (const [organizationId, budgetId] of [
+      ['org-a', 'bud-a'],
+      ['org-b', 'bud-b'],
+    ] as const) {
+      await seedPeriod(world.db, {
+        organizationId,
+        budgetId,
+        periodStart: '2026-03-01',
+        periodEnd: '2026-03-31',
+        spentMinor: 1_500_00,
+      })
+    }
+    await updateBudget(world.otherScope, 'bud-b', { alertThresholds: [50] })
+
+    const markers = createMemoryMarkerStore()
+    const mine = await sweepBudgetThresholds({
+      scope: world.scope,
+      today: '2026-03-15',
+      markers,
+    })
+    expect(mine.map((crossing) => crossing.budgetId)).toEqual(['bud-a'])
+
+    // A's marker is now written. B's identical crossing must still be found.
+    const theirs = await sweepBudgetThresholds({
+      scope: world.otherScope,
+      today: '2026-03-15',
+      markers,
+    })
+    expect(theirs.map((crossing) => crossing.budgetId)).toEqual(['bud-b'])
   })
 })

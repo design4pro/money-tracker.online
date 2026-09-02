@@ -69,12 +69,21 @@ interface Surface {
 }
 
 /**
- * The four screens named in the brief.
+ * The screens a reader cannot avoid: the four named in the brief, plus the three that wave 3 added.
  *
  * They are read with the seeded demo session, never written to, so `scripts/seed/verify.mjs` still
  * finds every counter it asserts. Reading the *demo* workspace also matters for what axe sees:
  * `/transactions` there is a populated grid and `/dashboard` a populated set of cards, so the scan
- * covers rendered rows, badges and figures rather than four empty-state illustrations.
+ * covers rendered rows, badges and figures rather than seven empty-state illustrations.
+ *
+ * `/budgets`, `/recurring` and `/goals` are here rather than only in their own per-route specs
+ * because those specs assert the plans' narrower bar — zero `serious`, zero `critical`, one theme,
+ * one locale. This file's bar is every WCAG A/AA violation at any impact, in **both** themes and
+ * **both** locales, and the three new surfaces carry exactly the things that axis catches: a
+ * hand-written `role="meter"` whose accessible value is a sentence, a status word that must survive
+ * translation, and a hue per verdict in two palettes. Their detail routes are not listed: an id in
+ * the path makes the surface a seeded row rather than a route, and the per-route visual specs
+ * already scan those with the same rule set.
  */
 /** Named, because the meter case at the foot of this file opens this same surface. */
 const ACCOUNTS: Surface = {
@@ -88,6 +97,9 @@ const SURFACES: readonly Surface[] = [
   { name: 'dashboard', path: '/dashboard', session: 'demo' },
   ACCOUNTS,
   { name: 'transactions', path: '/transactions', session: 'demo' },
+  { name: 'budgets', path: '/budgets', session: 'demo' },
+  { name: 'recurring', path: '/recurring', session: 'demo' },
+  { name: 'savings goals', path: '/goals', session: 'demo' },
 ]
 
 const THEMES: readonly AppTheme[] = ['light', 'dark']

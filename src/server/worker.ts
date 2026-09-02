@@ -19,13 +19,29 @@ import {
 
 import { drizzle } from 'drizzle-orm/d1'
 
+// Side effect only: installs this isolate's `LEDGER` batch ports. The fetch path reaches them
+// through the server functions it loads; a scheduled invocation loads no server function, so
+// without this line every rebuild the cron enqueues would be silently dropped and the balances it
+// moved would stay stale until the nightly sweep.
+import './ledger'
+
+import { runBudgetPeriodSweep } from './cron/budget-periods'
+import { runBudgetThresholdSweep } from './cron/budget-thresholds'
+import {
+  cronToday,
+  runRecurringHourly,
+  runRecurringReminderSweep,
+} from './cron/recurring'
 import * as financeSchema from './db/schema'
 import { AccountLedger as LedgerObject } from './do/ledger'
+import { createKvMarkerStore } from './recurring/markers'
 import { rebuildAccountBalance } from './repos/account-balances'
+import { listCronScopes } from './repos/recurring'
 import { SandcastleRegistry as RegistryObject } from './do/sandcastle-registry'
 import { loggerFromEnv } from './observability/logger'
 
 import type { Logger } from './observability/logger'
+import type { RecurringCronArgs } from './cron/recurring'
 import type { Database } from './repos/base'
 
 /**
@@ -97,9 +113,10 @@ const WEEKLY_CRON = '17 4 * * 1'
  * nothing" look identical from the outside otherwise.
  */
 const CRON_WORK: Readonly<Record<string, string | undefined>> = {
-  [REMINDER_CRON]:
-    'recurring due sweep, budget threshold alerts, tag reminders',
-  [RECURRING_CRON]: 'recurring auto-record materialisation',
+  // Both halves of this slot are wired below; tag reminders are still owed.
+  [REMINDER_CRON]: 'tag reminders',
+  // Both halves of this slot are wired below; nothing is owed on it.
+  [RECURRING_CRON]: 'recurring auto-record and budget period materialisation',
   [NIGHTLY_CRON]:
     'FX rate refresh, balance-history revaluation sweep, D1 logical backup, expired export prune',
   [WEEKLY_CRON]:
@@ -167,6 +184,43 @@ export default {
       return
     }
 
+    // The two quarter-hourly jobs and the hourly one are wired. The remaining slots are still
+    // owed and still warn, so "the nightly FX refresh has never run" stays visible in Workers
+    // Observability rather than being hidden by a slot that succeeds for a different reason.
+    if (controller.cron === RECURRING_CRON) {
+      // One set of arguments for both halves of the slot, for the reason the reminder branch
+      // gives below: the day is read once and both sweeps see the same workspaces on it.
+      const args = await recurringCronArgs(env, logger)
+
+      const recurring = await runRecurringHourly(args)
+      logger.info('recurring hourly sweep finished', { ...recurring })
+
+      // Budget periods are materialised here because `12-S2` puts them on this branch, and
+      // because the alternative — materialising only when somebody edits a budget — leaves an
+      // untouched budget with no period covering today the moment its current one ends.
+      const periods = await runBudgetPeriodSweep(args)
+      logger.info('budget period sweep finished', { ...periods })
+      return
+    }
+
+    if (controller.cron === REMINDER_CRON) {
+      // One set of arguments for both halves of the slot: the day is read once, the scope list is
+      // queried once, and the two sweeps see exactly the same workspaces on the same date.
+      const args = await recurringCronArgs(env, logger)
+
+      const reminders = await runRecurringReminderSweep(args)
+      logger.info('recurring reminder sweep finished', { ...reminders })
+
+      // `MarkerStore` and `ThresholdMarkerStore` are the same two methods declared in two domains
+      // that deliberately do not depend on each other, so the KV store satisfies both structurally.
+      const thresholds = await runBudgetThresholdSweep(args)
+      logger.info('budget threshold sweep finished', { ...thresholds })
+
+      // Returned, not fallen through: this slot now has handlers, and reaching the warning below
+      // would report the tag reminders that are still owed as if nothing in the slot had run.
+      return
+    }
+
     logger.warn('cron has no handler yet', {
       cron: controller.cron,
       pending,
@@ -174,4 +228,31 @@ export default {
     })
     return Promise.resolve()
   },
+}
+
+/**
+ * What both recurring branches need, built once from the environment.
+ *
+ * The database comes from {@link ledgerDb}, not from the isolate singleton in
+ * `src/server/auth/db.ts`: that one reads its binding through `cloudflare:workers`, which is the
+ * ambient **request** environment, and a cron is not serving a request. The `env` handed to
+ * `scheduled` is the one that is real here, exactly as it is for a Durable Object's own turn.
+ *
+ * `listCronScopes` builds one scope per workspace with its owner as the principal, so every row
+ * either branch touches goes through the same tenant predicate a request would. There is no cron
+ * super-user that can see across workspaces.
+ *
+ * The day is read **once**, here, and passed down; nothing below reads a clock. That is what makes
+ * the whole path testable at a pinned date.
+ */
+async function recurringCronArgs(
+  env: Cloudflare.Env,
+  logger: Logger,
+): Promise<RecurringCronArgs> {
+  return {
+    scopes: await listCronScopes(ledgerDb(env)),
+    markers: createKvMarkerStore(env.KV),
+    today: cronToday(),
+    logger,
+  }
 }
