@@ -90,6 +90,7 @@ the whole decision set, not a server-paginated scan a person walks through a pag
 - `src/server/repos/__tests__/imports.test.ts` — new
 - `src/server/import/types.ts` — new
 - `src/server/import/registry.ts` — new
+- `src/server/import/__tests__/registry.test.ts` — new
 - `src/server/import/amount.ts` — new
 - `src/server/import/__tests__/amount.test.ts` — new
 - `src/server/import/upload.ts` — new
