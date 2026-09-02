@@ -75,6 +75,18 @@ describe('the rate scale', () => {
     expect(() => rateFromString('0.00000000001')).toThrow(InvalidRateError)
   })
 
+  /**
+   * `String(1e21)` is `'1e+21'`, and the scaler expands that exponent by moving
+   * the point through the digit string rather than through `toFixed`, whose
+   * padding would invent digits the provider never published. The expanded
+   * figure is then refused for leaving the safe-integer range, which is the
+   * right answer: a rate that cannot be stored exactly is not stored at all.
+   */
+  it('refuses a provider figure too large to be a rate, exponent form and all', () => {
+    expect(() => rateFromDecimal(1e21)).toThrow(InvalidRateError)
+    expect(() => rateFromDecimal(1.234e21)).toThrow(InvalidRateError)
+  })
+
   it('gives a decimal back for a display line, and nothing to convert with', () => {
     expect(rateToDecimal(EUR_PLN)).toBe(4.3218)
     expect(rateToDecimal(IDENTITY_RATE)).toBe(1)
