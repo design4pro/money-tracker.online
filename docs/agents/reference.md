@@ -119,7 +119,7 @@ confirm the surface matches the description, and edit this file in the same PR a
 | `/pricing`                     | Plan cards with a monthly/yearly toggle and a quota table  | `(confirm)`                                            |
 | `/login`                       | Sign-in form — capture WITHOUT `--auth`                    | `(confirm)`                                            |
 | `/dashboard`                   | Widget grid: balance summary, trend chart, recent activity | `/dashboard`                                           |
-| `/accounts`                    | Account list grouped by kind, with totals                  | `(confirm)`                                            |
+| `/accounts`                    | Account list grouped by kind, with totals                  | `/accounts`                                            |
 | `/accounts/$accountId`         | One account: balance header, tabbed transaction list       | `(confirm)`                                            |
 | `/transactions`                | Dense transaction table with a filter bar                  | `/transactions`                                        |
 | `/transactions/new`            | Amount-first entry form                                    | `(confirm)`                                            |
@@ -128,7 +128,7 @@ confirm the surface matches the description, and edit this file in the same PR a
 | `/budgets/$budgetId`           | One budget: category breakdown and timeline                | `(confirm)`                                            |
 | `/recurring`                   | Recurring series with a next-due calendar                  | `(confirm)`                                            |
 | `/goals`                       | Savings goals with progress and a projected date           | `(confirm)`                                            |
-| `/analytics/cash-flow`         | Income vs expense over a period                            | `(confirm)`                                            |
+| `/analytics/cash-flow`         | Income vs expense over a period                            | reached from an index at `/analytics`, not a sibling   |
 | `/analytics/net-worth`         | Net-worth history line                                     | `(confirm)`                                            |
 | `/analytics/spending`          | Category donut with drill-down                             | `(confirm)`                                            |
 | `/settings/categories`         | Editable two-level category tree                           | `(confirm)`                                            |

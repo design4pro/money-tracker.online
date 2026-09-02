@@ -325,6 +325,18 @@ covers either.
 
 **Natural owner.** `17-analytics.md`.
 
+**Observed 2026-09-02, pixels only.** Confirmed, and the framing above was right. Their reports
+surface is an index of named reports in two groups, and the second group holds three of them: what
+drove the change in net worth, what has been contributed over time, and a forward projection. Only
+the first plausibly wants an instrument model; the other two are arithmetic over movements we
+already store. Reading `BND-03` as dropping all three is a misreading of our own boundary, and this
+is the evidence.
+
+The same round turned up a report with **no counterpart anywhere in our plan set**: a
+cross-tabulation of movements, two chosen dimensions against a chosen measure. It is not a chart, it
+is the thing people export to a spreadsheet to build by hand. Recorded here as a candidate rather
+than a gap, because nobody has decided we want it.
+
 ### 19. More than two interface languages, and a way for others to translate
 
 **What it does.** A locale set that grows without a code change, fed by contributors.
