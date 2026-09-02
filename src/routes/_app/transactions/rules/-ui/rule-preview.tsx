@@ -145,7 +145,7 @@ export function RulePreview({ rule }: RulePreviewProps) {
             {state.result.samples.map((sample) => (
               <li
                 key={sample.transactionId}
-                className="flex items-baseline justify-between gap-3 rounded-md bg-surface-2 px-3 py-2"
+                className="flex items-baseline justify-between gap-3 rounded-md bg-surface-sunken px-3 py-2"
               >
                 <span className="min-w-0 truncate text-body text-ink">
                   {sample.payeeName ??

@@ -128,7 +128,7 @@ export function ConditionRow({
 
   return (
     <fieldset
-      className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 p-3"
+      className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-sunken p-3"
       disabled={isDisabled}
     >
       <legend className="sr-only">

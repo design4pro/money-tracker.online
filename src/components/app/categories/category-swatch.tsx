@@ -52,7 +52,7 @@ export function CategorySwatch({
     >
       <span
         aria-hidden="true"
-        className="size-3 rounded-full border border-edge-strong"
+        className="size-3 rounded-full border border-border-strong"
         style={{ backgroundColor: color }}
       />
       {isLabelledBeside ? null : <span className="sr-only">{name}</span>}
