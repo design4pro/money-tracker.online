@@ -1,13 +1,13 @@
 name: Enhancement
 description: New behaviour, or better behaviour that was never promised.
 title: 'feat: '
-labels: ['type: enhancement', 'status: pending']
+labels: ['type: enhancement', 'status: triage']
 body:
   - type: markdown
     attributes:
       value: >
         One enhancement per issue. A request that needs more than one slice to land is a PRD, and
-        a PRD never carries `ready-for-agent` - its sub-issues do.
+        a PRD is never worked directly - its sub-issues are.
 
   - type: textarea
     id: problem

@@ -17,3 +17,7 @@ blob-report/
 coverage/
 .claude/settings.local.json
 .claude/worktrees/
+
+# Per-run scratch of the cezar workflows (scripts/agent/): the port pin, ladder verdicts and
+# digests, the claim and the handoff. Never committed; the run's pull request carries what matters.
+.agent/

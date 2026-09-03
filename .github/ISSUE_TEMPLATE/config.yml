@@ -11,5 +11,5 @@ contact_links:
   - name: Label vocabulary
     url: https://github.com/design4pro/money-tracker.online/blob/develop/.github/labels.yml
     about: >
-      What each label means and which ones the agent loop acts on - `ready-for-agent` is a gate,
-      not a wish.
+      What each label means and which ones a run acts on. Exactly one `status:` per open issue;
+      `run:` labels are commands, not states.

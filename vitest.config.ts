@@ -62,7 +62,7 @@ export default defineConfig({
           name: 'tooling',
           environment: 'node',
           globals: false,
-          include: ['scripts/**/__tests__/*.test.mjs'],
+          include: ['scripts/**/__tests__/*.test.{ts,mjs}'],
           restoreMocks: true,
         },
       },

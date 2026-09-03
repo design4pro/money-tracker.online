@@ -109,9 +109,10 @@ Every surface you ship owes, in the same pull request:
 ## Working on the backlog
 
 The backlog is GitHub Issues on `design4pro/money-tracker.online`. A PRD is a parent issue and its
-sub-issues are vertical slices in execution order. `ready-for-agent` is a per-slice gate and is
-never applied to a PRD. Ticket bodies must not contain `Closes #n` — closing is the merger's job.
-Full contract: `docs/agents/issue-tracker.md`; labels: `docs/agents/triage-labels.md`.
+sub-issues are vertical slices in execution order. Every open issue carries exactly one `status:`
+label, and `status: ready` on a slice is the gate: it is set by a triage or plan run, never by a
+reporter, and never on a PRD. Ticket bodies must not contain `Closes #n` — closing is the merger's
+job. Full contract: `docs/agents/issue-tracker.md`; labels: `docs/agents/triage-labels.md`.
 
 The staged plan set in `docs/plans/` is where a slice's scope comes from. If you are implementing a
 stage, its **Owned paths** list is your whole permitted diff, and its **Verification** block is what

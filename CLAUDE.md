@@ -46,9 +46,12 @@ live in `docs/adr/`. Arithmetic lives in `docs/MONEY.md`.
 - **Sharing a checkout** (measuring while somebody else edits): see `docs/agents/shared-checkout.md`
 - **Reference product** (feature and quality benchmark; the clean-room rule applies): see
   `docs/agents/reference.md`
+- **Cezar** (the agent orchestrator; ADR 0013): see `docs/agents/cezar.md`
 
-This repository has no agent orchestrator right now: sandcastle was removed and Cezar is not yet
-ported (`docs/adr/0013-cezar-replaces-sandcastle.md`). Work is driven by hand until it is.
-
-New work flows: grilling → `/to-spec-project` (PRD issue) → `/to-tickets-project` (vertical-slice
-sub-issues) → `/implement-project` per ticket in a fresh context.
+New work flows through the three Cezar workflows, one fresh context each: `plan` (`/plan-feature
+<issue> spec` → `prd` → `tickets`, a human answering one question per round) publishes a PRD and its
+vertical-slice sub-issues; `triage` (`/triage-ticket <issue>`) reproduces a new issue at HEAD and
+routes it; `implement-ticket` (`/implement-ticket <issue>`) turns one ready ticket into one draft PR.
+Every artefact stops at `status: review` for a human. Labels are the state machine and only the
+scripts in `scripts/agent/` write them (`docs/adr/0014-label-protocol.md`,
+`docs/agents/triage-labels.md`).

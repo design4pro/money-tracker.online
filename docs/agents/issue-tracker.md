@@ -16,13 +16,22 @@ gh api "repos/$GH_REPO/issues/<n>/sub_issues" --jq '.[].number'   # children, in
 
 ## Writing
 
+**Under an agent run nothing here is available.** `.claude/hooks/git-guardrails.sh` blocks every
+`gh issue|pr` mutation and every non-GET `gh api` when `CEZ_TASK_ID` or `GITHUB_ACTIONS` is set: a
+run writes through `scripts/agent/` (`triage-apply.sh`, `publish-*.sh`, `cez-handback.sh`) and reads
+through `scripts/agent/gh-ro.sh`. The commands below are a human's, at their own keyboard.
+
 ```bash
-gh issue create --title "PRD: <title>" --label "type: feature" --body-file <file>   # parent: never `ready-for-agent`
-gh issue create --title "<ticket>" --label "ready-for-agent" --body-file <file>     # sub-issue: the label IS the gate
+gh issue create --title "PRD: <title>" --label "type: feature,prd" --body-file <file>   # parent
+gh issue create --title "<ticket>" --label "status: queued" --body-file <file>          # sub-issue
 gh issue comment <n> --body "<text>"
-gh issue edit <n> --add-label "<label>" --remove-label "<label>"
+gh issue edit <n> --add-label "run: implement"                                          # a command
 gh issue close <n>
 ```
+
+A sub-issue is created `status: queued` and reaches `status: ready` only once its `sub_issues` and
+`blocked_by` links are verified - which is what `scripts/agent/publish-tickets.sh` does, and the
+reason to prefer it over the two lines above (`docs/adr/0014-label-protocol.md`).
 
 ## Sub-issues (PRD → tickets)
 
@@ -39,9 +48,9 @@ idempotent.
 Blocking relationships use native GitHub issue dependencies (GraphQL `blockedBy` / `blocking`). A
 ticket is workable only when it has zero open blockers and is not itself a PRD with sub-issues.
 
-Because a PRD is never workable, **`ready-for-agent` lives on sub-issues only**: an orchestrator
-handed a PRD expands it to its open children and filters those by the label, so a label on the
-parent would only ever offer the PRD itself as work.
+Because a PRD is never workable, it never carries `run: implement`: a PRD is marked `prd` and stays
+`status: in-progress` while any child is open. `auto-advance` on a PRD is how a human delegates the
+per-child command to the sweeper.
 
 **Ticket bodies must NOT contain `Closes #n` directives** — closing is the merger's job, and a
 `Closes` in a body closes the ticket the moment any branch mentioning it merges, including a branch
@@ -51,7 +60,10 @@ that only did half of it.
 
 A ticket is a vertical slice, and a slice an agent can act on states all of:
 
-- **Category** and a one-paragraph **Summary**.
+A ticket body is the `ticket/v2` schema, validated by `scripts/agent/plan.mjs` (`check-body`), and
+its sections appear in this order:
+
+- One-paragraph **Summary**.
 - **Current** behaviour and **Desired** behaviour.
 - **Fix direction** — the approach, not the diff.
 - **Key interfaces** — the types, function signatures and config shapes to look for. _Never file
@@ -64,13 +76,19 @@ A ticket is a vertical slice, and a slice an agent can act on states all of:
 - **Verification** — what to run and what evidence to leave.
 - **Out of scope** — what a reader might reasonably assume is included and is not.
 
+**Owned paths** are additionally checked: repo-relative, never under the agent's own configuration
+(`.github/`, `.claude/`, `.husky/`, `.ai/cezar/`, `scripts/agent/`), and disjoint between two tickets
+the dependency graph does not order. **Definition of Done** carries one to three acceptance criteria
+and no more; a longer list is a decomposition problem (`docs/SPEC.md` §8).
+
 A slice that maps onto a plan stage in `docs/plans/` copies these from the stage rather than
 re-deriving them; the stage's twelve headings are shaped to fill exactly this list.
 
 ## Relationship to `docs/plans/`
 
 The plan set is the **backlog source**; GitHub Issues is the **execution surface**. A plan stage
-becomes one PRD (the plan area) plus one sub-issue per stage, published by `/to-tickets-project`.
+becomes one PRD (the plan area) plus one sub-issue per stage, published by
+`scripts/agent/publish-tickets.sh` at the end of a `/plan-feature … tickets` run.
 The plan file remains the authority for scope and acceptance criteria; the issue is where state
 lives. When the two disagree, the issue that has already been worked wins and the plan is amended to
 say so.
