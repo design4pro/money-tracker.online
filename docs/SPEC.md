@@ -255,7 +255,7 @@ e2e/                 <module>.visual.spec.ts, one per module
 
 ## 7. Definition of done for any task
 
-Six numbered points, inherited unchanged by every stage, every ticket and every pull request:
+Seven numbered points, inherited unchanged by every stage, every ticket and every pull request:
 
 1. `pnpm build` succeeds.
 2. `pnpm lint` and `pnpm typecheck` are clean — no new errors, no suppressions.
@@ -265,6 +265,12 @@ Six numbered points, inherited unchanged by every stage, every ticket and every 
    with the interaction state that is the point of the change captured, not just the resting state.
 5. No TODOs, no placeholder copy, no `console.log`, no commented-out code left behind.
 6. You did not touch files outside your assigned ownership.
+7. **Every number you write down was produced by a command, not by an impression.** A count of
+   occurrences, call sites, files or failures that appears in a commit message, a docblock, a
+   report or a review comment must come from a `grep -c`, a `wc -l` or a test run whose output you
+   actually read. This is the cheapest claim in the repository to verify and the easiest to get
+   wrong, because a plausible number reads exactly like a measured one and nothing downstream
+   re-checks it. If you cannot run the count, do not write the number — write what you did observe.
 
 On top of those, the ten clauses of §2 are ticked per surface, and §10's accessibility gate must be
 green.

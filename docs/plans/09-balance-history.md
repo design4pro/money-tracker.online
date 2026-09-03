@@ -146,7 +146,7 @@ while failing.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+§7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 
@@ -246,7 +246,7 @@ write._ Cases in `money-invariants.test.ts`:
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+§7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 
@@ -330,7 +330,7 @@ correctness on the happy path but always restores it.** Cases:
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+§7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 

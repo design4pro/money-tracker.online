@@ -119,7 +119,7 @@ in `serialize.test.ts`:
 
 ### Definition of done
 
-All six §7 items; §2's visual clauses are carried by `20-S2`, stated explicitly.
+All seven §7 items; §2's visual clauses are carried by `20-S2`, stated explicitly.
 
 ### Blockers
 
@@ -239,7 +239,7 @@ _The export contains every transaction the workspace can see, and the same integ
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -336,7 +336,7 @@ _A restored workspace is arithmetically identical to the one that was backed up.
 
 ### Definition of done
 
-All six §7 items. The §2 visual clauses do not apply and the DoD says so with the reason, rather than
+All seven §7 items. The §2 visual clauses do not apply and the DoD says so with the reason, rather than
 ticking boxes for a screen that does not exist.
 
 ### Blockers

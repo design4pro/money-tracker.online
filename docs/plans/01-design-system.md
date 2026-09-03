@@ -101,7 +101,7 @@ no case of its own and says so.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses. This is the stage that defines what ticking those clauses
+All seven §7 items and all ten §2 clauses. This is the stage that defines what ticking those clauses
 means for every later stage, so ticking one it did not look at is worse here than anywhere else.
 
 ### Blockers
@@ -178,7 +178,7 @@ node_ and enforced in review by the rule being written down here rather than ass
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses, with the motion clause carrying this stage's weight.
+All seven §7 items and all ten §2 clauses, with the motion clause carrying this stage's weight.
 
 ### Blockers
 
@@ -251,7 +251,7 @@ exporting a currency-formatting function appears anywhere under `src/components/
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+§7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 

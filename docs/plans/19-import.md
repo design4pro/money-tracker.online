@@ -237,7 +237,7 @@ _Parsing produces integer minor units or it produces an error — never a float.
 
 ### Definition of done
 
-All six §7 items; the §2 visual clauses are carried by `19-S2` and `19-S3`, stated explicitly.
+All seven §7 items; the §2 visual clauses are carried by `19-S2` and `19-S3`, stated explicitly.
 
 ### Blockers
 
@@ -440,7 +440,7 @@ _The preview's numbers are the numbers that will be written._ Cases in `money-in
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -560,7 +560,7 @@ Cases in `money-invariants.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -685,7 +685,7 @@ never as a guess._ Cases in the two `parse.test.ts` files:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses, ticked against the preview step this stage feeds — the
+All seven §7 items and all ten §2 clauses, ticked against the preview step this stage feeds — the
 surface is `19-S2`'s, the content in it is this stage's, and evidence is taken here.
 
 ### Blockers
@@ -797,7 +797,7 @@ Category"` string containing a colon inside the leaf name, an empty amount pair 
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses, ticked against the preview step this stage feeds — the
+All seven §7 items and all ten §2 clauses, ticked against the preview step this stage feeds — the
 surface is `19-S2`'s and the evidence is taken here.
 
 ### Blockers

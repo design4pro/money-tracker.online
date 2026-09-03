@@ -245,7 +245,7 @@ LEDGER, TASKS`; production declares neither `SANDCASTLE_REGISTRY` nor `AI`; the 
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6 apply. Item 4 (visual verification) does not: no surface.
+`docs/SPEC.md` §7 items 1–3 and 5–7 apply. Item 4 (visual verification) does not: no surface.
 
 ### Blockers
 
@@ -320,7 +320,7 @@ against the 7:1 floor on every surface token they may sit on.
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6. Item 4 does not apply (no surface). Of the §2 clauses, only
+`docs/SPEC.md` §7 items 1–3 and 5–7. Item 4 does not apply (no surface). Of the §2 clauses, only
 _full parity in light and dark, dark shadows re-declared_ applies and is ticked here.
 
 ### Blockers
@@ -411,7 +411,7 @@ over values the caller already holds.
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+`docs/SPEC.md` §7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 
@@ -509,7 +509,7 @@ amendment. One new case is added: _every table with an `amount_minor` column als
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6. Item 4 does not apply.
+`docs/SPEC.md` §7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -588,7 +588,7 @@ duplicate `docs/MONEY.md` §7 forbids. The case
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses. This stage has a surface (through `01-S1`'s gallery) and
+All seven §7 items and all ten §2 clauses. This stage has a surface (through `01-S1`'s gallery) and
 takes no exemption.
 
 ### Blockers
@@ -667,7 +667,7 @@ recomputes_.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -740,7 +740,7 @@ a number of major units, so a caller cannot pass it something already rounded. H
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -813,7 +813,7 @@ repository parses it back into the money path.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -886,7 +886,7 @@ decimals than `digits` rounds once, at parse, and never twice_.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses, including the chart clause.
+All seven §7 items and all ten §2 clauses, including the chart clause.
 
 ### Blockers
 
@@ -957,7 +957,7 @@ sum the **stored** `ref_amount_minor` and never re-derive it from `amount_minor`
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -1034,7 +1034,7 @@ serialised into a queue message where it could be re-parsed. Held by
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -1101,7 +1101,7 @@ does not shift the grid, which is the `docs/SPEC.md` §2 zero-layout-shift claus
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -1172,7 +1172,7 @@ recomputes it or converts it to the workspace base currency — a price is not a
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -1240,7 +1240,7 @@ two sources of a price is how a checkout charges something the page did not say.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply to this stage; it applies to `25-S2`.
+§7 items 1–3 and 5–7. Item 4 does not apply to this stage; it applies to `25-S2`.
 
 ### Blockers
 
@@ -1310,7 +1310,7 @@ are held by `27-S2`'s tests.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

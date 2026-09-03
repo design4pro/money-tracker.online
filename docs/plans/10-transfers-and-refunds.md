@@ -137,7 +137,7 @@ transaction afterwards.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+§7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 
@@ -249,7 +249,7 @@ _A refund reduces the effective amount and never rewrites the original._ Cases:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -358,7 +358,7 @@ _Suggestion matching converts to base for comparison and never writes a converte
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
