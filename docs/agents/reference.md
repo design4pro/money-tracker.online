@@ -137,6 +137,15 @@ entry point off the page and supplies it on the command line. `--enter` is refus
 `--auth`, and a control that never appears times out into a warning with no frame filed, which the
 loop reports as a `skippedReason` like any other wall.
 
+A navigation round on 2026-09-03 confirmed the entry point still behaves as described and settled
+one question the section left open. The entry control navigates straight to the demo's dashboard -
+no form, no credential, no interstitial - and from there every other surface answers at its own URL,
+so a round can point a browser directly at a path once the click has happened. It has to happen in
+**every** context, though: `capture.mjs` opens a fresh one per invocation and the demo session does
+not survive it, so `--enter` is needed on each call and not only on the first. The banner it lands
+on states the sample data resets on a timer measured in hours, which is the other reason a round is
+worth finishing in one sitting.
+
 ---
 
 ## The surface map
@@ -155,37 +164,46 @@ pairing still holds, because the pairing is by what the screen is.
 `(confirm)` means nobody has recorded a path yet — navigate the demo's own top-level navigation,
 confirm the surface matches the description, and edit this file in the same PR as the capture.
 
-| Our route                      | The surface                                                | Reference path                                         |
-| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------ |
-| `/` (marketing)                | Landing page: hero, feature grid, pricing teaser, footer   | `/`                                                    |
-| `/pricing`                     | Plan cards with a monthly/yearly toggle and a quota table  | `(confirm)`                                            |
-| `/login`                       | Sign-in form — capture WITHOUT `--auth`                    | `(confirm)`                                            |
-| `/dashboard`                   | Widget grid: balance summary, trend chart, recent activity | `/dashboard`                                           |
-| `/accounts`                    | Account list grouped by kind, with totals                  | `/accounts`                                            |
-| `/accounts/$accountId`         | One account: balance header, tabbed transaction list       | `(confirm)`                                            |
-| `/transactions`                | Dense transaction table with a filter bar                  | `/transactions`                                        |
-| `/transactions/new`            | Amount-first entry form                                    | `(confirm)`                                            |
-| `/transactions/$transactionId` | Transaction detail: splits, tags, attachments              | no route — the surface is a modal over `/transactions` |
-| `/budgets`                     | Budget cards with utilisation bars                         | `(confirm)`                                            |
-| `/budgets/$budgetId`           | One budget: category breakdown and timeline                | `(confirm)`                                            |
-| `/recurring`                   | Recurring series with a next-due calendar                  | `(confirm)`                                            |
-| `/goals`                       | Savings goals with progress and a projected date           | `(confirm)`                                            |
-| `/analytics/cash-flow`         | Income vs expense over a period                            | reached from an index at `/analytics`, not a sibling   |
-| `/analytics/net-worth`         | Net-worth history line                                     | `(confirm)`                                            |
-| `/analytics/spending`          | Category donut with drill-down                             | `(confirm)`                                            |
-| `/settings/categories`         | Editable two-level category tree                           | `(confirm)`                                            |
-| `/import`                      | Import mapping step of a file import                       | `/settings/data-management/import/csv`                 |
-| `/settings/billing`            | Current plan, usage, invoices                              | `(confirm)`                                            |
+| Our route                      | The surface                                                | Reference path                                                |
+| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| `/` (marketing)                | Landing page: hero, feature grid, pricing teaser, footer   | `/`                                                           |
+| `/pricing`                     | Plan cards with a monthly/yearly toggle and a quota table  | `(confirm)`                                                   |
+| `/login`                       | Sign-in form — capture WITHOUT `--auth`                    | `(confirm)`                                                   |
+| `/dashboard`                   | Widget grid: balance summary, trend chart, recent activity | `/dashboard`                                                  |
+| `/accounts`                    | Account list grouped by kind, with totals                  | `/accounts`                                                   |
+| `/accounts/$accountId`         | One account: balance header, tabbed transaction list       | `(confirm)`                                                   |
+| `/transactions`                | Dense transaction table with a filter bar                  | `/transactions`                                               |
+| `/transactions/new`            | Amount-first entry form                                    | `(confirm)`                                                   |
+| `/transactions/$transactionId` | Transaction detail: splits, tags, attachments              | no route — the surface is a modal over `/transactions`        |
+| `/transactions/groups`         | Grouped transactions: a set treated as one movement        | `/transaction-groups` - top-level, not under transactions     |
+| `/budgets`                     | Budget cards with utilisation bars                         | `/planned/budgets`                                            |
+| `/budgets/$budgetId`           | One budget: category breakdown and timeline                | `(confirm)`                                                   |
+| `/recurring`                   | Recurring series with a next-due calendar                  | `/planned/recurring-payments`                                 |
+| `/goals`                       | Savings goals with progress and a projected date           | `(confirm)`                                                   |
+| `/analytics/cash-flow`         | Income vs expense over a period                            | `/analytics/cash-flow`, reached from an index at `/analytics` |
+| `/analytics/net-worth`         | Net-worth history line                                     | `/analytics/net-worth-history`                                |
+| `/analytics/spending`          | Category donut with drill-down                             | `(confirm)`                                                   |
+| `/settings/categories`         | Editable two-level category tree                           | `/settings/categories`                                        |
+| `/import`                      | Import mapping step of a file import                       | `/settings/data-management/import/csv`                        |
+| `/settings/billing`            | Current plan, usage, invoices                              | `(confirm)`                                                   |
 
 **No equivalent surface is a valid answer.** These have no counterpart worth pairing, and a capture
 agent that improvises one produces a comparison of two unrelated screens, which is worse than no
 comparison:
 
-- `/transactions/rules` and `/transactions/suggestions` — automation surfaces
-- `/settings/currencies` and everything multi-currency
-- `/console/*` — the platform console
-- `/settings/members` — shared workspace
+- `/console/*` - the platform console
 - `/legal/*`
+
+**Two entries left this list on 2026-09-03, and one caveat came with them.** `/transactions/rules`
+and `/transactions/suggestions` were filed here as automation surfaces with no counterpart. They
+have one: a navigation round reached two sibling surfaces under the reference's transactions branch,
+one shaped like a rules list and one shaped like a suggestions queue, at `/transactions/automations`
+and `/transactions/optimizations`. Pairing them is now valid.
+
+`/settings/currencies` and `/settings/members` are a weaker case and stay out for now. The
+reference's settings index lists a currency entry and a sharing entry, but the round only saw that
+index - the surfaces behind those rows were not opened, and an index row is not evidence that the
+screen behind it is comparable to ours. Open them before pairing either.
 
 For those, set `captured: false` with a `skippedReason` naming the screen.
 
