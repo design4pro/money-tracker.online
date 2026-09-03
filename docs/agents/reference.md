@@ -12,10 +12,17 @@ it navigates by, and the rule it works under.
 **Compare rendered pixels. Nothing else crosses.**
 
 This is not a style preference and it is not negotiable. Every stage of the loop, and every human
-who runs it by hand, is bound by all eight clauses:
+who runs it by hand, is bound by all eight clauses.
 
-1. **Pixels only.** Point a browser at a public URL and photograph what it paints. That is the
-   entire permitted interaction.
+Clauses 1 to 3 are about the **comparison loop**, and they are strict because a comparison that
+reached past the pixels would stop being a comparison of craft. Clause 8 is about **everything
+else** - it was amended on 2026-09-03 and now permits reading the reference's published source
+outside the loop. Clauses 4 to 7 hold everywhere, without exception, and they are the ones that
+carry the licence.
+
+1. **Pixels only, inside the loop.** Point a browser at a public URL and photograph what it paints.
+   That is the entire permitted interaction for a capture round - see clause 8 for what may be read
+   outside one.
 2. **Never read the reference's DOM.** No `page.content()`, no `view-source:`, no devtools element
    inspection, no accessibility-tree dump, no `document.querySelector` against their origin.
 3. **Never read its network traffic.** No API responses, no JSON payloads, no request logs, no
@@ -31,12 +38,27 @@ who runs it by hand, is bound by all eight clauses:
    comment, not in a PR body, not in a code comment, not in `.sandcastle-visual.json`, not in a
    screenshot directory. No artefact this loop writes may contain it. The critic works blind, and a
    product name anywhere in its reading is the end of blindness.
-8. **Never read the reference's source code.** The reference is an AGPL-3.0 project and the demo is
-   its deployed instance. Do not open its repository to answer an implementation question, do not
-   read a file of it to see how a behaviour is built, do not consult it while writing the equivalent
-   here. Its public readme and the shape of its directory tree are the outer limit, and they are for
-   enumerating _what exists_, never _how it works_. This clause is the one with teeth outside the
-   loop - see below.
+8. **The reference's source may be read to check what it does. Nothing from it may be
+   transcribed.** Amended 2026-09-03 by the product owner, who lifted the previous blanket ban on
+   opening the repository: it is a public open-source project, and everything here is rewritten
+   onto Cloudflare's platform regardless, so consulting how a behaviour actually works is allowed
+   where it was not before.
+
+   What did **not** change is clauses 4, 5 and 6, and they are what keeps this workable: no string,
+   no name, no number, no schema, no snippet, in any file, commit, issue or comment. A close
+   paraphrase of an implementation is that implementation. Read it, close it, write ours - and if
+   the result would be recognisable to somebody holding their file open beside it, it is derived
+   whatever route it took. Rewriting for a different runtime is not by itself the distance that
+   makes something ours; the same structure expressed in another framework is still the same
+   structure.
+
+   Clause 7 is also untouched, so a consultation happens outside the blind loop or not at all - a
+   critic that has read their source is no longer blind, and neither is a capture round that names
+   them in an artefact.
+
+   When a consultation changes what gets built here, say so in the change that carries it. One
+   sentence - "checked against the reference" - is what makes the boundary auditable later, and it
+   costs nothing while the reasoning is still in somebody's head.
 
 What the loop is allowed to conclude is a statement about _craft_: "the small viewport is a designed
 mobile layout on one side and a squeezed desktop on the other", "one side's dark theme has its own
@@ -72,10 +94,23 @@ The saving distinction, and the reason the product owner's parity directive is e
 - **Expression is.** Source code, copy, schema, and the specific arrangement of a screen are the
   protected part. Those are what clauses 4, 5 and 8 keep out.
 
-So: **match the feature, never the file.** If an implementation question is hard, the answer comes
-from our own spec, our own `docs/MONEY.md`, the framework's documentation or first principles - it
-never comes from reading theirs. An agent that cannot answer a question without opening their
-repository must stop and say so, because the cheap answer there is the expensive one here.
+So: **match the feature, never the file.** Clause 8's amendment moves where the line sits without
+moving what it protects. Reading published source is lawful; what creates exposure is shipping
+something derived from it. Which makes the test a question about the artefact, not about the
+reading:
+
+- **Nothing is transcribed.** Not a snippet, not a schema, not an identifier, not a close
+  paraphrase. The check is the file, not the intent behind it.
+- **A port is not a rewrite.** Moving a design from their runtime to Workers, D1 and Durable
+  Objects changes the words and keeps the arrangement, and the arrangement is the protected part.
+  The distance that makes something ours is a different decision, not a different API.
+
+The residual risk is worth naming rather than reassuring away: a reader who has seen an
+implementation cannot unsee it, and "arrived at independently" is a weaker account once a
+consultation is on the record. That is the trade the owner made in exchange for being able to check
+solutions rather than guess at them - so consult where it settles something, write down that you
+did, and keep answering the ordinary questions from our own spec, `docs/MONEY.md`, the framework's
+documentation or first principles, which is faster anyway.
 
 This is an engineering rule written from the plain text of the licence, not legal advice. Before
 anything ships commercially, a lawyer should confirm it.
