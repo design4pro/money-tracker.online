@@ -51,8 +51,15 @@ const BASE_URL = (
 const OUT_DIR = process.env.A11Y_OUT_DIR ?? 'a11y-report'
 // `||`, not `??`: an unset GitHub variable arrives as an empty string, and falling through to the
 // seed's own default is what makes the workflow run on a fork that has configured nothing.
+//
+// Both defaults are copies of `scripts/seed/seed.mjs`, and copies drift: the password here read
+// `demo-password-1234` while the seed wrote `money-demo-2026`, so sign-in answered 403 and this
+// gate failed on every run from the day it was added - on `develop` too - without auditing a
+// single page. A gate that always fails stops being read, which is why three days passed; and a
+// scan that never ran reports the same red as a scan that found a violation. If you change either
+// literal, change it in the seed and here, or the next reader inherits the same silence.
 const EMAIL = process.env.A11Y_USER_EMAIL || 'demo@money-tracker.online'
-const PASSWORD = process.env.A11Y_USER_PASSWORD || 'demo-password-1234'
+const PASSWORD = process.env.A11Y_USER_PASSWORD || 'money-demo-2026'
 const THEMES = (process.env.A11Y_THEMES ?? 'light,dark')
   .split(',')
   .map((t) => t.trim())
@@ -369,13 +376,22 @@ const readRoutes = async () => {
  */
 const signIn = async (context) => {
   const res = await context.request.post(`${BASE_URL}/api/auth/sign-in/email`, {
+    // Better Auth rejects a cross-site POST it cannot attribute, and a request issued by the
+    // API client rather than by a page carries no `Origin` of its own - so without this the
+    // endpoint answers 403 `MISSING_OR_NULL_ORIGIN` before it ever looks at the credentials.
+    // That is what this gate had been failing on, and the shape of the error is why it went
+    // unread: 403 reads as "these credentials were refused" when it means "this request was
+    // never asked about credentials".
+    headers: { origin: BASE_URL },
     data: { email: EMAIL, password: PASSWORD },
     failOnStatusCode: false,
   })
   if (!res.ok()) {
     throw new Error(
       `sign-in failed for ${EMAIL}: HTTP ${res.status()}. The scan cannot audit the signed-in ` +
-        `surface without it. Check the seed ran, or set A11Y_USER_EMAIL / A11Y_USER_PASSWORD.`,
+        `surface without it. 401 is the password: check it against the one ` +
+        `\`scripts/seed/seed.mjs\` writes, or set A11Y_USER_EMAIL / A11Y_USER_PASSWORD. ` +
+        `403 is not the password - the request was refused before them.`,
     )
   }
 }
@@ -444,8 +460,17 @@ const open = async (page, route, { theme, viewportName }) => {
   return page
 }
 
+// The excluded region is React Aria's global live announcer, not ours: `LiveAnnouncer.mjs:51`
+// stamps `data-live-announcer` on a container it keeps on `document.body`, and a pending `Button`
+// leaves `role="img"` nodes there whose `aria-labelledby` outlives the control it names. Axe is
+// right about them and nothing in this repository can fix them. `e2e/support/budgets.ts` excludes
+// the same region for the same reason - the two scanners have to agree, or a page passes one gate
+// and fails the other.
 const runAxe = async (page, tags) =>
-  new AxeBuilder({ page }).withTags(tags).analyze()
+  new AxeBuilder({ page })
+    .withTags(tags)
+    .exclude('[data-live-announcer]')
+    .analyze()
 
 const collectAxe = (results, { level, route, theme, viewportName }) => {
   for (const v of results.violations) {
