@@ -112,8 +112,12 @@ async function openRefundPanel(page: Page, labels: RefundLabels) {
   const panel = page.getByRole('region', { name: labels.panel })
   await expect(
     panel,
-    'The refund panel is not on the transaction detail screen. `refund-panel.tsx` has to be ' +
-      'mounted in `src/routes/_app/transactions/$transactionId.tsx` — see 10-S2.',
+    // Not a diagnosis. This message used to say the panel was unmounted and name the file to
+    // mount it in; it has been mounted since 10-S2 landed, so the message outlived its own cause
+    // and now sends a reader to repair what is not broken. A failed `toBeVisible` cannot know
+    // why - the row may not have opened, the panel may not have rendered, the accessible name
+    // may not be the one this locale expects - so it reports what it looked for instead.
+    `No region named "${labels.panel}" on the transaction detail screen (the name is locale-dependent).`,
   ).toBeVisible()
   return panel
 }

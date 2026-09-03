@@ -107,9 +107,9 @@ async function openReceipts(page: Page, labels: ReceiptLabels) {
   const panel = page.getByRole('region', { name: labels.panel })
   await expect(
     panel,
-    'The receipts panel is not on the transaction detail screen. `attachment-list.tsx` and ' +
-      '`attachment-dropzone.tsx` have to be mounted in ' +
-      '`src/routes/_app/transactions/$transactionId.tsx` — see 11-S3.',
+    // Not a diagnosis; see the note on the same assertion in `refunds.visual.spec.ts`. The panel
+    // has been mounted since 11-S3 landed, so naming the mount as the cause is now always wrong.
+    `No region named "${labels.panel}" on the transaction detail screen (the name is locale-dependent).`,
   ).toBeVisible()
   return panel
 }
