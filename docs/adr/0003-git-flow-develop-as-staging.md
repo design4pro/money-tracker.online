@@ -42,3 +42,23 @@ accumulates a merge conflict surface nobody wanted. Hotfixes to production have 
 deploys instead of one.
 
 The mitigation for the drift is cadence — promote often, in small pull requests — not tooling.
+
+## Amendment 2026-09-03
+
+Appended rather than superseded: the decision - `develop` is staging, promotion to `main` is a
+pull request - is unchanged and still right. Two names it used stopped existing, and a record that
+names a branch prefix and a label nobody can create is a record that sends the next fresh context
+looking for them.
+
+**`sandcastle/*` is gone.** ADR 0013 removed the orchestrator that cut those branches. Cezar cuts
+`cez/<id8>` instead, one per run, and `scripts/agent/cez-setup.sh` creates it as a worktree. The
+prefix list reads `feat/*`, `fix/*`, `chore/*`, `claude/*`, `cez/*`. Nothing else about the flow
+moved: a Cezar run targets `develop` through a pull request exactly as a human branch does, and
+`.ai/cezar/config.json` sets `baseBranch: develop` for that reason.
+
+**`qa-failed` is gone, and nothing replaces it.** ADR 0014 closed the label vocabulary at nineteen,
+and a QA outcome axis is not among them. A staging QA finding is now filed the way every other
+finding is: a new issue carrying `status: triage` and a `type:`, which a triage run reproduces at
+HEAD and routes. The original consequence still holds and is what mattered - the finding returns to
+the backlog as an issue rather than being fixed in place, so the record survives. It simply does
+not need a label of its own to say where it came from; the issue body says that.
