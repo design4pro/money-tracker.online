@@ -15,6 +15,9 @@ export type { CategorySwatchProps } from './category-swatch'
 export { CATEGORY_HUES, hueLabelKey, seriesVarForHex } from './palette'
 export type { CategoryHue } from './palette'
 
+export { CategoryColourField } from './category-colour-field'
+export type { CategoryColourFieldProps } from './category-colour-field'
+
 export {
   dropMove,
   hasChildren,

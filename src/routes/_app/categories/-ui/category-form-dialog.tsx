@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { ErrorPanel } from '#/components/app/accounts'
-import { CATEGORY_HUES, CategorySwatch } from '#/components/app/categories'
+import { CATEGORY_HUES, CategoryColourField } from '#/components/app/categories'
 import {
   Button,
   Dialog,
@@ -10,8 +10,6 @@ import {
   DialogHeader,
   Form,
   Modal,
-  Radio,
-  RadioGroup,
   Select,
   SelectItem,
   TextField,
@@ -35,10 +33,10 @@ import type { Category } from '#/server/repos/categories'
  * goes through the same `moveCategory` call. Two controls that both re-file a category would be
  * two places for the depth rule to be enforced, and one of them would eventually stop enforcing it.
  *
- * ## Colour is eight named choices, not a picker
+ * ## Colour is named choices, not a picker
  *
- * See `palette.ts`. Each option carries its swatch **and** its word, so the group is usable without
- * colour vision, and each is a real radio - one tab stop for the group, arrow keys inside it.
+ * See `CategoryColourField`, which owns the group and the rule that the stored colour is always
+ * one of its options - including when that colour came from an import and is not one of the eight.
  *
  * ## The failure stays on screen
  *
@@ -176,7 +174,9 @@ export function CategoryFormDialog({
             <DialogHeader
               title={t(isEdit ? 'categories.edit' : 'categories.create')}
               description={t(
-                isEdit ? 'categories.form.edit.body' : 'categories.form.create.body',
+                isEdit
+                  ? 'categories.form.edit.body'
+                  : 'categories.form.create.body',
               )}
               closeLabel={t('action.close')}
               onClose={close}
@@ -259,22 +259,10 @@ export function CategoryFormDialog({
                   )}
                 </div>
 
-                <RadioGroup
-                  label={t('common.colour')}
-                  description={t('categories.field.colour.help')}
-                  orientation="horizontal"
+                <CategoryColourField
                   value={draft.color}
                   onChange={(color) => patch({ color })}
-                >
-                  {CATEGORY_HUES.map((hue) => (
-                    <Radio key={hue.value} value={hue.value}>
-                      <span className="inline-flex items-center gap-2">
-                        <CategorySwatch color={hue.value} isLabelledBeside />
-                        {t(hue.labelKey)}
-                      </span>
-                    </Radio>
-                  ))}
-                </RadioGroup>
+                />
               </DialogBody>
 
               <DialogFooter>
