@@ -1,3 +1,4 @@
+import { seriesVarForHex } from '#/components/app/categories'
 import { Button } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
@@ -62,7 +63,10 @@ export function CategoryAllocation({
                 <span
                   aria-hidden="true"
                   className="size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: category.color }}
+                  style={{
+                    backgroundColor:
+                      seriesVarForHex(category.color) ?? category.color,
+                  }}
                 />
                 {category.name}
               </li>

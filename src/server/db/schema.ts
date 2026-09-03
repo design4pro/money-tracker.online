@@ -121,10 +121,23 @@ const organizationId = () =>
 const calendarDate = (name: string) => text(name, { length: 10 })
 
 /**
- * A `#rrggbb` colour, lower case, seven characters including the hash.
+ * A `#rrggbb` colour, seven characters including the hash.
  *
- * Stored as text rather than as an integer because it is round-tripped through a colour input and
- * an OKLCH contrast check, both of which speak hex.
+ * Stored as text, and stored as the value itself rather than as a reference to a palette entry,
+ * for two reasons that are load-bearing rather than stylistic:
+ *
+ * - **Equality is domain logic.** `cascadeColor` in `src/server/repos/categories.ts` defines "this
+ *   child inherits its parent's colour" as `child.color === parent's previous colour`. The
+ *   repository compares these values, so re-representing them as palette indices would change what
+ *   inheritance means.
+ * - **The set is open.** The write schemas accept any well-formed `#rrggbb`, not an enumeration, so
+ *   an imported row carries whatever colour it came with. A column that could only hold a palette
+ *   index could not store it, and rejecting it would lose data.
+ *
+ * The accompanying `CHECK` constrains length only, so case is not normalised on the way in and
+ * comparisons against a known palette must fold it — see `seriesVarForHex` in
+ * `src/components/app/categories/palette.ts`, which is also what lets a stored light-theme hex
+ * paint through a themed token instead of directly.
  */
 const colorHex = (name: string) => text(name, { length: 7 })
 

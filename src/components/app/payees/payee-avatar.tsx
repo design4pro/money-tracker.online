@@ -1,3 +1,4 @@
+import { seriesVarForHex } from '#/components/app/categories'
 import { cn } from '#/lib/cn'
 
 import type { Locale } from '#/lib/i18n'
@@ -69,7 +70,9 @@ export function PayeeAvatar({
         SIZES[size],
         className,
       )}
-      style={{ borderColor: color ?? 'transparent' }}
+      style={{
+        borderColor: color ? (seriesVarForHex(color) ?? color) : 'transparent',
+      }}
     >
       {shown}
     </span>
