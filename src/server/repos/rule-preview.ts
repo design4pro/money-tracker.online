@@ -9,8 +9,12 @@
  * *named* ones, capped at `MAX_SUBJECTS_PER_RUN` (96) because an apply run addresses the rows an
  * importer just wrote by id, and an `IN (…)` of ids is bound by D1's parameter ceiling. A preview
  * asks a different question: **the most recent N rows, whatever they are**, with no id list at all.
- * One `ORDER BY … LIMIT`, no binds that scale with N, and a ceiling chosen by the product rather
- * than by SQLite.
+ * One `ORDER BY … LIMIT`, and a ceiling chosen by the product rather than by SQLite.
+ *
+ * That freedom belongs to the *first* query only, and this module once claimed it for all three.
+ * The two follow-up queries do carry an id list — one bind per scanned row — so with the window at
+ * two thousand they asked D1 for two thousand bound parameters and it refused. See the third rule
+ * below: the ceiling the window escapes is the product's, never the transport's.
  *
  * ---------------------------------------------------------------------------
  * THE THREE RULES THIS MODULE KEEPS
@@ -30,9 +34,15 @@
  *
  * 3. **It never writes.** Three `select`s and a `map`.
  *
- * The three queries are constant in number, not per row: the accounts' groups and the rows' tags
- * are each one `IN (…)`, folded in memory. `loadRuleSubjects` resolves the same two joins the same
- * way and for the same reason.
+ * The queries are constant in *number*, not per row: the accounts' groups and the rows' tags are
+ * each one `IN (…)`, folded in memory. `loadRuleSubjects` resolves the same two joins the same way
+ * and for the same reason.
+ *
+ * A constant number of statements is not a constant number of **binds**, and reading the first as
+ * the second is what broke this module. Each `IN (…)` spends one parameter per id, so both are
+ * chunked at a size computed from D1's ceiling — see {@link IDS_PER_STATEMENT}. `loadRuleSubjects`
+ * needs no chunking only because its own caller is capped at `MAX_SUBJECTS_PER_RUN`, a number
+ * derived from that same ceiling rather than chosen.
  */
 
 import { desc, eq, inArray } from 'drizzle-orm'
@@ -67,6 +77,30 @@ export interface RulePreviewTarget extends RuleTarget {
 }
 
 const limitSchema = z.number().int().min(1).max(RULE_PREVIEW_SCAN_LIMIT)
+
+/**
+ * `docs/ARCHITECTURE.md` §4.3: a chunk size is **computed** from D1's bound-parameter ceiling, not
+ * chosen. One bind is spent on the tenant predicate; the rest of the statement's budget is ids.
+ *
+ * This is deliberately not shared with `./rules`, which derives its own from the same ceiling for
+ * a different statement shape. A single exported constant would have to be right for both, and the
+ * thing worth copying between them is the derivation, not the number it happens to produce.
+ */
+const D1_MAX_BOUND_PARAMETERS = 100
+const TENANT_PREDICATE_PARAMETERS = 1
+export const IDS_PER_STATEMENT =
+  D1_MAX_BOUND_PARAMETERS - TENANT_PREDICATE_PARAMETERS
+
+/** The ids in statement-sized runs, so no `IN (…)` built from them outgrows D1's ceiling. */
+export function idChunks(
+  ids: ReadonlyArray<string>,
+): Array<ReadonlyArray<string>> {
+  const chunks: Array<ReadonlyArray<string>> = []
+  for (let index = 0; index < ids.length; index += IDS_PER_STATEMENT) {
+    chunks.push(ids.slice(index, index + IDS_PER_STATEMENT))
+  }
+  return chunks
+}
 
 /**
  * The most recent transactions, newest first, as rule targets.
@@ -104,34 +138,47 @@ export async function loadRulePreviewTargets(
   const ids = rows.map((row) => row.id)
   const accountIds = [...new Set(rows.map((row) => row.accountId))]
 
-  const [groupRows, tagRows] = await Promise.all([
-    scope.db
-      .select({
-        accountId: accountGroupMembers.accountId,
-        groupId: accountGroupMembers.groupId,
-      })
-      .from(accountGroupMembers)
-      .where(
-        tenantFilter(
-          scope,
-          accountGroupMembers,
-          inArray(accountGroupMembers.accountId, accountIds),
-        ),
+  // Both lists are chunked, and both chunk runs are in flight at once: this sits behind a debounced
+  // keystroke, so the cost that matters is the round trips in series, not their number.
+  const [groupPages, tagPages] = await Promise.all([
+    Promise.all(
+      idChunks(accountIds).map((chunk) =>
+        scope.db
+          .select({
+            accountId: accountGroupMembers.accountId,
+            groupId: accountGroupMembers.groupId,
+          })
+          .from(accountGroupMembers)
+          .where(
+            tenantFilter(
+              scope,
+              accountGroupMembers,
+              inArray(accountGroupMembers.accountId, [...chunk]),
+            ),
+          ),
       ),
-    scope.db
-      .select({
-        transactionId: transactionTags.transactionId,
-        tagId: transactionTags.tagId,
-      })
-      .from(transactionTags)
-      .where(
-        tenantFilter(
-          scope,
-          transactionTags,
-          inArray(transactionTags.transactionId, ids),
-        ),
+    ),
+    Promise.all(
+      idChunks(ids).map((chunk) =>
+        scope.db
+          .select({
+            transactionId: transactionTags.transactionId,
+            tagId: transactionTags.tagId,
+          })
+          .from(transactionTags)
+          .where(
+            tenantFilter(
+              scope,
+              transactionTags,
+              inArray(transactionTags.transactionId, [...chunk]),
+            ),
+          ),
       ),
+    ),
   ])
+
+  const groupRows = groupPages.flat()
+  const tagRows = tagPages.flat()
 
   const groupsByAccount = new Map<string, Array<string>>()
   for (const row of groupRows) {
