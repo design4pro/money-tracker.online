@@ -21,6 +21,13 @@ it, and a rule that cannot be followed is not a rule.
 In practice: say so before you start editing if a run is going, and say so when you finish. A run
 takes minutes and a suite that has to be thrown away costs more than the wait.
 
+**A free tree is not a free machine.** "Nobody is editing" is heard as "go ahead", and agents who
+each accept it politely close the window that none of them would have closed alone. That has
+happened here: a quiet spell of about twenty minutes ended within minutes of being announced,
+because a full suite, a set of measurement runs and a workflow all started on the strength of one
+sentence. So say which of the two you are announcing, and if you need the machine and not only the
+tree, say that you are taking it and say when you are done with it.
+
 ## Recognising it after the fact
 
 The signature is **broad, cross-file redness in tests that were green minutes earlier**, made of
@@ -70,9 +77,11 @@ curl -o /dev/null -w '%{http_code}\n' http://localhost:3010/transactions/new
 ## Timing-sensitive measurement needs a quiet machine
 
 Test timeouts are claims about the machine until proven otherwise. Check `uptime` against
-`sysctl -n hw.ncpu` before trusting any run that failed on time; this repository's unit suite takes
-10-17 seconds normally and has been observed at 84 under load, with individual synchronous renders
-exceeding the 5-second limit.
+`sysctl -n hw.ncpu` before trusting any run that failed on time. In September 2026, on 16 cores and
+an idle machine, this repository's unit suite - 148 files, 2197 tests - takes 10-17 seconds; the
+same tree has been observed at 84 seconds under load, with individual synchronous renders exceeding
+the 5-second limit. Keep the date on the figure: without one, a future reader cannot tell a
+regression from ordinary growth.
 
 Two consequences worth knowing:
 
@@ -83,6 +92,14 @@ Two consequences worth knowing:
   style. A wait that expired (`element(s) not found`, `Received: ""` where an interaction should
   have set a value) may be about the machine. Both render as one `1 failed` line in a summary, so
   read the log, not the count.
+
+Retrying is the right response, because starvation cannot hand you a pass you did not earn - so a
+green run is green whenever it arrives, and a red one under load is not evidence about the code.
+But retry sparingly, one agent at a time. A failed run leaves nothing behind _inside_ the
+repository - no commit, no index change - which makes "just try again" sound free, and it is not:
+each attempt is two and a half minutes of sixteen workers on a machine somebody else is working
+on, it stashes and restores every uncommitted file that is not yours, and it leaves enough load
+behind to sink the next attempt for about two minutes after it finishes.
 
 Do not raise a timeout or pass `--no-verify` to get a commit through a hook that is failing this
 way. That trades an environment fault for an unverified commit.

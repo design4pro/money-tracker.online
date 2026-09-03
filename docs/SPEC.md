@@ -304,6 +304,15 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    has no owner. Two of us reached for the word on one sample each, and both failures turned out to
    be three out of three. Repeat it, or call it what you actually saw.
 
+   **The rule above catches numbers; it does not catch adjectives, and the adjective is the
+   commoner failure.** A count announces itself - a reader who meets `19` can ask where it came
+   from - but "intermittent", "engine-shaped", "always the same locator" and "moves every baseline"
+   ask nothing, because none of them looks like a measurement. Each one is still a claim about a
+   set of runs, and each of those four was written here on the strength of a single observation
+   promoted to a property; all four were wrong. Before writing a word that quantifies without
+   counting - _always_, _never_, _only_, _every_, _usually_, _sporadically_ - name the runs it
+   stands for. If there is one run, the honest word is the one that says so: _in this run_.
+
    A timeout is a claim about the machine until the error text says it is about the code. Both read
    as `1 failed` in the summary, and only the body separates `Received: hidden` - a computed style,
    which a starved processor computes no differently - from an empty value an interaction should
@@ -311,6 +320,24 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    whether to re-run or to fix. It also bounds the damage: starvation turns a passing test red and
    never a failing test green, so every _pass_ measured under load is worth what it would be worth
    on a quiet machine, and only the failures need repeating.
+
+   Repeating them does not have to wait for the machine to go quiet - re-run the files that
+   failed, on their own, straight away. Two files that timed out inside a 134-second full suite
+   passed together in 999ms while the one-minute load stood at 120, and that settles them, because
+   a pass is the direction starvation cannot fake. It costs a second and it removes the question
+   the hook cannot answer. What it does not do is open the gate: the hook still runs everything,
+   and an isolated pass is a diagnosis, not a pass.
+
+   And "the machine" is not the only alternative to "the code". A bare timeout reports that a
+   budget ran out, never what spent it, and the answer can be the subject itself, behaving
+   honestly. The CI browser job runs the suite against `pnpm dev`, where Vite compiles a route's
+   client module graph on its first visit - `e2e/support/app.ts` says so above `waitForHydration` -
+   so a spec that opens nine screens pays that cost nine times. In one chromium run, 202 hydration
+   waits took 696 of the 1005 seconds of Playwright step time, and the two specs that timed out
+   were the two longest in the job, each spending about three quarters of its budget waiting to
+   hydrate. Nothing was starved and nothing was broken. A timeout therefore sorts three ways, not
+   two: an assertion that saw something, a machine with no processor to give, and a subject that
+   spent the budget on work it genuinely does.
 
    And a hedge covers the clause it is attached to, never the one standing beside it. "Only the
    segments that were too small grow; which ones actually move was not measured here" reads as
@@ -342,6 +369,16 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    the next reader to build a rule on the deduced half. This is the "no claim got stronger without
    a measurement" clause applied to claims that are not yours, and it is the easier one to break,
    because a claim of your own has you to object and a borrowed one has nobody in the room.
+
+   **When a measurement points at a cause you have no authority to change, the next step is not
+   another measurement.** A morning went into describing one obstacle with rising precision - a
+   dose-response curve over four runs of an unchanged tree, a falsification of "the load is ours",
+   and finally the name of the session that owned it - and every one of those results was true and
+   none of them moved anything, because the process belonged to nobody on the team. It was not
+   outside the _user's_ reach, and asking took one sentence. Measuring is the default move and it
+   feels like progress, which is exactly why the moment to stop measuring and ask goes by
+   unnoticed. The question that catches it is not "do I know enough yet?" but "does anyone here
+   have the authority to act on what I already know?"
 
 On top of those, the ten clauses of §2 are ticked per surface, and §10's accessibility gate must be
 green.
