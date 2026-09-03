@@ -318,6 +318,31 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    in place, wearing the credibility the admission bought. Both halves came from no measurement.
    Hedge the sentence that would be wrong, or drop it.
 
+   **A failing gate that was not captured leaves a count and no shape.** A pre-commit hook prints
+   `5 failed` and scrolls away, and what survives is the number - which is the half that decides
+   nothing. The rule above needs the error text, so the run has to be piped somewhere it can be
+   read: `pnpm test 2>&1 | tee <file>` before the summary is quoted to anybody. The same five
+   failures, re-run four minutes later against the same tree, were 2197 passed in 21.43s. Nothing
+   about the code had changed, and the only reason that is knowable is that the second run was
+   kept.
+
+   **The three load averages say whether load is bursty or continuous, and they need two readings
+   separated in time** - one line of `load averages` is a photograph, not a trend. Bursty: the
+   one-minute figure jumps around a falling fifteen-minute figure. Continuous: all three converge,
+   the one-minute climbing to meet the others from below. Continuous does not by itself mean
+   somebody else's; it means "lasting longer than our longest command". So measure that: check how
+   long the longest thing we run here actually takes (today, the full e2e suite, ~3 min as of
+   2026-09), and if the load outlasts it, it is not ours. Which is a threshold, not a fact, and a
+   threshold written as a number rots silently - a suite that has grown to twenty minutes will read
+   this and blame the machine's owner. Whose it is exactly, only `ps` says.
+
+   Relaying somebody else's observation, split what they measured from what they inferred - a
+   report arrives as one sentence and both halves wear the same confidence. "Continuous and
+   external" was one measured word and one deduced one, and passing it on unsplit was enough for
+   the next reader to build a rule on the deduced half. This is the "no claim got stronger without
+   a measurement" clause applied to claims that are not yours, and it is the easier one to break,
+   because a claim of your own has you to object and a borrowed one has nobody in the room.
+
 On top of those, the ten clauses of §2 are ticked per surface, and §10's accessibility gate must be
 green.
 
