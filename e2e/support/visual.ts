@@ -46,7 +46,7 @@ const RECORDED_PROJECTS: readonly string[] = ['chromium', 'mobile-safari']
 
 /** How to record, quoted in the skip reason so it is never something to go and look up. */
 const RECORD_COMMAND =
-  'pnpm sandcastle:baselines (or the "Update e2e baselines" workflow)'
+  'the "Update e2e baselines" workflow (or pnpm e2e:update for this platform)'
 
 /**
  * Skips the calling test unless this run is one whose frames are recorded.

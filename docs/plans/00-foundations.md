@@ -197,8 +197,8 @@ placeholder id in this file is a deploy that silently writes to the wrong databa
 
 - `src/server/worker.ts` is the **custom entry** (`"main"`), not
   `@tanstack/react-start/server-entry`, because only the entry module's exports let workerd find the
-  DO classes, the queue consumer and the cron handler. It re-exports `AccountLedger` and (staging
-  only) `SandcastleRegistry`, and exports `default { fetch, queue, scheduled }`.
+  DO classes, the queue consumer and the cron handler. It re-exports `AccountLedger` and exports
+  `default { fetch, queue, scheduled }`.
 - `src/server/cron/scheduled.ts` switches on `controller.cron` against **four literal constants**
   (`*/15 * * * *`, `7 * * * *`, `0 3 * * *`, `17 4 * * 1`) and throws on an unrecognised value
   rather than silently doing nothing. Each branch is a stub that logs and returns until the owning
@@ -220,9 +220,8 @@ architecture-doc edit, never a quiet append.
 ### Tenant isolation test
 
 None — this stage adds no data access. The isolation property it does protect is that the
-**staging-only** bindings (`SANDCASTLE_REGISTRY`, `AI`) appear under `env.staging` and nowhere else,
-so production cannot reach an agent registry. A unit test reads `wrangler.jsonc` and asserts the
-production block declares neither.
+**staging-only** binding `AI` appears under `env.staging` and nowhere else. A unit test reads
+`wrangler.jsonc` and asserts the production block does not declare it.
 
 ### Money invariant
 
@@ -236,7 +235,7 @@ staging declares exactly `0 3 * * *`.
 
 - Command gate in order.
 - `src/server/__tests__/wrangler-config.test.ts`: production declares `DB, KV, SESSIONS, FILES,
-LEDGER, TASKS`; production declares neither `SANDCASTLE_REGISTRY` nor `AI`; the four cron
+LEDGER, TASKS`; production does not declare `AI`; the four cron
   expressions are exact; every `database_id` and KV `id` is a 32-hex or UUID string and not the
   literal `<created>`.
 - `CLOUDFLARE_ENV=staging pnpm build` then `node -e` asserting

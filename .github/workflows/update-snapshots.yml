@@ -7,10 +7,9 @@ name: Update e2e baselines
 # the thing that produces `-linux`, and `e2e/support/visual.ts` cites it in the
 # reason it skips frames off Linux. A rename here makes both comments lie.
 #
-# `pnpm sandcastle:baselines` does the same job on a developer's machine, in the
-# same image, without spending Actions minutes. This exists for the case that
-# has no sandbox behind it - a design change landed by someone not running the
-# loop - and because a config that names a workflow ought to be pointing at one.
+# This is the only producer of `-linux` baselines. `pnpm e2e:update` records the
+# platform it runs on, which for a developer on macOS is a different set - it
+# cannot stand in for this workflow, and CI compares against `-linux` alone.
 #
 # `workflow_dispatch` only. Recording is never automatic: a baseline refresh is
 # how a visual regression gets laundered into the repository, so it takes a

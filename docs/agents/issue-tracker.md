@@ -39,9 +39,9 @@ idempotent.
 Blocking relationships use native GitHub issue dependencies (GraphQL `blockedBy` / `blocking`). A
 ticket is workable only when it has zero open blockers and is not itself a PRD with sub-issues.
 
-Because a PRD is never workable, **`ready-for-agent` lives on sub-issues only**: `resolveOnlyIssues`
-in `.sandcastle/main.ts` expands `--issues <PRD>` to its open children and filters those by the
-label, so a label on the parent would only ever offer the PRD itself as work.
+Because a PRD is never workable, **`ready-for-agent` lives on sub-issues only**: an orchestrator
+handed a PRD expands it to its open children and filters those by the label, so a label on the
+parent would only ever offer the PRD itself as work.
 
 **Ticket bodies must NOT contain `Closes #n` directives** — closing is the merger's job, and a
 `Closes` in a body closes the ticket the moment any branch mentioning it merges, including a branch

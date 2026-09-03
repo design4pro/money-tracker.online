@@ -106,8 +106,7 @@ runs:
         # --host binds v4 and v6. The wait loop below (curl) reaches a ::1-only
         # vite over IPv6 and reports the server up, but Node's fetch in seed.mjs
         # resolves localhost to 127.0.0.1 and then finds nothing - the seed then
-        # fails against a server curl just proved alive. Same trap, same fix as
-        # .sandcastle/setup-e2e.sh.
+        # fails against a server curl just proved alive.
         #
         # `vite preview` runs the built Worker in workerd through
         # @cloudflare/vite-plugin, against the same local D1/KV/R2 under

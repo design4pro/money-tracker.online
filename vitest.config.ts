@@ -11,8 +11,8 @@ const src = fileURLToPath(new URL('./src/', import.meta.url))
  * - `server` runs repositories, queue handlers, the money and FX arithmetic, and route handlers
  *   in plain Node. Nothing there may import `cloudflare:workers`; bindings arrive as arguments,
  *   which is what makes them fake-able.
- * - `tooling` runs the agent tooling in plain Node as well, but over `.sandcastle/**` and
- *   `scripts/**` rather than `src/**`.
+ * - `tooling` runs the repository's own scripts in plain Node as well, over `scripts/**`
+ *   rather than `src/**`.
  *
  * `server` collects `.tsx` as well as `.ts` because the transactional email templates under
  * `src/server/email` are React components: they render to a string on the server and never reach
@@ -20,11 +20,9 @@ const src = fileURLToPath(new URL('./src/', import.meta.url))
  * up `jsx: react-jsx` from `tsconfig.json`, which is all a server-rendered component needs — the
  * React plugin exists for Fast Refresh, which no test has.
  *
- * `tooling` is one project for two directories because it is one world, and its failure mode is
- * silence: a parsing bug files a duplicate issue every week, or stops filing anything, and says
- * nothing either way. `pnpm typecheck` reaches `.sandcastle` only because tsconfig.json names it
- * explicitly, and it does not reach `scripts` at all — those are plain `.mjs` run by node. Tests
- * are the only gate that reaches all of it.
+ * `tooling` exists because its failure mode is silence: a seed or capture script that quietly
+ * produces the wrong thing says nothing either way. `pnpm typecheck` does not reach `scripts` at
+ * all — those are plain `.mjs` run by node — so tests are the only gate over them.
  */
 export default defineConfig({
   resolve: {
@@ -64,16 +62,7 @@ export default defineConfig({
           name: 'tooling',
           environment: 'node',
           globals: false,
-          include: [
-            '.sandcastle/**/__tests__/*.test.ts',
-            'scripts/**/__tests__/*.test.mjs',
-          ],
-          /**
-           * The loop creates full git worktrees under `.sandcastle/worktrees/`, each a copy of
-           * this checkout — the same hazard `vite.config.ts` describes for the dev server's
-           * watcher. Collecting them would run every one of these tests once per worktree.
-           */
-          exclude: ['.sandcastle/worktrees/**', '.sandcastle/logs/**'],
+          include: ['scripts/**/__tests__/*.test.mjs'],
           restoreMocks: true,
         },
       },

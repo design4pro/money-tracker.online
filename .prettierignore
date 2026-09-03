@@ -7,9 +7,6 @@ src/routeTree.gen.ts
 drizzle
 # Claude Code orchestration scripts and run state.
 .claude
-# Sandcastle loop state: agent worktrees (with copied node_modules) and logs.
-.sandcastle/worktrees
-.sandcastle/logs
 # Test and build artefacts.
 dist
 coverage

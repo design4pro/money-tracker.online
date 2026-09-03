@@ -1,22 +1,11 @@
 {
-  // `.sandcastle` is named separately because TypeScript's wildcard globs deliberately skip
-  // dot-directories: without this line the whole AFK loop — main.ts, the coordinator client,
-  // adoption, the triage scripts — goes unchecked while `pnpm typecheck` reports success.
-  // (Line comments, not block ones: a `**` glob written inside a block comment closes it early
-  // on its own `*` `/`.)
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".sandcastle/**/*.ts",
-    "eslint.config.js",
-    "prettier.config.js"
-  ],
+  // Line comments, not block ones: a `**` glob written inside a block comment closes it early
+  // on its own `*` `/`.
+  "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "prettier.config.js"],
 
   // Spelled out because naming an `exclude` replaces the default one, which is where
-  // `node_modules` comes from. The sandcastle loop creates a full git worktree per run under
-  // `.sandcastle/worktrees`, each a copy of this checkout; without this, typecheck would compile
-  // the whole repo once per worktree left on disk.
-  "exclude": ["node_modules", ".sandcastle/worktrees/**", "dist"],
+  // `node_modules` comes from.
+  "exclude": ["node_modules", "dist"],
 
   "compilerOptions": {
     "target": "ES2022",

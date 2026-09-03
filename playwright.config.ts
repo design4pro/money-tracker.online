@@ -15,7 +15,7 @@ const baseURL = externalBaseURL ?? 'http://localhost:3010'
  * Refuse to run against a server this workspace does not own.
  *
  * Ports 3010-3020 are the range this repo works in — 3010 is what `vite.config.ts` binds with
- * `strictPort`, and the sandcastle loop allocates the rest to its parallel worktrees. Anything
+ * `strictPort`, and the rest are for parallel checkouts. Anything
  * below is a developer's own process or another checkout's. A misdirected suite is worse than no
  * suite: it does not fail, it photographs a different branch's application and reports it as
  * evidence. So this is a hard stop rather than a warning.
@@ -99,8 +99,8 @@ export default defineConfig({
    * states it in the skip reason. Keeping `{platform}` in the filename is what makes an accidental
    * `--update-snapshots` on a Mac unable to overwrite the set CI compares against.
    *
-   * `-linux` is recorded by `pnpm sandcastle:baselines`, or by the `Update e2e baselines` workflow
-   * (`.github/workflows/update-snapshots.yml`), both of which run in the same container image the
+   * `-linux` is recorded by the `Update e2e baselines` workflow
+   * (`.github/workflows/update-snapshots.yml`), which runs in the same container image the
    * gate does.
    */
   snapshotPathTemplate:

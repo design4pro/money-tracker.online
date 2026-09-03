@@ -1,9 +1,10 @@
 # The reference surface, and the clean-room rule
 
-The blind A/B pixel loop (`.sandcastle/pixel-capture-prompt.md` → `.sandcastle/pixel-critic-prompt.md`)
-photographs one of our screens beside a comparable screen of a public demo, hands both to a critic
-who does not know which is which, and files the verdict as an advisory comment. This file is the map
-it navigates by, and the rule it works under.
+The blind A/B pixel round photographs one of our screens beside a comparable screen of a public
+demo, hands both to a critic who does not know which is which, and records the verdict. It ran
+inside the orchestrator until that was removed (`docs/adr/0013-cezar-replaces-sandcastle.md`), so
+today it is driven by hand from the recipe below. This file is the map it navigates by, and the rule
+it works under.
 
 ---
 
@@ -35,8 +36,8 @@ carry the licence.
    vocabulary is `CONTEXT.md` and it is ours.
 6. **Never copy a number.** Not a price, not a limit, not a quota, not a plan boundary.
 7. **Never name the reference product.** Not in a filename, not in a commit message, not in an issue
-   comment, not in a PR body, not in a code comment, not in `.sandcastle-visual.json`, not in a
-   screenshot directory. No artefact this loop writes may contain it. The critic works blind, and a
+   comment, not in a PR body, not in a code comment, not in a machine-readable verdict file, not
+   in a screenshot directory. No artefact this loop writes may contain it. The critic works blind, and a
    product name anywhere in its reading is the end of blindness.
 8. **The reference's source may be read to check what it does. Nothing from it may be
    transcribed.** Amended 2026-09-03 by the product owner, who lifted the previous blanket ban on
@@ -232,17 +233,18 @@ product made almost entirely of numbers:
 ## Running one round by hand
 
 ```bash
-bash .sandcastle/setup-e2e.sh --if-needed
-mkdir -p .sandcastle-shots/manual
+# The e2e environment first: migrate the local D1, seed it, and serve on :3010.
+# `.github/actions/e2e-env/action.yml` is the reference for those steps.
+mkdir -p .visual-shots/manual
 
 node scripts/visual/capture.mjs \
   --url http://localhost:3010/dashboard \
-  --out .sandcastle-shots/manual --label A \
+  --out .visual-shots/manual --label A \
   --viewports 1440x900,360x800 --themes light,dark --auth
 
 node scripts/visual/capture.mjs \
   --url https://<the demo's main host>/<path> \
-  --out .sandcastle-shots/manual --label B \
+  --out .visual-shots/manual --label B \
   --viewports 1440x900,360x800 --themes light,dark \
   --enter '<entry-control selector>' --enter-from 'https://<the demo's main host>/'
 ```
@@ -258,7 +260,7 @@ under the dashboard's filename. With it, the run lands on the entry page, clicks
 asks for the path. It is needed on **every** invocation, not just the first: each call opens a fresh
 context. Drop both flags only for a surface that answers to an anonymous visitor at its own URL.
 
-`.sandcastle-shots/` is gitignored. A pair exists only when both sides produced a frame for the same
+`.visual-shots/` is gitignored. A pair exists only when both sides produced a frame for the same
 viewport and theme; a lone frame is not evidence and must not be handed to a critic as one.
 
 ---

@@ -1,8 +1,8 @@
 /**
  * Take the frames a blind A/B pair is made of.
  *
- * The sandcastle loop's neutral capture step runs this — see `.sandcastle/pixel-capture-prompt.md`
- * — and so does anyone checking a visual change by hand. The script exists so the capture procedure
+ * The neutral capture step of a blind comparison round runs this, and so does anyone checking a
+ * visual change by hand (`docs/agents/reference.md`). The script exists so the capture procedure
  * is not re-derived from prose by every capture agent: a theme switched the wrong way, a frame shot
  * before the chart finished its entrance, a screen photographed at rest when the thing under
  * judgement was a hover state, and scratch PNGs left at the repository root are all defects of the
@@ -41,7 +41,7 @@
  * Usage:
  *   node scripts/visual/capture.mjs \
  *     --url http://localhost:3010/dashboard \
- *     --out .sandcastle-shots/issue-<n> \
+ *     --out .visual-shots/issue-<n> \
  *     --label A \
  *     --viewports 1440x900,360x800 \
  *     --themes light,dark \

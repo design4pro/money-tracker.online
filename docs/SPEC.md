@@ -95,8 +95,7 @@ the shadcn shape · **`@internationalized/date`** and **`@internationalized/numb
 `@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
 
 Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · Playwright · **`@axe-core/playwright`** ·
-`drizzle-kit` · ESLint 9 · Prettier · Husky + lint-staged · `@ai-hero/sandcastle` ·
-`vite-plugin-pwa`.
+`drizzle-kit` · ESLint 9 · Prettier · Husky + lint-staged · `vite-plugin-pwa`.
 
 Not used, deliberately: **Radix** (React Aria instead — ADR 0005), **any chart library** (ADR 0007),
 `xlsx`, `maplibre-gl`, any bank-aggregation SDK.
@@ -197,7 +196,7 @@ sharding in v1; the trade is recorded rather than assumed.
 ### 5.7 Bindings
 
 `DB` (D1) · `KV` and `SESSIONS` (KV) · `FILES` (R2) · `LEDGER` (Durable Object) · `TASKS` (Queue) ·
-`AI` (staging first) · `CF_VERSION_METADATA`. `SANDCASTLE_REGISTRY` exists on staging only.
+`AI` (staging first, and staging only) · `CF_VERSION_METADATA`.
 `wrangler.jsonc` is the one file that declares them and it is a shared path owned by
 `docs/plans/00-foundations.md`.
 

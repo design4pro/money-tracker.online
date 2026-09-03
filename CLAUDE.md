@@ -16,7 +16,6 @@ changing any dependency. There are no bank connectors and adding one is out of s
 - `pnpm generate-routes` — regenerate the route tree; `src/routeTree.gen.ts` is generated, never hand-edit
 - `pnpm db:generate` — generate a Drizzle migration; `drizzle/` is generated, never hand-edit
 - `pnpm db:migrate:local` — apply migrations to the local D1
-- `pnpm sandcastle` — the agent orchestration loop
 
 ## Rules
 
@@ -48,8 +47,8 @@ live in `docs/adr/`. Arithmetic lives in `docs/MONEY.md`.
 - **Reference product** (feature and quality benchmark; the clean-room rule applies): see
   `docs/agents/reference.md`
 
-Sentry findings enter the backlog through `pnpm sandcastle:sentry` (report-only; `--file-issues`
-writes) as `type: bug` + `status: pending`, and are then pre-triaged like any other bug.
+This repository has no agent orchestrator right now: sandcastle was removed and Cezar is not yet
+ported (`docs/adr/0013-cezar-replaces-sandcastle.md`). Work is driven by hand until it is.
 
 New work flows: grilling → `/to-spec-project` (PRD issue) → `/to-tickets-project` (vertical-slice
 sub-issues) → `/implement-project` per ticket in a fresh context.

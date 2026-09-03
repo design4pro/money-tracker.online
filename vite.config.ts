@@ -69,8 +69,8 @@ const config = defineConfig({
     strictPort: true,
 
     /**
-     * `.claude/worktrees/` and `.sandcastle/worktrees/` hold full git worktrees — each a copy of
-     * this checkout, `node_modules` and Playwright reports included. Chokidar walks all of it,
+     * `.claude/worktrees/` holds full git worktrees — each a copy of this
+     * checkout, `node_modules` and Playwright reports included. Chokidar walks all of it,
      * and every file another checkout's test run writes comes back to us as a page reload; the
      * dev server then churns until it dies. None of it is application source, so none of it
      * should reach the watcher.
@@ -78,7 +78,6 @@ const config = defineConfig({
     watch: {
       ignored: [
         '**/.claude/**',
-        '**/.sandcastle/**',
         '**/playwright-report/**',
         '**/test-results/**',
       ],

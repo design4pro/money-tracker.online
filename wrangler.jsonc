@@ -230,20 +230,19 @@
         { "binding": "FILES", "bucket_name": "money-tracker-files-staging" },
       ],
       "durable_objects": {
-        "bindings": [
-          { "name": "LEDGER", "class_name": "AccountLedger" },
-          // Staging alone carries the sandcastle run coordinator: one object per repository, so
-          // every claim against the backlog is decided in one thread. Production has neither
-          // this binding nor the SANDCASTLE_COORDINATOR_TOKEN secret, and answers 503 to the
-          // whole /api/sandcastle/* route by design.
-          { "name": "SANDCASTLE_REGISTRY", "class_name": "SandcastleRegistry" },
-        ],
+        "bindings": [{ "name": "LEDGER", "class_name": "AccountLedger" }],
       },
       // Append-only, and independent of the production list above: this worker has run one
       // more tag than production has.
       "migrations": [
         { "tag": "v1", "new_sqlite_classes": ["AccountLedger"] },
         { "tag": "v2", "new_sqlite_classes": ["SandcastleRegistry"] },
+        // v2 is kept because this list is append-only: a published tag is a fact about what this
+        // worker already ran, and dropping it would re-run history against a class that no longer
+        // exists. v3 is how a class actually leaves - and it destroys the objects, which is the
+        // point. The registry held nothing but issue leases for an orchestrator this repository
+        // no longer uses.
+        { "tag": "v3", "deleted_classes": ["SandcastleRegistry"] },
       ],
       // Workers AI, staging first: import column-mapping assist and statement extraction, both
       // structured-output-only and never written without review. Whether it ships in v1 is an

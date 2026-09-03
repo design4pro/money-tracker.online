@@ -30,7 +30,7 @@ config or anything under `src/server/`.
 ## Branches and commits
 
 - Cut from `develop`. Never commit to `develop` or `main` directly.
-- Branch names: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`, `claude/<slug>`, `sandcastle/<slug>`.
+- Branch names: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`, `claude/<slug>`.
 - **Conventional Commits, in English**, always: `feat(transactions): add split editor`. The scope
   is the plan area or the module, not a file name.
 - One pull request targets `develop`. Promotion to production is a separate pull request

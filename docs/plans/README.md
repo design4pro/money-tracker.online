@@ -21,7 +21,7 @@ docs/plans/NN-area.md   →   PRD issue (the area)   →   one sub-issue per sta
                                                         ↓
                                             `ready-for-agent` on each slice
                                                         ↓
-                                        `pnpm sandcastle` / `@claude` / a human
+                                            `@claude` / a human
 ```
 
 A stage's twelve headings are shaped to fill a ticket body exactly (`docs/agents/issue-tracker.md` →
@@ -230,7 +230,7 @@ The labels a plan-derived ticket carries, and the ones the automation reads. Ful
 | `priority: critical` / `high` / `medium` / `low`                                       | Priority                                                                            |
 | `qa` / `qa-failed`                                                                     | Staging QA outcome                                                                  |
 
-Body markers: `<!-- sandcastle-triage -->`, `<!-- sentry-issue: SHORT-ID[#n] -->`.
+Body marker: `<!-- sentry-issue: SHORT-ID[#n] -->`.
 Commit prefixes: `RALPH:` for in-loop agent commits, Conventional Commits in English everywhere else.
 
 ---

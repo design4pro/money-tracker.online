@@ -31,10 +31,6 @@
     "db:migrate:local": "wrangler d1 migrations apply money-tracker-db --local",
     "db:migrate:staging": "wrangler d1 migrations apply money-tracker-db-staging --remote --env staging",
     "db:migrate:prod": "wrangler d1 migrations apply money-tracker-db --remote",
-    "sandcastle": "tsx .sandcastle/main.ts",
-    "sandcastle:triage": "tsx .sandcastle/triage.ts",
-    "sandcastle:report": "tsx .sandcastle/report.ts",
-    "sandcastle:baselines": "tsx .sandcastle/record-baselines.ts",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -81,7 +77,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@ai-hero/sandcastle": "^0.12.0",
     "@axe-core/playwright": "^4.10.2",
     "@cloudflare/vite-plugin": "^1.26.0",
     "@cloudflare/workers-types": "^5.20260818.1",

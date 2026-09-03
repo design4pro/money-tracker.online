@@ -37,7 +37,6 @@ import { AccountLedger as LedgerObject } from './do/ledger'
 import { createKvMarkerStore } from './recurring/markers'
 import { rebuildAccountBalance } from './repos/account-balances'
 import { listCronScopes } from './repos/recurring'
-import { SandcastleRegistry as RegistryObject } from './do/sandcastle-registry'
 import { loggerFromEnv } from './observability/logger'
 
 import type { Logger } from './observability/logger'
@@ -82,16 +81,6 @@ function ledgerDb(env: Env): Database {
     logger: false,
   }) as unknown as Database
 }
-
-/**
- * Re-exported for the same reason, and bound on **staging only** (`env.staging` in
- * `wrangler.jsonc`). A run coordinator is worth having only if there is exactly one of it; a
- * second registry would let two agent fleets each believe they hold the backlog, which is the
- * failure it exists to prevent. Exporting the class unconditionally costs nothing — an
- * environment with no binding simply never instantiates it — and keeping the export conditional
- * is not expressible in an ES module anyway.
- */
-export const SandcastleRegistry = RegistryObject
 
 const fetchHandler = createStartHandler(defaultStreamHandler)
 
