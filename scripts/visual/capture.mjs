@@ -398,6 +398,26 @@ async function main() {
         if (enterFrom) {
           await page.goto(url, { waitUntil: 'commit', timeout: 45_000 })
           await settle(page)
+
+          // The click is asynchronous on the far side: a demo provisions a workspace before it
+          // hands over a session, and asking for a deep path too early bounces to a sign-in screen
+          // that photographs perfectly well. That frame is the most dangerous artefact this script
+          // can produce - it is sharp, it is complete, and it is of somebody's front door filed
+          // under a feature's name. A critic handed it reports the product as having no screen
+          // there at all, which is exactly what happened the first time this ran.
+          //
+          // The path is the test, not the whole URL: a screen that answers on its own and then
+          // appends its default query has not gone anywhere.
+          const landed = new URL(page.url()).pathname
+          const wanted = new URL(url).pathname
+          if (landed !== wanted) {
+            warnings.push(
+              `${vp.name}-${theme}-${label} asked for ${wanted} and landed on ${landed} - the ` +
+                `entry click did not carry a session to this path ` +
+                `(a longer --settle usually fixes it); no frame filed`,
+            )
+            continue
+          }
         }
       }
 
