@@ -84,6 +84,7 @@ import { execFile } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
@@ -349,13 +350,24 @@ function insert(table, columns, rows) {
 /* The dataset                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** 13 categories in exactly two levels: 4 parents, 9 children. */
-const CATEGORIES = [
+/**
+ * 13 categories in exactly two levels: 4 parents, 9 children.
+ *
+ * Colours are `CATEGORY_HUES` and nothing else. The seed writes rows the product itself would
+ * have written, so it may only use colours the product offers; when it used an unrelated palette,
+ * every demo tenant was a tenant whose colours the picker could not represent and whose dark
+ * theme the `--color-series-*` tokens could not correct. `categories-palette.test.mjs` holds it.
+ *
+ * Four children carry their parent's hue and five carry their own: that is `cascadeColor`'s
+ * "inheriting" versus "overridden", and the demo has to show both or the recolour cascade has
+ * nothing to demonstrate.
+ */
+export const CATEGORIES = [
   {
     id: 'demo-cat-home',
     name: 'Dom',
     slug: 'dom',
-    color: '#4C6EF5',
+    color: '#0d6abb',
     kind: 'expense',
     parent: null,
   },
@@ -363,7 +375,7 @@ const CATEGORIES = [
     id: 'demo-cat-rent',
     name: 'Czynsz',
     slug: 'czynsz',
-    color: '#4C6EF5',
+    color: '#0d6abb',
     kind: 'expense',
     parent: 'demo-cat-home',
   },
@@ -371,7 +383,7 @@ const CATEGORIES = [
     id: 'demo-cat-utilities',
     name: 'Media',
     slug: 'media',
-    color: '#5C7CFA',
+    color: '#0a646a',
     kind: 'expense',
     parent: 'demo-cat-home',
   },
@@ -379,7 +391,7 @@ const CATEGORIES = [
     id: 'demo-cat-daily',
     name: 'Codzienne',
     slug: 'codzienne',
-    color: '#12B886',
+    color: '#0f7b62',
     kind: 'expense',
     parent: null,
   },
@@ -387,7 +399,7 @@ const CATEGORIES = [
     id: 'demo-cat-groceries',
     name: 'Zakupy spożywcze',
     slug: 'zakupy-spozywcze',
-    color: '#12B886',
+    color: '#0f7b62',
     kind: 'expense',
     parent: 'demo-cat-daily',
   },
@@ -395,7 +407,7 @@ const CATEGORIES = [
     id: 'demo-cat-eatingout',
     name: 'Restauracje',
     slug: 'restauracje',
-    color: '#20C997',
+    color: '#436f0a',
     kind: 'expense',
     parent: 'demo-cat-daily',
   },
@@ -405,7 +417,7 @@ const CATEGORIES = [
     id: 'demo-cat-fun',
     name: 'Rozrywka',
     slug: 'rozrywka',
-    color: '#F76707',
+    color: '#625106',
     kind: 'expense',
     parent: 'demo-cat-daily',
   },
@@ -413,7 +425,7 @@ const CATEGORIES = [
     id: 'demo-cat-transport',
     name: 'Transport',
     slug: 'transport',
-    color: '#FD7E14',
+    color: '#b1440c',
     kind: 'expense',
     parent: null,
   },
@@ -421,7 +433,7 @@ const CATEGORIES = [
     id: 'demo-cat-fuel',
     name: 'Paliwo',
     slug: 'paliwo',
-    color: '#FD7E14',
+    color: '#b1440c',
     kind: 'expense',
     parent: 'demo-cat-transport',
   },
@@ -429,7 +441,7 @@ const CATEGORIES = [
     id: 'demo-cat-tickets',
     name: 'Bilety',
     slug: 'bilety',
-    color: '#FFA94D',
+    color: '#a60d47',
     kind: 'expense',
     parent: 'demo-cat-transport',
   },
@@ -437,7 +449,7 @@ const CATEGORIES = [
     id: 'demo-cat-income',
     name: 'Wpływy',
     slug: 'wplywy',
-    color: '#7048E8',
+    color: '#9724b5',
     kind: 'income',
     parent: null,
   },
@@ -445,7 +457,7 @@ const CATEGORIES = [
     id: 'demo-cat-salary',
     name: 'Wynagrodzenie',
     slug: 'wynagrodzenie',
-    color: '#7048E8',
+    color: '#9724b5',
     kind: 'income',
     parent: 'demo-cat-income',
   },
@@ -453,7 +465,7 @@ const CATEGORIES = [
     id: 'demo-cat-refunds',
     name: 'Zwroty',
     slug: 'zwroty',
-    color: '#9775FA',
+    color: '#0a646a',
     kind: 'income',
     parent: 'demo-cat-income',
   },
@@ -2976,9 +2988,17 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
-  )
-  process.exit(1)
-})
+// Only when run as a command. Without this the module seeds a workspace as a side effect of
+// being imported, which makes `CATEGORIES` - the dataset the palette gate reads - unreachable to
+// any test: importing it would write a SQL file and call the dev server.
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    )
+    process.exit(1)
+  })
+}
