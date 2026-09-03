@@ -60,6 +60,21 @@ const config = defineConfig({
     },
   },
 
+  /**
+   * `vite preview` serves the built bundle, and CI's browser gates run against it rather than
+   * against `vite dev`. A dev server compiles the client module graph per route on first visit,
+   * and that cost 69% of the e2e suite's wall clock - so the gate now measures the artefact that
+   * actually deploys instead of what a developer's watcher serves.
+   *
+   * It does not inherit `server.port`: left alone it binds 4173, and the suite would then be
+   * pointed at whatever *is* on 3010. The guarantee above has to be restated here to hold for the
+   * built bundle as well as for the watcher.
+   */
+  preview: {
+    port: 3010,
+    strictPort: true,
+  },
+
   plugins: [
     devtools(),
     cloudflare({ viteEnvironment: { name: 'ssr' } }),

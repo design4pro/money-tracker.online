@@ -271,12 +271,12 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
-      - name: Upload the dev server log
+      - name: Upload the server log
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-dev-server-log-${{ matrix.project }}
-          path: dev-server.log
+          name: e2e-server-log-${{ matrix.project }}
+          path: server.log
           retention-days: 3
           if-no-files-found: ignore
 
