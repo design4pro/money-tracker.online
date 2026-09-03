@@ -142,7 +142,7 @@ parameter cannot persist an amount into the platform log.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -249,7 +249,7 @@ Cases in `workspaces.test.ts` and `limit-overrides.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -362,7 +362,7 @@ integer._ Cases in `health.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

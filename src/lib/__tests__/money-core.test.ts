@@ -26,7 +26,9 @@ import {
   makeMoney,
   minorFromBigInt,
   negateMinor,
+  negateMoney,
   ratioOfMinor,
+  sameCurrency,
   scaleDecimalString,
   signOfMinor,
   subtractMinor,
@@ -118,6 +120,18 @@ describe('half-to-even division', () => {
     expect(halfEven * 2n).toBe(exactDoubled - 1n)
   })
 
+  /**
+   * A ratio may carry its sign on either part — a reversing adjustment is
+   * written `-1/2` by one caller and `1/-2` by the next — and the figure must
+   * not depend on which. Refunds cancel their purchases exactly (§1.4).
+   */
+  it('puts the sign on the result, not on the side the caller wrote it', () => {
+    expect(divideHalfEven(5n, -2n)).toBe(-2n)
+    expect(divideHalfEven(-5n, -2n)).toBe(2n)
+    expect(divideHalfEven(7n, -2n)).toBe(-4n)
+    expect(divideHalfEven(-7n, -2n)).toBe(4n)
+  })
+
   it('refuses to divide by zero rather than answering Infinity', () => {
     expect(() => divideHalfEven(1n, 0n)).toThrow(RangeError)
     expect(() => divideFloor(1n, 0n)).toThrow(RangeError)
@@ -155,6 +169,18 @@ describe('exact decimal scaling', () => {
     expect(scaleDecimalString('-1.005', 2)).toBe(-100n)
     expect(scaleDecimalString('-1.015', 2)).toBe(-102n)
     expect(scaleDecimalString('+12.34', 2)).toBe(1234n)
+  })
+
+  /**
+   * Half-to-even arbitrates an exact half and nothing else. A tail past the
+   * halfway mark rounds up whatever the parity of the digit it lands on, or a
+   * `12,346` in an import file would be booked as `12,34`.
+   */
+  it('rounds a tail above the half up, whichever neighbour is even', () => {
+    expect(scaleDecimalString('1.006', 2)).toBe(101n)
+    expect(scaleDecimalString('1.016', 2)).toBe(102n)
+    expect(scaleDecimalString('1.019', 2)).toBe(102n)
+    expect(scaleDecimalString('-1.006', 2)).toBe(-101n)
   })
 
   it('accepts the shapes a decimal really takes', () => {
@@ -201,6 +227,7 @@ describe('arithmetic on minor units', () => {
     expect(compareMinor(a, a)).toBe(0)
     expect(signOfMinor(asMinor(-1))).toBe(-1)
     expect(signOfMinor(asMinor(0))).toBe(0)
+    expect(signOfMinor(asMinor(1))).toBe(1)
   })
 
   it('throws at the point of an overflow rather than losing the last digits', () => {
@@ -274,6 +301,41 @@ describe('arithmetic on Money', () => {
       amountMinor: 0,
       currencyCode: 'JPY',
     })
+  })
+
+  it('totals a column of amounts in the currency it was asked for', () => {
+    expect(
+      sumMoney([eur(1234), eur(766), eur(-1000)], asCurrencyCode('EUR')),
+    ).toEqual({ amountMinor: 1000, currencyCode: 'EUR' })
+  })
+
+  /**
+   * The running total is checked at every step, so two enormous amounts that
+   * happen to cancel are reported rather than passing through an intermediate
+   * that has already lost its last digits and no longer cancels.
+   */
+  it('reports an overflowing total rather than a figure that lost its digits', () => {
+    const huge = eur(MAX_MINOR)
+    expect(() => sumMoney([huge, huge], asCurrencyCode('EUR'))).toThrow(
+      MoneyOverflowError,
+    )
+    expect(() =>
+      sumMoney([huge, huge, negateMoney(huge)], asCurrencyCode('EUR')),
+    ).toThrow(MoneyOverflowError)
+  })
+
+  it('negates an amount and keeps it in its own currency', () => {
+    // A refund is the same magnitude in the opposite direction (§4.4).
+    expect(negateMoney(eur(1234))).toEqual({
+      amountMinor: -1234,
+      currencyCode: 'EUR',
+    })
+    expect(negateMoney(negateMoney(eur(1234)))).toEqual(eur(1234))
+  })
+
+  it('says whether two amounts can be combined without a conversion', () => {
+    expect(sameCurrency(eur(100), eur(200))).toBe(true)
+    expect(sameCurrency(eur(100), makeMoney(100, 'PLN'))).toBe(false)
   })
 
   it('compares figures only when the currencies agree', () => {

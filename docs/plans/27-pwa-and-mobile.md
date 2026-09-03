@@ -139,7 +139,7 @@ _No amount is ever read from a cache._ Cases in `service-worker.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -225,7 +225,7 @@ rule that this heading is never skipped.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -338,7 +338,7 @@ _A number typed on a phone is the number that is stored._ Cases in `money-invari
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses. This is the final stage of the final plan, so its definition
+All seven §7 items and all ten §2 clauses. This is the final stage of the final plan, so its definition
 of done carries one extra clause: **`docs/MOBILE.md` and `docs/EMPTY-STATES.md` are both complete and
 their route-table tests pass**, which together assert that every route in the product has a designed
 empty state and a documented mobile behaviour.

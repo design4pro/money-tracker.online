@@ -37,7 +37,7 @@ resolution and deduplication.
 - `src/server/notify/dispatch.ts` — new
 - `src/server/notify/kinds.ts` — new
 - `src/server/notify/__tests__/dispatch.test.ts` — new
-- `src/server/functions/notifications.ts` — new
+- `src/server/fns/notifications.ts` — new
 
 ### Data and migration
 
@@ -117,7 +117,7 @@ _A notification carries a rendered amount, and it must be the amount that caused
 
 ### Definition of done
 
-All six §7 items; §2's visual clauses are carried by `21-S3`, stated explicitly.
+All seven §7 items; §2's visual clauses are carried by `21-S3`, stated explicitly.
 
 ### Blockers
 
@@ -239,7 +239,7 @@ _An email states the same number the app states._ Cases in `render.test.ts`:
 
 ### Definition of done
 
-All six §7 items and the §2 clauses that apply to the unsubscribe page.
+All seven §7 items and the §2 clauses that apply to the unsubscribe page.
 
 ### Blockers
 
@@ -331,7 +331,7 @@ amount for the same payload and locale_, asserted for `budget.exceeded`, `goal.r
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

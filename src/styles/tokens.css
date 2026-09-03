@@ -244,11 +244,23 @@
      indicator's own contrast at 7.30:1 (light) and 7.22:1 (dark) against the
      page — far past the 3:1 the criterion asks for.
 
-     Nothing in this product may clip a focus ring. Any scroll container that
-     could crop one reserves `--focus-reserve` of padding; the `focus-ring`
-     utility in `app.css` is drawn with `outline`, which is never affected by
-     `overflow: hidden` on an ancestor the way a `box-shadow` on a nested
-     element is.
+     The two rings are drawn by two different properties, and that is deliberate.
+     The `--color-focus` ring is an `outline`, which no ancestor's
+     `overflow: hidden` can crop. The band is a `box-shadow`, which one can. So
+     under a clipping ancestor the indicator degrades to the outline alone —
+     still 7.30:1 against the page, still conformant, only weaker on a fill of
+     its own colour. It never degrades to nothing, which is what a
+     `box-shadow`-only indicator would do.
+
+     Nothing in this product may clip a focus ring regardless: any scroll
+     container that could crop one reserves `--focus-reserve` of padding. The
+     split above is the floor under that rule, not a licence to stop applying it.
+
+     `focus-ring-inset` mirrors the same two rings inward, for a control that
+     sits flush against an edge and has no room outside itself. There the band
+     lands between the ring and the page rather than between the ring and the
+     fill, so it is the band, not the ring, that carries the contrast when the
+     control is filled with `--color-focus`'s own value.
      --------------------------------------------------------------------- */
   --color-focus: #064f89; /* 7.30:1 on sunken, 8.44:1 on surface */
   --color-focus-gap: #ffffff;
@@ -432,8 +444,8 @@
   --color-warning-soft: #2d200f; /* 7.60:1 */
   --color-on-warning: #23201a; /* 7.79:1 */
 
-  --color-info: #75b8fc; /* 7.22:1 on raised */
-  --color-info-soft: #152433; /* 7.52:1 */
+  --color-info: #75b8fc; /* = brand. 7.22:1 on raised */
+  --color-info-soft: #152433; /* carries --color-info at 7.52:1 */
   --color-on-info: #23201a; /* 7.75:1 */
 
   --color-hover: rgb(233 230 223 / 0.07);
@@ -481,9 +493,11 @@
      local fallback *immediately* after the web face, so a heading does not
      resize when the web font lands.
 
-     `--font-numeric` is the same text face pinned to tabular figures. Every
-     number that can change is set in it — a re-rendered total must not shift
-     the row it sits in, and a column of money must align on the decimal.
+     There is no third face for numbers. A number that can change keeps the
+     face it inherits and changes only its figures, through the `.tabular`
+     rule in `app.css` — `font-variant-numeric: tabular-nums`. That is what
+     stops a re-rendered total shifting the row it sits in and what makes a
+     column of money align on the decimal.
      --------------------------------------------------------------------- */
   --font-display:
     'Bricolage Grotesque', 'Bricolage Grotesque Fallback', 'Avenir Next',

@@ -91,7 +91,7 @@ export function ActionRow({
 }: ActionRowProps) {
   return (
     <fieldset
-      className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 p-3 sm:flex-row sm:items-end"
+      className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-sunken p-3 sm:flex-row sm:items-end"
       disabled={isDisabled}
     >
       <legend className="sr-only">

@@ -255,7 +255,7 @@ e2e/                 <module>.visual.spec.ts, one per module
 
 ## 7. Definition of done for any task
 
-Six numbered points, inherited unchanged by every stage, every ticket and every pull request:
+Seven numbered points, inherited unchanged by every stage, every ticket and every pull request:
 
 1. `pnpm build` succeeds.
 2. `pnpm lint` and `pnpm typecheck` are clean — no new errors, no suppressions.
@@ -265,6 +265,120 @@ Six numbered points, inherited unchanged by every stage, every ticket and every 
    with the interaction state that is the point of the change captured, not just the resting state.
 5. No TODOs, no placeholder copy, no `console.log`, no commented-out code left behind.
 6. You did not touch files outside your assigned ownership.
+7. **Every number you write down was produced by a command, not by an impression.** A count of
+   occurrences, call sites, files or failures that appears in a commit message, a docblock, a
+   report or a review comment must come from a `grep -c`, a `wc -l` or a test run whose output you
+   actually read. This is the cheapest claim in the repository to verify and the easiest to get
+   wrong, because a plausible number reads exactly like a measured one and nothing downstream
+   re-checks it. If you cannot run the count, do not write the number — write what you did observe.
+
+   A result of **nothing** is the trap inside the trap. A command aimed at a path that does not
+   exist answers `0` and exits quietly; a test filter that matches no test reports no failures.
+   Both are the exact shape of the answer you were hoping for and neither complains, so nothing you
+   ran is a measurement until you have separately confirmed it was aimed at something. This is the
+   one case where a correctly executed command produces a false reading with no signal at all —
+   even an invented number looks like a number, and this does not look like anything.
+
+   The value is never the tell; the target is. A suite pointed at a poisoned server ran to
+   completion, reported a believable spread of passes and failures and printed its summary line -
+   `355 passed`, which is every sign of a measurement except the one that decides. It failed in
+   exactly the way `0` does, and it was harder to catch, because zero at least looks like nothing.
+   Confirm what a command was aimed at before you read what it gave back.
+
+   Nor does a total that reconciles vouch for the parts it was built from. A breakdown can be wrong
+   in every line and still add up, and that is worse than a wrong sum: a wrong sum invites the
+   question, and a right one closes it.
+
+   The same rule binds a sentence that carries a claim. **A statement that grew stronger between
+   two messages, without a new measurement, reverts to the version that had one.** "Saving is safe,
+   because the patch fires only on a change" was measured. "You cannot save the form without
+   changing the colour" was the same belief with the hedge taken out, and it was false. The number
+   rule catches an invented count because a count looks like a count; this one has no such tell,
+   and the sharpened sentence is shorter, more useful and more quotable than the careful one, which
+   is exactly why it travels. Put the hedge back, or measure it again.
+
+   **"Intermittent" is a claim about a distribution, and one run is not one.** A single pass proves
+   only that a test _can_ pass; calling it a flake on that sample smuggles in a frequency nobody
+   measured. This is the cheapest way in the repository to retire a real defect, because it takes
+   a reproducible failure out of everyone's list at once and leaves nothing behind to reopen: noise
+   has no owner. Two of us reached for the word on one sample each, and both failures turned out to
+   be three out of three. Repeat it, or call it what you actually saw.
+
+   **The rule above catches numbers; it does not catch adjectives, and the adjective is the
+   commoner failure.** A count announces itself - a reader who meets `19` can ask where it came
+   from - but "intermittent", "engine-shaped", "always the same locator" and "moves every baseline"
+   ask nothing, because none of them looks like a measurement. Each one is still a claim about a
+   set of runs, and each of those four was written here on the strength of a single observation
+   promoted to a property; all four were wrong. Before writing a word that quantifies without
+   counting - _always_, _never_, _only_, _every_, _usually_, _sporadically_ - name the runs it
+   stands for. If there is one run, the honest word is the one that says so: _in this run_.
+
+   A timeout is a claim about the machine until the error text says it is about the code. Both read
+   as `1 failed` in the summary, and only the body separates `Received: hidden` - a computed style,
+   which a starved processor computes no differently - from an empty value an interaction should
+   have set, which a stalled machine loses on its own. That separation costs one `grep` and decides
+   whether to re-run or to fix. It also bounds the damage: starvation turns a passing test red and
+   never a failing test green, so every _pass_ measured under load is worth what it would be worth
+   on a quiet machine, and only the failures need repeating.
+
+   Repeating them does not have to wait for the machine to go quiet - re-run the files that
+   failed, on their own, straight away. Two files that timed out inside a 134-second full suite
+   passed together in 999ms while the one-minute load stood at 120, and that settles them, because
+   a pass is the direction starvation cannot fake. It costs a second and it removes the question
+   the hook cannot answer. What it does not do is open the gate: the hook still runs everything,
+   and an isolated pass is a diagnosis, not a pass.
+
+   And "the machine" is not the only alternative to "the code". A bare timeout reports that a
+   budget ran out, never what spent it, and the answer can be the subject itself, behaving
+   honestly. The CI browser job runs the suite against `pnpm dev`, where Vite compiles a route's
+   client module graph on its first visit - `e2e/support/app.ts` says so above `waitForHydration` -
+   so a spec that opens nine screens pays that cost nine times. In one chromium run, 202 hydration
+   waits took 696 of the 1005 seconds of Playwright step time, and the two specs that timed out
+   were the two longest in the job, each spending about three quarters of its budget waiting to
+   hydrate. Nothing was starved and nothing was broken. A timeout therefore sorts three ways, not
+   two: an assertion that saw something, a machine with no processor to give, and a subject that
+   spent the budget on work it genuinely does.
+
+   And a hedge covers the clause it is attached to, never the one standing beside it. "Only the
+   segments that were too small grow; which ones actually move was not measured here" reads as
+   caution and works as a claim: it conceded the uncertainty and left the unmeasured conclusion
+   in place, wearing the credibility the admission bought. Both halves came from no measurement.
+   Hedge the sentence that would be wrong, or drop it.
+
+   **A failing gate that was not captured leaves a count and no shape.** A pre-commit hook prints
+   `5 failed` and scrolls away, and what survives is the number - which is the half that decides
+   nothing. The rule above needs the error text, so the run has to be piped somewhere it can be
+   read: `pnpm test 2>&1 | tee <file>` before the summary is quoted to anybody. The same five
+   failures, re-run four minutes later against the same tree, were 2197 passed in 21.43s. Nothing
+   about the code had changed, and the only reason that is knowable is that the second run was
+   kept.
+
+   **The three load averages say whether load is bursty or continuous, and they need two readings
+   separated in time** - one line of `load averages` is a photograph, not a trend. Bursty: the
+   one-minute figure jumps around a falling fifteen-minute figure. Continuous: all three converge,
+   the one-minute climbing to meet the others from below. Continuous does not by itself mean
+   somebody else's; it means "lasting longer than our longest command". So measure that: check how
+   long the longest thing we run here actually takes (today, the full e2e suite, ~3 min as of
+   2026-09), and if the load outlasts it, it is not ours. Which is a threshold, not a fact, and a
+   threshold written as a number rots silently - a suite that has grown to twenty minutes will read
+   this and blame the machine's owner. Whose it is exactly, only `ps` says.
+
+   Relaying somebody else's observation, split what they measured from what they inferred - a
+   report arrives as one sentence and both halves wear the same confidence. "Continuous and
+   external" was one measured word and one deduced one, and passing it on unsplit was enough for
+   the next reader to build a rule on the deduced half. This is the "no claim got stronger without
+   a measurement" clause applied to claims that are not yours, and it is the easier one to break,
+   because a claim of your own has you to object and a borrowed one has nobody in the room.
+
+   **When a measurement points at a cause you have no authority to change, the next step is not
+   another measurement.** A morning went into describing one obstacle with rising precision - a
+   dose-response curve over four runs of an unchanged tree, a falsification of "the load is ours",
+   and finally the name of the session that owned it - and every one of those results was true and
+   none of them moved anything, because the process belonged to nobody on the team. It was not
+   outside the _user's_ reach, and asking took one sentence. Measuring is the default move and it
+   feels like progress, which is exactly why the moment to stop measuring and ask goes by
+   unnoticed. The question that catches it is not "do I know enough yet?" but "does anyone here
+   have the authority to act on what I already know?"
 
 On top of those, the ten clauses of §2 are ticked per surface, and §10's accessibility gate must be
 green.

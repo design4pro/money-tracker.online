@@ -123,7 +123,7 @@ unchanged. Functions covered: all three exports.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -227,7 +227,7 @@ is never stored._ Cases:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -341,7 +341,7 @@ file size. Held by `attachments.test.ts` → _byte sizes are formatted by `forma
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

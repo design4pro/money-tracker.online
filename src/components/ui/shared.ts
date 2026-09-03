@@ -67,6 +67,10 @@ export const focusRing = [
   'outline-focus',
   'data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:outline-offset-2',
   'focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2',
+  // The inner band. Without it the indicator is invisible on a fill of its own
+  // colour, which `bg-brand` is: `--color-brand` and `--color-focus` are one value.
+  'data-[focus-visible]:ring-2 data-[focus-visible]:ring-focus-gap',
+  'focus-visible:ring-2 focus-visible:ring-focus-gap',
 ].join(' ')
 
 /** The same ring drawn inward, for a control flush against a panel edge. */
@@ -74,6 +78,9 @@ export const focusRingInset = [
   'outline-focus',
   'data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
   'focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2',
+  // Inward, so the band is inset as well — see `focus-ring-inset` in `app.css`.
+  'data-[focus-visible]:inset-ring-2 data-[focus-visible]:inset-ring-focus-gap',
+  'focus-visible:inset-ring-2 focus-visible:inset-ring-focus-gap',
 ].join(' ')
 
 /** Ring for a wrapper (`Group`) that takes focus on behalf of a nested input. */
@@ -81,6 +88,8 @@ export const focusRingWithin = [
   'outline-focus',
   'data-[focus-within]:outline-2 data-[focus-within]:outline-solid data-[focus-within]:outline-offset-2',
   'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-offset-2',
+  'data-[focus-within]:ring-2 data-[focus-within]:ring-focus-gap',
+  'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus-gap',
 ].join(' ')
 
 /**

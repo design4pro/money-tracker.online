@@ -130,7 +130,7 @@ Cases in `money-invariants.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -234,7 +234,7 @@ which one is rendered under the other's label.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -346,7 +346,7 @@ overwrite.** Cases in `money-invariants.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

@@ -27,7 +27,7 @@ import {
   executed,
   seedCategory,
 } from '../../repos/__tests__/budget-harness'
-import { setLedgerTouchSink, setLimitResolver } from '../../repos/base'
+import { runWithLedgerCollector, setLimitResolver } from '../../repos/base'
 import { applyRules, resolveOutcome } from '../apply'
 import { ruleActionsSchema, ruleConditionsSchema } from '../schema'
 
@@ -186,7 +186,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   setLimitResolver(null)
-  setLedgerTouchSink(null)
 })
 
 /* -------------------------------------------------------------------------- */
@@ -443,19 +442,20 @@ describe('a rule never changes an amount, a currency, a rate or a date', () => {
   })
 
   it('enqueues no ledger rebuild, because nothing it wrote can move a balance', async () => {
-    const touched: Array<string> = []
-    setLedgerTouchSink((accountId) => touched.push(accountId))
+    const touched = new Set<string>()
+    await runWithLedgerCollector(touched, async () => {
+      await seedTransaction({ id: 'tx-1' })
+      await seedRule({
+        id: 'rule-1',
+        position: 0,
+        conditions: EXPENSE,
+        actions: [{ kind: 'set_category', categoryId: 'cat-groceries' }],
+      })
 
-    await seedTransaction({ id: 'tx-1' })
-    await seedRule({
-      id: 'rule-1',
-      position: 0,
-      conditions: EXPENSE,
-      actions: [{ kind: 'set_category', categoryId: 'cat-groceries' }],
+      await applyRules(scope, { transactionIds: ['tx-1'], trigger: 'import' })
     })
 
-    await applyRules(scope, { transactionIds: ['tx-1'], trigger: 'import' })
-    expect(touched).toEqual([])
+    expect([...touched]).toEqual([])
   })
 })
 

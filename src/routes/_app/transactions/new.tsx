@@ -12,9 +12,11 @@ import {
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
+import { listTemplates } from '#/server/fns/transaction-groups'
 import { createTransaction } from '#/server/fns/transactions'
 
 import { useDataRefresh } from '../-lib/refresh'
+import { TemplatePicker } from './-ui/template-picker'
 import { TransactionFormSkeleton } from './-ui/form-skeleton'
 import { loadTransactionDetail } from './-server/detail'
 import { loadTransactionReference } from './-server/list'
@@ -25,6 +27,7 @@ import type {
 } from '#/components/app/transactions'
 import type { Minor } from '#/lib/money'
 import type { Transaction } from '#/server/db/types'
+import type { TransactionDraft } from '#/server/repos/transaction-templates'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 
 /**
@@ -44,6 +47,14 @@ import type { TransactionPolicies } from '#/server/repos/transactions'
  * entry that starts somewhere other than blank, so it is the same screen rather than a second one —
  * and because the source is in the URL, the row action is a plain navigation and the result is
  * reloadable.
+ *
+ * ## A template is a starting point, not a second screen
+ *
+ * `TemplatePicker` sits above the form rather than behind a route of its own, because picking a
+ * template is the first keystroke of an entry and not an errand. It writes nothing: applying one
+ * fills the fields and leaves the person on the same form, free to change any of them before
+ * saving. With no templates saved it renders nothing at all, so the screen is unchanged for anyone
+ * who has never made one.
  *
  * ## The gates are outside the form
  *
@@ -178,6 +189,41 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
   const [resetToken, setResetToken] = useState(0)
   const [serverError, setServerError] = useState<string | undefined>(undefined)
 
+  const templatesQuery = useQuery({
+    queryKey: ['transactions', 'templates'],
+    queryFn: () => listTemplates(),
+    staleTime: 5 * 60_000,
+  })
+  // A template list that cannot be fetched is not an error this screen reports: the form behind it
+  // works, and a failure banner over an optional shortcut would be louder than the shortcut.
+  const templates = templatesQuery.data ?? []
+
+  /**
+   * A draft fills the fields it carries and leaves the rest of the form alone.
+   *
+   * The date and the planned flag are deliberately untouched — a template describes *what*, and the
+   * entry form has already decided *when*. `accountId` falls back to the one on screen because the
+   * form's value is non-nullable and a template need not name an account.
+   *
+   * `draft.tagIds` is dropped, and that is a gap rather than a decision: the entry form has no tag
+   * control, so a template's tags have nowhere to land. Applying one silently loses them.
+   */
+  const applyDraft = useCallback((draft: TransactionDraft) => {
+    setValues((current) => ({
+      ...current,
+      direction: draft.direction === 'income' ? 'income' : 'expense',
+      amountMinor: draft.amountMinor,
+      accountId: draft.accountId ?? current.accountId,
+      categoryId: draft.categoryId,
+      payeeId: draft.payeeId,
+      note: draft.note ?? '',
+      paymentMethod: draft.paymentMethod,
+    }))
+    // The form holds its own uncontrolled amount input; without this it keeps showing what the
+    // person typed before they picked a template.
+    setResetToken((token) => token + 1)
+  }, [])
+
   const goToList = useCallback(
     () => void navigate({ to: '/transactions', search: {} }),
     [navigate],
@@ -254,6 +300,12 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
             : t('transactions.form.newSubtitle')}
         </p>
       </header>
+
+      <TemplatePicker
+        templates={templates}
+        onApply={applyDraft}
+        isDisabled={creation.isPending}
+      />
 
       <TransactionForm
         values={values}

@@ -121,7 +121,7 @@ how a category edit would start rewriting the ledger.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -229,7 +229,7 @@ comparison._ Cases in `money-invariants.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -349,7 +349,7 @@ and after, because a bulk update is where a stray `SET` clause does the most dam
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

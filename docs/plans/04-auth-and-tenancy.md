@@ -122,7 +122,7 @@ single report.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+§7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 
@@ -222,7 +222,7 @@ which produces a page that silently skips rows.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+§7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 
@@ -320,7 +320,7 @@ second read of `base_currency_code` outside the shell loader and the repositorie
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -426,7 +426,7 @@ No test file; the requirement is a copy key asserted present by `02-S2`'s parity
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

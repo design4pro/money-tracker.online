@@ -194,6 +194,46 @@ components:
 
 # Design System: money-tracker.online
 
+> **Every colour value in this document is historical. `src/styles/tokens.css` is the source of
+> truth, and where the two disagree, the stylesheet wins.**
+>
+> The divergence is not small and not confined to the front matter above. This document describes a
+> deep-teal brand on cool grey paper (`brand: #0a4a42`, `canvas: #f7f7f5`, `ink: #111310`, Inter
+> Tight); what ships is a blue brand on warm paper (`#064f89`, `#fbf9f5`, `#23201a`, Bricolage
+> Grotesque over Inter).
+>
+> Worse than the values is the vocabulary. **Thirteen names, forty-four mentions, resolve to no
+> `--color-*` token at all**, and they are not scattered typos - they are a coherent naming scheme
+> that happens to be the wrong one. Three shapes, measured against `src/styles/tokens.css`:
+>
+> - **A different word for the same idea, applied consistently.** This document says `edge` and
+>   `edge-strong`; the stylesheet says `border-subtle` and `border-strong` (17 mentions). It says
+>   `accent-on`, `brand-on`, `info-on`, `warning-on`; the stylesheet inverts them to `on-accent`,
+>   `on-brand`, `on-info`, `on-warning` (6). It says `brand-subtle`, `info-subtle`,
+>   `warning-subtle`, `accent-subtle`; the stylesheet says `-soft`, and has no `accent-soft` at
+>   all (7). An author who learns the convention here learns it wrongly and applies it wrongly
+>   everywhere, which is the opposite of what a naming convention is for.
+> - **A rung that was never built.** `ink-3` appears 5 times, including a ladder described as
+>   "three tiers" with contrast ratios quoted for all three. The shipped ladder is `ink` and
+>   `ink-2`. There is no third tier and the ratios given for it measure nothing.
+> - **Planes that do not map one-to-one.** `surface-2` (5) and `surface-inset` (4) against a
+>   stylesheet whose planes are `surface-panel`, `surface-raised` and `surface-sunken`. The count
+>   of grounds differs too: this document names four, the stylesheet declares five.
+>
+> That is the reason this notice exists rather than a footnote. `docs/SPEC.md` §4 makes this
+> document the owner of the visual language, so an author reaching for `bg-surface-2` or
+> `border-edge-strong` was reading the owning document correctly and still shipping a class that
+> resolves to nothing. Two of them did, and the classes sat in five components until
+> `src/styles/__tests__/token-classes.test.ts` was written to catch them. That gate catches the
+> symptom after the fact; this notice is aimed at the cause.
+>
+> **What remains authoritative here is structure, not value.** The composition of the ledger row,
+> the budget meter's reading order, the chip and chart vocabulary, the motion rules - those are
+> what the source files citing this document actually rely on, and they still hold. Read it for
+> what a component is made of; never for what colour it is.
+>
+> Reconciling the two documents is a task of its own and has not been done.
+
 ## Overview
 
 **Creative North Star: "The Set Table."**

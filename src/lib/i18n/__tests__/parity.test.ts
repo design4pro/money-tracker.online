@@ -38,8 +38,12 @@ const PROPER_NOUNS: ReadonlyArray<string> = [
   // The product name. It is not translated, in any language.
   'app.name',
   // Polish uses the same word for the noun. `action.import` is the verb and is
-  // `Importuj`, which is why only this one is listed.
+  // `Importuj`, which is why only these three are listed. `import.step.done`
+  // is the fourth step's label and is a noun like the three beside it —
+  // `Wczytanie`, `Mapowanie kolumn`, `Przegląd`, `Import`.
   'nav.import',
+  'import.title',
+  'import.step.done',
   // Key caps, not copy. A shortcut sheet has to print what is engraved on the
   // key the reader is being asked to press, and a Polish keyboard is engraved
   // `Enter`, `Delete`, `E` and `D`. The rest of the sheet — `Strzałki`,

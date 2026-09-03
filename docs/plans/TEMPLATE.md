@@ -166,7 +166,7 @@ so and naming what it does touch instead — that is an answer. Silence is not.
 
 ### Definition of done
 
-The six repository-wide items from `docs/SPEC.md` §7 apply to every stage without amendment:
+The seven repository-wide items from `docs/SPEC.md` §7 apply to every stage without amendment:
 
 1. `pnpm build` succeeds.
 2. `pnpm lint` and `pnpm typecheck` are clean — no new errors, no suppressions.
@@ -174,6 +174,9 @@ The six repository-wide items from `docs/SPEC.md` §7 apply to every stage witho
 4. The feature is visually verified in a real browser, light and dark, desktop and mobile.
 5. No TODOs, no placeholder copy, no `console.log`, no commented-out code left behind.
 6. You did not touch files outside your assigned ownership.
+7. Every number you write down was produced by a command, not by an impression, no claim of yours
+   got stronger without a new measurement, and you confirmed what each command was aimed at before
+   you read what it returned.
 
 On top of those, the ten clauses of `docs/SPEC.md` §2 are ticked per surface the stage ships:
 

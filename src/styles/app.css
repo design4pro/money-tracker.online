@@ -447,10 +447,12 @@
   &:focus-visible {
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: var(--focus-gap);
+    box-shadow: 0 0 0 var(--focus-gap) var(--color-focus-gap);
   }
   &[data-focus-visible] {
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: var(--focus-gap);
+    box-shadow: 0 0 0 var(--focus-gap) var(--color-focus-gap);
   }
 }
 
@@ -461,6 +463,9 @@
   &[data-focus-visible] {
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: calc(var(--focus-gap) * -1);
+    /* Inward, so the band it separates from is the control's own fill and the
+       shadow is inset too. Drawn at the same width as the outward case. */
+    box-shadow: inset 0 0 0 var(--focus-gap) var(--color-focus-gap);
   }
 }
 
@@ -470,6 +475,7 @@
   &[data-focus-within] {
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: var(--focus-gap);
+    box-shadow: 0 0 0 var(--focus-gap) var(--color-focus-gap);
   }
 }
 

@@ -132,7 +132,7 @@ that disagrees with checkout is a chargeback.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -236,7 +236,7 @@ place. A feature page quoting a price is a page that will be wrong.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -339,7 +339,7 @@ _Every price on `/pricing` is the price the checkout charges._ Cases in `money-i
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

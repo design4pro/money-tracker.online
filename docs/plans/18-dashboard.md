@@ -36,7 +36,7 @@ Three structural commitments:
 
 - `src/server/repos/dashboard.ts` — new
 - `src/server/repos/__tests__/dashboard.test.ts` — new
-- `src/server/functions/dashboard.ts` — new
+- `src/server/fns/dashboard.ts` — new
 - `src/routes/_app/index.tsx` — new
 - `src/routes/_app/-ui/widget-grid.tsx` — new
 - `src/routes/_app/-ui/widget-catalog.ts` — new
@@ -122,7 +122,7 @@ boundary from eroding.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -227,7 +227,7 @@ _A widget is a smaller view of a number another plan already proved._ Cases in
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -306,7 +306,7 @@ disagree on the same screen.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

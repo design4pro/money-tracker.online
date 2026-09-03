@@ -2,14 +2,15 @@
  * `runWithLedgerBatch` — one rebuild per touched account, per unit of work.
  *
  * The repositories do not know that Durable Objects exist. When a write moves money they call
- * `touchLedgerAccount(accountId)` from `src/server/repos/base.ts`, which hands the id to whatever
- * sink is installed and does nothing at all when none is. This module is what installs one.
+ * `touchLedgerAccount(accountId)` from `src/server/repos/base.ts`, which adds the id to whatever
+ * collector is open in the current async context and does nothing at all when none is. This module
+ * is what opens one.
  *
- * Three properties, each of them a decision:
+ * Four properties, each of them a decision:
  *
  * **One rebuild per account, not per write.** Importing ten rows into one account should cost one
- * rebuild. The sink collects into a `Set`, so the tenth touch of an account is free and the order
- * the writes happened in does not change what gets enqueued.
+ * rebuild. The collector is a `Set`, so the tenth touch of an account is free and the order the
+ * writes happened in does not change what gets enqueued.
  *
  * **The rebuilds are enqueued after the work settles, including when it throws.** By the time a
  * server function fails, D1 has already committed whatever statements ran before the failure — D1
@@ -23,14 +24,18 @@
  * other accounts in the batch, and the nightly rebuild cron re-derives every qualifying account
  * regardless — which is what heals both a failed enqueue and a write that ran outside a batch.
  *
- * **Batches nest.** A server function that calls another one (a balance correction writes a
- * transaction) must not open a second sink and lose the outer one's collection. An inner call joins
- * the batch already open and only the outermost flushes.
+ * **Batches nest, and concurrent requests do not.** A server function that calls another one (a
+ * balance correction writes a transaction) must not open a second collector and lose the outer
+ * one's collection: an inner call joins the batch already open and only the outermost flushes. A
+ * *second request* interleaved with the first at an `await` is not that, and must get a batch of
+ * its own. Both fall out of the collector living in an `AsyncLocalStorage` rather than on the
+ * module: "already open" means open **in this async context**, which is exactly the question.
  */
 
-import { setLedgerTouchSink } from '#/server/repos/base'
-
-import type { LedgerTouchSink } from '#/server/repos/base'
+import {
+  currentLedgerCollector,
+  runWithLedgerCollector,
+} from '#/server/repos/base'
 
 /** The Durable Object namespace this module drives. Structural, so a test can pass a fake. */
 export interface LedgerNamespace {
@@ -62,9 +67,6 @@ export interface LedgerBatchPorts {
  */
 const STUB_ORIGIN = 'https://ledger.invalid'
 
-/** The batch currently open on this isolate, or `null`. */
-let openBatch: Set<string> | null = null
-
 let ports: LedgerBatchPorts = {
   namespace: () => null,
 }
@@ -75,6 +77,11 @@ let ports: LedgerBatchPorts = {
  * Module-level because the answer is request-independent, and the same reason `setLimitResolver` is:
  * one isolate serves many requests, and threading a namespace through every server function's
  * signature would put the binding in the type of every handler that does not use it.
+ *
+ * **That reasoning holds for the binding and for nothing else in this file.** The batch itself used
+ * to sit beside it in a module variable, borrowing a justification that does not transfer: a
+ * binding is request-independent, a batch is the most request-dependent thing here. It lives in an
+ * `AsyncLocalStorage` in `repos/base.ts` now — see the note on `ledgerStore` there.
  */
 export function setLedgerBatchPorts(next: LedgerBatchPorts | null): void {
   ports = next ?? { namespace: () => null }
@@ -90,26 +97,16 @@ export function setLedgerBatchPorts(next: LedgerBatchPorts | null): void {
 export async function runWithLedgerBatch<T>(
   work: () => Promise<T>,
 ): Promise<T> {
-  if (openBatch !== null) {
-    // Already inside a batch: join it. Do not touch the sink — restoring it on the way out would
-    // uninstall the outer batch's collector while the outer batch is still running.
+  if (currentLedgerCollector() !== null) {
+    // Already inside a batch **in this async context**: join it, and leave the settling to the
+    // caller that opened it. A concurrent request is a different context and gets its own batch.
     return work()
   }
 
   const touched = new Set<string>()
-  const previous = openBatch
-  openBatch = touched
-
-  const sink: LedgerTouchSink = (accountId) => {
-    touched.add(accountId)
-  }
-  setLedgerTouchSink(sink)
-
   try {
-    return await work()
+    return await runWithLedgerCollector(touched, work)
   } finally {
-    openBatch = previous
-    setLedgerTouchSink(null)
     await flush(touched)
   }
 }
@@ -138,7 +135,7 @@ async function flush(touched: ReadonlySet<string>): Promise<void> {
   }
 }
 
-/** Test seam: the accounts the batch currently open has collected. `null` when none is open. */
+/** Test seam: the accounts the batch open in this context has collected. `null` when none is. */
 export function currentLedgerBatch(): ReadonlySet<string> | null {
-  return openBatch
+  return currentLedgerCollector()
 }

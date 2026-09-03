@@ -79,7 +79,7 @@ export function ContributionList({
             className="flex items-center justify-between gap-3 border-t border-border-subtle px-4 py-3 first:border-t-0"
           >
             <div className="min-w-0">
-              <p className="text-label font-medium text-ink">
+              <p className="text-label font-medium tabular text-ink">
                 {formatCalendarDate(locale, transaction.bookedOn, 'medium')}
               </p>
               <p className="mt-0.5 truncate text-caption text-ink-2">

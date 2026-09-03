@@ -39,7 +39,7 @@ import {
 import { deleteAccount, deleteAccountGroup } from '#/server/repos/accounts'
 import { deleteCategory } from '#/server/repos/categories'
 import { deletePayee } from '#/server/repos/payees'
-import { setLedgerTouchSink, setLimitResolver } from '#/server/repos/base'
+import { setLimitResolver } from '#/server/repos/base'
 import { listApplicableRules } from '#/server/repos/rules'
 import { ruleDefinitionSchema } from '#/server/rules/schema'
 
@@ -194,7 +194,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   setLimitResolver(null)
-  setLedgerTouchSink(null)
 })
 
 /* -------------------------------------------------------------------------- */

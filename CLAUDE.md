@@ -44,6 +44,7 @@ live in `docs/adr/`. Arithmetic lives in `docs/MONEY.md`.
 - **Issue tracker**: GitHub Issues on `design4pro/money-tracker.online` — see `docs/agents/issue-tracker.md`
 - **Triage labels**: see `docs/agents/triage-labels.md`
 - **Domain docs**: see `docs/agents/domain.md`
+- **Sharing a checkout** (measuring while somebody else edits): see `docs/agents/shared-checkout.md`
 - **Reference product** (feature and quality benchmark; the clean-room rule applies): see
   `docs/agents/reference.md`
 
