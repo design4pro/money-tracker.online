@@ -636,6 +636,68 @@ const GROUPS = [
 ]
 
 /** 3 budgets; the third carries its surplus, so the rollover ledger has something in it. */
+/**
+ * Four saved shapes for the entry form's template picker.
+ *
+ * They are the four entries this household actually repeats, and between them they cover every
+ * branch the picker renders: one with a fixed amount and one without (the button falls back to
+ * `templates.picker.noAmount`), one income against three expenses, and one with no payee. A
+ * template deliberately carries no date — `applyTemplate` returns a draft, and *when* is decided
+ * on the form.
+ *
+ * `amount_minor` and `currency_code` travel together or not at all; the table's
+ * `transaction_templates_amount_currency_pair_check` refuses the halves apart.
+ */
+/** Two of `CATEGORY_HUES`, picked so a group does not read as one of the categories beside it. */
+const GROUP_HUES = ['#9724b5', '#a60d47']
+
+const TEMPLATES = [
+  {
+    id: 'demo-tpl-1',
+    name: 'Zakupy Biedronka',
+    account: 'demo-acc-1',
+    direction: 'expense',
+    amount: null,
+    category: 'demo-cat-groceries',
+    payee: PAYEE_BIEDRONKA,
+    note: null,
+    method: 'card',
+  },
+  {
+    id: 'demo-tpl-2',
+    name: 'Tankowanie',
+    account: 'demo-acc-1',
+    direction: 'expense',
+    amount: null,
+    category: 'demo-cat-fuel',
+    payee: PAYEE_ORLEN,
+    note: null,
+    method: 'card',
+  },
+  {
+    id: 'demo-tpl-3',
+    name: 'Netflix',
+    account: 'demo-acc-1',
+    direction: 'expense',
+    amount: 43_00,
+    category: 'demo-cat-fun',
+    payee: PAYEE_NETFLIX,
+    note: 'Abonament miesięczny',
+    method: 'direct_debit',
+  },
+  {
+    id: 'demo-tpl-4',
+    name: 'Wypłata',
+    account: 'demo-acc-1',
+    direction: 'income',
+    amount: 9_200_00,
+    category: 'demo-cat-salary',
+    payee: null,
+    note: null,
+    method: 'transfer',
+  },
+]
+
 const BUDGETS = [
   {
     id: 'demo-bud-1',
@@ -1409,6 +1471,42 @@ function buildLedger(organizationId, userId) {
     refunds,
   )
 
+  /* ---- Transaction groups -------------------------------------------------- */
+
+  /**
+   * Two groups, built from rows this file has already written.
+   *
+   * Members are taken from the base-currency account on purpose: a group's total is a single figure
+   * and the screen labels it with one currency code, so a group spanning two denominations would be
+   * a fixture asking a question the UI does not yet answer.
+   *
+   * Both have three members. Two is the floor the product enforces — a group that drops to one
+   * member is deleted in the statement that empties it — and seeding at the floor would let a
+   * fixture sit one deletion away from vanishing.
+   */
+  const groupable = settled.filter(
+    (row) =>
+      row.accountId === 'demo-acc-1' &&
+      row.direction === 'expense' &&
+      !row.isPlanned,
+  )
+  const groups = [
+    {
+      id: 'demo-grp-1',
+      name: 'Wyjazd w góry',
+      note: 'Weekend, wszystkie koszty razem',
+      icon: 'mountain',
+      members: groupable.slice(0, 3).map((row) => row.id),
+    },
+    {
+      id: 'demo-grp-2',
+      name: 'Remont kuchni',
+      note: null,
+      icon: 'hammer',
+      members: groupable.slice(3, 6).map((row) => row.id),
+    },
+  ].filter((group) => group.members.length > 1)
+
   /* ---- The daily balance grid --------------------------------------------- */
 
   const balances = buildBalanceGrid(settled)
@@ -1417,6 +1515,7 @@ function buildLedger(organizationId, userId) {
     organizationId,
     userId,
     settled,
+    groups,
     planned,
     transfers,
     splits,
@@ -2030,6 +2129,9 @@ function buildSql(organizationId, userId) {
     'refunds',
     'transaction_splits',
     'transaction_tags',
+    'transaction_group_items',
+    'transaction_groups',
+    'transaction_templates',
     'budget_transactions',
     'budget_periods',
     'budget_categories',
@@ -2066,6 +2168,8 @@ function buildSql(organizationId, userId) {
   for (const table of [
     'refunds',
     'transaction_splits',
+    'transaction_groups',
+    'transaction_templates',
     'budgets',
     'transactions',
     'savings_goals',
@@ -2741,6 +2845,87 @@ function buildSql(organizationId, userId) {
     ),
   )
 
+  out.push(
+    insert(
+      'transaction_groups',
+      [
+        'id',
+        'organization_id',
+        'name',
+        'note',
+        'color',
+        'icon',
+        'created_at',
+        'updated_at',
+      ],
+      ledger.groups.map((group, index) => [
+        group.id,
+        org,
+        group.name,
+        group.note,
+        // The product's own palette, same rule and same reason as the categories above: the seed
+        // writes rows the product would have written, so it may only use colours the product
+        // offers. Written as literals because this file is a `.mjs` script and cannot import the
+        // `.ts` module that defines them — `categories-palette.mjs` is what holds the two equal.
+        GROUP_HUES[index % GROUP_HUES.length],
+        group.icon,
+        CREATED_AT,
+        CREATED_AT,
+      ]),
+    ),
+  )
+  out.push(
+    insert(
+      'transaction_group_items',
+      ['organization_id', 'group_id', 'transaction_id', 'position'],
+      ledger.groups.flatMap((group) =>
+        group.members.map((transactionId, position) => [
+          org,
+          group.id,
+          transactionId,
+          position,
+        ]),
+      ),
+    ),
+  )
+  out.push(
+    insert(
+      'transaction_templates',
+      [
+        'id',
+        'organization_id',
+        'name',
+        'account_id',
+        'direction',
+        'amount_minor',
+        'currency_code',
+        'category_id',
+        'payee_id',
+        'note',
+        'payment_method',
+        'position',
+        'created_at',
+        'updated_at',
+      ],
+      TEMPLATES.map((tpl, index) => [
+        tpl.id,
+        org,
+        tpl.name,
+        tpl.account,
+        tpl.direction,
+        tpl.amount,
+        tpl.amount === null ? null : BASE,
+        tpl.category,
+        tpl.payee,
+        tpl.note,
+        tpl.method,
+        index,
+        CREATED_AT,
+        CREATED_AT,
+      ]),
+    ),
+  )
+
   // The two figures above went in as zeroes because the columns are `not null` and the rows have
   // to exist before anything can count against them. They are filled in here, from the ledger this
   // same file wrote, in the order the arithmetic needs: the spend first, then the carry that reads
@@ -2774,6 +2959,12 @@ function buildSql(organizationId, userId) {
       recurringPeriods: ledger.recurringPeriods.length,
       recurringLinks: ledger.recurringLinks.length,
       rules: RULES.length,
+      templates: TEMPLATES.length,
+      transactionGroups: ledger.groups.length,
+      transactionGroupItems: ledger.groups.reduce(
+        (n, g) => n + g.members.length,
+        0,
+      ),
       importBatches: 1,
       importedTransactions: ledger.importedCount,
       accountBalances: ledger.balances.length,
