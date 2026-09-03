@@ -164,13 +164,32 @@ const slugSchema = z
     error: 'A slug is lowercase words joined by single hyphens.',
   })
 
-/** Six lowercase hex digits behind a `#`. The one shape `categories_color_check` accepts. */
+/**
+ * Six lowercase hex digits behind a `#`. The one shape `categories_color_check` accepts.
+ *
+ * ## Why the case is folded here and not left to the caller
+ *
+ * The regex has always been case-insensitive and the `CHECK` constrains length, not case, so
+ * `#0D6ABB` was as storable as `#0d6abb`. Everything that reads a colour folds the case or does
+ * not care - except {@link cascadeColor}, which is the only place in the repositories that
+ * compares a colour column for equality, and it does so with `eq()`. A child written in upper
+ * case under a parent written in lower case is therefore two different colours to the cascade:
+ * the child stops inheriting, with no error, no visible difference, and nothing to notice until
+ * somebody recolours the parent and one row does not follow.
+ *
+ * This normalises the write path and nothing else. It deliberately does **not** repair what is
+ * already stored - a transform rewrites the values passing through it, and `cascadeColor` stays
+ * case-sensitive - so a row written in upper case before this existed still fails to match a
+ * lower-case parent until it is saved again. Backfilling would mean rewriting colour values in
+ * databases whose contents we do not know, which is a data migration and not a validation change.
+ */
 const colorSchema = z
   .string()
   .trim()
   .regex(/^#[0-9a-f]{6}$/iu, {
     error: 'A colour is a six-digit hex value, for example #0d6abb.',
   })
+  .transform((value) => value.toLowerCase())
 
 /**
  * A member of the shared icon tuple rather than free text.

@@ -421,6 +421,30 @@ describe('colour inheritance', () => {
     expect((await categoryRow(overridden.id))?.color).toBe('#a60d47')
   })
 
+  it('keeps inheriting when parent and child were written in different cases', async () => {
+    // `cascadeColor` matches with `eq()`, which is case-sensitive. Written as
+    // they arrive, these two are the same hue to a reader and two different
+    // colours to the cascade, so the child stops inheriting with nothing to
+    // show for it - no error, no visible difference, and nobody finds out
+    // until the parent is recoloured. Both cases are storable: the column's
+    // `CHECK` constrains length, not case.
+    const parent = await createCategory(scope, {
+      name: 'Food',
+      color: '#0f7b62',
+    })
+    const child = await createCategory(scope, {
+      name: 'Groceries',
+      parentId: parent.id,
+      color: '#0F7B62',
+    })
+
+    expect(child.color).toBe('#0f7b62')
+
+    await updateCategory(scope, parent.id, { color: '#625106' })
+
+    expect((await categoryRow(child.id))?.color).toBe('#625106')
+  })
+
   it('adopts the new parent’s colour when an inheriting child is re-parented', async () => {
     const green = await createCategory(scope, {
       name: 'Food',
