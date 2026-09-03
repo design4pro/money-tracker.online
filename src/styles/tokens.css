@@ -444,8 +444,8 @@
   --color-warning-soft: #2d200f; /* 7.60:1 */
   --color-on-warning: #23201a; /* 7.79:1 */
 
-  --color-info: #75b8fc; /* 7.22:1 on raised */
-  --color-info-soft: #152433; /* 7.52:1 */
+  --color-info: #75b8fc; /* = brand. 7.22:1 on raised */
+  --color-info-soft: #152433; /* carries --color-info at 7.52:1 */
   --color-on-info: #23201a; /* 7.75:1 */
 
   --color-hover: rgb(233 230 223 / 0.07);
