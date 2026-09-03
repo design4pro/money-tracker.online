@@ -24,6 +24,13 @@ import type { FieldSize } from './shared'
 import type { FieldErrorMessage } from './text-field'
 
 const segment = cn(
+  // 24×24 is WCAG 2.2 §2.5.8 Target Size (Minimum), and a segment is a spinbutton rather than an
+  // inline word, so none of the exceptions apply to it. Padding alone does not reach it: a
+  // single-digit month — which `M/D/YYYY` renders and `DD.MM.YYYY` does not — is one character plus
+  // 4px, so the English date field failed the check the Polish one passed. The minimum is stated on
+  // the box and the digits centred inside it, which leaves a two-digit segment exactly where it was
+  // and only grows the ones that were too small.
+  'inline-flex min-h-6 min-w-6 items-center justify-center',
   'rounded-sm px-0.5 text-ink tabular outline-hidden',
   transitionBase,
   // The placeholder is real text a reader will meet, so it takes `ink-2` (7:1)
