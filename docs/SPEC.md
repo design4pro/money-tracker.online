@@ -270,10 +270,18 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    report or a review comment must come from a `grep -c`, a `wc -l` or a test run whose output you
    actually read. This is the cheapest claim in the repository to verify and the easiest to get
    wrong, because a plausible number reads exactly like a measured one and nothing downstream
-   re-checks it. A count of zero is the trap inside the trap: `grep -c` over a path that does not
-   exist prints `0` and exits quietly, which is indistinguishable from the pattern being absent, so
-   a zero is a measurement only once you have confirmed the file you searched is there. If you
-   cannot run the count, do not write the number — write what you did observe.
+   re-checks it. If you cannot run the count, do not write the number — write what you did observe.
+
+   A result of **nothing** is the trap inside the trap. A command aimed at a path that does not
+   exist answers `0` and exits quietly; a test filter that matches no test reports no failures.
+   Both are the exact shape of the answer you were hoping for and neither complains, so nothing you
+   ran is a measurement until you have separately confirmed it was aimed at something. This is the
+   one case where a correctly executed command produces a false reading with no signal at all —
+   even an invented number looks like a number, and this does not look like anything.
+
+   Nor does a total that reconciles vouch for the parts it was built from. A breakdown can be wrong
+   in every line and still add up, and that is worse than a wrong sum: a wrong sum invites the
+   question, and a right one closes it.
 
    The same rule binds a sentence that carries a claim. **A statement that grew stronger between
    two messages, without a new measurement, reverts to the version that had one.** "Saving is safe,
