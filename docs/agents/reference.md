@@ -263,11 +263,12 @@ viewport and theme; a lone frame is not evidence and must not be handed to a cri
 
 ---
 
-## Two ways the shutter invents a finding, and one thing it cannot hide
+## Three ways the shutter invents a finding, and one thing it cannot hide
 
-Found the first time this loop was actually run end to end, on 2026-09-03. Both are properties of
-`fullPage: true`, and both produce a defect that exists only in the photograph - which the critic
-then charges to the product, because the critic has nothing else to go on.
+Found the first time this loop was actually run end to end, on 2026-09-03. Each produces a defect
+that exists only in the photograph - which the critic then charges to the product, because the
+critic has nothing else to go on. The first two are properties of `fullPage: true`; the third is
+the dangerous one, because it produces a frame with nothing visibly wrong with it at all.
 
 **Anything positioned against the viewport lands in the wrong place.** `position: fixed` resolves
 against the window, so in a 1600px full-page frame a mobile tab bar is not at the bottom - it is
@@ -282,13 +283,29 @@ rows into a container sized for all six hundred. Scrolled by a person it fills i
 whole it is a 4487px frame with roughly 2500px of empty ground between the last row and the footer.
 Nothing is wrong with the screen. Everything is wrong with the picture of it.
 
+**A deep path asked for too early photographs a front door.** The entry click is asynchronous on
+the far side: the demo provisions a workspace before it hands over a session, so a deep path
+requested before that finishes bounces to a sign-in screen. Nothing about the resulting frame looks
+broken. It is sharp, it is complete, it is correctly named, and it is a photograph of somebody's
+front door filed under a feature's name. A critic handed it does not report a bad capture - it
+reports the product as having no such screen, and that is exactly what happened: one verdict had to
+be thrown away after a critic described "a centred login card in an otherwise empty viewport" as a
+finding against the reference. It was found only because the critic wrote the artefact down instead
+of scoring it silently.
+
+`capture.mjs` now compares the path it landed on against the path it asked for and files no frame
+when they differ, warning instead. The path is the test rather than the whole URL, because a screen
+that answers on its own and then appends its default query has not gone anywhere. A longer
+`--settle` is the usual fix; 16s was not enough for every surface and 26-30s was. Check `warnings`
+on every reference run and treat a refusal as a missing pair, never as a screen that does not exist.
+
 So a comparison frame is shot with `--viewport-only` at every viewport where either side pins
 anything or virtualises anything, which in practice means all of them. Identical treatment, and the
 frame is what a visitor actually arrives at. The cost is that composition below the fold goes
 unjudged; pay it.
 
 **And the blind is not as blind as the procedure implies.** Both products paint their own wordmark
-in the sidebar, so a critic reading the frames can name them, and in this round both critics did -
+in the sidebar, so a critic reading the frames can name them, and in this round all seven did -
 each disclosed the recognition unprompted and said it changed nothing, one adding that it made them
 hunt harder for our faults. That is the right way for a critic to handle it, and it is still a
 weaker claim than "blind". What the labels protect is which side the runner is on; they do not
