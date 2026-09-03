@@ -279,6 +279,12 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    one case where a correctly executed command produces a false reading with no signal at all —
    even an invented number looks like a number, and this does not look like anything.
 
+   The value is never the tell; the target is. A suite pointed at a poisoned server ran to
+   completion, reported a believable spread of passes and failures and printed its summary line -
+   `355 passed`, which is every sign of a measurement except the one that decides. It failed in
+   exactly the way `0` does, and it was harder to catch, because zero at least looks like nothing.
+   Confirm what a command was aimed at before you read what it gave back.
+
    Nor does a total that reconciles vouch for the parts it was built from. A breakdown can be wrong
    in every line and still add up, and that is worse than a wrong sum: a wrong sum invites the
    question, and a right one closes it.
@@ -290,6 +296,27 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    rule catches an invented count because a count looks like a count; this one has no such tell,
    and the sharpened sentence is shorter, more useful and more quotable than the careful one, which
    is exactly why it travels. Put the hedge back, or measure it again.
+
+   **"Intermittent" is a claim about a distribution, and one run is not one.** A single pass proves
+   only that a test _can_ pass; calling it a flake on that sample smuggles in a frequency nobody
+   measured. This is the cheapest way in the repository to retire a real defect, because it takes
+   a reproducible failure out of everyone's list at once and leaves nothing behind to reopen: noise
+   has no owner. Two of us reached for the word on one sample each, and both failures turned out to
+   be three out of three. Repeat it, or call it what you actually saw.
+
+   A timeout is a claim about the machine until the error text says it is about the code. Both read
+   as `1 failed` in the summary, and only the body separates `Received: hidden` - a computed style,
+   which a starved processor computes no differently - from an empty value an interaction should
+   have set, which a stalled machine loses on its own. That separation costs one `grep` and decides
+   whether to re-run or to fix. It also bounds the damage: starvation turns a passing test red and
+   never a failing test green, so every _pass_ measured under load is worth what it would be worth
+   on a quiet machine, and only the failures need repeating.
+
+   And a hedge covers the clause it is attached to, never the one standing beside it. "Only the
+   segments that were too small grow; which ones actually move was not measured here" reads as
+   caution and works as a claim: it conceded the uncertainty and left the unmeasured conclusion
+   in place, wearing the credibility the admission bought. Both halves came from no measurement.
+   Hedge the sentence that would be wrong, or drop it.
 
 On top of those, the ten clauses of §2 are ticked per surface, and §10's accessibility gate must be
 green.

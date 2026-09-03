@@ -174,8 +174,9 @@ The seven repository-wide items from `docs/SPEC.md` §7 apply to every stage wit
 4. The feature is visually verified in a real browser, light and dark, desktop and mobile.
 5. No TODOs, no placeholder copy, no `console.log`, no commented-out code left behind.
 6. You did not touch files outside your assigned ownership.
-7. Every number you write down was produced by a command, not by an impression, and no claim of
-   yours got stronger without a new measurement.
+7. Every number you write down was produced by a command, not by an impression, no claim of yours
+   got stronger without a new measurement, and you confirmed what each command was aimed at before
+   you read what it returned.
 
 On top of those, the ten clauses of `docs/SPEC.md` §2 are ticked per surface the stage ships:
 
