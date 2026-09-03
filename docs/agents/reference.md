@@ -244,12 +244,52 @@ node scripts/visual/capture.mjs \
   --url https://<the demo's main host>/<path> \
   --out .sandcastle-shots/manual --label B \
   --viewports 1440x900,360x800 --themes light,dark \
-  --enter '<entry-control selector>'
+  --enter '<entry-control selector>' --enter-from 'https://<the demo's main host>/'
 ```
 
 `<entry-control selector>` is a placeholder on purpose, and stays one: you read the entry point
 off the page in front of you and pass it at call time. Nothing about their markup gets written down
-here. Drop `--enter` once the surface you want is at a URL that answers on its own.
+here.
+
+`--enter-from` is what makes any surface past the front door reachable. The entry click grants a
+session that lives in the browser context that clicked and nowhere else, and a signed-out deep path
+does not carry the control at all - so without it the second call photographs the marketing page
+under the dashboard's filename. With it, the run lands on the entry page, clicks once, and only then
+asks for the path. It is needed on **every** invocation, not just the first: each call opens a fresh
+context. Drop both flags only for a surface that answers to an anonymous visitor at its own URL.
 
 `.sandcastle-shots/` is gitignored. A pair exists only when both sides produced a frame for the same
 viewport and theme; a lone frame is not evidence and must not be handed to a critic as one.
+
+---
+
+## Two ways the shutter invents a finding, and one thing it cannot hide
+
+Found the first time this loop was actually run end to end, on 2026-09-03. Both are properties of
+`fullPage: true`, and both produce a defect that exists only in the photograph - which the critic
+then charges to the product, because the critic has nothing else to go on.
+
+**Anything positioned against the viewport lands in the wrong place.** `position: fixed` resolves
+against the window, so in a 1600px full-page frame a mobile tab bar is not at the bottom - it is
+stranded a fifth of the way down, painted over whatever content sits behind it. That would be
+harmless if it hit both sides equally. It does not: a layout that scrolls the document produces a
+tall frame carrying the artefact, while a layout that scrolls an inner container produces a
+viewport-height frame with its chrome exactly where a visitor sees it. Ours took the damage and the
+reference did not, and the pair read as us shipping a broken navigation bar.
+
+**A virtualised list photographs as a hole.** `/transactions` renders about fifty of six hundred
+rows into a container sized for all six hundred. Scrolled by a person it fills in; photographed
+whole it is a 4487px frame with roughly 2500px of empty ground between the last row and the footer.
+Nothing is wrong with the screen. Everything is wrong with the picture of it.
+
+So a comparison frame is shot with `--viewport-only` at every viewport where either side pins
+anything or virtualises anything, which in practice means all of them. Identical treatment, and the
+frame is what a visitor actually arrives at. The cost is that composition below the fold goes
+unjudged; pay it.
+
+**And the blind is not as blind as the procedure implies.** Both products paint their own wordmark
+in the sidebar, so a critic reading the frames can name them, and in this round both critics did -
+each disclosed the recognition unprompted and said it changed nothing, one adding that it made them
+hunt harder for our faults. That is the right way for a critic to handle it, and it is still a
+weaker claim than "blind". What the labels protect is which side the runner is on; they do not
+protect brand identity, and a verdict must not be reported as though they do.
