@@ -270,7 +270,10 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    report or a review comment must come from a `grep -c`, a `wc -l` or a test run whose output you
    actually read. This is the cheapest claim in the repository to verify and the easiest to get
    wrong, because a plausible number reads exactly like a measured one and nothing downstream
-   re-checks it. If you cannot run the count, do not write the number — write what you did observe.
+   re-checks it. A count of zero is the trap inside the trap: `grep -c` over a path that does not
+   exist prints `0` and exits quietly, which is indistinguishable from the pattern being absent, so
+   a zero is a measurement only once you have confirmed the file you searched is there. If you
+   cannot run the count, do not write the number — write what you did observe.
 
    The same rule binds a sentence that carries a claim. **A statement that grew stronger between
    two messages, without a new measurement, reverts to the version that had one.** "Saving is safe,
