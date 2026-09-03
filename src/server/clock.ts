@@ -31,6 +31,21 @@
  * branch behind, so the header is inert against anything but a dev server. That is deliberate and
  * load-bearing rather than defensive: a header that could move the server's idea of today in
  * production is a header that can be used to read a budget period that has not opened yet.
+ *
+ * ## The second pin, which exists because the first one cannot follow the gate
+ *
+ * CI stopped serving the browser suite from `pnpm dev` - a dev server compiles the client graph per
+ * route on first visit and that cost 69% of the suite's wall clock - so the gate now photographs a
+ * build, where the branch above no longer exists. A screenshot of a screen that reads a clock still
+ * has to be reproducible, so the day arrives the one way that keeps the property intact: folded in
+ * at compile time by `vite.config.ts`, not accepted from a request.
+ *
+ * `__E2E_SERVER_TODAY__` is a Vite `define`. With `E2E_BUILD` unset it is replaced by the literal
+ * `undefined`, the comparison below reads `undefined !== undefined`, and the branch is eliminated
+ * from the bundle exactly as the header branch is. So the deployed worker has no second way to be
+ * told what day it is - not a header, not a variable, not a flag - and the guarantee the paragraph
+ * above describes is unchanged. What differs is only which artefact carries the pin: a bundle CI
+ * builds for itself and never deploys.
  */
 
 import { getRequestHeader } from '@tanstack/react-start/server'
@@ -42,12 +57,28 @@ const SERVER_TODAY_HEADER = 'x-mt-server-today'
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 
 /**
+ * The day an end-to-end build was compiled to believe in, or nothing at all everywhere else.
+ *
+ * Declared here rather than in a global `.d.ts` so the only file that may read it is the only file
+ * that knows what it means. `vite.config.ts` replaces the identifier textually; nothing imports it.
+ *
+ * It is read through `typeof` because in one runner the identifier is not merely undefined, it is
+ * **absent**: `vitest.config.ts` is a separate config and does not inherit `vite.config.ts`'s
+ * `define`, so a bare reference is a `ReferenceError` rather than a falsy value - which is how 57
+ * repository tests went red the first time this was written without it. `typeof` also keeps the
+ * elimination: with the define in place the expression folds to a constant either way, and a plain
+ * build carries neither the identifier nor the date.
+ */
+declare const __E2E_SERVER_TODAY__: string | undefined
+
+/**
  * Today, as a UTC calendar date.
  *
- * Under `pnpm dev` an `x-mt-server-today` header wins; everywhere else, and always in production,
- * this is the wall clock.
+ * An end-to-end build carries its day compiled in; under `pnpm dev` an `x-mt-server-today` header
+ * wins; everywhere else, and always in production, this is the wall clock.
  */
 export function serverToday(): string {
+  if (typeof __E2E_SERVER_TODAY__ === 'string') return __E2E_SERVER_TODAY__
   if (import.meta.env.DEV) {
     const pinned = pinnedDay()
     if (pinned !== null) return pinned

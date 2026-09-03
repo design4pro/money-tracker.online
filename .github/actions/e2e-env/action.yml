@@ -79,8 +79,19 @@ runs:
     # before every local run would cost the fast loop the gate does not need.
     # That divergence is deliberate and is the reason this action exists - CI is
     # the only place both browser workflows agree on.
+    #
+    # `E2E_BUILD=1` folds `e2e/baseline-day.ts` into the bundle as the day the server believes it
+    # is. The suite photographs screens that read a clock - the dashboard opens on the current
+    # month, budget bars divide by days elapsed - and `src/server/clock.ts` only honours the
+    # `x-mt-server-today` header under `import.meta.env.DEV`, which a build folds away on purpose.
+    # Without this the gate would compare August's baselines against whatever month the runner
+    # woke up in, which is how 24 screenshots failed the first time this step served a build.
+    # Unset, the define emits `undefined` and the branch leaves the bundle, so nothing about a
+    # deployed worker changes.
     - name: Build the application
       shell: bash
+      env:
+        E2E_BUILD: '1'
       run: pnpm build
 
     # Started here rather than by Playwright's `webServer` because the seed has

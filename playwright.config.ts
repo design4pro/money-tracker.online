@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+import { BASELINE_DAY } from './e2e/baseline-day'
+
 const isCI = process.env.CI === 'true' || process.env.CI === '1'
 
 /**
@@ -49,9 +51,13 @@ if (!isCI && process.env.PLAYWRIGHT_ALLOW_ANY_PORT !== '1') {
  * document and the server-function RPCs that follow it agree about the day. The guard around it
  * is `import.meta.env.DEV`, which the production build folds to `false` and drops, so the header
  * is inert against anything but a dev server.
+ *
+ * Which is why CI does not rely on it. The browser gates serve a build, where that branch no longer
+ * exists, so `vite.config.ts` folds the same constant in at compile time as `__E2E_SERVER_TODAY__`.
+ * The header stays for `pnpm dev`, the define covers the build, and both take their day from
+ * `e2e/baseline-day.ts` so there is one date in the repository rather than two that agree today.
  */
 const SERVER_TODAY_HEADER = 'x-mt-server-today'
-const BASELINE_DAY = '2026-08-20'
 const clockPin = { [SERVER_TODAY_HEADER]: BASELINE_DAY }
 
 /**
