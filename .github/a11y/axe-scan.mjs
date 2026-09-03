@@ -24,7 +24,9 @@
  * 32px icon button is "in a sentence" or whether a session warning is adjustable - so they are
  * advisory by construction, not by leniency. 2.2.6 cannot be automated at all and says so.
  *
- * Usage:  node .github/a11y/axe-scan.mjs
+ * Usage:  pnpm exec tsx .github/a11y/axe-scan.mjs
+ *         (tsx, not node: this file imports the shared axe corrections from `e2e/support/`,
+ *          which are TypeScript because everything else in `e2e/` is.)
  * Env:    A11Y_BASE_URL (or PLAYWRIGHT_BASE_URL)  default http://localhost:3010
  *         A11Y_OUT_DIR                            default a11y-report
  *         A11Y_USER_EMAIL / A11Y_USER_PASSWORD    the seeded demo account
@@ -37,6 +39,8 @@ import axePlaywright from '@axe-core/playwright'
 import { mkdir, readFile, writeFile, appendFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+
+import { withoutKnownAxeDefects } from '../../e2e/support/axe-defects.ts'
 
 // The package is CommonJS and publishes the builder as both a default and a named export;
 // which one a plain .mjs import resolves to depends on the interop path, so accept either.
@@ -466,11 +470,23 @@ const open = async (page, route, { theme, viewportName }) => {
 // right about them and nothing in this repository can fix them. `e2e/support/budgets.ts` excludes
 // the same region for the same reason - the two scanners have to agree, or a page passes one gate
 // and fails the other.
-const runAxe = async (page, tags) =>
-  new AxeBuilder({ page })
+//
+// The meter correction below is the other half of the same argument, and it is imported rather
+// than restated: `e2e/support/axe-defects.ts` drops the `aria-allowed-attr` nodes that are an
+// axe-core resolution failure against React Aria's `role="meter progressbar"` fallback list, on
+// three conditions and with a re-check date. It is a correction, not a waiver - a fifth attribute,
+// a different element or a changed role string still fails here exactly as it fails the spec.
+const runAxe = async (page, tags) => {
+  const results = await new AxeBuilder({ page })
     .withTags(tags)
     .exclude('[data-live-announcer]')
     .analyze()
+
+  return {
+    ...results,
+    violations: await withoutKnownAxeDefects(page, results.violations),
+  }
+}
 
 const collectAxe = (results, { level, route, theme, viewportName }) => {
   for (const v of results.violations) {
