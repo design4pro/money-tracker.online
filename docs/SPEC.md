@@ -94,8 +94,9 @@ the shadcn shape · **`@internationalized/date`** and **`@internationalized/numb
 **Polar** through a hand-rolled REST client · `zod` v4 · Sentry · React Email · `motion` · `sonner` ·
 `@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
 
-Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · Playwright · **`@axe-core/playwright`** ·
-`drizzle-kit` · ESLint 9 · Prettier · Husky + lint-staged · `vite-plugin-pwa`.
+Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
+(ADR 0015) · Playwright · **`@axe-core/playwright`** · `drizzle-kit` · ESLint 9 · Prettier ·
+Husky + lint-staged · `vite-plugin-pwa`.
 
 Not used, deliberately: **Radix** (React Aria instead — ADR 0005), **any chart library** (ADR 0007),
 `xlsx`, `maplibre-gl`, any bank-aggregation SDK.
@@ -113,6 +114,10 @@ run that installs a different minor than the one the verification ladder was gre
 whole class of failures nobody can explain.
 
 `pnpm-lock.yaml` is installed `--frozen-lockfile` in CI and in the agent sandbox.
+
+The set itself is changed by a human, in an ADR, with the reason attached - the freeze binds
+stages and agent runs, not the decision record. `@cloudflare/vitest-pool-workers` is the one
+addition so far (ADR 0015); a `### Blockers` row is still how a stage reports needing a package.
 
 ---
 
