@@ -272,6 +272,14 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    wrong, because a plausible number reads exactly like a measured one and nothing downstream
    re-checks it. If you cannot run the count, do not write the number — write what you did observe.
 
+   The same rule binds a sentence that carries a claim. **A statement that grew stronger between
+   two messages, without a new measurement, reverts to the version that had one.** "Saving is safe,
+   because the patch fires only on a change" was measured. "You cannot save the form without
+   changing the colour" was the same belief with the hedge taken out, and it was false. The number
+   rule catches an invented count because a count looks like a count; this one has no such tell,
+   and the sharpened sentence is shorter, more useful and more quotable than the careful one, which
+   is exactly why it travels. Put the hedge back, or measure it again.
+
 On top of those, the ten clauses of §2 are ticked per surface, and §10's accessibility gate must be
 green.
 
