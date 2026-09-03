@@ -164,6 +164,23 @@ jobs:
       - name: Check the build left the route tree alone
         run: git diff --exit-code -- src/routeTree.gen.ts
 
+      # `pnpm build` above is the plain one - no `E2E_BUILD=1` - so `vite.config.ts`
+      # folds `__E2E_SERVER_TODAY__` to `undefined` and `serverToday()` falls back to
+      # the wall clock. The failure this guards against is silent in every other gate:
+      # if the define ever leaked into a production build, the app would serve the
+      # baseline day as today's date and the browser suite - which pins that same day
+      # on purpose - would keep passing while telling nobody. So assert on the artefact
+      # rather than on the config that produces it, and read the day from the module
+      # that owns it so this does not become the fourth copy of the date.
+      - name: Check the production build carries no pinned day
+        run: |
+          day=$(sed -n "s/^export const BASELINE_DAY = '\\(.*\\)'$/\\1/p" e2e/baseline-day.ts)
+          test -n "$day" || { echo "BASELINE_DAY not found in e2e/baseline-day.ts"; exit 1; }
+          if grep -rl -e "$day" -e '__E2E_SERVER_TODAY__' dist; then
+            echo "::error::The production build carries the end-to-end day pin ($day)."
+            exit 1
+          fi
+
   # Rung 5, with coverage. Its own job rather than a sixth step in `verify`: the
   # suite is CPU-bound and independent of the build, so running the two in
   # parallel is the whole gate's critical path minus whichever is shorter.

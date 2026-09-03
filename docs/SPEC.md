@@ -378,6 +378,16 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    test that leans on any of those is a test about to change meaning. The list is short, it is
    knowable in advance, and reading it is cheaper than reading twenty-four screenshot diffs.
 
+   The operation is asymmetric, and the loud half is the harmless one. Repointing a gate can take a
+   guarantee away; it cannot hand one over that the new target does not already provide. Which way
+   the loss surfaces is luck: twenty-four screenshots went red, so the missing pin announced itself
+   within a single run. Had the same loss instead removed something a test was asserting _against_
+   - an environment guard that made a check meaningful, a fixture that made an assertion strict -
+     the suite would have gone green and stayed green, and the retarget would read in the history as
+     a speedup with no cost. So the list of what the old target provided is not a curiosity to file
+     after the diffs are read. It is written before the gate moves, and every entry on it is a green
+     result that has stopped meaning what it used to mean until something re-establishes it.
+
    And "the machine" is not the only alternative to "the code". A bare timeout reports that a
    budget ran out, never what spent it, and the answer can be the subject itself, behaving
    honestly. The CI browser job runs the suite against `pnpm dev`, where Vite compiles a route's
