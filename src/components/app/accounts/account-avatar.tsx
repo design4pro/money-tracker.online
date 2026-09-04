@@ -1,4 +1,4 @@
-import { seriesVarForHex } from '#/components/app/categories'
+import { paintFor } from '#/components/app/categories'
 import { cn } from '#/lib/cn'
 
 import type { Locale } from '#/lib/i18n'
@@ -74,7 +74,7 @@ export function AccountAvatar({
       {color ? (
         <span
           className="absolute inset-y-0 start-0 w-1"
-          style={{ backgroundColor: seriesVarForHex(color) ?? color }}
+          style={{ backgroundColor: paintFor(color) }}
         />
       ) : null}
       {label}

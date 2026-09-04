@@ -1,4 +1,4 @@
-import { seriesVarForHex } from '#/components/app/categories'
+import { paintFor } from '#/components/app/categories'
 import { cn } from '#/lib/cn'
 
 import type { Locale } from '#/lib/i18n'
@@ -71,7 +71,7 @@ export function PayeeAvatar({
         className,
       )}
       style={{
-        borderColor: color ? (seriesVarForHex(color) ?? color) : 'transparent',
+        borderColor: color ? paintFor(color) : 'transparent',
       }}
     >
       {shown}

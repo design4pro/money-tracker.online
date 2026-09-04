@@ -282,8 +282,9 @@ describe('the category palette tracks the light series', () => {
   })
 
   it('resolves a colour outside the palette to null', () => {
-    // The seed's categories use a different palette entirely, so this is the
-    // common case in practice, not the edge one.
+    // Import is what produces one of these, not the seed: all thirteen seeded
+    // category colours are eight-palette values. `CategoryColourField` offers
+    // only the eight, so a ninth reaches the column from a file or the API.
     expect(seriesVarForHex('#4c6ef5')).toBeNull()
   })
 })

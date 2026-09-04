@@ -1,7 +1,7 @@
 import { useTranslate } from '#/lib/i18n'
 import { cn } from '#/lib/cn'
 
-import { hueLabelKey, seriesVarForHex } from './palette'
+import { hueLabelKey, paintFor } from './palette'
 
 export interface CategorySwatchProps {
   /** Six hex digits behind a `#`, as the repository stores it. */
@@ -53,7 +53,7 @@ export function CategorySwatch({
       <span
         aria-hidden="true"
         className="size-3 rounded-full border border-border-strong"
-        style={{ backgroundColor: seriesVarForHex(color) ?? color }}
+        style={{ backgroundColor: paintFor(color) }}
       />
       {isLabelledBeside ? null : <span className="sr-only">{name}</span>}
     </span>
