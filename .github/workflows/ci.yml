@@ -208,6 +208,14 @@ jobs:
       - name: Run the unit suite with coverage
         run: pnpm test:coverage
 
+      # The other half of rung 5. `test:coverage` excludes the `workerd` project
+      # because it cannot be instrumented; vitest.config.ts records why, next to
+      # the project itself. This step is not optional: without it the Durable
+      # Object tests would run nowhere in CI, which is worse than the red check
+      # the exclusion fixes.
+      - name: Run the workerd suite
+        run: pnpm test:workerd
+
       - name: Upload the coverage report
         if: always()
         uses: actions/upload-artifact@v4

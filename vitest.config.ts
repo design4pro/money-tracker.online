@@ -66,6 +66,18 @@ const workerdProject = {
       wrangler: { configPath: './wrangler.jsonc' },
     }),
   ],
+  /**
+   * Not covered, and it cannot be: `@vitest/coverage-v8` constructs a
+   * `node:inspector` Session at import time, and inside workerd that constructor throws
+   * `ERR_METHOD_NOT_IMPLEMENTED`, which fails the entire run rather than this project
+   * alone. The pool refuses the v8 provider for exactly this reason and points at
+   * Istanbul, which instruments source instead of asking the runtime; adopting it would
+   * mean a new dependency, and the stack is frozen (`docs/SPEC.md` §3.1).
+   *
+   * So `pnpm test:coverage` runs `--project='!workerd'` and `pnpm test:workerd` runs this
+   * one uninstrumented. `pnpm test` still runs all four, and CI runs both scripts. What is
+   * lost is the coverage *number* for `src/server/do/**`; no threshold reads those files.
+   */
   test: {
     name: 'workerd',
     globals: false,
