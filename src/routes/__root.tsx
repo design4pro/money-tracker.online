@@ -210,6 +210,51 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         { name: 'twitter:description', content: meta.description },
       ],
       links: [
+        // The fonts come before the stylesheet on purpose. `app.css` is where the
+        // faces are declared, so without these the font request cannot even be
+        // discovered until that stylesheet has downloaded and parsed - a full round
+        // trip behind first paint, which is the cost the comment at the top of
+        // `app.css` was written to avoid.
+        //
+        // `crossOrigin` is required even though these are same-origin: fonts are
+        // always fetched in CORS mode, and a preload whose mode does not match the
+        // request it is meant to satisfy is simply downloaded a second time.
+        {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
+          href: '/fonts/bricolage-grotesque-latin.woff2',
+          crossOrigin: 'anonymous' as const,
+        },
+        {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
+          href: '/fonts/inter-latin.woff2',
+          crossOrigin: 'anonymous' as const,
+        },
+        // For a Polish document `latin-ext` is not an extra subset, it is the
+        // document: every Polish diacritic except `ó` lives there, so the first
+        // sentence needs it. An English document never asks for it, which is the
+        // whole reason the faces are split by `unicode-range`.
+        ...(meta.locale === 'pl'
+          ? [
+              {
+                rel: 'preload',
+                as: 'font',
+                type: 'font/woff2',
+                href: '/fonts/bricolage-grotesque-latin-ext.woff2',
+                crossOrigin: 'anonymous' as const,
+              },
+              {
+                rel: 'preload',
+                as: 'font',
+                type: 'font/woff2',
+                href: '/fonts/inter-latin-ext.woff2',
+                crossOrigin: 'anonymous' as const,
+              },
+            ]
+          : []),
         { rel: 'stylesheet', href: appCss },
         { rel: 'icon', href: FAVICON_HREF, type: 'image/svg+xml' },
         { rel: 'canonical', href: SITE_URL },

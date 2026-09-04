@@ -480,6 +480,131 @@
 }
 
 /* ==========================================================================
+   FACES
+
+   Both families are served from this origin, out of `public/fonts`. The
+   dependency freeze in `docs/SPEC.md` §3.1 rules out `@fontsource/*`, and a
+   `<link>` to a font CDN would put a third-party origin in front of every
+   first paint, break the offline story `PRODUCT.md` still owes, and hand a
+   visitor's IP to that origin on a page the visitor never asked to share.
+   Font files are assets, not packages, so vendoring them keeps the freeze.
+
+   Both faces are SIL OFL 1.1. The licences ship beside them, which is what
+   the licence requires of a redistributor.
+
+   Two subsets each. `latin-ext` is not optional here: every Polish diacritic
+   except `ó` lives in U+0100-02BA, so the PL catalogue is unreadable without
+   it. `unicode-range` is what keeps an EN reader from paying for it.
+
+   Only the `wght` axis is requested. Nothing in this product sets
+   `font-stretch`, `font-variation-settings` or `font-optical-sizing`, and
+   dropping the unused `wdth` and `opsz` axes took the four files from 383 KB
+   to 189 KB. Weights actually used are 400, 500, 600 and 700; the ranges are
+   wider because narrowing them saves nothing (the axis ships whole either
+   way) and a wider range costs nothing.
+
+   `font-display: swap` never blocks the text. The two `latin` files are
+   preloaded by the document shell in `src/routes/__root.tsx`, so the request
+   starts with the HTML rather than one round trip behind this stylesheet.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-grotesque-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* --------------------------------------------------------------------------
+   THE FALLBACK FACES
+
+   These are what the type stacks below name second. They are not fonts: each
+   is a local face whose *vertical* metrics have been replaced with the ones
+   measured out of the web font's own `head` and `hhea` tables, so the line
+   box is the same height before and after the swap and a heading does not
+   move the paragraph under it when the web font lands.
+
+   Because `ascent-override` and friends replace the metrics outright rather
+   than scaling them, it does not matter which `local()` source actually
+   answers. The same line box is produced on every platform.
+
+     Bricolage Grotesque   unitsPerEm 1000, ascent  930, descent -270
+     Inter                 unitsPerEm 2048, ascent 1984, descent -494
+
+   There is deliberately no `size-adjust`. Matching advance widths needs the
+   average character width of whichever local face substitutes, and that is
+   both platform-dependent and unmeasurable from this repository. The OS/2
+   `xAvgCharWidth` field is not a usable stand-in: foundries compute it to
+   two different specifications, and for these two files it moved when the
+   unused axes were dropped without a single glyph changing. A number nobody
+   can derive is how the dead `Fallback` names got here in the first place,
+   and one guess is not repaid by another.
+
+   So the swap still reflows text horizontally. It no longer changes the
+   height of a line, which is the shift a reader actually notices.
+   -------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Bricolage Grotesque Fallback';
+  src:
+    local('Avenir Next'), local('Segoe UI'), local('Roboto'),
+    local('Helvetica Neue'), local('Arial');
+  ascent-override: 93%;
+  descent-override: 27%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Inter Fallback';
+  src:
+    local('Helvetica Neue'), local('Segoe UI'), local('Roboto'), local('Arial');
+  ascent-override: 96.875%;
+  descent-override: 24.121%;
+  line-gap-override: 0%;
+}
+
+/* ==========================================================================
    NON-THEMED SCALES
    These do not change between light and dark, so they are declared once.
    ========================================================================== */
@@ -489,9 +614,10 @@
      TYPE
 
      Two faces: a geometric display face for the few large things and a neutral
-     text face for the many small ones. Both stacks name a metric-compensated
-     local fallback *immediately* after the web face, so a heading does not
-     resize when the web font lands.
+     text face for the many small ones. Both stacks name their fallback face
+     *immediately* after the web face, so the swap cannot change the height of
+     a line. Those two faces, and the limit of what they compensate for, are
+     declared under FACES above.
 
      There is no third face for numbers. A number that can change keeps the
      face it inherits and changes only its figures, through the `.tabular`
@@ -656,7 +782,14 @@
   --nav-h: 4rem; /* 64px */
   --subnav-h: 3rem; /* 48px */
   --impersonation-h: 0rem;
-  --content-max: 90rem; /* 1440px */
+  /* The app content well. 80rem because that is the width the shell has always
+     drawn - this token said 90rem and was consumed by nothing, so the number
+     that shipped and the number that was written down disagreed with no way to
+     tell which was meant. It is mapped into Tailwind's container namespace by
+     `app.css` and reached as `max-w-content`, so the shell can no longer state
+     its own width and drift from this again. The marketing surface is a
+     deliberately narrower well and does not use this token. */
+  --content-max: 80rem; /* 1280px */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-start: env(safe-area-inset-left, 0px);
