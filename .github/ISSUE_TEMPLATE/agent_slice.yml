@@ -127,5 +127,4 @@ body:
         applies them.
       options:
         - label: 'Changes rendered output on purpose (`visual-change-expected`)'
-        - label: 'Needs the browser suite on the pull request (`needs-e2e`)'
         - label: 'Needs a human to exercise it by hand afterwards (`qa`)'

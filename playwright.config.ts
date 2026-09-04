@@ -42,9 +42,10 @@ if (!isCI && process.env.PLAYWRIGHT_ALLOW_ANY_PORT !== '1') {
  *
  * The server picks *which rows* a screen shows by comparing a fixture date against its own
  * `new Date()` — the dashboard reads the current month, the upcoming rail reads forward from
- * today, the budget bars divide by days elapsed — so a baseline recorded one evening photographs
- * a different set of rows the next morning, and every following month boundary moves the whole
- * dashboard. No mask absorbs that: a row leaving a list moves everything below it.
+ * today, the budget bars divide by days elapsed — so a spec written one evening asserts against a
+ * different set of rows the next morning, and every following month boundary moves the whole
+ * dashboard. Retiring the baselines did not retire this: a count, a total and an empty state all
+ * depend on which day the server thinks it is.
  *
  * `serverToday()` in `src/server/clock.ts` therefore accepts this header on a development
  * request, and both browser projects send it on every request the context makes, so the SSR
@@ -61,7 +62,7 @@ const SERVER_TODAY_HEADER = 'x-mt-server-today'
 const clockPin = { [SERVER_TODAY_HEADER]: BASELINE_DAY }
 
 /**
- * End-to-end, accessibility and visual-regression suite.
+ * End-to-end and accessibility suite.
  *
  * Three browser projects:
  *
@@ -73,38 +74,19 @@ const clockPin = { [SERVER_TODAY_HEADER]: BASELINE_DAY }
  *   most likely to disagree about `:focus-visible` — the criterion the whole keyboard story
  *   rests on.
  *
- * Screenshot baselines are per project, per theme and per locale, and are compared with
- * animations disabled so a mid-transition frame can never fail a run. They are recorded for
- * `chromium` and `mobile-safari` only, because those are the two projects `ci.yml` runs; a
- * `webkit` run skips them rather than failing for want of files. `e2e/visual.spec.ts` owns the
- * frames and `e2e/support/visual.ts` owns that rule.
+ * No screenshot is compared anywhere. ADR 0016 retired the baselines: what a screen *looks* like
+ * is judged by the blind A/B pair (`scripts/visual/capture.mjs`), by a human, at review. What this
+ * suite asserts is that a screen answers, hydrates, says nothing in the console and can be acted
+ * on — see `e2e/support/console.ts` for the last of those.
  */
 export default defineConfig({
   testDir: './e2e',
-  snapshotDir: './e2e/__screenshots__',
-  /**
-   * `{platform}` is in the path because a frame is only comparable to one taken on the same OS —
-   * and one platform, Linux, is the only one recorded.
-   *
-   * The reason is stronger than antialiasing. This product loads **no web font at all**:
-   * `src/styles/app.css` says so, there is no `@font-face` and no `public/` directory. So
-   * `--font-sans` falls past `'Inter'` and `'Inter Fallback'` to `-apple-system` on macOS and to
-   * `ui-sans-serif` on Linux, which are different typefaces with different metrics, breaking lines
-   * in different places. No tolerance absorbs that and no un-suffixed baseline can serve both.
-   *
-   * Only `-linux` is recorded, because Linux is what the gate in `ci.yml` runs. A second `-darwin`
-   * set would buy a laptop a green run and cost the project a second set of PNGs to refresh in
-   * lockstep, by whoever owns a Mac, or the gate starts disagreeing with itself. So the frames are
-   * *skipped* off Linux rather than recorded there, and `e2e/support/visual.ts` owns that rule and
-   * states it in the skip reason. Keeping `{platform}` in the filename is what makes an accidental
-   * `--update-snapshots` on a Mac unable to overwrite the set CI compares against.
-   *
-   * `-linux` is recorded by the `Update e2e baselines` workflow
-   * (`.github/workflows/update-snapshots.yml`), which runs in the same container image the
-   * gate does.
-   */
-  snapshotPathTemplate:
-    '{snapshotDir}/{testFileName}/{arg}-{projectName}-{platform}{ext}',
+  // Narrower than the default `**/*.@(spec|test).*`, which would also collect
+  // `e2e/support/__tests__/*.test.ts` - the console policy's vitest neighbours (ADR 0016). Those
+  // import no Playwright, so Playwright loading them fails at `describe` with a message about
+  // `config` that says nothing about the real cause. `.spec.ts` is what every browser test here
+  // is named; the `setup` project overrides this with its own `testMatch`.
+  testMatch: /\.spec\.ts$/,
   outputDir: './test-results',
   fullyParallel: true,
   forbidOnly: isCI,
@@ -117,14 +99,14 @@ export default defineConfig({
   workers: isCI ? 1 : undefined,
   timeout: 30_000,
   // A wall-clock ceiling on the whole run, not a per-test one, and not a tolerance: nothing that
-  // fails is accepted, the job is only allowed to take longer to find out. It was ten minutes
-  // until `e2e/visual.spec.ts` landed. That file adds 28 frames per project, each of which opens a
-  // screen the run has not opened before and waits for a development server to compile it, and it
-  // measured 5.1 minutes for `chromium` alone on a quiet 16-core machine - so on the two-core
-  // runner the comment above is about, the old ceiling was no longer a safety net but a scheduled
-  // failure. Twenty-five sits inside the `timeout-minutes: 30` that ci.yml puts on the job, so the
-  // job's own limit stays the outer bound and this one still cuts a hung run short.
-  globalTimeout: isCI ? 25 * 60_000 : undefined,
+  // fails is accepted, the job is only allowed to take longer to find out. The history is the
+  // reason for the number: ten minutes held until `e2e/visual.spec.ts` landed, that file's 28
+  // frames per project pushed it to twenty-five, and ADR 0016 has now deleted the file. Fifteen
+  // rather than back to ten, because ten was measured against a suite this one has grown past and
+  // the post-0016 run has not been timed on the runner - so this is headroom, and the honest thing
+  // to do with it is say so rather than quote a figure nobody took. It sits inside the
+  // `timeout-minutes: 20` that ci.yml puts on the job, so this one still fires first.
+  globalTimeout: isCI ? 15 * 60_000 : undefined,
   reporter: [
     ['line'],
     ['json', { outputFile: 'test-results/results.json' }],
@@ -133,17 +115,6 @@ export default defineConfig({
 
   expect: {
     timeout: 5_000,
-    toHaveScreenshot: {
-      // ~0.2% of a 1440x900 viewport. Baselines are single-platform (see `snapshotPathTemplate`),
-      // so this is not absorbing a cross-OS font difference — it is headroom for the last-pixel
-      // disagreement a GPU or a subpixel rounding can produce between two runs on the same image,
-      // and it is far too tight to hide a shifted card or a wrong colour.
-      maxDiffPixelRatio: 0.002,
-      threshold: 0.2,
-      animations: 'disabled',
-      caret: 'hide',
-      scale: 'css',
-    },
   },
 
   use: {
@@ -153,11 +124,11 @@ export default defineConfig({
     video: 'retain-on-failure',
     actionTimeout: 10_000,
     navigationTimeout: 20_000,
-    // Deterministic rendering: a fixed locale, zone and theme keep both the screenshots and any
-    // date or money assertion stable. `en-GB` rather than `en-US` because it is the grouping and
-    // date order the English baselines were recorded in; the Polish locale is exercised by its
-    // own tests, which pin `pl-PL` per test. Dark theme and reduced motion are per-test
-    // concerns — switch them with `page.emulateMedia()`.
+    // Deterministic rendering: a fixed locale, zone and theme keep every date and money assertion
+    // stable. `en-GB` rather than `en-US` because it is the grouping and date order this suite's
+    // English expectations are written in; the Polish locale is exercised by its own tests, which
+    // pin `pl-PL` per test. Dark theme and reduced motion are per-test concerns — switch them
+    // with `page.emulateMedia()`.
     locale: 'en-GB',
     timezoneId: 'UTC',
     colorScheme: 'light',

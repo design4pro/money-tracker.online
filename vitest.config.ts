@@ -124,7 +124,15 @@ export default defineConfig({
           name: 'tooling',
           environment: 'node',
           globals: false,
-          include: ['scripts/**/__tests__/*.test.{ts,mjs}'],
+          // `e2e/support` is here rather than under a browser project because the modules it
+          // matches import no Playwright: the console policy (ADR 0016) is a pure classifier,
+          // and the tolerance table is the one place in this repository where a single array
+          // entry turns a red run green, so it is asserted in the fast loop rather than only
+          // in the browser gate.
+          include: [
+            'scripts/**/__tests__/*.test.{ts,mjs}',
+            'e2e/support/__tests__/*.test.ts',
+          ],
           restoreMocks: true,
         },
       },

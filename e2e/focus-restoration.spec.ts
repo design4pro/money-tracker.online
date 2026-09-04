@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/console'
 
 import { mountFocusHarness } from './support/mount-harness'
 

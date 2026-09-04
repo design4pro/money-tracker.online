@@ -260,8 +260,8 @@ describe('the two themes are separately designed', () => {
  * Nothing else ties the two files together. This suite parses `tokens.css` and, until now, did not
  * know `palette.ts` existed — which is precisely why the drift it guards against survived long
  * enough to be worth a test. Retune a series token without retuning the palette and every stored
- * category silently stops resolving; the swatches keep painting, in the old colour, and no
- * baseline records it because the stored hex has not changed.
+ * category silently stops resolving; the swatches keep painting, in the old colour, and nothing
+ * else notices because the stored hex has not changed.
  *
  * Green today, by construction. It earns its keep on the day somebody edits one file and not the
  * other.

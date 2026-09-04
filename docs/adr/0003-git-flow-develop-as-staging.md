@@ -62,3 +62,10 @@ finding is: a new issue carrying `status: triage` and a `type:`, which a triage 
 HEAD and routes. The original consequence still holds and is what mattered - the finding returns to
 the backlog as an issue rather than being fixed in place, so the record survives. It simply does
 not need a label of its own to say where it came from; the issue body says that.
+
+## Amendment 2026-09-04
+
+**The e2e trigger sentence above is void.** ADR 0016 deleted `needs-e2e` along with the screenshot
+gate it existed to make optional. The browser suite now runs on every pull request, unlabelled,
+like the rest of the gate. Everything else in this record stands: the flow, the two environments
+and the promotion pull request are unchanged.

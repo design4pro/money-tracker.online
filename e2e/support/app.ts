@@ -90,20 +90,30 @@ export const LABELS: Readonly<Record<AppLocale, UiLabels>> = {
  * reader picks its voice from, would state the previous language for the whole of the axe scan.
  * The cookie is the first rung of that chain, so setting it here is the same door the language
  * picker uses.
+ *
+ * It is written for **both** loopback names, and that is not belt and braces. A cookie is scoped
+ * to the host it names, and this suite is run against either: `playwright.config.ts` defaults to
+ * `localhost:3010`, while `scripts/agent/setup-e2e.sh` prints `PLAYWRIGHT_BASE_URL` on
+ * `127.0.0.1` — for a reason of its own, that the seed's `fetch` resolves `localhost` to v4 while
+ * a default Vite bind can be v6-only. Naming one host meant that following the setup script's own
+ * instruction left every `pl` test looking at an English document: `<html lang>` read `en`, the
+ * assertion failed on the language rather than on the screen, and the Polish half of the suite
+ * proved nothing while reporting a defect. Measured on this branch: 30 of 32 chromium failures
+ * were that, and all of them passed on `localhost` unchanged.
  */
 export async function useLocale(
   context: BrowserContext,
   locale: AppLocale,
 ): Promise<void> {
-  await context.addCookies([
-    {
+  await context.addCookies(
+    ['localhost', '127.0.0.1'].map((domain) => ({
       name: LOCALE_COOKIE,
       value: locale,
-      domain: 'localhost',
+      domain,
       path: '/',
-      sameSite: 'Lax',
-    },
-  ])
+      sameSite: 'Lax' as const,
+    })),
+  )
 }
 
 /**

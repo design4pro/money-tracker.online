@@ -20,4 +20,3 @@ coverage
 playwright-report
 blob-report
 test-results
-e2e/__screenshots__

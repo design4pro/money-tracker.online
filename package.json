@@ -26,7 +26,6 @@
     "test:workerd": "vitest run --project=workerd",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "e2e:update": "playwright test --update-snapshots",
     "generate-routes": "tsr generate",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply money-tracker-db --local",
