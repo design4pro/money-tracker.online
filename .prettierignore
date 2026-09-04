@@ -7,6 +7,13 @@ src/routeTree.gen.ts
 drizzle
 # Claude Code orchestration scripts and run state.
 .claude
+# The same skills and agents, mirrored where GitHub's tooling looks for them,
+# plus the design skill's own run state. Vendored: formatting them rewrites
+# files this repository does not own and makes the next update conflict.
+.github/agents
+.github/hooks
+.github/skills
+.impeccable
 # Test and build artefacts.
 dist
 coverage
