@@ -302,6 +302,22 @@ export function TransactionForm({
           </RadioGroup>
 
           <div ref={amountRef}>
+            {/*
+              Not disabled while the save is in flight, unlike every other field here.
+
+              The amount is the one control that is *always* focused when a save starts — it takes
+              focus on arrival and the accelerator puts the caret straight back into it — and
+              disabling a focused input makes the browser fire `blur` from inside React's commit
+              phase. React Aria's number field commits its typed text from that handler with
+              `flushSync`, which React refuses mid-commit: "flushSync was called from inside a
+              lifecycle method". The reader also loses focus to `<body>` for the length of the round
+              trip, which is the half of it that costs them a keystroke.
+
+              Nothing is lost by leaving it live. The payload was snapshotted at `mutate` time, so a
+              character typed during the round trip cannot reach the row being written, and the
+              buttons carry `isPending` — which is how every other form in this codebase says
+              "saving" without taking a field away from whoever is typing in it.
+            */}
             <AmountField
               label={t('transactions.field.amount')}
               value={values.amountMinor}
@@ -309,7 +325,6 @@ export function TransactionForm({
               onChange={(amountMinor) => patch({ amountMinor })}
               errorMessage={shown.amountMinor}
               isRequired
-              isDisabled={isSubmitting}
               autoFocus={autoFocusAmount}
               description={
                 showsConversion
