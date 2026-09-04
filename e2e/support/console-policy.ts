@@ -44,32 +44,52 @@ export interface ConsoleReport {
  * `classifyConsoleMessage()` answers `fatal` for both before the table is consulted. A
  * warning-only tolerance is structurally incapable of swallowing one.
  *
- * **The single entry cannot fire on the surface that gates a merge, and that is the point.**
- * `.github/actions/e2e-env/action.yml` serves a production build through `vite preview`, so in CI
- * the document loads hashed `/assets/*` and nothing else. The pattern below only matches a URL a
- * *development* server publishes — `/src/…` is the source tree, anything under `/@` is one of
- * Vite's own namespaces (`/@vite/`, `/@id/`, `/@fs/`, `/@react-refresh`), `/node_modules/…` is an
- * unbundled dependency — on a loopback host with a port. So the tolerance exists for the local
- * `pnpm e2e` path against `pnpm dev`, and the bar CI holds is the absolute one.
+ * ## What earns a place here
  *
- * That asymmetry is deliberate and is the rule for anything added here: an entry earns its place by
- * being something the *engine* says, on the dev-server path, that a built application cannot
- * produce. An entry that could fire in CI is the application talking, and the fix is the
- * application.
+ * One thing only: **a message the browser's own resource loader emits about its own bookkeeping,
+ * whose arrival depends on how long the page stayed open rather than on what the page rendered.**
+ * Anything the application says - a React warning, a deprecation, a failed request, a thrown error
+ * - is the application talking, and the fix is the application, not this array.
  *
- * Nothing has yet been observed to fire this in this repository. It is here because the same
- * advisory is a known Vite dev-server behaviour and a developer meeting it should find the reason
- * written down rather than a red suite; if it turns out never to fire, deleting it costs nothing.
+ * That test is narrower than it sounds, because a timing verdict cannot carry a correctness one.
+ * "You preloaded something and had not used it a few seconds later" is true or false about the
+ * clock; it is never the shape a hydration mismatch, a missing key or a 500 arrives in. Each entry
+ * is anchored at `^` and matches the advisory's whole sentence, so a warning that merely quotes one
+ * is still fatal.
+ *
+ * ## The entry below was widened once, and the reason is measured
+ *
+ * It first shipped restricted to a Vite dev-server URL, on the reasoning that CI serves a
+ * production build through `vite preview` and therefore could not produce it. **The first CI run of
+ * this suite falsified that**, in both engines at once:
+ *
+ * - chromium said it about `/fonts/inter-latin.woff2` and `/fonts/bricolage-grotesque-latin.woff2`,
+ *   which `src/routes/__root.tsx` preloads correctly - `as="font"`, `type="font/woff2"`,
+ *   `crossorigin` - and `src/styles/tokens.css` then asks for by the same absolute path;
+ * - mobile-safari said it about `/assets/_app-*.js`, `useDrop`, `copy` and `eye-off`, which are
+ *   Vite's own `modulepreload` hints for route chunks, in its own wording ("preloaded for nothing").
+ *
+ * The distribution is what settles it. Of 132 chromium tests **131 passed**, and the two that did
+ * not were the two longest - one of them **flaky**, green on retry. A page that closes before the
+ * browser's few-second timer never hears the advisory at all, which is the signature of a clock,
+ * not of a defect: the same document, rendered identically, is green or red depending on how long
+ * the test kept it open.
+ *
+ * So the scope was wrong and the class was right. Whether those four chunks and two faces are
+ * preloaded to any purpose is a real performance question and it is not this file's - the answer
+ * lives in a build measurement, not in a browser advisory that fires on a stopwatch.
  */
 export const TOLERATED_CONSOLE_WARNINGS: readonly ToleratedConsoleWarning[] = [
   {
     why:
-      "the browser's resource loader reporting that a Vite dev-server URL was speculatively " +
-      'preloaded and not used — a path that exists only under `pnpm dev`, never in the build CI ' +
-      'serves, and a warning whose arrival depends on how long the page stayed open rather than ' +
-      'on what the page rendered',
+      "the browser's resource loader reporting that something was speculatively preloaded and " +
+      'not used within a few seconds - a stopwatch verdict emitted by chromium and WebKit alike, ' +
+      "about the framework's own build output as readily as about the document shell, and one " +
+      'whose arrival depends on how long a test kept the page open',
+    // The sentence is identical in both engines; only the advice after it differs, so the pattern
+    // stops before it. `\S+` keeps the URL from swallowing the rest of an unrelated message.
     match:
-      /^The resource https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):\d+\/(?:src\/|node_modules\/|@)\S* was preloaded using link preload but not used within a few seconds from the window's load event\./,
+      /^The resource \S+ was preloaded using link preload but not used within a few seconds from the window's load event\./,
   },
 ]
 

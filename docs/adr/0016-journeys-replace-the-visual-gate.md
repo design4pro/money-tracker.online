@@ -93,3 +93,37 @@ shows no evidence of having taken the pair is incomplete, and the template says 
   end of their own records, per ADR 0001's append-only rule.
 - `docs/adr/0013-cezar-replaces-sandcastle.md` mourns the loss of `record-baselines.ts`. That loss
   stopped mattering the moment there were no baselines to record; the amendment there says so.
+
+## Amendment, 2026-09-04: the tolerance covers the advisory, not a dev-server URL
+
+Point 3 above claimed the tolerance table was "structurally unable to fire on the surface that
+gates a merge", because CI serves a build and the entry matched only a dev-server URL. The first
+CI run of this suite falsified that, in both engines at once:
+
+- **chromium** emitted it about `/fonts/inter-latin.woff2` and `/fonts/bricolage-grotesque-latin.woff2`
+  - two faces `src/routes/__root.tsx` preloads with `as="font"`, `type="font/woff2"` and
+    `crossorigin`, and that `src/styles/tokens.css` then requests by the same absolute path;
+- **mobile-safari** emitted it about `/assets/_app-*.js`, `useDrop`, `copy` and `eye-off` - Vite's
+  own `modulepreload` hints for route chunks - in WebKit's wording, "preloaded for nothing".
+
+The distribution is what decides the verdict. Of 132 chromium tests **131 passed**; the two that
+did not were the two longest, and one of them was **flaky** - green on retry. A page that closes
+before the browser's few-second timer never hears the advisory at all. The same document, rendered
+identically, is green or red depending on how long the test kept it open, which is the signature of
+a stopwatch rather than of a defect.
+
+So the class was right and the scope was wrong. The entry now matches the advisory's own sentence
+on any resource, and the rule that admits it is stated positively in `console-policy.ts`: a message
+the browser's **resource loader** emits about its own bookkeeping, whose arrival depends on how long
+the page stayed open rather than on what the page rendered. A timing verdict cannot carry a
+correctness one - "you preloaded something and had not used it a few seconds later" is never the
+shape a hydration mismatch, a missing key or a 500 arrives in - so widening it does not widen what
+the net can miss. Everything the application says stays fatal, and each entry stays anchored at `^`
+so a warning that merely quotes one is still fatal.
+
+Whether those four chunks and two faces are preloaded to any purpose is a real performance question.
+It is answered by a build measurement, not by a browser advisory that fires on a clock, and it is
+not this record's to answer.
+
+One consequence above can now be replaced by a number rather than a disclaimer: the suite has run.
+`e2e · chromium` took **5.6 minutes** of the job's 20, well inside the 15-minute `globalTimeout`.
