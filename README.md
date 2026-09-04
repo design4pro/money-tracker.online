@@ -82,10 +82,14 @@ missing — is `docs/DEPLOY.md`.
 
 ## Working with agents
 
-- Mention `@claude` on a GitHub issue and `claude.yml` implements it on a runner: branch cut from
-  `develop`, pull request back to `develop`.
+- New work flows through the three Cezar workflows, one fresh context each: `plan`, `triage` and
+  `implement-ticket`. Every artefact stops at `status: review` for a human. `docs/agents/cezar.md`.
 - The backlog contract, label vocabulary and triage rules are `docs/agents/issue-tracker.md` and
   `docs/agents/triage-labels.md`.
+- `claude-code-review.yml` reviews every pull request, when `CLAUDE_CODE_OAUTH_TOKEN` is set. It is
+  deliberately hard to leave red for a reason that is not a finding: a missing credential and a
+  spent usage limit both end the job green with a warning
+  (`scripts/ci/claude-usage-limit.mjs`).
 
 ## Documentation
 
