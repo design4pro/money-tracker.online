@@ -1,0 +1,87 @@
+name: Promote develop
+
+# Git Flow's promotion leg, kept open automatically: after every push to `develop` - which is
+# every merge into staging - this opens the `develop` → `main` pull request if one is not already
+# open, and otherwise leaves the existing one alone. It never merges anything; a human still
+# reviews and merges, and merging is what deploys production (deploy-production.yml).
+#
+# ADR 0003 names the drift between the two long-lived branches as the cost of this flow, and
+# cadence as the only mitigation. A promotion pull request that always exists is what makes the
+# cadence visible: the diff to production is on screen from the first merge into staging.
+#
+# ── The token, and why there are two ──────────────────────────────────────────────────────────
+# A pull request opened with the default GITHUB_TOKEN does not trigger `pull_request` workflows,
+# so it shows no checks of its own. Set the repository secret `PROMOTE_PR_TOKEN` - a fine-grained
+# PAT or a GitHub App installation token with `contents: read` and `pull requests: write` on this
+# repository - and the promotion pull request runs ci.yml, a11y.yml and claude-code-review.yml
+# like any other.
+#
+# Without that secret the expression below falls back to GITHUB_TOKEN and the workflow still
+# works; only the checks are missing. That is survivable, because ci.yml and a11y.yml also run
+# `on: push: branches: [main, develop]`, so the exact commit being promoted has already been
+# through the full gate on `develop`.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+# One at a time: two pushes landing together must not race into two duplicate pull requests.
+concurrency:
+  group: promote-develop
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  promote:
+    name: Open the develop → main pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Open it, or report the one already open
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          existing=$(gh pr list --base main --head develop --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "::notice title=Promotion pull request::#${existing} is already open and now carries this commit."
+            exit 0
+          fi
+
+          # `main` is an ancestor of `develop` when there is nothing to promote - a just-merged
+          # promotion, or a fresh repo. `gh pr create` would fail red on that; it is not a failure.
+          if [ -z "$(git log --oneline origin/main..origin/develop)" ]; then
+            echo '::notice title=Nothing to promote::develop carries no commits main does not have.'
+            exit 0
+          fi
+
+          body=$(printf '%s\n' \
+            'Automated promotion pull request, opened by `.github/workflows/promote-develop.yml`.' \
+            '' \
+            'Merging this deploys **production**. It stays open and keeps collecting commits until a' \
+            'human merges it, so the diff between staging and production is always one click away.' \
+            '' \
+            'Before merging, check that staging has actually been exercised:' \
+            '<https://staging.money-tracker.online>.' \
+            '' \
+            'Every commit below has already passed the full gate on `develop`. Whether this pull' \
+            'request also runs its own checks depends on the token that opened it - see the header of' \
+            '`.github/workflows/promote-develop.yml`.')
+
+          gh pr create \
+            --base main \
+            --head develop \
+            --title 'chore(release): promote develop to main' \
+            --body "$body"

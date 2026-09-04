@@ -15,6 +15,10 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    # Git Flow: nothing targets `main` directly (docs/adr/0003-git-flow-develop-as-staging.md).
+    # Without this, Dependabot cuts from and targets the repository's default branch, which is
+    # `main` - a bump would skip staging entirely.
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -67,6 +71,7 @@ updates:
       - /
       - /.github/actions/setup
       - /.github/actions/e2e-env
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
