@@ -1,7 +1,6 @@
 <!--
 Conventional Commits in the title, in English: feat(transactions): …, fix(budgets): …,
-chore(deps): … . An in-loop agent commit is prefixed `RALPH:` instead; the pull request title
-still follows Conventional Commits.
+chore(deps): … . A Cezar run follows the same convention: there is no agent-only prefix.
 -->
 
 ## What changed

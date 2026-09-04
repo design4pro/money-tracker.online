@@ -114,11 +114,6 @@
   // coalescing window: a rebuild request arriving mid-rebuild sets a dirty bit instead of
   // queueing a second pass. The object holds no ledger data — a lock and a dirty bit — and
   // calls back into D1.
-  //
-  // No SANDCASTLE_REGISTRY here, and that is the point: the agent-run coordinator is bound on
-  // staging alone (see env.staging). A coordinator is only worth having if there is exactly one
-  // of it; a second registry would let two fleets each believe they hold the backlog, which is
-  // the failure it exists to prevent.
   "durable_objects": {
     "bindings": [{ "name": "LEDGER", "class_name": "AccountLedger" }],
   },

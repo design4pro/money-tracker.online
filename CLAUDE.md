@@ -31,7 +31,7 @@ changing any dependency. There are no bank connectors and adding one is out of s
   owner"): `docs/SPEC.md` §8. Accessibility conformance and what may be claimed: `docs/SPEC.md` §10.
 - User-facing copy is never hardcoded — it lives in the EN + PL catalogue and a new key lands in
   both locales in the same change (the parity test enforces this; contract: `docs/SPEC.md` §9).
-- Commits: Conventional Commits, in English. `RALPH:` prefixes are for in-loop agent commits only.
+- Commits: Conventional Commits, in English, agent runs included. There is no agent-only prefix.
 
 ## Domain
 

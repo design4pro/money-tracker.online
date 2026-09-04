@@ -232,7 +232,7 @@ The labels a plan-derived ticket carries, and the ones the automation reads. Ful
 | `prd` / `auto-advance`                                                 | The parent, and the sweeper's licence to advance its children                         |
 
 Body marker: `<!-- sentry-issue: SHORT-ID[#n] -->`.
-Commit prefixes: `RALPH:` for in-loop agent commits, Conventional Commits in English everywhere else.
+Commits: Conventional Commits in English, agent runs included. There is no agent-only prefix.
 
 ---
 
