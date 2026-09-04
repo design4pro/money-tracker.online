@@ -106,8 +106,8 @@ CI run of this suite falsified that, in both engines at once:
 - **mobile-safari** emitted it about `/assets/_app-*.js`, `useDrop`, `copy` and `eye-off` - Vite's
   own `modulepreload` hints for route chunks - in WebKit's wording, "preloaded for nothing".
 
-The distribution is what decides the verdict. Of 132 chromium tests **131 passed**; the two that
-did not were the two longest, and one of them was **flaky** - green on retry. A page that closes
+The distribution is what decides the verdict. Of the 133 chromium tests that ran, **131 passed**;
+the two that did not were the two longest, and one of them was **flaky** - green on retry. A page that closes
 before the browser's few-second timer never hears the advisory at all. The same document, rendered
 identically, is green or red depending on how long the test kept it open, which is the signature of
 a stopwatch rather than of a defect.
@@ -125,5 +125,8 @@ Whether those four chunks and two faces are preloaded to any purpose is a real p
 It is answered by a build measurement, not by a browser advisory that fires on a clock, and it is
 not this record's to answer.
 
-One consequence above can now be replaced by a number rather than a disclaimer: the suite has run.
-`e2e · chromium` took **5.6 minutes** of the job's 20, well inside the 15-minute `globalTimeout`.
+One consequence above can now be replaced by numbers rather than a disclaimer, measured on the
+first fully green run of this branch: Playwright reported **134 passed in 5.8 minutes** for
+chromium and **122 passed in 10.2 minutes** for mobile-safari, inside the 15-minute `globalTimeout`
+in both cases. The jobs' wall clocks were 10m29s and 12m03s, inside `timeout-minutes: 20`. The
+margin on mobile-safari is the thinner of the two and is the one to watch.

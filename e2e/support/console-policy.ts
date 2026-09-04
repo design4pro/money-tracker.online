@@ -69,8 +69,8 @@ export interface ConsoleReport {
  * - mobile-safari said it about `/assets/_app-*.js`, `useDrop`, `copy` and `eye-off`, which are
  *   Vite's own `modulepreload` hints for route chunks, in its own wording ("preloaded for nothing").
  *
- * The distribution is what settles it. Of 132 chromium tests **131 passed**, and the two that did
- * not were the two longest - one of them **flaky**, green on retry. A page that closes before the
+ * The distribution is what settles it. Of the 133 chromium tests that ran, **131 passed**, and the
+ * two that did not were the two longest - one of them **flaky**, green on retry. A page that closes before the
  * browser's few-second timer never hears the advisory at all, which is the signature of a clock,
  * not of a defect: the same document, rendered identically, is green or red depending on how long
  * the test kept it open.
