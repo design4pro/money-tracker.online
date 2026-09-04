@@ -26,9 +26,7 @@
       "Bash(git blame:*)",
       "Bash(git branch --list:*)",
       "Bash(git rev-parse:*)",
-      "Bash(git merge-base:*)",
-      "Bash(rtk read:*)",
-      "Bash(rtk gh:*)"
+      "Bash(git merge-base:*)"
     ],
     "deny": [
       "Bash(pnpm run deploy:*)",
