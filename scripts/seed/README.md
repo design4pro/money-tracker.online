@@ -113,7 +113,7 @@ forbids that, but it is a property of the fixture rather than of the domain.
 
 Once the wall clock leaves this month, bump `ANCHOR` in `seed.mjs` (and `EXPECTED_ANCHOR` in
 `verify.mjs`) and re-run. Do not reach for a clock — that is the one thing determinism costs, and
-paying it is cheaper than a suite of baselines that photographs whatever day it happened to be.
+paying it is cheaper than a suite whose counts and totals depend on which evening it ran.
 
 ### Internal transfers, and the four reference-amount cases
 

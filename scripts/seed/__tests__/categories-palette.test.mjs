@@ -15,8 +15,8 @@ import { CATEGORY_HUES } from '#/components/app/categories/palette'
  * Both defects were invisible in the seed itself; they only appeared two layers away, and only for
  * data nobody thought of as wrong.
  *
- * Nothing else can see this. The screenshot baselines record whatever colour the seed emits as
- * correct by definition, and no type connects a `.mjs` string literal to `CATEGORY_HUES`.
+ * Nothing else can see this. No type connects a `.mjs` string literal to `CATEGORY_HUES`, and the
+ * browser suite asserts that the picker has a tab stop, not which hue it lands on.
  */
 const HUES = new Set(CATEGORY_HUES.map((hue) => hue.value))
 

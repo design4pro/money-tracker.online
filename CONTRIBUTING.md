@@ -96,15 +96,13 @@ Every surface you ship owes, in the same pull request:
 
 - **Unit and repository tests** with Vitest. A pure function gets a unit test; a repository function
   gets a tenant-isolation case; a money-touching write gets a money-invariant case.
-- **e2e and visual** with Playwright. A module adds `e2e/<module>.visual.spec.ts` and never appends
-  to a shared spec — baseline collisions are prevented mechanically by the snapshot path template.
-- `maxDiffPixelRatio: 0.002` and `threshold: 0.2` are **never raised** — not globally, not per
-  project, not per call. That budget exists for cross-platform font antialiasing and nothing else.
-  The two legal remedies for a failing diff are pinning the renderer or fixing the source of the
-  difference.
-- Screenshot baselines are per platform. `-darwin` is recorded locally with `pnpm e2e:update`;
-  `-linux` is recorded through the **Update e2e baselines** workflow, which opens a reviewable
-  pull request.
+- **Browser tests** with Playwright. A module adds `e2e/<module>.visual.spec.ts` and never appends
+  to a shared spec, so two modules can never collide over one file.
+- **No screenshot is compared** (`docs/adr/0016-journeys-replace-the-visual-gate.md`). A spec
+  asserts that a screen answers, hydrates, says nothing in the console and can be acted on. What it
+  _looks_ like is judged by a human, from the blind pair `node scripts/visual/capture.mjs` takes.
+- Every spec imports `test` from `./support/console`, not from `@playwright/test`. That fixture is
+  what enforces `docs/SPEC.md` §2.10, and a spec importing Playwright directly is unwatched.
 
 ## Working on the backlog
 

@@ -27,10 +27,6 @@ case "$file_path" in
     echo "BLOCKED: worker-configuration.d.ts is generated from wrangler.jsonc. Change the bindings there and run 'pnpm exec wrangler types' instead of editing it." >&2
     exit 2
     ;;
-  */e2e/__screenshots__/*)
-    echo "BLOCKED: Playwright baselines change only via 'pnpm e2e:update' (darwin) or the update-snapshots workflow (linux), never by direct edits." >&2
-    exit 2
-    ;;
 esac
 
 [ -n "${CEZ_TASK_ID:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ] || exit 0

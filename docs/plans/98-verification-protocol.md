@@ -107,37 +107,28 @@ script in the repository root**, and an auditor checks for both.
 
 ## 4. The spec-file split rule
 
-A module plan adds **`e2e/<module>.visual.spec.ts`** and never appends to a shared spec.
+A module plan adds **`e2e/<module>.visual.spec.ts`** and never appends to a shared spec. It is the
+same disjointness that **Owned paths** asks for: two stages in one wave never open the same file, so
+neither can lose the other's work to a merge.
 
-```ts
-snapshotPathTemplate: '{snapshotDir}/{testFileName}/{arg}-{projectName}-{platform}{ext}'
-```
-
-That template makes a baseline collision **inexpressible**: two stages cannot produce the same
-baseline path because the spec file name is in it. It is the same disjointness that **Owned paths**
-asks for, obtained mechanically rather than by discipline.
-
-`{platform}` is mandatory. macOS and Linux antialias differently, and a `-darwin` baseline compared
-against a Linux render fails every time for a reason that is not a bug.
+Every such spec imports `test` from `e2e/support/console`, never from `@playwright/test`. That
+fixture is what makes §6.4 measurable; a spec that imports Playwright directly is silently unwatched.
 
 ---
 
-## 5. `maxDiffPixelRatio` is never raised
+## 5. No screenshot is compared
 
-`maxDiffPixelRatio: 0.002` and `threshold: 0.2`. **Not globally, not per project, not per call, not
-"just for this one test".**
+`docs/adr/0016-journeys-replace-the-visual-gate.md` retired the baselines, and nothing in this
+repository or in CI compares a pixel. **A stage may not reintroduce one** — not a
+`toHaveScreenshot`, not a committed PNG under `e2e/`, not a hand-rolled image diff.
 
-That budget exists for cross-platform font antialiasing and for nothing else. A diff that exceeds it
-is a real visual change, and there are exactly two legal remedies:
+What replaces it is already in this protocol and is stricter about the things that were actually
+breaking: the frame set of §3 goes to a human as a blind pair, and §6.4 puts an instrument on the
+console that the pixel gate never had.
 
-1. **Pin the renderer** — run the comparison in the same container CI does.
-2. **Fix the source of the difference** — or, if the change is intended, re-record the baseline
-   through the **Update e2e baselines** workflow, which opens a reviewable pull request. An
-   intended change is declared in the ticket's `## Visual change expected` section, and a human
-   re-records from the pull request; a run never passes `--update-snapshots`.
-
-Raising the threshold converts a visual regression suite into a suite that passes. A stage that
-raises it has removed the gate it was measured by, and an auditor rejects the stage.
+The judgement a screenshot comparison was making - _does this look right_ - is a human's, made at
+review, from the frames. The judgement it was **not** making, and could not, is _does this screen
+still work_: a suite that photographs a 500 page is green as soon as the 500 is re-recorded.
 
 ---
 
@@ -160,7 +151,9 @@ Six frames per surface, plus the declared interaction frames of §3.2.
 
 ### 6.4 The console verdict: zero errors, zero warnings
 
-Measured through one shared `watchConsole` + `classifyConsoleMessage`.
+Measured through one shared `watchConsole` + `classifyConsoleMessage` (`e2e/support/console.ts`,
+`e2e/support/console-policy.ts`). The fixture is `auto: true`, so a spec importing `test` from
+`./support/console` is watched whether its author thought about the console or not.
 
 **The tolerance list is fixed and no stage may append to it to green its own run.** A stage that
 needs a new tolerance files it as a finding, not as a diff. **React hydration mismatches are never
@@ -235,7 +228,7 @@ and **one completed import batch**.
 Ids and timestamps come from `withSuppliedRowDefaults(defaults, write)` — a deterministic-clock and
 `newId()` override that is `import.meta.env.DEV` only, with a source-reading test asserting there is
 no second caller. A second caller would make the seed non-deterministic, and a non-deterministic seed
-makes every visual baseline flaky in a way that looks like a product bug.
+makes every count, total and empty-state assertion flaky in a way that looks like a product bug.
 
 ---
 

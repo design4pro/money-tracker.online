@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The only exit of an implement run. Green: push `claude/issue-<n>-<run8>`, open a draft PR
-# to develop labelled `agent-pr` (+ `needs-e2e` when the ladder saw UI), move the ticket to
+# to develop labelled `agent-pr`, move the ticket to
 # `status: review`. Blocked: commit and push the WIP, leave a digest, `status: needs-human`.
 # A diff that touches the agent's own configuration or package.json's scripts never pushes.
 # Never closes the issue (the sweeper does, after the merge). Always frees the port.
@@ -115,12 +115,13 @@ if [ -z "$PR" ]; then
     if [ -s "$AGENT_DIR/review.md" ]; then printf '## Self-review\n\n%s\n\n' "$(cat "$AGENT_DIR/review.md")"; fi
     if [ -s "$AGENT_DIR/noticed.md" ]; then printf '## Noticed but not touching\n\n%s\n\n' "$(cat "$AGENT_DIR/noticed.md")"; fi
     if grep -q '^## Visual change expected' <<<"$BODY_ISSUE"; then
-      printf 'Baselines: the ticket declares a visual change; run update-snapshots.yml with commit-to-ref=%s before merging.\n\n' "$BRANCH"
+      printf 'Visual change: the ticket declares one, and nothing in CI photographs it (ADR 0016). Run `node scripts/visual/capture.mjs` over the affected screens and look at the pair before merging.\n\n'
     fi
     printf '<!-- agent-run: %s -->\n' "$RUN_ID"
   } | neutralise > "$PR_BODY"
+  # The browser suite runs on every pull request since ADR 0016, so there is no label to ask for
+  # it with any more.
   LABELS=(--label agent-pr)
-  [ "$UI" = "true" ] && LABELS+=(--label needs-e2e)
   PR_URL=$(gh pr create --repo "$REPO" --draft --base "$BASE" --head "$BRANCH" "${LABELS[@]}" \
     --title "$(printf '%s (refs #%s)' "$TITLE" "$N" | neutralise)" --body-file "$PR_BODY")
   rm -f "$PR_BODY"

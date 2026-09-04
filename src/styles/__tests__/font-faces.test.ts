@@ -12,8 +12,7 @@ import { expect, it } from 'vitest'
  * Fallback'` for the whole of this product's life so far, and neither existed.
  * There was no `@font-face`, no file, no package and no link tag. Every heading
  * rendered in `Avenir Next` on a Mac and in the platform UI font everywhere
- * else, `DESIGN.md` documented a typeface nobody had ever seen on the site, and
- * the visual baselines froze that substitution as the correct answer.
+ * else, and `DESIGN.md` documented a typeface nobody had ever seen on the site.
  *
  * It is the same silent direction `token-classes.test.ts` was written for: a
  * defect that removes design rather than changing it. A missing font is not a

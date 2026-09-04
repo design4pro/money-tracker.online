@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/console'
 
 import { gotoApp, uniqueToken } from './support/app'
 import { storageStateFor } from './support/session'
@@ -284,5 +284,33 @@ test.describe('the entry form, from the keyboard', () => {
     // "enter an amount" beside a box that visibly contains one.
     await expect(amount).toHaveValue('')
     await expect(page.getByRole('textbox', { name: 'Note' })).toHaveValue('')
+  })
+
+  test('saving does not disable the field the caret is sitting in', async ({
+    page,
+  }) => {
+    // The amount holds focus at the moment every save starts — it is the first control, it takes
+    // focus on arrival, and `Ctrl`/`⌘ + Enter` puts the caret straight back into it. Disabling it
+    // while it is focused makes the browser fire `blur` in the middle of React's commit, and React
+    // Aria's number field commits its typed text from that handler with `flushSync` — which React
+    // reports as "flushSync was called from inside a lifecycle method". Nothing visible breaks, so
+    // the console is the only place it is ever said, and the focus the reader loses to `<body>` for
+    // the length of the round trip is the part that actually costs them something.
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        consoleErrors.push(message.text())
+      }
+    })
+
+    await gotoApp(page, '/transactions/new')
+    const amount = page.getByRole('textbox', { name: 'Amount' })
+    await expect(amount).toBeFocused()
+
+    await page.keyboard.type('9.99')
+    await page.keyboard.press('Control+Enter')
+    await expect(amount).toHaveValue('')
+
+    expect(consoleErrors, 'a save must not write to the console').toEqual([])
   })
 })

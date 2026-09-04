@@ -18,9 +18,9 @@
  * The seed is anchored to a constant (`ANCHOR` in `scripts/seed/seed.mjs`) and reads no clock, so
  * the fixture itself never moves. The *comparison* does. Left to the wall clock, the relationship
  * between the fixture and today advances every midnight, and with it every budget bar, every due
- * badge and the month the dashboard lands on - so a screenshot baseline recorded one evening is
- * photographing a different application the next morning. No tolerance absorbs that: a row leaving
- * a list moves everything below it.
+ * badge and the month the dashboard lands on - so a spec that asserts a count, a total or an empty
+ * state passes one evening and fails the next morning. A row leaving a list moves everything below
+ * it.
  *
  * So a development request may name the day, and `x-mt-server-today` is how. Both browser projects
  * in `playwright.config.ts` send it on every request their context makes - the SSR document and the

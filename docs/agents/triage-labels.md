@@ -6,24 +6,23 @@ else is state. The vocabulary is closed: 19 labels, listed here, and no others.
 
 ## Vocabulary
 
-| Label                                                   | Written by                                  | Meaning                                                                               |
-| ------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `status: triage`                                        | issue forms                                 | new, not yet reproduced; a triage run picks it up                                     |
-| `status: needs-info`                                    | triage                                      | triage needs an answer from the reporter (questions in a comment)                     |
-| `status: backlog`                                       | triage (`needs-plan`)                       | a feature or idea waiting for a plan run or a decision                                |
-| `status: queued`                                        | publish-tickets, sweeper                    | a ticket with an open native blocker                                                  |
-| `status: ready`                                         | triage, publish-tickets, sweeper            | specified and unblocked; `run: implement` may claim it                                |
-| `status: in-progress`                                   | **claim scripts only**                      | a run holds it (a PRD keeps it while any child is open)                               |
-| `status: review`                                        | handback, publish-spec/prd/tickets          | an artefact waits for a human: a draft PR, a spec, a PRD, tickets                     |
-| `status: needs-human`                                   | handback `--blocked`, triage, sweeper       | a workflow could not finish; the comment says why                                     |
-| `run: triage`                                           | a human                                     | command: (re)triage; bypasses the "already triaged" marker                            |
-| `run: implement`                                        | a human; the sweeper under `auto-advance`   | command: implement this ticket                                                        |
-| `type: bug` / `feature` / `enhancement` / `maintenance` | issue forms, triage                         | mandatory on every issue without a parent; absent on tickets (they inherit the PRD's) |
-| `prd`                                                   | publish-prd                                 | parent issue: title `PRD: …`, body `prd/v1`; its sub-issues are the tickets           |
-| `auto-advance`                                          | a human, on an open PRD only                | the sweeper adds `run: implement` to each child as it unblocks                        |
-| `agent-pr` (PR)                                         | handback                                    | a draft PR opened by an implement run                                                 |
-| `needs-e2e` (PR)                                        | handback when the ladder reports UI touched | run the browser suite in `ci.yml`                                                     |
-| `agent-docs` (PR)                                       | cez-docs-pr                                 | a PR carrying `CONTEXT.md` or ADR changes from a plan run                             |
+| Label                                                   | Written by                                | Meaning                                                                               |
+| ------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| `status: triage`                                        | issue forms                               | new, not yet reproduced; a triage run picks it up                                     |
+| `status: needs-info`                                    | triage                                    | triage needs an answer from the reporter (questions in a comment)                     |
+| `status: backlog`                                       | triage (`needs-plan`)                     | a feature or idea waiting for a plan run or a decision                                |
+| `status: queued`                                        | publish-tickets, sweeper                  | a ticket with an open native blocker                                                  |
+| `status: ready`                                         | triage, publish-tickets, sweeper          | specified and unblocked; `run: implement` may claim it                                |
+| `status: in-progress`                                   | **claim scripts only**                    | a run holds it (a PRD keeps it while any child is open)                               |
+| `status: review`                                        | handback, publish-spec/prd/tickets        | an artefact waits for a human: a draft PR, a spec, a PRD, tickets                     |
+| `status: needs-human`                                   | handback `--blocked`, triage, sweeper     | a workflow could not finish; the comment says why                                     |
+| `run: triage`                                           | a human                                   | command: (re)triage; bypasses the "already triaged" marker                            |
+| `run: implement`                                        | a human; the sweeper under `auto-advance` | command: implement this ticket                                                        |
+| `type: bug` / `feature` / `enhancement` / `maintenance` | issue forms, triage                       | mandatory on every issue without a parent; absent on tickets (they inherit the PRD's) |
+| `prd`                                                   | publish-prd                               | parent issue: title `PRD: …`, body `prd/v1`; its sub-issues are the tickets           |
+| `auto-advance`                                          | a human, on an open PRD only              | the sweeper adds `run: implement` to each child as it unblocks                        |
+| `agent-pr` (PR)                                         | handback                                  | a draft PR opened by an implement run                                                 |
+| `agent-docs` (PR)                                       | cez-docs-pr                               | a PR carrying `CONTEXT.md` or ADR changes from a plan run                             |
 
 A command is not a state: the claim script removes the `run:` label as its first action, and adding
 the next command is how a human accepts the previous artefact. There is no priority axis; "visual

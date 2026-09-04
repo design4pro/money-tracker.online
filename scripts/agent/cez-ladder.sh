@@ -56,7 +56,7 @@ write_digest() { # verdict-json label
     echo
     if [ "$(jq '.e2e.failed | length' "$v")" -gt 0 ]; then
       echo "## Failed specs"
-      jq -r '.e2e.failed[] | "- \(.title)\n  \(.error // "" | gsub("\n"; " ") | .[0:300])\(if .snapshotDiff then "\n  diff: " + .snapshotDiff else "" end)"' "$v"
+      jq -r '.e2e.failed[] | "- \(.title)\n  \(.error // "" | gsub("\n"; " ") | .[0:300])"' "$v"
       echo
     fi
     for name in $(jq -r '.steps[] | select(.ok | not) | .name' "$v"); do
