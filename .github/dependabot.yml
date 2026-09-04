@@ -2,8 +2,8 @@
 #
 # `type: maintenance` says what the change is, and it is the only label here. A `status:` is a
 # label on an issue, never on a pull request (docs/adr/0014-label-protocol.md), and none of the
-# three pull-request labels applies to a bot's bump: `agent-pr` and `agent-docs` mean a run opened
-# it, and `needs-e2e` is an escape hatch a human pulls.
+# two pull-request labels applies to a bot's bump: `agent-pr` and `agent-docs` both mean a run
+# opened it.
 #
 # Two pins are load-bearing and are NOT ignored here, because a bump to either has to be followed
 # by a matching edit and it is better that the pull request exists and goes red:

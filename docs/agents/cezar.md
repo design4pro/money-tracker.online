@@ -69,8 +69,7 @@ hooks in `.claude/hooks/` then tighten:
   cezar run state and `.agent/handoff*`.
 - `guard-generated.sh` also refuses edits under `.github/`, `.claude/`, `.husky/`, `.ai/cezar/`,
   `scripts/agent/`, `.npmrc` and `pnpm-workspace.yaml`, on top of the generated files it already
-  refuses for everyone (`src/routeTree.gen.ts`, `drizzle/`, `worker-configuration.d.ts`,
-  `e2e/__screenshots__/`).
+  refuses for everyone (`src/routeTree.gen.ts`, `drizzle/`, `worker-configuration.d.ts`).
 
 Workflows give the agent a `bashAllowlist` of prefixes; every entry must be safe for any suffix,
 which is why the scripts below have closed argument spaces and why repo code always runs under
@@ -90,7 +89,7 @@ claude-code-action.
 | `cez-reseed.sh`                                 | agent (allowlist)                   | `scripts/seed/seed.mjs --force` + `verify.mjs` on the pinned port                                                                                                                                                                                                                        |
 | `gh-ro.sh <path> [--paginate] [--jq]`           | agent (allowlist)                   | GET-only window onto `repos/design4pro/money-tracker.online/{issues,pulls,labels,commits,compare,contents,git/ref,search}`                                                                                                                                                               |
 | `cez-claim.sh`                                  | workflow `implement-ticket` (claim) | per-issue lock, refresh onto `origin/develop`, one-call preflight (open, `run: implement`, `ready`/`needs-human`, leaf, no open blocker, no open agent PR); a refusal drops `run:` and comments `refused`; a claim swaps to `in-progress` and adopts a clean `claude/issue-<n>-*` branch |
-| `cez-handback.sh [--blocked --reason]`          | agent (allowlist)                   | green: push `claude/issue-<n>-<run8>`, draft PR `agent-pr` (+ `needs-e2e`), `status: review`, `CEZ:PR=<n>`; blocked: WIP pushed, digest, `status: needs-human`; protected paths or `package.json` scripts never push; frees the port                                                     |
+| `cez-handback.sh [--blocked --reason]`          | agent (allowlist)                   | green: push `claude/issue-<n>-<run8>`, draft PR `agent-pr`, `status: review`, `CEZ:PR=<n>`; blocked: WIP pushed, digest, `status: needs-human`; protected paths or `package.json` scripts never push; frees the port                                                                     |
 | `cez-automations.sh [--dry-run]`                | operator                            | registers `docs/agents/cezar-automations.json` with the running cezar over its API (create enabled or update in place)                                                                                                                                                                   |
 | `cez-triage-claim.sh`                           | workflow `triage` (claim)           | per-issue lock, refresh onto `origin/develop`, preflight (open, leaf, not held, not in review); without `run: triage` only `status: triage` without the `<!-- agent-triage -->` marker qualifies, and a stand-down writes nothing                                                        |
 | `triage-apply.sh [--check]`                     | agent (allowlist)                   | the only writer of a verdict: `.agent/triage.json` + `triage/notes.md` (+ `triage/brief.md`, a `ticket/v2` body, for `promoted`) → the `<!-- agent-triage -->` comment, the brief into the body, `status: ready \| needs-info \| backlog \| needs-human`; never closes                   |
@@ -147,8 +146,9 @@ PRD lets the sweeper add the label to children as they unblock.
   `security`, `infra`) means a pushed WIP branch and `status: needs-human` with the digest.
 - The handback refuses a tree the ladder did not see (`.agent/ladder-tree`) and never pushes a diff
   that touches the agent's own configuration or `package.json` scripts. A ticket with a "Visual change
-  expected" section gets a baseline note in the PR; the human re-records with `pnpm e2e:update` or the
-  update-snapshots workflow.
+  expected" section gets a note in the PR telling the human to take the blind pair with
+  `node scripts/visual/capture.mjs` and look at it before merging - nothing in CI photographs a
+  screen (ADR 0016).
 - Locally the same skill runs as `/implement-ticket <issue>` on a branch off `origin/develop` with
   `.agent/issue` written by hand; the handback then uses the developer's `gh`.
 

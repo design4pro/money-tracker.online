@@ -74,7 +74,8 @@ Every surface, every stage, without amendment. A stage that ships nine of these 
 9. **Every chart** ships a visually-hidden data table, keyboard-reachable points, and a non-colour
    encoding.
 10. **Zero console errors or warnings, zero layout shift after paint**, and a clean
-    `@axe-core/playwright` run — no `serious`, no `critical`, every `moderate` waiver named.
+    `@axe-core/playwright` run — no `serious`, no `critical`, every `moderate` waiver named. The
+    console half is enforced by `e2e/support/console.ts`, which watches every browser test.
 
 The visual reference for the benchmark comparison is captured by the advisory pixel loop described
 in `docs/agents/reference.md`; it never blocks a merge, and the ten clauses above do.
@@ -271,6 +272,8 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    case; a new money-touching write path has a money-invariant case.
 4. The feature is visually verified in a real browser: light and dark, 360px and 1280px at minimum,
    with the interaction state that is the point of the change captured, not just the resting state.
+   Nothing in CI compares a screenshot (ADR 0016), so this point is the whole visual judgement:
+   take the pair with `node scripts/visual/capture.mjs` and look at it.
 5. No TODOs, no placeholder copy, no `console.log`, no commented-out code left behind.
 6. You did not touch files outside your assigned ownership.
 7. **Every number you write down was produced by a command, not by an impression.** A count of

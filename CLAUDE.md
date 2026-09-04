@@ -11,8 +11,9 @@ changing any dependency. There are no bank connectors and adding one is out of s
 - `pnpm dev` — dev server on :3000
 - `pnpm typecheck` / `pnpm lint` / `pnpm test` — the fast feedback trio; run all three before committing
 - `pnpm build` — production build (`CLOUDFLARE_ENV=staging pnpm build` for staging)
-- `pnpm e2e` — Playwright visual, i18n and axe suites (needs local D1 migrations and the seed)
-- `pnpm e2e:update` — re-record baselines for the current platform only
+- `pnpm e2e` — Playwright behaviour, i18n and axe suites (needs local D1 migrations and the seed).
+  Nothing compares a pixel: ADR 0016 retired the baselines, and a visual change is judged by
+  `node scripts/visual/capture.mjs` and a human.
 - `pnpm generate-routes` — regenerate the route tree; `src/routeTree.gen.ts` is generated, never hand-edit
 - `pnpm db:generate` — generate a Drizzle migration; `drizzle/` is generated, never hand-edit
 - `pnpm db:migrate:local` — apply migrations to the local D1

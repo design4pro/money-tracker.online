@@ -54,10 +54,10 @@ vitest, `pnpm build`, and chromium e2e when the diff touches UI, and writes
 `.agent/ladder-digest.md`. Three passes per run: read the digest, fix the cause, run it again.
 `--skip-e2e` is for a diff that provably touches no UI path; a narrowed green never counts.
 
-Only one shape of e2e failure earns a rerun without a change: a timeout with no pixel count
-and no assertion diff. Never pass `--update-snapshots` and never edit `e2e/__screenshots__`;
-an intended pixel change exists only when the ticket has a "Visual change expected" section,
-and then the human re-records baselines from the PR.
+Only one shape of e2e failure earns a rerun without a change: a timeout with no assertion diff
+and no console entry. Nothing compares a screenshot (ADR 0016), so there is no such thing as a
+frame to re-record: a red console is the application talking and is fixed in the application,
+never by appending to `TOLERATED_CONSOLE_WARNINGS`.
 
 ## Stop conditions
 
@@ -98,8 +98,8 @@ Each of these has been said in this repo by an agent that then burned its whole 
 
 Stop and hand back blocked instead of doing any of these: hand-editing generated files; adding
 `@ts-ignore`, `@ts-expect-error`, `eslint-disable`, or widening to `any`; deleting or weakening
-an assertion, `test.skip`, `.only`; editing `e2e/__screenshots__`; editing outside Owned paths;
-adding a second way to do something the repo already does one way.
+an assertion, `test.skip`, `.only`; appending to `TOLERATED_CONSOLE_WARNINGS` to green a run;
+editing outside Owned paths; adding a second way to do something the repo already does one way.
 
 ## Before the handback
 
@@ -117,7 +117,7 @@ adding a second way to do something the repo already does one way.
 scripts/agent/cez-handback.sh
 ```
 
-The script pushes `claude/issue-<n>-<run8>`, opens a draft PR labelled `agent-pr` (and
-`needs-e2e` when the ladder saw UI), moves the ticket to `status: review` and prints
+The script pushes `claude/issue-<n>-<run8>`, opens a draft PR labelled `agent-pr`, moves the
+ticket to `status: review` and prints
 `CEZ:PR=<n>`. Repeat that line in your final message, then end with `CEZ:DONE`. Every run ends
 through the handback, green or blocked.

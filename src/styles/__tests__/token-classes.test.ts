@@ -12,8 +12,7 @@ import { expect, it } from 'vitest'
  *
  * A Tailwind class naming a token nobody registered fails **silently**. It is
  * not a type error, not a lint error, and not an axe violation — the utility
- * simply emits no rule, the element keeps whatever it inherits, and the
- * screenshot baseline then freezes the result as correct. `bg-surface-2`,
+ * simply emits no rule and the element keeps whatever it inherits. `bg-surface-2`,
  * `border-line` and `border-edge-strong` survived that way (names carried over
  * from `DESIGN.md`'s older vocabulary), and so did four `border-border` rows
  * whose `<tbody>` siblings three lines below spelled `border-border-subtle`
@@ -63,7 +62,8 @@ import { expect, it } from 'vitest'
  *   the four template literals in `src/routes/index.tsx` concatenate whole
  *   constants that are literals elsewhere, which the scanner reads normally.
  * - **Right token, wrong token.** `bg-surface` where `bg-surface-sunken` was
- *   meant resolves fine and always will. That stays review and baseline work.
+ *   meant resolves fine and always will. That stays review work, on the frames
+ *   `scripts/visual/capture.mjs` takes.
  * - **Tokens with no consumer.** The opposite direction — a token declared in
  *   `tokens.css` that nothing uses — is not checked here.
  */

@@ -34,9 +34,10 @@
  * never records its network traffic, and never writes its name into a filename. See
  * `docs/agents/reference.md`.
  *
- * It deliberately does NOT record anything under `e2e/__screenshots__`. Those baselines are compared
- * pixel for pixel across machines and belong to Playwright's own projects; this script writes only
- * into the `--out` directory it is given, for a blind critic to look at.
+ * Nothing in this repository compares a screenshot (ADR 0016), and this script is what took the
+ * comparison's place: it writes only into the `--out` directory it is given, outside the
+ * repository, for a blind critic to look at. A frame it takes is evidence for a human, never an
+ * assertion.
  *
  * Usage:
  *   node scripts/visual/capture.mjs \
@@ -311,7 +312,7 @@ async function main() {
     timezoneId: 'UTC',
   })
 
-  // The clock the Worker reads, pinned to the same day as the baselines. Scoped to this origin by
+  // The clock the Worker reads, pinned to the same day the browser suite pins. Scoped to this origin by
   // hand rather than set context-wide: a custom header on a cross-origin request turns a font or
   // icon fetch into a preflight the third party rejects, and every frame then records the fallback
   // face. The reference host never sees it either, which is the point — it is our own dev-only

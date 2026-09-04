@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/console'
 
 import { gotoApp, useLocale, useTheme } from './support/app'
 // The axe-core meter defect is corrected in `support/axe-defects.ts` rather than here, because

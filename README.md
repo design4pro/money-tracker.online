@@ -35,20 +35,19 @@ also the reference for the steps to run locally.
 
 ## Scripts
 
-| Script                  | What it does                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev`              | Vite dev server with the Cloudflare plugin, on :3000                            |
-| `pnpm build`            | Production build. `CLOUDFLARE_ENV=staging pnpm build` builds the staging Worker |
-| `pnpm typecheck`        | `tsc --noEmit`                                                                  |
-| `pnpm lint`             | ESLint. `pnpm lint:fix` writes                                                  |
-| `pnpm test`             | Vitest (unit + repository). `pnpm test:watch`, `pnpm test:coverage`             |
-| `pnpm e2e`              | Playwright: visual, i18n and accessibility suites. `pnpm e2e:ui` for the runner |
-| `pnpm e2e:update`       | Re-record screenshot baselines **for the current platform only**                |
-| `pnpm generate-routes`  | Regenerate `src/routeTree.gen.ts` — generated, never hand-edited                |
-| `pnpm db:generate`      | Generate a Drizzle migration into `drizzle/` — generated, never hand-edited     |
-| `pnpm db:migrate:local` | Apply migrations to the local D1                                                |
-| `pnpm deploy`           | Build then `wrangler deploy` (production)                                       |
-| `pnpm deploy:staging`   | `CLOUDFLARE_ENV=staging` build then deploy                                      |
+| Script                  | What it does                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm dev`              | Vite dev server with the Cloudflare plugin, on :3000                               |
+| `pnpm build`            | Production build. `CLOUDFLARE_ENV=staging pnpm build` builds the staging Worker    |
+| `pnpm typecheck`        | `tsc --noEmit`                                                                     |
+| `pnpm lint`             | ESLint. `pnpm lint:fix` writes                                                     |
+| `pnpm test`             | Vitest (unit + repository). `pnpm test:watch`, `pnpm test:coverage`                |
+| `pnpm e2e`              | Playwright: behaviour, i18n and accessibility suites. `pnpm e2e:ui` for the runner |
+| `pnpm generate-routes`  | Regenerate `src/routeTree.gen.ts` — generated, never hand-edited                   |
+| `pnpm db:generate`      | Generate a Drizzle migration into `drizzle/` — generated, never hand-edited        |
+| `pnpm db:migrate:local` | Apply migrations to the local D1                                                   |
+| `pnpm deploy`           | Build then `wrangler deploy` (production)                                          |
+| `pnpm deploy:staging`   | `CLOUDFLARE_ENV=staging` build then deploy                                         |
 
 `pnpm typecheck`, `pnpm lint` and `pnpm test` are the fast feedback trio: run all three before
 committing. Two files in this repository are generated and a hand edit to either is a build
@@ -63,10 +62,11 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
 - Promotion is a pull request `develop` → **`main`**; merging deploys **production**:
   https://money-tracker.online (`deploy.yml`).
 - `ci.yml` runs lint · typecheck · unit tests · build · the route-tree and migration drift checks
-  on every pull request; the e2e visual gate runs on push and on PRs labelled `needs-e2e`.
-- Screenshot baselines are per platform: `-darwin` recorded locally with `pnpm e2e:update`,
-  `-linux` re-recorded through the manual **Update e2e baselines** workflow, which opens a
-  reviewable pull request rather than committing to your branch.
+  and the browser suite on every pull request.
+- No screenshot is compared anywhere: `docs/adr/0016-journeys-replace-the-visual-gate.md` retired
+  the baselines. What a screen _looks_ like is judged by `node scripts/visual/capture.mjs` and a
+  human at review; what the suite asserts is that the screen answers, hydrates, says nothing in
+  the console and can be acted on.
 
 Rationale: `docs/adr/0003-git-flow-develop-as-staging.md`.
 

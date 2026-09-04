@@ -44,7 +44,6 @@ type: maintenance
 prd
 auto-advance
 agent-pr
-needs-e2e
 agent-docs'
 
 # `status: in progress` followed by U+FE0F (bytes EF B8 8F): the label whose name cannot be typed.
@@ -53,7 +52,13 @@ IN_PROGRESS_OLD=$(printf 'status: in progress\xEF\xB8\x8F')
 # Labels step 2 strips from every open issue, so step 3 may delete them without a use count.
 # The `priority:` family is here because the protocol has no priority axis and this repo, unlike
 # the one the protocol came from, does carry them on open issues: they are stripped, not migrated.
+#
+# `needs-e2e` (ADR 0016) is the odd one out: it is a *pull-request* label, so step 2 finds nothing
+# to strip and step 3's use count - `gh issue list`, which does not count pull requests - would
+# read 0 and delete it anyway. Listing it here makes that deletion a decision somebody wrote down
+# rather than a side effect of what `gh issue list` happens not to see.
 CLEARED_BY_RELABEL='ready-for-agent
+needs-e2e
 visual-change-expected
 status: pending
 status: on hold
@@ -136,7 +141,6 @@ ensure_label 'type: maintenance'   c2e0c6 'Internal work with no user-visible be
 ensure_label 'prd'                 6f42c1 'Parent issue: title PRD:, body prd/v1, its sub-issues are the tickets'
 ensure_label 'auto-advance'        8250df 'PRD only: the sweeper adds run: implement to each child as it unblocks'
 ensure_label 'agent-pr'            0e8a16 'Draft PR opened by an implement run'
-ensure_label 'needs-e2e'           0e8a16 'Run the Playwright visual gate on this PR (ci.yml e2e escape hatch)'
 ensure_label 'agent-docs'          c5def5 'PR carrying CONTEXT.md or ADR changes from a plan run'
 [ "$APPLY" = 1 ] && LABELS=$(labels_now)
 
@@ -237,6 +241,7 @@ LABELS=$(labels_now)
 printf '%s\n' "$LABELS" | grep -q "$(printf '\xEF\xB8\x8F')" && fail 'a label still carries U+FE0F'
 printf '%s\n' "$LABELS" | grep -Fxq 'ready-for-agent' && fail 'ready-for-agent still exists'
 printf '%s\n' "$LABELS" | grep -q '^priority: ' && fail 'a priority: label still exists'
+printf '%s\n' "$LABELS" | grep -Fxq 'needs-e2e' && fail 'needs-e2e still exists (ADR 0016)'
 printf '%s\n' "$LABELS" | while read -r l; do
   [ -n "$l" ] && ! in_list "$l" "$KEEP" && fail "label outside the protocol survived: $l" || true
 done
