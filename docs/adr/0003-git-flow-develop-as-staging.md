@@ -69,3 +69,33 @@ not need a label of its own to say where it came from; the issue body says that.
 gate it existed to make optional. The browser suite now runs on every pull request, unlabelled,
 like the rest of the gate. Everything else in this record stands: the flow, the two environments
 and the promotion pull request are unchanged.
+
+## Amendment 2026-09-04 (promotion tooling)
+
+Two gaps between this record and what the repository actually did, both now closed.
+
+**Dependabot was opening its bumps against `main`.** It carries no `target-branch`, and the default
+for that field is the repository's default branch - so every weekly bump proposed a change that
+skipped staging, in a flow whose whole premise is that `main` only receives what staging has already
+run. `.github/dependabot.yml` now sets `target-branch: develop` on both ecosystems. Pull requests
+opened before this change keep their old base; closing one makes Dependabot recut it against
+`develop`.
+
+**The promotion pull request is now opened by a workflow.** Every push to `develop` runs
+`.github/workflows/promote-develop.yml`, which opens `develop` → `main` if no such pull request is
+open and does nothing when one already is.
+
+That qualifies the sentence above - "the mitigation for the drift is cadence, not tooling" - without
+overturning it. The tooling does not promote anything and cannot: it opens a pull request and stops,
+and a human still reviews and merges, which is still the act that deploys production. What it
+removes is the case where the diff to production went unnoticed because nobody had opened the pull
+request that would have shown it. Cadence is still the mitigation; this only keeps the meter in
+sight.
+
+A pull request opened with the default `GITHUB_TOKEN` does not trigger `pull_request` workflows,
+so it would carry no checks. The workflow therefore reads `secrets.PROMOTE_PR_TOKEN` first and only
+falls back to `GITHUB_TOKEN`; setting that secret to a fine-grained PAT or a GitHub App token gives
+the promotion pull request the same checks as any other. The fallback is not a broken state - ci.yml
+and a11y.yml also run on push to `develop`, so the promoted commit has already been through the full
+gate - but it is the degraded one, and provisioning the secret belongs in the repository setup
+runbook.
