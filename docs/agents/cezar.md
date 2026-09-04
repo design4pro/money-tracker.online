@@ -24,6 +24,40 @@ writer that is not a run.
   `vite.config.ts` binds it with `strictPort`, so it belongs to the developer's own dev server and a
   worktree taking it would fight the person at the keyboard.
 
+## The cockpit process
+
+One cezar per host, not one per project. `cez serve` binds 127.0.0.1:4321 and answers
+`GET /api/v1/p/<id>/runs` for every repo in `cezar projects`, so a second checkout does not
+want a second cockpit - it wants `cezar projects add <repo root>`. Two cockpits are the failure
+mode worth naming: the second silently binds :4322, every sweeper on the host keeps reading 4321
+and never sees it, and both write the same `.ai/cezar/` state.
+
+Started by hand it does not survive a reboot, and the sweeper does - which leaves the host looking
+alive while nothing dispatches. Install it as a launchd job instead (template in
+`scripts/agent/launchd/`, installed once per host; every repo running this protocol carries the
+same copy and they share the `Label`, so a second `bootstrap` is refused rather than starting a
+duplicate):
+
+```bash
+sed -e "s|__NPX__|$(command -v npx)|g" -e "s|__REPO_ROOT__|$PWD|g" -e "s|__HOME__|$HOME|g" \
+  -e "s|__PATH__|$(dirname "$(command -v node)"):$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin|g" \
+  scripts/agent/launchd/dev.cezar.cockpit.plist > ~/Library/LaunchAgents/dev.cezar.cockpit.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.cezar.cockpit.plist
+```
+
+`--repo` only sets the boot context; the registry decides what is served. The `PATH` must carry
+everything a run spawns - `node`, `claude`, `git`, `gh`, `pnpm` - because the job deliberately
+does not go through a login shell: `bash -lc` sources `~/.profile`, and per the service-environment
+rule above, a key exported there would reach every agent run.
+
+Lifecycle is the same shape as the sweeper's below (`print`, `bootout`, `bootstrap`, `disable`,
+`enable`), with two differences: `KeepAlive` means launchd restarts it whenever it exits, so
+`bootout` is how you stop it rather than killing the pid; and `kickstart -k` is the restart after
+a version bump. Once it is installed, stop running bare `cezar` in a repo - that is `cezar serve`
+by another name and it will start the duplicate on :4322. Open <http://localhost:4321> instead.
+
+Log: `~/Library/Logs/cezar-cockpit.log`.
+
 ## Agent mode
 
 A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTIONS` is set. The
@@ -150,7 +184,34 @@ It reads GitHub (issues, PRs, claim comments, label timeline) and cezar's run li
 unreachable it reports and never escalates. Report mode prints violations and the actions `--fix`
 would take; `--strict` exits 1 when anything is off.
 
-Install (template in `scripts/agent/launchd/`):
+### One agent per repository
+
+The launchd job is not shared between projects, and installing it here does nothing for any other
+repo. Every part of it is per-project: the `Label`, the repo root it `cd`s into, the log path, and
+`sweep.mjs`'s own `GH_REPO` / `CEZ_PROJECT` defaults. Each repo running this protocol carries its
+own template under `scripts/agent/launchd/` - `dev.money-tracker.sweeper.plist` here,
+`dev.planned-travel.sweeper.plist` in `planned.travel` - and each needs its own install. launchd
+keys jobs by `Label`, so they coexist without touching each other. The cockpit above is the
+opposite case: one job for the whole host.
+
+### Prerequisite: the project is registered with a running cockpit
+
+One cezar serves many projects and answers `GET /api/v1/p/<id>/runs`; every copy of `sweep.mjs`
+reads `CEZ_API`, default `http://localhost:4321`. A project the cockpit does not know answers
+`404 unknown project`, the run list comes back null, and the sweeper prints
+`cezar UNREACHABLE (fail closed)` - a report with no run data, which reads exactly like a clean
+one. So register the project first, and check it answers:
+
+```bash
+cezar projects add <repo root>   # `cezar projects` lists what the cockpit serves
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4321/api/v1/p/money-tracker/runs   # want 200
+```
+
+Read the `cezar` field of the report, not just the violation count.
+
+### Install
+
+From the repo root, with `node` and `gh` on PATH:
 
 ```bash
 sed -e "s|__REPO_ROOT__|$PWD|g" -e "s|__PATH__|$(dirname "$(command -v node)"):$(dirname "$(command -v gh)"):/usr/bin:/bin|g" \
@@ -158,8 +219,41 @@ sed -e "s|__REPO_ROOT__|$PWD|g" -e "s|__PATH__|$(dirname "$(command -v node)"):$
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.money-tracker.sweeper.plist
 ```
 
-Remove with `launchctl bootout gui/$(id -u)/dev.money-tracker.sweeper`. Log:
-`.ai/cezar/tmp/sweeper.log`.
+That installs report mode. Promote it by appending `--fix` to the `ProgramArguments` string once
+the log has been clean for a day, then `bootout` and `bootstrap` again. Until then nothing is
+applied: a merged PR does not close its issue on its own.
+
+### Lifecycle
+
+| what                              | command                                                                                   |
+| --------------------------------- | ----------------------------------------------------------------------------------------- |
+| status, run count, last exit code | `launchctl print gui/$(id -u)/dev.money-tracker.sweeper`                                  |
+| run one sweep now                 | `launchctl kickstart gui/$(id -u)/dev.money-tracker.sweeper`                              |
+| stop until the next login         | `launchctl bootout gui/$(id -u)/dev.money-tracker.sweeper`                                |
+| start again after that            | `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.money-tracker.sweeper.plist` |
+| stop for good, keep the file      | `launchctl disable gui/$(id -u)/dev.money-tracker.sweeper`                                |
+| undo that                         | `launchctl enable gui/$(id -u)/dev.money-tracker.sweeper`                                 |
+| uninstall                         | `bootout`, then delete `~/Library/LaunchAgents/dev.money-tracker.sweeper.plist`           |
+
+`state = not running` between ticks is correct: each tick runs `sweep.mjs` to completion and exits.
+There is no `KeepAlive`, so a failed tick is not restarted, only retried 15 minutes later.
+
+### What survives a restart
+
+Persistence comes from the file in `~/Library/LaunchAgents/`, which launchd loads at every GUI
+login; `bootstrap` only saves you the logout. Consequences:
+
+- It is a LaunchAgent, not a LaunchDaemon: it starts at login, not at boot, and nothing runs before
+  the FileVault unlock or while the account is logged out.
+- `bootout` is not permanent - the job returns at the next login. `disable` is, and it survives
+  reboots.
+- macOS lists it under System Settings → General → Login Items & Extensions. Switching it off there
+  writes the same persistent disabled record, after which `bootstrap` fails with
+  `Service is disabled` (EIO 5); `launchctl enable` undoes it.
+- `StartInterval` ticks falling during sleep are missed rather than queued (a kqueue limitation), so
+  an overnight sleep costs one tick, not a burst. `RunAtLoad` fires once per login.
+
+Log: `.ai/cezar/tmp/sweeper.log`. launchd appends and nothing rotates it.
 
 ## Markers
 

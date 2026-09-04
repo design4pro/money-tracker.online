@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The cezar cockpit: one per host, not one per project. A single `cez serve` on 4321 answers
+     /api/v1/p/<id>/runs for every repo in `cezar projects`, so this file is installed once no
+     matter how many repos run the protocol. Every repo running this protocol carries the same
+     copy so it can bootstrap a host on its own; they share the Label, so whichever one you
+     install from, a second `bootstrap` is refused rather than starting a duplicate cockpit.
+
+     Template: replace __NPX__ with `command -v npx`, __PATH__ with a PATH holding node, claude,
+     git, gh and pnpm (cezar spawns all five inside a run), __REPO_ROOT__ with the boot repo and
+     __HOME__ with the home directory. Install per docs/agents/cezar.md.
+
+     Deliberately NOT `bash -lc`, unlike the sweeper: a login shell sources ~/.profile, and cezar
+     copies its own environment into every agent run, so a key exported there would become a key
+     in every run. The explicit PATH below is the whole environment the cockpit gets, plus the
+     two CEZ_ variables the workflows need.
+
+     `npx` resolves from a content-hashed cache that npm may collect; for a KeepAlive service
+     prefer `npm i -g @open-mercato/cezar@0.10.0` and point __NPX__ at the stable `cezar` binary
+     with the three npx arguments below removed. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.cezar.cockpit</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NPX__</string>
+    <string>--yes</string>
+    <string>@open-mercato/cezar@0.10.0</string>
+    <string>serve</string>
+    <string>--no-open</string>
+    <string>--port</string>
+    <string>4321</string>
+    <string>--repo</string>
+    <string>__REPO_ROOT__</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>__PATH__</string>
+    <key>CEZ_AUTOMATIONS</key>
+    <string>1</string>
+    <key>CEZ_AUTONOMOUS_DEFAULT</key>
+    <string>0</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>__REPO_ROOT__</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/cezar-cockpit.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/cezar-cockpit.log</string>
+</dict>
+</plist>
