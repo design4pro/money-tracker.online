@@ -6,6 +6,10 @@
  * The fixtures are the shapes `claude-execution-output.json` actually holds: a list of SDK
  * messages ending in one of `type: "result"`. The wording of the limit lines is the CLI's own, in
  * both the forms `scripts/ci/claude-usage-limit.mjs` documents.
+ *
+ * The absent-file cases are the other half of the contract and the reason the script exists at all:
+ * a repository the Claude Code GitHub App is not installed on produces no output whatsoever, and if
+ * that read as a corrupt file it would be red on every pull request forever.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -25,20 +29,30 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true })
 })
 
-/** Runs the script over `messages` and returns its exit code and output. */
-function run(messages) {
+/** Runs the script with the given environment and returns its exit code and output. */
+function runWith(env) {
+  const { status, stdout } = spawnSync(process.execPath, [script], {
+    encoding: 'utf-8',
+    env: { ...process.env, GITHUB_STEP_SUMMARY: '', RUNNER_TEMP: '', ...env },
+  })
+  return { status, stdout }
+}
+
+/** A scratch directory that outlives the call and is removed after the test. */
+function scratch() {
   const dir = mkdtempSync(join(tmpdir(), 'claude-limit-'))
   dirs.push(dir)
-  const file = join(dir, 'claude-execution-output.json')
+  return dir
+}
+
+/** Runs the script over `messages` and returns its exit code and output. */
+function run(messages) {
+  const file = join(scratch(), 'claude-execution-output.json')
   writeFileSync(
     file,
     typeof messages === 'string' ? messages : JSON.stringify(messages),
   )
-  const { status, stdout } = spawnSync(process.execPath, [script], {
-    encoding: 'utf-8',
-    env: { ...process.env, EXECUTION_FILE: file, GITHUB_STEP_SUMMARY: '' },
-  })
-  return { status, stdout }
+  return runWith({ EXECUTION_FILE: file })
 }
 
 /** A run that ended on `text`, in the shape the SDK reports a limit: no error list, no cost. */
@@ -115,7 +129,28 @@ describe('claude-usage-limit', () => {
     expect(run([{ type: 'system', subtype: 'init' }]).status).toBe(1)
   })
 
+  /**
+   * A file that exists is a run that happened, and a run we cannot read is a run we cannot vouch
+   * for. This is the case the two below must not be allowed to swallow.
+   */
   it('fails when the execution output is unreadable', () => {
     expect(run('{ not json').status).toBe(1)
+  })
+
+  /**
+   * Measured on PR #29: the Claude Code GitHub App was not installed, the app-token exchange
+   * answered 401, and the action exited before writing anything.
+   */
+  it('passes with a warning when the action wrote no execution output', () => {
+    const { status, stdout } = runWith({
+      EXECUTION_FILE: join(scratch(), 'claude-execution-output.json'),
+    })
+    expect(status).toBe(0)
+    expect(stdout).toContain('::warning::')
+    expect(stdout).toContain('github.com/apps/claude')
+  })
+
+  it('passes when the action failed before naming an output file at all', () => {
+    expect(runWith({ EXECUTION_FILE: '' }).status).toBe(0)
   })
 })
