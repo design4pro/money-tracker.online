@@ -28,7 +28,8 @@ changing any dependency. There are no bank connectors and adding one is out of s
 - `components/ui` never fetches data and never imports from `server/`.
 - Validate every server-function input with Zod, and parse it a second time in the repository.
   Named exports only (route modules excepted).
-- Definition of done for any task: `docs/SPEC.md` §7. Decomposition rule ("one concept, one
+- Definition of done for any task: `docs/SPEC.md` §7; how to reach it, and how to read a
+  confusing failure, is the `verifying-changes` skill. Decomposition rule ("one concept, one
   owner"): `docs/SPEC.md` §8. Accessibility conformance and what may be claimed: `docs/SPEC.md` §10.
 - User-facing copy is never hardcoded — it lives in the EN + PL catalogue and a new key lands in
   both locales in the same change (the parity test enforces this; contract: `docs/SPEC.md` §9).
