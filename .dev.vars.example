@@ -13,9 +13,9 @@
 # rule deliberately, and each argues the exception in its own comment rather than leaving it
 # silent: the billing environment switch, and the local APP_URL override at the bottom.
 #
-# GOTCHA, and it is the one that costs an afternoon: **a commented-out line is not a key.** The
-# sandcastle env resolver iterates the keys that appear in this file, and so does every reader
-# who treats it as the inventory. A name that exists only inside a `#` comment does not exist.
+# GOTCHA, and it is the one that costs an afternoon: **a commented-out line is not a key.** Every
+# reader treats this file as the inventory, so a name that exists only inside a `#` comment does
+# not exist.
 # If a secret is real, it gets an uncommented `NAME=` line here, empty value and all.
 #
 # A `.dev.vars.<environment>` file REPLACES this one wholesale instead of merging with it, so a
@@ -101,29 +101,6 @@ D1_DATABASE_ID=
 # change rather than a code change, and because the availability of a free, unowned rate feed on
 # a paid product is a known open risk. Unset, the keyless provider is used.
 FX_API_KEY=
-
-
-# ── Sandcastle coordinator (staging only; the route answers 503 without it) ──
-
-# Shared bearer token for /api/sandcastle/*, the registry every sandcastle run claims its GitHub
-# issues from. Set it on STAGING ALONE:
-#
-#   wrangler secret put SANDCASTLE_COORDINATOR_TOKEN --env staging
-#
-# and nowhere else. The SANDCASTLE_REGISTRY Durable Object is bound in `env.staging` only: a
-# coordinator is worth having only if there is exactly one of it, and a second registry would let
-# two fleets each believe they hold the backlog. Production has neither the binding nor this
-# name, and answers 503 to the whole route.
-#
-# Leave it blank locally unless you are working on the route itself. Local dev has no binding
-# either, so it 503s before it ever looks at this value; the AFK loop in `.sandcastle/` reads its
-# own copy from `.sandcastle/.env` and talks to deployed staging, not to your dev server.
-#
-# The same token goes in the repository's Actions secrets, so triage running as a workflow claims
-# from the registry the laptops claim from. Rotating it stops every run that has not been
-# restarted, which is the intended blast radius.
-# Generate: openssl rand -base64 32
-SANDCASTLE_COORDINATOR_TOKEN=
 
 
 # ── Error reporting (optional; the Worker reports nothing without it) ────────

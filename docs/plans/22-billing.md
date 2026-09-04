@@ -117,7 +117,7 @@ code, unconverted._ Cases in `polar-client.test.ts`:
 
 ### Definition of done
 
-All six §7 items; §2's visual clauses are carried by `22-S3`, stated explicitly.
+All seven §7 items; §2's visual clauses are carried by `22-S3`, stated explicitly.
 
 ### Blockers
 
@@ -235,7 +235,7 @@ _Billing state never touches ledger money, and plan numbers are counts, not amou
 
 ### Definition of done
 
-All six §7 items; §2 carried by `22-S3`.
+All seven §7 items; §2 carried by `22-S3`.
 
 ### Blockers
 
@@ -346,7 +346,7 @@ _The screen states the provider's price and the ledger's counts, and never confu
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

@@ -49,7 +49,13 @@ test('offers a way back to the list without using the browser button', async ({
 }) => {
   await gotoApp(page, '/recurring/candidates')
 
-  const back = page.locator('a[href="/recurring"]').first()
+  // Scoped to `<main>` on purpose. The rail links `/recurring` too and comes first in the
+  // document, but it is `display: none` below `lg` - matching it would pass on the desktop
+  // projects and fail on `mobile-safari`, which is the one viewport where a browser back button
+  // is hardest to reach. The affordance this test is about is the one inside the page.
+  const back = page
+    .getByRole('main')
+    .getByRole('link', { name: 'All recurring series' })
   await expect(back).toBeVisible()
 })
 

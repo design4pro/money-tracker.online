@@ -130,7 +130,7 @@ _Progress is the sum of linked transactions, and the cache is never the authorit
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -232,7 +232,7 @@ _The projection is arithmetic over integers and never invents progress._ Cases i
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

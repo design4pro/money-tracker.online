@@ -132,8 +132,9 @@ is a real visual change, and there are exactly two legal remedies:
 
 1. **Pin the renderer** — run the comparison in the same container CI does.
 2. **Fix the source of the difference** — or, if the change is intended, re-record the baseline
-   through the **Update e2e baselines** workflow, which opens a reviewable pull request, or by
-   labelling the issue `visual-change-expected` so the loop re-records instead of failing.
+   through the **Update e2e baselines** workflow, which opens a reviewable pull request. An
+   intended change is declared in the ticket's `## Visual change expected` section, and a human
+   re-records from the pull request; a run never passes `--update-snapshots`.
 
 Raising the threshold converts a visual regression suite into a suite that passes. A stage that
 raises it has removed the gate it was measured by, and an auditor rejects the stage.

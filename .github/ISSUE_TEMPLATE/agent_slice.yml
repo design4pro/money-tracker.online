@@ -1,7 +1,7 @@
 name: Agent slice
 description: One self-contained slice, briefed well enough for the agent loop to finish unattended.
 title: 'slice: '
-labels: ['status: pending']
+labels: ['status: triage']
 body:
   - type: markdown
     attributes:
@@ -10,10 +10,12 @@ body:
         nothing left to do; leave half of it and the issue sits.
 
 
-        **`ready-for-agent` is not applied by this form.** It is the gate, and a gate a reporter
-        can open is not a gate - a human or the triager adds it once the brief below actually
-        holds. A slice, never a PRD: if this needs more than one branch to land, open the parent
-        and let it spawn children.
+        **`status: ready` is not applied by this form.** That is the gate, and a gate a reporter
+        can open is not a gate: a triage run sets it once the brief below actually holds
+        (docs/adr/0014-label-protocol.md). Add a `type:` label yourself - this form cannot know
+        whether the slice fixes a bug or adds behaviour, and every issue without a parent needs
+        one. A slice, never a PRD: if this needs more than one branch to land, open the parent and
+        let it spawn children.
 
   - type: textarea
     id: summary

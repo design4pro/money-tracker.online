@@ -107,7 +107,6 @@ export default [
       // reason as `.claude/**`: vendored configuration for tools around the project, written
       // against no tsconfig of ours.
       '.github/**',
-      '.sandcastle/**',
       'dist/**',
       'drizzle/**',
       'playwright-report/**',

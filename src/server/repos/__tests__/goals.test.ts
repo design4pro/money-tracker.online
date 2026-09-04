@@ -34,7 +34,7 @@ import {
 } from '#/server/db/schema'
 import { addSecondMember, createBudgetWorld, executed } from './budget-harness'
 
-import { setLedgerTouchSink, setLimitResolver } from '../base'
+import { runWithLedgerCollector, setLimitResolver } from '../base'
 import {
   addContribution,
   archiveGoal,
@@ -223,7 +223,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   setLimitResolver(null)
-  setLedgerTouchSink(null)
 })
 
 /* -------------------------------------------------------------------------- */
@@ -845,21 +844,24 @@ describe('the goals quota', () => {
 
 describe('a goal write never enqueues a balance rebuild', () => {
   it('touches no account across a create, an add, a remove and a delete', async () => {
-    const touched: Array<string> = []
-    setLedgerTouchSink((accountId) => touched.push(accountId))
-
-    const goal = await createGoal(scope, {
-      name: 'Holiday',
-      targetMinor: 1_000_00,
-      currencyCode: 'PLN',
-      accountId: 'acc-a',
+    const touched = new Set<string>()
+    await runWithLedgerCollector(touched, async () => {
+      const goal = await createGoal(scope, {
+        name: 'Holiday',
+        targetMinor: 1_000_00,
+        currencyCode: 'PLN',
+        accountId: 'acc-a',
+      })
+      await seedTx({ id: 'tx-1', amountMinor: 200_00 })
+      await addContribution(scope, { goalId: goal.id, transactionId: 'tx-1' })
+      await removeContribution(scope, {
+        goalId: goal.id,
+        transactionId: 'tx-1',
+      })
+      await deleteGoal(scope, goal.id)
     })
-    await seedTx({ id: 'tx-1', amountMinor: 200_00 })
-    await addContribution(scope, { goalId: goal.id, transactionId: 'tx-1' })
-    await removeContribution(scope, { goalId: goal.id, transactionId: 'tx-1' })
-    await deleteGoal(scope, goal.id)
 
-    expect(touched).toEqual([])
+    expect([...touched]).toEqual([])
   })
 })
 

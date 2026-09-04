@@ -22,7 +22,8 @@
     "check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --project='!workerd'",
+    "test:workerd": "vitest run --project=workerd",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:update": "playwright test --update-snapshots",
@@ -31,10 +32,6 @@
     "db:migrate:local": "wrangler d1 migrations apply money-tracker-db --local",
     "db:migrate:staging": "wrangler d1 migrations apply money-tracker-db-staging --remote --env staging",
     "db:migrate:prod": "wrangler d1 migrations apply money-tracker-db --remote",
-    "sandcastle": "tsx .sandcastle/main.ts",
-    "sandcastle:triage": "tsx .sandcastle/triage.ts",
-    "sandcastle:report": "tsx .sandcastle/report.ts",
-    "sandcastle:baselines": "tsx .sandcastle/record-baselines.ts",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -81,9 +78,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@ai-hero/sandcastle": "^0.12.0",
     "@axe-core/playwright": "^4.10.2",
     "@cloudflare/vite-plugin": "^1.26.0",
+    "@cloudflare/vitest-pool-workers": "0.22.0",
     "@cloudflare/workers-types": "^5.20260818.1",
     "@playwright/test": "^1.62.1",
     "@sentry/vite-plugin": "^5.4.0",

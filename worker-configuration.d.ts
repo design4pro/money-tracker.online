@@ -45,12 +45,6 @@ interface WorkerEnv {
    *  balance-history rebuilds: it holds a lock and a dirty bit, never ledger data. */
   LEDGER: DurableObjectNamespace
 
-  /** `SandcastleRegistry`, bound on `env.staging` ONLY. One object per repository, so every
-   *  claim against the agent backlog is decided in one thread. Production and local dev have no
-   *  binding and `/api/sandcastle/*` answers 503 by design — which is why this is optional and
-   *  why every reader must check it rather than assert it. */
-  SANDCASTLE_REGISTRY?: DurableObjectNamespace
-
   /** Workers AI, bound on `env.staging` ONLY: import column-mapping assist and statement
    *  extraction, structured output only, never written without review. */
   AI?: Ai
@@ -100,9 +94,6 @@ interface WorkerEnv {
   D1_DATABASE_ID?: string
 
   FX_API_KEY?: string
-
-  /** Staging only, and paired with the SANDCASTLE_REGISTRY binding above. */
-  SANDCASTLE_COORDINATOR_TOKEN?: string
 
   SENTRY_DSN?: string
 }

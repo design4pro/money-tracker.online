@@ -24,7 +24,9 @@
  * 32px icon button is "in a sentence" or whether a session warning is adjustable - so they are
  * advisory by construction, not by leniency. 2.2.6 cannot be automated at all and says so.
  *
- * Usage:  node .github/a11y/axe-scan.mjs
+ * Usage:  pnpm exec tsx .github/a11y/axe-scan.mjs
+ *         (tsx, not node: this file imports the shared axe corrections from `e2e/support/`,
+ *          which are TypeScript because everything else in `e2e/` is.)
  * Env:    A11Y_BASE_URL (or PLAYWRIGHT_BASE_URL)  default http://localhost:3010
  *         A11Y_OUT_DIR                            default a11y-report
  *         A11Y_USER_EMAIL / A11Y_USER_PASSWORD    the seeded demo account
@@ -37,6 +39,8 @@ import axePlaywright from '@axe-core/playwright'
 import { mkdir, readFile, writeFile, appendFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+
+import { withoutKnownAxeDefects } from '../../e2e/support/axe-defects.ts'
 
 // The package is CommonJS and publishes the builder as both a default and a named export;
 // which one a plain .mjs import resolves to depends on the interop path, so accept either.
@@ -51,8 +55,15 @@ const BASE_URL = (
 const OUT_DIR = process.env.A11Y_OUT_DIR ?? 'a11y-report'
 // `||`, not `??`: an unset GitHub variable arrives as an empty string, and falling through to the
 // seed's own default is what makes the workflow run on a fork that has configured nothing.
+//
+// Both defaults are copies of `scripts/seed/seed.mjs`, and copies drift: the password here read
+// `demo-password-1234` while the seed wrote `money-demo-2026`, so sign-in answered 403 and this
+// gate failed on every run from the day it was added - on `develop` too - without auditing a
+// single page. A gate that always fails stops being read, which is why three days passed; and a
+// scan that never ran reports the same red as a scan that found a violation. If you change either
+// literal, change it in the seed and here, or the next reader inherits the same silence.
 const EMAIL = process.env.A11Y_USER_EMAIL || 'demo@money-tracker.online'
-const PASSWORD = process.env.A11Y_USER_PASSWORD || 'demo-password-1234'
+const PASSWORD = process.env.A11Y_USER_PASSWORD || 'money-demo-2026'
 const THEMES = (process.env.A11Y_THEMES ?? 'light,dark')
   .split(',')
   .map((t) => t.trim())
@@ -369,13 +380,22 @@ const readRoutes = async () => {
  */
 const signIn = async (context) => {
   const res = await context.request.post(`${BASE_URL}/api/auth/sign-in/email`, {
+    // Better Auth rejects a cross-site POST it cannot attribute, and a request issued by the
+    // API client rather than by a page carries no `Origin` of its own - so without this the
+    // endpoint answers 403 `MISSING_OR_NULL_ORIGIN` before it ever looks at the credentials.
+    // That is what this gate had been failing on, and the shape of the error is why it went
+    // unread: 403 reads as "these credentials were refused" when it means "this request was
+    // never asked about credentials".
+    headers: { origin: BASE_URL },
     data: { email: EMAIL, password: PASSWORD },
     failOnStatusCode: false,
   })
   if (!res.ok()) {
     throw new Error(
       `sign-in failed for ${EMAIL}: HTTP ${res.status()}. The scan cannot audit the signed-in ` +
-        `surface without it. Check the seed ran, or set A11Y_USER_EMAIL / A11Y_USER_PASSWORD.`,
+        `surface without it. 401 is the password: check it against the one ` +
+        `\`scripts/seed/seed.mjs\` writes, or set A11Y_USER_EMAIL / A11Y_USER_PASSWORD. ` +
+        `403 is not the password - the request was refused before them.`,
     )
   }
 }
@@ -444,8 +464,29 @@ const open = async (page, route, { theme, viewportName }) => {
   return page
 }
 
-const runAxe = async (page, tags) =>
-  new AxeBuilder({ page }).withTags(tags).analyze()
+// The excluded region is React Aria's global live announcer, not ours: `LiveAnnouncer.mjs:51`
+// stamps `data-live-announcer` on a container it keeps on `document.body`, and a pending `Button`
+// leaves `role="img"` nodes there whose `aria-labelledby` outlives the control it names. Axe is
+// right about them and nothing in this repository can fix them. `e2e/support/budgets.ts` excludes
+// the same region for the same reason - the two scanners have to agree, or a page passes one gate
+// and fails the other.
+//
+// The meter correction below is the other half of the same argument, and it is imported rather
+// than restated: `e2e/support/axe-defects.ts` drops the `aria-allowed-attr` nodes that are an
+// axe-core resolution failure against React Aria's `role="meter progressbar"` fallback list, on
+// three conditions and with a re-check date. It is a correction, not a waiver - a fifth attribute,
+// a different element or a changed role string still fails here exactly as it fails the spec.
+const runAxe = async (page, tags) => {
+  const results = await new AxeBuilder({ page })
+    .withTags(tags)
+    .exclude('[data-live-announcer]')
+    .analyze()
+
+  return {
+    ...results,
+    violations: await withoutKnownAxeDefects(page, results.violations),
+  }
+}
 
 const collectAxe = (results, { level, route, theme, viewportName }) => {
   for (const v of results.violations) {

@@ -219,8 +219,25 @@ describe('parseMoney', () => {
    * worse than one that reports an error.
    */
   it('answers null for grouping that is not grouping', () => {
-    for (const text of ['1.2.3,4', '1,23,456.78', '1.2.3', '12,34,56']) {
+    for (const text of [
+      '1.2.3,4',
+      '1,23,456.78',
+      '1.2.3',
+      '12,34,56',
+      '12345,678',
+    ]) {
       expect(parseMoney('en', text, 'USD'), text).toBeNull()
+    }
+  })
+
+  /**
+   * The Polish comma is a decimal point wherever it sits, so junk on either
+   * side of it is interior junk rather than a symbol to trim off an end. An
+   * import cell is a number or an error, and `12,3a4` is not `12,34`.
+   */
+  it('answers null for junk inside the figure, not only around it', () => {
+    for (const text of ['12,3a4', '1a2,34']) {
+      expect(parseMoney('pl', text, 'PLN'), text).toBeNull()
     }
   })
 
@@ -323,7 +340,11 @@ describe('formatRateE10', () => {
 describe('formatMoneySegments', () => {
   it('joins back into exactly what formatMoney drew', () => {
     for (const locale of ['en', 'pl'] as const) {
-      for (const amount of [makeMoney(7_232_833, 'PLN'), makeMoney(-169_211, 'PLN'), makeMoney(500_000, 'JPY')]) {
+      for (const amount of [
+        makeMoney(7_232_833, 'PLN'),
+        makeMoney(-169_211, 'PLN'),
+        makeMoney(500_000, 'JPY'),
+      ]) {
         expect(
           formatMoneySegments(locale, amount)
             .map((segment) => segment.value)
@@ -348,6 +369,18 @@ describe('formatMoneySegments', () => {
   it('keeps the sign its own segment, so a column can hang it outside the digits', () => {
     const segments = formatMoneySegments('en', makeMoney(-169_211, 'PLN'))
     expect(segments[0]).toEqual({ kind: 'sign', value: '\u2212' })
+  })
+
+  it('keeps an explicit plus its own segment, as it does the minus', () => {
+    const amount = makeMoney(169_211, 'PLN')
+    const segments = formatMoneySegments('en', amount, {
+      signDisplay: 'always',
+    })
+
+    expect(segments[0]).toEqual({ kind: 'sign', value: '+' })
+    expect(segments.map((segment) => segment.value).join('')).toBe(
+      formatMoney('en', amount, { signDisplay: 'always' }),
+    )
   })
 
   it('carries the group separators with the integer and the decimal with the fraction', () => {
@@ -378,4 +411,3 @@ describe('fractionDigits', () => {
     ).toBe('12,000')
   })
 })
-

@@ -85,7 +85,7 @@ export function RolloverLedger({
           {t('budgets.ledger.caption')}
         </caption>
         <thead>
-          <tr className="border-b border-border">
+          <tr className="border-b border-border-subtle">
             <th
               scope="col"
               className="px-3 py-2 text-start font-medium text-ink-2"

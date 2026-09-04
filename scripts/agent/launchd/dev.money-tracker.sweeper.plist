@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The label sweeper (scripts/agent/sweep.mjs) every 15 minutes on the cezar host.
+     Template: replace __REPO_ROOT__ with the main checkout and __PATH__ with a PATH that
+     holds node and gh, then install per docs/agents/cezar.md. Report mode; add "--fix" to
+     ProgramArguments once the report has been clean for a while. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.money-tracker.sweeper</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd __REPO_ROOT__ &amp;&amp; node scripts/agent/sweep.mjs</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>__PATH__</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>900</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__REPO_ROOT__/.ai/cezar/tmp/sweeper.log</string>
+  <key>StandardErrorPath</key>
+  <string>__REPO_ROOT__/.ai/cezar/tmp/sweeper.log</string>
+</dict>
+</plist>

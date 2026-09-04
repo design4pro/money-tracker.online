@@ -16,20 +16,23 @@
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { transactions } from '#/server/db/schema'
+import { tags, transactionTags, transactions } from '#/server/db/schema'
 import { applyRules } from '#/server/rules/apply'
 import { evaluateRule } from '#/server/rules/evaluate'
 
 import {
+  NOW,
   createBudgetWorld,
   executed,
   seedCategory,
   seedTransaction,
 } from './budget-harness'
-import { setLedgerTouchSink, setLimitResolver } from '../base'
+import { setLimitResolver } from '../base'
 import { createRule } from '../rules'
 import {
+  IDS_PER_STATEMENT,
   RULE_PREVIEW_SCAN_LIMIT,
+  idChunks,
   loadRulePreviewTargets,
 } from '../rule-preview'
 
@@ -48,7 +51,6 @@ beforeEach(async () => {
   scope = world.scope
   otherScope = world.otherScope
   setLimitResolver(null)
-  setLedgerTouchSink(null)
   await seedCategory(db, { id: 'cat-groceries', name: 'Groceries' })
 })
 
@@ -76,6 +78,94 @@ const AMOUNT_RULE: EvaluableRule = {
     },
   ],
 }
+
+/* -------------------------------------------------------------------------- */
+/* D1's bound-parameter ceiling                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * **What this suite cannot do, stated before what it can.**
+ *
+ * The defect these tests were written for is D1 refusing a statement with more than 100 bound
+ * parameters. It cannot be reproduced here and it never will be: this suite runs against a real
+ * SQLite, whose own ceiling is `SQLITE_MAX_VARIABLE_NUMBER` — 999 by default, ten times the budget
+ * the production engine allows. Remove the chunking from `loadRulePreviewTargets`, run the whole
+ * file, and every test below still passes. The green is a fact about the substitute engine, not
+ * about the code.
+ *
+ * That is worth naming rather than working around, because the usual repair for a test that passes
+ * either way — pick better data — does not apply. No ledger size makes SQLite refuse what D1
+ * refuses. Mutation testing, which is how a decorative assertion is normally caught, is silent
+ * here.
+ *
+ * So the boundary is asserted where it *is* reachable, on the derivation itself, and the ledger
+ * test below guards the other half: that chunking a list does not lose or duplicate a row. Between
+ * them they catch a wrong chunk size and a wrong fold. Neither catches a chunk size that is right
+ * arithmetically and wrong about D1 — only `docs/ARCHITECTURE.md` §4.3 and a real deployment do.
+ */
+describe('the chunk size is derived, and the fold survives it', () => {
+  it('leaves a statement inside D1’s ceiling, with room for the tenant predicate', () => {
+    // 100 is written as a literal on purpose. Asserting the chunk size against the constant that
+    // produced it is self-referential — it passes for every value of that constant, including a
+    // wrong one, which is how the first draft of this test managed to survive its own mutation.
+    // The number that has to be pinned is the external one, so the external one is what is here.
+    expect(IDS_PER_STATEMENT).toBeLessThanOrEqual(100 - 1)
+    expect(IDS_PER_STATEMENT).toBeGreaterThan(0)
+  })
+
+  it('never yields a run larger than that', () => {
+    const ids = Array.from({ length: 250 }, (_, index) => `tx-${index}`)
+
+    for (const chunk of idChunks(ids)) {
+      expect(chunk.length).toBeLessThanOrEqual(IDS_PER_STATEMENT)
+      expect(chunk.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('is a partition: every id once, in order, nothing invented', () => {
+    const ids = Array.from({ length: 250 }, (_, index) => `tx-${index}`)
+
+    expect(idChunks(ids).flat()).toEqual(ids)
+  })
+
+  it('asks for nothing at all when there is nothing to ask about', () => {
+    expect(idChunks([])).toEqual([])
+  })
+
+  it('reads every row’s tags when the window spans several statements', async () => {
+    const count = IDS_PER_STATEMENT * 2 + 5
+    await seedLedger(count)
+    await db.insert(tags).values({
+      id: 'tag-a',
+      organizationId: 'org-a',
+      name: 'Holiday',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    // One tagged row inside each chunk, including the short last one. The ledger reads newest
+    // first, so these indices are positions in the *seeded* order and land in different statements
+    // by construction rather than by luck.
+    const tagged = [0, IDS_PER_STATEMENT, count - 1].map(
+      (index) => `org-a-tx-${String(index).padStart(3, '0')}`,
+    )
+    await db.insert(transactionTags).values(
+      tagged.map((transactionId) => ({
+        organizationId: 'org-a',
+        transactionId,
+        tagId: 'tag-a',
+      })),
+    )
+
+    const targets = await loadRulePreviewTargets(scope, RULE_PREVIEW_SCAN_LIMIT)
+
+    expect(targets).toHaveLength(count)
+    const carrying = targets
+      .filter((target) => target.tagIds.includes('tag-a'))
+      .map((target) => target.transactionId)
+    expect(carrying.sort()).toEqual([...tagged].sort())
+  })
+})
 
 describe('the window the preview reads', () => {
   it('reads at most the cap, newest first', async () => {

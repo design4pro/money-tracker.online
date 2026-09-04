@@ -87,7 +87,7 @@ export function AppShell({ shell, pathname, children }: AppShellProps) {
         <main
           id={MAIN_CONTENT_ID}
           tabIndex={-1}
-          className="mx-auto w-full max-w-7xl flex-1 scroll-mt-16 px-4 pt-6 pb-28 outline-none sm:px-6 lg:px-8 lg:pb-12"
+          className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-28 outline-none sm:px-6 lg:px-8 lg:pb-12"
         >
           {children}
         </main>
@@ -142,7 +142,7 @@ export function AppShellFallback({ children }: AppShellFallbackProps) {
         <main
           id={MAIN_CONTENT_ID}
           tabIndex={-1}
-          className="mx-auto w-full max-w-7xl flex-1 scroll-mt-16 px-4 pt-6 pb-12 outline-none sm:px-6 lg:px-8"
+          className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-12 outline-none sm:px-6 lg:px-8"
         >
           {children}
         </main>

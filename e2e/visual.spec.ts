@@ -17,9 +17,7 @@ import type { Page } from '@playwright/test'
  * screenshot. Spreading frames across them would have put the recording rule (which platform,
  * which projects, which surfaces, what counts as settled) in six places, and a rule in six places
  * is a rule that gets widened in one of them by whoever is in a hurry. `docs/SPEC.md` §8: one
- * concept, one owner. The baselines are one concept. `.sandcastle/record-baselines.ts` already
- * assumed this file existed and says so - "scoped to visual.spec.ts: that is the only file that
- * owns baselines" - so this is the owner it was written against.
+ * concept, one owner. The baselines are one concept, and this file is their owner.
  *
  * ## The matrix, and why the locale axis earns its cost
  *

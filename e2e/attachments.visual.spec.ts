@@ -107,9 +107,9 @@ async function openReceipts(page: Page, labels: ReceiptLabels) {
   const panel = page.getByRole('region', { name: labels.panel })
   await expect(
     panel,
-    'The receipts panel is not on the transaction detail screen. `attachment-list.tsx` and ' +
-      '`attachment-dropzone.tsx` have to be mounted in ' +
-      '`src/routes/_app/transactions/$transactionId.tsx` — see 11-S3.',
+    // Not a diagnosis; see the note on the same assertion in `refunds.visual.spec.ts`. The panel
+    // has been mounted since 11-S3 landed, so naming the mount as the cause is now always wrong.
+    `No region named "${labels.panel}" on the transaction detail screen (the name is locale-dependent).`,
   ).toBeVisible()
   return panel
 }
@@ -149,7 +149,22 @@ test('attaching is a button, not a drag gesture', async ({ page }) => {
 
   // The drop target is an enhancement over it, and it has its own accessible name rather than
   // being a decorated `<div>`.
-  await expect(panel.getByLabel(labels.dropzone)).toBeVisible()
+  //
+  // That name is deliberately not on anything painted. React Aria exposes a drop target to
+  // assistive technology through a proxy `<button>` measured at 0x0 inside a 1x1 wrapper, while
+  // the region a reader sees - 228x155 here - is a bare `div[data-rac]` carrying this file's
+  // classes and no role of its own. So `toBeVisible()` on the named node asserted something the
+  // library can never satisfy, and this test failed on all three projects from the commit that
+  // introduced it. What matters for clause 7 is not that the name is painted but that a keyboard
+  // reader can reach the thing it names.
+  const dropTarget = panel.getByLabel(labels.dropzone)
+  await expect(dropTarget).toBeAttached()
+  // `tabindex="0"` is the half that makes "reachable" true rather than merely "focusable":
+  // `focus()` succeeds on anything with a tabindex at all, including `-1`, which is a node no
+  // amount of tabbing ever arrives at.
+  await expect(dropTarget).toHaveAttribute('tabindex', '0')
+  await dropTarget.focus()
+  await expect(dropTarget).toBeFocused()
 })
 
 test('a renamed executable is refused, and the reason names that file', async ({

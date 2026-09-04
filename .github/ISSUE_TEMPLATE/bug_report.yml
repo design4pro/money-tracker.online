@@ -1,7 +1,7 @@
 name: Bug report
 description: Behaviour that is wrong against a stated expectation.
 title: 'bug: '
-labels: ['type: bug', 'status: pending']
+labels: ['type: bug', 'status: triage']
 body:
   - type: markdown
     attributes:

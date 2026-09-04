@@ -1,22 +1,11 @@
 {
-  // `.sandcastle` is named separately because TypeScript's wildcard globs deliberately skip
-  // dot-directories: without this line the whole AFK loop — main.ts, the coordinator client,
-  // adoption, the triage scripts — goes unchecked while `pnpm typecheck` reports success.
-  // (Line comments, not block ones: a `**` glob written inside a block comment closes it early
-  // on its own `*` `/`.)
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".sandcastle/**/*.ts",
-    "eslint.config.js",
-    "prettier.config.js"
-  ],
+  // Line comments, not block ones: a `**` glob written inside a block comment closes it early
+  // on its own `*` `/`.
+  "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "prettier.config.js"],
 
   // Spelled out because naming an `exclude` replaces the default one, which is where
-  // `node_modules` comes from. The sandcastle loop creates a full git worktree per run under
-  // `.sandcastle/worktrees`, each a copy of this checkout; without this, typecheck would compile
-  // the whole repo once per worktree left on disk.
-  "exclude": ["node_modules", ".sandcastle/worktrees/**", "dist"],
+  // `node_modules` comes from.
+  "exclude": ["node_modules", "dist"],
 
   "compilerOptions": {
     "target": "ES2022",
@@ -36,7 +25,14 @@
        so `worker-configuration.d.ts` can name them without importing. They collide with `DOM`
        on Response/Request/WebSocket and friends; `skipLibCheck` below is what makes the two
        coexist, exactly as it does in the generated-types setup this repo is ported from. */
-    "types": ["vite/client", "@cloudflare/workers-types"],
+    /* `@cloudflare/vitest-pool-workers/types` declares the `cloudflare:test` module, which only
+       the `*.workerd.test.ts` files import. It is listed globally because a second tsconfig for a
+       handful of test files would cost more than it explains. */
+    "types": [
+      "vite/client",
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-pool-workers/types"
+    ],
 
     /* Bundler mode */
     "moduleResolution": "bundler",

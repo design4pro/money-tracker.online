@@ -30,8 +30,8 @@ name placed in `.dev.vars` is an empty string at build time rather than an error
 repeat this warning next to the names it applies to.
 
 The e2e suite needs a migrated local D1 and the seeded demo workspace
-(`node scripts/seed/seed.mjs`). In CI and in the agent sandbox this is automated —
-`.github/actions/e2e-env` and `.sandcastle/setup-e2e.sh` respectively.
+(`node scripts/seed/seed.mjs`). In CI this is automated by `.github/actions/e2e-env`, which is
+also the reference for the steps to run locally.
 
 ## Scripts
 
@@ -49,7 +49,6 @@ The e2e suite needs a migrated local D1 and the seeded demo workspace
 | `pnpm db:migrate:local` | Apply migrations to the local D1                                                |
 | `pnpm deploy`           | Build then `wrangler deploy` (production)                                       |
 | `pnpm deploy:staging`   | `CLOUDFLARE_ENV=staging` build then deploy                                      |
-| `pnpm sandcastle`       | Run the agent orchestration loop in the Docker sandbox                          |
 
 `pnpm typecheck`, `pnpm lint` and `pnpm test` are the fast feedback trio: run all three before
 committing. Two files in this repository are generated and a hand edit to either is a build
@@ -57,7 +56,7 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
 
 ## Branch model
 
-- Feature branches (`feat/*`, `fix/*`, `claude/*`, `sandcastle/*`) open a pull request to
+- Feature branches (`feat/*`, `fix/*`, `claude/*`) open a pull request to
   **`develop`**.
 - Merging `develop` deploys **staging**: https://staging.money-tracker.online
   (`deploy-staging.yml`).
@@ -85,7 +84,6 @@ missing — is `docs/DEPLOY.md`.
 
 - Mention `@claude` on a GitHub issue and `claude.yml` implements it on a runner: branch cut from
   `develop`, pull request back to `develop`.
-- `pnpm sandcastle` runs the local orchestration loop against issues labelled `ready-for-agent`.
 - The backlog contract, label vocabulary and triage rules are `docs/agents/issue-tracker.md` and
   `docs/agents/triage-labels.md`.
 

@@ -71,14 +71,24 @@ import {
 } from '../budget-periods'
 import {
   createBudgetWorld,
+  executed as harnessExecuted,
   seedBudget,
   seedCategory,
   seedPeriod,
   seedTransaction,
 } from './budget-harness'
+import {
+  advanceImportBatch,
+  createImportBatch,
+  getImportBatch,
+  importFileKey,
+  importsThisMonth,
+  listImportBatches,
+} from '../imports'
 
 import { createTenantRepository, tenantFilter } from '../base'
 import {
+  ForbiddenError,
   MissingTenantContextError,
   NotFoundError,
   TenantIsolationError,
@@ -908,5 +918,159 @@ describe('budgets cannot be reached across a workspace boundary', () => {
       markers,
     })
     expect(theirs.map((crossing) => crossing.budgetId)).toEqual(['bud-b'])
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Imports                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Import batches, held to the archetype above, plus the one thing no other module in this file has
+ * to answer for: **an object in a bucket**.
+ *
+ * A row that leaks is read through a scoped `SELECT` and the base repository makes that
+ * inexpressible. A *key* is a string, and a string composed from a request body would let a caller
+ * write bytes into — or point a row at — another workspace's prefix without any SQL being wrong at
+ * all. So the assertions here are about the fake bucket's log as much as about the rows: what was
+ * written, where, and whether anything was written before the refusal.
+ *
+ * The fixture is `budget-harness.ts` — the same two workspaces, the same real SQLite built from
+ * `drizzle/*.sql` — because an upload needs an account to name, and `acc-b` belongs to B.
+ */
+describe('import batches cannot be reached or aimed across a workspace boundary', () => {
+  /** Only the two methods the import path calls, with a memory of what it was asked to do. */
+  class RecordingBucket {
+    readonly writes: Array<string> = []
+    readonly deletes: Array<string> = []
+
+    async put(key: string): Promise<unknown> {
+      this.writes.push(key)
+      return {}
+    }
+
+    async delete(key: string): Promise<void> {
+      this.deletes.push(key)
+    }
+
+    asR2(): R2Bucket {
+      return this as unknown as R2Bucket
+    }
+  }
+
+  const FILE = new TextEncoder().encode('data;kwota\n2026-01-02;-45,00\n')
+
+  let importWorld: BudgetWorld
+  let bucket: RecordingBucket
+
+  beforeEach(async () => {
+    importWorld = await createBudgetWorld()
+    bucket = new RecordingBucket()
+  })
+
+  function payload(overrides: Record<string, unknown> = {}) {
+    return {
+      source: 'csv' as const,
+      accountId: 'acc-a',
+      fileName: 'wyciag.csv',
+      byteSize: FILE.byteLength,
+      ...overrides,
+    }
+  }
+
+  it('refuses an accountId from another workspace with a not-found, and writes no object', async () => {
+    // Not a `ForbiddenError`: a 403 would confirm that `acc-b` exists, which turns a guessed id
+    // into an oracle for "does that workspace have this account".
+    const attempt = createImportBatch(
+      importWorld.scope,
+      bucket.asR2(),
+      payload({ accountId: 'acc-b' }),
+      FILE,
+    )
+
+    await expect(attempt).rejects.toBeInstanceOf(NotFoundError)
+    await expect(attempt).rejects.not.toBeInstanceOf(ForbiddenError)
+    // The account is checked *before* the `put`, so a probe costs a `SELECT` and stores nothing.
+    expect(bucket.writes).toEqual([])
+    expect(bucket.deletes).toEqual([])
+  })
+
+  it('builds the key from the scope’s workspace, so a forged organizationId cannot move the object', async () => {
+    // The forgery: the body claims to be B's. `createImportBatchSchema` is a `strictObject`, so an
+    // unknown key does not parse at all — and even a caller who cast around the type reaches a key
+    // composed from `scope.ctx`, which is the session's workspace and nothing else.
+    let created: Awaited<ReturnType<typeof createImportBatch>> | null = null
+    let refused: unknown = null
+    try {
+      created = await createImportBatch(
+        importWorld.scope,
+        bucket.asR2(),
+        payload({ organizationId: 'org-b' }),
+        FILE,
+      )
+    } catch (error) {
+      refused = error
+    }
+
+    // Either the strict schema refused the extra key, or the object landed under A's prefix. What
+    // must never happen is an object under `imports/org-b/`.
+    if (created === null) {
+      expect(refused).not.toBeNull()
+      expect(bucket.writes).toEqual([])
+    } else {
+      expect(created.fileR2Key).toBe(
+        importFileKey('org-a', created.id, 'wyciag.csv'),
+      )
+    }
+    expect(bucket.writes.some((key) => key.startsWith('imports/org-b/'))).toBe(
+      false,
+    )
+  })
+
+  it('never lets A read, list or move B’s batch', async () => {
+    const theirs = await createImportBatch(
+      importWorld.otherScope,
+      bucket.asR2(),
+      payload({ accountId: 'acc-b' }),
+      FILE,
+    )
+
+    await expect(
+      getImportBatch(importWorld.scope, { id: theirs.id }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      advanceImportBatch(importWorld.scope, {
+        id: theirs.id,
+        status: 'failed',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    // B's row is untouched, as B sees it.
+    const after = await getImportBatch(importWorld.otherScope, {
+      id: theirs.id,
+    })
+    expect(after.status).toBe('queued')
+
+    // And it is absent from A's list and from A's count, not merely unreadable by id.
+    expect((await listImportBatches(importWorld.scope)).items).toEqual([])
+    expect(await importsThisMonth(importWorld.scope)).toBe(0)
+    expect(await importsThisMonth(importWorld.otherScope)).toBe(1)
+  })
+
+  it('scopes every statement the batch repository runs', async () => {
+    // The harness's own log, because `createBudgetWorld` builds the database this world runs on.
+    harnessExecuted.length = 0
+    await createImportBatch(importWorld.scope, bucket.asR2(), payload(), FILE)
+    await listImportBatches(importWorld.scope)
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('import_batches'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads.filter(
+      (candidate) => !candidate.startsWith('insert'),
+    )) {
+      expect(statement).toContain('organization_id')
+    }
   })
 })

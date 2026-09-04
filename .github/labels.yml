@@ -1,72 +1,76 @@
 # The label vocabulary, in one place.
 #
+# Labels are the backlog's state machine (docs/adr/0014-label-protocol.md). The vocabulary is
+# closed at the 19 labels below and any label outside it is deleted by
+# scripts/agent/labels-migrate.sh.
+#
 # This file is documentation, not automation: nothing syncs it. It exists because the issue forms
 # under .github/ISSUE_TEMPLATE/ apply labels by name, and GitHub silently drops a label that does
 # not exist on the repository - so a missing label here shows up as a form that quietly applies
 # nothing.
 #
-# To create them all on a fresh repository:
+# To create or repair the whole set on a repository, run the migration:
 #
-#   node --input-type=module -e "
-#     import { readFileSync } from 'node:fs';
-#     import { execFileSync } from 'node:child_process';
-#     for (const line of readFileSync('.github/labels.yml','utf8').split('\n')) {
-#       const m = /^  - name: '(.+)'\s*$/.exec(line); if (!m) continue;
-#       execFileSync('gh', ['label','create',m[1],'--force'], { stdio: 'inherit' });
-#     }
-#   "
+#   scripts/agent/labels-migrate.sh            # plan only
+#   scripts/agent/labels-migrate.sh --apply    # perform
 #
-# and then set each colour and description by hand, or with `gh label edit`.
+# It carries the colours and descriptions, so this file states meaning and nothing else.
 
-# ── the agent gate ────────────────────────────────────────────────────────────────────────────
-# `ready-for-agent` goes on a SLICE, never on a PRD. It is the only label that makes the loop pick
-# an issue up, and it means: the brief is complete enough that an agent can finish it unattended.
-gate:
-  - name: 'ready-for-agent'
-    description: 'A single slice, briefed well enough for an agent to finish unattended. Never on a PRD.'
-  - name: 'agent-blocked'
-    description: 'An agent stopped on this and needs a human decision before it can continue.'
+# ── where an issue stands: exactly one of these on every open issue ───────────────────────────
+status:
+  - name: 'status: triage'
+    description: 'New, not yet reproduced. A triage run picks it up.'
+  - name: 'status: needs-info'
+    description: 'Triage needs an answer from the reporter. The questions are in a comment.'
+  - name: 'status: backlog'
+    description: 'A feature or idea waiting for a plan run, or for a decision.'
+  - name: 'status: queued'
+    description: 'A ticket with an open native blocker. The sweeper opens it when the blocker closes.'
+  - name: 'status: ready'
+    description: 'Specified and unblocked. `run: implement` may claim it.'
+  - name: 'status: in-progress'
+    description: 'A run holds it. Written by the claim scripts and by nothing else.'
+  - name: 'status: review'
+    description: 'An artefact waits for a human: a draft PR, a spec, a PRD, a set of tickets.'
+  - name: 'status: needs-human'
+    description: 'A workflow could not finish. The comment says why.'
 
-# ── what kind of change ───────────────────────────────────────────────────────────────────────
+# ── commands a human gives; a script consumes them ────────────────────────────────────────────
+# A command is not a state. The claim script removes the `run:` label as its first action, so a
+# command still sitting there is a command nobody has taken.
+run:
+  - name: 'run: triage'
+    description: 'Command: (re)triage this issue. Bypasses the already-triaged marker.'
+  - name: 'run: implement'
+    description: 'Command: implement this ticket.'
+
+# ── what kind of change: mandatory on every issue without a parent ────────────────────────────
+# Tickets inherit their PRD's type and carry none of their own.
 type:
   - name: 'type: bug'
     description: 'Behaviour that is wrong against a stated expectation.'
+  - name: 'type: feature'
+    description: 'A new capability. Needs a spec and a PRD before tickets.'
   - name: 'type: enhancement'
-    description: 'New behaviour, or better behaviour that was never promised.'
+    description: 'Better behaviour that was never promised.'
   - name: 'type: maintenance'
     description: 'Dependencies, tooling, refactoring, docs. No user-visible behaviour change.'
 
-# ── where it stands ───────────────────────────────────────────────────────────────────────────
-status:
-  - name: 'status: pending'
-    description: 'Filed, not yet triaged.'
-  - name: 'status: on hold'
-    description: 'Deliberately paused. The reason is in a comment.'
-  - name: 'status: review needed'
-    description: 'Work exists and is waiting on a human read.'
-  - name: 'status: blocked'
-    description: 'Cannot proceed until something outside this issue changes.'
-  - name: 'status: abandoned'
-    description: 'Closed without doing it, on purpose. The reason is in a comment.'
+# ── the parent, and the one place autonomy widens ─────────────────────────────────────────────
+structure:
+  - name: 'prd'
+    description: 'Parent issue: title `PRD:`, body `prd/v1`, its sub-issues are the tickets.'
+  - name: 'auto-advance'
+    description: 'On an open PRD only: the sweeper adds `run: implement` to each child as it unblocks.'
 
-# ── how urgent ────────────────────────────────────────────────────────────────────────────────
-priority:
-  - name: 'priority: critical'
-    description: 'Data loss, money wrong, or the product is down. Interrupt whatever is in flight.'
-  - name: 'priority: high'
-    description: 'Next in line.'
-  - name: 'priority: medium'
-    description: 'Scheduled work.'
-  - name: 'priority: low'
-    description: 'Worth doing, whenever.'
-
-# ── what CI and the loop must do about it ─────────────────────────────────────────────────────
-signals:
+# ── pull-request labels ───────────────────────────────────────────────────────────────────────
+pull_request:
+  - name: 'agent-pr'
+    description: 'A draft pull request opened by an implement run.'
   - name: 'needs-e2e'
-    description: 'Run the browser suite on this pull request. The escape hatch for branches with no local loop behind them.'
-  - name: 'visual-change-expected'
-    description: 'Rendered output changes on purpose. A screenshot diff here is the intent, not a regression.'
-  - name: 'qa'
-    description: 'Ready for a human to exercise by hand.'
-  - name: 'qa-failed'
-    description: 'A human exercised it and it did not hold up. The report is in a comment.'
+    description: 'Run the browser suite on this pull request. The escape hatch in ci.yml.'
+  - name: 'agent-docs'
+    description: 'A pull request carrying CONTEXT.md or ADR changes from a plan run.'
+
+# There is no priority axis, and "visual change expected" is a body section
+# (`## Visual change expected`), not a label.

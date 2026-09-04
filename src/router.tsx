@@ -13,6 +13,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 
+import { RouteError } from '#/components/app/shell/route-error'
+
 import { routeTree } from './routeTree.gen'
 
 import type { ReactNode } from 'react'
@@ -48,6 +50,25 @@ export function getRouter() {
     // before the click lands, which is most of the difference between "instant" and "fine".
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
+    /**
+     * The floor under every route that has not furnished its own failure state.
+     *
+     * Most of them never reach it. `_app.tsx` mounts a `CatchBoundary` inside the shell, so
+     * anything that throws under the guarded product is already caught there with the rail and
+     * the sign-out control still on screen, and `(auth)/route.tsx` does the same for the signed-out
+     * pages. What neither covers is the marketing landing and anything added beside it later -
+     * routes that sit directly under the root - and those fell through to TanStack's built-in,
+     * which prints the raw message and stack in English with no way back.
+     *
+     * That default is wrong here twice over: the copy is untranslated in a product whose whole
+     * shell is not, and a stack in the reader's browser is a stack in an attacker's. `RouteError`
+     * says neither - catalogue copy, and `reset` as the way out.
+     */
+    defaultErrorComponent: ({ reset }) => (
+      <div className="mx-auto w-full max-w-3xl px-4 py-16">
+        <RouteError onRetry={reset} />
+      </div>
+    ),
     Wrap: ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     ),

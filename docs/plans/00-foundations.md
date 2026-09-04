@@ -197,8 +197,8 @@ placeholder id in this file is a deploy that silently writes to the wrong databa
 
 - `src/server/worker.ts` is the **custom entry** (`"main"`), not
   `@tanstack/react-start/server-entry`, because only the entry module's exports let workerd find the
-  DO classes, the queue consumer and the cron handler. It re-exports `AccountLedger` and (staging
-  only) `SandcastleRegistry`, and exports `default { fetch, queue, scheduled }`.
+  DO classes, the queue consumer and the cron handler. It re-exports `AccountLedger` and exports
+  `default { fetch, queue, scheduled }`.
 - `src/server/cron/scheduled.ts` switches on `controller.cron` against **four literal constants**
   (`*/15 * * * *`, `7 * * * *`, `0 3 * * *`, `17 4 * * 1`) and throws on an unrecognised value
   rather than silently doing nothing. Each branch is a stub that logs and returns until the owning
@@ -220,9 +220,8 @@ architecture-doc edit, never a quiet append.
 ### Tenant isolation test
 
 None — this stage adds no data access. The isolation property it does protect is that the
-**staging-only** bindings (`SANDCASTLE_REGISTRY`, `AI`) appear under `env.staging` and nowhere else,
-so production cannot reach an agent registry. A unit test reads `wrangler.jsonc` and asserts the
-production block declares neither.
+**staging-only** binding `AI` appears under `env.staging` and nowhere else. A unit test reads
+`wrangler.jsonc` and asserts the production block does not declare it.
 
 ### Money invariant
 
@@ -236,7 +235,7 @@ staging declares exactly `0 3 * * *`.
 
 - Command gate in order.
 - `src/server/__tests__/wrangler-config.test.ts`: production declares `DB, KV, SESSIONS, FILES,
-LEDGER, TASKS`; production declares neither `SANDCASTLE_REGISTRY` nor `AI`; the four cron
+LEDGER, TASKS`; production does not declare `AI`; the four cron
   expressions are exact; every `database_id` and KV `id` is a 32-hex or UUID string and not the
   literal `<created>`.
 - `CLOUDFLARE_ENV=staging pnpm build` then `node -e` asserting
@@ -245,7 +244,7 @@ LEDGER, TASKS`; production declares neither `SANDCASTLE_REGISTRY` nor `AI`; the 
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6 apply. Item 4 (visual verification) does not: no surface.
+`docs/SPEC.md` §7 items 1–3 and 5–7 apply. Item 4 (visual verification) does not: no surface.
 
 ### Blockers
 
@@ -320,7 +319,7 @@ against the 7:1 floor on every surface token they may sit on.
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6. Item 4 does not apply (no surface). Of the §2 clauses, only
+`docs/SPEC.md` §7 items 1–3 and 5–7. Item 4 does not apply (no surface). Of the §2 clauses, only
 _full parity in light and dark, dark shadows re-declared_ applies and is ticked here.
 
 ### Blockers
@@ -411,7 +410,7 @@ over values the caller already holds.
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6. Item 4 does not apply (no surface).
+`docs/SPEC.md` §7 items 1–3 and 5–7. Item 4 does not apply (no surface).
 
 ### Blockers
 
@@ -509,7 +508,7 @@ amendment. One new case is added: _every table with an `amount_minor` column als
 
 ### Definition of done
 
-`docs/SPEC.md` §7 items 1–3, 5 and 6. Item 4 does not apply.
+`docs/SPEC.md` §7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -588,7 +587,7 @@ duplicate `docs/MONEY.md` §7 forbids. The case
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses. This stage has a surface (through `01-S1`'s gallery) and
+All seven §7 items and all ten §2 clauses. This stage has a surface (through `01-S1`'s gallery) and
 takes no exemption.
 
 ### Blockers
@@ -667,7 +666,7 @@ recomputes_.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -740,7 +739,7 @@ a number of major units, so a caller cannot pass it something already rounded. H
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -813,7 +812,7 @@ repository parses it back into the money path.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -886,7 +885,7 @@ decimals than `digits` rounds once, at parse, and never twice_.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses, including the chart clause.
+All seven §7 items and all ten §2 clauses, including the chart clause.
 
 ### Blockers
 
@@ -957,7 +956,7 @@ sum the **stored** `ref_amount_minor` and never re-derive it from `amount_minor`
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -1034,7 +1033,7 @@ serialised into a queue message where it could be re-parsed. Held by
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -1101,7 +1100,7 @@ does not shift the grid, which is the `docs/SPEC.md` §2 zero-layout-shift claus
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -1172,7 +1171,7 @@ recomputes it or converts it to the workspace base currency — a price is not a
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply.
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 
@@ -1240,7 +1239,7 @@ two sources of a price is how a checkout charges something the page did not say.
 
 ### Definition of done
 
-§7 items 1–3, 5 and 6. Item 4 does not apply to this stage; it applies to `25-S2`.
+§7 items 1–3 and 5–7. Item 4 does not apply to this stage; it applies to `25-S2`.
 
 ### Blockers
 
@@ -1310,7 +1309,7 @@ are held by `27-S2`'s tests.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

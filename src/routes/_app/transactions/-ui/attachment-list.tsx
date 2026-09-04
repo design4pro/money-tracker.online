@@ -164,7 +164,7 @@ export function AttachmentList({
               return (
                 <li
                   key={file.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle px-3 py-2"
                 >
                   {/*
                     `/api/files/$id` is the only read path. The href is built from the id alone —

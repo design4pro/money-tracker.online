@@ -106,7 +106,7 @@ _A chart datum is an integer minor-unit amount plus a currency, all the way to t
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses, with the chart clause carrying this stage's weight.
+All seven §7 items and all ten §2 clauses, with the chart clause carrying this stage's weight.
 
 ### Blockers
 
@@ -197,7 +197,7 @@ artefact._ Cases:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -277,7 +277,7 @@ that makes the wave-3-ships-the-table, wave-4-adds-the-chart ordering safe.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

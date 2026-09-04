@@ -2147,6 +2147,275 @@ const messages = {
     '{name} is deleted for good. The transaction itself is untouched.',
   'attachments.confirm.action': 'Remove',
   'attachments.toast.deleted': 'Receipt removed',
+  /* -- Why an import refused a row (19-S2) ---------------------------------- */
+  // One key per `import_row_errors.code`. The row is written once and read back
+  // in whatever language the person is using then, so the column stores the key
+  // and this is where the sentence lives. Each one says what the file contained
+  // and what to do, because "invalid row" is not something anybody can act on.
+  'import.error.date_empty': 'The date column is empty on this row.',
+  'import.error.date_unparseable':
+    'This date is not written the way the chosen date format describes.',
+  'import.error.date_impossible': 'This date does not exist in the calendar.',
+  'import.error.amount_empty': 'The amount column is empty on this row.',
+  'import.error.amount_unparseable':
+    'This amount could not be read with the chosen decimal separator.',
+  'import.error.amount_currency_mismatch':
+    'This amount names a different currency from the account it would be imported into.',
+  'import.error.amount_too_precise':
+    'This amount has more decimal places than the currency has, so it was not rounded.',
+  'import.error.amount_out_of_range': 'This amount is too large to store.',
+  'import.error.amount_zero': 'An imported transaction cannot be for zero.',
+  'import.error.amount_both_empty':
+    'Neither the debit nor the credit column has a figure on this row.',
+  'import.error.amount_debit_and_credit':
+    'This row has both a debit and a credit, so it is not one transaction.',
+  'import.error.row_currency_mismatch':
+    'This row is in a different currency from the account it would be imported into.',
+
+  /* -- Import: the entry surface, the stepper, mapping and preview (19-S2) -- */
+  // The flow is four named steps and every state it can be in is designed: an
+  // upload, a mapping, a blocking DMY/MDY question, a preview, a dead end when
+  // nothing could be read, and a seam for the commit that lands later.
+  'import.title': 'Import',
+  'import.lead':
+    'Bring a statement or another tracker’s export into this workspace. Nothing is written until you have seen what the file would do.',
+
+  'import.group.file.title': 'From your bank or a spreadsheet',
+  'import.group.file.body':
+    'A statement you downloaded, or a sheet you keep yourself. The format is worked out from the file — there is nothing to pick from a list of acronyms.',
+  'import.group.migration.title': 'From another tracker',
+  'import.group.migration.body':
+    'An export out of the app you were keeping your money in before.',
+  'import.group.empty':
+    'Nothing here can be read yet. When a format lands it appears in this group on its own.',
+
+  'import.upload.account.label': 'Import into',
+  'import.upload.account.placeholder': 'Choose an account',
+  'import.upload.file.label': 'The file',
+  'import.upload.dropzone': 'Drop a file here to read it',
+  'import.upload.choose': 'Choose a file',
+  'import.upload.accepts': 'Accepted here: {extensions}. Up to {size}.',
+  'import.upload.selected': 'Chosen: {name}',
+  'import.upload.submit': 'Read this file',
+  'import.upload.state.uploading': 'Sending {name}…',
+  'import.upload.state.sniffing': 'Working out what the file is…',
+  'import.upload.noAccounts':
+    'Make an account first — an imported transaction has to land in one.',
+  'import.upload.error.account':
+    'Choose the account these transactions belong to.',
+  'import.upload.error.file': 'Choose a file to import.',
+  'import.upload.error.extension':
+    '{name} does not end in a file type this import can read, so there is no parser for it.',
+  'import.upload.error.tooLarge':
+    '{name} is larger than {size}. Export a shorter period and bring it in as two files.',
+  'import.upload.error.failed': 'The file was not read: {reason}',
+
+  'import.history.title': 'Import history',
+  'import.history.body':
+    'Every file this workspace has brought in, newest first.',
+  'import.history.empty.title': 'No imports yet',
+  'import.history.empty.body':
+    'A file you bring in stays here with what it did, so an import can be found again months later.',
+  'import.history.table': 'Imports, newest first',
+  'import.history.column.file': 'File',
+  'import.history.column.status': 'Status',
+  'import.history.column.rows': 'Rows',
+  'import.history.column.created': 'Started',
+  'import.history.open': 'Open the import of {name}',
+  'import.history.rows': '{imported} of {total}',
+
+  'import.source.csv': 'Spreadsheet or CSV',
+  'import.source.ofx': 'OFX statement',
+  'import.source.qif': 'QIF statement',
+  'import.source.ynab': 'YNAB export',
+  'import.source.wallet': 'Wallet export',
+  'import.source.json_backup': 'Money Tracker backup',
+
+  'import.status.queued': 'Waiting',
+  'import.status.parsing': 'Reading',
+  'import.status.mapping': 'Needs mapping',
+  'import.status.previewing': 'Reviewed',
+  'import.status.running': 'Importing',
+  'import.status.completed': 'Imported',
+  'import.status.failed': 'Failed',
+  'import.status.reverted': 'Undone',
+
+  'import.stepper.label': 'Import steps',
+  'import.step.upload': 'Upload',
+  'import.step.map': 'Map the columns',
+  'import.step.review': 'Review',
+  'import.step.done': 'Import',
+  'import.step.position': 'Step {position} of {total}: {name}',
+  'import.step.current': 'You are here',
+  'import.step.back': 'Back: {name}',
+  'import.step.next': 'Next: {name}',
+  'import.step.locked': 'This step opens once the one before it is finished.',
+
+  'import.file.title': 'The file',
+  'import.file.rows': '{rows} rows were read from {name}.',
+  'import.file.account': 'They would be imported into {account}.',
+  'import.file.truncated':
+    'Only the first {rows} rows were read — the file carries more than one import may take.',
+  'import.warnings.title': 'Worth knowing about this file',
+  'import.warning.ragged_row':
+    'Some rows carry a different number of fields from the header row. Nothing was dropped.',
+  'import.warning.re_encoded':
+    'The file is not UTF-8 and was read through a fallback encoding, so check the accented characters below.',
+  'import.warning.replacement_character':
+    'Some characters could not be decoded, which usually means the encoding was guessed wrongly.',
+  'import.warning.row_cap_reached':
+    'The file has more rows than one import can carry, so the rest were not read.',
+
+  'import.resume.pending': 'Reading the stored file again…',
+  'import.resume.title': 'The stored file could not be read again',
+  'import.resume.body':
+    'This tab no longer holds the file’s columns, and reading the stored copy back did not work. Nothing was written, and the earlier upload is still in your history — upload the file again to map it.',
+  'import.resume.action': 'Start over',
+
+  'import.mapping.title': 'Map the columns',
+  'import.mapping.body':
+    'Say what each column of the file holds. The first three values are shown beside every column so the choice is made on the data rather than on a header name.',
+  'import.mapping.table': 'The file’s columns and what each one holds',
+  'import.mapping.column.header': 'Column',
+  'import.mapping.column.samples': 'First values',
+  'import.mapping.column.target': 'Holds',
+  'import.mapping.column.empty': '(empty)',
+  'import.mapping.target.label': 'What the column “{column}” holds',
+  'import.mapping.target.ignore': 'Leave this column out',
+  'import.mapping.target.date': 'Date',
+  'import.mapping.target.amount': 'Amount, with its own sign',
+  'import.mapping.target.debit': 'Money out',
+  'import.mapping.target.credit': 'Money in',
+  'import.mapping.target.description': 'Description',
+  'import.mapping.target.payee': 'Payee',
+  'import.mapping.target.category': 'Category',
+  'import.mapping.target.reference': 'Reference',
+  'import.mapping.target.notes': 'Notes',
+  'import.mapping.target.currency': 'Currency',
+  'import.mapping.target.sourceRef': 'The bank’s own row id',
+
+  'import.mapping.preset.title': 'A mapping you saved has been filled in',
+  'import.mapping.preset.body':
+    'It was remembered for a file with exactly these columns. Check every row before continuing: a bank that reorders its columns keeps the same header names.',
+  'import.mapping.preset.named': 'You called it “{label}”.',
+
+  'import.mapping.numbers.title': 'How the numbers are written',
+  'import.mapping.decimal.label': 'Decimal separator',
+  'import.mapping.decimal.dot': 'Dot — 1234.56',
+  'import.mapping.decimal.comma': 'Comma — 1234,56',
+  'import.mapping.thousands.label': 'Thousands separator',
+  'import.mapping.thousands.dot': 'Dot — 1.234,56',
+  'import.mapping.thousands.comma': 'Comma — 1,234.56',
+  'import.mapping.thousands.space': 'Space — 1 234,56',
+  'import.mapping.thousands.none': 'None — 1234,56',
+  'import.mapping.accounting.label': 'Money out is written in brackets',
+  'import.mapping.accounting.description':
+    'Some exports write money out as (45,00) rather than −45,00.',
+
+  'import.mapping.date.label': 'Date format',
+  'import.mapping.date.iso': 'Year first — 2026-04-03',
+  'import.mapping.date.dmySlash': 'Day first — 03/04/2026',
+  'import.mapping.date.mdySlash': 'Month first — 04/03/2026',
+  'import.mapping.date.dmyDot': 'Day first — 03.04.2026',
+  'import.mapping.date.ambiguous.title': 'Which way round are these dates?',
+  'import.mapping.date.ambiguous.body':
+    'Every sampled date can be read both ways — {sample} is one of them. The file does not say which it means, and a guess misdates up to twelve rows in every thirty-one without anybody noticing for months.',
+  'import.mapping.date.ambiguous.legend': 'How this file writes its dates',
+  'import.mapping.date.ambiguous.required':
+    'Choose how this file writes its dates before continuing.',
+  'import.mapping.date.unrecognised':
+    'The values in “{column}” are not written in any date format this import reads. Re-export the file with a plain date column.',
+  'import.mapping.date.checking': 'Reading the dates in this column…',
+
+  'import.mapping.save.label': 'Call this mapping',
+  'import.mapping.save.description':
+    'The mapping is remembered for the next file with the same columns, and offered rather than applied. The name is what you call this bank.',
+  'import.mapping.save.placeholder': 'My bank, current account',
+
+  'import.mapping.problems': 'Before continuing',
+  'import.mapping.error.account':
+    'Choose the account these rows would be imported into.',
+  'import.mapping.error.date': 'Point one column at the date.',
+  'import.mapping.error.amount':
+    'Point one column at the amount, or one at money out and one at money in.',
+  'import.mapping.error.amountShapes':
+    'Use either one signed amount column or a money-out and money-in pair, not both.',
+  'import.mapping.error.creditMissing':
+    'A money-out column needs a money-in column beside it.',
+  'import.mapping.error.debitMissing':
+    'A money-in column needs a money-out column beside it.',
+  'import.mapping.error.separators':
+    'The decimal and thousands separators have to be different characters.',
+  'import.mapping.submit': 'Save the mapping and preview',
+  'import.mapping.pending': 'Saving the mapping…',
+  'import.mapping.failed': 'The mapping was not saved: {reason}',
+
+  'import.preview.title': 'Review what this would do',
+  'import.preview.body':
+    'Nothing has been written. Every row below is a transaction as it would be created, and the figures are the ones that would be stored.',
+  'import.preview.pending': 'Working out what this file would do…',
+  'import.preview.failed.title': 'The preview did not run',
+  'import.preview.failed.body':
+    'Nothing was written. Go back to the mapping, check the columns and try again.',
+  'import.preview.retry': 'Try the preview again',
+
+  'import.preview.summary.label': 'What this file would do',
+  'import.preview.count.total': 'Rows read',
+  'import.preview.count.toCreate': 'To create',
+  'import.preview.count.duplicates': 'Duplicates skipped',
+  'import.preview.count.invalid': 'Refused',
+  'import.preview.count.flagged': 'Worth a look',
+  'import.preview.count.amount': 'Change to the balance',
+
+  'import.preview.filter.label': 'Show',
+  'import.preview.filter.all': 'Every row',
+  'import.preview.filter.create': 'Rows to create',
+  'import.preview.filter.duplicate': 'Rows to skip',
+  'import.preview.filter.flagged': 'Possible duplicates',
+
+  'import.preview.table': 'The rows this file would create',
+  'import.preview.column.date': 'Date',
+  'import.preview.column.description': 'Description',
+  'import.preview.column.amount': 'Amount',
+  'import.preview.column.match': 'Match',
+  'import.preview.column.decision': 'What happens',
+  'import.preview.decision.label': 'What happens to {date}, {amount}',
+  'import.preview.decision.create': 'Create it',
+  'import.preview.decision.skip': 'Skip it',
+  'import.preview.match.certain': 'Duplicate',
+  'import.preview.match.probable': 'Possible duplicate',
+  'import.preview.match.none': 'New',
+  'import.preview.reason.source_ref':
+    'The row id this file stamped is already on a transaction in this account.',
+  'import.preview.reason.exact_match':
+    'Same day, same amount and the same description.',
+  'import.preview.reason.amount_and_date':
+    'Same amount within three days, but the day or the wording moved.',
+  'import.preview.reason.within_file':
+    'An earlier row of this same file says the same thing.',
+  'import.preview.empty': 'No row matches this filter.',
+  'import.preview.sourceRef.used':
+    'This file stamps its own row ids, so duplicates were matched on those rather than guessed at.',
+  'import.preview.quota':
+    'Importing these rows would take you {excess} transactions past your plan’s limit of {limit}.',
+  'import.preview.decisions.note':
+    'What you choose per row is held in this browser. Writing the rows arrives with the last step of this flow.',
+
+  'import.preview.invalid.title': 'Rows that were refused',
+  'import.preview.invalid.body':
+    'These rows are not imported. The file’s own text is quoted so you can see what was there.',
+  'import.preview.invalid.row': 'Row {row}',
+  'import.preview.invalid.raw': 'The file says: {raw}',
+  'import.preview.allInvalid.title': 'Not one row could be read',
+  'import.preview.allInvalid.body':
+    'All {count} rows were refused, which almost always means a column is pointed at the wrong field. The first three say why:',
+  'import.preview.allInvalid.remap': 'Back to the mapping',
+  'import.preview.allInvalid.restart': 'Start over with another file',
+
+  'import.done.title': 'Import the rows',
+  'import.done.body':
+    'Nothing has been written yet. Writing a reviewed import into the ledger is not available in this workspace yet, so the review above is safe to leave open or to come back to.',
+  'import.done.back': 'Back to the review',
 } as const satisfies MessageCatalogueSource
 
 export default messages

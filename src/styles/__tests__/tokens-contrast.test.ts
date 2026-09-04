@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
+import {
+  CATEGORY_HUES,
+  seriesVarForHex,
+} from '#/components/app/categories/palette'
+
 /**
  * The contrast contract, enforced.
  *
@@ -242,5 +247,44 @@ describe('the two themes are separately designed', () => {
       }
     }
     expect(Math.min(...pairs)).toBeLessThan(3)
+  })
+})
+
+/**
+ * The stored category palette is the light series, in order.
+ *
+ * `CATEGORY_HUES` hardcodes eight hex literals because they are what the column stores, and
+ * `seriesVarForHex` maps each one back to `--color-series-N` so a category paints through a themed
+ * token instead of the stored value. That mapping is positional: hue 1 must be series 1.
+ *
+ * Nothing else ties the two files together. This suite parses `tokens.css` and, until now, did not
+ * know `palette.ts` existed — which is precisely why the drift it guards against survived long
+ * enough to be worth a test. Retune a series token without retuning the palette and every stored
+ * category silently stops resolving; the swatches keep painting, in the old colour, and no
+ * baseline records it because the stored hex has not changed.
+ *
+ * Green today, by construction. It earns its keep on the day somebody edits one file and not the
+ * other.
+ */
+describe('the category palette tracks the light series', () => {
+  it('is the eight light series values, in slot order', () => {
+    expect(CATEGORY_HUES.map((hue) => hue.value)).toEqual(
+      SERIES_KEYS.map((key) => light[key]),
+    )
+  })
+
+  it('resolves every stored hue to its own slot, ignoring case', () => {
+    for (const [index, hue] of CATEGORY_HUES.entries()) {
+      const expected = `var(--color-series-${index + 1})`
+      expect(seriesVarForHex(hue.value)).toBe(expected)
+      expect(seriesVarForHex(hue.value.toUpperCase())).toBe(expected)
+    }
+  })
+
+  it('resolves a colour outside the palette to null', () => {
+    // Import is what produces one of these, not the seed: all thirteen seeded
+    // category colours are eight-palette values. `CategoryColourField` offers
+    // only the eight, so a ninth reaches the column from a file or the API.
+    expect(seriesVarForHex('#4c6ef5')).toBeNull()
   })
 })

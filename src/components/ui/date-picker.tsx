@@ -24,6 +24,22 @@ import type { FieldSize } from './shared'
 import type { FieldErrorMessage } from './text-field'
 
 const segment = cn(
+  // 24×24 is WCAG 2.2 §2.5.8 Target Size (Minimum), and a segment is a spinbutton rather than an
+  // inline word, so none of the exceptions apply to it. Padding alone does not reach it: at
+  // `--text-label` a digit advances 8.29px, so a segment measured 12.30px wide for one digit and
+  // 20.59px for two, and 18.19px tall for every one of them.
+  //
+  // Which means this repaints more than it repairs, and the first version of this comment said the
+  // opposite. It claimed a two-digit segment stays where it was; measured, `09` in `DD.MM.YYYY`
+  // goes 20.59 × 18.19 to 24 × 24. Every segment grows in height and every one but the four-digit
+  // year grows in width, in both locales, so every date field in the product moves and both sets
+  // of visual baselines drift.
+  //
+  // The violation was narrower than the repaint, which is what made the false version plausible:
+  // axe reported it on the English month alone. Its rule weighs a target's neighbours, and
+  // `M/D/YYYY` sets two narrow segments side by side where `DD.MM.YYYY` puts a wider one between
+  // them. Polish passed the check and still moves.
+  'inline-flex min-h-6 min-w-6 items-center justify-center',
   'rounded-sm px-0.5 text-ink tabular outline-hidden',
   transitionBase,
   // The placeholder is real text a reader will meet, so it takes `ink-2` (7:1)

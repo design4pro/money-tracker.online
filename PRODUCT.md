@@ -4,7 +4,7 @@
 
 ## Platform
 
-web (installable PWA)
+web
 
 ## Users
 
@@ -78,6 +78,10 @@ Five claims, all five checkable:
   schema names or assets; never use its name, wordmark or logo anywhere in this repository or on
   any public surface. Our copy — including every Polish translation — is authored from our own
   English.
+- **Installability is planned, not shipped.** `vite-plugin-pwa` is a declared dependency and
+  nothing else: there is no manifest, no registered service worker and no plugin in
+  `vite.config.ts`. Until that wiring lands, no surface may describe the product as installable
+  or offline-capable, and the design must not assume a standalone display mode.
 - **Design language and visual contract** live in `DESIGN.md` and `docs/SPEC.md` §4. This file
   does not restate them and future work must not contradict them.
 - **Commit and copy language is English**; the product's source locale is `en`.
@@ -120,9 +124,11 @@ Five claims, all five checkable:
 
 These are open and **must not be presented as settled** in copy, in a plan, or in code:
 
-1. **Is multi-currency a paid module or a core capability?** `src/lib/plans.ts` currently proposes
-   it as paid. It is also the single sharpest differentiator from a spreadsheet. Changing it later
-   is a migration across four Polar products, the pricing page and the comparison table.
+1. **Is multi-currency a paid module or a core capability?** The working assumption has been
+   paid, but nothing implements it — there is no plan or entitlement catalogue in the codebase
+   yet, so the assumption rests on no code. It is also the single sharpest differentiator from a
+   spreadsheet. Changing it later is a migration across four Polar products, the pricing page and
+   the comparison table.
 2. **The free tier's account ceiling** (3 or 5) and the exact quota table.
 3. **Per-account sharing inside a household** (`transactionsWriteScope: all | own`). The current
    plan is workspace-level membership only, with per-account scoping deferred; that deferral is
@@ -149,9 +155,12 @@ carry_all`; what the budget detail screen does with an overspend is a product an
 
 ## Evidence on Hand
 
-- **Real:** the product itself — actual screens, the seeded demo workspace, the plan and quota
-  catalogue in `src/lib/plans.ts`, the Playwright baselines under `e2e/`, and the axe results the
-  verification protocol requires every stage to produce.
+- **Real:** the product itself — actual screens, the seeded demo workspace, the Playwright
+  baselines under `e2e/`, and the axe results the verification protocol requires every stage to
+  produce.
+- **Not yet real, and so not citable as proof:** the plan, quota and entitlement catalogue. The
+  plan names (`free`, `plus`, `household`) are settled; the table behind them is not written, so
+  no surface may state a limit, a price or a per-plan feature list as fact.
 - **Does not exist and must never be fabricated:** users, testimonials, quotes, customer logos,
   press mentions, ratings, awards, adoption or usage numbers, uptime or performance claims,
   security certifications (we hold none — no SOC 2, no ISO 27001), case studies, named partners,

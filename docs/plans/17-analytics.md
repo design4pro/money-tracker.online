@@ -38,7 +38,7 @@ this plan depends on 09. Budget context comes from plan 12, and the charts come 
 - `src/server/repos/__tests__/analytics.test.ts` — new
 - `src/lib/period.ts` — new
 - `src/lib/__tests__/period.test.ts` — new
-- `src/server/functions/analytics.ts` — new
+- `src/server/fns/analytics.ts` — new
 
 ### Data and migration
 
@@ -120,7 +120,7 @@ _A report is a sum of stored integers in the base currency, and it is stable ove
 
 ### Definition of done
 
-All six §7 items; the §2 visual clauses are carried by `17-S2`, and this stage's DoD says so
+All seven §7 items; the §2 visual clauses are carried by `17-S2`, and this stage's DoD says so
 explicitly rather than silently ticking them.
 
 ### Blockers
@@ -216,7 +216,7 @@ _What the chart draws, the table states, and the drill-down lists must be the sa
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -240,8 +240,8 @@ None.
 - `src/server/repos/saved-views.ts` — new
 - `src/server/repos/__tests__/saved-views.test.ts` — new
 - `src/routes/_app/reports/-ui/saved-views-menu.tsx` — new
-- `src/server/lib/report-csv.ts` — new
-- `src/server/lib/__tests__/report-csv.test.ts` — new
+- `src/server/analytics/report-csv.ts` — new
+- `src/server/analytics/__tests__/report-csv.test.ts` — new
 
 ### Data and migration
 
@@ -314,7 +314,7 @@ _A CSV of a report contains the same integers the screen showed._ Cases in `repo
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

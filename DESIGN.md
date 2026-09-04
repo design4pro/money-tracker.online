@@ -1,602 +1,721 @@
 ---
 name: money-tracker.online
-description: A ledger that reads like a well-set table of figures - cool paper, one deep teal voice, near-black ink, and colour that only ever carries data with a second signal beside it.
+description: A warm-paper ledger in which every claim carries its measurement, and every place a guarantee is impossible says so and adds a second channel instead.
 colors:
-  ink: '#111310'
-  ink-2: '#33372f'
-  ink-3: '#454a41'
-  canvas: '#f7f7f5'
+  canvas: '#fbf9f5'
   surface: '#ffffff'
-  surface-2: '#eeeeeb'
-  surface-inset: '#e6e6e2'
-  edge: '#dcdcd7'
-  edge-strong: '#6f7468'
-  accent: '#111310'
-  accent-hover: '#2a2e27'
-  accent-on: '#ffffff'
-  accent-subtle: '#e6e6e2'
-  brand: '#0a4a42'
-  brand-hover: '#073630'
-  brand-on: '#ffffff'
-  brand-subtle: '#e2efec'
-  success: '#0f5236'
-  success-on: '#ffffff'
-  success-subtle: '#e3f1ea'
-  warning: '#6a4004'
-  warning-on: '#ffffff'
-  warning-subtle: '#f7ecdc'
-  danger: '#8f1e16'
-  danger-on: '#ffffff'
-  danger-subtle: '#fbe8e6'
-  info: '#1539a8'
-  info-on: '#ffffff'
-  info-subtle: '#e6ecfb'
-  amount-income: '#0f5236'
-  amount-expense: '#8f1e16'
-  amount-transfer: '#454a41'
-  amount-planned: '#1539a8'
-  series-1: '#0a4a42'
-  series-2: '#1539a8'
-  series-3: '#8f1e16'
-  series-4: '#6a4004'
-  series-5: '#62288a'
-  series-6: '#084e5e'
-  series-7: '#7f1a55'
-  series-8: '#34490e'
-  ring: '#0a4a42'
-  selection: '#cfe6e0'
-  track: '#eeeeeb'
-  track-fill: '#0a4a42'
-  inverse: '#111310'
-  inverse-on: '#f4f5f2'
+  surface-raised: '#ffffff'
+  surface-sunken: '#f1eee9'
+  surface-panel: '#f1eee9'
+  ink: '#23201a'
+  ink-2: '#524e46'
+  border-subtle: '#e3dfd8'
+  border-strong: '#838078'
+  border-panel: '#c5c0b7'
+  accent: '#23201a'
+  accent-hover: '#36322b'
+  accent-press: '#16140f'
+  on-accent: '#ffffff'
+  brand: '#064f89'
+  brand-hover: '#033c6a'
+  brand-soft: '#e6f2fe'
+  on-brand: '#ffffff'
+  positive: '#085b44'
+  positive-soft: '#dbf8ec'
+  on-positive: '#ffffff'
+  negative: '#7d0a03'
+  negative-soft: '#feebe8'
+  on-negative: '#ffffff'
+  warning: '#6c4806'
+  warning-soft: '#feedd7'
+  on-warning: '#ffffff'
+  info: '#064f89'
+  info-soft: '#e6f2fe'
+  on-info: '#ffffff'
+  focus: '#064f89'
+  focus-gap: '#ffffff'
+  hover: 'rgb(35 32 26 / 0.055)'
+  press: 'rgb(35 32 26 / 0.1)'
+  selection: '#cfe3f7'
+  scrim: 'rgb(28 25 20 / 0.55)'
+  skeleton: '#ece8e2'
+  skeleton-sheen: 'rgb(255 255 255 / 0.75)'
+  chart-emphasis: 'rgb(35 32 26 / 0.06)'
+  series-1: '#0d6abb'
+  series-2: '#0a646a'
+  series-3: '#0f7b62'
+  series-4: '#436f0a'
+  series-5: '#625106'
+  series-6: '#b1440c'
+  series-7: '#a60d47'
+  series-8: '#9724b5'
 typography:
   hero:
-    fontFamily: 'Inter Tight, Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: 'clamp(2.5rem, 6.8vw, 5rem)'
+    fontFamily: 'Bricolage Grotesque, Bricolage Grotesque Fallback, Avenir Next, ui-sans-serif, system-ui, sans-serif'
+    fontSize: 'clamp(2.5rem, 6.8vw, 4.5rem)'
     fontWeight: 700
-    lineHeight: 1
+    lineHeight: 0.98
     letterSpacing: '-0.032em'
-  headline:
-    fontFamily: 'Inter Tight, Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: 'clamp(2rem, 4.8vw, 3.25rem)'
+  display:
+    fontFamily: 'Bricolage Grotesque, Bricolage Grotesque Fallback, Avenir Next, ui-sans-serif, system-ui, sans-serif'
+    fontSize: 'clamp(1.875rem, 4.4vw, 2.5rem)'
     fontWeight: 700
-    lineHeight: 1.05
+    lineHeight: 1.04
     letterSpacing: '-0.028em'
-  figure:
-    fontFamily: 'Inter Tight, Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: 'clamp(1.875rem, 4vw, 2.75rem)'
-    fontWeight: 700
-    lineHeight: 1
-    letterSpacing: '-0.02em'
-    fontFeature: 'tabular-nums'
   title:
-    fontFamily: 'Inter Tight, Inter, -apple-system, Segoe UI, sans-serif'
+    fontFamily: 'Bricolage Grotesque, Bricolage Grotesque Fallback, Avenir Next, ui-sans-serif, system-ui, sans-serif'
     fontSize: '1.5rem'
-    fontWeight: 650
-    lineHeight: 1.2
-    letterSpacing: '-0.018em'
+    fontWeight: 700
+    lineHeight: 1.18
+    letterSpacing: '-0.02em'
   subtitle:
-    fontFamily: 'Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: '1.0625rem'
-    fontWeight: 600
-    lineHeight: 1.45
-  body:
-    fontFamily: 'Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: '0.9375rem'
-    fontWeight: 400
-    lineHeight: 1.6
-  amount:
-    fontFamily: 'Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: '0.9375rem'
-    fontWeight: 550
-    lineHeight: 1.5
-    fontFeature: 'tabular-nums'
-  caption:
-    fontFamily: 'Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: '0.8125rem'
-    fontWeight: 400
-    lineHeight: 1.55
-  micro:
-    fontFamily: 'Inter, -apple-system, Segoe UI, sans-serif'
-    fontSize: '0.6875rem'
+    fontFamily: 'Inter, Inter Fallback, -apple-system, BlinkMacSystemFont, Segoe UI, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '1.125rem'
     fontWeight: 600
     lineHeight: 1.4
-    letterSpacing: '0.07em'
-    textTransform: 'uppercase'
+    letterSpacing: '-0.012em'
+  body:
+    fontFamily: 'Inter, Inter Fallback, -apple-system, BlinkMacSystemFont, Segoe UI, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.9375rem'
+    fontWeight: 400
+    lineHeight: 1.55
+  label:
+    fontFamily: 'Inter, Inter Fallback, -apple-system, BlinkMacSystemFont, Segoe UI, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.8125rem'
+    fontWeight: 500
+    lineHeight: 1.4
+  caption:
+    fontFamily: 'Inter, Inter Fallback, -apple-system, BlinkMacSystemFont, Segoe UI, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.75rem'
+    fontWeight: 400
+    lineHeight: 1.35
+  micro:
+    fontFamily: 'Inter, Inter Fallback, -apple-system, BlinkMacSystemFont, Segoe UI, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.6875rem'
+    fontWeight: 600
+    lineHeight: 1.2
+    letterSpacing: '0.08em'
 rounded:
-  none: '0'
-  sm: '4px'
-  md: '8px'
-  lg: '12px'
-  xl: '18px'
+  sm: '0.5rem'
+  md: '0.75rem'
+  lg: '1rem'
+  xl: '1.25rem'
+  2xl: '1.75rem'
   full: '9999px'
 spacing:
-  0: '0'
-  1: '4px'
-  2: '8px'
-  3: '12px'
-  4: '16px'
-  5: '20px'
-  6: '24px'
-  8: '32px'
-  10: '40px'
-  12: '48px'
-  16: '64px'
-  24: '96px'
+  1: '0.25rem'
+  2: '0.5rem'
+  3: '0.75rem'
+  4: '1rem'
+  5: '1.25rem'
+  6: '1.5rem'
+  8: '2rem'
+  10: '2.5rem'
+  12: '3rem'
+  16: '4rem'
+  20: '5rem'
+  24: '6rem'
 components:
   button-primary:
-    background: '{colors.accent}'
-    color: '{colors.accent-on}'
-    radius: '{rounded.md}'
-    minHeight: '44px'
-    padding: '{spacing.3} {spacing.5}'
+    backgroundColor: '{colors.accent}'
+    textColor: '{colors.on-accent}'
+    rounded: '{rounded.md}'
+    height: '2.5rem'
+    padding: '0 {spacing.4}'
+    typography: '{typography.label}'
+  button-primary-hover:
+    backgroundColor: '{colors.accent-hover}'
+    textColor: '{colors.on-accent}'
+  button-primary-active:
+    backgroundColor: '{colors.accent-press}'
+    textColor: '{colors.on-accent}'
+  button-secondary:
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.md}'
+    height: '2.5rem'
+    padding: '0 {spacing.4}'
+    typography: '{typography.label}'
+  button-secondary-hover:
+    backgroundColor: '{colors.surface-sunken}'
+    textColor: '{colors.ink}'
+  button-ghost:
+    backgroundColor: 'transparent'
+    textColor: '{colors.ink-2}'
+    rounded: '{rounded.md}'
+    height: '2.5rem'
+    padding: '0 {spacing.4}'
+  button-ghost-hover:
+    backgroundColor: '{colors.hover}'
+    textColor: '{colors.ink}'
   button-brand:
-    background: '{colors.brand}'
-    color: '{colors.brand-on}'
-    radius: '{rounded.md}'
-    minHeight: '44px'
-  button-quiet:
-    background: '{colors.surface-2}'
-    color: '{colors.ink}'
-    border: '1px solid {colors.edge-strong}'
-    radius: '{rounded.md}'
-    minHeight: '44px'
-  field:
-    background: '{colors.surface}'
-    border: '1px solid {colors.edge-strong}'
-    radius: '{rounded.md}'
-    minHeight: '44px'
-    focusRing: '2px solid {colors.ring}'
-  amount-field:
-    extends: 'field'
-    fontFeature: 'tabular-nums'
-    textAlign: 'end'
+    backgroundColor: '{colors.brand}'
+    textColor: '{colors.on-brand}'
+    rounded: '{rounded.md}'
+    height: '2.5rem'
+    padding: '0 {spacing.4}'
+  button-danger:
+    backgroundColor: '{colors.negative}'
+    textColor: '{colors.on-negative}'
+    rounded: '{rounded.md}'
+    height: '2.5rem'
+    padding: '0 {spacing.4}'
   card:
-    background: '{colors.surface}'
-    border: '1px solid {colors.edge}'
-    radius: '{rounded.lg}'
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.xl}'
     padding: '{spacing.5}'
-  stat-tile:
-    extends: 'card'
-    figure: '{typography.figure}'
-    label: '{typography.micro}'
+  card-inset:
+    backgroundColor: '{colors.surface-sunken}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.lg}'
+    padding: '{spacing.5}'
+  card-brand:
+    backgroundColor: '{colors.brand-soft}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.xl}'
+    padding: '{spacing.5}'
+  field:
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.md}'
+    height: '2.5rem'
+    padding: '0 {spacing.3}'
+    typography: '{typography.label}'
+  badge-neutral:
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.full}'
+    height: '1.5rem'
+    padding: '0 {spacing.2}'
+    typography: '{typography.caption}'
+  badge-positive:
+    backgroundColor: '{colors.positive-soft}'
+    textColor: '{colors.positive}'
+    rounded: '{rounded.full}'
+    height: '1.5rem'
+    padding: '0 {spacing.2}'
+  badge-negative:
+    backgroundColor: '{colors.negative-soft}'
+    textColor: '{colors.negative}'
+    rounded: '{rounded.full}'
+    height: '1.5rem'
+    padding: '0 {spacing.2}'
   ledger-row:
-    minHeight: '52px'
-    borderBottom: '1px solid {colors.edge}'
-    amount: '{typography.amount}'
-  chip:
-    radius: '{rounded.full}'
-    minHeight: '32px'
-    hitArea: '44px'
-    border: '1px solid {colors.edge-strong}'
-  budget-meter:
-    track: '{colors.track}'
-    fill: '{colors.track-fill}'
-    radius: '{rounded.full}'
-    height: '8px'
-  chart-surface:
-    background: '{colors.surface}'
-    gridline: '{colors.edge}'
-    axisLabel: '{typography.caption}'
-  toast:
-    background: '{colors.inverse}'
-    color: '{colors.inverse-on}'
-    radius: '{rounded.md}'
-  dialog:
-    background: '{colors.surface}'
-    radius: '{rounded.xl}'
-    scrim: 'rgba(17, 19, 16, 0.44)'
-  focus-ring:
-    width: '2px'
-    offset: '2px'
-    color: '{colors.ring}'
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    height: '3.25rem'
+    typography: '{typography.label}'
+  ledger-row-selected:
+    backgroundColor: '{colors.brand-soft}'
+    textColor: '{colors.ink}'
 ---
 
 # Design System: money-tracker.online
 
 ## Overview
 
-**Creative North Star: "The Set Table."**
+**Creative North Star: "The Audited Ledger."**
 
-This is a ledger. The whole design exists to make a column of numbers readable, comparable and
-trustworthy at a glance, and everything that does not serve that gets out of the way. Cool paper,
-near-black ink, one deep teal that points, and figures set in tabular numerals so that a column of
-amounts lines up on the decimal separator whether it holds `9,90` or `12 480,00`.
+A ledger whose every claim carries its receipt. This is a product about money being right, so the
+visual system is built the way a set of accounts is built: every value is measured before it is
+used, the measurement is written down beside it, and where a guarantee turns out to be impossible
+the system says so out loud and adds another channel rather than quietly hoping. `src/styles/
+tokens.css` states the contrast ratio of every colour against every ground it can land on, names
+the dichromat separation of the positive/negative pair as low as 1.14:1, and then makes colour the
+_third_ channel of money direction rather than the first. That refusal to overclaim is the design.
 
-The product's authority comes from exactness, not from volume. A screen has at most one loud
-element: one inverse slab, one primary button, one oversized figure. Everything else is set quietly
-enough that the loud thing is heard.
+The paper is warm, not clinical. `canvas` is a bone white with yellow in it and dark is a warm
+charcoal, never pure black; a finance product spends its life next to a column of figures and a
+blue-white screen makes that column feel like a spreadsheet cell rather than a page. Against that
+paper there are exactly two saturated voices: a near-black `accent` that commands, and one working
+blue `brand` that points. `info` deliberately reuses the brand hue, because a notice with no verdict
+speaks in the product's own voice and a fifth hue would have put a second blue beside the first for
+no informational gain.
 
-Two constraints shape this system more than taste does, and both are stated as measurements rather
-than as preferences:
+Density is high and quiet. A screen carries at most one loud thing - one primary button, one
+oversized numeral - and the signature composition is an 11px uppercase `micro` label sitting
+directly above a 40px `display` figure with nothing in between. The scale jump is deliberate and
+softening it with an intermediate step is what makes a dashboard read as generic. Everything else
+is set at `label` or `caption`, flat, on a strict 4px grid, so that the one loud thing is heard.
 
-1. **The palette is designed to a 7:1 floor on text.** Every text token clears 7:1 against every
-   one of the four grounds it can land on, in both themes. That floor was chosen before any hue
-   was, which is why the ink ladder has three tiers rather than the four a looser floor would have
-   allowed.
-2. **7:1 against the ground does not make two colours distinguishable from each other.** Measured:
-   `series-2` (`#1539a8`) and `series-7` (`#7f1a55`) both clear 7.69:1 against `surface`, and
-   against **each other** they measure **1.00:1**. Two chart series can therefore be perfectly
-   contrasty and perfectly indistinguishable at the same time. That single measurement is why
-   colour never carries information alone anywhere in this product, and why the accessibility
-   position in `docs/ACCESSIBILITY.md` is what it is.
+**Key Characteristics:**
 
-**Key characteristics:**
-
-- Cool paper canvas (`#f7f7f5`), never clinical white; in dark, a near-neutral charcoal, never
-  pure black.
-- One near-black accent and one deep teal brand. No third voice.
-- Flat at rest. Shadow answers interaction; it is not a resting property.
-- Tabular numerals on every number that can change, without exception.
-- Strict 4px grid with no eyeballed exceptions.
-- A 44×44 CSS px minimum hit area on every interactive element, everywhere, including inside dense
-  ledger rows.
-- Light and dark are two designed systems, not one system and its inversion.
+- Warm paper (`#fbf9f5`), never clinical white; warm charcoal in dark, never pure black.
+- Two voices only: a near-black accent that commands and one blue that points.
+- Five grounds, and `surface-panel` is the one whose direction flips between themes.
+- Flat at rest. Shadow means a genuine second layer, plus one step of hover lift.
+- Every number that can change is tabular, without exception.
+- Colour is never the only channel, and the reason is measured rather than assumed.
+- Light and dark are two designed systems; a dark value computed from a light one is a defect.
+- The 44px hit area is a separate dimension from the visual box, and the primitive owns it.
+- Every token carries its measured contrast ratio as a trailing comment. One without is unfinished.
 
 ## Colors
 
-A cool, low-chroma paper system carrying two saturated voices: a near-black that commands and a
-deep teal that points. Every value below is stated with its measured contrast ratio; ratios were
-computed against all four grounds (`canvas`, `surface`, `surface-2`, `surface-inset`) and the
-**minimum** is the one quoted, because the minimum is the one that has to hold.
+A warm, low-chroma paper system carrying a near-black that commands and a single blue that points.
+Ramps were built in OKLCH and every pair measured with the WCAG relative-luminance formula; chroma
+sits at 96% of the sRGB gamut boundary for its lightness and hue, which is why the chromatic values
+look saturated without clipping a channel. Ratios below are the light theme measured against
+`surface-sunken`, the darkest ground light text lands on; the dark theme is measured against
+`surface-raised`, its lightest.
 
 ### Primary
 
-- **Ink** (`#111310` light / `#f4f5f2` dark): the accent and the body text at once — the darkest
-  ink and the loudest fill are deliberately the same value. Primary buttons, inverse slabs, body
-  copy. Min contrast **14.92:1** light, **13.31:1** dark.
+- **Ink Black** (`accent` / `ink`): the same value serves as the darkest text and the loudest fill,
+  deliberately. Primary buttons, body copy, headings. White on the accent fill measures 16.24:1;
+  the text role measures 14.03:1 on sunken and 15.99:1 on surface. Dark theme lifts it to a warm
+  bone `#e9e6df` (12.15:1 on raised) and the accent inverts with it.
 
 ### Secondary
 
-- **Deep Teal** (`brand`, `#0a4a42` light / `#5fd3bd` dark): links, active navigation, the focus
-  ring, selection, the budget meter fill, the primary chart series. It points; it does not command.
-  Min **8.10:1** light, **8.00:1** dark. White on the light fill measures 10.14:1.
-- **Teal Wash** (`brand-subtle`, `#e2efec` light / `#0e2b26` dark): the tinted ground for upsells,
-  empty-state invitations and selected chips. It carries `brand` as readable text at **8.59:1**
-  light and **8.29:1** dark, so it is a real surface rather than a decorative tint.
+- **Working Blue** (`brand`): links, active navigation, the focus ring, selection, the primary
+  chart series, and the single monetisation call to action. 7.30:1 on sunken, 8.44:1 on surface.
+  Dark is a lifted `#75b8fc` at 7.22:1 on raised - lifted, not flipped.
+- **Blue Wash** (`brand-soft`): the tinted ground for upsells, empty-state invitations and the
+  selected ledger row. It carries `brand` as readable text at 7.44:1, so it is a real surface
+  rather than decoration. Dark is `#152433`, carrying its own brand at 7.52:1.
 
-### Tertiary — the four semantic hues
+### Tertiary - the four verdicts
 
-Each has an `-on` foreground measured against its solid fill and a `-subtle` tint that carries its
-own hue as text above 7:1:
+Hues were chosen for dichromatic separation rather than convention: the positive/negative pair is
+bluish-green (168 degrees) against vermillion (30 degrees), the Okabe-Ito axis that best survives
+protanopia and deuteranopia, instead of the textbook green-versus-red pair that collapses entirely.
+Each carries an `-on` foreground for its solid fill and a `-soft` tint that carries its own hue as
+text above 7:1.
 
-- **Ledger Green** (`success`, `#0f5236` / `#59d69a`) — settled, paid, reached, within budget.
-  Min 7.36:1 / 7.98:1; on `success-subtle`, 7.91:1.
-- **Amber** (`warning`, `#6a4004` / `#f0b64a`) — approaching a limit, over quota, unconfirmed,
-  overdue soon. Min 7.15:1 / 7.97:1; on `warning-subtle`, 7.66:1.
-- **Signal Red** (`danger`, `#8f1e16` / `#ff9b8f`) — destructive confirmation, validation failure,
-  exceeded. Never the resting state of a row action. Min 7.10:1 / 7.17:1; on `danger-subtle`, 7.52:1.
-- **Reference Blue** (`info`, `#1539a8` / `#9db8ff`) — system notices with no verdict, and planned
-  (future-dated) rows. Min 7.69:1 / 7.45:1; on `info-subtle`, 8.14:1.
-
-### The amount hues
-
-Four reserved tokens, and they are the reason `success` and `danger` may never be used
-decoratively anywhere near a figure:
-
-| Token             | Light     | Dark      | Means                                      |
-| ----------------- | --------- | --------- | ------------------------------------------ |
-| `amount-income`   | `#0f5236` | `#59d69a` | money in                                   |
-| `amount-expense`  | `#8f1e16` | `#ff9b8f` | money out                                  |
-| `amount-transfer` | `#454a41` | `#b3b7ad` | moved between own accounts — no net effect |
-| `amount-planned`  | `#1539a8` | `#9db8ff` | future-dated, not yet real                 |
+- **Ledger Green** (`positive`) - money in, settled, within budget. 7.01:1 on sunken; on
+  `positive-soft`, 7.20:1. Dark `#21cb9c`.
+- **Oxblood** (`negative`) - money out, destructive confirmation, validation failure, overspend.
+  9.47:1 on sunken; on `negative-soft`, 9.53:1. Dark `#fdaa9c`.
+- **Tobacco** (`warning`) - approaching a limit, over quota, unconfirmed, overdue soon. 7.07:1 on
+  sunken; on `warning-soft`, 7.13:1. Dark `#efa51e`.
+- **Notice Blue** (`info`) - system notices with no verdict, and planned future-dated rows. Shares
+  the brand value exactly.
 
 ### Neutral
 
-- **Cool Paper** (`canvas`, `#f7f7f5` / `#0e0f0e`): the page ground.
-- **Sheet** (`surface`, `#ffffff` / `#171917`): every card face.
-- **Recessed Sheet** (`surface-2`, `#eeeeeb` / `#1f221f`) and **Inset** (`surface-inset`,
-  `#e6e6e2` / `#262a26`): nested panels, quiet filled buttons, meter tracks, table header bands.
-  Depth by tone, not by shadow.
-- **The ink ladder** — `ink` (14.92:1 min), `ink-2` (9.71:1 min), `ink-3` (7.27:1 min) light;
-  `ink` (13.31:1), `ink-2` (9.62:1), `ink-3` (7.14:1) dark. **Three tiers, and all three clear
-  7:1 on all four grounds.** Hierarchy therefore comes from weight and scale, not from fading text
-  towards the background.
-- **Hairline** (`edge`, `#dcdcd7` / `#2c302c`): decorative separation only.
-- **Control Boundary** (`edge-strong`, `#6f7468` / `#7e8479`): the edge of anything interactive.
-  Min 3.84:1 light and 3.79:1 dark — above the 3:1 that WCAG 2.2 1.4.11 requires of a control
-  boundary, without the heaviness of a full-contrast border. This token is what separates a _drawn_
-  box from a _pressable_ one.
+- **Warm Paper** (`canvas`): the page ground.
+- **Sheet** (`surface`) and **Raised** (`surface-raised`): in light these share white, because
+  white is the top of the range and elevation there is carried by shadow. In dark they separate
+  (`#1d1b18` against `#272622`), because a shadow against charcoal reads as nothing and tone is
+  the only honest elevation channel. That asymmetry is the reason both tokens exist.
+- **Well** (`surface-sunken`): recessed panels, meter tracks, table header bands, the left rail.
+- **Panel** (`surface-panel`): the fifth ground, for a plane filling a whole region of the
+  composition - the auth rail, a half-screen split. It is the only ground whose _direction_ flips:
+  light recesses it (1.10:1 against canvas), dark lifts it (1.16:1). The steps are deliberately
+  unequal, forced by the contrast contract rather than chosen: in light this is the darkest ground
+  text lands on and `positive` already sits at 7.01:1 on it, so 1.10 is the entire budget.
+- **The ink ladder is two tiers, and both are AAA.** `ink` (14.03:1) and `ink-2` (7.15:1). `ink-2`
+  is not a 4.5:1 grey; hierarchy in this product comes from weight, size and position, never from
+  fading text toward the background. There is no third tier.
+- **Hairline** (`border-subtle`): decorative separation only, and it carries no contrast claim.
+- **Control Boundary** (`border-strong`): the edge of anything interactive. 3.41:1 on sunken,
+  above the 3:1 WCAG 1.4.11 asks of a control boundary without the weight of a full-contrast
+  border. This token is what separates a drawn box from a pressable one.
+- **Panel Edge** (`border-panel`): the one rule that draws the `surface-panel` split. Decorative,
+  so no 3:1 claim, but held to a floor of 1.5:1 against _both_ grounds it divides in both themes.
+  `border-subtle` cannot do this job: at 1.32:1 against the dark panel it disappears exactly where
+  the tonal step is weakest.
 
-### The categorical series palette
+### The category series palette
 
-Eight hues for charts, pivot rows and category swatches. Measured minimum against the four grounds:
-`series-1` 8.10, `series-2` 7.69, `series-3` 7.10, `series-4` 7.15, `series-5` 7.66, `series-6`
-7.42, `series-7` 7.69, `series-8` 7.97 (light); 8.00, 7.45, 7.17, 7.97, 7.07, 7.56, 7.63, 8.14
-(dark).
+Eight hues at 252, 202, 172, 132, 95, 42, 8 and 318 degrees, for charts, category chips and
+legends. **Read the guarantee precisely, because it is narrower than a palette usually claims.**
 
-They are ordered so that adjacent indices are maximally separated in hue **and** in lightness, and
-they are still not sufficient on their own — see the next section.
+Eight hues that are simultaneously mutually distinguishable, at 7:1 against both a near-white and a
+near-black ground, and stable under dichromacy do not exist inside sRGB. That is the size of the
+gamut, not a failure of the ramp. What it actually guarantees: every value clears **3:1 against
+every ground in its own theme** (measured minimum 4.50:1 light, 4.87:1 dark), which is the WCAG
+1.4.11 floor for a graphical object and is enough for a fill, a stroke or a swatch. It does **not**
+guarantee 7:1, so **a series colour is never used as text.** The worst-case pair separates by only
+1.03:1 in luminance, and under simulated deuteranopia the worst pair falls to 1.02:1.
 
 ### Named Rules
 
-**The One Voice Rule.** Ink and Deep Teal are the only two saturated voices in the chrome. A screen
-gets at most one inverse slab and one primary button. If a layout needs a third colour to make its
-hierarchy legible, the hierarchy is wrong and the palette is not.
+**The Two Voices Rule.** `accent` and `brand` are the only saturated voices in the chrome. A screen
+gets one primary button. If a layout needs a third colour to make its hierarchy legible, the
+hierarchy is wrong and the palette is not.
 
-**The Semantic Amount Rule.** `amount-income`, `amount-expense`, `amount-transfer` and
-`amount-planned` are **reserved**. They may not be used for decoration, for a brand accent, for an
-icon that is not about an amount, or for a chart series. Conversely, a figure that represents money
-in or out is painted in them and in nothing else. The reason is that a reader learns the mapping in
-the first minute of use and then trusts it everywhere; one decorative red total destroys it.
+**The Colour-Is-Third Rule.** Money direction is never encoded by colour alone, and colour is not
+even the first channel. Measured separation between `positive` and `negative` after
+Viénot-Brettel-Mollon simulation falls to 1.14:1 in light and 1.12:1 in dark - invisible. So every
+amount carries an explicit sign, inflow is set at a heavier weight than outflow, every intent
+surface carries an icon, and the product stays correct with all colour removed.
 
-**The Colour-Is-Never-Alone Rule.** Colour is never the sole channel of information anywhere in
-this product. Every chart series carries at least one of: a direct in-place label, a distinct marker
-shape, or a fill pattern. Every income/expense figure carries a sign or an explicit `+`/`−`. Every
-status carries a word or an icon with an accessible name. The justification is measured, not
-theoretical: `series-2` and `series-7` differ by **1.00:1** from each other while both clear 7.69:1
-against the surface. Contrast against the ground says nothing about distinguishability between two
-foreground hues, and a colour-blind reader, a greyscale print and a low-quality projector all
-collapse that pair to the same grey.
-
-**The 7:1 Rule.** Every text token clears 7:1 against every ground it can land on, in both themes,
-and the measured minimum is recorded as a trailing comment beside the token in
-`src/styles/tokens.css`. A token added without its measurement is not finished. **Two named
-exceptions, and only two:** (1) disabled control text, which is exempt from contrast requirements
-by WCAG and is set at `ink-3` on `surface-inset` with a non-colour disabled affordance beside it;
-(2) chart gridlines and axis rules, which are non-text and are held to 3:1. Everything else clears
-7:1 or it does not ship.
-
-**The 44px Rule.** Every interactive element has a hit area of at least 44×44 CSS px, including
-inside a dense ledger row, including the row's inline category chip, including the sort control in
-a table header. Where the _visual_ element is smaller — a 32px chip, a 20px checkbox — the hit
-area is expanded with padding or a pseudo-element, and the expansion is part of the primitive, not
-something a caller remembers. This is WCAG 2.2 2.5.5 (Enhanced) and it is one of the criteria this
-product actually claims, so it is verified rather than assumed: the axe suite checks it on every
-route in the visual spec.
+**The Series-Is-Secondary Rule.** Anything painted from the series ramp also carries a text label, a
+value, or a pattern. A chart whose only channel is series colour is a defect, and the primitives in
+`src/components/charts` are built so it cannot be expressed.
 
 **The Measured Pair Rule.** Every colour token that can meet text carries its measured contrast
-ratio as a trailing comment beside its declaration, stated against every ground the value can
-actually land on rather than against a convenient one.
+ratio as a trailing comment beside its declaration, stated against every ground it can actually
+land on rather than a convenient one. A token added without its measurement is not finished.
 
-**The Two Systems Rule.** Dark is designed, not derived. Its surfaces are near-neutral charcoal
-rather than inverted paper, its shadows are re-declared darker and tighter rather than reused, and
-its semantic hues are lifted rather than flipped. A dark value computed from a light one is a defect.
+**The Two Systems Rule.** Dark is designed, not derived. Its neutrals are warm charcoal, its
+chromatic values are lifted rather than flipped, and its shadows are re-declared opaque rather than
+reused. A dark value computed from a light one is a defect.
+
+**The Three-Site Rule.** Every themed colour is declared in exactly three places: bare `:root`,
+then `@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme="light"])`, then
+`:root[data-theme="dark"]`. Fewer than three produces a toggle that works in one direction only.
 
 ## Typography
 
-**Display / figure face:** Inter Tight (650/700), with a metric-compatible local fallback.
-**Body face:** Inter (400/500/550/600), with a metric-compatible local fallback.
+**Display Font:** Bricolage Grotesque (with a metric-compensated `Bricolage Grotesque Fallback`,
+then Avenir Next) - a geometric face for the few large things.
+**Body Font:** Inter (with `Inter Fallback`, then the system stack) - a neutral face for the many
+small ones.
+**Mono Font:** the system mono stack (`ui-monospace`, SF Mono, JetBrains Mono, Cascadia, Menlo).
 
-Both faces ship the tabular figure set this product depends on and both cover Polish diacritics
-(ą ć ę ł ń ó ś ź ż) at every weight in use. A locale is always named in its own language: _English_,
-_Polski_.
+**Character:** geometric warmth over neutral clarity. Both stacks name their metric-compensated
+local fallback _immediately_ after the web face, so a heading does not resize when the web font
+lands. There is deliberately **no third face for numbers**: a figure keeps the face it inherits and
+changes only its numeral set.
 
 ### Hierarchy
 
-- **Hero** (700, `clamp(2.5rem, 6.8vw, 5rem)`, 1.0, `-0.032em`): the marketing headline. One per page.
-- **Headline** (700, `clamp(2rem, 4.8vw, 3.25rem)`): marketing section openers.
-- **Figure** (700, `clamp(1.875rem, 4vw, 2.75rem)`, tabular): the one number a screen is about —
-  net worth, a budget's remaining amount, an account balance. One per card, at most two per screen.
-- **Title** (650, 24px): page and dialog titles.
-- **Subtitle** (600, 17px): card titles and section headings.
-- **Body** (400, 15px, 1.6): prose and form labels.
-- **Amount** (550, 15px, tabular): every monetary figure inside a list, a table or a form.
-- **Caption** (400, 13px): metadata, axis labels, helper text — set in `ink-3`, which still clears
-  7:1, so a caption in this product is genuinely readable rather than decoratively grey.
-- **Micro** (600, 11px, uppercase, `0.07em`): the whisper label above a Figure. It is the smallest
-  type in the system and it is used the most: it is what makes the numeral beneath it loud.
+- **Hero** (700, `clamp(2.5rem, 6.8vw, 4.5rem)`, 0.98, -0.032em): the marketing headline. One per
+  page.
+- **Display** (700, `clamp(1.875rem, 4.4vw, 2.5rem)`, 1.04, -0.028em): the one number a screen is
+  about - net worth, a budget's remainder, an account balance. Set in the display face.
+- **Title** (700, 24px, 1.18): page and dialog titles.
+- **Subtitle** (600, 18px, 1.4): card titles and section headings.
+- **Body** (400, 15px, 1.55): prose and form labels. Running text is capped at `--measure` (68ch).
+- **Label** (500, 13px, 1.4): the default inside controls - button labels, field text, list rows,
+  the ledger row's payee.
+- **Caption** (400, 12px, 1.35): metadata, axis labels, helper text, the converted amount under a
+  figure. Set in `ink-2`, which still clears 7:1, so a caption here is genuinely readable rather
+  than decoratively grey.
+- **Micro** (600, 11px, 0.08em, uppercase): the whisper label above a figure, and collection
+  headers. It is the smallest type in the system and it is what makes the numeral beneath it loud.
 
 ### Named Rules
 
-**The Tabular Rule.** Any number that can change is set in `font-variant-numeric: tabular-nums`.
-No exceptions. Every amount, rate, percentage, count, date figure and axis tick, on every surface,
-in every locale. "It is inside a `StatTile` already" is not an exemption — the rule is checked on
-the rendered element that holds the digits, not on an ancestor. A column of amounts that does not
-align on the decimal separator is a bug report waiting to be filed.
+**The Tabular Rule.** Any number that can change carries the `.tabular` utility
+(`font-variant-numeric: tabular-nums`). No exceptions: every amount, rate, percentage, count, date
+figure and axis tick, in every locale. The rule is checked on the rendered element that holds the
+digits, never on an ancestor. This is what stops a re-rendered total shifting the row it sits in
+and what makes a column of money align on the decimal separator.
 
-**The Aligned Column Rule.** Amounts are right-aligned (`text-align: end`) in every table, list and
-form field. The currency symbol or code sits on the _outside_ of the alignment, so the digits align
-even when a workspace holds `PLN`, `€` and `¥` in the same view. A left-aligned amount column is a
-defect.
+**The Two-Step Rule.** An 11px uppercase `micro` label sits directly above a 40px `display` numeral
+with nothing in between. The contrast is the signature composition; an intermediate size softens
+the pairing and the pairing is the point.
 
-**The Two-Step Rule.** Scale contrast is extreme and deliberate: an 11px Micro label sits directly
-above a 44px Figure with nothing in between. Intermediate steps soften the pairing and the pairing
-is the point.
+**The Real Minus Rule.** A negative amount is prefixed with U+2212, not a hyphen. At the size a
+ledger column is set in, a hyphen is a third of the width of the plus beside it and the column
+stops reading as a column.
 
-**The Own-Script Rule.** A language is always named in its own language and its own script, in a
-frozen table. `Intl.DisplayNames` is never used for this: it resolves against the _reader's_ locale,
-so a Polish reader sees "angielski" where the switcher must say "English".
+**The Aligned Column Rule.** Amounts are end-aligned in every table, list and form field, with the
+currency symbol outside the alignment so digits line up across a workspace holding `PLN`, `EUR` and
+`JPY` in one view.
 
-**The Never-Abbreviate-Money Rule.** An amount is never rendered as `1.2k`, `1,2 tys.` or `€1.2M`
-in a ledger, a form, a table cell, a tooltip or an export. Abbreviation is permitted in exactly one
-place: a chart **axis tick**, where the full value is available in the chart's visually-hidden data
-table and in the point's accessible name. A reader checking their own balance must see the digits.
+**The Spoken-Sentence Rule.** A money cell carries two strings: the drawing, marked `aria-hidden`,
+and a full sentence in an `sr-only` span built with `currencyDisplay: 'name'` - _"Expense of 20.00
+Polish zlotys"_. A narrow currency symbol is announced inconsistently and a minus sign is not the
+same sentence as "an expense".
+
+**The Never-Abbreviate-Money Rule.** An amount is never rendered as `1.2k` or `1,2 tys.` in a
+ledger, form, table cell, tooltip or export. Abbreviation is permitted only on a chart axis tick,
+where the full value is in the chart's data table and the point's accessible name.
 
 ## Layout
 
-A 4px grid, a 12-column content well capped at 1280px for app surfaces and 1140px for reading
-surfaces, and a fixed left rail at ≥1024px that becomes a bottom bar below it.
+A strict 4px rhythm. `--spacing: 0.25rem` pins Tailwind's own numeric scale to the same grid, so
+`p-6`, `gap-6` and `--space-6` are always the same 24px. A one-off value in a component is a defect,
+not a judgement call.
 
-- **App shell**: header 56px, left rail 248px (collapsed 64px), bottom bar 64px + safe-area inset.
-- **Content well**: `padding-inline` 16px at 360px, 24px at 768px, 32px at 1280px and above.
-- **Ledger row**: 52px minimum height on desktop, 64px on touch, three columns at 360px
-  (payee + category / date / amount) and five at 1280px.
-- **Dense mode**: a user preference that reduces row height to 44px and body to 14px. It never
-  reduces a hit area below 44px, and it never reduces contrast.
+- **App shell**: a fixed 220px rail from `lg` (1024px) up, on `surface-sunken` behind a
+  `border-subtle` end-edge; below that breakpoint the rail is `display: none` and a bottom bar takes
+  over. The content column is capped at 1280px by `--content-max`, reached as `max-w-content`,
+  and centred. The marketing surface is a deliberately narrower well at 1152px and does not use
+  that token.
+- **Content padding**: 16px at 360px, 24px from `sm`, 32px from `lg`. Bottom padding is 112px below
+  `lg` to clear the bottom bar and 48px above it.
+- **Chrome geometry is composed, never hand-calculated**: `--nav-h` (64px), `--subnav-h` (48px) and
+  `--impersonation-h` combine through the `h-chrome` / `top-chrome` / `pt-chrome` utilities, plus
+  the `--safe-*` inset tokens. `--impersonation-h` is added unconditionally and resolves to 0 when
+  no impersonation bar is present.
+- **Ledger row**: a single stacked block below `lg`, and a three-column baseline-aligned grid
+  (`1.5fr / 1fr / 1fr`) from `lg` up.
+- **Reading measure**: `--measure` caps running text at 68ch with 1.6 line height and 1.5em
+  paragraph spacing (WCAG 2.2 §1.4.8 AAA), applied by the `prose-measure` utility.
 
 ### Named Rules
 
-**The 4px Rule.** Every dimension is a multiple of 4px and comes from a `--space-*` token. There
-are no eyeballed one-off margins, and a hard-coded `padding: 13px` is a review rejection.
+**The 4px Rule.** Every dimension is a multiple of 4px and comes from a `--space-*` token. A
+hard-coded `padding: 13px` is a review rejection.
 
-**The Reserved Edge Rule.** Exactly one thing clears each fixed edge. The content well pads for the
-header at the top and for the bottom bar (plus `env(safe-area-inset-bottom)`) at the bottom; a
-sticky sub-header composes those values rather than re-deriving them. Two elements both claiming to
-clear the same edge is how a focused input ends up under the keyboard on a phone.
+**The Composed-Chrome Rule.** No consumer re-derives the height of the chrome above it. Sticky
+regions and scroll margins compose the same named tokens, because two elements each claiming to
+clear the same edge is how a focused input ends up under a phone keyboard.
 
-**The Focus Reachability Rule.** No sticky, fixed or floating element may cover a focused control —
-this is WCAG 2.2 2.4.11 and 2.4.12, and 2.4.12 (Enhanced, _no part_ obscured) is one of the criteria
-this product claims. Every sticky region therefore declares `scroll-margin` on its scroll container
-sized to its own height, and the e2e suite tabs through every route asserting the focused element's
-rect is fully inside the viewport and unoccluded.
+**The Closed-Ladder Rule.** Nothing in the product invents a `z-index`. There are eight named rungs
+(`base` 0, `nav` 30, `dropdown` 40, `overlay` 50, `modal` 60, `popover` 65, `tooltip` 70, `toast` 80) and `src/lib/cn.ts` registers them with tailwind-merge so an override genuinely wins instead of
+leaving two classes and letting stylesheet order decide.
+
+**The Focus Reserve Rule.** Nothing may clip a focus ring. Any scroll container that could crop one
+reserves `--focus-reserve` of padding.
 
 ## Elevation & Depth
 
-### Shadow vocabulary
+**Flat at rest.** Depth comes from the ground ladder (canvas -> surface -> sunken) and a hairline.
+Shadow is reserved for things genuinely on another layer, plus a single step of hover lift. No
+glassmorphism, no blur panels, no coloured glow.
 
-- `--shadow-0` — none. The resting state of every surface.
-- `--shadow-1` — hover: `0 1px 2px rgba(17,19,16,.06), 0 2px 6px rgba(17,19,16,.06)`.
-- `--shadow-2` — popovers, menus, the FAB: `0 2px 4px rgba(17,19,16,.07), 0 8px 20px rgba(17,19,16,.10)`.
-- `--shadow-3` — dialogs and drawers: `0 4px 8px rgba(17,19,16,.09), 0 24px 48px rgba(17,19,16,.16)`.
+### Shadow Vocabulary
+
+- **`--shadow-card`** (`0 1px 2px rgb(35 32 26 / 0.04), 0 1px 3px -1px rgb(35 32 26 / 0.05)`): 4-5%
+  alpha, and it exists only to keep a white sheet from dissolving into the warm canvas behind it.
+- **`--shadow-elevated`**: the hover step for a filled button, and any surface briefly lifted.
+- **`--shadow-dropdown`**: menus, list boxes, the floating-panel treatment.
+- **`--shadow-popover`**: popovers and tooltips.
+- **`--shadow-modal`** (`0 2px 8px -2px rgb(35 32 26 / 0.1), 0 32px 72px -16px rgb(35 32 26 /
+0.28)`): dialogs and drawers.
+
+Dark re-declares all five opaquely (`--shadow-card` becomes `0 1px 2px rgb(0 0 0 / 0.5), 0 1px 1px
+rgb(0 0 0 / 0.3)`), because a light shadow's low-alpha warm black is invisible against charcoal.
 
 ### Named Rules
 
 **The Flat-At-Rest Rule.** A resting surface gets a hairline and a tone, never a shadow step. If a
 card needs a shadow to read as a card, its border or its ground is wrong.
 
-**The One-Pixel Rule.** The hover lift is 1px of `translateY` plus one shadow step; the press is
-1px back down and one step off. Nothing in this product moves further than a pixel at rest scale.
+**The One-Pixel Rule.** The press is `translate-y-px` and one shadow step down - never a bounce and
+never a scale. The control reads as pushed into the page rather than as shrinking.
 
-**The Re-declared Dark Rule.** Dark shadows are written out again — darker, tighter, and with a
-1px top hairline of `rgba(255,255,255,.05)` in place of the ambient bounce that does not exist in
-dark. A dark shadow that reuses a light shadow's rgba is a defect.
+**The Tone-In-Dark Rule.** In light, `surface` and `surface-raised` share white and elevation is
+carried by shadow. In dark they separate and tone carries it, because a shadow against charcoal
+reads as nothing.
 
 ## Shapes
 
-`sm` 4px (chips inside a row, badges) · `md` 8px (buttons, fields, menu items) · `lg` 12px (cards,
-panels) · `xl` 18px (dialogs, sheets, the mobile entry drawer) · `full` (chips, avatars, meters,
-toggles).
+Radius is a category signal, not decoration:
+
+`sm` 8px (a nested inset, a small control) - `md` 12px (a control: button, field, menu item) -
+`lg` 16px (a floating layer: menu, popover, inset panel) - `xl` 20px (a sheet: the card) -
+`2xl` 28px (the largest sheets) - `full` (a chip, badge, avatar, meter).
 
 ### Named Rules
 
-**The Pill Means Pickable Rule.** `border-radius: full` on a rectangle-shaped element declares it
-selectable: a filter chip, a tag, a period toggle. A pill that does nothing when clicked is a lie
-the reader only has to be told once.
+**The Pill Means Pickable Rule.** `full` radius on a rectangle declares it a token you can pick up -
+a chip, a badge, an avatar. Never on a panel.
 
-**The Hairline Honesty Rule.** If a box can be clicked, its border is `edge-strong`. If it cannot,
-its border is `edge`. There is no third case, and a decorative `edge-strong` border is a defect.
+**The Hairline Honesty Rule.** If a box can be clicked, its border is `border-strong`. If it cannot,
+its border is `border-subtle`. There is no third case, and a decorative `border-strong` is a defect.
 
 ## Components
 
+Everything under `src/components/ui` is built on **React Aria Components**, not Radix, and is
+expressed purely in tokens: there is no raw hex, literal px radius or hand-written shadow anywhere
+in that directory. Interaction state arrives as data attributes (`data-hovered`, `data-pressed`,
+`data-focus-visible`, `data-selected`, `data-disabled`, `data-invalid`), and the shared fragments in
+`ui/shared.ts` spell those selectors out rather than relying on plugin variant names.
+
 ### Buttons
 
-Four variants — `primary` (accent fill), `brand` (teal fill, used for the single monetisation CTA
-and nothing else), `quiet` (`surface-2` fill with an `edge-strong` border) and `ghost`. All are
-44px minimum height with 12px/20px padding, `md` radius, a 2px `ring` focus ring at 2px offset, a
-1px hover lift, and a loading state that swaps the label for a spinner **while preserving the
-button's width**, because a button that changes size on click moves the thing under the reader's
-finger.
+- **Shape:** `md` radius (12px), `sm` at the small size. `pill` and `icon` shapes available.
+- **Sizes:** sm 32px / md 40px / lg 48px visual height, all below 44px on purpose - the hit area is
+  grown separately.
+- **Primary:** `accent` fill with `on-accent` text and `--shadow-card`; hover moves to
+  `accent-hover` and `--shadow-elevated`; press to `accent-press`, one pixel down, shadow back to
+  card.
+- **Secondary (the default variant):** a `border-strong` hairline on `surface`. Hover darkens the
+  border to `ink-2` and the ground to `surface-sunken`.
+- **Ghost:** no chrome until touched - `ink-2` text, `hover` wash on hover. Toolbars, table rows.
+- **Subtle:** a quiet `surface-sunken` fill that sits inside a card without competing with it.
+- **Brand:** `brand` fill, for marketing and onboarding calls to action.
+- **Danger:** `negative` fill. Never the resting state of a row action.
+- **Link:** `brand` text with a 40%-opacity underline that reaches full opacity on hover; no height,
+  no padding, no shadow.
+- **Disabled** repaints rather than fades: a filled button drops to `surface-sunken` with `ink-2`
+  text. Dropping a filled control to 45% opacity dims its label with its fill and lands the pair
+  near 2.9:1, which reads as broken rather than waiting. Opacity is reserved for controls with no
+  label of their own.
+
+**The Pending-Not-Disabled Rule.** A submit button in flight uses React Aria's `isPending`: it stays
+focusable, gets `aria-disabled` rather than `disabled`, and announces politely. A `disabled` element
+loses focus the moment it is disabled, dumping a keyboard user at the top of the document with no
+announcement of why. The label stays in the DOM under the spinner marked `invisible`, so the button
+holds its measured width and a pending action never reflows its row.
 
 ### Fields
 
-44px minimum height, `surface` ground, `edge-strong` border, `md` radius. The label is always
-visible — a placeholder is never a label. Errors render below the field, are referenced by
-`aria-describedby`, use `danger` **and** an icon **and** a text message, and are announced through
-a polite live region on blur rather than on every keystroke.
+- **Style:** `surface` ground, `border-strong` hairline, `md` radius, 40px at the default size.
+- **Hover** darkens the border to `ink-2`; **focus** moves it to `brand` _and_ draws the ring.
+- **Invalid** moves it to `negative`; errors render below the field, are wired by
+  `aria-describedby`, and combine colour with an icon and a text message.
+- **Disabled:** `surface-sunken` ground, `ink-2` text, `not-allowed` cursor.
+- **The label is always visible.** A placeholder is never a label.
 
-**The amount field** is the most-used control in the product and gets its own treatment: tabular
-figures, end-aligned, a currency affix outside the alignment, `inputmode="decimal"`, a locale-aware
-parser that accepts both `1 234,56` and `1,234.56` from either locale, and a numeric keypad on
-mobile. It never silently rounds what was typed: an input with more decimal places than the
-currency's `digits` shows the value it will store before submit.
+**The amount field** is the most-used control in the product and the one place a decimal is allowed
+to exist on the way in. It crosses the decimal-to-minor-units boundary _through a string_ rather
+than through a float, takes its digit count from the currency rather than a constant, is end-aligned
+and tabular, and shows the value it will store before submit rather than silently rounding.
 
-### Cards and stat tiles
+### Focus
 
-`surface` ground, `edge` hairline, `lg` radius, 20px padding, flat at rest. A stat tile is a Micro
-label, a Figure and at most one delta line; the delta carries a sign and an arrow glyph, never
-colour alone.
+One treatment, product-wide, drawn **outside** the control: a 2px `focus-gap` band separating the
+indicator from whatever fill sits underneath, then the 2px `focus` ring itself. The band is what
+makes the indicator survive on a brand-filled button, where `--color-brand` and `--color-focus` are
+the same value. The indicator measures 7.30:1 against the page in light and 7.22:1 in dark, far past
+the 3:1 the criterion asks for.
 
-### The ledger row
+The two rings are drawn by two different properties on purpose: the ring is an `outline`, which no
+ancestor's `overflow: hidden` can crop, and the band is a `box-shadow`, which one can. Under a
+clipping ancestor the indicator degrades to the outline alone - still conformant, only weaker. It
+never degrades to nothing, which is what a shadow-only indicator would do. `focus-ring-inset`
+mirrors both rings inward for a control flush against an edge.
 
-The signature component. Left: payee (or note) on line one, category chip and account on line two.
-Right: the amount in `amount-*`, with the base-currency equivalent beneath it in `caption` when the
-transaction's currency is not the workspace base. Whole row is a link; the category chip and the
-overflow menu are nested interactive elements with their own 44px hit areas and their own accessible
-names. A planned row is set in `amount-planned` **and** carries a "planned" badge — never colour
-alone.
+**The Outline-Solid Rule.** `outline-solid` is load-bearing and `outline-none` must never appear
+beside it. In Tailwind v4 the outline utilities share one `--tw-outline-style` custom property:
+`outline-none` sets it to `none`, and `outline-2` then resolves against that, producing a ring two
+pixels wide and styled `none`. Every control built on that pair reports a focus colour and draws
+nothing.
 
-### Chips
+### Cards
 
-`full` radius, 32px visual height, 44px hit area, `edge-strong` border. A category chip carries its
-category's colour as a 8px dot plus the category **name**; the colour is never the only identifier.
+- **Corner:** `xl` (20px); the inset variant drops to `lg`.
+- **Default:** `border-subtle` hairline on `surface` with `--shadow-card`.
+- **Inset:** `surface-sunken`, no border - for a panel nested inside another card.
+- **Brand:** `brand-soft` ground behind a 25%-opacity brand border - an upsell or an empty-state
+  invitation.
+- **Dashed:** a dashed `border-strong` at 60% on transparent - the "create something here"
+  affordance.
+- **Padding:** 16 / 20 / 24px.
+- **Header** composes a `micro` uppercase eyebrow, a `subtitle` heading at a caller-chosen level,
+  and a `caption` description, with a trailing action slot.
 
-### Charts
+A card is **not** interactive and there is deliberately no `isInteractive` prop. A clickable card is
+a `Button` or `Link` wrapping a card, so the thing that takes the press is the thing that takes
+focus, is announced with a role, and answers Enter.
 
-Hand-rolled accessible SVG on `d3-scale` / `d3-shape` / `d3-time` — there is no chart library, and
-`docs/adr/0007-hand-rolled-accessible-charts-over-a-chart-library.md` records why. Every chart in
-this product ships, without exception:
+### Badges and chips
 
-1. A visually-hidden `<table>` carrying exactly the data the chart draws, with a caption.
-2. Keyboard-reachable data points (arrow keys move along a series, Home/End jump to the ends), each
-   with an accessible name that includes the full unabbreviated amount.
-3. A non-colour encoding per series: a marker shape, a dash pattern, or a direct in-place label.
-4. Gridlines and axes at 3:1 minimum, axis labels in `caption` at 7:1.
-5. A `prefers-reduced-motion` path in which the draw-in animation does not run and the chart is
-   simply present.
+`full` radius, 20px (sm) or 24px (md) visual height. Tones are `neutral` (the only bordered one),
+`accent`, `brand`, `positive`, `negative`, `warning` and `info`; every tinted tone pairs a `-soft`
+ground with its own hue as text at 7:1 or better. A category chip carries its colour as a dot beside
+the category **name**; the colour is never the only identifier.
 
 ### Navigation
 
-Left rail at ≥1024px with a collapse control; bottom bar below it with five destinations and a
-centred entry FAB. The current destination is marked with `aria-current="page"` **and** a filled
-icon **and** a 3px inline start bar — three channels, one meaning.
+A 220px rail on `surface-sunken` from `lg` up, a bottom bar below it. The current destination is
+marked by `aria-current="page"` plus a second visual channel, never by colour alone.
+
+### Charts
+
+Hand-rolled accessible SVG on `d3-scale` / `d3-shape` / `d3-time`; there is no chart library
+(`docs/adr/0007`). `ChartFrame` makes the guarantees structural rather than advisory:
+
+- **`dataTable` is a required prop**, so a chart built without a text equivalent is a compile error
+  rather than a review finding.
+- The `<svg>` is authored at the container's **actual pixel width**, so one user unit is one CSS
+  pixel at every breakpoint. A fixed viewBox scaled by CSS would shrink the 11px axis labels to 6px
+  at 360px.
+- **Empty is a designed state**: the axes stay on screen and the message sits over them, so the
+  layout does not jump when the first transaction arrives.
+- The focused point's description is a **readout under the plot, not a floating tooltip** - a
+  tooltip that follows focus is the classic way to obscure the focus indicator, and this product
+  claims WCAG 2.2 §2.4.12 Enhanced. The readout is `aria-hidden` because the point already carries
+  the same string as its accessible name.
+- `overflow-visible` on the `<svg>` is load-bearing: the focus ring on an edge data point sits
+  outside the viewBox and the default would clip it away.
+- The entrance fade is gated behind `motion-safe:`. There is no other animation in the directory.
 
 ### Signature: the Budget Meter
 
-A `full`-radius 8px track with a teal fill, a tick at the 100% mark, and — this is the part that
-matters — a threshold marker for each configured alert (50 / 80 / 100 by default) drawn as a 2px
-notch. Over 100% the fill continues in `danger` past the tick and the meter's accessible name says
-"116% of 1 200,00 zł spent", so a screen-reader user gets the overspend as a sentence and not as a
-red rectangle.
+The one component this product is judged on. Its headline is **the remainder**, at the display step,
+because "how much is left" is what somebody standing in a shop needs - not how much is spent and not
+what percentage is gone, which are the two figures every budgeting product leads with. The
+percentage is a caption beneath it.
 
-## Motion
+It does not use the plain `Meter` primitive, because it needs two marks on the track that are a
+`Meter` internal: a **tick at 100%** so the reader sees the line before it is crossed, and a **2px
+notch per configured alert**, so a workspace that asked to be told at 50% and 80% can see where
+those are. The track comes from the shared `AmountMeter`, so the `role="meter"` contract and the
+accessible value live in one place rather than two that can drift.
 
-150–260ms, `--ease-out-quint` or a sibling token, transform and opacity only. Layout-affecting
-properties are never animated. `prefers-reduced-motion: reduce` removes every non-essential
-animation — the chart draw-in, the number roll-up, the row-enter stagger, the drawer slide — and
-leaves crossfades under 100ms where a state change would otherwise be invisible.
+An overspend is unmistakable through four channels, with colour last: the **word** changes (_On
+track_ / _Close to the limit_ / _Over budget_), an **icon** changes with it, the remainder **flips to
+an over-by figure** with a real minus sign, and past 100% the fill runs **hatched** as well as
+negative-coloured - so the state survives greyscale, a forced-colours theme and deuteranopia. The
+fill stops at the track's end because a bar overflowing its own track says nothing a full bar does
+not; the sentence does not stop, and 116% reads as 116%.
+
+### Signature: the ledger row
+
+A real `<tr>` inside a `role="grid"` table. Below `lg` it is a stacked block; from `lg` up it is a
+three-column baseline-aligned grid at 52px minimum height. Payee is `label` weight-medium on
+`surface`; date, account and category sit in `caption` at `ink-2`; the amount is end-aligned and
+tabular. Hover paints the `hover` wash; selection paints `brand-soft` with a 3px inset brand bar on
+the leading edge - tone plus a rule, never tone alone.
+
+Money direction is written by four tones, and none of them is a dedicated colour token: **income**
+is `positive` at semibold, **expense** is `negative` at normal weight, **transfer** is `ink-2` with
+a repeat glyph, **planned** is `info`. Inflow is heavier as well as differently coloured because the
+measured dichromat separation makes colour unreliable on its own. The transfer glyph exists and the
+income/expense arrows deliberately do not: the sign already states direction at the same glance, and
+a glyph in front of a right-aligned number gives the column two left edges so nothing in it lines
+up. A transfer has no sign of its own, so its glyph is the channel that keeps it from being "an
+expense in a different grey".
+
+### Motion
+
+Four durations (90 / 150 / 220 / 320ms) and four easings (`ease-out-quint`, `ease-in-quint`,
+`ease-standard`, `ease-drawer`). Only `transform` and `opacity` plus paint-only colour properties
+are ever animated; height, width, `top` and margin are reflows and cannot be animated honestly at
+60fps. Because Tailwind v4 compiles `-translate-y-px` and `scale-95` to standalone `translate` and
+`scale` properties rather than to `transform`, the shared transition names all three - listing only
+`transform` leaves every press in the directory snapping instantly while the class looks animated.
+
+**The Collapse-The-Tokens Rule.** `prefers-reduced-motion: reduce` sets the four duration tokens to
+0.01ms rather than blanket-killing animations. A `!important` `animation: none` breaks components
+that wait on `animationend` - React Aria's overlays do exactly that to unmount an exiting popover -
+leaving a dialog that never closes. Collapsing durations removes all perceptible motion while every
+completion event still fires, and because they are tokens the collapse reaches animations written
+after the stylesheet was, including third-party CSS.
+
+### Target size
+
+**The 44px Rule.** Every pointer target answers 44x44 CSS px (WCAG 2.2 §2.5.5 AAA). The `target-min`
+utility grows the _hit area_ with a pseudo-element while the visual box stays on the size scale, so
+a 32px icon button keeps its 32px drawing and still answers a 44px tap. The hit area and the visual
+box are separate dimensions; conflating them produces a toolbar of 44px-tall ghost buttons with dead
+space between their labels. The expansion lives in the primitive, so a caller cannot forget it.
 
 ## Do's and Don'ts
 
-### Do
+### Do:
 
-- Set every changeable number in tabular figures and right-align its column.
-- Give every drag surface a keyboard equivalent in a menu ("Move up", "Move down", "Move to…"),
-  and ship the menu in the same change as the drag.
-- Give every chart a visually-hidden data table in the same component that draws it.
-- Expand a small control's hit area inside the primitive, so callers cannot forget.
-- Re-declare dark shadows and dark semantic hues.
-- Record every colour token's measured contrast beside its declaration.
-- Say the full amount in an accessible name, even where the visual is abbreviated.
+- **Do** record every colour token's measured contrast beside its declaration, against every ground
+  it can land on. A token without its measurement is not finished.
+- **Do** declare every themed colour in all three sites (`:root`, the guarded media query, and
+  `[data-theme="dark"]`), or the toggle will work in one direction only.
+- **Do** set every changeable number with the `.tabular` utility on the element holding the digits.
+- **Do** give every amount an explicit sign and set inflow heavier than outflow.
+- **Do** pair every series colour with a label, a value, or a pattern.
+- **Do** grow hit areas inside the primitive with `target-min`, never with padding on the caller.
+- **Do** write `outline-solid` explicitly and never place `outline-none` beside an outline width.
+- **Do** repaint disabled controls that carry their own label; reserve opacity for controls that
+  do not.
+- **Do** use `isPending` rather than `disabled` for an in-flight action, and keep the label in the
+  DOM so the control holds its width.
+- **Do** compose chrome geometry from the named tokens instead of re-deriving a height.
+- **Do** re-declare dark shadows opaquely and lift dark chromatic values rather than flipping them.
 
-### Don't
+### Don't:
 
-- Don't use `success` or `danger` decoratively anywhere near a figure.
-- Don't encode a chart series, a status or a category by colour alone.
-- Don't abbreviate money outside a chart axis tick.
-- Don't render an amount from a float, at any layer, for any reason, including a tooltip.
-- Don't put a shadow on a resting surface.
-- Don't fade text below 7:1 to create hierarchy — change weight or scale instead.
-- Don't animate a layout property, and don't ship an animation without a reduced-motion path.
-- Don't claim AAA conformance in any copy. `docs/ACCESSIBILITY.md` states exactly what is claimed;
-  the reason a blanket claim is refused is on the next line.
-
-## The accessibility position, and why the claim is scoped
-
-**WCAG 2.2 Level AA is the hard gate**, product-wide, enforced in CI: `@axe-core/playwright` runs
-on every route in the visual spec and any `serious` or `critical` violation fails the build.
-
-**Five AAA criteria are additionally held to AAA** and are verified rather than aspired to:
-2.5.5 Target Size (Enhanced) — the 44px Rule; 2.4.11 and 2.4.12 Focus Not Obscured — the Focus
-Reachability Rule; 1.4.8 Visual Presentation; 2.2.6 Timeouts; and 3.3.9 Accessible Authentication
-(Enhanced). The palette is designed to a 7:1 text floor, which is 1.4.6's threshold.
-
-**A blanket "WCAG 2.2 AAA" claim is not made, and no user-facing or marketing copy may make one.**
-Three reasons, in order of weight:
-
-1. **It would be false.** Several AAA criteria are unachievable or actively product-hostile here.
-   1.4.6 cannot hold across the categorical series palette — and, as the measurement at the top of
-   this document shows, holding it there would not even help, because 7:1 against the ground says
-   nothing about two series being distinguishable from each other. 3.1.5 (lower-secondary reading
-   level) conflicts with vocabulary a finance product cannot avoid. 2.4.9 (link purpose from link
-   text alone) is hostile to a dense ledger table where "Edit" is the honest label and the row is
-   the context.
-2. **It would be a legal exposure.** A published accessibility statement is a representation. In
-   the EU, an overstated one is a false statement about an accessibility feature, and this product
-   is squarely inside the European Accessibility Act's scope.
-3. **A scoped claim is more useful than a broad one.** "AA everywhere, plus these five AAA criteria,
-   and here is every AAA criterion we do not meet and why" tells a reader something they can act on.
-   "AAA" tells them nothing they can check.
-
-`docs/ACCESSIBILITY.md` is the authoritative statement and lists every AAA criterion, claimed or
-excluded, with its reason. This document must never contradict it.
+- **Don't** paint text in a series colour. The ramp guarantees 3:1 for graphical objects and
+  explicitly does not guarantee 7:1.
+- **Don't** encode money direction, a chart series, a status or a category by colour alone.
+- **Don't** abbreviate money anywhere except a chart axis tick.
+- **Don't** render an amount from a float at any layer, including a tooltip.
+- **Don't** use a hyphen where a negative amount needs U+2212.
+- **Don't** put a shadow on a resting surface, or add a second shadow step to a card.
+- **Don't** fade text below 7:1 to create hierarchy - change weight, size or position instead.
+- **Don't** invent a `z-index`; take a rung from the closed ladder.
+- **Don't** hard-code a dimension off the 4px grid.
+- **Don't** animate a layout property, and don't ship an animation without a reduced-motion path.
+- **Don't** make a card interactive; wrap it in a `Button` or `Link` instead.
+- **Don't** let a tooltip or sticky region cover a focused control.
+- **Don't** claim blanket WCAG AAA conformance. `docs/ACCESSIBILITY.md` states exactly what is
+  claimed, and this document must never contradict it.

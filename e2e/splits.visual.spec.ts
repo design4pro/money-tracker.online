@@ -116,8 +116,9 @@ async function openSplitEditor(page: Page, labels: SplitLabels) {
   const editor = page.getByRole('region', { name: labels.panel })
   await expect(
     editor,
-    'The split editor is not on the transaction detail screen. `split-editor.tsx` has to be ' +
-      'mounted in `src/routes/_app/transactions/$transactionId.tsx` — see 11-S1.',
+    // Not a diagnosis; see the note on the same assertion in `refunds.visual.spec.ts`. The editor
+    // has been mounted since 11-S1 landed, so naming the mount as the cause is now always wrong.
+    `No region named "${labels.panel}" on the transaction detail screen (the name is locale-dependent).`,
   ).toBeVisible()
   return editor
 }

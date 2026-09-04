@@ -1,0 +1,69 @@
+[
+  {
+    "color": "e11d21",
+    "description": "Critical priority, needs immediate response",
+    "name": "priority: critical"
+  },
+  {
+    "color": "eb6420",
+    "description": "High priority, needs immediate response",
+    "name": "priority: high"
+  },
+  { "color": "009800", "description": "", "name": "priority: low" },
+  { "color": "fbca04", "description": "", "name": "priority: medium" },
+  { "color": "000000", "description": "", "name": "status: abandoned" },
+  { "color": "009800", "description": "", "name": "status: accepted" },
+  { "color": "bfe5bf", "description": "", "name": "status: available" },
+  { "color": "e11d21", "description": "", "name": "status: blocked" },
+  {
+    "color": "006b75",
+    "description": "This has been addressed in a branch and will be scheduled for release in the assigned milestone.",
+    "name": "status: completed"
+  },
+  {
+    "color": "cccccc",
+    "description": "Currently being developed for a future release.",
+    "name": "status: in progress️"
+  },
+  {
+    "color": "e11d21",
+    "description": "Work has stopped. There may be one or more blockers or needs more information.",
+    "name": "status: on hold"
+  },
+  { "color": "fef2c0", "description": "", "name": "status: pending" },
+  { "color": "fbca04", "description": "", "name": "status: review needed" },
+  {
+    "color": "fbca04",
+    "description": "App is not working correctly.",
+    "name": "type: bug"
+  },
+  {
+    "color": "e99695",
+    "description": "Discussing usage, best practices, questions, etc.",
+    "name": "type: discussion"
+  },
+  {
+    "color": "6addf7",
+    "description": "Related to improving documentation and the wiki.",
+    "name": "type: documentation"
+  },
+  {
+    "color": "84b6eb",
+    "description": "A new feature suggestion or improvement upon an existing feature.",
+    "name": "type: enhancement"
+  },
+  { "color": "1d76db", "description": "", "name": "type: feature" },
+  { "color": "fbca04", "description": "", "name": "type: maintenance" },
+  { "color": "cc317c", "description": "", "name": "type: question" },
+  { "color": "7037C4", "description": "", "name": "type: release" },
+  {
+    "color": "1d76db",
+    "description": "Questions, concerns, or suggestions for improving the security of the app.",
+    "name": "type: security"
+  },
+  {
+    "color": "1D76DB",
+    "description": "Run the browser e2e jobs on this pull request",
+    "name": "needs-e2e"
+  }
+]

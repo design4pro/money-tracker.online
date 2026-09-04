@@ -1,0 +1,8 @@
+{
+  "defaultRunner": "claude",
+  "reviewGate": false,
+  "baseBranch": "develop",
+  "worktreeRetention": 10,
+  "maxParallel": 2,
+  "skillsRepos": []
+}

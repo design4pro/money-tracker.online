@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AllocationError,
+  MAX_MINOR,
+  MoneyOverflowError,
   allocate,
   allocateEvenly,
   allocateMoney,
@@ -153,6 +155,17 @@ describe('remainderOf', () => {
     expect(remainderOf(makeMoney(1000, 'EUR'), [makeMoney(1200, 'EUR')])).toBe(
       -200,
     )
+  })
+
+  /**
+   * Both figures are legal amounts on their own, so the guard is on the
+   * difference: a remainder past 2^53 would be printed under the rows having
+   * quietly lost its last digits.
+   */
+  it('refuses a remainder that has left the safe-integer range', () => {
+    expect(() =>
+      remainderOf(makeMoney(MAX_MINOR, 'PLN'), [makeMoney(-MAX_MINOR, 'PLN')]),
+    ).toThrow(MoneyOverflowError)
   })
 
   it('refuses a split line in another currency', () => {

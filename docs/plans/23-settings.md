@@ -130,7 +130,7 @@ affect `booked_on`_, which is stored as a date, not a rendering.
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -253,7 +253,7 @@ _Membership changes never touch money._ Cases:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -378,7 +378,7 @@ _A purge removes money rows completely, and a pending deletion removes none._ Ca
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

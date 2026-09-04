@@ -27,7 +27,7 @@ import { MAX_RULES_PER_WORKSPACE } from '#/server/rules/schema'
 import { applyRules } from '#/server/rules/apply'
 
 import { createBudgetWorld, seedCategory } from './budget-harness'
-import { setLedgerTouchSink, setLimitResolver } from '../base'
+import { setLimitResolver } from '../base'
 import {
   createRule,
   deleteRule,
@@ -184,7 +184,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   setLimitResolver(null)
-  setLedgerTouchSink(null)
 })
 
 /* -------------------------------------------------------------------------- */

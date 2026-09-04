@@ -1,0 +1,1083 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-04T05:12:02.984Z",
+  "title": "Design System: money-tracker.online",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "oklch(98.3% 0.006 84.6)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#282623",
+          "#464542",
+          "#656360",
+          "#85837f",
+          "#a6a4a1",
+          "#cccac6",
+          "#f0eeea"
+        ],
+        "dark": "#12110f"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Sheet",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#1d1b18"
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Raised Sheet",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#272622"
+      },
+      "surface-sunken": {
+        "role": "neutral",
+        "displayName": "Well",
+        "canonical": "oklch(95.0% 0.007 80.7)",
+        "tonalRamp": [
+          "#0d0b08",
+          "#282622",
+          "#474541",
+          "#65635f",
+          "#85837e",
+          "#a7a49f",
+          "#cdcac5",
+          "#f1eee9"
+        ],
+        "dark": "#0b0b09"
+      },
+      "surface-panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "canonical": "oklch(95.0% 0.007 80.7)",
+        "tonalRamp": [
+          "#0d0b08",
+          "#282622",
+          "#474541",
+          "#65635f",
+          "#85837e",
+          "#a7a49f",
+          "#cdcac5",
+          "#f1eee9"
+        ],
+        "dark": "#22201c"
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink Black",
+        "canonical": "oklch(24.5% 0.012 84.6)",
+        "tonalRamp": [
+          "#0d0b06",
+          "#292620",
+          "#48453e",
+          "#66635c",
+          "#86837b",
+          "#a8a49c",
+          "#cecac2",
+          "#f2eee6"
+        ],
+        "dark": "#e9e6df"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Second Ink",
+        "canonical": "oklch(42.5% 0.014 84.6)",
+        "tonalRamp": [
+          "#0e0b05",
+          "#2a261f",
+          "#48453d",
+          "#67635a",
+          "#87837a",
+          "#a9a49b",
+          "#cfcac1",
+          "#f3eee4"
+        ],
+        "dark": "#bcb8b0"
+      },
+      "border-subtle": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(90.5% 0.010 81.8)",
+        "tonalRamp": [
+          "#0d0b07",
+          "#292621",
+          "#48453f",
+          "#66635d",
+          "#86837c",
+          "#a8a49d",
+          "#cecac3",
+          "#f2eee7"
+        ],
+        "dark": "#33312d"
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Control Boundary",
+        "canonical": "oklch(60.0% 0.012 89.8)",
+        "tonalRamp": [
+          "#0d0b06",
+          "#292620",
+          "#48453e",
+          "#66635b",
+          "#86837b",
+          "#a7a49c",
+          "#cecac2",
+          "#f2eee5"
+        ],
+        "dark": "#7e7b75"
+      },
+      "border-panel": {
+        "role": "neutral",
+        "displayName": "Panel Edge",
+        "canonical": "oklch(80.9% 0.014 82.4)",
+        "tonalRamp": [
+          "#0e0b05",
+          "#2a261f",
+          "#49443d",
+          "#67635b",
+          "#87837a",
+          "#a9a49b",
+          "#cfcac1",
+          "#f3eee4"
+        ],
+        "dark": "#494640"
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Ink Black",
+        "canonical": "oklch(24.5% 0.012 84.6)",
+        "tonalRamp": [
+          "#0d0b06",
+          "#292620",
+          "#48453e",
+          "#66635c",
+          "#86837b",
+          "#a8a49c",
+          "#cecac2",
+          "#f2eee6"
+        ],
+        "dark": "#e9e6df"
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Ink Black Hover",
+        "canonical": "oklch(31.9% 0.013 81.7)",
+        "tonalRamp": [
+          "#0e0b05",
+          "#2a261f",
+          "#49443d",
+          "#67635b",
+          "#87837a",
+          "#a9a49b",
+          "#cfcac1",
+          "#f3eee5"
+        ],
+        "dark": "#d1cdc5"
+      },
+      "accent-press": {
+        "role": "primary",
+        "displayName": "Ink Black Press",
+        "canonical": "oklch(19.2% 0.010 88.8)",
+        "tonalRamp": [
+          "#0d0b07",
+          "#282621",
+          "#47453f",
+          "#65635d",
+          "#86837c",
+          "#a7a49d",
+          "#cdcac3",
+          "#f1eee7"
+        ],
+        "dark": "#f8f5ef"
+      },
+      "on-accent": {
+        "role": "neutral",
+        "displayName": "On Accent",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#23201a"
+      },
+      "brand": {
+        "role": "secondary",
+        "displayName": "Working Blue",
+        "canonical": "oklch(42.1% 0.116 250.0)",
+        "tonalRamp": [
+          "#000c1c",
+          "#012749",
+          "#03477c",
+          "#2666a2",
+          "#4887c6",
+          "#6aaaea",
+          "#a3cffe",
+          "#e3f0ff"
+        ],
+        "dark": "#75b8fc"
+      },
+      "brand-hover": {
+        "role": "secondary",
+        "displayName": "Working Blue Deep",
+        "canonical": "oklch(35.0% 0.096 249.9)",
+        "tonalRamp": [
+          "#000c1c",
+          "#012749",
+          "#124776",
+          "#346698",
+          "#5487bb",
+          "#75a9df",
+          "#a2cffe",
+          "#e3f0ff"
+        ],
+        "dark": "#a3cffd"
+      },
+      "brand-soft": {
+        "role": "secondary",
+        "displayName": "Blue Wash",
+        "canonical": "oklch(95.6% 0.021 248.0)",
+        "tonalRamp": [
+          "#050c13",
+          "#1f2730",
+          "#3d4650",
+          "#5a656f",
+          "#7a858f",
+          "#9ba6b1",
+          "#c0ccd8",
+          "#e4f0fc"
+        ],
+        "dark": "#152433"
+      },
+      "on-brand": {
+        "role": "neutral",
+        "displayName": "On Brand",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#23201a"
+      },
+      "positive": {
+        "role": "tertiary",
+        "displayName": "Ledger Green",
+        "canonical": "oklch(42.0% 0.082 167.7)",
+        "tonalRamp": [
+          "#000f09",
+          "#012f21",
+          "#03523d",
+          "#29725a",
+          "#4d9379",
+          "#6fb59a",
+          "#95dcc0",
+          "#c0ffe5"
+        ],
+        "dark": "#21cb9c"
+      },
+      "positive-soft": {
+        "role": "tertiary",
+        "displayName": "Ledger Green Wash",
+        "canonical": "oklch(95.5% 0.034 168.8)",
+        "tonalRamp": [
+          "#000f09",
+          "#142c23",
+          "#334b42",
+          "#506a60",
+          "#708a7f",
+          "#91aca1",
+          "#b6d2c7",
+          "#d9f6ea"
+        ],
+        "dark": "#102820"
+      },
+      "on-positive": {
+        "role": "neutral",
+        "displayName": "On Positive",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#23201a"
+      },
+      "negative": {
+        "role": "tertiary",
+        "displayName": "Oxblood",
+        "canonical": "oklch(37.5% 0.147 29.9)",
+        "tonalRamp": [
+          "#1f0000",
+          "#4e0301",
+          "#821208",
+          "#a7392c",
+          "#cc5b4c",
+          "#f27d6c",
+          "#feb6a9",
+          "#ffe9e5"
+        ],
+        "dark": "#fdaa9c"
+      },
+      "negative-soft": {
+        "role": "tertiary",
+        "displayName": "Oxblood Wash",
+        "canonical": "oklch(95.4% 0.021 28.3)",
+        "tonalRamp": [
+          "#130806",
+          "#302321",
+          "#50413f",
+          "#6f5f5c",
+          "#907f7c",
+          "#b2a09d",
+          "#d8c6c3",
+          "#fdeae7"
+        ],
+        "dark": "#321c19"
+      },
+      "on-negative": {
+        "role": "neutral",
+        "displayName": "On Negative",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#23201a"
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Tobacco",
+        "canonical": "oklch(43.2% 0.088 75.1)",
+        "tonalRamp": [
+          "#130900",
+          "#362201",
+          "#5e3e02",
+          "#805b21",
+          "#a27b43",
+          "#c59d64",
+          "#edc389",
+          "#ffebd2"
+        ],
+        "dark": "#efa51e"
+      },
+      "warning-soft": {
+        "role": "tertiary",
+        "displayName": "Tobacco Wash",
+        "canonical": "oklch(95.4% 0.034 74.4)",
+        "tonalRamp": [
+          "#130900",
+          "#302413",
+          "#504230",
+          "#6f614e",
+          "#90816d",
+          "#b2a28d",
+          "#d8c8b2",
+          "#fdecd6"
+        ],
+        "dark": "#2d200f"
+      },
+      "on-warning": {
+        "role": "neutral",
+        "displayName": "On Warning",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#23201a"
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "Notice Blue",
+        "canonical": "oklch(42.1% 0.116 250.0)",
+        "tonalRamp": [
+          "#000c1c",
+          "#012749",
+          "#03477c",
+          "#2666a2",
+          "#4887c6",
+          "#6aaaea",
+          "#a3cffe",
+          "#e3f0ff"
+        ],
+        "dark": "#75b8fc"
+      },
+      "info-soft": {
+        "role": "tertiary",
+        "displayName": "Notice Blue Wash",
+        "canonical": "oklch(95.6% 0.021 248.0)",
+        "tonalRamp": [
+          "#050c13",
+          "#1f2730",
+          "#3d4650",
+          "#5a656f",
+          "#7a858f",
+          "#9ba6b1",
+          "#c0ccd8",
+          "#e4f0fc"
+        ],
+        "dark": "#152433"
+      },
+      "on-info": {
+        "role": "neutral",
+        "displayName": "On Info",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#23201a"
+      },
+      "focus": {
+        "role": "secondary",
+        "displayName": "Focus Blue",
+        "canonical": "oklch(42.1% 0.116 250.0)",
+        "tonalRamp": [
+          "#000c1c",
+          "#012749",
+          "#03477c",
+          "#2666a2",
+          "#4887c6",
+          "#6aaaea",
+          "#a3cffe",
+          "#e3f0ff"
+        ],
+        "dark": "#75b8fc"
+      },
+      "focus-gap": {
+        "role": "neutral",
+        "displayName": "Focus Gap",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#636363",
+          "#838383",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ],
+        "dark": "#12110f"
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover",
+        "canonical": "rgb(35 32 26 / 0.055)"
+      },
+      "press": {
+        "role": "neutral",
+        "displayName": "Press",
+        "canonical": "rgb(35 32 26 / 0.1)"
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "Selection Blue",
+        "canonical": "oklch(90.7% 0.035 248.2)",
+        "tonalRamp": [
+          "#010c19",
+          "#182837",
+          "#364757",
+          "#546577",
+          "#738598",
+          "#94a7ba",
+          "#b9cde1",
+          "#e2f0ff"
+        ],
+        "dark": "#17324a"
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Scrim",
+        "canonical": "rgb(28 25 20 / 0.55)"
+      },
+      "skeleton": {
+        "role": "neutral",
+        "displayName": "Skeleton",
+        "canonical": "oklch(93.2% 0.009 78.3)",
+        "tonalRamp": [
+          "#0d0b07",
+          "#292622",
+          "#484440",
+          "#66635e",
+          "#86837d",
+          "#a8a49e",
+          "#cecac4",
+          "#f2eee8"
+        ],
+        "dark": "#262421"
+      },
+      "skeleton-sheen": {
+        "role": "neutral",
+        "displayName": "Skeleton Sheen",
+        "canonical": "rgb(255 255 255 / 0.75)"
+      },
+      "chart-emphasis": {
+        "role": "neutral",
+        "displayName": "Chart Emphasis",
+        "canonical": "rgb(35 32 26 / 0.06)"
+      },
+      "series-1": {
+        "role": "neutral",
+        "displayName": "Series 1 Blue",
+        "canonical": "oklch(52.0% 0.149 251.8)",
+        "tonalRamp": [
+          "#000b1d",
+          "#01274b",
+          "#03467f",
+          "#0664b3",
+          "#3386d9",
+          "#59a8fd",
+          "#a5cffe",
+          "#e3f0ff"
+        ],
+        "dark": "#4da2fb"
+      },
+      "series-2": {
+        "role": "neutral",
+        "displayName": "Series 2 Teal",
+        "canonical": "oklch(45.9% 0.076 202.3)",
+        "tonalRamp": [
+          "#000e10",
+          "#012d30",
+          "#034f54",
+          "#1e7076",
+          "#449197",
+          "#67b3b9",
+          "#8edae0",
+          "#c3faff"
+        ],
+        "dark": "#23cfda"
+      },
+      "series-3": {
+        "role": "neutral",
+        "displayName": "Series 3 Green",
+        "canonical": "oklch(52.1% 0.098 171.4)",
+        "tonalRamp": [
+          "#000f0a",
+          "#012e23",
+          "#035240",
+          "#07745c",
+          "#37967c",
+          "#5db99d",
+          "#84e0c3",
+          "#bfffe9"
+        ],
+        "dark": "#1fbf9b"
+      },
+      "series-4": {
+        "role": "neutral",
+        "displayName": "Series 4 Olive",
+        "canonical": "oklch(49.1% 0.131 132.0)",
+        "tonalRamp": [
+          "#050f00",
+          "#182d01",
+          "#2e5003",
+          "#46720f",
+          "#659338",
+          "#85b65b",
+          "#aadd81",
+          "#d3ffb1"
+        ],
+        "dark": "#8fe326"
+      },
+      "series-5": {
+        "role": "neutral",
+        "displayName": "Series 5 Ochre",
+        "canonical": "oklch(43.9% 0.087 94.4)",
+        "tonalRamp": [
+          "#0f0b00",
+          "#2f2601",
+          "#534402",
+          "#73621f",
+          "#948242",
+          "#b6a463",
+          "#ddca88",
+          "#ffefb5"
+        ],
+        "dark": "#cbac1c"
+      },
+      "series-6": {
+        "role": "neutral",
+        "displayName": "Series 6 Rust",
+        "canonical": "oklch(52.9% 0.154 41.9)",
+        "tonalRamp": [
+          "#1a0400",
+          "#451501",
+          "#752902",
+          "#a53d05",
+          "#cd5d2e",
+          "#f38051",
+          "#feb79c",
+          "#ffe9e1"
+        ],
+        "dark": "#f76316"
+      },
+      "series-7": {
+        "role": "neutral",
+        "displayName": "Series 7 Crimson",
+        "canonical": "oklch(46.9% 0.181 7.9)",
+        "tonalRamp": [
+          "#1e0007",
+          "#4d011c",
+          "#820435",
+          "#b11e4f",
+          "#d7476e",
+          "#fd6d8f",
+          "#feb3bf",
+          "#ffe8eb"
+        ],
+        "dark": "#fd9eb0"
+      },
+      "series-8": {
+        "role": "neutral",
+        "displayName": "Series 8 Violet",
+        "canonical": "oklch(51.1% 0.220 318.0)",
+        "tonalRamp": [
+          "#17001e",
+          "#3e014e",
+          "#6b0483",
+          "#941fb1",
+          "#b749d6",
+          "#db6efc",
+          "#ecb1fe",
+          "#f9e7ff"
+        ],
+        "dark": "#dd74fc"
+      }
+    },
+    "typographyMeta": {
+      "hero": {
+        "displayName": "Hero",
+        "purpose": "The marketing headline. One per page, display face."
+      },
+      "display": {
+        "displayName": "Display",
+        "purpose": "The one number a screen is about - net worth, a budget remainder, an account balance."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Page and dialog titles."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "Card titles and section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose and form labels, capped at a 68ch measure."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "The default inside controls - buttons, fields, list rows, the ledger payee."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Metadata, axis labels, helper text. Set in ink-2, which still clears 7:1."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "The uppercase whisper label above a figure. Smallest type in the system."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "0 1px 2px rgb(35 32 26 / 0.04), 0 1px 3px -1px rgb(35 32 26 / 0.05)",
+        "purpose": "Keeps a white sheet from dissolving into the warm canvas. The only shadow a resting surface may carry."
+      },
+      {
+        "name": "elevated",
+        "value": "0 1px 2px rgb(35 32 26 / 0.05), 0 10px 24px -8px rgb(35 32 26 / 0.12)",
+        "purpose": "The hover step for a filled button, and any surface briefly lifted."
+      },
+      {
+        "name": "dropdown",
+        "value": "0 2px 6px -1px rgb(35 32 26 / 0.06), 0 12px 32px -10px rgb(35 32 26 / 0.18)",
+        "purpose": "Menus, list boxes, the shared floating-panel treatment."
+      },
+      {
+        "name": "popover",
+        "value": "0 2px 8px -2px rgb(35 32 26 / 0.07), 0 16px 44px -12px rgb(35 32 26 / 0.2)",
+        "purpose": "Popovers and tooltips."
+      },
+      {
+        "name": "modal",
+        "value": "0 2px 8px -2px rgb(35 32 26 / 0.1), 0 32px 72px -16px rgb(35 32 26 / 0.28)",
+        "purpose": "Dialogs and drawers. Re-declared opaque in dark."
+      }
+    ],
+    "motion": [
+      {
+        "name": "duration-instant",
+        "value": "90ms",
+        "purpose": "Exit of a popover; anything that must feel already-gone."
+      },
+      {
+        "name": "duration-fast",
+        "value": "150ms",
+        "purpose": "The default for a state change on a control."
+      },
+      {
+        "name": "duration-base",
+        "value": "220ms",
+        "purpose": "Dialog and drawer entrance."
+      },
+      {
+        "name": "duration-slow",
+        "value": "320ms",
+        "purpose": "The longest motion in the product."
+      },
+      {
+        "name": "ease-out-quint",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Entrances and every hover or press transition."
+      },
+      {
+        "name": "ease-in-quint",
+        "value": "cubic-bezier(0.64, 0, 0.78, 0)",
+        "purpose": "Exits."
+      },
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Indeterminate and looping animation."
+      },
+      {
+        "name": "ease-drawer",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "The drawer only, which travels further than anything else."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "2xl",
+        "value": "1536px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one decision on a screen. Near-black in light, near-white in dark.",
+      "html": "<button class=\"ds-btn-primary\">Add transaction</button>",
+      "css": ".ds-btn-primary { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.5rem; padding: 0 1rem; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: var(--text-label); font-weight: 600; line-height: var(--text-label--line-height); white-space: nowrap; cursor: pointer; transition: color var(--duration-fast) var(--ease-out-quint), background-color var(--duration-fast) var(--ease-out-quint), border-color var(--duration-fast) var(--ease-out-quint), box-shadow var(--duration-fast) var(--ease-out-quint), translate var(--duration-fast) var(--ease-out-quint); } .ds-btn-primary::after { content: ''; position: absolute; left: 50%; top: 50%; translate: -50% -50%; min-width: var(--target-min); min-height: var(--target-min); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-focus-gap); } .ds-btn-primary:active { translate: 0 1px; } .ds-btn-primary { background: var(--color-accent); color: var(--color-on-accent); box-shadow: var(--shadow-card); } .ds-btn-primary:hover { background: var(--color-accent-hover); box-shadow: var(--shadow-elevated); } .ds-btn-primary:active { background: var(--color-accent-press); box-shadow: var(--shadow-card); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default variant: a control-boundary hairline on a sheet. Anything that is not the main action.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.5rem; padding: 0 1rem; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: var(--text-label); font-weight: 600; line-height: var(--text-label--line-height); white-space: nowrap; cursor: pointer; transition: color var(--duration-fast) var(--ease-out-quint), background-color var(--duration-fast) var(--ease-out-quint), border-color var(--duration-fast) var(--ease-out-quint), box-shadow var(--duration-fast) var(--ease-out-quint), translate var(--duration-fast) var(--ease-out-quint); } .ds-btn-secondary::after { content: ''; position: absolute; left: 50%; top: 50%; translate: -50% -50%; min-width: var(--target-min); min-height: var(--target-min); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-focus-gap); } .ds-btn-secondary:active { translate: 0 1px; } .ds-btn-secondary { background: var(--color-surface); color: var(--color-ink); border: 1px solid var(--color-border-strong); box-shadow: var(--shadow-card); } .ds-btn-secondary:hover { border-color: var(--color-ink-2); background: var(--color-surface-sunken); } .ds-btn-secondary:active { background: var(--color-surface-sunken); box-shadow: none; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "No chrome until touched. Toolbars, table rows, card affordances.",
+      "html": "<button class=\"ds-btn-ghost\">Edit</button>",
+      "css": ".ds-btn-ghost { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.5rem; padding: 0 1rem; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: var(--text-label); font-weight: 600; line-height: var(--text-label--line-height); white-space: nowrap; cursor: pointer; transition: color var(--duration-fast) var(--ease-out-quint), background-color var(--duration-fast) var(--ease-out-quint), border-color var(--duration-fast) var(--ease-out-quint), box-shadow var(--duration-fast) var(--ease-out-quint), translate var(--duration-fast) var(--ease-out-quint); } .ds-btn-ghost::after { content: ''; position: absolute; left: 50%; top: 50%; translate: -50% -50%; min-width: var(--target-min); min-height: var(--target-min); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-focus-gap); } .ds-btn-ghost:active { translate: 0 1px; } .ds-btn-ghost { background: transparent; color: var(--color-ink-2); } .ds-btn-ghost:hover { background: var(--color-hover); color: var(--color-ink); } .ds-btn-ghost:active { background: var(--color-press); }"
+    },
+    {
+      "name": "Brand Button",
+      "kind": "button",
+      "refersTo": "button-brand",
+      "description": "The single monetisation call to action. Marketing and onboarding only.",
+      "html": "<button class=\"ds-btn-brand\">Upgrade workspace</button>",
+      "css": ".ds-btn-brand { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.5rem; padding: 0 1rem; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: var(--text-label); font-weight: 600; line-height: var(--text-label--line-height); white-space: nowrap; cursor: pointer; transition: color var(--duration-fast) var(--ease-out-quint), background-color var(--duration-fast) var(--ease-out-quint), border-color var(--duration-fast) var(--ease-out-quint), box-shadow var(--duration-fast) var(--ease-out-quint), translate var(--duration-fast) var(--ease-out-quint); } .ds-btn-brand::after { content: ''; position: absolute; left: 50%; top: 50%; translate: -50% -50%; min-width: var(--target-min); min-height: var(--target-min); } .ds-btn-brand:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-focus-gap); } .ds-btn-brand:active { translate: 0 1px; } .ds-btn-brand { background: var(--color-brand); color: var(--color-on-brand); box-shadow: var(--shadow-card); } .ds-btn-brand:hover { background: var(--color-brand-hover); box-shadow: var(--shadow-elevated); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Always-visible label, control-boundary hairline, brand border on focus. A placeholder is never a label.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-payee\">Payee</label><input class=\"ds-field-input\" id=\"ds-payee\" type=\"text\" value=\"Biedronka\" /><span class=\"ds-field-help\">Shown on the transaction row.</span></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 0.375rem; font-family: var(--font-sans); max-width: 20rem; } .ds-field-label { font-size: var(--text-label); font-weight: 500; color: var(--color-ink); } .ds-field-input { width: 100%; height: 2.5rem; padding: 0 0.75rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); font-family: inherit; font-size: var(--text-label); transition: border-color var(--duration-fast) var(--ease-out-quint), box-shadow var(--duration-fast) var(--ease-out-quint); } .ds-field-input::placeholder { color: var(--color-ink-2); } .ds-field-input:hover { border-color: var(--color-ink-2); } .ds-field-input:focus-visible { border-color: var(--color-brand); outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-focus-gap); } .ds-field-help { font-size: var(--text-caption); line-height: var(--text-caption--line-height); color: var(--color-ink-2); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The sheet, and the default unit of composition. Flat at rest: a hairline and a tone, not a shadow step.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-eyebrow\">Net worth</p><h3 class=\"ds-card-title\">All accounts</h3><p class=\"ds-card-figure\">48 210,55 zl</p><p class=\"ds-card-desc\">Across 6 accounts in 2 currencies.</p></div>",
+      "css": ".ds-card { border: 1px solid var(--color-border-subtle); border-radius: var(--radius-xl); background: var(--color-surface); box-shadow: var(--shadow-card); padding: 1.25rem; font-family: var(--font-sans); max-width: 22rem; } .ds-card-eyebrow { margin: 0; font-size: var(--text-micro); font-weight: 600; letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--color-ink-2); } .ds-card-title { margin: 0; font-size: var(--text-subtitle); font-weight: 600; line-height: var(--text-subtitle--line-height); color: var(--color-ink); } .ds-card-figure { margin: 0.5rem 0 0; font-family: var(--font-display); font-size: var(--text-display); font-weight: 700; line-height: var(--text-display--line-height); letter-spacing: var(--text-display--letter-spacing); color: var(--color-ink); font-variant-numeric: tabular-nums; } .ds-card-desc { margin: 0.25rem 0 0; font-size: var(--text-caption); color: var(--color-ink-2); }"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge-positive",
+      "description": "Full-radius tint carrying its own hue as text at 7:1 or better. Every tone pairs a -soft ground with its matching foreground.",
+      "html": "<span class=\"ds-badge ds-badge-positive\">Settled</span><span class=\"ds-badge ds-badge-warning\">Close to limit</span><span class=\"ds-badge ds-badge-neutral\">Uncategorised</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 0.25rem; height: 1.5rem; padding: 0 0.5rem; margin-right: 0.375rem; border: 1px solid transparent; border-radius: var(--radius-full); font-family: var(--font-sans); font-size: var(--text-caption); font-weight: 600; white-space: nowrap; } .ds-badge-positive { background: var(--color-positive-soft); color: var(--color-positive); } .ds-badge-warning { background: var(--color-warning-soft); color: var(--color-warning); } .ds-badge-neutral { background: var(--color-surface); color: var(--color-ink); border-color: var(--color-border-strong); }"
+    },
+    {
+      "name": "Ledger Row",
+      "kind": "custom",
+      "refersTo": "ledger-row",
+      "description": "The signature component. Three-column baseline grid from lg up; income is positive at semibold, expense negative at normal weight, and the sign carries the direction before colour does.",
+      "html": "<div class=\"ds-ledger\"><div class=\"ds-ledger-row\"><div><span class=\"ds-ledger-payee\">Biedronka</span><span class=\"ds-ledger-meta\">Groceries · Current account</span></div><span class=\"ds-ledger-date\">3 Sep</span><span class=\"ds-ledger-amount ds-ledger-out\">−86,40 zł</span></div><div class=\"ds-ledger-row\"><div><span class=\"ds-ledger-payee\">Salary</span><span class=\"ds-ledger-meta\">Income · Current account</span></div><span class=\"ds-ledger-date\">1 Sep</span><span class=\"ds-ledger-amount ds-ledger-in\">+8 400,00 zł</span></div><div class=\"ds-ledger-row ds-ledger-selected\"><div><span class=\"ds-ledger-payee\">To Savings</span><span class=\"ds-ledger-meta\">Transfer · Current → Savings</span></div><span class=\"ds-ledger-date\">1 Sep</span><span class=\"ds-ledger-amount ds-ledger-transfer\">↻ −1 000,00 zł</span></div></div>",
+      "css": ".ds-ledger { font-family: var(--font-sans); background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-xl); overflow: hidden; max-width: 34rem; } .ds-ledger-row { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr); align-items: baseline; gap: 0 1rem; min-height: 3.25rem; padding: 0.625rem 1rem; border-top: 1px solid var(--color-border-subtle); transition: background-color var(--duration-fast) var(--ease-out-quint); } .ds-ledger-row:first-child { border-top: none; } .ds-ledger-row:hover { background: var(--color-hover); } .ds-ledger-selected { background: var(--color-brand-soft); box-shadow: inset 3px 0 0 0 var(--color-brand); } .ds-ledger-selected:hover { background: var(--color-brand-soft); } .ds-ledger-payee { display: block; font-size: var(--text-label); font-weight: 500; color: var(--color-ink); } .ds-ledger-meta { display: block; margin-top: 0.125rem; font-size: var(--text-caption); color: var(--color-ink-2); } .ds-ledger-date { font-size: var(--text-caption); color: var(--color-ink-2); font-variant-numeric: tabular-nums; } .ds-ledger-amount { text-align: end; font-size: var(--text-label); font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-ledger-in { color: var(--color-positive); font-weight: 600; } .ds-ledger-out { color: var(--color-negative); } .ds-ledger-transfer { color: var(--color-ink-2); }"
+    },
+    {
+      "name": "Budget Meter",
+      "kind": "custom",
+      "refersTo": "budget-meter",
+      "description": "The remainder leads, the percentage is a caption. A tick marks 100% and a notch marks each configured alert; past 100% the fill runs hatched as well as negative-coloured.",
+      "html": "<div class=\"ds-meter\"><div class=\"ds-meter-head\"><span class=\"ds-meter-name\">Groceries</span><span class=\"ds-meter-state\">Close to the limit</span></div><p class=\"ds-meter-figure\">213,60 zł left</p><div class=\"ds-meter-track\" role=\"meter\" aria-label=\"Groceries\" aria-valuenow=\"82\"><div class=\"ds-meter-fill\"></div><span class=\"ds-meter-notch\" style=\"left:50%\"></span><span class=\"ds-meter-notch\" style=\"left:80%\"></span><span class=\"ds-meter-tick\"></span></div><p class=\"ds-meter-caption\">82% of 1 200,00 zł spent</p></div>",
+      "css": ".ds-meter { font-family: var(--font-sans); max-width: 22rem; } .ds-meter-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; } .ds-meter-name { font-size: var(--text-subtitle); font-weight: 600; color: var(--color-ink); } .ds-meter-state { font-size: var(--text-caption); font-weight: 600; color: var(--color-warning); } .ds-meter-figure { margin: 0.25rem 0 0.625rem; font-family: var(--font-display); font-size: var(--text-display); font-weight: 700; line-height: var(--text-display--line-height); letter-spacing: var(--text-display--letter-spacing); color: var(--color-ink); font-variant-numeric: tabular-nums; } .ds-meter-track { position: relative; height: 0.5rem; border-radius: var(--radius-full); background: var(--color-surface-sunken); overflow: hidden; } .ds-meter-fill { width: 82%; height: 100%; border-radius: var(--radius-full); background: var(--color-brand); } .ds-meter-notch { position: absolute; top: 0; width: 2px; height: 100%; background: var(--color-canvas); opacity: 0.9; } .ds-meter-tick { position: absolute; top: 0; right: 0; width: 2px; height: 100%; background: var(--color-ink-2); } .ds-meter-caption { margin: 0.375rem 0 0; font-size: var(--text-caption); color: var(--color-ink-2); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Navigation Rail Link",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Rail destination on the well ground. The current page is marked by tone, weight and a leading bar - never by colour alone.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link ds-nav-current\" href=\"#\" aria-current=\"page\">Dashboard</a><a class=\"ds-nav-link\" href=\"#\">Transactions</a><a class=\"ds-nav-link\" href=\"#\">Budgets</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 0.125rem; width: 13.75rem; padding: 0.75rem; background: var(--color-surface-sunken); font-family: var(--font-sans); } .ds-nav-link { position: relative; display: flex; align-items: center; min-height: 2.5rem; padding: 0 0.75rem; border-radius: var(--radius-md); font-size: var(--text-label); font-weight: 500; color: var(--color-ink-2); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-out-quint), color var(--duration-fast) var(--ease-out-quint); } .ds-nav-link:hover { background: var(--color-hover); color: var(--color-ink); } .ds-nav-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-focus-gap); } .ds-nav-current { background: var(--color-surface); color: var(--color-ink); font-weight: 600; box-shadow: inset 3px 0 0 0 var(--color-brand); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Audited Ledger",
+    "overview": "A ledger whose every claim carries its receipt. This is a product about money being right, so the visual system is built the way a set of accounts is built: every value is measured before it is used, the measurement is written down beside it, and where a guarantee turns out to be impossible the system says so out loud and adds another channel rather than quietly hoping. `src/styles/ tokens.css` states the contrast ratio of every colour against every ground it can land on, names the dichromat separation of the positive/negative pair as low as 1.14:1, and then makes colour the *third* channel of money direction rather than the first. That refusal to overclaim is the design.\n\nThe paper is warm, not clinical. `canvas` is a bone white with yellow in it and dark is a warm charcoal, never pure black; a finance product spends its life next to a column of figures and a blue-white screen makes that column feel like a spreadsheet cell rather than a page. Against that paper there are exactly two saturated voices: a near-black `accent` that commands, and one working blue `brand` that points. `info` deliberately reuses the brand hue, because a notice with no verdict speaks in the product's own voice and a fifth hue would have put a second blue beside the first for no informational gain.\n\nDensity is high and quiet. A screen carries at most one loud thing - one primary button, one oversized numeral - and the signature composition is an 11px uppercase `micro` label sitting directly above a 40px `display` figure with nothing in between. The scale jump is deliberate and softening it with an intermediate step is what makes a dashboard read as generic. Everything else is set at `label` or `caption`, flat, on a strict 4px grid, so that the one loud thing is heard.",
+    "keyCharacteristics": [
+      "Warm paper (`#fbf9f5`), never clinical white; warm charcoal in dark, never pure black.",
+      "Two voices only: a near-black accent that commands and one blue that points.",
+      "Five grounds, and `surface-panel` is the one whose direction flips between themes.",
+      "Flat at rest. Shadow means a genuine second layer, plus one step of hover lift.",
+      "Every number that can change is tabular, without exception.",
+      "Colour is never the only channel, and the reason is measured rather than assumed.",
+      "Light and dark are two designed systems; a dark value computed from a light one is a defect.",
+      "The 44px hit area is a separate dimension from the visual box, and the primitive owns it.",
+      "Every token carries its measured contrast ratio as a trailing comment. One without is unfinished."
+    ],
+    "rules": [
+      {
+        "name": "The Two Voices Rule",
+        "body": "`accent` and `brand` are the only saturated voices in the chrome. A screen gets one primary button. If a layout needs a third colour to make its hierarchy legible, the hierarchy is wrong and the palette is not.",
+        "section": "colors"
+      },
+      {
+        "name": "The Colour-Is-Third Rule",
+        "body": "Money direction is never encoded by colour alone, and colour is not even the first channel. Measured separation between `positive` and `negative` after Viénot-Brettel-Mollon simulation falls to 1.14:1 in light and 1.12:1 in dark - invisible. So every amount carries an explicit sign, inflow is set at a heavier weight than outflow, every intent surface carries an icon, and the product stays correct with all colour removed.",
+        "section": "colors"
+      },
+      {
+        "name": "The Series-Is-Secondary Rule",
+        "body": "Anything painted from the series ramp also carries a text label, a value, or a pattern. A chart whose only channel is series colour is a defect, and the primitives in `src/components/charts` are built so it cannot be expressed.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured Pair Rule",
+        "body": "Every colour token that can meet text carries its measured contrast ratio as a trailing comment beside its declaration, stated against every ground it can actually land on rather than a convenient one. A token added without its measurement is not finished.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Systems Rule",
+        "body": "Dark is designed, not derived. Its neutrals are warm charcoal, its chromatic values are lifted rather than flipped, and its shadows are re-declared opaque rather than reused. A dark value computed from a light one is a defect.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three-Site Rule",
+        "body": "Every themed colour is declared in exactly three places: bare `:root`, then `@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme=\"light\"])`, then `:root[data-theme=\"dark\"]`. Fewer than three produces a toggle that works in one direction only.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Any number that can change carries the `.tabular` utility (`font-variant-numeric: tabular-nums`). No exceptions: every amount, rate, percentage, count, date figure and axis tick, in every locale. The rule is checked on the rendered element that holds the digits, never on an ancestor. This is what stops a re-rendered total shifting the row it sits in and what makes a column of money align on the decimal separator.",
+        "section": "typography"
+      },
+      {
+        "name": "The Two-Step Rule",
+        "body": "An 11px uppercase `micro` label sits directly above a 40px `display` numeral with nothing in between. The contrast is the signature composition; an intermediate size softens the pairing and the pairing is the point.",
+        "section": "typography"
+      },
+      {
+        "name": "The Real Minus Rule",
+        "body": "A negative amount is prefixed with U+2212, not a hyphen. At the size a ledger column is set in, a hyphen is a third of the width of the plus beside it and the column stops reading as a column.",
+        "section": "typography"
+      },
+      {
+        "name": "The Aligned Column Rule",
+        "body": "Amounts are end-aligned in every table, list and form field, with the currency symbol outside the alignment so digits line up across a workspace holding `PLN`, `EUR` and `JPY` in one view.",
+        "section": "typography"
+      },
+      {
+        "name": "The Spoken-Sentence Rule",
+        "body": "A money cell carries two strings: the drawing, marked `aria-hidden`, and a full sentence in an `sr-only` span built with `currencyDisplay: 'name'` - *\"Expense of 20.00 Polish zlotys\"*. A narrow currency symbol is announced inconsistently and a minus sign is not the same sentence as \"an expense\".",
+        "section": "typography"
+      },
+      {
+        "name": "The Never-Abbreviate-Money Rule",
+        "body": "An amount is never rendered as `1.2k` or `1,2 tys.` in a ledger, form, table cell, tooltip or export. Abbreviation is permitted only on a chart axis tick, where the full value is in the chart's data table and the point's accessible name.",
+        "section": "typography"
+      },
+      {
+        "name": "The 4px Rule",
+        "body": "Every dimension is a multiple of 4px and comes from a `--space-*` token. A hard-coded `padding: 13px` is a review rejection.",
+        "section": "layout"
+      },
+      {
+        "name": "The Composed-Chrome Rule",
+        "body": "No consumer re-derives the height of the chrome above it. Sticky regions and scroll margins compose the same named tokens, because two elements each claiming to clear the same edge is how a focused input ends up under a phone keyboard.",
+        "section": "layout"
+      },
+      {
+        "name": "The Closed-Ladder Rule",
+        "body": "Nothing in the product invents a `z-index`. There are eight named rungs (`base` 0, `nav` 30, `dropdown` 40, `overlay` 50, `modal` 60, `popover` 65, `tooltip` 70, `toast` 80) and `src/lib/cn.ts` registers them with tailwind-merge so an override genuinely wins instead of leaving two classes and letting stylesheet order decide.",
+        "section": "layout"
+      },
+      {
+        "name": "The Focus Reserve Rule",
+        "body": "Nothing may clip a focus ring. Any scroll container that could crop one reserves `--focus-reserve` of padding.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "A resting surface gets a hairline and a tone, never a shadow step. If a card needs a shadow to read as a card, its border or its ground is wrong.",
+        "section": "elevation-depth"
+      },
+      {
+        "name": "The One-Pixel Rule",
+        "body": "The press is `translate-y-px` and one shadow step down - never a bounce and never a scale. The control reads as pushed into the page rather than as shrinking.",
+        "section": "elevation-depth"
+      },
+      {
+        "name": "The Tone-In-Dark Rule",
+        "body": "In light, `surface` and `surface-raised` share white and elevation is carried by shadow. In dark they separate and tone carries it, because a shadow against charcoal reads as nothing.",
+        "section": "elevation-depth"
+      },
+      {
+        "name": "The Pill Means Pickable Rule",
+        "body": "`full` radius on a rectangle declares it a token you can pick up - a chip, a badge, an avatar. Never on a panel.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Hairline Honesty Rule",
+        "body": "If a box can be clicked, its border is `border-strong`. If it cannot, its border is `border-subtle`. There is no third case, and a decorative `border-strong` is a defect.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Pending-Not-Disabled Rule",
+        "body": "A submit button in flight uses React Aria's `isPending`: it stays focusable, gets `aria-disabled` rather than `disabled`, and announces politely. A `disabled` element loses focus the moment it is disabled, dumping a keyboard user at the top of the document with no announcement of why. The label stays in the DOM under the spinner marked `invisible`, so the button holds its measured width and a pending action never reflows its row.",
+        "section": "components"
+      },
+      {
+        "name": "The Outline-Solid Rule",
+        "body": "`outline-solid` is load-bearing and `outline-none` must never appear beside it. In Tailwind v4 the outline utilities share one `--tw-outline-style` custom property: `outline-none` sets it to `none`, and `outline-2` then resolves against that, producing a ring two pixels wide and styled `none`. Every control built on that pair reports a focus colour and draws nothing.",
+        "section": "components"
+      },
+      {
+        "name": "The Collapse-The-Tokens Rule",
+        "body": "`prefers-reduced-motion: reduce` sets the four duration tokens to 0.01ms rather than blanket-killing animations. A `!important` `animation: none` breaks components that wait on `animationend` - React Aria's overlays do exactly that to unmount an exiting popover - leaving a dialog that never closes. Collapsing durations removes all perceptible motion while every completion event still fires, and because they are tokens the collapse reaches animations written after the stylesheet was, including third-party CSS.",
+        "section": "components"
+      },
+      {
+        "name": "The 44px Rule",
+        "body": "Every pointer target answers 44x44 CSS px (WCAG 2.2 §2.5.5 AAA). The `target-min` utility grows the *hit area* with a pseudo-element while the visual box stays on the size scale, so a 32px icon button keeps its 32px drawing and still answers a 44px tap. The hit area and the visual box are separate dimensions; conflating them produces a toolbar of 44px-tall ghost buttons with dead space between their labels. The expansion lives in the primitive, so a caller cannot forget it.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** record every colour token's measured contrast beside its declaration, against every ground it can land on. A token without its measurement is not finished.",
+      "**Do** declare every themed colour in all three sites (`:root`, the guarded media query, and `[data-theme=\"dark\"]`), or the toggle will work in one direction only.",
+      "**Do** set every changeable number with the `.tabular` utility on the element holding the digits.",
+      "**Do** give every amount an explicit sign and set inflow heavier than outflow.",
+      "**Do** pair every series colour with a label, a value, or a pattern.",
+      "**Do** grow hit areas inside the primitive with `target-min`, never with padding on the caller.",
+      "**Do** write `outline-solid` explicitly and never place `outline-none` beside an outline width.",
+      "**Do** repaint disabled controls that carry their own label; reserve opacity for controls that do not.",
+      "**Do** use `isPending` rather than `disabled` for an in-flight action, and keep the label in the DOM so the control holds its width.",
+      "**Do** compose chrome geometry from the named tokens instead of re-deriving a height.",
+      "**Do** re-declare dark shadows opaquely and lift dark chromatic values rather than flipping them."
+    ],
+    "donts": [
+      "**Don't** paint text in a series colour. The ramp guarantees 3:1 for graphical objects and explicitly does not guarantee 7:1.",
+      "**Don't** encode money direction, a chart series, a status or a category by colour alone.",
+      "**Don't** abbreviate money anywhere except a chart axis tick.",
+      "**Don't** render an amount from a float at any layer, including a tooltip.",
+      "**Don't** use a hyphen where a negative amount needs U+2212.",
+      "**Don't** put a shadow on a resting surface, or add a second shadow step to a card.",
+      "**Don't** fade text below 7:1 to create hierarchy - change weight, size or position instead.",
+      "**Don't** invent a `z-index`; take a rung from the closed ladder.",
+      "**Don't** hard-code a dimension off the 4px grid.",
+      "**Don't** animate a layout property, and don't ship an animation without a reduced-motion path.",
+      "**Don't** make a card interactive; wrap it in a `Button` or `Link` instead.",
+      "**Don't** let a tooltip or sticky region cover a focused control.",
+      "**Don't** claim blanket WCAG AAA conformance. `docs/ACCESSIBILITY.md` states exactly what is claimed, and this document must never contradict it."
+    ]
+  }
+}

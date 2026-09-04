@@ -19,15 +19,17 @@ The plan set is the **backlog source**; GitHub Issues is the **execution surface
 ```
 docs/plans/NN-area.md   →   PRD issue (the area)   →   one sub-issue per stage, in stage order
                                                         ↓
-                                            `ready-for-agent` on each slice
+                                     `status: queued` → `status: ready` per slice
                                                         ↓
-                                        `pnpm sandcastle` / `@claude` / a human
+                                     a human adds `run: implement` (or the PRD's `auto-advance`)
 ```
 
 A stage's twelve headings are shaped to fill a ticket body exactly (`docs/agents/issue-tracker.md` →
-_What a ticket body must contain_). `/to-tickets-project` publishes them; `ready-for-agent` is applied
-per slice and **never** to the PRD. When a plan and an already-worked issue disagree, the issue wins
-and the plan is amended to say so.
+_What a ticket body must contain_). `scripts/agent/publish-tickets.sh` publishes them at the end of a
+`/plan-feature <issue> tickets` run: created `status: queued`, opened to `status: ready` only after
+the native `sub_issues` and `blocked_by` links are verified, and **never** the PRD, which stays
+`status: in-progress` while any child is open. When a plan and an already-worked issue disagree, the
+issue wins and the plan is amended to say so.
 
 ---
 
@@ -35,10 +37,19 @@ and the plan is amended to say so.
 
 **Stages inside a wave may run in parallel. A stage never depends on another stage in its own wave.**
 
-That is the whole contract, and two properties enforce it:
+That is the whole contract, and three properties enforce it:
 
 1. **Owned paths are disjoint within a wave.** Two stages in one wave may not name the same file.
 2. **The eight shared paths belong to `00-foundations.md` and to nothing else**, in any wave.
+3. **No stage runs a tree-wide git operation while another stage is open.** Stashing, discarding
+   the whole working tree, or resetting it hard respects no path ownership whatsoever: stashing
+   with `-u` in particular removes every untracked file in the repository, so a stage that has
+   written a new test but not yet committed it watches that file vanish and return underneath
+   itself. The damage is not the lost work — popping the stash restores the bytes — it is that
+   **every gate run inside that window lies, in both directions**: green against deleted tests,
+   red against code from before a fix. To compare the working tree against `HEAD` while another
+   stage is open, use a separate `git worktree`, or say so and wait. A gate result is evidence
+   only if the files did not move under it; checksum them before and after if there is any doubt.
 
 Waves are sequential: wave _n+1_ opens when wave _n_ is closed. A wave-0 stage owning a file that a
 wave-3 stage later edits is fine — disjointness is a _within-wave_ rule.
@@ -210,18 +221,17 @@ rejected before it is scheduled.
 The labels a plan-derived ticket carries, and the ones the automation reads. Full contract:
 `docs/agents/triage-labels.md`.
 
-| Label                                                                                  | Meaning                                                                             |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `ready-for-agent`                                                                      | **The gate.** Per-slice, **never** on a PRD                                         |
-| `agent-blocked`                                                                        | The loop swapped it in after the fix budget was exhausted. A human re-queues        |
-| `visual-change-expected`                                                               | An intended pixel change; the loop re-records baselines instead of failing the diff |
-| `needs-e2e`                                                                            | A pull-request label: run the CI e2e job on this PR                                 |
-| `status: pending` / `on hold` / `review needed` / `abandoned` / `blocked`              | Triage state                                                                        |
-| `type: bug` / `maintenance` / `enhancement` / `feature` / `security` / `documentation` | Kind                                                                                |
-| `priority: critical` / `high` / `medium` / `low`                                       | Priority                                                                            |
-| `qa` / `qa-failed`                                                                     | Staging QA outcome                                                                  |
+| Label                                                                  | Meaning                                                                               |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `status: queued` → `status: ready`                                     | **The gate.** Per-slice, **never** on a PRD; written by the publish and sweep scripts |
+| `run: implement`                                                       | A human's command to start one ready ticket; the claim removes it                     |
+| `status: needs-human`                                                  | A run stopped. The digest comment says why, and a human decides                       |
+| `needs-e2e`                                                            | A pull-request label: run the browser suite on this PR                                |
+| `status: triage` / `needs-info` / `backlog` / `in-progress` / `review` | The rest of the lifecycle                                                             |
+| `type: bug` / `feature` / `enhancement` / `maintenance`                | Kind; on the PRD, never on its tickets                                                |
+| `prd` / `auto-advance`                                                 | The parent, and the sweeper's licence to advance its children                         |
 
-Body markers: `<!-- sandcastle-triage -->`, `<!-- sentry-issue: SHORT-ID[#n] -->`.
+Body marker: `<!-- sentry-issue: SHORT-ID[#n] -->`.
 Commit prefixes: `RALPH:` for in-loop agent commits, Conventional Commits in English everywhere else.
 
 ---

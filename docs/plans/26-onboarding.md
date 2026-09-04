@@ -145,7 +145,7 @@ _Onboarding creates structure, not amounts._ Cases in `presets.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -249,7 +249,7 @@ _An amount entered during onboarding is indistinguishable from one entered later
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
@@ -373,7 +373,7 @@ in `sample-data.test.ts`:
 
 ### Definition of done
 
-All six §7 items and all ten §2 clauses.
+All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 

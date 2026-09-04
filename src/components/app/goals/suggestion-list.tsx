@@ -77,7 +77,7 @@ export function SuggestionList({
               className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-border-subtle px-3 py-2.5 first:border-t-0"
             >
               <div className="min-w-0">
-                <p className="text-label font-medium text-ink">
+                <p className="text-label font-medium tabular text-ink">
                   {formatCalendarDate(locale, transaction.bookedOn, 'medium')}
                 </p>
                 <p className="mt-0.5 truncate text-caption text-ink-2">

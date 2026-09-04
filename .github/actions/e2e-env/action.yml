@@ -1,8 +1,9 @@
 name: Prepare the browser-test environment
 description: >
   Everything a browser suite needs before its first page load: dependencies, a
-  generated route tree, a throwaway .dev.vars, a migrated local D1, a dev server
-  on port 3010 and the seeded demo workspace behind it.
+  generated route tree, a throwaway .dev.vars, a migrated local D1, a production
+  build served by `vite preview` on port 3010, and the seeded demo workspace
+  behind it.
 
   Two workflows need this identical preparation - the e2e gate in ci.yml and the
   accessibility gate in a11y.yml - and a drift between them would show up as a
@@ -19,7 +20,7 @@ description: >
 inputs:
   port:
     description: >
-      Port the dev server binds. 3010 is what vite.config.ts binds with
+      Port the preview server binds. 3010 is what vite.config.ts pins with
       `strictPort` and what playwright.config.ts defaults `baseURL` to; passing
       anything else means passing PLAYWRIGHT_BASE_URL to match.
     required: false
@@ -64,10 +65,39 @@ runs:
       shell: bash
       run: pnpm db:migrate:local
 
+    # A build, not `vite dev`, and the reason is measured rather than stylistic.
+    # Under the dev server Vite compiles the client module graph per route on
+    # first visit, so every screen a spec opens is paid for once - and in run
+    # 33744603513 that was 202 `waitForHydration` waits totalling 696s of the
+    # chromium job's 1005s, averaging 3.4s each and peaking at 8.7s. It put the
+    # suite's two longest tests over their 30s ceiling for no reason connected
+    # to the product. A built bundle has no per-route compile, and it is also
+    # the artefact that actually ships, so the gate now measures what deploys
+    # rather than what a developer's watcher serves.
+    #
+    # `pnpm dev` stays the local path (playwright.config.ts starts it): a build
+    # before every local run would cost the fast loop the gate does not need.
+    # That divergence is deliberate and is the reason this action exists - CI is
+    # the only place both browser workflows agree on.
+    #
+    # `E2E_BUILD=1` folds `e2e/baseline-day.ts` into the bundle as the day the server believes it
+    # is. The suite photographs screens that read a clock - the dashboard opens on the current
+    # month, budget bars divide by days elapsed - and `src/server/clock.ts` only honours the
+    # `x-mt-server-today` header under `import.meta.env.DEV`, which a build folds away on purpose.
+    # Without this the gate would compare August's baselines against whatever month the runner
+    # woke up in, which is how 24 screenshots failed the first time this step served a build.
+    # Unset, the define emits `undefined` and the branch leaves the bundle, so nothing about a
+    # deployed worker changes.
+    - name: Build the application
+      shell: bash
+      env:
+        E2E_BUILD: '1'
+      run: pnpm build
+
     # Started here rather than by Playwright's `webServer` because the seed has
     # to run against it before the first spec: the seed writes through the
     # Worker, so there is no seeding a database without a server in front of it.
-    - name: Start the dev server
+    - name: Start the preview server
       shell: bash
       env:
         PORT: ${{ inputs.port }}
@@ -76,18 +106,22 @@ runs:
         # --host binds v4 and v6. The wait loop below (curl) reaches a ::1-only
         # vite over IPv6 and reports the server up, but Node's fetch in seed.mjs
         # resolves localhost to 127.0.0.1 and then finds nothing - the seed then
-        # fails against a server curl just proved alive. Same trap, same fix as
-        # .sandcastle/setup-e2e.sh.
-        pnpm exec vite dev --port "$PORT" --strictPort --host > dev-server.log 2>&1 &
+        # fails against a server curl just proved alive.
+        #
+        # `vite preview` runs the built Worker in workerd through
+        # @cloudflare/vite-plugin, against the same local D1/KV/R2 under
+        # .wrangler/state that the migration step above just prepared - so the
+        # seed still writes through the Worker exactly as it did under dev.
+        pnpm exec vite preview --port "$PORT" --strictPort --host > server.log 2>&1 &
         for _ in $(seq 1 60); do
           if curl --silent --fail --output /dev/null "http://localhost:$PORT/"; then
-            echo "dev server up on :$PORT"
+            echo "preview server up on :$PORT"
             exit 0
           fi
           sleep 2
         done
-        echo "::error title=Dev server::did not answer on :$PORT within 120s"
-        tail -50 dev-server.log
+        echo "::error title=Preview server::did not answer on :$PORT within 120s"
+        tail -50 server.log
         exit 1
 
     # The seed is a first-class artefact, not a convenience: the demo workspace
@@ -117,6 +151,6 @@ runs:
           echo '::notice title=Seed verification::scripts/seed/verify.mjs does not exist yet - skipped.'
         fi
 
-# The dev server's stdout lands in `dev-server.log` in the workspace. Uploading
-# it is the caller's job, not this action's: an artifact name has to be unique
-# within a workflow run, and only the caller knows its own matrix.
+# The server's stdout lands in `server.log` in the workspace. Uploading it is the
+# caller's job, not this action's: an artifact name has to be unique within a
+# workflow run, and only the caller knows its own matrix.

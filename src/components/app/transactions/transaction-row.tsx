@@ -16,6 +16,7 @@ import {
   MenuTrigger,
   Popover,
 } from '#/components/ui'
+import { paintFor } from '#/components/app/categories'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, money } from '#/lib/money'
@@ -185,7 +186,9 @@ function CategoryMark({ color }: { color: string | null }) {
     <span
       aria-hidden="true"
       className="size-2 shrink-0 rounded-full border border-border-subtle"
-      style={{ backgroundColor: color ?? 'transparent' }}
+      style={{
+        backgroundColor: color === null ? 'transparent' : paintFor(color),
+      }}
     />
   )
 }

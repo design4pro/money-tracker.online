@@ -84,6 +84,7 @@ import { execFile } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
@@ -349,13 +350,24 @@ function insert(table, columns, rows) {
 /* The dataset                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** 13 categories in exactly two levels: 4 parents, 9 children. */
-const CATEGORIES = [
+/**
+ * 13 categories in exactly two levels: 4 parents, 9 children.
+ *
+ * Colours are `CATEGORY_HUES` and nothing else. The seed writes rows the product itself would
+ * have written, so it may only use colours the product offers; when it used an unrelated palette,
+ * every demo tenant was a tenant whose colours the picker could not represent and whose dark
+ * theme the `--color-series-*` tokens could not correct. `categories-palette.test.mjs` holds it.
+ *
+ * Four children carry their parent's hue and five carry their own: that is `cascadeColor`'s
+ * "inheriting" versus "overridden", and the demo has to show both or the recolour cascade has
+ * nothing to demonstrate.
+ */
+export const CATEGORIES = [
   {
     id: 'demo-cat-home',
     name: 'Dom',
     slug: 'dom',
-    color: '#4C6EF5',
+    color: '#0d6abb',
     kind: 'expense',
     parent: null,
   },
@@ -363,7 +375,7 @@ const CATEGORIES = [
     id: 'demo-cat-rent',
     name: 'Czynsz',
     slug: 'czynsz',
-    color: '#4C6EF5',
+    color: '#0d6abb',
     kind: 'expense',
     parent: 'demo-cat-home',
   },
@@ -371,7 +383,7 @@ const CATEGORIES = [
     id: 'demo-cat-utilities',
     name: 'Media',
     slug: 'media',
-    color: '#5C7CFA',
+    color: '#0a646a',
     kind: 'expense',
     parent: 'demo-cat-home',
   },
@@ -379,7 +391,7 @@ const CATEGORIES = [
     id: 'demo-cat-daily',
     name: 'Codzienne',
     slug: 'codzienne',
-    color: '#12B886',
+    color: '#0f7b62',
     kind: 'expense',
     parent: null,
   },
@@ -387,7 +399,7 @@ const CATEGORIES = [
     id: 'demo-cat-groceries',
     name: 'Zakupy spożywcze',
     slug: 'zakupy-spozywcze',
-    color: '#12B886',
+    color: '#0f7b62',
     kind: 'expense',
     parent: 'demo-cat-daily',
   },
@@ -395,7 +407,7 @@ const CATEGORIES = [
     id: 'demo-cat-eatingout',
     name: 'Restauracje',
     slug: 'restauracje',
-    color: '#20C997',
+    color: '#436f0a',
     kind: 'expense',
     parent: 'demo-cat-daily',
   },
@@ -405,7 +417,7 @@ const CATEGORIES = [
     id: 'demo-cat-fun',
     name: 'Rozrywka',
     slug: 'rozrywka',
-    color: '#F76707',
+    color: '#625106',
     kind: 'expense',
     parent: 'demo-cat-daily',
   },
@@ -413,7 +425,7 @@ const CATEGORIES = [
     id: 'demo-cat-transport',
     name: 'Transport',
     slug: 'transport',
-    color: '#FD7E14',
+    color: '#b1440c',
     kind: 'expense',
     parent: null,
   },
@@ -421,7 +433,7 @@ const CATEGORIES = [
     id: 'demo-cat-fuel',
     name: 'Paliwo',
     slug: 'paliwo',
-    color: '#FD7E14',
+    color: '#b1440c',
     kind: 'expense',
     parent: 'demo-cat-transport',
   },
@@ -429,7 +441,7 @@ const CATEGORIES = [
     id: 'demo-cat-tickets',
     name: 'Bilety',
     slug: 'bilety',
-    color: '#FFA94D',
+    color: '#a60d47',
     kind: 'expense',
     parent: 'demo-cat-transport',
   },
@@ -437,7 +449,7 @@ const CATEGORIES = [
     id: 'demo-cat-income',
     name: 'Wpływy',
     slug: 'wplywy',
-    color: '#7048E8',
+    color: '#9724b5',
     kind: 'income',
     parent: null,
   },
@@ -445,7 +457,7 @@ const CATEGORIES = [
     id: 'demo-cat-salary',
     name: 'Wynagrodzenie',
     slug: 'wynagrodzenie',
-    color: '#7048E8',
+    color: '#9724b5',
     kind: 'income',
     parent: 'demo-cat-income',
   },
@@ -453,7 +465,7 @@ const CATEGORIES = [
     id: 'demo-cat-refunds',
     name: 'Zwroty',
     slug: 'zwroty',
-    color: '#9775FA',
+    color: '#0a646a',
     kind: 'income',
     parent: 'demo-cat-income',
   },
@@ -624,6 +636,68 @@ const GROUPS = [
 ]
 
 /** 3 budgets; the third carries its surplus, so the rollover ledger has something in it. */
+/**
+ * Four saved shapes for the entry form's template picker.
+ *
+ * They are the four entries this household actually repeats, and between them they cover every
+ * branch the picker renders: one with a fixed amount and one without (the button falls back to
+ * `templates.picker.noAmount`), one income against three expenses, and one with no payee. A
+ * template deliberately carries no date — `applyTemplate` returns a draft, and *when* is decided
+ * on the form.
+ *
+ * `amount_minor` and `currency_code` travel together or not at all; the table's
+ * `transaction_templates_amount_currency_pair_check` refuses the halves apart.
+ */
+/** Two of `CATEGORY_HUES`, picked so a group does not read as one of the categories beside it. */
+const GROUP_HUES = ['#9724b5', '#a60d47']
+
+const TEMPLATES = [
+  {
+    id: 'demo-tpl-1',
+    name: 'Zakupy Biedronka',
+    account: 'demo-acc-1',
+    direction: 'expense',
+    amount: null,
+    category: 'demo-cat-groceries',
+    payee: PAYEE_BIEDRONKA,
+    note: null,
+    method: 'card',
+  },
+  {
+    id: 'demo-tpl-2',
+    name: 'Tankowanie',
+    account: 'demo-acc-1',
+    direction: 'expense',
+    amount: null,
+    category: 'demo-cat-fuel',
+    payee: PAYEE_ORLEN,
+    note: null,
+    method: 'card',
+  },
+  {
+    id: 'demo-tpl-3',
+    name: 'Netflix',
+    account: 'demo-acc-1',
+    direction: 'expense',
+    amount: 43_00,
+    category: 'demo-cat-fun',
+    payee: PAYEE_NETFLIX,
+    note: 'Abonament miesięczny',
+    method: 'direct_debit',
+  },
+  {
+    id: 'demo-tpl-4',
+    name: 'Wypłata',
+    account: 'demo-acc-1',
+    direction: 'income',
+    amount: 9_200_00,
+    category: 'demo-cat-salary',
+    payee: null,
+    note: null,
+    method: 'transfer',
+  },
+]
+
 const BUDGETS = [
   {
     id: 'demo-bud-1',
@@ -1397,6 +1471,42 @@ function buildLedger(organizationId, userId) {
     refunds,
   )
 
+  /* ---- Transaction groups -------------------------------------------------- */
+
+  /**
+   * Two groups, built from rows this file has already written.
+   *
+   * Members are taken from the base-currency account on purpose: a group's total is a single figure
+   * and the screen labels it with one currency code, so a group spanning two denominations would be
+   * a fixture asking a question the UI does not yet answer.
+   *
+   * Both have three members. Two is the floor the product enforces — a group that drops to one
+   * member is deleted in the statement that empties it — and seeding at the floor would let a
+   * fixture sit one deletion away from vanishing.
+   */
+  const groupable = settled.filter(
+    (row) =>
+      row.accountId === 'demo-acc-1' &&
+      row.direction === 'expense' &&
+      !row.isPlanned,
+  )
+  const groups = [
+    {
+      id: 'demo-grp-1',
+      name: 'Wyjazd w góry',
+      note: 'Weekend, wszystkie koszty razem',
+      icon: 'mountain',
+      members: groupable.slice(0, 3).map((row) => row.id),
+    },
+    {
+      id: 'demo-grp-2',
+      name: 'Remont kuchni',
+      note: null,
+      icon: 'hammer',
+      members: groupable.slice(3, 6).map((row) => row.id),
+    },
+  ].filter((group) => group.members.length > 1)
+
   /* ---- The daily balance grid --------------------------------------------- */
 
   const balances = buildBalanceGrid(settled)
@@ -1405,6 +1515,7 @@ function buildLedger(organizationId, userId) {
     organizationId,
     userId,
     settled,
+    groups,
     planned,
     transfers,
     splits,
@@ -2018,6 +2129,9 @@ function buildSql(organizationId, userId) {
     'refunds',
     'transaction_splits',
     'transaction_tags',
+    'transaction_group_items',
+    'transaction_groups',
+    'transaction_templates',
     'budget_transactions',
     'budget_periods',
     'budget_categories',
@@ -2054,6 +2168,8 @@ function buildSql(organizationId, userId) {
   for (const table of [
     'refunds',
     'transaction_splits',
+    'transaction_groups',
+    'transaction_templates',
     'budgets',
     'transactions',
     'savings_goals',
@@ -2729,6 +2845,87 @@ function buildSql(organizationId, userId) {
     ),
   )
 
+  out.push(
+    insert(
+      'transaction_groups',
+      [
+        'id',
+        'organization_id',
+        'name',
+        'note',
+        'color',
+        'icon',
+        'created_at',
+        'updated_at',
+      ],
+      ledger.groups.map((group, index) => [
+        group.id,
+        org,
+        group.name,
+        group.note,
+        // The product's own palette, same rule and same reason as the categories above: the seed
+        // writes rows the product would have written, so it may only use colours the product
+        // offers. Written as literals because this file is a `.mjs` script and cannot import the
+        // `.ts` module that defines them — `categories-palette.mjs` is what holds the two equal.
+        GROUP_HUES[index % GROUP_HUES.length],
+        group.icon,
+        CREATED_AT,
+        CREATED_AT,
+      ]),
+    ),
+  )
+  out.push(
+    insert(
+      'transaction_group_items',
+      ['organization_id', 'group_id', 'transaction_id', 'position'],
+      ledger.groups.flatMap((group) =>
+        group.members.map((transactionId, position) => [
+          org,
+          group.id,
+          transactionId,
+          position,
+        ]),
+      ),
+    ),
+  )
+  out.push(
+    insert(
+      'transaction_templates',
+      [
+        'id',
+        'organization_id',
+        'name',
+        'account_id',
+        'direction',
+        'amount_minor',
+        'currency_code',
+        'category_id',
+        'payee_id',
+        'note',
+        'payment_method',
+        'position',
+        'created_at',
+        'updated_at',
+      ],
+      TEMPLATES.map((tpl, index) => [
+        tpl.id,
+        org,
+        tpl.name,
+        tpl.account,
+        tpl.direction,
+        tpl.amount,
+        tpl.amount === null ? null : BASE,
+        tpl.category,
+        tpl.payee,
+        tpl.note,
+        tpl.method,
+        index,
+        CREATED_AT,
+        CREATED_AT,
+      ]),
+    ),
+  )
+
   // The two figures above went in as zeroes because the columns are `not null` and the rows have
   // to exist before anything can count against them. They are filled in here, from the ledger this
   // same file wrote, in the order the arithmetic needs: the spend first, then the carry that reads
@@ -2762,6 +2959,12 @@ function buildSql(organizationId, userId) {
       recurringPeriods: ledger.recurringPeriods.length,
       recurringLinks: ledger.recurringLinks.length,
       rules: RULES.length,
+      templates: TEMPLATES.length,
+      transactionGroups: ledger.groups.length,
+      transactionGroupItems: ledger.groups.reduce(
+        (n, g) => n + g.members.length,
+        0,
+      ),
       importBatches: 1,
       importedTransactions: ledger.importedCount,
       accountBalances: ledger.balances.length,
@@ -2976,9 +3179,17 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
-  )
-  process.exit(1)
-})
+// Only when run as a command. Without this the module seeds a workspace as a side effect of
+// being imported, which makes `CATEGORIES` - the dataset the palette gate reads - unreachable to
+// any test: importing it would write a SQL file and call the dev server.
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    )
+    process.exit(1)
+  })
+}

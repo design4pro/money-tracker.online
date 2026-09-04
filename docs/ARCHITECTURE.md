@@ -123,17 +123,16 @@ by the same scan, not a hand-maintained index.
 
 ## 3. Binding map
 
-| Binding               | Type                              | Holds                                                                                                               | Written by                             |
-| --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `DB`                  | D1 `money-tracker-db`             | All domain tables and all Better Auth tables. `migrations_dir: drizzle`                                             | server functions, queue handlers, cron |
-| `KV`                  | KV                                | Plan-state cache (60s), queue idempotency claims, FX day-cache, import-preset fingerprints, reminder dedupe markers | mutations, webhook, queue, cron        |
-| `SESSIONS`            | KV                                | Better Auth secondary storage: sessions, OAuth state, rate-limit counters (60s TTL floor)                           | sign-in, refresh, sign-out             |
-| `FILES`               | R2 `money-tracker-files`          | Uploaded import files, generated exports, receipt attachments, dead-letter bodies, nightly D1 backups               | upload server fn, queue handlers, cron |
-| `LEDGER`              | Durable Object `AccountLedger`    | **A lock and a dirty bit. No ledger data.** Addressed `idFromName(accountId)`                                       | the ledger queue handler               |
-| `TASKS`               | Queue                             | Every asynchronous job                                                                                              | server functions, cron                 |
-| `AI`                  | Workers AI (staging first)        | Import column-mapping assistance and statement extraction, always review-before-write                               | import queue handlers                  |
-| `CF_VERSION_METADATA` | version metadata                  | The Sentry release identifier                                                                                       | —                                      |
-| `SANDCASTLE_REGISTRY` | Durable Object (**staging only**) | Agent-run backlog claims and leases                                                                                 | the orchestration loop                 |
+| Binding               | Type                           | Holds                                                                                                               | Written by                             |
+| --------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `DB`                  | D1 `money-tracker-db`          | All domain tables and all Better Auth tables. `migrations_dir: drizzle`                                             | server functions, queue handlers, cron |
+| `KV`                  | KV                             | Plan-state cache (60s), queue idempotency claims, FX day-cache, import-preset fingerprints, reminder dedupe markers | mutations, webhook, queue, cron        |
+| `SESSIONS`            | KV                             | Better Auth secondary storage: sessions, OAuth state, rate-limit counters (60s TTL floor)                           | sign-in, refresh, sign-out             |
+| `FILES`               | R2 `money-tracker-files`       | Uploaded import files, generated exports, receipt attachments, dead-letter bodies, nightly D1 backups               | upload server fn, queue handlers, cron |
+| `LEDGER`              | Durable Object `AccountLedger` | **A lock and a dirty bit. No ledger data.** Addressed `idFromName(accountId)`                                       | the ledger queue handler               |
+| `TASKS`               | Queue                          | Every asynchronous job                                                                                              | server functions, cron                 |
+| `AI`                  | Workers AI (staging first)     | Import column-mapping assistance and statement extraction, always review-before-write                               | import queue handlers                  |
+| `CF_VERSION_METADATA` | version metadata               | The Sentry release identifier                                                                                       | —                                      |
 
 Keeping `SESSIONS` in its own namespace from `KV` means a cache purge can never sign everyone out.
 That is the whole reason for the second namespace and it is worth the extra binding.
