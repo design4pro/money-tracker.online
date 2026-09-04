@@ -1,18 +1,25 @@
 import { fileURLToPath } from 'node:url'
+import {
+  cloudflareTest,
+  readD1Migrations,
+} from '@cloudflare/vitest-pool-workers'
 import { defineConfig } from 'vitest/config'
 import viteReact from '@vitejs/plugin-react'
 
 const src = fileURLToPath(new URL('./src/', import.meta.url))
 
 /**
- * Three projects, because the code under test needs different worlds:
+ * Four projects, because the code under test needs different worlds:
  *
  * - `ui` runs component tests in jsdom with the React plugin.
  * - `server` runs repositories, queue handlers, the money and FX arithmetic, and route handlers
  *   in plain Node. Nothing there may import `cloudflare:workers`; bindings arrive as arguments,
  *   which is what makes them fake-able.
- * - `tooling` runs the agent tooling in plain Node as well, but over `.sandcastle/**` and
- *   `scripts/**` rather than `src/**`.
+ * - `tooling` runs the repository's own scripts in plain Node as well, over `scripts/**`
+ *   rather than `src/**`.
+ * - `workerd` runs the handful of things a fake cannot reproduce inside the real runtime, on the
+ *   real bindings from `wrangler.jsonc` (ADR 0015). Its files are named `*.workerd.test.ts` and
+ *   `server` excludes them, so the suffix is what says which world a file expects.
  *
  * `server` collects `.tsx` as well as `.ts` because the transactional email templates under
  * `src/server/email` are React components: they render to a string on the server and never reach
@@ -20,12 +27,65 @@ const src = fileURLToPath(new URL('./src/', import.meta.url))
  * up `jsx: react-jsx` from `tsconfig.json`, which is all a server-rendered component needs — the
  * React plugin exists for Fast Refresh, which no test has.
  *
- * `tooling` is one project for two directories because it is one world, and its failure mode is
- * silence: a parsing bug files a duplicate issue every week, or stops filing anything, and says
- * nothing either way. `pnpm typecheck` reaches `.sandcastle` only because tsconfig.json names it
- * explicitly, and it does not reach `scripts` at all — those are plain `.mjs` run by node. Tests
- * are the only gate that reaches all of it.
+ * `tooling` exists because its failure mode is silence: a seed or capture script that quietly
+ * produces the wrong thing says nothing either way. The scripts themselves are plain `.mjs` that
+ * `tsc` only sees through their `.d.mts` neighbours, so tests are the real gate over them.
  */
+/**
+ * The `workerd` project: the exception to "bindings arrive as arguments".
+ *
+ * `server` fakes its bindings on purpose, and that is right for almost everything - a repository
+ * that takes a `Database` is testable in milliseconds and says what it means. Two things are not
+ * reproducible that way, and both are the kind that fail in production and nowhere else: a Durable
+ * Object's storage and its single-threaded turn semantics, and D1 accepting the SQL Drizzle
+ * generated. This project runs those inside workerd, on the bindings `wrangler.jsonc` declares,
+ * with the migrations in `drizzle/` applied to a real (in-memory) D1. Everything else stays where
+ * it is - including the queue consumer, which has no handler to assert against yet.
+ *
+ * `main` is a test-only entry rather than `src/server/worker.ts`: the pool needs a module that
+ * exports the Durable Object class so the `LEDGER` binding resolves, and the real entry pulls the
+ * whole TanStack Start application in behind it for no gain here.
+ */
+const migrations = await readD1Migrations(
+  fileURLToPath(new URL('./drizzle', import.meta.url)),
+)
+
+const workerdProject = {
+  resolve: {
+    alias: [{ find: /^#\/(.*)$/, replacement: `${src}$1` }],
+  },
+  plugins: [
+    cloudflareTest({
+      main: './src/server/worker.workerd-entry.ts',
+      miniflare: {
+        compatibilityDate: '2026-08-15',
+        compatibilityFlags: ['nodejs_compat'],
+        // Read in Node, applied inside workerd by `vitest.setup.workerd.ts`.
+        bindings: { TEST_MIGRATIONS: migrations },
+      },
+      wrangler: { configPath: './wrangler.jsonc' },
+    }),
+  ],
+  /**
+   * Not covered, and it cannot be: `@vitest/coverage-v8` constructs a
+   * `node:inspector` Session at import time, and inside workerd that constructor throws
+   * `ERR_METHOD_NOT_IMPLEMENTED`, which fails the entire run rather than this project
+   * alone. The pool refuses the v8 provider for exactly this reason and points at
+   * Istanbul, which instruments source instead of asking the runtime; adopting it would
+   * mean a new dependency, and the stack is frozen (`docs/SPEC.md` §3.1).
+   *
+   * So `pnpm test:coverage` runs `--project='!workerd'` and `pnpm test:workerd` runs this
+   * one uninstrumented. `pnpm test` still runs all four, and CI runs both scripts. What is
+   * lost is the coverage *number* for `src/server/do/**`; no threshold reads those files.
+   */
+  test: {
+    name: 'workerd',
+    globals: false,
+    setupFiles: ['./vitest.setup.workerd.ts'],
+    include: ['src/server/**/*.workerd.test.ts'],
+  },
+}
+
 export default defineConfig({
   resolve: {
     alias: [{ find: /^#\/(.*)$/, replacement: `${src}$1` }],
@@ -64,16 +124,7 @@ export default defineConfig({
           name: 'tooling',
           environment: 'node',
           globals: false,
-          include: [
-            '.sandcastle/**/__tests__/*.test.ts',
-            'scripts/**/__tests__/*.test.mjs',
-          ],
-          /**
-           * The loop creates full git worktrees under `.sandcastle/worktrees/`, each a copy of
-           * this checkout — the same hazard `vite.config.ts` describes for the dev server's
-           * watcher. Collecting them would run every one of these tests once per worktree.
-           */
-          exclude: ['.sandcastle/worktrees/**', '.sandcastle/logs/**'],
+          include: ['scripts/**/__tests__/*.test.{ts,mjs}'],
           restoreMocks: true,
         },
       },
@@ -89,9 +140,12 @@ export default defineConfig({
             'src/routes/**/*.test.ts',
             'src/styles/**/*.test.ts',
           ],
+          // The workerd project owns these; run in Node they would fail on `cloudflare:test`.
+          exclude: ['src/server/**/*.workerd.test.ts'],
           restoreMocks: true,
         },
       },
+      workerdProject,
     ],
     coverage: {
       provider: 'v8',
@@ -107,6 +161,8 @@ export default defineConfig({
         'src/**/*.d.ts',
         'src/**/__tests__/**',
         'src/**/*.test.{ts,tsx}',
+        // The workerd entry exists only to give the pool a module to load.
+        'src/server/worker.workerd-entry.ts',
       ],
       /**
        * Thresholds are per-glob rather than global: they hold the modules carrying arithmetic

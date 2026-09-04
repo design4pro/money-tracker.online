@@ -33,7 +33,7 @@ export interface AppHeaderProps {
 export function AppHeader({ shell }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-nav border-b border-border-subtle bg-canvas">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-content items-center gap-2 px-4 sm:px-6 lg:px-8">
         {/* Only while there is no rail to hold it. From `lg` the household is pinned to the foot
             of the rail instead, which leaves this bar to the three controls below and gives the
             screen's own `<h1>` an uncontested first line. */}

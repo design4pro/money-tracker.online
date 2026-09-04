@@ -95,24 +95,6 @@ async function choose(page: Page, label: string, option: string | RegExp) {
   await page.getByRole('option', { name: option, exact: false }).first().click()
 }
 
-/**
- * Waits for React Aria's live announcer to tidy up before axe looks at the page.
- *
- * A `Button` with `isPending` announces the state change assertively while it holds focus, and the
- * announcer does that by appending an off-screen `<div role="img" aria-labelledby>` pointing at the
- * button. When the pending call ends in a navigation the button is gone long before the
- * announcement expires seven seconds later, so the document is briefly left holding an `img` whose
- * label resolves to nothing - which axe reads, correctly, as an image with no accessible name.
- *
- * The node is the library's, it names a control this flow no longer shows, and it removes itself.
- * So the scans wait it out rather than photographing the gap: first a beat for the announcement to
- * be made at all (it comes from an effect, not from the click), then for the node to go.
- */
-async function settleAnnouncer(page: Page) {
-  await page.waitForTimeout(1000)
-  await expect(page.locator('[role="img"]')).toHaveCount(0, { timeout: 15_000 })
-}
-
 test.describe('import: map a statement and preview it', () => {
   test.beforeEach(async ({ context }) => {
     await useLocale(context, 'en')
@@ -152,7 +134,6 @@ test.describe('import: map a statement and preview it', () => {
     ).toBeVisible()
     await expect(page.getByText('3 rows were read')).toBeVisible()
 
-    await settleAnnouncer(page)
     await expectNoSeriousViolations(page, 'import upload step')
 
     await page.getByRole('link', { name: 'Next: Map the columns' }).click()
@@ -165,7 +146,17 @@ test.describe('import: map a statement and preview it', () => {
     // columns are re-read from the stored object. The account is the one thing that cannot come
     // back with them - no batch column holds it before a mapping is confirmed - so the step asks.
     await page.reload()
-    await expect(page.getByText('Żabka nano 4471')).toBeVisible()
+    // The one assertion here that outlives the suite's five-second budget, and the only one given a
+    // longer one. It waits on a named, bounded piece of work - a cold R2 fetch and a second parse of
+    // the whole file - and the step says `Reading the stored file again…` on screen while it runs.
+    // Measured on CI run 33744603513: 4.36s and 4.62s where it passed, and a failure at 5.15s that
+    // was the five-second budget expiring rather than the file being unreadable. Twelve is that
+    // measurement with room, not an accommodation of a slow runner: a budget large enough to swallow
+    // the test's own 30s ceiling would fail as a bare `Test timeout` naming nothing, which is the
+    // barrier this file just finished removing.
+    await expect(page.getByText('Żabka nano 4471')).toBeVisible({
+      timeout: 12_000,
+    })
     await picker(page, 'Import into').click()
     await page.getByRole('option').first().click()
 
@@ -200,7 +191,6 @@ test.describe('import: map a statement and preview it', () => {
       .click()
     await expect(page.getByRole('radio', { name: /Day first/ })).toBeChecked()
 
-    await settleAnnouncer(page)
     await expectNoSeriousViolations(page, 'import mapping step')
 
     await page
@@ -237,7 +227,6 @@ test.describe('import: map a statement and preview it', () => {
       .first()
     await expect(zabka).toContainText('Apr')
 
-    await settleAnnouncer(page)
     await expectNoSeriousViolations(page, 'import preview step')
 
     // Nothing was written and nothing here offers to: the fourth step is the seam `19-S3` fills.

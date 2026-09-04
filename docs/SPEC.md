@@ -38,7 +38,11 @@ code, documents, plans, commit messages and copy equally:
    reduces the effective spend of the transaction it points at" is a behavioural statement. A field
    list read off someone else's schema is not.
 4. Reading it to learn _what_ a feature does is sanctioned. Carrying its text into this repository is
-   not. One of the reference products is AGPL-3.0 with an asserted trademark.
+   not. One of the reference products is AGPL-3.0 with an asserted trademark. That includes its
+   published source: `docs/agents/reference.md` clause 8 forbade opening the repository at all until
+   the product owner lifted that on 2026-09-03, and the line now sits where this clause always put
+   it - read what it does, transcribe nothing, and a port to another runtime is not the distance
+   that makes a design ours.
 5. The pixel-comparison loop compares **rendered pixels only**. It never reads the reference's DOM,
    never copies a string, and never names the product in any artefact it writes.
 
@@ -90,9 +94,9 @@ the shadcn shape · **`@internationalized/date`** and **`@internationalized/numb
 **Polar** through a hand-rolled REST client · `zod` v4 · Sentry · React Email · `motion` · `sonner` ·
 `@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
 
-Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · Playwright · **`@axe-core/playwright`** ·
-`drizzle-kit` · ESLint 9 · Prettier · Husky + lint-staged · `@ai-hero/sandcastle` ·
-`vite-plugin-pwa`.
+Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
+(ADR 0015) · Playwright · **`@axe-core/playwright`** · `drizzle-kit` · ESLint 9 · Prettier ·
+Husky + lint-staged · `vite-plugin-pwa`.
 
 Not used, deliberately: **Radix** (React Aria instead — ADR 0005), **any chart library** (ADR 0007),
 `xlsx`, `maplibre-gl`, any bank-aggregation SDK.
@@ -110,6 +114,10 @@ run that installs a different minor than the one the verification ladder was gre
 whole class of failures nobody can explain.
 
 `pnpm-lock.yaml` is installed `--frozen-lockfile` in CI and in the agent sandbox.
+
+The set itself is changed by a human, in an ADR, with the reason attached - the freeze binds
+stages and agent runs, not the decision record. `@cloudflare/vitest-pool-workers` is the one
+addition so far (ADR 0015); a `### Blockers` row is still how a stage reports needing a package.
 
 ---
 
@@ -193,7 +201,7 @@ sharding in v1; the trade is recorded rather than assumed.
 ### 5.7 Bindings
 
 `DB` (D1) · `KV` and `SESSIONS` (KV) · `FILES` (R2) · `LEDGER` (Durable Object) · `TASKS` (Queue) ·
-`AI` (staging first) · `CF_VERSION_METADATA`. `SANDCASTLE_REGISTRY` exists on staging only.
+`AI` (staging first, and staging only) · `CF_VERSION_METADATA`.
 `wrangler.jsonc` is the one file that declares them and it is a shared path owned by
 `docs/plans/00-foundations.md`.
 
@@ -289,6 +297,16 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    in every line and still add up, and that is worse than a wrong sum: a wrong sum invites the
    question, and a right one closes it.
 
+   **A mean is the same defect wearing better clothes: it has the units of a case, so it reads as
+   one.** Three tests in one file cost 545ms, 7ms and 7ms. The mean is 191ms and it describes none
+   of them. Two readers computed it correctly, from correct data, and drew opposite conclusions
+   from it - "about 190ms each, so nowhere near the 5000ms ceiling" and "the set that stretches
+   furthest under load" - while the real shape was one test sitting 9x under the ceiling and two
+   sitting 714x under it, which means exactly one of the three can ever cross. A total at least
+   announces itself as an aggregate and invites the breakdown; a mean hides the spread behind a
+   plausible middle. Before a mean carries a decision, look at what it was taken over, and say how
+   many samples that was.
+
    The same rule binds a sentence that carries a claim. **A statement that grew stronger between
    two messages, without a new measurement, reverts to the version that had one.** "Saving is safe,
    because the patch fires only on a change" was measured. "You cannot save the form without
@@ -327,6 +345,52 @@ Seven numbered points, inherited unchanged by every stage, every ticket and ever
    a pass is the direction starvation cannot fake. It costs a second and it removes the question
    the hook cannot answer. What it does not do is open the gate: the hook still runs everything,
    and an isolated pass is a diagnosis, not a pass.
+
+   **`VITEST_MAX_WORKERS` is the knob for a contended machine, and it stays in the shell rather
+   than in `vitest.config.ts`.** Vitest defaults to `cores - 1`, which assumes the suite owns the
+   machine: true on a runner, never on a laptop with a second session on it. Capping is not free in
+   either direction, and the two comparisons available are not equally clean. Under contention the
+   pair is matched: at load 12.38 fifteen workers took 63.19s and one test failed; nine minutes
+   later at load 12.29, four workers took 52.03s and none did. The other direction rests on runs
+   that were not matched - fifteen workers finished in 29.75s at load 4.40, four finished in 36.49s
+   at load 10.25 - so "the cap costs wall clock on a free machine" is a reading of unmatched
+   samples, not a measurement. That asymmetry is the reason the cap is not written into the config:
+   a CI runner is the free case, and pinning it there would slow the gate to fix a symptom that
+   only appears on a developer's machine.
+
+   Whether the cap applied is itself measurable rather than assumable. Vitest reports phase
+   durations summed per worker, so sum-of-phases divided by wall clock recovers the realised
+   concurrency - about 3.5 with four workers and 13.3 to 13.8 with fifteen. That ratio held across
+   load averages from 4 to 29 across eight runs, which is what makes it usable as a check:
+   starvation slowed every worker uniformly instead of taking workers away, so the figure reports
+   the setting and not the weather.
+
+   **Moving a gate onto a different target silently revokes everything that was true only of the
+   old one.** The browser suite was moved from the dev server to a build, which halved its wall
+   clock and broke 24 screenshots in the same step. `src/server/clock.ts` accepts a day-pinning
+   header behind `import.meta.env.DEV`, and a production build folds that guard away on purpose -
+   so the pin left with the branch, the dashboard opened on the runner's real month instead of the
+   baselines' one, and the diff read as a rendering change when it was a calendar change. Nothing
+   was wrong with either the gate or the guard; what was wrong was assuming a capability travels
+   with the suite rather than with what the suite is pointed at.
+
+   The change itself named this risk - "it changes what the gate covers" - and named it in the
+   commit message, which is where a risk goes to be admired rather than checked. The check that
+   would have caught it is mechanical and takes one grep: before repointing a gate, list what the
+   old target provided that the new one does not. A dev server provides `import.meta.env.DEV`,
+   source maps, unminified names, a module graph compiled per route, and an HMR client - so every
+   test that leans on any of those is a test about to change meaning. The list is short, it is
+   knowable in advance, and reading it is cheaper than reading twenty-four screenshot diffs.
+
+   The operation is asymmetric, and the loud half is the harmless one. Repointing a gate can take a
+   guarantee away; it cannot hand one over that the new target does not already provide. Which way
+   the loss surfaces is luck: twenty-four screenshots went red, so the missing pin announced itself
+   within a single run. Had the same loss instead removed something a test was asserting _against_
+   - an environment guard that made a check meaningful, a fixture that made an assertion strict -
+     the suite would have gone green and stayed green, and the retarget would read in the history as
+     a speedup with no cost. So the list of what the old target provided is not a curiosity to file
+     after the diffs are read. It is written before the gate moves, and every entry on it is a green
+     result that has stopped meaning what it used to mean until something re-establishes it.
 
    And "the machine" is not the only alternative to "the code". A bare timeout reports that a
    budget ran out, never what spent it, and the answer can be the subject itself, behaving

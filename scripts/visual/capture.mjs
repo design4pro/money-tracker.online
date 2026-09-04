@@ -1,8 +1,8 @@
 /**
  * Take the frames a blind A/B pair is made of.
  *
- * The sandcastle loop's neutral capture step runs this — see `.sandcastle/pixel-capture-prompt.md`
- * — and so does anyone checking a visual change by hand. The script exists so the capture procedure
+ * The neutral capture step of a blind comparison round runs this, and so does anyone checking a
+ * visual change by hand (`docs/agents/reference.md`). The script exists so the capture procedure
  * is not re-derived from prose by every capture agent: a theme switched the wrong way, a frame shot
  * before the chart finished its entrance, a screen photographed at rest when the thing under
  * judgement was a hover state, and scratch PNGs left at the repository root are all defects of the
@@ -23,6 +23,11 @@
  *     the click must be one that NAVIGATES, never one that MUTATES what the next visitor sees. It is
  *     somebody else's shop window — a control that signs up, saves, deletes or submits is not an
  *     entry point and is never what this flag is pointed at.
+ *   - `--enter-from` says the entry control lives on a different page from the screen being
+ *     photographed. The run lands there, clicks once, and only then asks for `--url` — which is how
+ *     a surface deeper than the demo's own front door gets photographed at all, since the session
+ *     the click grants exists only inside the context that clicked and does not survive to the next
+ *     invocation. Without it, `--url` must itself be the page carrying the control.
  *
  * CLEAN ROOM. This script points a browser at a URL and photographs what it paints. That is the
  * whole of its contract with anything that is not ours: it never reads the reference product's DOM,
@@ -36,13 +41,13 @@
  * Usage:
  *   node scripts/visual/capture.mjs \
  *     --url http://localhost:3010/dashboard \
- *     --out .sandcastle-shots/issue-<n> \
+ *     --out .visual-shots/issue-<n> \
  *     --label A \
  *     --viewports 1440x900,360x800 \
  *     --themes light,dark \
  *     [--auth] [--state hover-row] \
  *     [--hover 'selector'] [--click 'selector'] [--settle 800] \
- *     [--enter 'selector']
+ *     [--enter 'selector'] [--enter-from https://host/] [--viewport-only]
  *
  * Prints one JSON object on stdout: `{ requestedUrl, files, console, warnings, captureValid }`. Each
  * file records the URL the browser actually landed on, so a redirect the refusal list does not know
@@ -156,6 +161,24 @@ const themes = String(opt.themes ?? 'light,dark')
  */
 const statePrefix = typeof opt.state === 'string' ? `${opt.state}-` : ''
 const settleMs = Number(opt.settle ?? 600)
+/**
+ * Photograph the viewport instead of the whole document.
+ *
+ * A full-page frame is the right default for judging a screen's whole composition, and it is the
+ * wrong one the moment a product pins chrome to the viewport. `position: fixed` resolves against
+ * the viewport, so in a 4000px full-page image a mobile tab bar is not at the bottom - it is
+ * stranded a fifth of the way down, cutting through whatever content is behind it.
+ *
+ * That would merely be ugly if it hit both sides of a pair equally. It does not. A layout that
+ * scrolls the document produces a tall frame with the artefact in it; a layout that scrolls an
+ * inner container produces a viewport-height frame with its chrome exactly where a visitor sees
+ * it. Handed to a blind critic, the pair reads as one product having a broken navigation bar, and
+ * the finding is entirely an invention of the shutter.
+ *
+ * So a comparison at a viewport where either side pins anything is shot viewport-only: identical
+ * treatment, and the frame is what a visitor actually arrives at.
+ */
+const viewportOnly = flag('viewport-only')
 
 if (!Number.isFinite(settleMs) || settleMs < 0) {
   console.error(
@@ -233,6 +256,8 @@ async function settle(page) {
 async function main() {
   const wantsAuth = flag('auth')
   const enter = typeof opt.enter === 'string' ? opt.enter : undefined
+  const enterFrom =
+    typeof opt['enter-from'] === 'string' ? opt['enter-from'] : undefined
 
   // The two flags belong to opposite sides of the pair. `--auth` replays OUR app's cached session;
   // an entry click is how somebody else's public demo lets an anonymous visitor in. Asking for both
@@ -243,6 +268,18 @@ async function main() {
       "capture: --enter and --auth cannot be combined. --auth replays our own app's cached " +
         "session; --enter clicks the entry control on somebody else's public demo. One run " +
         'photographs one side — drop whichever flag is not the side of this URL.',
+    )
+    process.exit(2)
+  }
+
+  // `--enter-from` is the entry click and the destination pulled apart. A demo that hands an
+  // anonymous visitor a session on one control leaves every other surface reachable by URL, but
+  // only from inside the context that clicked - so photographing the third screen in means landing
+  // on the door, opening it, and only then asking for the room. Without `--enter` there is no door
+  // to open and the flag is a plain redirect with extra steps.
+  if (enterFrom && !enter) {
+    console.error(
+      'capture: --enter-from needs --enter — it names where the entry control lives.',
     )
     process.exit(2)
   }
@@ -316,7 +353,10 @@ async function main() {
     await page.setViewportSize({ width: vp.w, height: vp.h })
     for (const theme of themes) {
       await page.emulateMedia({ colorScheme: theme })
-      await page.goto(url, { waitUntil: 'commit', timeout: 45_000 })
+      await page.goto(enterFrom ?? url, {
+        waitUntil: 'commit',
+        timeout: 45_000,
+      })
 
       // A cached session that has expired does not fail — it redirects, and the frame filed is the
       // login screen. A critic handed that reports the product as having no content at all. Refuse
@@ -352,6 +392,33 @@ async function main() {
           break
         }
         await settle(page)
+
+        // The click bought a session, not a destination. Ask for the screen this run is actually
+        // about, in the context that now has one.
+        if (enterFrom) {
+          await page.goto(url, { waitUntil: 'commit', timeout: 45_000 })
+          await settle(page)
+
+          // The click is asynchronous on the far side: a demo provisions a workspace before it
+          // hands over a session, and asking for a deep path too early bounces to a sign-in screen
+          // that photographs perfectly well. That frame is the most dangerous artefact this script
+          // can produce - it is sharp, it is complete, and it is of somebody's front door filed
+          // under a feature's name. A critic handed it reports the product as having no screen
+          // there at all, which is exactly what happened the first time this ran.
+          //
+          // The path is the test, not the whole URL: a screen that answers on its own and then
+          // appends its default query has not gone anywhere.
+          const landed = new URL(page.url()).pathname
+          const wanted = new URL(url).pathname
+          if (landed !== wanted) {
+            warnings.push(
+              `${vp.name}-${theme}-${label} asked for ${wanted} and landed on ${landed} - the ` +
+                `entry click did not carry a session to this path ` +
+                `(a longer --settle usually fixes it); no frame filed`,
+            )
+            continue
+          }
+        }
       }
 
       await quiesce(page)
@@ -382,7 +449,7 @@ async function main() {
       const path = `${outDir}/${name}`
       await page.screenshot({
         path,
-        fullPage: true,
+        fullPage: !viewportOnly,
         animations: 'disabled',
         caret: 'hide',
       })

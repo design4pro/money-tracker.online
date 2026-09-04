@@ -26,8 +26,9 @@
     "",
     "/accounts/groups is absent for a different reason than the rest: it does not exist, but it",
     "also does not 404. `/accounts/$accountId` matches `groups` as an id, so the route answered",
-    "HTTP 500 where every other missing path answered 404. That is worth a ticket on its own and",
-    "is not something this list can express."
+    "HTTP 500 where every other missing path answered 404. That turned out not to be about this",
+    "path at all - seven of the eight dynamic-segment screens answer 500 for an id that names no",
+    "row - and it is now issue #16 rather than a note here."
   ],
   "routes": [
     { "path": "/", "name": "Landing", "access": "public" },

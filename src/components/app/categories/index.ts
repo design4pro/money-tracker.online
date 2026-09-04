@@ -12,7 +12,12 @@ export type { CategoryIconName } from './icons'
 export { CategorySwatch } from './category-swatch'
 export type { CategorySwatchProps } from './category-swatch'
 
-export { CATEGORY_HUES, hueLabelKey, seriesVarForHex } from './palette'
+export {
+  CATEGORY_HUES,
+  hueLabelKey,
+  paintFor,
+  seriesVarForHex,
+} from './palette'
 export type { CategoryHue } from './palette'
 
 export { CategoryColourField } from './category-colour-field'

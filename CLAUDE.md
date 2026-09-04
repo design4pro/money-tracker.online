@@ -16,7 +16,6 @@ changing any dependency. There are no bank connectors and adding one is out of s
 - `pnpm generate-routes` — regenerate the route tree; `src/routeTree.gen.ts` is generated, never hand-edit
 - `pnpm db:generate` — generate a Drizzle migration; `drizzle/` is generated, never hand-edit
 - `pnpm db:migrate:local` — apply migrations to the local D1
-- `pnpm sandcastle` — the agent orchestration loop
 
 ## Rules
 
@@ -47,9 +46,12 @@ live in `docs/adr/`. Arithmetic lives in `docs/MONEY.md`.
 - **Sharing a checkout** (measuring while somebody else edits): see `docs/agents/shared-checkout.md`
 - **Reference product** (feature and quality benchmark; the clean-room rule applies): see
   `docs/agents/reference.md`
+- **Cezar** (the agent orchestrator; ADR 0013): see `docs/agents/cezar.md`
 
-Sentry findings enter the backlog through `pnpm sandcastle:sentry` (report-only; `--file-issues`
-writes) as `type: bug` + `status: pending`, and are then pre-triaged like any other bug.
-
-New work flows: grilling → `/to-spec-project` (PRD issue) → `/to-tickets-project` (vertical-slice
-sub-issues) → `/implement-project` per ticket in a fresh context.
+New work flows through the three Cezar workflows, one fresh context each: `plan` (`/plan-feature
+<issue> spec` → `prd` → `tickets`, a human answering one question per round) publishes a PRD and its
+vertical-slice sub-issues; `triage` (`/triage-ticket <issue>`) reproduces a new issue at HEAD and
+routes it; `implement-ticket` (`/implement-ticket <issue>`) turns one ready ticket into one draft PR.
+Every artefact stops at `status: review` for a human. Labels are the state machine and only the
+scripts in `scripts/agent/` write them (`docs/adr/0014-label-protocol.md`,
+`docs/agents/triage-labels.md`).

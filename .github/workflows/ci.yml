@@ -1,8 +1,7 @@
 name: CI
 
-# The gate. Every rung below has a twin in `.sandcastle/validate.sh`, in the
-# same order and with the same command, so the sandbox loop and CI cannot
-# disagree about what "green" means:
+# The gate. The rungs below are the definition of "green" for this repository,
+# in this order and with these commands:
 #
 #   1. route-tree  pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts
 #   2. db-drift    pnpm db:generate     && git diff --exit-code -- drizzle/
@@ -149,8 +148,8 @@ jobs:
           && '--cache --cache-strategy content' || '' }}
 
       # No `pnpm check` rung. Formatting is enforced on the way in - lint-staged on commit, and
-      # the format-file.sh Claude hook on every edit - and `.sandcastle/validate.sh` does not run
-      # prettier either. Adding it here alone is exactly the drift this file exists to prevent.
+      # the format-file.sh Claude hook on every edit. Adding it here as well would gate on
+      # something no local run gates on.
       - name: Build
         run: pnpm build
 
@@ -163,6 +162,23 @@ jobs:
       # dev server silently doing it.
       - name: Check the build left the route tree alone
         run: git diff --exit-code -- src/routeTree.gen.ts
+
+      # `pnpm build` above is the plain one - no `E2E_BUILD=1` - so `vite.config.ts`
+      # folds `__E2E_SERVER_TODAY__` to `undefined` and `serverToday()` falls back to
+      # the wall clock. The failure this guards against is silent in every other gate:
+      # if the define ever leaked into a production build, the app would serve the
+      # baseline day as today's date and the browser suite - which pins that same day
+      # on purpose - would keep passing while telling nobody. So assert on the artefact
+      # rather than on the config that produces it, and read the day from the module
+      # that owns it so this does not become the fourth copy of the date.
+      - name: Check the production build carries no pinned day
+        run: |
+          day=$(sed -n "s/^export const BASELINE_DAY = '\\(.*\\)'$/\\1/p" e2e/baseline-day.ts)
+          test -n "$day" || { echo "BASELINE_DAY not found in e2e/baseline-day.ts"; exit 1; }
+          if grep -rl -e "$day" -e '__E2E_SERVER_TODAY__' dist; then
+            echo "::error::The production build carries the end-to-end day pin ($day)."
+            exit 1
+          fi
 
   # Rung 5, with coverage. Its own job rather than a sixth step in `verify`: the
   # suite is CPU-bound and independent of the build, so running the two in
@@ -192,6 +208,14 @@ jobs:
       - name: Run the unit suite with coverage
         run: pnpm test:coverage
 
+      # The other half of rung 5. `test:coverage` excludes the `workerd` project
+      # because it cannot be instrumented; vitest.config.ts records why, next to
+      # the project itself. This step is not optional: without it the Durable
+      # Object tests would run nowhere in CI, which is worse than the red check
+      # the exclusion fixes.
+      - name: Run the workerd suite
+        run: pnpm test:workerd
+
       - name: Upload the coverage report
         if: always()
         uses: actions/upload-artifact@v4
@@ -209,12 +233,9 @@ jobs:
   # momentum scrolling behave differently there than anywhere else, and mobile
   # transaction entry is the product's most-used screen.
   #
-  # Demoted from every-PR to a post-merge safety net: the sandcastle loop runs
-  # this exact suite, in this exact image, per issue and again in the
-  # per-iteration audit - so a pull request from the loop arrives already
-  # validated. The job still runs on every push to develop/main, on demand, and
-  # on any pull request carrying the `needs-e2e` label, which is the escape
-  # hatch for branches with no local loop behind them.
+  # A post-merge safety net rather than an every-PR gate: it runs on every push
+  # to develop/main, on demand, and on any pull request carrying the `needs-e2e`
+  # label, which is the escape hatch for a branch that needs it earlier.
   e2e:
     name: e2e · ${{ matrix.project }}
     if: >

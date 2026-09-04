@@ -16,10 +16,12 @@
    variable into `@layer theme`, the utilities point at that copy, and the theme
    switch stops working for everything except the four raw `:root` declarations.
 
-   Web fonts are deliberately NOT imported here. An `@import url(…)` inside this
-   file is only discovered once this stylesheet has downloaded and parsed, which
-   puts the font request a full round trip behind first paint. The document
-   shell renders the link tags in `<head>` instead.
+   No font is fetched from another origin. An `@import url(…)` of a remote font
+   stylesheet inside this file would only be discovered once this stylesheet had
+   downloaded and parsed, which puts the font request a full round trip behind
+   first paint. The faces are self-hosted and declared under FACES in
+   `tokens.css`, and the document shell in `src/routes/__root.tsx` preloads the
+   two files every visitor needs, so the request still starts with the HTML.
    ========================================================================== */
 
 @import 'tailwindcss';
@@ -154,6 +156,11 @@
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
   --radius-2xl: var(--radius-2xl);
+
+  /* Tailwind reads `max-w-*` from the container namespace, so the app content
+     well is reachable as `max-w-content` rather than as a repeated `max-w-7xl`
+     that three files each had to agree on. */
+  --container-content: var(--content-max);
 
   --shadow-card: var(--shadow-card);
   --shadow-elevated: var(--shadow-elevated);

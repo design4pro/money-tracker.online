@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 
 import { Card } from '#/components/ui'
+import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 import { MAIN_CONTENT_ID } from './__root'
 
@@ -90,7 +91,7 @@ const FEATURES: ReadonlyArray<Feature> = [
  * the app shell's loader sees the session cookie on its first run.
  */
 const CTA_BASE =
-  'target-min-h inline-flex items-center justify-center gap-2 rounded-md px-5 text-label font-semibold no-underline transition-[color,background-color,box-shadow] duration-fast ease-out-quint focus-ring'
+  'target-min-h inline-flex items-center justify-center gap-2 rounded-md px-5 text-label font-semibold whitespace-nowrap no-underline transition-[color,background-color,box-shadow] duration-fast ease-out-quint focus-ring'
 const CTA_PRIMARY = `${CTA_BASE} bg-brand text-on-brand shadow-card hover:bg-brand-hover hover:shadow-elevated`
 const CTA_SECONDARY = `${CTA_BASE} border border-border-strong bg-surface text-ink hover:bg-surface-sunken`
 
@@ -104,7 +105,7 @@ function LandingPage() {
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <a
             href="/"
-            className="target-min-h inline-flex items-center gap-2 rounded-md text-subtitle font-semibold no-underline text-ink focus-ring"
+            className="target-min-h inline-flex items-center gap-2 rounded-md text-subtitle font-semibold whitespace-nowrap no-underline text-ink focus-ring"
           >
             <span
               aria-hidden="true"
@@ -121,25 +122,31 @@ function LandingPage() {
           >
             <a
               href="#features"
-              className="target-min-h hidden items-center rounded-md px-3 text-label text-ink-2 no-underline hover:text-ink focus-ring sm:inline-flex"
+              className="target-min-h hidden items-center rounded-md px-3 text-label whitespace-nowrap text-ink-2 no-underline hover:text-ink focus-ring sm:inline-flex"
             >
               {t('marketing.nav.features')}
             </a>
             <a
               href="#privacy"
-              className="target-min-h hidden items-center rounded-md px-3 text-label text-ink-2 no-underline hover:text-ink focus-ring sm:inline-flex"
+              className="target-min-h hidden items-center rounded-md px-3 text-label whitespace-nowrap text-ink-2 no-underline hover:text-ink focus-ring sm:inline-flex"
             >
               {t('marketing.nav.security')}
             </a>
             <a
               href="/login"
-              className="target-min-h inline-flex items-center rounded-md px-3 text-label font-medium text-ink no-underline focus-ring hover:bg-hover"
+              className="target-min-h inline-flex items-center rounded-md px-3 text-label font-medium whitespace-nowrap text-ink no-underline focus-ring hover:bg-hover"
             >
               {t('marketing.nav.signIn')}
             </a>
             <a
               href="/login"
-              className={`${CTA_PRIMARY} h-10 hidden sm:inline-flex`}
+              // `cn` rather than interpolation: `CTA_BASE` already sets
+              // `inline-flex`, so a plain template leaves both that and `hidden`
+              // on the element and lets stylesheet order pick the winner. It
+              // picked `inline-flex`, which is why this button was on screen at
+              // every width despite saying otherwise. `tailwind-merge` settles
+              // the `display` group by argument order instead.
+              className={cn(CTA_PRIMARY, 'h-10 hidden sm:inline-flex')}
             >
               {t('marketing.nav.getStarted')}
             </a>

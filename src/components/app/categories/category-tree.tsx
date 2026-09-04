@@ -32,7 +32,7 @@ import { useTranslate } from '#/lib/i18n'
 
 import { CategoryIcon } from './icons'
 import { CategorySwatch } from './category-swatch'
-import { dropMove, reparentMove, stepMove } from './move'
+import { dropMove, hasChildren, reparentMove, stepMove } from './move'
 
 import type { ComponentType } from 'react'
 import type { Key } from 'react-aria-components'
@@ -256,14 +256,16 @@ function CategoryRowMenu({
     { step: 'up', label: t('action.moveUp'), icon: ChevronUp },
     { step: 'down', label: t('action.moveDown'), icon: ChevronDown },
     { step: 'top', label: t('categories.move.top'), icon: ArrowUpToLine },
-    { step: 'bottom', label: t('categories.move.bottom'), icon: ArrowDownToLine },
+    {
+      step: 'bottom',
+      label: t('categories.move.bottom'),
+      icon: ArrowDownToLine,
+    },
   ]
 
   // A parent that still holds children cannot be nested inside another parent: the repository
   // refuses it, and offering a control that can only ever fail is worse than not offering it.
-  const canBeNested = !categories.some(
-    (candidate) => candidate.parentId === row.id,
-  )
+  const canBeNested = !hasChildren(categories, row.id)
   const destinations = parents.filter((candidate) => candidate.id !== row.id)
 
   function applyReparent(key: Key) {

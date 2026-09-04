@@ -1,6 +1,7 @@
 # 0004. Sandcastle is the agent orchestration layer, ported rather than reinvented
 
-Status: accepted
+Status: superseded
+Superseded by: 0013
 Date: 2026-09-01
 
 ## Context

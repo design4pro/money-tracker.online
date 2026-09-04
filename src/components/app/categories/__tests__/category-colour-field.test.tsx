@@ -63,6 +63,33 @@ describe('the colour a category already has is always an option', () => {
     )
   })
 
+  // The same defect, reached through case rather than through import. `hueLabelKey`
+  // folds case and React Aria's equality does not, so a palette hue stored in upper
+  // case used to fall between them: no ninth option was added, because the value *is*
+  // one of the eight, and no existing option matched, because none of them is spelled
+  // that way. The group lost its tab stop for a colour the product itself offers, and
+  // the seed cannot produce this row - only an import or the API can, which is why it
+  // survived every fixture in this repository.
+  it('keeps the group operable when a palette hue is stored in upper case', async () => {
+    const stored = CATEGORY_HUES[0].value.toUpperCase()
+    const { onChange, user } = setup(stored)
+
+    expect(screen.getAllByRole('radio')).toHaveLength(CATEGORY_HUES.length)
+    expect(screen.getByRole('radio', { checked: true })).toBe(
+      screen.getByRole('radio', { name: 'Blue' }),
+    )
+
+    await user.tab()
+    await user.tab()
+    const focused = screen
+      .getAllByRole('radio')
+      .find((radio) => radio === document.activeElement)
+    expect(focused).toBeDefined()
+
+    await user.keyboard('{ArrowRight}')
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
   it('lets the keyboard reach and change a colour outside the eight', async () => {
     const { onChange, user } = setup(IMPORTED)
 

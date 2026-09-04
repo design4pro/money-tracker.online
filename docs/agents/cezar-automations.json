@@ -1,0 +1,52 @@
+[
+  {
+    "name": "triage-opened",
+    "description": "A new issue from an issue form, an audit or the Sentry sweep carries `status: triage`; the triage workflow reproduces it at HEAD and routes it (ADR 0014). The claim stands down when the `<!-- agent-triage -->` marker is already there.",
+    "events": ["issue.opened"],
+    "intervalSeconds": 60,
+    "filters": {
+      "anyLabels": ["status: triage"]
+    },
+    "task": {
+      "prompt": "{{github.number}} {{github.url}}",
+      "workflow": "triage",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1
+    }
+  },
+  {
+    "name": "triage-relabel",
+    "description": "A human adds `run: triage` to (re)triage an issue; bypasses the already-triaged marker. Issues a run holds or that wait for a human never match.",
+    "events": ["issue.labeled"],
+    "intervalSeconds": 60,
+    "filters": {
+      "changedLabels": ["run: triage"],
+      "excludeLabels": ["status: in-progress", "status: review"]
+    },
+    "task": {
+      "prompt": "{{github.number}} {{github.url}}",
+      "workflow": "triage",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1
+    }
+  },
+  {
+    "name": "implement",
+    "description": "A human adds `run: implement` to a ready ticket; the implement-ticket workflow claims it (ADR 0014). Tickets already held, in review, or PRDs never match.",
+    "events": ["issue.labeled"],
+    "intervalSeconds": 60,
+    "filters": {
+      "changedLabels": ["run: implement"],
+      "excludeLabels": ["status: in-progress", "status: review", "prd"]
+    },
+    "task": {
+      "prompt": "{{github.number}} {{github.url}}",
+      "workflow": "implement-ticket",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1
+    }
+  }
+]

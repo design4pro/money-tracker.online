@@ -1,4 +1,6 @@
 import { defineConfig } from 'vite'
+
+import { BASELINE_DAY } from './e2e/baseline-day'
 import { devtools } from '@tanstack/devtools-vite'
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -26,9 +28,32 @@ const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN
 const uploadsSourceMaps =
   sentryAuthToken !== undefined && sentryAuthToken !== ''
 
+/**
+ * The day an end-to-end build believes it is, folded in at compile time.
+ *
+ * `src/server/clock.ts` lets a *development* request pin the day with a header, and guards it with
+ * `import.meta.env.DEV` on purpose: a header that could move the server's idea of today in
+ * production is a header that can read a budget period which has not opened yet. A production build
+ * folds that guard to `false` and drops the branch, and that is the property to preserve.
+ *
+ * So the browser gates, which serve a build rather than the dev server, get their day the only way
+ * that keeps the property intact - baked in, not accepted at runtime. With `E2E_BUILD` unset this
+ * emits the literal `undefined`, the comparison in `clock.ts` becomes `undefined !== undefined`, and
+ * the whole branch is eliminated exactly as the header branch is. There is no header to send, no
+ * variable to set and nothing to reach in a deployed worker: the day is only in a bundle that is
+ * only ever built by CI's own e2e step.
+ *
+ * The cost is stated rather than hidden: the artefact the gate photographs differs from the one that
+ * deploys by this one folded constant. That is a far smaller divergence than the dev server it
+ * replaces, and it is the smallest one that lets a screenshot be stable at all.
+ */
+const e2eServerToday =
+  process.env.E2E_BUILD === '1' ? JSON.stringify(BASELINE_DAY) : 'undefined'
+
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
   build: { sourcemap: uploadsSourceMaps ? 'hidden' : false },
+  define: { __E2E_SERVER_TODAY__: e2eServerToday },
 
   /**
    * Port 3010, and it must not drift.
@@ -44,8 +69,8 @@ const config = defineConfig({
     strictPort: true,
 
     /**
-     * `.claude/worktrees/` and `.sandcastle/worktrees/` hold full git worktrees — each a copy of
-     * this checkout, `node_modules` and Playwright reports included. Chokidar walks all of it,
+     * `.claude/worktrees/` holds full git worktrees — each a copy of this
+     * checkout, `node_modules` and Playwright reports included. Chokidar walks all of it,
      * and every file another checkout's test run writes comes back to us as a page reload; the
      * dev server then churns until it dies. None of it is application source, so none of it
      * should reach the watcher.
@@ -53,7 +78,6 @@ const config = defineConfig({
     watch: {
       ignored: [
         '**/.claude/**',
-        '**/.sandcastle/**',
         '**/playwright-report/**',
         '**/test-results/**',
       ],

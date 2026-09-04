@@ -18,7 +18,7 @@ Closes #
 
 <!--
 Paste what you ran, not what you intend to run. The ladder is the same one CI runs, in the same
-order, and `.sandcastle/validate.sh` runs it too - so a green loop is a green CI unless something
+order - so a green local run is a green CI unless something
 has drifted.
 -->
 
@@ -50,15 +50,17 @@ has drifted.
 ## Visual change
 
 <!--
-If this changes rendered output on purpose, say so here AND add the `visual-change-expected`
-label - that label is what tells the loop a screenshot diff is intended rather than a regression.
-Refresh the baselines with `pnpm sandcastle:baselines` or the "Update e2e baselines" workflow.
+If this changes rendered output on purpose, say so here. There is no label for it: the ticket's
+`## Visual change expected` section is what declares an intended screenshot diff
+(docs/adr/0014-label-protocol.md), and a diff nobody declared is a regression.
+Refresh the baselines with the "Update e2e baselines" workflow (`pnpm e2e:update` covers this
+platform only).
 There is one set and it is `-linux`, because Linux is what the gate runs on; `pnpm e2e:update` on
 a Mac records nothing, because the frames skip off Linux.
 -->
 
 - [ ] No visual change
-- [ ] Visual change is intended, `visual-change-expected` label added, baselines refreshed
+- [ ] Visual change is intended, declared in the ticket's `## Visual change expected`, baselines refreshed
 
 ## Risk
 

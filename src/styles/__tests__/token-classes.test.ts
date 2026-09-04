@@ -80,6 +80,10 @@ const srcDir = fileURLToPath(new URL('../..', import.meta.url))
 
 /** Utility prefixes whose final segment names a theme token. */
 const TOKEN_PREFIXES = [
+  // Not a colour, but the same silent failure: `max-w-content` reads the
+  // container namespace, so a renamed `--content-max` would leave the app
+  // shell with no cap and nothing would say so.
+  'max-w-',
   'bg-',
   'text-',
   'border-',

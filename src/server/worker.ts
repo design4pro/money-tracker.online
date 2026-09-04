@@ -3,21 +3,19 @@
  *
  * TanStack Start's own entry (`@tanstack/react-start/server-entry`) exports only `fetch`. A
  * Worker, though, is the union of everything the configuration declares: this one also declares
- * two Durable Object classes, a queue consumer and four cron triggers, and the runtime can only
- * find those if the **entry module** exports them. Miniflare is blunt about the omission — a
+ * a Durable Object class, a queue consumer and four cron triggers, and the runtime can only find
+ * those if the **entry module** exports them. Miniflare is blunt about the omission — a
  * missing `AccountLedger` export fails isolate startup outright, so `vite dev` never serves a
  * request, and `wrangler deploy` refuses a migration naming a class it cannot resolve.
  *
  * Hence this module rather than the default entry: it re-creates Start's fetch handler and
- * exports it alongside the classes, the consumer and the scheduler.
+ * exports it alongside the class, the consumer and the scheduler.
  */
 
 import {
   createStartHandler,
   defaultStreamHandler,
 } from '@tanstack/react-start/server'
-
-import { drizzle } from 'drizzle-orm/d1'
 
 // Side effect only: installs this isolate's `LEDGER` batch ports. The fetch path reaches them
 // through the server functions it loads; a scheduled invocation loads no server function, so
@@ -32,66 +30,20 @@ import {
   runRecurringHourly,
   runRecurringReminderSweep,
 } from './cron/recurring'
-import * as financeSchema from './db/schema'
-import { AccountLedger as LedgerObject } from './do/ledger'
+import { dbFromEnv } from './db/from-env'
 import { createKvMarkerStore } from './recurring/markers'
-import { rebuildAccountBalance } from './repos/account-balances'
 import { listCronScopes } from './repos/recurring'
-import { SandcastleRegistry as RegistryObject } from './do/sandcastle-registry'
 import { loggerFromEnv } from './observability/logger'
 
 import type { Logger } from './observability/logger'
 import type { RecurringCronArgs } from './cron/recurring'
-import type { Database } from './repos/base'
 
 /**
- * Exported so `durable_objects.bindings[].class_name` resolves on every environment, and
- * **constructed with its real rebuild port**.
- *
- * `AccountLedger` is declared against narrow port interfaces (`AccountLedgerState`,
- * `AccountLedgerStorage`, `RebuildPort`) rather than against `DurableObjectState`, which is what
- * lets it be constructed with fakes in a plain Node test. A real `DurableObjectState` satisfies
- * those ports structurally; the two descriptions are of the same runtime object and only the
- * static types cannot see it, so this subclass is the one place they meet.
- *
- * The subclass exists for one reason: the runtime instantiates a Durable Object with exactly
- * `(state, env)`, so an injected dependency has nowhere else to enter. Its own docblock said the
- * D1 half would be "passed in here and nothing else changes" once the finance domain landed. It
- * has landed, so it is passed in; without it the object answers `'skipped'` to every rebuild and
- * every account balance in the product stays at zero.
+ * Exported so `durable_objects.bindings[].class_name` resolves on every environment. The class
+ * and its rebuild port live in `./do/account-ledger`, because the `workerd` vitest project needs
+ * the same wired class from an entry that does not pull the application in behind it.
  */
-export class AccountLedger extends LedgerObject {
-  constructor(state: DurableObjectState, env: Env) {
-    super(state, env, {
-      rebuild: (accountId) => rebuildAccountBalance(ledgerDb(env), accountId),
-    })
-  }
-}
-
-/**
- * A Drizzle handle over this object's D1 binding.
- *
- * Built per construction rather than reaching `src/server/auth/db.ts`'s isolate singleton: that one
- * reads the binding through `cloudflare:workers`, which is the ambient request environment, and a
- * Durable Object is not serving a request when it rebuilds — it is serving its own turn, with the
- * `env` it was constructed with.
- */
-function ledgerDb(env: Env): Database {
-  return drizzle(env.DB, {
-    schema: financeSchema,
-    logger: false,
-  }) as unknown as Database
-}
-
-/**
- * Re-exported for the same reason, and bound on **staging only** (`env.staging` in
- * `wrangler.jsonc`). A run coordinator is worth having only if there is exactly one of it; a
- * second registry would let two agent fleets each believe they hold the backlog, which is the
- * failure it exists to prevent. Exporting the class unconditionally costs nothing — an
- * environment with no binding simply never instantiates it — and keeping the export conditional
- * is not expressible in an ES module anyway.
- */
-export const SandcastleRegistry = RegistryObject
+export { AccountLedger } from './do/account-ledger'
 
 const fetchHandler = createStartHandler(defaultStreamHandler)
 
@@ -233,7 +185,7 @@ export default {
 /**
  * What both recurring branches need, built once from the environment.
  *
- * The database comes from {@link ledgerDb}, not from the isolate singleton in
+ * The database comes from {@link dbFromEnv}, not from the isolate singleton in
  * `src/server/auth/db.ts`: that one reads its binding through `cloudflare:workers`, which is the
  * ambient **request** environment, and a cron is not serving a request. The `env` handed to
  * `scheduled` is the one that is real here, exactly as it is for a Durable Object's own turn.
@@ -250,7 +202,7 @@ async function recurringCronArgs(
   logger: Logger,
 ): Promise<RecurringCronArgs> {
   return {
-    scopes: await listCronScopes(ledgerDb(env)),
+    scopes: await listCronScopes(dbFromEnv(env)),
     markers: createKvMarkerStore(env.KV),
     today: cronToday(),
     logger,

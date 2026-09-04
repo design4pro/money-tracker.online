@@ -74,7 +74,7 @@ jobs:
           # scanner to say so.
           A11Y_USER_EMAIL: ${{ vars.E2E_USER_EMAIL }}
           A11Y_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-        run: node .github/a11y/axe-scan.mjs
+        run: pnpm exec tsx .github/a11y/axe-scan.mjs
 
       # `always()`: the JSON is at its most useful on the run that failed.
       - name: Upload the axe results

@@ -140,10 +140,12 @@ exist fails to deploy, and an incident is the worst possible moment to discover 
 "migrations": [ { "tag": "v1", "new_sqlite_classes": ["AccountLedger"] } ]
 ```
 
-Staging additionally binds `SANDCASTLE_REGISTRY` under tag `v2`. Production does not, and the
-`/api/sandcastle/*` routes answer `503` outside staging by design.
+Staging carries two further tags: `v2` created `SandcastleRegistry`, and `v3` deleted it when the
+orchestrator was removed (`docs/adr/0013-cezar-replaces-sandcastle.md`). Both stay in the list.
 
-**Migration tags are append-only and are never renumbered.** A tag that has been applied to a
+**Migration tags are append-only and are never renumbered.** Deleting a class is itself a new tag
+carrying `deleted_classes`, never the removal of the tag that created it - and it destroys the
+objects' contents, which is why it is a decision rather than a cleanup. A tag that has been applied to a
 deployed Worker is history. A new DO class is a new tag.
 
 The class must be **re-exported from `src/server/worker.ts`**. A missing export fails isolate
@@ -226,9 +228,6 @@ pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN      # backup cron, D1:read o
 pnpm exec wrangler secret put D1_DATABASE_ID            # backup cron
 pnpm exec wrangler secret put FX_API_KEY                # only if a keyed FX provider is chosen
 pnpm exec wrangler secret put SENTRY_DSN
-
-# Staging only
-pnpm exec wrangler secret put SANDCASTLE_COORDINATOR_TOKEN --env staging
 ```
 
 ### 6.1 What breaks when each one is missing
@@ -243,7 +242,6 @@ pnpm exec wrangler secret put SANDCASTLE_COORDINATOR_TOKEN --env staging
 | `CLOUDFLARE_*` / `D1_DATABASE_ID`        | The nightly backup logs a skip and continues. **No backups exist**                                                                                                      |
 | `FX_API_KEY`                             | Falls back to the keyless provider. Not needed unless a keyed provider is chosen                                                                                        |
 | `SENTRY_DSN`                             | Nothing is reported. Errors still classify and redact correctly                                                                                                         |
-| `SANDCASTLE_COORDINATOR_TOKEN`           | `/api/sandcastle/*` answers 503. Production answers 503 regardless, by design                                                                                           |
 
 ### 6.2 Verify
 
@@ -318,9 +316,8 @@ curl -s -o /dev/null -w '%{http_code}\n' https://money-tracker.online/
 A `200` here means the application was removed or its destinations no longer match, and production
 is public again.
 
-**Staging is deliberately _not_ behind Access.** The browser suites and the sandcastle loop drive it
-unattended, and an interactive login in front of them turns every run into a redirect to an identity
-provider.
+**Staging is deliberately _not_ behind Access.** The browser suites drive it unattended, and an
+interactive login in front of them turns every run into a redirect to an identity provider.
 
 **Access breaks the production smoke check, and that is not yet fixed.** `deploy-production.yml`
 asserts `/api/health` answers exactly `200`; behind Access it answers `302`, so the production
@@ -408,15 +405,13 @@ production takes a card, and tick them here.
 
 **Secrets** (Settings → Secrets and variables → Actions → Secrets):
 
-| Name                                    | Used by                                                                                                                                                                                             |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`                  | `deploy.yml`, `deploy-staging.yml`                                                                                                                                                                  |
-| `CLOUDFLARE_ACCOUNT_ID`                 | same                                                                                                                                                                                                |
-| `SENTRY_AUTH_TOKEN`                     | source-map upload                                                                                                                                                                                   |
-| `CF_ACCESS_CLIENT_ID` / `_SECRET`       | the post-deploy smoke check                                                                                                                                                                         |
-| `CLAUDE_CODE_OAUTH_TOKEN`               | `claude.yml`, `claude-code-review.yml`, `triage.yml`                                                                                                                                                |
-| `SANDCASTLE_GH_TOKEN`                   | the orchestration loop. **A PAT, not `github.token`** — actions authenticated with `GITHUB_TOKEN` emit no workflow-triggering events, so a loop using it would open pull requests that never run CI |
-| `SANDCASTLE_COORDINATOR_URL` / `_TOKEN` | the shared-run coordinator                                                                                                                                                                          |
+| Name                              | Used by                                              |
+| --------------------------------- | ---------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`            | `deploy.yml`, `deploy-staging.yml`                   |
+| `CLOUDFLARE_ACCOUNT_ID`           | same                                                 |
+| `SENTRY_AUTH_TOKEN`               | source-map upload                                    |
+| `CF_ACCESS_CLIENT_ID` / `_SECRET` | the post-deploy smoke check                          |
+| `CLAUDE_CODE_OAUTH_TOKEN`         | `claude.yml`, `claude-code-review.yml`, `triage.yml` |
 
 **Variables** (not secrets — they are inlined into the client bundle):
 
@@ -445,12 +440,11 @@ curl -s -o /dev/null -w '%{http_code} /api/health\n'              "$BASE/api/hea
 curl -s -o /dev/null -w '%{http_code} /api/auth/get-session\n'    "$BASE/api/auth/get-session"
 curl -s -o /dev/null -w '%{http_code} /pricing\n'                 "$BASE/pricing"
 curl -s -o /dev/null -w '%{http_code} GET webhook (405)\n'        "$BASE/api/webhooks/polar"
-curl -s -o /dev/null -w '%{http_code} /api/sandcastle/ping (503)\n' "$BASE/api/sandcastle/ping"
 ```
 
-Expected: `200 200 200 200 405 503`. Anything else is a failed deploy.
+Expected: `200 200 200 200 405`. Anything else is a failed deploy.
 
-**Against production this currently returns `302` six times**, because §8.1 put the site behind
+**Against production this currently returns `302` five times**, because §8.1 put the site behind
 Cloudflare Access and Access is default-deny. The check is not wrong; it is unauthenticated. Two
 ways out, and the first is the one to take:
 

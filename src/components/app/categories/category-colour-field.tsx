@@ -2,7 +2,7 @@ import { Radio, RadioGroup } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
 import { CategorySwatch } from './category-swatch'
-import { CATEGORY_HUES, hueLabelKey } from './palette'
+import { CATEGORY_HUES, canonicalHex, hueLabelKey } from './palette'
 
 export interface CategoryColourFieldProps {
   /** The stored colour, as the repository holds it. Never empty. */
@@ -30,20 +30,29 @@ export interface CategoryColourFieldProps {
  *
  * Its name is the hex itself. `hueLabelKey` returns `null` here by design — this product has no
  * honest word for `#4c6ef5` — and a hex is at least a fact the reader can act on.
+ *
+ * ## Why the value is canonicalised first
+ *
+ * The same defect has a second door. `hueLabelKey` folds case, React Aria's equality does not, so a
+ * palette colour stored as `#0D6ABB` produced no ninth option *and* matched no existing one: the
+ * group came up with nothing selected and the tab stop gone, for a colour this product offers.
+ * {@link canonicalHex} resolves the stored value to the spelling the options actually carry. It
+ * only resolves for display - the form keeps whatever is stored until somebody picks a colour.
  */
 export function CategoryColourField({
   value,
   onChange,
 }: CategoryColourFieldProps) {
   const t = useTranslate()
-  const custom = hueLabelKey(value) === null ? value : null
+  const selected = canonicalHex(value)
+  const custom = hueLabelKey(selected) === null ? selected : null
 
   return (
     <RadioGroup
       label={t('common.colour')}
       description={t('categories.field.colour.help')}
       orientation="horizontal"
-      value={value}
+      value={selected}
       onChange={onChange}
     >
       {CATEGORY_HUES.map((hue) => (
