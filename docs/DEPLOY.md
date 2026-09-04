@@ -405,13 +405,13 @@ production takes a card, and tick them here.
 
 **Secrets** (Settings → Secrets and variables → Actions → Secrets):
 
-| Name                              | Used by                                              |
-| --------------------------------- | ---------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`            | `deploy.yml`, `deploy-staging.yml`                   |
-| `CLOUDFLARE_ACCOUNT_ID`           | same                                                 |
-| `SENTRY_AUTH_TOKEN`               | source-map upload                                    |
-| `CF_ACCESS_CLIENT_ID` / `_SECRET` | the post-deploy smoke check                          |
-| `CLAUDE_CODE_OAUTH_TOKEN`         | `claude.yml`, `claude-code-review.yml`, `triage.yml` |
+| Name                              | Used by                                             |
+| --------------------------------- | --------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`            | `deploy.yml`, `deploy-staging.yml`                  |
+| `CLOUDFLARE_ACCOUNT_ID`           | same                                                |
+| `SENTRY_AUTH_TOKEN`               | source-map upload                                   |
+| `CF_ACCESS_CLIENT_ID` / `_SECRET` | the post-deploy smoke check                         |
+| `CLAUDE_CODE_OAUTH_TOKEN`         | `claude-code-review.yml` (optional; unset skips it) |
 
 **Variables** (not secrets — they are inlined into the client bundle):
 

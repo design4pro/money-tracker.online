@@ -4,14 +4,15 @@
 # turns the verdict below into a digest the run reads.
 #
 #   TARGET_BRANCH=<integration branch> bash scripts/agent/validate.sh --json-out <path> \
-#     [--force-e2e] [--skip-e2e] [--build] [--update-snapshots] [--e2e-projects <csv>]
+#     [--force-e2e] [--skip-e2e] [--build] [--e2e-projects <csv>]
 #     [--e2e-grep <regex>]
 #
 # Always: route-tree freshness gate, migration-drift gate, typecheck, lint, vitest.
 # --build adds `pnpm build` after vitest (the cezar ladder turns it on; SPEC §7.1).
 # When the diff since TARGET_BRANCH touches UI paths (glob heuristic below):
-# setup-e2e.sh --if-needed, then the Playwright suite against the -linux
-# baselines recorded for this platform.
+# setup-e2e.sh --if-needed, then the Playwright suite. Nothing it runs compares
+# a screenshot (ADR 0016); a red run is an assertion, a console entry or a
+# timeout.
 #
 # --e2e-grep narrows it further, to the specs whose full title matches the regex
 # (Playwright's `-g`). The step is then named `<step> (narrowed)`, because a
@@ -36,7 +37,6 @@ set -uo pipefail
 JSON_OUT=""
 FORCE_E2E=0
 SKIP_E2E=0
-UPDATE_SNAPSHOTS=0
 E2E_PROJECTS=""
 BUILD=0
 E2E_GREP=""
@@ -46,7 +46,6 @@ while [ $# -gt 0 ]; do
     --force-e2e) FORCE_E2E=1; shift ;;
     --skip-e2e) SKIP_E2E=1; shift ;;
     --build) BUILD=1; shift ;;
-    --update-snapshots) UPDATE_SNAPSHOTS=1; shift ;;
     --e2e-projects) E2E_PROJECTS="$2"; shift 2 ;;
     --e2e-grep) E2E_GREP="$2"; shift 2 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
@@ -209,7 +208,6 @@ if [ "$UI_TOUCHED" -eq 1 ] && [ "$OVERALL_OK" -eq 1 ]; then
     # `--retries=1` - silently overrode the E2E_RETRIES override above. validate-sh.test.ts pins
     # the override, so a second line here goes red.
     PW_ARGS=(--workers="${E2E_WORKERS:-4}" --retries="${E2E_RETRIES:-1}" --reporter=line,json,html)
-    [ "$UPDATE_SNAPSHOTS" -eq 1 ] && PW_ARGS+=(--update-snapshots)
     # Repeated `--project` IS a list, unlike `--reporter` above: playwright declares it as
     # `--project <project-name...>`. Narrowing to chromium is what lets the fix loop re-validate
     # for roughly half the time — mobile-safari is the larger half of the suite — while the caller
@@ -267,9 +265,9 @@ if [ "$UI_TOUCHED" -eq 1 ] && [ "$OVERALL_OK" -eq 1 ]; then
       # `results[-1]`, not `results[0]`: with the retry above, `results` holds one entry per
       # attempt, oldest first, and it is the *last* attempt that decided `ok == false`. Reading the
       # first would describe a spec that blipped on `Connection refused` and then failed for real
-      # on a pixel diff as a connection error with `snapshotDiff: false` — handing the fix agent
-      # the flake this rung was taught to tolerate instead of the regression it caught.
-      E2E_FAILED_JSON=$(jq -c '[.. | objects | select(has("specs")) | .specs[] | select(.ok == false) | (.tests[0].results[-1].error.message // "") as $msg | {title: .title, error: ($msg | split("\n")[0] | .[0:300]), snapshotDiff: ($msg | test("toHaveScreenshot|screenshot comparison"))}] | .[0:40]' "$E2E_RESULTS_FILE" 2>/dev/null || echo '[]')
+      # as a connection error — handing the fix agent the flake this rung was taught to tolerate
+      # instead of the regression it caught.
+      E2E_FAILED_JSON=$(jq -c '[.. | objects | select(has("specs")) | .specs[] | select(.ok == false) | (.tests[0].results[-1].error.message // "") as $msg | {title: .title, error: ($msg | split("\n")[0] | .[0:300])}] | .[0:40]' "$E2E_RESULTS_FILE" 2>/dev/null || echo '[]')
     elif [ "$E2E_OK" -ne 0 ]; then
       # Not a step of its own: the ladder is already red and run_step has just
       # printed the tail, which still carries the line reporter. What this says

@@ -226,13 +226,12 @@ The labels a plan-derived ticket carries, and the ones the automation reads. Ful
 | `status: queued` → `status: ready`                                     | **The gate.** Per-slice, **never** on a PRD; written by the publish and sweep scripts |
 | `run: implement`                                                       | A human's command to start one ready ticket; the claim removes it                     |
 | `status: needs-human`                                                  | A run stopped. The digest comment says why, and a human decides                       |
-| `needs-e2e`                                                            | A pull-request label: run the browser suite on this PR                                |
 | `status: triage` / `needs-info` / `backlog` / `in-progress` / `review` | The rest of the lifecycle                                                             |
 | `type: bug` / `feature` / `enhancement` / `maintenance`                | Kind; on the PRD, never on its tickets                                                |
 | `prd` / `auto-advance`                                                 | The parent, and the sweeper's licence to advance its children                         |
 
 Body marker: `<!-- sentry-issue: SHORT-ID[#n] -->`.
-Commit prefixes: `RALPH:` for in-loop agent commits, Conventional Commits in English everywhere else.
+Commits: Conventional Commits in English, agent runs included. There is no agent-only prefix.
 
 ---
 

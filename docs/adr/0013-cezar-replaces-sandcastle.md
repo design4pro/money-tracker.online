@@ -51,3 +51,13 @@ real rather than incidental:
 
 Whatever replaces them belongs under `scripts/`, not under an orchestrator's directory - that
 placement is what made them removable by a decision that was not about them.
+
+## Amendment 2026-09-04
+
+**Half of the loss recorded above stopped being a loss.** `record-baselines.ts` mattered because
+`-linux` baselines had to come from somewhere; ADR 0016 deleted the baselines, so there is nothing
+left for it to have recorded. The `Update e2e baselines` workflow and `pnpm e2e:update` are gone
+with them.
+
+`setup-e2e.sh` is the half that was real, and it exists: `scripts/agent/setup-e2e.sh`, under
+`scripts/` where this record said such a thing belongs.

@@ -196,7 +196,7 @@ worktree_tree_id() {
   rm -f "$index"
 }
 
-# The `agent-pr`/`needs-e2e` and protected-path rules read the run's diff against the base.
+# The `agent-pr` and protected-path rules read the run's diff against the base.
 diff_base() { git merge-base HEAD "origin/${CEZ_BASE_BRANCH:-develop}"; }
 # shellcheck disable=SC2034  # read by cez-claim.sh and cez-handback.sh
 PROTECTED_PATH_RE='^(\.github/|\.claude/|\.husky/|\.ai/cezar/|scripts/agent/|\.npmrc$|pnpm-workspace\.yaml$)'

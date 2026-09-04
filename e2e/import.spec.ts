@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/console'
 
 import { gotoApp, uniqueToken, useLocale } from './support/app'
 import { expectNoSeriousViolations } from './support/budgets'

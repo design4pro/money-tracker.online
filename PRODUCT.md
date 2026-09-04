@@ -155,9 +155,8 @@ carry_all`; what the budget detail screen does with an overspend is a product an
 
 ## Evidence on Hand
 
-- **Real:** the product itself — actual screens, the seeded demo workspace, the Playwright
-  baselines under `e2e/`, and the axe results the verification protocol requires every stage to
-  produce.
+- **Real:** the product itself — actual screens, the seeded demo workspace, the Playwright suites
+  under `e2e/`, and the axe results the verification protocol requires every stage to produce.
 - **Not yet real, and so not citable as proof:** the plan, quota and entitlement catalogue. The
   plan names (`free`, `plus`, `household`) are settled; the table behind them is not written, so
   no surface may state a limit, a price or a per-plan feature list as fact.

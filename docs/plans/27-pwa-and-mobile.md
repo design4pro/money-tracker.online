@@ -331,8 +331,8 @@ _A number typed on a phone is the number that is stored._ Cases in `money-invari
 - Browser evidence: every primary route at **360px in both themes**, plus **landscape narrow** for the
   entry form and the transaction list, the **bottom nav**, the **sheet open over the virtualised
   list**, and the **numeric keyboard shown for the amount field**.
-- Visual regression across the mobile project at `maxDiffPixelRatio: 0.002`, `threshold: 0.2` — never
-  raised.
+- The blind pair captured across the mobile surfaces and read by a human — nothing compares a
+  screenshot (ADR 0016).
 - axe under the mobile project on every primary route: zero `serious`, zero `critical`.
 - Console silent.
 

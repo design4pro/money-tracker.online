@@ -24,9 +24,6 @@ name: CI
 on:
   pull_request:
     branches: [main, develop]
-    # `labeled` lets adding the `needs-e2e` label trigger the browser jobs on a
-    # pull request that would otherwise skip them.
-    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -67,7 +64,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -127,7 +124,7 @@ jobs:
       # one that guards the shared branch.
       - name: Restore the ESLint cache
         if: github.event_name == 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .eslintcache
           # `github.sha` never hits, so every run saves a fresh entry and the
@@ -191,7 +188,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
@@ -218,48 +215,47 @@ jobs:
 
       - name: Upload the coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage
           retention-days: 7
           if-no-files-found: ignore
 
-  # The browser gate: the same suite, in the same container image, on the two
-  # projects whose baselines are recorded for Linux.
+  # The browser gate: the same suite, in the same container image, on two
+  # projects.
   #
   # `chromium` is the desktop layout at 1440x900. `mobile-safari` is an
   # iPhone 15, and it is not a smaller chromium: safe-area insets, `100dvh` and
   # momentum scrolling behave differently there than anywhere else, and mobile
   # transaction entry is the product's most-used screen.
   #
-  # A post-merge safety net rather than an every-PR gate: it runs on every push
-  # to develop/main, on demand, and on any pull request carrying the `needs-e2e`
-  # label, which is the escape hatch for a branch that needs it earlier.
+  # It runs on **every** pull request, with no label and no condition (ADR 0016).
+  # It was a post-merge net gated behind `needs-e2e` while it carried 56
+  # screenshot comparisons; without them there is nothing left that is expensive
+  # enough to ration, and a regression found on the pull request that caused it
+  # is worth more than the runner minutes. `needs-e2e` is gone with the gate it
+  # rationed - there is no label to add, because there is nothing to opt into.
   e2e:
     name: e2e · ${{ matrix.project }}
-    if: >
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      (contains(github.event.pull_request.labels.*.name, 'needs-e2e') &&
-       !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
+    # so the run's own clock is the one that fires first and names the test it
+    # died on; this only catches a job wedged before or after the suite.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         project: [chromium, mobile-safari]
     # Keep in step with the `@playwright/test` devDependency in package.json:
     # the image carries the browsers that version expects, and a mismatch is
-    # reported as a missing executable rather than as a wrong one. The image is
-    # also the platform the `-linux` baselines under e2e/__screenshots__ were
-    # recorded on; a run anywhere else compares against a set it does not have.
+    # reported as a missing executable rather than as a wrong one.
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare the browser-test environment
         uses: ./.github/actions/e2e-env
@@ -285,7 +281,7 @@ jobs:
       # uploads nothing.
       - name: Upload the blob report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-blob-${{ matrix.project }}
           path: blob-report
@@ -294,7 +290,7 @@ jobs:
 
       - name: Upload the server log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-server-log-${{ matrix.project }}
           path: server.log
@@ -307,19 +303,22 @@ jobs:
   e2e-report:
     name: e2e · merged report
     needs: e2e
-    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
+    # `!cancelled()` alone: the gate runs on every event now, so there is no
+    # `skipped` result left to guard against, and a failing e2e job still owes
+    # the reader its report.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup
 
       - name: Download the blob reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: e2e-blob-*
           path: all-blob-reports
@@ -336,7 +335,7 @@ jobs:
 
       - name: Upload the Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report

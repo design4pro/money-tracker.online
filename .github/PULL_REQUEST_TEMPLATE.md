@@ -1,7 +1,6 @@
 <!--
 Conventional Commits in the title, in English: feat(transactions): …, fix(budgets): …,
-chore(deps): … . An in-loop agent commit is prefixed `RALPH:` instead; the pull request title
-still follows Conventional Commits.
+chore(deps): … . A Cezar run follows the same convention: there is no agent-only prefix.
 -->
 
 ## What changed
@@ -27,7 +26,7 @@ has drifted.
 - [ ] `pnpm typecheck`
 - [ ] `pnpm lint`
 - [ ] `pnpm test`
-- [ ] `pnpm e2e` (or the `needs-e2e` label, so CI runs it)
+- [ ] `pnpm e2e` (CI runs it on every pull request too)
 
 ## Invariants
 
@@ -50,17 +49,16 @@ has drifted.
 ## Visual change
 
 <!--
-If this changes rendered output on purpose, say so here. There is no label for it: the ticket's
-`## Visual change expected` section is what declares an intended screenshot diff
-(docs/adr/0014-label-protocol.md), and a diff nobody declared is a regression.
-Refresh the baselines with the "Update e2e baselines" workflow (`pnpm e2e:update` covers this
-platform only).
-There is one set and it is `-linux`, because Linux is what the gate runs on; `pnpm e2e:update` on
-a Mac records nothing, because the frames skip off Linux.
+If this changes rendered output on purpose, say so here, and name the screens.
+Nothing in CI photographs a screen any more (docs/adr/0016-journeys-replace-the-visual-gate.md),
+so this section is not paperwork about a diff somebody will see anyway - it is the only notice a
+reviewer gets. Take the blind pair yourself over the affected screens:
+  node scripts/visual/capture.mjs --url ... --out <scratchpad>/... --viewports 360x800,1280x900
+and say which screens you shot. Frames belong outside the repository.
 -->
 
 - [ ] No visual change
-- [ ] Visual change is intended, declared in the ticket's `## Visual change expected`, baselines refreshed
+- [ ] Visual change is intended, declared in the ticket's `## Visual change expected`, pair captured
 
 ## Risk
 

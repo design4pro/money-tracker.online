@@ -1,8 +1,10 @@
 # The label vocabulary, in one place.
 #
 # Labels are the backlog's state machine (docs/adr/0014-label-protocol.md). The vocabulary is
-# closed at the 19 labels below and any label outside it is deleted by
-# scripts/agent/labels-migrate.sh.
+# closed at the 18 labels below and any label outside it is deleted by
+# scripts/agent/labels-migrate.sh. It was 19 until ADR 0016 retired `needs-e2e` along with the
+# visual gate it rationed: the browser suite now runs on every pull request, so there is nothing
+# left to opt into.
 #
 # This file is documentation, not automation: nothing syncs it. It exists because the issue forms
 # under .github/ISSUE_TEMPLATE/ apply labels by name, and GitHub silently drops a label that does
@@ -67,8 +69,6 @@ structure:
 pull_request:
   - name: 'agent-pr'
     description: 'A draft pull request opened by an implement run.'
-  - name: 'needs-e2e'
-    description: 'Run the browser suite on this pull request. The escape hatch in ci.yml.'
   - name: 'agent-docs'
     description: 'A pull request carrying CONTEXT.md or ADR changes from a plan run.'
 

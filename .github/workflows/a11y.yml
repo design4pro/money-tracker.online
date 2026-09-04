@@ -15,7 +15,7 @@ name: Accessibility
 # "WCAG 2.2 AAA compliant" claim in user-facing or marketing copy, and the report says so.
 #
 # The scanner and its route list live in .github/a11y/. The route list is meant to track the
-# visual specs under e2e/visual/: a route worth photographing is a route worth scanning.
+# browser specs under e2e/: a route worth a journey is a route worth scanning.
 #
 # ── GitHub configuration this workflow needs ──────────────────────────────────────────────────
 # secrets    E2E_USER_PASSWORD  optional; only if the seed's demo password is not the default
@@ -25,7 +25,8 @@ name: Accessibility
 on:
   pull_request:
     branches: [main, develop]
-    types: [opened, synchronize, reopened, labeled]
+    # No `labeled`: ADR 0016 retired `needs-e2e`, and no label changes what this workflow does.
+    types: [opened, synchronize, reopened]
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -56,7 +57,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare the browser-test environment
         uses: ./.github/actions/e2e-env
@@ -79,7 +80,7 @@ jobs:
       # `always()`: the JSON is at its most useful on the run that failed.
       - name: Upload the axe results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a11y-axe-results
           path: a11y-report
@@ -88,7 +89,7 @@ jobs:
 
       - name: Upload the dev server log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a11y-dev-server-log
           path: dev-server.log

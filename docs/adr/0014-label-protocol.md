@@ -87,3 +87,15 @@ the vocabulary, and asserts the invariants the sweeper will enforce.
 For this repository's six open issues the computed status is `status: triage` in all six cases: they
 are parentless, untriaged findings from the comparison round, which is exactly what a triage run is
 for.
+
+## Amendment 2026-09-04
+
+**Two PR labels, not three, and the vocabulary closes at 18.** ADR 0016 retired `needs-e2e`: the
+browser suite runs on every pull request, so a label asking for it has nothing to ask. `agent-pr`
+and `agent-docs` remain, and the rest of the protocol - the `status:` axis, the `run:` commands,
+the native `blocked_by` relations, the sweeper as sole extra writer - is untouched.
+
+`needs-e2e` is the one deletion `scripts/agent/labels-migrate.sh` has to be told about explicitly.
+Step 2 of that script counts issues carrying a label before removing it, and a _pull-request_ label
+reads 0 from `gh issue list` however many PRs wear it - so it is listed in `CLEARED_BY_RELABEL`,
+which makes deleting it a decision somebody wrote down rather than an accident of the query.

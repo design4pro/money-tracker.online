@@ -11,8 +11,9 @@ changing any dependency. There are no bank connectors and adding one is out of s
 - `pnpm dev` — dev server on :3000
 - `pnpm typecheck` / `pnpm lint` / `pnpm test` — the fast feedback trio; run all three before committing
 - `pnpm build` — production build (`CLOUDFLARE_ENV=staging pnpm build` for staging)
-- `pnpm e2e` — Playwright visual, i18n and axe suites (needs local D1 migrations and the seed)
-- `pnpm e2e:update` — re-record baselines for the current platform only
+- `pnpm e2e` — Playwright behaviour, i18n and axe suites (needs local D1 migrations and the seed).
+  Nothing compares a pixel: ADR 0016 retired the baselines, and a visual change is judged by
+  `node scripts/visual/capture.mjs` and a human.
 - `pnpm generate-routes` — regenerate the route tree; `src/routeTree.gen.ts` is generated, never hand-edit
 - `pnpm db:generate` — generate a Drizzle migration; `drizzle/` is generated, never hand-edit
 - `pnpm db:migrate:local` — apply migrations to the local D1
@@ -27,11 +28,12 @@ changing any dependency. There are no bank connectors and adding one is out of s
 - `components/ui` never fetches data and never imports from `server/`.
 - Validate every server-function input with Zod, and parse it a second time in the repository.
   Named exports only (route modules excepted).
-- Definition of done for any task: `docs/SPEC.md` §7. Decomposition rule ("one concept, one
+- Definition of done for any task: `docs/SPEC.md` §7; how to reach it, and how to read a
+  confusing failure, is the `verifying-changes` skill. Decomposition rule ("one concept, one
   owner"): `docs/SPEC.md` §8. Accessibility conformance and what may be claimed: `docs/SPEC.md` §10.
 - User-facing copy is never hardcoded — it lives in the EN + PL catalogue and a new key lands in
   both locales in the same change (the parity test enforces this; contract: `docs/SPEC.md` §9).
-- Commits: Conventional Commits, in English. `RALPH:` prefixes are for in-loop agent commits only.
+- Commits: Conventional Commits, in English, agent runs included. There is no agent-only prefix.
 
 ## Domain
 
