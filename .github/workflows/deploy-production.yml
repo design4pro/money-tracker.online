@@ -12,6 +12,9 @@ name: Deploy production
 # secrets    CLOUDFLARE_API_TOKEN   Workers Scripts:Edit + D1:Edit on account 6cfdf3b5143cddc631383a4c14736c3a
 #            CLOUDFLARE_ACCOUNT_ID  6cfdf3b5143cddc631383a4c14736c3a
 #            SENTRY_AUTH_TOKEN      optional; without it no source maps are uploaded
+#            CF_ACCESS_CLIENT_ID    Cloudflare Access service token; money-tracker.online is behind
+#            CF_ACCESS_CLIENT_SECRET  Access and answers an unauthenticated smoke check with a 302
+#                                   to the team login. Needs a Service Auth policy on the app.
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY, VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY,
 #            VITE_SENTRY_DSN, SENTRY_ORG, SENTRY_PROJECT
@@ -138,27 +141,24 @@ jobs:
           wranglerVersion: '4.70.0'
           command: deploy
 
-      # Proof that the new version is actually serving: /api/health exercises the Worker, the D1
-      # binding and the KV binding in a single request. The status code is asserted exactly rather
-      # than with `curl --fail`, so an error page served with 200 or a redirect is not mistaken
-      # for success. The retry loop absorbs the few seconds a new version takes to become globally
-      # routable; it does not absorb a broken one.
+      # Proof that the new version is actually serving: /api/health boots the Worker and reads the
+      # version metadata binding in a single request. The script asserts the status code exactly
+      # rather than leaning on `curl --fail`, so an error page served with 200 or a redirect is
+      # not mistaken for success, and it separates a Worker that answered badly - worth the retry
+      # loop, because a new version takes a few seconds to become globally routable - from
+      # Cloudflare's own edge answering in its place, which no amount of retrying will fix. See
+      # scripts/smoke-check.sh for both credentials.
       - name: Smoke-check the deployment
         if: steps.gate.outputs.configured == 'true'
-        run: |
-          set -euo pipefail
-          url=https://money-tracker.online/api/health
-          for attempt in $(seq 1 10); do
-            code=$(curl --silent --show-error --output /tmp/health.json \
-              --write-out '%{http_code}' --max-time 20 "$url" || echo 000)
-            echo "attempt $attempt: $code"
-            if [ "$code" = 200 ]; then
-              cat /tmp/health.json
-              echo
-              exit 0
-            fi
-            sleep 6
-          done
-          echo "::error title=Smoke check failed::$url answered $code, expected 200. Production is live and unhealthy - roll back by re-running the previous green deploy from its commit."
-          cat /tmp/health.json || true
-          exit 1
+        env:
+          # money-tracker.online sits behind Cloudflare Access, which answers an
+          # unauthenticated request with a 302 to the team login - the Worker
+          # never sees it. This service token is what gets the check through. It
+          # is admitted by the `money-tracker.online smoke check` Access
+          # application, whose single destination is money-tracker.online
+          # /api/health and whose only policy is Service Auth naming the
+          # `money-tracker-smoke-production` token - so the token reaches the
+          # health endpoint and nothing else on the domain.
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: bash scripts/smoke-check.sh https://money-tracker.online/api/health

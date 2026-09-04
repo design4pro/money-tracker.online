@@ -147,26 +147,16 @@ jobs:
           command: deploy
 
       # Proof that the new version is actually serving, and the cheapest one there is: /api/health
-      # exercises the Worker, the D1 binding and the KV binding in a single request. The status
-      # code is asserted exactly rather than with `curl --fail`, so a 302 to a login page or an
-      # error page served with 200 is not mistaken for success. The retry loop absorbs the few
-      # seconds a new version takes to become globally routable; it does not absorb a broken one.
+      # boots the Worker and reads the version metadata binding in a single request. The script
+      # asserts the status code exactly rather than leaning on `curl --fail`, so a 302 to a login
+      # page or an error page served with 200 is not mistaken for success, and it separates a
+      # Worker that answered badly - worth the retry loop, because a new version takes a few
+      # seconds to become globally routable - from Cloudflare's own edge answering in its place,
+      # which no amount of retrying will fix.
+      #
+      # staging.money-tracker.online carries no Access application, so this check sends no
+      # credentials. It did need Bot Fight Mode turned off: it was on zone-wide and challenged the
+      # runner's IP on all ten attempts, and the Free plan has no rule that could exempt it.
       - name: Smoke-check the deployment
         if: steps.gate.outputs.configured == 'true'
-        run: |
-          set -euo pipefail
-          url=https://staging.money-tracker.online/api/health
-          for attempt in $(seq 1 10); do
-            code=$(curl --silent --show-error --output /tmp/health.json \
-              --write-out '%{http_code}' --max-time 20 "$url" || echo 000)
-            echo "attempt $attempt: $code"
-            if [ "$code" = 200 ]; then
-              cat /tmp/health.json
-              echo
-              exit 0
-            fi
-            sleep 6
-          done
-          echo "::error title=Smoke check failed::$url answered $code, expected 200. The deploy is live but unhealthy."
-          cat /tmp/health.json || true
-          exit 1
+        run: bash scripts/smoke-check.sh https://staging.money-tracker.online/api/health
