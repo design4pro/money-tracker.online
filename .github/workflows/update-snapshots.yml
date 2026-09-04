@@ -57,7 +57,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare the browser-test environment
         uses: ./.github/actions/e2e-env
@@ -81,7 +81,7 @@ jobs:
 
       - name: Upload the dev server log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: update-snapshots-dev-server-log
           path: dev-server.log
@@ -93,7 +93,7 @@ jobs:
       # regression and an intended redesign are byte-for-byte the same kind of
       # diff. The reviewer looking at the PNGs is the gate, not this workflow.
       - name: Open a pull request with the new baselines
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           add-paths: e2e/__screenshots__
           branch: chore/update-e2e-baselines
