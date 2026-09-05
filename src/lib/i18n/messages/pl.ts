@@ -1264,44 +1264,114 @@ const messages = {
   'a11y.showSuggestions': 'Pokaż podpowiedzi',
 
   /* -- Marketing (public pages) ------------------------------------------- */
-  'marketing.nav.features': 'Funkcje',
-  'marketing.nav.security': 'Bezpieczeństwo',
+  'marketing.nav.how': 'Jak to działa',
+  'marketing.nav.ledger': 'Wydatki',
+  'marketing.nav.scope': 'Zakres',
   'marketing.nav.signIn': 'Zaloguj się',
   'marketing.nav.getStarted': 'Zacznij za darmo',
-  'marketing.hero.title':
-    'Jedna księga dla wszystkich kont i każdej waluty, którą trzymasz.',
+
+  'marketing.hero.title.lead': 'Bez loginu do banku.',
+  'marketing.hero.title.rest': 'Ani teraz, ani nigdy.',
   'marketing.hero.body':
-    'Money Tracker zapisuje Twoje wydatki i zobowiązania z tego, co wpiszesz, albo z pliku, który sam wyeksportujesz. Bez logowania do banku, bez pobierania danych z ekranu, bez powierzania komukolwiek haseł.',
+    'Money Tracker to domowy budżet dla jednej osoby albo dla całego domu: konta, budżety i każda waluta, którą trzymasz.',
   'marketing.hero.cta.primary': 'Zacznij zapisywać za darmo',
-  'marketing.hero.cta.secondary': 'Zobacz, co jest w środku',
-  'marketing.hero.note':
-    'Plan darmowy, bez karty. Wszystko, co wpiszesz, pobierzesz w dowolnej chwili.',
-  'marketing.features.title': 'Co dostajesz',
-  'marketing.feature.multiCurrency.title': 'Wiele walut, które się zgadzają',
-  'marketing.feature.multiCurrency.body':
-    'Kwoty trzymamy jako całkowite jednostki podrzędne w skali właściwej dla danej waluty i przeliczamy po kursie z dnia księgowania, więc marcowy wydatek zostaje wyceniony po marcowym kursie.',
-  'marketing.feature.manual.title': 'Ręczny wpis i import pliku',
-  'marketing.feature.manual.body':
-    'Zapisz transakcję w kilka sekund albo wczytaj eksport CSV, OFX lub QIF. Nic tutaj nigdy nie poprosi o hasło do banku.',
-  'marketing.feature.budgets.title': 'Budżety z przeniesieniem nadwyżki',
-  'marketing.feature.budgets.body':
-    'Ustaw limit dla kategorii albo koperty i zdecyduj, co dzieje się z nadwyżką po zamknięciu okresu.',
-  'marketing.feature.recurring.title': 'Rachunki, zanim nadejdą',
-  'marketing.feature.recurring.body':
-    'Subskrypcje, raty i wypłaty prowadzimy jako serie, z przypomnieniem przed każdym terminem.',
-  'marketing.feature.reports.title': 'Raporty, które da się drążyć',
-  'marketing.feature.reports.body':
-    'Przepływy, wartość netto, wydatki według kategorii i tabela przestawna, którą sam układasz — z każdej liczby zejdziesz do transakcji, które za nią stoją.',
-  'marketing.feature.household.title': 'Wspólne z domownikami',
-  'marketing.feature.household.body':
-    'Zaproś osoby, z którymi naprawdę dzielisz pieniądze, i miej jeden zestaw liczb zamiast dwóch arkuszy.',
-  'marketing.privacy.title': 'Twoje zapisy zostają Twoje',
-  'marketing.privacy.body':
-    'Nie ma tu integracji z bankami i nigdy nie będzie. Wszystko w przestrzeni wpisał ktoś, kto do niej należy, a całość pobierzesz jako JSON lub CSV, kiedy zechcesz.',
+  'marketing.hero.note': 'Wszystko, co wpiszesz, pobierzesz w dowolnej chwili.',
+
+  'marketing.instead.title': 'To skąd cokolwiek się w niej bierze?',
+  'marketing.instead.body':
+    'Na cztery sposoby i żaden z nich nie wymaga oddania danych logowania do banku ani nam, ani nikomu innemu.',
+  'marketing.instead.entry.title': 'Wpisujesz, w jakieś dziesięć sekund',
+  'marketing.instead.entry.body':
+    'Kwota, odbiorca, kategoria. Pole kwoty przyjmuje tyle miejsc po przecinku, ile naprawdę ma dana waluta, i pokazuje zapisywaną wartość, zanim ją wyślesz.',
+  'marketing.instead.import.title': 'Wczytujesz plik, który już masz',
+  'marketing.instead.import.body':
+    'CSV z mapowaniem kolumn, które zapisujesz i wykorzystujesz ponownie, OFX, QIF albo eksport z innego programu. Duplikaty wychodzą przed zapisem, a całą partię można wycofać.',
+  'marketing.instead.recurring.title': 'Seria zapisuje się sama',
+  'marketing.instead.recurring.body':
+    'Abonamenty, raty, rachunki i wypłaty ustawiasz raz jako płatności cykliczne. Mogą zapisywać się same albo tylko przypominać.',
+  'marketing.instead.rules.title': 'Zasady porządkują od razu',
+  'marketing.instead.rules.body':
+    'Warunki i działania w kolejności, którą ustawiasz, z licznikiem dopasowań na żywo jeszcze przed zapisem. Zasada, której kategorię usunięto, wstrzymuje się sama i mówi o tym wprost.',
+  'marketing.ledger.title':
+    'Jeden wydatek, pół roku później, wciąż wyceniony na dzień, w którym się wydarzył.',
+  'marketing.ledger.body':
+    'Dom prowadzony w złotych, w którym siedzi wydatek zrobiony w euro. Wpisana kwota nigdy się nie zmienia, a przeliczona pod nią została zapisana po kursie z tamtego dnia i nie jest przeliczana ani dziś, ani za rok.',
+  'marketing.ledger.caption':
+    'Pięć przykładowych wpisów z domu prowadzonego w złotych.',
+  'marketing.ledger.sample':
+    'Wiersze przykładowe. Nic tutaj nie pochodzi z prawdziwego konta.',
+  'marketing.ledger.figure.label': 'Wydane w euro, trzymane w złotych',
+  'marketing.ledger.figure.caption':
+    '27,40 € przeliczone po kursie 4,3218 z 14 marca 2026 i tam zostawione.',
+  'marketing.ledger.row.groceries': 'Sklep spożywczy, Berlin',
+  'marketing.ledger.row.salary': 'Wynagrodzenie',
+  'marketing.ledger.row.streaming': 'Subskrypcja streamingowa',
+  'marketing.ledger.row.savings': 'Przeniesione na oszczędności',
+  'marketing.ledger.row.rent': 'Czynsz',
+  'marketing.ledger.category.groceries': 'Zakupy spożywcze',
+  'marketing.ledger.category.income': 'Przychód',
+  'marketing.ledger.category.subscriptions': 'Subskrypcje',
+  'marketing.ledger.category.transfer': 'Przelew',
+  'marketing.ledger.category.housing': 'Mieszkanie',
+
+  'marketing.meter.title':
+    'To, że przekraczasz budżet, widać także z wyłączonym kolorem.',
+  'marketing.meter.body':
+    'Każdy stan zmienia cztery rzeczy naraz: słowo, ikonę, pozostałą kwotę i kreskowanie wypełnienia. Zmierzona odległość między naszą zielenią a czerwienią przy deuteranopii spada do 1,14:1, więc kolor jest tu ostatnim kanałem, a nigdy pierwszym.',
+  'marketing.meter.caption':
+    'Nagłówkiem jest to, co zostało, a nie to, co wydane: właśnie tej liczby potrzebujesz, stojąc w sklepie.',
+  'marketing.meter.groceries': 'Zakupy spożywcze',
+  'marketing.meter.fuel': 'Paliwo',
+  'marketing.meter.eatingOut': 'Jedzenie na mieście',
+
+  'marketing.scope.title': 'Co w niej jest',
+  'marketing.scope.accounts':
+    'Konta w ośmiu kategoriach, z grupami, archiwizacją i limitami kredytowymi',
+  'marketing.scope.transactions':
+    'Wydatki z podziałem na kategorie, zwrotami, załącznikami i edycją zbiorczą',
+  'marketing.scope.classification':
+    'Dwupoziomowe kategorie, tagi i odbiorcy z aliasami',
+  'marketing.scope.budgets':
+    'Budżety z okresami, progami alertów i przenoszeniem nadwyżki',
+  'marketing.scope.recurring':
+    'Płatności cykliczne, cele oszczędnościowe i zasady',
+  'marketing.scope.currency':
+    'Zestaw walut na dom, jedna waluta główna, kursy na każdy dzień',
+  'marketing.scope.reports':
+    'Przepływy, wartość netto, wydatki według kategorii i tabela przestawna',
+  'marketing.scope.dashboard':
+    'Siatka pulpitu, którą przestawiasz myszą albo z klawiatury',
+  'marketing.scope.data':
+    'Import CSV, OFX i QIF, eksport JSON i CSV, pełna kopia zapasowa',
+  'marketing.scope.household':
+    'Dom liczący od dwóch do sześciu osób na jednym zestawie liczb',
+
+  'marketing.never.title': 'Czym nigdy nie będzie',
+  'marketing.never.connectors.title': 'Połączeniem z bankiem',
+  'marketing.never.connectors.body':
+    'Nie ma go i nie będzie. Ta decyzja jest zapisana i opatrzona datą, a nie zostawiona jako plan na później.',
+  'marketing.never.investments.title': 'Portfelem inwestycyjnym',
+  'marketing.never.investments.body':
+    'Konto inwestycyjne trzyma stan. Nie trzyma pozycji, transz, ceny nabycia ani dywidend.',
+  'marketing.never.tax.title': 'Narzędziem podatkowym ani doradztwem',
+  'marketing.never.tax.body':
+    'Żadnych rozliczeń podatkowych, żadnego fakturowania i niczego, co dałoby się odczytać jako poradę, co zrobić z pieniędzmi.',
+  'marketing.never.realtime.title': 'Dokumentem edytowanym na żywo',
+  'marketing.never.realtime.body':
+    'Osoby dzielące dom widzą swoje wpisy po przeładowaniu strony, a nie w trakcie pisania.',
+  'marketing.commit.title': 'Dwie rzeczy, które zapisujemy na piśmie',
+  'marketing.commit.export.title': 'Wszystko wychodzi, kiedy tylko zechcesz',
+  'marketing.commit.export.body':
+    'Pełny eksport JSON i CSV w każdym planie, także darmowym, bez ścieżki do przeklikania i bez oferty stojącej po drodze.',
+  'marketing.commit.a11y.title':
+    'Dostępność jest bramką w buildzie, a nie akapitem',
+  'marketing.commit.a11y.body':
+    'WCAG 2.2 AA sprawdzamy audytem automatycznym, który zatrzymuje build, na każdej trasie ze specyfikacji wizualnej, a ponad tym utrzymujemy nazwaną listę kryteriów AAA na poziomie AAA. Nie deklarujemy AAA w całym produkcie.',
+
   'marketing.cta.title': 'Zacznij od tego miesiąca',
   'marketing.cta.body':
     'Dodaj jedno konto, wczytaj wyciąg i zobacz, dokąd naprawdę poszły pieniądze.',
-  'marketing.cta.action': 'Załóż darmową przestrzeń',
+  'marketing.cta.action': 'Załóż darmowy dom',
   'marketing.footer.legal': 'Wszelkie prawa zastrzeżone.',
 
   /* -- The authenticated shell -------------------------------------------- */

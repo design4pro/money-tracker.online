@@ -1236,44 +1236,114 @@ const messages = {
   'a11y.showSuggestions': 'Show suggestions',
 
   /* -- Marketing (public pages) ------------------------------------------- */
-  'marketing.nav.features': 'Features',
-  'marketing.nav.security': 'Security',
+  'marketing.nav.how': 'How it works',
+  'marketing.nav.ledger': 'Spending',
+  'marketing.nav.scope': 'Scope',
   'marketing.nav.signIn': 'Sign in',
-  'marketing.nav.getStarted': 'Get started free',
-  'marketing.hero.title':
-    'One ledger for every account, in every currency you hold.',
+  'marketing.nav.getStarted': 'Start free',
+
+  'marketing.hero.title.lead': 'No bank login.',
+  'marketing.hero.title.rest': 'Not now, not ever.',
   'marketing.hero.body':
-    'Money Tracker records what you spend and what you owe from what you type or from a file you export yourself. No bank logins, no screen scraping, nobody else holding your credentials.',
+    'Money Tracker is a household budget for one person or a whole home: accounts, budgets, and every currency you hold.',
   'marketing.hero.cta.primary': 'Start tracking free',
-  'marketing.hero.cta.secondary': 'See what is included',
-  'marketing.hero.note':
-    'Free plan, no card. Export everything you enter, at any time.',
-  'marketing.features.title': 'What is in the box',
-  'marketing.feature.multiCurrency.title': 'Multi-currency that adds up',
-  'marketing.feature.multiCurrency.body':
-    'Amounts are stored as whole minor units at each currency’s own scale and converted at the rate of the day they were booked, so a March expense stays valued at March.',
-  'marketing.feature.manual.title': 'Manual entry and file import',
-  'marketing.feature.manual.body':
-    'Record a transaction in seconds, or bring a CSV, OFX or QIF export across. Nothing here ever asks for a bank password.',
-  'marketing.feature.budgets.title': 'Budgets that carry over',
-  'marketing.feature.budgets.body':
-    'Set a limit per category or per envelope, and decide what happens to a surplus when the period closes.',
-  'marketing.feature.recurring.title': 'Bills before they land',
-  'marketing.feature.recurring.body':
-    'Subscriptions, instalments and salaries are kept as series, with a reminder ahead of each due date.',
-  'marketing.feature.reports.title': 'Reports you can interrogate',
-  'marketing.feature.reports.body':
-    'Cash flow, net worth, spending by category and a pivot you arrange yourself — every figure drills through to the transactions behind it.',
-  'marketing.feature.household.title': 'Shared with the household',
-  'marketing.feature.household.body':
-    'Invite the people you actually share money with and keep one set of figures instead of two spreadsheets.',
-  'marketing.privacy.title': 'Your records stay yours',
-  'marketing.privacy.body':
-    'There are no bank connectors and there never will be. Everything in a workspace was put there by somebody in it, and the whole of it exports as JSON or CSV whenever you ask.',
+  'marketing.hero.note': 'Export everything you enter, at any time.',
+
+  'marketing.instead.title': 'So how does anything get into it?',
+  'marketing.instead.body':
+    'Four ways, and not one of them involves handing your banking credentials to us or to anybody else.',
+  'marketing.instead.entry.title': 'You type it, in about ten seconds',
+  'marketing.instead.entry.body':
+    'Amount, payee, category. The amount field takes the number of decimals that currency actually has, and shows you the value it will store before you submit it.',
+  'marketing.instead.import.title': 'You bring a file you already have',
+  'marketing.instead.import.body':
+    'CSV with a column mapping you save and reuse, OFX, QIF, or an export from another tracker. Duplicates are found before anything is written, and a whole batch can be reverted.',
+  'marketing.instead.recurring.title': 'A series records itself',
+  'marketing.instead.recurring.body':
+    'Subscriptions, instalments, bills and salaries are set up once as recurring series. They can record themselves, or only remind you.',
+  'marketing.instead.rules.title': 'Rules tidy up straight away',
+  'marketing.instead.rules.body':
+    'Conditions and actions in an order you set, with a live match count before you save. A rule whose category was deleted pauses itself and says so.',
+
+  'marketing.ledger.title':
+    'One expense, six months on, still valued at the day it happened.',
+  'marketing.ledger.body':
+    'A household kept in Polish zloty, holding an expense made in euro. The figure you entered never changes, and the converted figure beneath it was frozen at the rate of that day, not recalculated today and not recalculated next year.',
+  'marketing.ledger.caption':
+    'Five example rows from a household kept in Polish zloty.',
+  'marketing.ledger.sample':
+    'Example rows. Nothing here comes from a real account.',
+  'marketing.ledger.figure.label': 'Spent in euro, held in zloty',
+  'marketing.ledger.figure.caption':
+    '27.40 € converted at 4.3218, the rate on 14 March 2026, and left there.',
+  'marketing.ledger.row.groceries': 'Grocery shop, Berlin',
+  'marketing.ledger.row.salary': 'Salary',
+  'marketing.ledger.row.streaming': 'Streaming subscription',
+  'marketing.ledger.row.savings': 'Moved to savings',
+  'marketing.ledger.row.rent': 'Rent',
+  'marketing.ledger.category.groceries': 'Groceries',
+  'marketing.ledger.category.income': 'Income',
+  'marketing.ledger.category.subscriptions': 'Subscriptions',
+  'marketing.ledger.category.transfer': 'Transfer',
+  'marketing.ledger.category.housing': 'Housing',
+
+  'marketing.meter.title':
+    'You can tell that you are over budget with the colour switched off.',
+  'marketing.meter.body':
+    'Every state changes four things at once: the word, the icon, the remaining figure, and the hatching on the fill. Measured separation between our green and our red under deuteranopia falls to 1.14:1, so colour is the last channel here and never the first.',
+  'marketing.meter.caption':
+    'The headline is what is left rather than what is spent, because what is left is the figure you need while standing in a shop.',
+  'marketing.meter.groceries': 'Groceries',
+  'marketing.meter.fuel': 'Fuel',
+  'marketing.meter.eatingOut': 'Eating out',
+
+  'marketing.scope.title': 'What is in it',
+  'marketing.scope.accounts':
+    'Accounts in eight categories, with groups, archiving and credit limits',
+  'marketing.scope.transactions':
+    'Spending with splits, refunds, attachments and bulk editing',
+  'marketing.scope.classification':
+    'Two-level categories, tags, and payees with aliases',
+  'marketing.scope.budgets':
+    'Budgets with periods, alert thresholds and rollover',
+  'marketing.scope.recurring': 'Recurring series, savings goals, and rules',
+  'marketing.scope.currency':
+    'A currency set per household, one base currency, rates per day',
+  'marketing.scope.reports':
+    'Cash flow, net worth, spending by category, and a pivot report',
+  'marketing.scope.dashboard':
+    'A dashboard grid you rearrange by dragging or by keyboard',
+  'marketing.scope.data':
+    'CSV, OFX and QIF import; JSON and CSV export; a full backup',
+  'marketing.scope.household':
+    'A household of two to six people on one set of figures',
+
+  'marketing.never.title': 'What it will never be',
+  'marketing.never.connectors.title': 'A bank connection',
+  'marketing.never.connectors.body':
+    'There are none and there will be none. That decision is written down and dated, not left standing as a plan for later.',
+  'marketing.never.investments.title': 'An investment portfolio',
+  'marketing.never.investments.body':
+    'An investment account holds a balance. It does not hold positions, lots, cost basis or dividends.',
+  'marketing.never.tax.title': 'A tax tool, or financial advice',
+  'marketing.never.tax.body':
+    'No tax reporting, no invoicing, and nothing that could be read as advice about what to do with your money.',
+  'marketing.never.realtime.title': 'A document edited live',
+  'marketing.never.realtime.body':
+    'People sharing a household see each other’s rows when the page reloads, not as they are being typed.',
+  'marketing.commit.title': 'Two things we put in writing',
+  'marketing.commit.export.title': 'Everything leaves whenever you want it to',
+  'marketing.commit.export.body':
+    'Full JSON and CSV export on every plan, the free one included, with nothing to click through and no offer standing in the way.',
+  'marketing.commit.a11y.title':
+    'Accessibility is a build gate, not a paragraph',
+  'marketing.commit.a11y.body':
+    'WCAG 2.2 AA is checked by an automated audit that fails the build, on every route in the visual spec, and a named list of AAA criteria is held to AAA above it. We do not claim AAA across the product.',
+
   'marketing.cta.title': 'Start with this month',
   'marketing.cta.body':
     'Add one account, import a statement, and see where the money actually went.',
-  'marketing.cta.action': 'Create a free workspace',
+  'marketing.cta.action': 'Create a free household',
   'marketing.footer.legal': 'All rights reserved.',
 
   /* -- The authenticated shell -------------------------------------------- */
