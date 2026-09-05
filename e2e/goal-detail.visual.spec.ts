@@ -128,7 +128,7 @@ test('the contribution dialog offers transactions rather than an amount field', 
 }) => {
   await openFirstGoal(page)
 
-  await page.getByRole('button', { name: 'Count a transaction' }).click()
+  await page.getByRole('button', { name: 'Count an entry' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
 

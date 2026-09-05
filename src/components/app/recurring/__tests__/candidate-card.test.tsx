@@ -61,7 +61,7 @@ describe('CandidateCard', () => {
       />,
     )
     expect(
-      screen.getByText(/None of the transactions it was found from is changed/),
+      screen.getByText(/None of the entries it was found from is changed/),
     ).toBeTruthy()
   })
 
@@ -73,7 +73,7 @@ describe('CandidateCard', () => {
         onDismiss={() => undefined}
       />,
     )
-    expect(screen.getByText('From 3 transactions')).toBeTruthy()
+    expect(screen.getByText('From 3 entries')).toBeTruthy()
     unmount()
 
     renderRecurring(
@@ -84,7 +84,7 @@ describe('CandidateCard', () => {
       />,
     )
     // The count is the least important thing on the card; it must not take the list down with it.
-    expect(screen.getByText('From 0 transactions')).toBeTruthy()
+    expect(screen.getByText('From 0 entries')).toBeTruthy()
   })
 
   it('names both actions by the series they act on', async () => {
@@ -137,6 +137,6 @@ describe('CandidateCard', () => {
     expect(
       screen.getByRole('button', { name: 'Utwórz serię dla Netflix' }),
     ).toBeTruthy()
-    expect(screen.getByText('Na podstawie 3 transakcji')).toBeTruthy()
+    expect(screen.getByText('Na podstawie 3 wydatków')).toBeTruthy()
   })
 })

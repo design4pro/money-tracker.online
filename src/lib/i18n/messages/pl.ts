@@ -12,14 +12,18 @@ import type { TranslationOf } from '../types'
  *
  * **Four plural branches, not two.** Polish counts in `one` / `few` / `many` /
  * `other`, and the `other` branch is the one a fractional count falls into
- * (`1,5 transakcji`), so it is not a copy of `many`. Every plural message below
+ * (`1,5 wydatku`), so it is not a copy of `many`. Every plural message below
  * carries all four.
  *
- * **Financial vocabulary, not a literal translation.** `Saldo`, not
- * `Bilans`; `Kontrahent` for a payee, which is what an accountant and a bank
- * statement both call it; `Rachunek bieżący` for a current account;
- * `Zlecenie stałe` and `Polecenie zapłaty` for the two standing payment types,
- * which are the terms printed on a Polish statement.
+ * **Household vocabulary, not accountancy.** This is a product for people who
+ * keep a household budget, not for bookkeepers, so the surface reads the way
+ * they speak: `Wydatek` for a transaction, `Stan konta` for a balance,
+ * `Odbiorca` for a payee, `Dom` for a workspace, `Konto osobiste` for a current
+ * account, `Zasada` for a rule, `Wyrównanie stanu konta` for a balance
+ * adjustment. The code keeps the domain names (`transaction`, `payee`,
+ * `workspace`); this rule governs what is displayed, not what is stored.
+ * `Zlecenie stałe` and `Polecenie zapłaty` stay, because they are the words
+ * printed on the statement the reader is holding.
  *
  * Second person is `Ty`-form and capitalised in direct address (`Cię`, `Twoje`),
  * which is the register a Polish product uses with an individual user.
@@ -28,8 +32,7 @@ const messages = {
   /* -- Dokument ----------------------------------------------------------- */
   'meta.title': 'Money Tracker — wiedz, dokąd trafiają Twoje pieniądze',
   'meta.description':
-    'Osobisty menedżer finansów: konta, transakcje, budżety, płatności cykliczne i raportowanie wielowalutowe. Wyłącznie ręczne wprowadzanie danych i import plików — nigdy integracje bankowe.',
-
+    'Budżet domowy: konta, wydatki, limity na kategorie, płatności cykliczne i kilka walut naraz. Wszystko wpisujesz sam albo wczytujesz z pliku, nigdy nie łączymy się z Twoim bankiem.',
   /* -- The shell ---------------------------------------------------------- */
   'app.name': 'Money Tracker',
   'app.tagline': 'Wiedz, dokąd trafiają Twoje pieniądze.',
@@ -45,9 +48,9 @@ const messages = {
   'app.theme.system': 'Jak w systemie',
   'app.language.label': 'Język',
   'app.language.change': 'Zmień język',
-  'app.workspace.label': 'Przestrzeń',
-  'app.workspace.switch': 'Przełącz przestrzeń',
-  'app.workspace.create': 'Nowa przestrzeń',
+  'app.workspace.label': 'Dom',
+  'app.workspace.switch': 'Przełącz dom',
+  'app.workspace.create': 'Nowy dom',
   'app.account.menu': 'Twoje konto',
   'app.signOut': 'Wyloguj się',
 
@@ -55,15 +58,15 @@ const messages = {
   'nav.primary': 'Nawigacja główna',
   'nav.dashboard': 'Pulpit',
   'nav.accounts': 'Konta',
-  'nav.transactions': 'Transakcje',
+  'nav.transactions': 'Wydatki',
   'nav.budgets': 'Budżety',
   'nav.categories': 'Kategorie',
   'nav.tags': 'Tagi',
-  'nav.payees': 'Kontrahenci',
+  'nav.payees': 'Odbiorcy',
   'nav.recurring': 'Płatności cykliczne',
   'nav.goals': 'Cele oszczędnościowe',
   'nav.reports': 'Raporty',
-  'nav.rules': 'Reguły',
+  'nav.rules': 'Zasady',
   'nav.import': 'Import',
   'nav.export': 'Eksport',
   'nav.settings': 'Ustawienia',
@@ -237,13 +240,13 @@ const messages = {
   'accounts.create': 'Nowe konto',
   'accounts.edit': 'Edytuj konto',
   'accounts.delete.confirm':
-    'Usunąć konto {name}? Razem z nim znikną jego transakcje, a tego nie da się cofnąć.',
+    'Usunąć konto {name}? Razem z nim znikną wszystkie jego wydatki, a tego nie da się cofnąć.',
   'accounts.field.name': 'Nazwa konta',
   'accounts.field.category': 'Rodzaj konta',
   'accounts.field.currency': 'Waluta',
-  'accounts.field.initialBalance': 'Saldo początkowe',
+  'accounts.field.initialBalance': 'Stan początkowy',
   'accounts.field.initialBalance.help':
-    'Ile było na koncie dzień przed pierwszą transakcją.',
+    'Ile było na koncie dzień przed pierwszym wydatkiem.',
   'accounts.field.creditLimit': 'Limit kredytowy',
   'accounts.field.note': 'Notatka',
   'accounts.field.excludeFromStats': 'Pomijaj w raportach',
@@ -251,20 +254,20 @@ const messages = {
     'Konto działa normalnie, ale nie wlicza się do sum ani wykresów.',
   'accounts.category.general': 'Ogólne',
   'accounts.category.cash': 'Gotówka',
-  'accounts.category.current': 'Rachunek bieżący',
+  'accounts.category.current': 'Konto osobiste',
   'accounts.category.creditCard': 'Karta kredytowa',
   'accounts.category.savings': 'Oszczędności',
   'accounts.category.investment': 'Inwestycje',
   'accounts.category.loan': 'Kredyt',
   'accounts.category.other': 'Inne',
-  'accounts.balance': 'Saldo',
+  'accounts.balance': 'Stan konta',
   'accounts.balance.available': 'Dostępne środki',
-  'accounts.balance.adjust': 'Skoryguj saldo',
+  'accounts.balance.adjust': 'Wyrównaj stan konta',
   'accounts.balance.adjust.help':
-    'Korekta zapisuje się jako osobna transakcja, więc historia pozostaje wiarygodna.',
-  'accounts.totalBalance': 'Saldo łączne',
+    'Wyrównanie zapisuje się jako osobny wpis z datą, więc historia zostaje wiarygodna.',
+  'accounts.totalBalance': 'Łącznie na kontach',
   'accounts.netWorth': 'Wartość netto',
-  'accounts.hideZeroBalance': 'Ukryj konta z zerowym saldem',
+  'accounts.hideZeroBalance': 'Ukryj konta z zerowym stanem',
   'accounts.group.title': 'Grupy',
   'accounts.group.create': 'Nowa grupa',
   'accounts.group.ungrouped': 'Poza grupami',
@@ -276,7 +279,7 @@ const messages = {
   },
   'accounts.empty.title': 'Nie masz jeszcze kont',
   'accounts.empty.body':
-    'Dodaj pierwsze konto, które chcesz śledzić — rachunek, portfel albo kartę.',
+    'Dodaj pierwsze konto, które chcesz śledzić: konto w banku, portfel albo kartę.',
   'accounts.empty.action': 'Dodaj pierwsze konto',
   'accounts.archived.empty.title': 'Archiwum jest puste',
   'accounts.archived.empty.body':
@@ -306,8 +309,8 @@ const messages = {
   'accounts.list.loading': 'Wczytujemy Twoje konta…',
   'accounts.error.title': 'Nie udało się wczytać kont',
   'accounts.error.body':
-    'Nic nie zostało zmienione. Spróbuj ponownie — a jeśli błąd się powtarza, przestrzeń jest chwilowo niedostępna.',
-  'accounts.balance.missing': 'Saldo niedostępne',
+    'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli błąd się powtarza, Twój dom jest chwilowo niedostępny.',
+  'accounts.balance.missing': 'Stan konta niedostępny',
   'accounts.balance.inBase': 'W walucie {currency}',
   'accounts.empty.pick.title': 'Albo zacznij od jednego z tych',
   'accounts.empty.pick.body':
@@ -319,12 +322,12 @@ const messages = {
   /* -- Accounts: one account ---------------------------------------------- */
   'accounts.detail.tab.overview': 'Przegląd',
   'accounts.detail.tab.settings': 'Ustawienia',
-  'accounts.detail.balanceToday': 'Saldo na dziś',
+  'accounts.detail.balanceToday': 'Stan na dziś',
   'accounts.detail.transactions': {
-    one: '{count} transakcja na tym koncie',
-    few: '{count} transakcje na tym koncie',
-    many: '{count} transakcji na tym koncie',
-    other: '{count} transakcji na tym koncie',
+    one: '{count} wydatek na tym koncie',
+    few: '{count} wydatki na tym koncie',
+    many: '{count} wydatków na tym koncie',
+    other: '{count} wydatku na tym koncie',
   },
   'accounts.detail.note.empty': 'To konto nie ma jeszcze notatki.',
   'accounts.detail.error.title': 'Nie udało się wczytać tego konta',
@@ -342,17 +345,17 @@ const messages = {
   /* -- Accounts: the lifecycle -------------------------------------------- */
   'accounts.archive.title': 'Zarchiwizować konto {name}?',
   'accounts.archive.body':
-    'Zniknie z sum i z list wyboru, ale zachowa wszystkie transakcje. Możesz je przywrócić w każdej chwili.',
+    'Zniknie z sum i z list wyboru, ale zachowa wszystkie wydatki. Możesz je przywrócić w każdej chwili.',
   'accounts.archive.action': 'Zarchiwizuj konto',
   'accounts.restore.action': 'Przywróć konto',
   'accounts.delete.title': 'Usunąć konto {name}?',
   'accounts.delete.action': 'Usuń bezpowrotnie',
   'accounts.delete.blocked': {
-    one: 'Na tym koncie jest {count} transakcja, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
-    few: 'Na tym koncie są {count} transakcje, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
-    many: 'Na tym koncie jest {count} transakcji, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
+    one: 'Na tym koncie jest {count} wydatek, więc nie można go usunąć. Zarchiwizuj je, historia zostanie zachowana.',
+    few: 'Na tym koncie są {count} wydatki, więc nie można go usunąć. Zarchiwizuj je, historia zostanie zachowana.',
+    many: 'Na tym koncie jest {count} wydatków, więc nie można go usunąć. Zarchiwizuj je, historia zostanie zachowana.',
     other:
-      'Na tym koncie jest {count} transakcji, więc nie można go usunąć. Zarchiwizuj je — historia zostanie zachowana.',
+      'Na tym koncie jest {count} wydatku, więc nie można go usunąć. Zarchiwizuj je, historia zostanie zachowana.',
   },
   'accounts.actions.label': 'Działania dla konta {name}',
   'accounts.toast.created': 'Konto {name} zostało dodane.',
@@ -365,58 +368,54 @@ const messages = {
   'accounts.form.create.body':
     'Wymagana jest tylko nazwa i waluta. Resztę możesz uzupełnić później.',
   'accounts.form.edit.body':
-    'Zmiana waluty albo salda początkowego przelicza całą historię tego konta.',
+    'Zmiana waluty albo stanu początkowego przelicza całą historię tego konta.',
   'accounts.form.error.title': 'Nie udało się zapisać konta',
   'accounts.field.openedOn': 'Data otwarcia',
   'accounts.field.openedOn.help':
-    'Dzień, którego dotyczy saldo początkowe. To z tego dnia zapisujemy kurs wymiany.',
+    'Dzień, którego dotyczy stan początkowy. To z tego dnia zapisujemy kurs wymiany.',
   'accounts.field.creditLimit.help':
     'Kwota dodatnia. Zostaw puste, jeśli konto nie ma limitu.',
   'accounts.field.currency.help':
-    'Proponujemy tylko waluty, które ma Twoja przestrzeń.',
-
+    'Proponujemy tylko waluty, które ma Twój dom.',
   /* -- Accounts: correcting a balance ------------------------------------- */
   'accounts.adjust.body':
-    'Podaj, ile powinno być na koncie. Różnicę zapiszemy jako transakcję, którą znajdziesz, poprawisz i wyeksportujesz.',
+    'Podaj, ile powinno być na koncie. Różnicę zapiszemy jako zwykły wpis, który znajdziesz, poprawisz i pobierzesz razem z resztą.',
   'accounts.adjust.field.target': 'Ile powinno być na koncie',
   'accounts.adjust.field.date': 'Na koniec dnia',
   'accounts.adjust.field.note': 'Powód',
   'accounts.adjust.field.note.help':
-    'Zapisujemy go przy transakcji, więc powód zostaje razem z korektą.',
+    'Zapisujemy go przy tym wpisie, więc powód zostaje razem z wyrównaniem.',
   'accounts.adjust.preview.title': 'Co zostanie zapisane',
-  'accounts.adjust.preview.income': 'Wpływ {amount} z datą księgowania {date}.',
-  'accounts.adjust.preview.expense':
-    'Wydatek {amount} z datą księgowania {date}.',
+  'accounts.adjust.preview.income': 'Wpływ {amount} z datą {date}.',
+  'accounts.adjust.preview.expense': 'Wydatek {amount} z datą {date}.',
   'accounts.adjust.preview.none':
-    'Nic. Saldo na dzień {date} już wynosi {amount}.',
+    'Nic. Na dzień {date} na koncie jest już {amount}.',
   'accounts.adjust.preview.past':
-    'Różnicę liczymy wobec salda na koniec dnia {date}, które odczytujemy przy zapisie. Pokażemy dokładnie to, co zostało zapisane.',
+    'Różnicę liczymy wobec stanu konta na koniec dnia {date}, który odczytujemy przy zapisie. Pokażemy dokładnie to, co zostało zapisane.',
   'accounts.adjust.action': 'Zapisz korektę',
   'accounts.adjust.result.title': 'Zapisano',
-  'accounts.adjust.result.income':
-    'Zapisaliśmy wpływ {amount} z datą księgowania {date}.',
+  'accounts.adjust.result.income': 'Zapisaliśmy wpływ {amount} z datą {date}.',
   'accounts.adjust.result.expense':
-    'Zapisaliśmy wydatek {amount} z datą księgowania {date}.',
+    'Zapisaliśmy wydatek {amount} z datą {date}.',
   'accounts.adjust.result.unchanged':
-    'Nic nie zapisaliśmy — saldo na dzień {date} już wynosiło {amount}.',
+    'Nic nie zapisaliśmy, na dzień {date} na koncie było już {amount}.',
   'accounts.adjust.error.title': 'Nie udało się zapisać korekty',
 
   /* -- Transactions ------------------------------------------------------- */
-  'transactions.title': 'Transakcje',
-  'transactions.create': 'Nowa transakcja',
+  'transactions.title': 'Wydatki',
+  'transactions.create': 'Nowy wydatek',
   'transactions.createIncome': 'Zapisz wpływ',
   'transactions.createExpense': 'Zapisz wydatek',
   'transactions.createTransfer': 'Zapisz przelew',
-  'transactions.edit': 'Edytuj transakcję',
-  'transactions.delete.confirm':
-    'Usunąć tę transakcję? Tego nie da się cofnąć.',
+  'transactions.edit': 'Edytuj wydatek',
+  'transactions.delete.confirm': 'Usunąć ten wydatek? Tego nie da się cofnąć.',
   'transactions.direction.income': 'Wpływ',
   'transactions.direction.expense': 'Wydatek',
   'transactions.field.amount': 'Kwota',
   'transactions.field.date': 'Data',
   'transactions.field.account': 'Konto',
   'transactions.field.category': 'Kategoria',
-  'transactions.field.payee': 'Kontrahent',
+  'transactions.field.payee': 'Odbiorca',
   'transactions.field.note': 'Notatka',
   'transactions.field.tags': 'Tagi',
   'transactions.field.paymentMethod': 'Forma płatności',
@@ -428,8 +427,8 @@ const messages = {
   'transactions.method.other': 'Inna',
   'transactions.planned': 'Planowana',
   'transactions.planned.help':
-    'Nie wpływa na saldo, dopóki nie potwierdzisz, że doszła do skutku.',
-  'transactions.balanceAdjustment': 'Korekta salda',
+    'Nie wpływa na stan konta, dopóki nie potwierdzisz, że doszło do skutku.',
+  'transactions.balanceAdjustment': 'Wyrównanie stanu konta',
   'transactions.transfer.from': 'Konto źródłowe',
   'transactions.transfer.to': 'Konto docelowe',
   'transactions.transfer.rate': 'Kurs wymiany',
@@ -438,22 +437,21 @@ const messages = {
   'transactions.splits.title': 'Podział na kategorie',
   'transactions.splits.add': 'Dodaj pozycję',
   'transactions.splits.remainder': 'Do rozdzielenia: {amount}',
-  'transactions.splits.balanced': 'Cała kwota transakcji jest rozdzielona.',
+  'transactions.splits.balanced': 'Cała kwota jest rozdzielona.',
   'transactions.refund.title': 'Zwroty',
   'transactions.refund.link': 'Powiąż zwrot',
   'transactions.refund.unlink': 'Rozłącz zwrot',
   'transactions.refund.external': 'Zwrot za coś spoza Money Tracker',
   'transactions.attachment.add': 'Dołącz paragon',
   'transactions.attachment.remove': 'Usuń załącznik',
-  'transactions.search.placeholder':
-    'Szukaj w notatkach, kontrahentach i kwotach',
+  'transactions.search.placeholder': 'Szukaj w notatkach, odbiorcach i kwotach',
   'transactions.filter.title': 'Filtry',
   'transactions.filter.reset': 'Wyczyść filtry',
   'transactions.count': {
-    one: '{count} transakcja',
-    few: '{count} transakcje',
-    many: '{count} transakcji',
-    other: '{count} transakcji',
+    one: '{count} wydatek',
+    few: '{count} wydatki',
+    many: '{count} wydatków',
+    other: '{count} wydatku',
   },
   'transactions.selected': {
     one: 'zaznaczono {count}',
@@ -463,44 +461,44 @@ const messages = {
   },
   'transactions.empty.title': 'Nic jeszcze nie zapisano',
   'transactions.empty.body':
-    'Zapisz pierwszą transakcję albo zaimportuj wyciąg, który już masz.',
-  'transactions.empty.action': 'Zapisz transakcję',
-  'transactions.noResults.title': 'Brak pasujących transakcji',
+    'Zapisz pierwszy wydatek albo wczytaj wyciąg, który już masz.',
+  'transactions.empty.action': 'Zapisz wydatek',
+  'transactions.noResults.title': 'Nic nie pasuje do tych filtrów',
   'transactions.noResults.body':
     'Spróbuj szerszego zakresu dat albo mniejszej liczby filtrów.',
 
   /* -- Transactions: the ledger surface ----------------------------------- */
-  'transactions.list.label': 'Rejestr transakcji',
-  'transactions.list.caption.all': 'Wszystkie transakcje ({count}), {sort}.',
+  'transactions.list.label': 'Lista wydatków i wpływów',
+  'transactions.list.caption.all': 'Wszystkie wpisy ({count}), {sort}.',
   'transactions.list.caption.filtered':
-    'Transakcje pasujące do filtrów {filters} ({count}), {sort}.',
+    'Wpisy pasujące do filtrów {filters} ({count}), {sort}.',
   'transactions.list.caption.sort': 'sortowanie według: {field}, {order}',
   'transactions.sort.label': 'Sortuj według',
   'transactions.sort.ascending': 'od najstarszych',
   'transactions.sort.descending': 'od najnowszych',
   'transactions.column.description': 'Opis',
   'transactions.column.actions': 'Działania',
-  'transactions.day.net': 'Saldo dnia',
-  'transactions.loading': 'Wczytywanie transakcji…',
+  'transactions.day.net': 'Razem w tym dniu',
+  'transactions.loading': 'Wczytywanie wydatków…',
   'transactions.loadMore': 'Wczytaj więcej',
-  'transactions.loadingMore': 'Wczytywanie kolejnych transakcji…',
+  'transactions.loadingMore': 'Wczytywanie kolejnych wydatków…',
   'transactions.loadedOf': 'Wczytano {loaded} z {total}',
-  'transactions.selectAllLoaded': 'Zaznacz wszystkie wczytane transakcje',
+  'transactions.selectAllLoaded': 'Zaznacz wszystkie wczytane wpisy',
   'transactions.excludedFromTotals': 'Poza sumami',
   'transactions.amount.income': 'Wpływ {amount}',
   'transactions.amount.expense': 'Wydatek {amount}',
-  'transactions.row.select': 'Zaznacz transakcję {amount} z dnia {date}',
+  'transactions.row.select': 'Zaznacz wpis {amount} z dnia {date}',
   'transactions.row.actions': 'Działania dla: {name}',
   'transactions.row.open': 'Otwórz',
   'transactions.totals.label': 'Sumy dla wybranych filtrów',
   'transactions.totals.currency': 'Sumy w walucie {currency}',
-  'transactions.bulk.label': 'Działania na zaznaczonych transakcjach',
+  'transactions.bulk.label': 'Działania na zaznaczonych wpisach',
   'transactions.bulk.delete': 'Usuń zaznaczone',
   'transactions.bulk.confirm': {
-    one: 'Usunąć {count} transakcję? Tej operacji nie można cofnąć.',
-    few: 'Usunąć {count} transakcje? Tej operacji nie można cofnąć.',
-    many: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
-    other: 'Usunąć {count} transakcji? Tej operacji nie można cofnąć.',
+    one: 'Usunąć {count} wpis? Tego nie da się cofnąć.',
+    few: 'Usunąć {count} wpisy? Tego nie da się cofnąć.',
+    many: 'Usunąć {count} wpisów? Tego nie da się cofnąć.',
+    other: 'Usunąć {count} wpisu? Tego nie da się cofnąć.',
   },
   'transactions.keyboard.title': 'Skróty klawiszowe',
   'transactions.keyboard.column.key': 'Klawisz',
@@ -513,16 +511,16 @@ const messages = {
   'transactions.keyboard.keys.delete': 'Delete',
   'transactions.keyboard.keys.help': '?',
   'transactions.keyboard.move': 'Przechodzenie między komórkami',
-  'transactions.keyboard.open': 'Otwarcie transakcji',
+  'transactions.keyboard.open': 'Otwarcie wpisu',
   'transactions.keyboard.select': 'Zaznaczenie wiersza',
-  'transactions.keyboard.edit': 'Edycja transakcji',
+  'transactions.keyboard.edit': 'Edycja wpisu',
   'transactions.keyboard.duplicate': 'Skopiowanie do nowego wpisu',
-  'transactions.keyboard.remove': 'Usunięcie transakcji',
+  'transactions.keyboard.remove': 'Usunięcie wpisu',
   'transactions.keyboard.help': 'Wyświetlenie tej listy',
 
   /* -- Transactions: filters ---------------------------------------------- */
   'transactions.filter.description':
-    'Zawęź rejestr. Wszystko, co tu ustawisz, zapisuje się w adresie, więc widok można udostępnić.',
+    'Zawęź listę. Wszystko, co tu ustawisz, zapisuje się w adresie, więc widok można udostępnić.',
   'transactions.filter.activeLabel': 'Aktywne filtry',
   'transactions.filter.remove': 'Usuń filtr: {name}',
   'transactions.filter.direction': 'Wpływy czy wydatki',
@@ -536,7 +534,7 @@ const messages = {
   'transactions.filter.receipt': 'Paragon',
   'transactions.filter.noMatches': 'Brak dopasowań',
   'transactions.filter.categoryPlaceholder': 'Znajdź kategorię',
-  'transactions.filter.payeePlaceholder': 'Znajdź kontrahenta',
+  'transactions.filter.payeePlaceholder': 'Znajdź odbiorcę',
   'transactions.filter.tagPlaceholder': 'Znajdź etykietę',
   'transactions.chip.text': 'Tekst: {value}',
   'transactions.chip.dates': 'Daty: od {from} do {to}',
@@ -544,7 +542,7 @@ const messages = {
   'transactions.chip.accounts': 'Konto: {value}',
   'transactions.chip.accountGroups': 'Grupa: {value}',
   'transactions.chip.categories': 'Kategoria: {value}',
-  'transactions.chip.payees': 'Kontrahent: {value}',
+  'transactions.chip.payees': 'Odbiorca: {value}',
   'transactions.chip.tags': 'Etykieta: {value}',
   'transactions.chip.direction': 'Kierunek: {value}',
   'transactions.chip.paymentMethods': 'Forma płatności: {value}',
@@ -554,60 +552,60 @@ const messages = {
   'transactions.chip.withoutReceipt': 'Bez paragonu',
 
   /* -- Transactions: the entry form --------------------------------------- */
-  'transactions.form.newTitle': 'Nowa transakcja',
+  'transactions.form.newTitle': 'Nowy wydatek',
   'transactions.form.newSubtitle':
     'Zaczynamy od kwoty. Poza kontem i datą reszta pól jest opcjonalna.',
-  'transactions.form.editTitle': 'Edycja transakcji',
+  'transactions.form.editTitle': 'Edycja wydatku',
   'transactions.form.details': 'Szczegóły',
   'transactions.form.moreDetails': 'Więcej',
   'transactions.form.saveAndNew': 'Zapisz i dodaj kolejną',
   'transactions.form.saveAndNewHint':
     'Zostawia datę, konto i kategorię, więc do następnego wpisu wystarczy kwota.',
-  'transactions.form.notePlaceholder': 'Czego dotyczyła ta transakcja?',
+  'transactions.form.notePlaceholder': 'Czego dotyczył ten wydatek?',
   'transactions.form.payeePlaceholder': 'Komu zapłacono albo kto zapłacił',
   'transactions.form.categoryPlaceholder': 'Wybierz kategorię',
-  'transactions.form.noPayees': 'Nie ma jeszcze kontrahentów',
+  'transactions.form.noPayees': 'Nie masz jeszcze żadnych odbiorców',
   'transactions.form.noCategories': 'Nie ma jeszcze kategorii',
   'transactions.form.conversionNote':
-    'Zapisujemy w walucie {currency} i przeliczamy na {base} po kursie z daty księgowania.',
-  'transactions.form.error.title': 'Transakcja nie została zapisana',
+    'Zapisujemy w walucie {currency} i przeliczamy na {base} po kursie z dnia, którego dotyczy wpis.',
+  'transactions.form.error.title': 'Nie zapisaliśmy tego wpisu',
   'transactions.form.error.amount': 'Podaj kwotę większą od zera.',
   'transactions.form.error.account': 'Wybierz konto, którego dotyczy wpis.',
   'transactions.form.error.date': 'Podaj datę w formacie {example}.',
   'transactions.form.error.note': 'Notatka może mieć najwyżej {max} znaków.',
   'transactions.form.noAccounts.title': 'Najpierw konto',
   'transactions.form.noAccounts.body':
-    'Transakcja musi należeć do konta. Załóż konto i wróć tutaj.',
+    'Każdy wpis musi należeć do konta. Załóż konto i wróć tutaj.',
   'transactions.form.noAccounts.action': 'Załóż konto',
-  'transactions.saved': 'Transakcja zapisana.',
-  'transactions.deleted': 'Transakcja usunięta.',
+  'transactions.saved': 'Zapisane.',
+  'transactions.deleted': 'Usunięte.',
   'transactions.deletedMany': {
-    one: 'Usunięto {count} transakcję.',
-    few: 'Usunięto {count} transakcje.',
-    many: 'Usunięto {count} transakcji.',
-    other: 'Usunięto {count} transakcji.',
+    one: 'Usunęliśmy {count} wpis.',
+    few: 'Usunęliśmy {count} wpisy.',
+    many: 'Usunęliśmy {count} wpisów.',
+    other: 'Usunęliśmy {count} wpisu.',
   },
   'transactions.duplicated':
     'Skopiowano do nowego wpisu. Nic nie zostało jeszcze zapisane.',
 
   /* -- Transactions: the detail screen ------------------------------------ */
-  'transactions.detail.title': 'Transakcja',
-  'transactions.detail.back': 'Wróć do transakcji',
+  'transactions.detail.title': 'Wydatek',
+  'transactions.detail.back': 'Wróć do wydatków',
   'transactions.detail.summary': 'Podsumowanie',
   'transactions.detail.recordedAt': 'Zapisano {datetime}',
   'transactions.detail.rate': 'Przeliczono po kursie {rate} z dnia {date}.',
   'transactions.detail.identityRate':
     'Zapisano w walucie raportowania, więc przeliczenie nie było potrzebne.',
-  'transactions.detail.noTags': 'Ta transakcja nie ma etykiet.',
+  'transactions.detail.noTags': 'Ten wpis nie ma etykiet.',
   'transactions.detail.noAttachments': 'Nie dołączono paragonu.',
   'transactions.detail.noRefunds': 'Nie powiązano zwrotu.',
-  'transactions.detail.notFound.title': 'Nie ma takiej transakcji',
+  'transactions.detail.notFound.title': 'Nie ma takiego wpisu',
   'transactions.detail.notFound.body':
     'Mogła zostać usunięta albo adres jest nieprawidłowy.',
   /* -- Transakcje: podział transakcji -------------------------------------- */
-  'splits.title': 'Podziel tę transakcję',
+  'splits.title': 'Podziel ten wydatek',
   'splits.description':
-    'Rozdziel jedną płatność na kilka kategorii. Zanim zapiszemy podział, wiersze muszą sumować się do kwoty transakcji.',
+    'Rozdziel jedną płatność na kilka kategorii. Zanim zapiszemy podział, części muszą sumować się do pełnej kwoty.',
   'splits.lines.label': 'Wiersze podziału',
   'splits.row.legend': 'Wiersz {position}',
   'splits.row.category': 'Kategoria',
@@ -620,7 +618,7 @@ const messages = {
   'splits.add': 'Dodaj wiersz',
   'splits.assigned': 'Przypisano {assigned} z {total}.',
   'splits.remaining': 'Do przypisania zostało {amount}.',
-  'splits.over': '{amount} ponad kwotę transakcji.',
+  'splits.over': '{amount} ponad kwotę wydatku.',
   'splits.balanced': 'Cała kwota jest przypisana.',
   'splits.assignRemainder': 'Przypisz resztę',
   'splits.save': 'Zapisz podział',
@@ -634,16 +632,16 @@ const messages = {
     'Jej kwota należy do przepływu między dwoma kontami, a nie do podziału na kategorie.',
 
   /* -- Transakcje: grupy (11-S2) ------------------------------------------- */
-  'groups.title': 'Grupy transakcji',
+  'groups.title': 'Grupy wydatków',
   'groups.subtitle':
-    'Kilka transakcji czytanych jako jedna całość — wakacje, remont, przeprowadzka. Grupa to sposób czytania wierszy; jej usunięcie nigdy nie usuwa transakcji.',
+    'Kilka wydatków czytanych jako jedna całość: wakacje, remont, przeprowadzka. Grupa to tylko sposób patrzenia na wpisy, a jej usunięcie nigdy nie usuwa samych wydatków.',
   'groups.create': 'Nowa grupa',
-  'groups.loading': 'Wczytywanie grup transakcji…',
-  'groups.error.title': 'Nie udało się wczytać grup transakcji',
+  'groups.loading': 'Wczytywanie grup…',
+  'groups.error.title': 'Nie udało się wczytać grup',
   'groups.empty.title': 'Nie masz jeszcze żadnej grupy',
   'groups.empty.body':
-    'Grupa zbiera transakcje, które chcesz czytać razem — wszystkie płatności za wakacje albo wszystkie faktury za remont. Suma grupy jest wyliczana z jej transakcji przy każdym otwarciu i nigdy nie jest zapisywana.',
-  'groups.table.label': 'Grupy transakcji',
+    'Grupa zbiera wydatki, które chcesz czytać razem: wszystkie płatności za wakacje albo wszystkie faktury za remont. Sumę grupy liczymy przy każdym otwarciu i nigdy jej nie zapisujemy.',
+  'groups.table.label': 'Grupy wydatków',
   'groups.table.summary': {
     one: '{count} grupa. Każda suma poniżej jest w walucie {currency}.',
     few: '{count} grupy. Każda suma poniżej jest w walucie {currency}.',
@@ -651,20 +649,20 @@ const messages = {
     other: '{count} grupy. Każda suma poniżej jest w walucie {currency}.',
   },
   'groups.column.name': 'Grupa',
-  'groups.column.members': 'Transakcje',
+  'groups.column.members': 'Wydatki',
   'groups.column.total': 'Suma',
   'groups.column.actions': 'Akcje',
   'groups.members': {
-    one: '{count} transakcja',
-    few: '{count} transakcje',
-    many: '{count} transakcji',
-    other: '{count} transakcji',
+    one: '{count} wydatek',
+    few: '{count} wydatki',
+    many: '{count} wydatków',
+    other: '{count} wydatku',
   },
   'groups.total.summary': {
-    one: '{name} — {count} transakcja, {amount}',
-    few: '{name} — {count} transakcje, {amount}',
-    many: '{name} — {count} transakcji, {amount}',
-    other: '{name} — {count} transakcji, {amount}',
+    one: '{name}: {count} wydatek, {amount}',
+    few: '{name}: {count} wydatki, {amount}',
+    many: '{name}: {count} wydatków, {amount}',
+    other: '{name}: {count} wydatku, {amount}',
   },
   'groups.actions.label': 'Akcje dla grupy {name}',
   'groups.rename': 'Zmień nazwę',
@@ -677,14 +675,14 @@ const messages = {
     'Do czego służy ta grupa. Później nie da się tego zmienić.',
   'groups.delete.title': 'Usunąć grupę {name}?',
   'groups.delete.body':
-    'Znika sama grupa. Transakcje, które zawierała, zostają dokładnie tam, gdzie były.',
+    'Znika sama grupa. Wydatki, które zawierała, zostają dokładnie tam, gdzie były.',
   'groups.toast.created': 'Utworzono grupę {name}.',
   'groups.toast.renamed': 'Zmieniono nazwę na {name}.',
   'groups.toast.deleted': 'Usunięto grupę {name}.',
   'groups.panel.title': 'Grupy',
   'groups.panel.description':
-    'Grupy, w ramach których czytana jest ta transakcja. Każda suma jest w Twojej walucie raportowania.',
-  'groups.panel.empty': 'Ta transakcja nie należy do żadnej grupy.',
+    'Grupy, w ramach których czytany jest ten wydatek. Każda suma jest w Twojej walucie raportowania.',
+  'groups.panel.empty': 'Ten wydatek nie należy do żadnej grupy.',
   'groups.panel.add.label': 'Dodaj do grupy',
   'groups.panel.add.placeholder': 'Wybierz grupę',
   'groups.panel.add.action': 'Dodaj',
@@ -693,7 +691,7 @@ const messages = {
   'groups.panel.added': 'Dodano do grupy {name}.',
   'groups.panel.removed': 'Usunięto z grupy {name}.',
   'groups.panel.dissolved':
-    'Grupa {name} miała tylko dwie transakcje, więc usunięcie jednej rozwiązało grupę.',
+    'Grupa {name} miała tylko dwa wydatki, więc usunięcie jednego rozwiązało grupę.',
   'groups.panel.error.title': 'Grupa nie została zmieniona',
 
   /* -- Transakcje: szablony (11-S2) ---------------------------------------- */
@@ -709,18 +707,18 @@ const messages = {
   /* -- Transakcje: zwroty -------------------------------------------------- */
   'refunds.title': 'Zwroty',
   'refunds.description':
-    'Pieniądze, które wróciły za tę transakcję. Powiązanie zwrotu nigdy nie zmienia tego, co zapłaciliśmy pierwotnie; zmienia to, ile ostatecznie kosztowało.',
+    'Pieniądze, które wróciły za ten wydatek. Powiązanie zwrotu nigdy nie zmienia tego, co zapłaciłeś na początku; zmienia to, ile ostatecznie kosztowało.',
   'refunds.effective':
     'Pierwotnie {original}, zwrócono {refunded}, ostatecznie {effective}.',
   'refunds.empty': 'Nie powiązano żadnego zwrotu.',
   'refunds.loading': 'Wczytujemy zwroty…',
   'refunds.error.title': 'Nie wczytaliśmy zwrotów',
-  'refunds.list.label': 'Zwroty tej transakcji',
+  'refunds.list.label': 'Zwroty do tego wydatku',
   'refunds.column.date': 'Data',
   'refunds.column.amount': 'Kwota',
   'refunds.column.origin': 'Dotyczy',
   'refunds.column.actions': 'Działania',
-  'refunds.origin.whole': 'Całej transakcji',
+  'refunds.origin.whole': 'Całego wydatku',
   'refunds.origin.line': 'Jednego wiersza podziału',
   'refunds.unlink': 'Odepnij',
   'refunds.unlink.label': 'Odepnij zwrot {amount} z dnia {date}',
@@ -729,16 +727,16 @@ const messages = {
   'refunds.given.title': 'Czego dotyczy ten zwrot',
   'refunds.given.transaction': 'Oddaje część kwoty {amount} zapłaconej {date}.',
   'refunds.given.external':
-    'Dotyczy zakupu spoza tego obszaru roboczego, więc liczy się jak zwykły przychód i nie jest z niczym saldowany.',
+    'Dotyczy zakupu spoza tego domu, więc liczy się jak zwykły wpływ i nie pomniejsza żadnego wydatku.',
   'refunds.given.unlink': 'Usuń to powiązanie zwrotu',
   'refunds.link': 'Zapisz to jako zwrot',
-  'refunds.dialog.title': 'Czego dotyczy ta transakcja?',
+  'refunds.dialog.title': 'Za co jest ten zwrot?',
   'refunds.dialog.description':
-    'Zwrot oddaje pieniądze, które wcześniej wyszły. Wskaż, czego dotyczy, aby przy pierwotnej transakcji było widać, ile ostatecznie kosztowała.',
+    'Zwrot oddaje pieniądze, które wcześniej wyszły. Wskaż, czego dotyczy, aby przy pierwotnym wydatku było widać, ile ostatecznie kosztował.',
   'refunds.dialog.field': 'Czego dotyczy ten zwrot',
   'refunds.dialog.ranking':
     'Najpierw najbliższe kwotą, potem najbliższe datą. Przy każdej propozycji piszemy, dlaczego tu jest.',
-  'refunds.dialog.external': 'Czegoś spoza tego obszaru roboczego',
+  'refunds.dialog.external': 'Czegoś spoza tego domu',
   'refunds.dialog.external.help':
     'Tego zakupu nigdy tu nie zapisaliśmy. Pieniądze i tak wróciły i liczą się jak zwykły przychód.',
   'refunds.dialog.option': '{amount} z dnia {date}',
@@ -747,26 +745,26 @@ const messages = {
   'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
   'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
   'refunds.suggest.empty':
-    'Żadna transakcja tego samego kontrahenta z ostatnich 90 dni nie jest dość duża, aby to był jej zwrot.',
+    'Żaden wydatek u tego samego odbiorcy z ostatnich 90 dni nie jest dość duży, aby to był jego zwrot.',
   'refunds.suggest.reason.exact':
-    'Ten sam kontrahent, dokładnie ta kwota, {when}.',
+    'Ten sam odbiorca, dokładnie ta kwota, {when}.',
   'refunds.suggest.reason.larger':
-    'Ten sam kontrahent, o {surplus} więcej niż ten zwrot, {when}.',
-  'refunds.suggest.when.sameDay': 'zaksięgowana tego samego dnia',
+    'Ten sam odbiorca, o {surplus} więcej niż ten zwrot, {when}.',
+  'refunds.suggest.when.sameDay': 'zapisany tego samego dnia',
   'refunds.suggest.when.earlier': {
-    one: 'zaksięgowana 1 dzień wcześniej',
-    few: 'zaksięgowana {count} dni wcześniej',
-    many: 'zaksięgowana {count} dni wcześniej',
-    other: 'zaksięgowana {count} dni wcześniej',
+    one: 'zapisany 1 dzień wcześniej',
+    few: 'zapisany {count} dni wcześniej',
+    many: 'zapisany {count} dni wcześniej',
+    other: 'zapisany {count} dnia wcześniej',
   },
   'refunds.suggest.alreadyRefunded': 'Zwrócono już z tego {amount}.',
 
-  'transactions.planned.title': 'Transakcje planowane',
+  'transactions.planned.title': 'Zaplanowane',
   'transactions.planned.subtitle':
-    'Wpisy zaksięgowane na datę, która jeszcze nie nadeszła. Nie wchodzą do sald, dopóki ich nie potwierdzisz.',
+    'Wpisy z datą, która jeszcze nie nadeszła. Nie zmieniają stanu kont, dopóki ich nie potwierdzisz.',
   'transactions.planned.empty.title': 'Nic nie jest zaplanowane',
   'transactions.planned.empty.body':
-    'Zapisz transakcję z przyszłą datą i oznacz ją jako planowaną, aby zobaczyć ją tutaj.',
+    'Zapisz wydatek z przyszłą datą i oznacz go jako zaplanowany, aby zobaczyć go tutaj.',
   /* -- Kolory (osiem zmierzonych barw kategorii) -------------------------- */
   'colour.blue': 'Niebieski',
   'colour.teal': 'Morski',
@@ -802,7 +800,7 @@ const messages = {
   'categories.filter.showArchived': 'Pokaż zarchiwizowane kategorie',
   'categories.field.kind': 'Stosowana do',
   'categories.field.kind.help':
-    'Po której stronie księgi ta kategoria będzie proponowana.',
+    'Czy ta kategoria ma być proponowana przy wydatkach, czy przy wpływach.',
   'categories.field.parent': 'Wewnątrz',
   'categories.field.parent.help':
     'Zostaw na poziomie głównym albo umieść wewnątrz istniejącej kategorii.',
@@ -816,69 +814,69 @@ const messages = {
   'categories.error.title': 'Nie udało się wczytać kategorii',
   'categories.empty.title': 'Nie masz jeszcze kategorii',
   'categories.empty.body':
-    'Kategoria to odpowiedź transakcji na pytanie „na co to było”. Dodaj pierwszą, a raporty będą miały według czego grupować.',
+    'Kategoria odpowiada na pytanie „na co to było”. Dodaj pierwszą, a raporty będą miały według czego grupować.',
   'categories.archive.title': 'Zarchiwizować kategorię {name}?',
   'categories.archive.body':
-    'Przestaniemy ją proponować przy nowych transakcjach, a wszystko, co już do niej przypisano, zachowa swoją etykietę. Podkategorie archiwizują się razem z nią. Możesz ją przywrócić w każdej chwili.',
+    'Przestaniemy ją proponować przy nowych wpisach, a wszystko, co już do niej przypisano, zachowa swoją etykietę. Podkategorie archiwizują się razem z nią. Możesz ją przywrócić w każdej chwili.',
   'categories.delete.title': 'Usunąć kategorię {name}?',
   'categories.delete.body':
     'Tej operacji nie da się cofnąć. Kategorii, która była kiedykolwiek użyta, nie można usunąć - zarchiwizuj ją zamiast tego.',
   'categories.delete.refused': 'Tej kategorii nie można usunąć',
   'categories.delete.refused.body':
-    'Jest już przypisana do transakcji, a usunięcie zostawiłoby je bez etykiety. Zarchiwizuj ją: zniknie z list wyboru i zachowa historię.',
+    'Jest już przypisana do wydatków, a usunięcie zostawiłoby je bez etykiety. Zarchiwizuj ją: zniknie z list wyboru i zachowa historię.',
   'categories.toast.created': 'Dodaliśmy kategorię {name}.',
   'categories.toast.updated': 'Zapisaliśmy kategorię {name}.',
   'categories.toast.archived': 'Zarchiwizowaliśmy kategorię {name}.',
   'categories.toast.restored': 'Przywróciliśmy kategorię.',
   'categories.toast.deleted': 'Usunęliśmy kategorię {name}.',
 
-  /* -- Kontrahenci -------------------------------------------------------- */
-  'payees.title': 'Kontrahenci',
+  /* -- Odbiorcy -------------------------------------------------------- */
+  'payees.title': 'Odbiorcy',
   'payees.subtitle':
-    'Komu płacisz i kto płaci Tobie - oraz opisy z wyciągu, które mają się z nimi zgadzać.',
-  'payees.create': 'Dodaj kontrahenta',
-  'payees.edit': 'Edytuj kontrahenta',
-  'payees.loading': 'Wczytujemy kontrahentów',
-  'payees.list.label': 'Kontrahenci',
+    'Komu płacisz i kto płaci Tobie, oraz opisy z wyciągu, które mają się z nimi zgadzać.',
+  'payees.create': 'Dodaj odbiorcę',
+  'payees.edit': 'Edytuj odbiorcę',
+  'payees.loading': 'Wczytujemy odbiorców',
+  'payees.list.label': 'Odbiorcy',
   'payees.actions.label': 'Działania dla: {name}',
-  'payees.search.label': 'Szukaj kontrahentów',
+  'payees.search.label': 'Szukaj odbiorców',
   'payees.search.placeholder': 'Fragment nazwy',
-  'payees.error.title': 'Nie udało się wczytać kontrahentów',
-  'payees.empty.title': 'Nie masz jeszcze kontrahentów',
+  'payees.error.title': 'Nie udało się wczytać odbiorców',
+  'payees.empty.title': 'Nie masz jeszcze żadnych odbiorców',
   'payees.empty.body':
-    'Kontrahent zamienia „ZABKA NANO 4471” z wyciągu w nazwę, którą rozpoznajesz. Dodaj pierwszego albo pozwól, żeby import utworzył ich za Ciebie.',
+    'Odbiorca zamienia „ZABKA NANO 4471” z wyciągu w nazwę, którą rozpoznajesz. Dodaj pierwszego albo pozwól, żeby wczytany plik utworzył ich za Ciebie.',
   'payees.noMatches.title': 'Nic nie pasuje',
   'payees.noMatches.body': 'Spróbuj krótszego fragmentu nazwy.',
   'payees.defaultCategory.summary': 'Podpowiada: {name}',
-  'payees.detail.back': 'Wróć do kontrahentów',
+  'payees.detail.back': 'Wróć do odbiorców',
   'payees.detail.noCategory': 'Nie podpowiada żadnej kategorii',
-  'payees.detail.notFound.title': 'Nie ma tu tego kontrahenta',
+  'payees.detail.notFound.title': 'Nie ma tu takiego odbiorcy',
   'payees.detail.notFound.body':
     'Mógł zostać usunięty albo scalony z innym, albo adres jest błędny.',
-  'payees.field.name.help': 'Nazwa, którą chcesz widzieć w księdze.',
+  'payees.field.name.help': 'Nazwa, którą chcesz widzieć przy swoich wpisach.',
   'payees.field.defaultCategory': 'Podpowiadana kategoria',
   'payees.field.defaultCategory.help':
-    'Do niej trafi nowa transakcja z tym kontrahentem.',
+    'Do niej trafi nowy wydatek u tego odbiorcy.',
   'payees.field.mode': 'Jak stanowczo ją stosować',
   'payees.field.logoDomain': 'Strona internetowa',
   'payees.field.logoDomain.help':
     'Domena, na przykład zabka.pl - nie pełny odnośnik.',
   'payees.mode.off': 'Nic nie podpowiadaj',
-  'payees.mode.off.help': 'Ten kontrahent nigdy nie rusza pola kategorii.',
+  'payees.mode.off.help': 'Ten odbiorca nigdy nie rusza pola kategorii.',
   'payees.mode.hint': 'Wypełnij wstępnie',
   'payees.mode.hint.help':
-    'Nowe transakcje zaczynają od podpowiadanej kategorii, a Ty możesz ją zmienić.',
+    'Nowe wydatki zaczynają od podpowiadanej kategorii, a Ty możesz ją zmienić.',
   'payees.mode.enforce': 'Zawsze stosuj',
   'payees.mode.enforce.help':
-    'Nowe transakcje przyjmą podpowiadaną kategorię, a zapis przypisze do niej także te już zarejestrowane u tego kontrahenta.',
+    'Nowe wydatki przyjmą podpowiadaną kategorię, a zapis przypisze do niej także te już zarejestrowane u tego odbiorcy.',
   'payees.form.create.body':
     'Wystarczy nazwa. Ustawienia podpowiedzi mogą poczekać.',
   'payees.form.edit.body':
-    'Zmiana nazwy kontrahenta zmienia ją w każdej transakcji, w której występuje.',
-  'payees.form.error.title': 'Nie zapisaliśmy kontrahenta',
+    'Zmiana nazwy odbiorcy zmienia ją w każdym wpisie, w którym występuje.',
+  'payees.form.error.title': 'Nie zapisaliśmy tego odbiorcy',
   'payees.aliases.title': 'Opisy z wyciągu',
   'payees.aliases.body':
-    'Ciągi znaków, których bank używa dla tego kontrahenta. Każdy zapisujemy w postaci porównywanej - małymi literami, bez znaków diakrytycznych i bez numerów referencyjnych - bo właśnie to porównuje import.',
+    'Nazwy, których bank używa dla tego odbiorcy. Każdą zapisujemy w postaci porównywanej: małymi literami, bez polskich znaków i bez numerów referencyjnych, bo właśnie to porównujemy przy wczytywaniu pliku.',
   'payees.aliases.count': {
     one: '{count} alias',
     few: '{count} aliasy',
@@ -889,29 +887,28 @@ const messages = {
   'payees.aliases.add.help': 'Wklej go dokładnie tak, jak widnieje na wyciągu.',
   'payees.aliases.added': 'Dodaliśmy opis z wyciągu.',
   'payees.aliases.remove': 'Usuń {name}',
-  'payees.aliases.empty':
-    'Na razie pasuje tylko własna nazwa tego kontrahenta.',
+  'payees.aliases.empty': 'Na razie pasuje tylko własna nazwa tego odbiorcy.',
   'payees.aliases.failed': 'Nie dodaliśmy tego opisu',
-  'payees.ignored.title': 'Opisy, które nigdy nie są kontrahentem',
+  'payees.ignored.title': 'Opisy, które nigdy nie są odbiorcą',
   'payees.ignored.body':
-    'Ciągi znaków, z których import nie może zrobić kontrahenta - „PŁATNOŚĆ KARTĄ”, „POLECENIE ZAPŁATY” i wszystko inne, co bank dopisuje do każdej pozycji.',
+    'Nazwy, z których nie da się zrobić odbiorcy: „PŁATNOŚĆ KARTĄ”, „POLECENIE ZAPŁATY” i wszystko inne, co bank dopisuje do każdej pozycji.',
   'payees.ignored.add': 'Dodaj opis do pominięcia',
   'payees.ignored.remove': 'Przestań pomijać {name}',
   'payees.ignored.empty': 'Nie pomijamy żadnego opisu.',
   'payees.ignored.failed': 'Nie dodaliśmy tego opisu',
-  'payees.merge.action': 'Scal z innym kontrahentem',
-  'payees.merge.title': 'Scal kontrahenta {name}',
-  'payees.merge.into': 'Zachowaj tego kontrahenta',
+  'payees.merge.action': 'Połącz z innym odbiorcą',
+  'payees.merge.title': 'Połącz odbiorcę {name}',
+  'payees.merge.into': 'Zachowaj tego odbiorcę',
   'payees.merge.body':
-    'Wszystkie transakcje, aliasy i etykiety kontrahenta {from} przejdą do {into}, a „{from}” zachowamy jako opis z wyciągu, żeby kolejne importy nadal go rozpoznawały. Tej operacji nie da się cofnąć.',
-  'payees.merge.noTargets': 'Nie ma innego kontrahenta, z którym można scalić.',
-  'payees.merge.failed': 'Nie scaliliśmy kontrahentów',
-  'payees.delete.title': 'Usunąć kontrahenta {name}?',
+    'Wszystkie wydatki, nazwy z wyciągu i etykiety odbiorcy {from} przejdą do {into}, a „{from}” zachowamy jako nazwę z wyciągu, żeby kolejne pliki nadal go rozpoznawały. Tego nie da się cofnąć.',
+  'payees.merge.noTargets': 'Nie ma innego odbiorcy, z którym można połączyć.',
+  'payees.merge.failed': 'Nie połączyliśmy odbiorców',
+  'payees.delete.title': 'Usunąć odbiorcę {name}?',
   'payees.delete.body':
-    'Tej operacji nie da się cofnąć. Transakcje zachowają kwoty i daty, stracą tylko nazwę kontrahenta.',
-  'payees.toast.created': 'Dodaliśmy kontrahenta {name}.',
-  'payees.toast.updated': 'Zapisaliśmy kontrahenta {name}.',
-  'payees.toast.deleted': 'Usunęliśmy kontrahenta {name}.',
+    'Tego nie da się cofnąć. Wydatki zachowają kwoty i daty, stracą tylko nazwę odbiorcy.',
+  'payees.toast.created': 'Dodaliśmy odbiorcę {name}.',
+  'payees.toast.updated': 'Zapisaliśmy odbiorcę {name}.',
+  'payees.toast.deleted': 'Usunęliśmy odbiorcę {name}.',
   'payees.toast.merged': 'Scaliliśmy {from} z {into}.',
 
   /* -- Dashboard ---------------------------------------------------------- */
@@ -925,7 +922,7 @@ const messages = {
   'dashboard.widget.netWorth': 'Wartość netto',
   'dashboard.widget.cashFlow': 'Przepływy pieniężne',
   'dashboard.widget.spendingByCategory': 'Wydatki według kategorii',
-  'dashboard.widget.recentTransactions': 'Ostatnie transakcje',
+  'dashboard.widget.recentTransactions': 'Ostatnie wydatki',
   'dashboard.widget.upcomingBills': 'Nadchodzące płatności',
   'dashboard.widget.budgetProgress': 'Budżety',
   'dashboard.widget.savingsGoals': 'Cele oszczędnościowe',
@@ -952,7 +949,7 @@ const messages = {
     'Liczone w walucie {currency}, po kursie zapisanym przy każdym koncie.',
   'dashboard.netWorth.empty.title': 'Nie ma jeszcze czego sumować',
   'dashboard.netWorth.empty.body':
-    'Dodaj konto — jego saldo będzie pierwszą kwotą w tym miejscu.',
+    'Dodaj konto, a jego stan będzie pierwszą kwotą w tym miejscu.',
   'dashboard.cashFlow.month': 'Miesiąc',
   'dashboard.cashFlow.surplus': 'Zostało Ci {amount}',
   'dashboard.cashFlow.deficit': 'Wydatki przewyższyły wpływy o {amount}',
@@ -961,8 +958,7 @@ const messages = {
   'dashboard.cashFlow.context':
     'Wybrany okres: {month}. Wcześniejsze miesiące to kontekst.',
   'dashboard.cashFlow.empty.title': 'W tym okresie nic się nie wydarzyło',
-  'dashboard.cashFlow.empty.body':
-    'Zapisz transakcję albo wybierz dłuższy okres.',
+  'dashboard.cashFlow.empty.body': 'Zapisz wydatek albo wybierz dłuższy okres.',
   'dashboard.spending.other': 'Pozostałe',
   'dashboard.spending.showOther': 'Pokaż mniejsze kategorie',
   'dashboard.spending.hideOther': 'Ukryj mniejsze kategorie',
@@ -973,15 +969,15 @@ const messages = {
     'Przypisz wydatkowi kategorię, a jego udział w okresie pojawi się tutaj.',
   'dashboard.accounts.viewAll': 'Wszystkie konta',
   'dashboard.accounts.owed': 'Zobowiązanie',
-  'dashboard.recent.viewAll': 'Wszystkie transakcje',
+  'dashboard.recent.viewAll': 'Wszystkie wydatki',
   'dashboard.firstRun.title': 'Witamy. Trzy kroki i liczby zaczną pracować.',
   'dashboard.firstRun.body':
     'Nie ma tu przykładowych kwot. Wszystko, co zobaczysz, będzie Twoje.',
   'dashboard.firstRun.steps.label': 'Pierwsze kroki',
   'dashboard.firstRun.step.account.title': 'Dodaj konto',
   'dashboard.firstRun.step.account.body':
-    'Rachunek osobisty, portfel, karta — cokolwiek chcesz śledzić.',
-  'dashboard.firstRun.step.transaction.title': 'Zapisz transakcję',
+    'Konto w banku, portfel, karta - cokolwiek chcesz śledzić.',
+  'dashboard.firstRun.step.transaction.title': 'Zapisz wydatek',
   'dashboard.firstRun.step.transaction.body':
     'Jedna wystarczy, żeby wykres przepływów miał co narysować.',
   'dashboard.firstRun.step.review.title': 'Wróć tutaj',
@@ -990,7 +986,7 @@ const messages = {
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budżety',
-  'budgets.subtitle': 'Ile zostało — koperta po kopercie.',
+  'budgets.subtitle': 'Ile zostało w każdej kategorii.',
   'budgets.spentOf': '{spent} z {limit}',
   'budgets.remaining': 'Pozostało {amount}',
   'budgets.overspent': 'Przekroczono o {amount}',
@@ -1021,11 +1017,10 @@ const messages = {
   'budgets.kind.label': 'Co obejmuje',
   'budgets.kind.category': 'Kategorie',
   'budgets.kind.category.help':
-    'Liczy każdą transakcję z wybranych kategorii i ich podkategorii.',
+    'Liczy każdy wydatek z wybranych kategorii i ich podkategorii.',
   'budgets.kind.manual': 'Wybrane ręcznie',
   'budgets.kind.manual.help':
-    'Liczy tylko transakcje, które sam do niego dodasz. Na wyjazd, remont, jednorazowy wydatek.',
-
+    'Liczy tylko te wydatki, które sam do niego dodasz. Na wyjazd, remont albo jednorazowy zakup.',
   'budgets.period.label': 'Okres rozliczeniowy',
   'budgets.period.one_off': 'Jednorazowy',
   'budgets.period.weekly': 'Tygodniowy',
@@ -1040,14 +1035,14 @@ const messages = {
   'budgets.rollover.carry_surplus': 'Przenoś nadwyżkę',
   'budgets.rollover.carry_surplus.help':
     'Niewydane pieniądze doliczamy do kolejnego okresu. Przekroczenie nie przechodzi dalej, ale zapisujemy je w zestawieniu.',
-  'budgets.rollover.carry_all': 'Przenoś całe saldo',
+  'budgets.rollover.carry_all': 'Przenoś resztę i przekroczenie',
   'budgets.rollover.carry_all.help':
     'Kolejny okres zaczyna się od tego, co zostało — albo na minusie, jeśli był przekroczony.',
 
   'budgets.status.archived': 'Zarchiwizowany',
   'budgets.status.closed': 'Zamknięty',
   'budgets.status.open': 'Otwarty',
-  'budgets.autoInclude': 'Automatycznie liczy nowe transakcje',
+  'budgets.autoInclude': 'Automatycznie liczy nowe wydatki',
   'budgets.categories.count': {
     one: '{count} kategoria',
     few: '{count} kategorie',
@@ -1074,7 +1069,7 @@ const messages = {
 
   'budgets.empty.title': 'Nie masz jeszcze budżetów',
   'budgets.empty.body':
-    'Budżet to koperta z limitem i okresem. Podepnij pod niego kategorie, a wypełni się sam, albo dodawaj transakcje ręcznie — do jednorazowego wydatku.',
+    'Budżet to limit na wybrane kategorie w wybranym okresie. Podepnij pod niego kategorie, a wypełni się sam, albo dodawaj wydatki ręcznie, gdy chodzi o jeden konkretny zakup.',
   'budgets.empty.action': 'Utwórz pierwszy budżet',
   'budgets.empty.archived.title': 'Nic nie jest zarchiwizowane',
   'budgets.empty.archived.body':
@@ -1117,9 +1112,9 @@ const messages = {
 
   'budgets.allocation.title': 'Kategorie w tym budżecie',
   'budgets.allocation.body':
-    'Każda transakcja z tych kategorii i ich podkategorii pomniejsza limit.',
+    'Każdy wydatek z tych kategorii i ich podkategorii pomniejsza limit.',
   'budgets.allocation.manual':
-    'Ten budżet liczy tylko transakcje dodane do niego ręcznie.',
+    'Ten budżet liczy tylko wydatki dodane do niego ręcznie.',
   'budgets.allocation.edit': 'Zmień kategorie',
   'budgets.transactions.title': 'Co zaliczyliśmy w tym okresie',
   'budgets.transactions.empty':
@@ -1245,8 +1240,7 @@ const messages = {
     'Ta strona nie istnieje albo nie jest już Tobie udostępniona.',
   'empty.notFound.action': 'Wróć na pulpit',
   'empty.forbidden.title': 'Brak dostępu',
-  'empty.forbidden.body':
-    'Poproś właściciela przestrzeni o nadanie Ci dostępu.',
+  'empty.forbidden.body': 'Poproś właściciela tego domu o nadanie Ci dostępu.',
   'empty.offline.title': 'Jesteś offline',
   'empty.offline.body':
     'To, co teraz zapiszesz, wyślemy, gdy wrócisz do sieci.',
@@ -1256,7 +1250,7 @@ const messages = {
   'notifications.markAllRead': 'Oznacz wszystkie jako przeczytane',
   'notifications.empty.title': 'Nic nowego',
   'notifications.empty.body':
-    'Alerty o budżetach, rachunkach i wspólnych przestrzeniach pojawią się tutaj.',
+    'Alerty o budżetach, rachunkach i wspólnych domach pojawią się tutaj.',
   'notifications.unread': {
     one: '{count} nieprzeczytane powiadomienie',
     few: '{count} nieprzeczytane powiadomienia',
@@ -1317,7 +1311,7 @@ const messages = {
   'app.nav.section.plan': 'Planowanie',
   'app.nav.section.insight': 'Analizy',
   'app.signedInAs': 'Zalogowano jako {email}',
-  'app.workspace.current': 'Bieżąca przestrzeń',
+  'app.workspace.current': 'Bieżący dom',
   'app.workspace.role.owner': 'Właściciel',
   'app.workspace.role.admin': 'Administrator',
   'app.workspace.role.member': 'Uczestnik',
@@ -1327,9 +1321,9 @@ const messages = {
 
   /* -- Settings ----------------------------------------------------------- */
   'settings.subtitle':
-    'Jak produkt wygląda dla Ciebie i co zawiera ta przestrzeń. Każda karta wskazuje, czyje jest dane ustawienie.',
+    'Jak produkt wygląda dla Ciebie i co zawiera ten dom. Każda karta wskazuje, czyje jest dane ustawienie.',
   'settings.scope.you': 'Tylko Twoje',
-  'settings.scope.workspace': 'Wspólne dla przestrzeni',
+  'settings.scope.workspace': 'Wspólne dla całego domu',
   'settings.appearance.description':
     'Jasny, ciemny albo zgodny z ustawieniem tego urządzenia. Zapisujemy go lokalnie, więc telefon i laptop mogą mieć różne motywy.',
   'settings.language.description':
@@ -1337,23 +1331,23 @@ const messages = {
   'settings.account.title': 'Twoje konto',
   'settings.account.description': 'Dane konta, z którego korzystasz.',
   'settings.workspace.description':
-    'Wspólne księgi tej przestrzeni. Do tych dwóch list przypisywana jest każda transakcja.',
-  'settings.workspace.name': 'Nazwa przestrzeni',
+    'Wspólne listy tego domu. Do tych dwóch trafia każdy wpis.',
+  'settings.workspace.name': 'Nazwa domu',
   'settings.categories.description':
-    'Dwupoziomowe drzewo, do którego trafia każda transakcja.',
+    'Dwupoziomowe drzewo, do którego trafia każdy wpis.',
   'settings.payees.description':
     'Komu trafiły pieniądze oraz nazwy, które import ma z nimi scalać.',
 
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Każda kwota co do grosza.',
   'auth.aside.body':
-    'Kwoty trzymamy jako całkowite jednostki podrzędne i przeliczamy po kursie z dnia księgowania, więc zeszły marzec nadal zgadza się tak, jak zgadzał się w marcu.',
+    'Kwoty trzymamy co do grosza i przeliczamy po kursie z dnia, którego dotyczy wydatek, więc zeszły marzec nadal zgadza się tak, jak zgadzał się w marcu.',
   'auth.aside.point.privacy':
     'Żadnych integracji z bankami. Czytamy tylko to, co sam wpiszesz lub zaimportujesz.',
   'auth.aside.point.currency':
     'Konta w kilku walutach raportowane w jednej walucie bazowej.',
   'auth.aside.point.export':
-    'Całą przestrzeń pobierzesz jako CSV lub JSON, kiedy tylko zechcesz.',
+    'Cały dom pobierzesz jako CSV lub JSON, kiedy tylko zechcesz.',
   'auth.continueWith': 'lub',
   'auth.provider.google': 'Kontynuuj z Google',
   'auth.provider.apple': 'Kontynuuj z Apple',
@@ -1500,15 +1494,14 @@ const messages = {
   /* -- Oznaczanie jako opłacone ---------------------------------------------- */
   'recurring.markPaid.title': 'Oznacz ten okres jako opłacony',
   'recurring.markPaid.body':
-    'Wskaż transakcję, która go uregulowała. Nic tutaj nie tworzy transakcji — jeśli płatność nie jest jeszcze zapisana, zapisz ją najpierw.',
-  'recurring.markPaid.field': 'Transakcja, która to uregulowała',
-  'recurring.markPaid.placeholder': 'Szukaj w transakcjach',
+    'Wskaż wydatek, który to uregulował. Nic tutaj nie tworzy nowych wpisów: jeśli płatność nie jest jeszcze zapisana, zapisz ją najpierw.',
+  'recurring.markPaid.field': 'Wydatek, który to uregulował',
+  'recurring.markPaid.placeholder': 'Szukaj wśród wydatków',
   'recurring.markPaid.empty':
-    'Żadna transakcja z tego okna nie pasuje. Zapisz najpierw płatność i wróć tutaj.',
+    'Żaden wydatek z tego okna nie pasuje. Zapisz najpierw płatność i wróć tutaj.',
   'recurring.markPaid.confirm': 'Połącz',
   'recurring.markPaid.never':
-    'Oznaczenie okresu jako opłaconego nigdy nie tworzy transakcji.',
-
+    'Oznaczenie jako opłaconego nigdy nie tworzy nowego wpisu.',
   /* -- Automatyzacja --------------------------------------------------------- */
   'recurring.automation.label': 'Automatyzacja',
   'recurring.automation.none':
@@ -1517,14 +1510,14 @@ const messages = {
     'Seria przypomina i pilnuje, co jest nieuregulowane. Nic nie zostanie zapisane bez Ciebie.',
   'recurring.automation.auto': 'Zapisuj za mnie',
   'recurring.automation.auto.help':
-    'W dniu terminu na wskazanym koncie powstaje transakcja na oczekiwaną kwotę. Możesz ją potem edytować jak każdą inną.',
+    'W dniu terminu na wskazanym koncie powstaje wydatek na oczekiwaną kwotę. Możesz go potem edytować jak każdy inny.',
   'recurring.automation.match': 'Dopasowuj to, co zapiszę',
   'recurring.automation.match.help':
-    'Nic nie zostaje zapisane. Transakcja, którą wprowadzisz i która pasuje do poniższej reguły, zostanie połączona z okresem, który reguluje.',
+    'Nic nie zostaje zapisane. Wydatek, który wprowadzisz i który pasuje do poniższych warunków, zostanie połączony z płatnością, którą reguluje.',
   'recurring.automation.exclusive':
     'Seria albo zapisuje za Ciebie, albo dopasowuje to, co zapisujesz. Nie może robić obu naraz — automatyczny wpis nie ma już czego dopasowywać.',
   'recurring.automation.needsAccount':
-    'Zapisywanie za Ciebie wymaga konta, na którym ma powstać transakcja.',
+    'Zapisywanie za Ciebie wymaga konta, na którym ma powstać wydatek.',
   'recurring.automation.badge.auto': 'Zapisuje automatycznie',
   'recurring.automation.badge.match': 'Dopasowuje Twoje wpisy',
 
@@ -1632,15 +1625,14 @@ const messages = {
   'recurring.toast.periodPaid': 'Okres oznaczony jako opłacony',
   'recurring.toast.periodSkipped': 'Okres pominięty',
   'recurring.toast.periodReverted': 'Okres otwarty ponownie',
-  'recurring.toast.unlinked': 'Transakcja odłączona',
-
+  'recurring.toast.unlinked': 'Wydatek odłączony',
   /* -- Połączone transakcje ---------------------------------------------------- */
-  'recurring.links.title': 'Połączone transakcje',
+  'recurring.links.title': 'Połączone wydatki',
   'recurring.links.caption':
     'To, co ta seria przyjęła, i skąd wzięło się każde połączenie.',
   'recurring.links.empty': 'Nic jeszcze nie jest połączone.',
   'recurring.links.source.manual': 'Połączone przez Ciebie',
-  'recurring.links.source.rule': 'Dopasowane regułą',
+  'recurring.links.source.rule': 'Dopasowane zasadą',
   'recurring.links.source.auto': 'Zapisane automatycznie',
   'recurring.links.unlink': 'Odłącz',
   'recurring.links.unlinked': 'Odłączone',
@@ -1649,7 +1641,7 @@ const messages = {
   'recurring.candidates.title': 'Zauważone serie',
   'recurring.candidates.subtitle':
     'Wzorce w tym, co masz już zapisane. Każdy z nich to propozycja, a nie coś, co zrobiliśmy.',
-  'recurring.candidates.loading': 'Przeglądanie transakcji…',
+  'recurring.candidates.loading': 'Przeglądanie wydatków…',
   'recurring.candidates.detect': 'Poszukaj ponownie',
   'recurring.candidates.detecting': 'Szukanie…',
   'recurring.candidates.link': 'Zauważone serie',
@@ -1677,10 +1669,10 @@ const messages = {
   'recurring.candidate.confidence.medium': 'Średnia',
   'recurring.candidate.confidence.low': 'Niska',
   'recurring.candidate.evidence': {
-    one: 'Na podstawie {count} transakcji',
-    few: 'Na podstawie {count} transakcji',
-    many: 'Na podstawie {count} transakcji',
-    other: 'Na podstawie {count} transakcji',
+    one: 'Na podstawie {count} wydatku',
+    few: 'Na podstawie {count} wydatków',
+    many: 'Na podstawie {count} wydatków',
+    other: 'Na podstawie {count} wydatku',
   },
   'recurring.candidate.because.occurrences':
     'Pewność obniża to, jak niewiele razy to się wydarzyło.',
@@ -1693,7 +1685,7 @@ const messages = {
   'recurring.candidate.dismiss.for': 'Odrzuć propozycję dla {name}',
   'recurring.candidate.accept.for': 'Utwórz serię dla {name}',
   'recurring.candidate.creates':
-    'Utworzenie serii tworzy wyłącznie plan. Żadna z transakcji, na podstawie których ją znaleziono, nie zostaje zmieniona.',
+    'Utworzenie płatności cyklicznej tworzy wyłącznie plan. Żaden z wydatków, na podstawie których ją znaleźliśmy, nie zostaje zmieniony.',
   'recurring.candidate.toast.dismissed': 'Propozycja odrzucona',
   'recurring.candidate.toast.accepted': 'Seria utworzona z propozycji',
 
@@ -1721,7 +1713,7 @@ const messages = {
 
   'goals.empty.title': 'Nie masz jeszcze żadnych celów',
   'goals.empty.body':
-    'Cel to kwota docelowa i — jeśli chcesz — data. Postęp bierze się z transakcji, które masz już zapisane; nic tutaj nie tworzy pieniędzy ani ich nie przenosi.',
+    'Cel to kwota docelowa i, jeśli chcesz, data. Postęp bierze się z wpisów, które masz już zapisane; nic tutaj nie tworzy pieniędzy ani ich nie przenosi.',
   'goals.empty.action': 'Utwórz pierwszy cel',
   'goals.empty.filtered.title': 'Tutaj nic nie ma',
   'goals.empty.filtered.body':
@@ -1829,7 +1821,7 @@ const messages = {
   'goals.chart.series.monthly': 'Wpłacone w tym miesiącu',
   'goals.chart.empty.title': 'Nie ma jeszcze czego pokazać',
   'goals.chart.empty.body':
-    'Zalicz transakcję na poczet tego celu, a jej historia pojawi się tutaj.',
+    'Zalicz wpis na poczet tego celu, a jego historia pojawi się tutaj.',
   'goals.chart.noData': 'Nic',
   'goals.chart.zeroNote':
     'Miesiąc bez słupka to miesiąc, w którym nic nie wpłynęło — prawdziwe zero, a nie brak danych.',
@@ -1844,15 +1836,14 @@ const messages = {
   },
   'goals.contributions.empty.title': 'Nie ma jeszcze wpłat',
   'goals.contributions.empty.body':
-    'Wpłata wskazuje na transakcję, którą masz już zapisaną. Nic nowego nie powstaje i żadne pieniądze się nie przemieszczają.',
+    'Wpłata wskazuje na wpis, który masz już zapisany. Nic nowego nie powstaje i żadne pieniądze się nie przemieszczają.',
   'goals.contributions.column.date': 'Data',
   'goals.contributions.column.amount': 'Kwota',
-  'goals.contributions.column.detail': 'Transakcja',
+  'goals.contributions.column.detail': 'Wpis',
   'goals.contributions.column.actions': 'Działania',
   'goals.contributions.linkedOn': 'Zaliczono {date}',
   'goals.contributions.remove': 'Usuń {amount} z tego celu',
-  'goals.contributions.add': 'Zalicz transakcję',
-
+  'goals.contributions.add': 'Zalicz wpis',
   /* -- Podpowiedzi: propozycje, nigdy automatyczne powiązania -------------- */
   'goals.suggestions.heading': 'Przelewy, które wyglądają na wpłaty',
   'goals.suggestions.body':
@@ -1893,23 +1884,22 @@ const messages = {
   'goals.form.error': 'Nie udało się zapisać celu',
 
   /* -- Zaliczanie wpłaty ---------------------------------------------------- */
-  'goals.contribute.title': 'Zalicz transakcję na poczet celu {name}',
+  'goals.contribute.title': 'Zalicz wpis na poczet celu {name}',
   'goals.contribute.description':
-    'Wybierz transakcję, która już się wydarzyła. Zostaje dokładnie taka, jaka jest — zapisujemy tylko to, na co była.',
-  'goals.contribute.field': 'Transakcja',
+    'Wybierz wpis, który już się wydarzył. Zostaje dokładnie taki, jaki jest, zapisujemy tylko to, na co poszedł.',
+  'goals.contribute.field': 'Wpis',
   'goals.contribute.field.help':
-    'Zaliczyć można wyłącznie transakcje w walucie {currency}, ponieważ cel jest liczony w {currency}.',
+    'Zaliczyć można wyłącznie wpisy w walucie {currency}, ponieważ cel jest liczony w {currency}.',
   'goals.contribute.option': '{date} · {amount}',
   'goals.contribute.empty':
-    'Nie ma niepowiązanej transakcji w walucie {currency}, którą można zaliczyć. Zapisz ją najpierw albo zmień konto, na którym trzymasz ten cel.',
+    'Nie ma niepowiązanego wpisu w walucie {currency}, który można zaliczyć. Zapisz go najpierw albo zmień konto, na którym trzymasz ten cel.',
   'goals.contribute.submit': 'Zalicz',
   'goals.contribute.cancel': 'Anuluj',
-  'goals.contribute.error': 'Nie udało się zaliczyć transakcji',
+  'goals.contribute.error': 'Nie udało się zaliczyć tego wpisu',
   'goals.contribute.error.currency':
-    'Ta transakcja jest w walucie {transaction}, a cel w {goal}. Przeliczenie wymagałoby kursu, którego nikt nie wybrał, więc odrzucamy ją, zamiast zgadywać.',
+    'Ten wpis jest w walucie {transaction}, a cel w {goal}. Przeliczenie wymagałoby kursu, którego nikt nie wybrał, więc odrzucamy go, zamiast zgadywać.',
   'goals.contribute.error.direction':
-    'Ten cel jest finansowany transakcjami typu {expected}, a ta jest typu {received}. Zaliczenie jej zmniejszyłoby postęp, zamiast go zwiększyć.',
-
+    'Ten cel zasilają wpisy typu {expected}, a ten jest typu {received}. Zaliczenie go zmniejszyłoby postęp, zamiast go zwiększyć.',
   /* -- Akcje i potwierdzenia ------------------------------------------------ */
   'goals.actions.label': 'Działania dla celu {name}',
   'goals.actions.edit': 'Edytuj',
@@ -1924,11 +1914,11 @@ const messages = {
   'goals.confirm.archive.action': 'Zarchiwizuj',
   'goals.confirm.delete.title': 'Usunąć ten cel?',
   'goals.confirm.delete.body':
-    'Cel i zapis o tym, które transakcje się na niego składały, znikną na dobre. Same transakcje pozostają nietknięte.',
+    'Cel i zapis o tym, które wpisy się na niego składały, znikną na dobre. Same wpisy pozostają nietknięte.',
   'goals.confirm.delete.action': 'Usuń',
   'goals.confirm.remove.title': 'Usunąć tę wpłatę?',
   'goals.confirm.remove.body':
-    'Transakcja zostaje dokładnie taka, jaka jest. Znika tylko adnotacja, że była na ten cel, a postęp spada o tę kwotę.',
+    'Wpis zostaje dokładnie taki, jaki jest. Znika tylko adnotacja, że był na ten cel, a postęp spada o tę kwotę.',
   'goals.confirm.remove.action': 'Usuń',
 
   'goals.toast.created': 'Cel utworzony',
@@ -1941,43 +1931,43 @@ const messages = {
   'goals.toast.recomputed': 'Postęp przeliczony',
   'goals.toast.reached': 'Cel {name} jest w pełni sfinansowany',
   'goals.toast.failed': 'Nie udało się',
-  /* -- Reguły · baner wstrzymanej reguły ------------------------------------ */
+  /* -- Zasady · baner wstrzymanej zasady ------------------------------------ */
   'rules.paused.badge': 'Wstrzymana',
-  'rules.paused.title': 'Reguła „{name}” jest wstrzymana',
+  'rules.paused.title': 'Zasada „{name}” jest wstrzymana',
   'rules.paused.body':
-    'Element, którego potrzebowała ta reguła, został usunięty, więc przestała działać. Wybierz zamiennik, aby włączyć ją z powrotem, albo usuń regułę.',
+    'Element, którego potrzebowała ta zasada, został usunięty, więc przestała działać. Wybierz zamiennik, aby włączyć ją z powrotem, albo usuń zasadę.',
   'rules.paused.at': 'Wstrzymano {when}.',
   'rules.paused.missing.account': 'Usunięte konto: „{label}”',
   'rules.paused.missing.accountGroup': 'Usunięta grupa kont: „{label}”',
   'rules.paused.missing.category': 'Usunięta kategoria: „{label}”',
-  'rules.paused.missing.payee': 'Usunięty kontrahent: „{label}”',
+  'rules.paused.missing.payee': 'Usunięty odbiorca: „{label}”',
   'rules.paused.missing.tag': 'Usunięty tag: „{label}”',
-  'rules.paused.replace.label': 'Zamiennik dla reguły „{name}”',
+  'rules.paused.replace.label': 'Zamiennik dla zasady „{name}”',
   'rules.paused.replace.placeholder': 'Wybierz zamiennik',
   'rules.paused.replace.empty':
-    'Nie ma na co przełączyć. Najpierw utwórz zamiennik albo usuń tę regułę.',
-  'rules.paused.delete': 'Usuń tę regułę',
-  'rules.paused.resumed': 'Reguła znów działa',
+    'Nie ma na co przełączyć. Najpierw utwórz zamiennik albo usuń tę zasadę.',
+  'rules.paused.delete': 'Usuń tę zasadę',
+  'rules.paused.resumed': 'Zasada znów działa',
 
-  /* -- Reguły: silnik automatyzacji ---------------------------------------- */
-  'rules.title': 'Reguły',
+  /* -- Zasady: silnik automatyzacji ---------------------------------------- */
+  'rules.title': 'Zasady',
   'rules.subtitle':
-    'Reguły działają od góry do dołu na każdej transakcji, która uruchamia ich wyzwalacz. Wykonują się wszystkie pasujące, a późniejsza reguła nadpisuje to, co ustawiła wcześniejsza.',
-  'rules.new': 'Nowa reguła',
-  'rules.list.label': 'Reguły w kolejności działania',
-  'rules.back': 'Wróć do reguł',
-  'rules.error.title': 'Nie udało się wczytać reguł',
+    'Zasady działają od góry do dołu na każdym wpisie, który je uruchamia. Wykonują się wszystkie pasujące, a późniejsza zasada nadpisuje to, co ustawiła wcześniejsza.',
+  'rules.new': 'Nowa zasada',
+  'rules.list.label': 'Zasady w kolejności działania',
+  'rules.back': 'Wróć do zasad',
+  'rules.error.title': 'Nie udało się wczytać zasad',
   'rules.error.body':
     'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli będzie się powtarzać, prześlij nam szczegóły poniżej.',
   'rules.error.locked':
-    'Reguły nie wchodzą w skład tego planu, więc nic nie zapisano.',
+    'Zasady nie wchodzą w skład tego planu, więc nic nie zapisano.',
 
-  'rules.empty.title': 'Nie ma jeszcze żadnej reguły',
+  'rules.empty.title': 'Nie ma jeszcze żadnej zasady',
   'rules.empty.body':
-    'Reguła wypatruje transakcji, które opiszesz, i zmienia je za Ciebie — nadaje kategorię sklepowi, do którego chodzisz co tydzień, albo tag subskrypcji, o której ciągle zapominasz.',
+    'Zasada wypatruje wpisów, które opiszesz, i zmienia je za Ciebie: nadaje kategorię sklepowi, do którego chodzisz co tydzień, albo etykietę płatności, o której ciągle zapominasz.',
   'rules.empty.locked.title': 'Automatyzacja nie wchodzi w skład tego planu',
   'rules.empty.locked.body':
-    'Reguły nadają kategorie, tagi i nazwy transakcjom w chwili, gdy się pojawiają. Zmiana planu je włącza; nic z tego, co już wprowadziłeś, się nie zmienia.',
+    'Zasady nadają kategorie, etykiety i nazwy nowym wpisom w chwili, gdy się pojawiają. Zmiana planu je włącza; nic z tego, co już wprowadziłeś, się nie zmienia.',
   'rules.empty.locked.action': 'Zobacz plany',
 
   'rules.row.actions': 'Działania dla {name}',
@@ -1991,25 +1981,25 @@ const messages = {
   'rules.move.top': 'Przenieś na górę',
   'rules.move.bottom': 'Przenieś na dół',
 
-  'rules.confirm.delete.title': 'Usunąć tę regułę?',
+  'rules.confirm.delete.title': 'Usunąć tę zasadę?',
   'rules.confirm.delete.body':
-    'Od tej chwili przestaje działać. Nic, co już wpisała w transakcje, nie zostaje cofnięte.',
+    'Od tej chwili przestaje działać. Nic, co już wpisała, nie zostaje cofnięte.',
   'rules.confirm.delete.action': 'Usuń',
 
   'rules.toast.reordered': 'Kolejność zapisana',
-  'rules.toast.activated': 'Reguła włączona',
-  'rules.toast.deactivated': 'Reguła wyłączona',
-  'rules.toast.created': 'Reguła utworzona',
-  'rules.toast.saved': 'Reguła zapisana',
-  'rules.toast.deleted': 'Reguła usunięta',
+  'rules.toast.activated': 'Zasada włączona',
+  'rules.toast.deactivated': 'Zasada wyłączona',
+  'rules.toast.created': 'Zasada utworzona',
+  'rules.toast.saved': 'Zasada zapisana',
+  'rules.toast.deleted': 'Zasada usunięta',
   'rules.toast.failed': 'Nie udało się',
 
   /* -- Edytor --------------------------------------------------------------- */
-  'rules.editor.new.title': 'Nowa reguła',
-  'rules.editor.edit.title': 'Edytuj regułę',
+  'rules.editor.new.title': 'Nowa zasada',
+  'rules.editor.edit.title': 'Edytuj zasadę',
   'rules.editor.name': 'Nazwa',
   'rules.editor.name.description':
-    'To, jak nazwiesz tę regułę, przeglądając listę.',
+    'To, jak nazwiesz tę zasadę, przeglądając listę.',
   'rules.editor.matchMode': 'Dopasowanie',
   'rules.editor.matchMode.all': 'Każdy warunek',
   'rules.editor.matchMode.any': 'Dowolny warunek',
@@ -2022,18 +2012,18 @@ const messages = {
   'rules.editor.addRange': 'Dodaj przedział kwoty',
   'rules.editor.addRange.description':
     'Dodaje dwa warunki — co najmniej i co najwyżej. Przedział jest przedziałem tylko wtedy, gdy muszą zachodzić wszystkie warunki, więc najpierw ustaw Dopasowanie na „Każdy warunek”.',
-  'rules.editor.conditions.full': 'Reguła mieści najwyżej {count} warunków.',
-  'rules.editor.actions.full': 'Reguła mieści najwyżej {count} działań.',
-  'rules.editor.runOn': 'Uruchamiaj tę regułę',
-  'rules.editor.runOn.manual_create': 'Gdy dodaję transakcję',
+  'rules.editor.conditions.full': 'Zasada mieści najwyżej {count} warunków.',
+  'rules.editor.actions.full': 'Zasada mieści najwyżej {count} działań.',
+  'rules.editor.runOn': 'Uruchamiaj tę zasadę',
+  'rules.editor.runOn.manual_create': 'Gdy dodaję wpis',
   'rules.editor.runOn.import': 'Gdy importuję plik',
-  'rules.editor.runOn.edit': 'Gdy edytuję transakcję',
+  'rules.editor.runOn.edit': 'Gdy edytuję wpis',
   'rules.editor.runOn.none':
-    'Ta reguła nie uruchamia się w żadnej sytuacji, więc nigdy nie zmieni transakcji. Mimo to można ją zapisać.',
-  'rules.editor.sentence.label': 'Co robi ta reguła',
-  'rules.editor.save': 'Zapisz regułę',
-  'rules.editor.delete': 'Usuń tę regułę',
-  'rules.editor.error.title': 'Reguła nie została zapisana',
+    'Ta zasada nie uruchamia się w żadnej sytuacji, więc nigdy niczego nie zmieni. Mimo to można ją zapisać.',
+  'rules.editor.sentence.label': 'Co robi ta zasada',
+  'rules.editor.save': 'Zapisz zasadę',
+  'rules.editor.delete': 'Usuń tę zasadę',
+  'rules.editor.error.title': 'Zasada nie została zapisana',
 
   /* -- Wiersz warunku ------------------------------------------------------- */
   'rules.condition.legend': 'Warunek {position}',
@@ -2060,7 +2050,7 @@ const messages = {
   'rules.condition.amount': 'Kwota',
   'rules.condition.currency': 'Waluta',
   'rules.condition.currency.description':
-    'Kwotę porównuje się w jednej walucie i nigdy nie przelicza, więc transakcja w innej walucie nie pasuje.',
+    'Kwotę porównujemy w jednej walucie i nigdy nie przeliczamy, więc wpis w innej walucie nie pasuje.',
   'rules.condition.direction': 'Kierunek',
   'rules.condition.direction.income': 'Wpływ',
   'rules.condition.direction.expense': 'Wydatek',
@@ -2110,20 +2100,20 @@ const messages = {
 
   /* -- Podgląd na żywo ------------------------------------------------------ */
   'rules.preview.title': 'Podgląd',
-  'rules.preview.counts': 'Pasuje {matched} z ostatnich {scanned} transakcji.',
-  'rules.preview.empty': 'Brak dopasowań wśród ostatnich {scanned} transakcji.',
+  'rules.preview.counts': 'Pasuje {matched} z ostatnich {scanned} wpisów.',
+  'rules.preview.empty': 'Brak dopasowań wśród ostatnich {scanned} wpisów.',
   'rules.preview.incomplete':
     'Dodaj warunek i działanie, a podgląd pojawi się tutaj.',
   'rules.preview.loading': 'Sprawdzam…',
-  'rules.preview.samples.label': 'Pasujące transakcje',
+  'rules.preview.samples.label': 'Pasujące wpisy',
   'rules.preview.samples.shown': 'Wypisano pierwsze {shown}.',
   'rules.preview.scanCap':
-    'Sprawdzanych jest tylko {limit} najnowszych transakcji, więc to próbka Twojej księgi, a nie całość.',
+    'Sprawdzamy tylko {limit} najnowszych wpisów, więc to próbka Twojej historii, a nie całość.',
   'rules.preview.error.title': 'Nie udało się wykonać podglądu',
   'rules.preview.error.body':
-    'Nic nie zostało zmienione — podgląd nigdy nie zapisuje. Reguła nadal czeka na zapisanie lub edycję.',
+    'Nic nie zostało zmienione — podgląd nigdy nie zapisuje. Zasada nadal czeka na zapisanie lub edycję.',
 
-  /* -- Reguła odczytana jako zdanie ----------------------------------------- */
+  /* -- Zasada odczytana jako zdanie ----------------------------------------- */
   'rules.sentence.template': 'Gdy {when}, {then}.',
   'rules.sentence.and': ' i ',
   'rules.sentence.or': ' lub ',
@@ -2131,9 +2121,9 @@ const messages = {
   'rules.sentence.quoted': '„{value}”',
   'rules.sentence.unknownReference': 'coś, czego już nie ma',
   'rules.sentence.noConditions':
-    'Dodaj warunek, a reguła zostanie tu odczytana zdaniem.',
+    'Dodaj warunek, a zasada zostanie tu odczytana zdaniem.',
   'rules.sentence.noActions':
-    'Dodaj działanie, a reguła zostanie tu odczytana zdaniem.',
+    'Dodaj działanie, a zasada zostanie tu odczytana zdaniem.',
 
   'rules.clause.note.contains': 'notatka zawiera {values}',
   'rules.clause.note.notContains': 'notatka nie zawiera {values}',
@@ -2170,13 +2160,13 @@ const messages = {
   /* -- Attachments (11-S3) -------------------------------------------------- */
   'attachments.title': 'Paragony',
   'attachments.description':
-    'Zdjęcia i pliki PDF przechowywane przy tej transakcji. Otworzą je tylko osoby z tej przestrzeni.',
+    'Zdjęcia i pliki PDF przechowywane przy tym wpisie. Otworzą je tylko osoby z tego domu.',
   'attachments.list.label': 'Załączone paragony',
   'attachments.link': '{name} · {size} · {kind}',
   'attachments.remove': 'Usuń {name}',
   'attachments.empty.title': 'Brak załączonych paragonów',
   'attachments.empty.body':
-    'Trzymaj paragon, fakturę lub potwierdzenie przelewu razem z transakcją, której dotyczą.',
+    'Trzymaj paragon, fakturę lub potwierdzenie przelewu razem z wydatkiem, którego dotyczą.',
   'attachments.attach': 'Załącz paragon',
   'attachments.dropzone.label': 'Upuść tutaj paragony, aby je załączyć',
   'attachments.dropzone.hint': 'Upuść pliki tutaj albo je wybierz:',
@@ -2196,7 +2186,7 @@ const messages = {
   'attachments.type.other': 'Plik',
   'attachments.confirm.title': 'Usunąć ten paragon?',
   'attachments.confirm.body':
-    'Plik {name} zostanie usunięty na stałe. Sama transakcja pozostanie bez zmian.',
+    'Plik {name} zostanie usunięty na stałe. Sam wpis pozostanie bez zmian.',
   'attachments.confirm.action': 'Usuń',
   'attachments.toast.deleted': 'Paragon usunięty',
   /* -- Why an import refused a row (19-S2) ---------------------------------- */
@@ -2213,12 +2203,11 @@ const messages = {
     'Ta kwota ma więcej miejsc po przecinku niż waluta, więc nie została zaokrąglona.',
   'import.error.amount_out_of_range':
     'Ta kwota jest zbyt duża, aby ją zapisać.',
-  'import.error.amount_zero':
-    'Importowana transakcja nie może opiewać na zero.',
+  'import.error.amount_zero': 'Wczytywany wpis nie może opiewać na zero.',
   'import.error.amount_both_empty':
     'W tym wierszu nie ma kwoty ani w kolumnie obciążeń, ani uznań.',
   'import.error.amount_debit_and_credit':
-    'Ten wiersz ma jednocześnie obciążenie i uznanie, więc nie jest jedną transakcją.',
+    'Ten wiersz ma jednocześnie obciążenie i uznanie, więc nie jest jednym wpisem.',
   'import.error.row_currency_mismatch':
     'Ten wiersz jest w innej walucie niż konto, do którego miałby trafić.',
 
@@ -2247,9 +2236,8 @@ const messages = {
   'import.upload.state.uploading': 'Wysyłanie {name}…',
   'import.upload.state.sniffing': 'Ustalamy, czym jest ten plik…',
   'import.upload.noAccounts':
-    'Najpierw załóż konto - zaimportowana transakcja musi gdzieś trafić.',
-  'import.upload.error.account':
-    'Wybierz konto, do którego należą te transakcje.',
+    'Najpierw załóż konto, wczytane wpisy muszą gdzieś trafić.',
+  'import.upload.error.account': 'Wybierz konto, do którego należą te wpisy.',
   'import.upload.error.file': 'Wybierz plik do zaimportowania.',
   'import.upload.error.extension':
     'Plik {name} nie ma rozszerzenia, które umiemy tu odczytać, więc nie ma dla niego parsera.',
@@ -2258,8 +2246,7 @@ const messages = {
   'import.upload.error.failed': 'Nie udało się wczytać pliku: {reason}',
 
   'import.history.title': 'Historia importów',
-  'import.history.body':
-    'Każdy plik wczytany w tej przestrzeni, od najnowszego.',
+  'import.history.body': 'Każdy plik wczytany w tym domu, od najnowszego.',
   'import.history.empty.title': 'Nie było jeszcze importu',
   'import.history.empty.body':
     'Wczytany plik zostaje tutaj razem z tym, co zrobił, więc import da się odnaleźć także po miesiącach.',
@@ -2400,7 +2387,7 @@ const messages = {
 
   'import.preview.title': 'Sprawdź, co się wydarzy',
   'import.preview.body':
-    'Nic nie zostało zapisane. Każdy wiersz poniżej to transakcja w takiej postaci, w jakiej zostałaby utworzona, a kwoty są dokładnie tymi, które trafiłyby do bazy.',
+    'Nic nie zostało zapisane. Każdy wiersz poniżej to wpis w takiej postaci, w jakiej zostałby utworzony, a kwoty są dokładnie tymi, które trafiłyby do bazy.',
   'import.preview.pending': 'Ustalamy, co zrobiłby ten plik…',
   'import.preview.failed.title': 'Podgląd się nie wykonał',
   'import.preview.failed.body':
@@ -2413,8 +2400,7 @@ const messages = {
   'import.preview.count.duplicates': 'Pominięte duplikaty',
   'import.preview.count.invalid': 'Odrzucone',
   'import.preview.count.flagged': 'Do obejrzenia',
-  'import.preview.count.amount': 'Zmiana salda',
-
+  'import.preview.count.amount': 'Zmiana stanu konta',
   'import.preview.filter.label': 'Pokaż',
   'import.preview.filter.all': 'Wszystkie wiersze',
   'import.preview.filter.create': 'Wiersze do utworzenia',
@@ -2434,7 +2420,7 @@ const messages = {
   'import.preview.match.probable': 'Możliwy duplikat',
   'import.preview.match.none': 'Nowa',
   'import.preview.reason.source_ref':
-    'Identyfikator wiersza z tego pliku jest już przy transakcji na tym koncie.',
+    'Wiersz o tym identyfikatorze jest już zapisany na tym koncie.',
   'import.preview.reason.exact_match':
     'Ten sam dzień, ta sama kwota i ten sam opis.',
   'import.preview.reason.amount_and_date':
@@ -2445,7 +2431,7 @@ const messages = {
   'import.preview.sourceRef.used':
     'Ten plik stempluje własne identyfikatory wierszy, więc duplikaty dopasowaliśmy po nich, a nie po przypuszczeniach.',
   'import.preview.quota':
-    'Zaimportowanie tych wierszy przekroczyłoby limit {limit} transakcji w Twoim planie o {excess}.',
+    'Wczytanie tych wierszy przekroczyłoby limit {limit} wpisów w Twoim planie o {excess}.',
   'import.preview.decisions.note':
     'To, co wybierzesz przy poszczególnych wierszach, żyje w tej przeglądarce. Zapis wierszy pojawi się razem z ostatnim krokiem tego przepływu.',
 
@@ -2463,7 +2449,7 @@ const messages = {
 
   'import.done.title': 'Zaimportuj wiersze',
   'import.done.body':
-    'Nic jeszcze nie zostało zapisane. Zapis sprawdzonego importu do księgi nie jest tu jeszcze dostępny, więc podgląd powyżej możesz spokojnie zostawić otwarty albo wrócić do niego później.',
+    'Nic jeszcze nie zostało zapisane. Zapis sprawdzonego importu do Twoich wydatków nie jest tu jeszcze dostępny, więc podgląd powyżej możesz spokojnie zostawić otwarty albo wrócić do niego później.',
   'import.done.back': 'Wróć do przeglądu',
 } satisfies TranslationOf<typeof En>
 

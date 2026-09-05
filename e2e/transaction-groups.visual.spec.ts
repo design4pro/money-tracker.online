@@ -77,8 +77,8 @@ interface GroupLabels {
 
 const LABELS: Readonly<Record<AppLocale, GroupLabels>> = {
   en: {
-    heading: 'Transaction groups',
-    table: 'Transaction groups',
+    heading: 'Spending groups',
+    table: 'Spending groups',
     emptyTitle: 'No groups yet',
     create: 'New group',
     totalColumn: 'Total',
@@ -86,8 +86,8 @@ const LABELS: Readonly<Record<AppLocale, GroupLabels>> = {
     pickerList: 'Templates',
   },
   pl: {
-    heading: 'Grupy transakcji',
-    table: 'Grupy transakcji',
+    heading: 'Grupy wydatków',
+    table: 'Grupy wydatków',
     emptyTitle: 'Nie masz jeszcze żadnej grupy',
     create: 'Nowa grupa',
     totalColumn: 'Suma',
@@ -210,7 +210,7 @@ test('every group listed has at least two transactions', async ({ page }) => {
   const counts = await table
     .getByRole('row')
     .getByRole('gridcell')
-    .filter({ hasText: /^\d+ transactions?$/ })
+    .filter({ hasText: /^\d+ expenses?$/ })
     .allInnerTexts()
 
   expect(counts.length).toBeGreaterThan(0)
