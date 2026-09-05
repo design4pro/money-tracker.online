@@ -1408,6 +1408,170 @@ const messages = {
   'settings.payees.description':
     'Komu trafiły pieniądze oraz nazwy, które import ma z nimi scalać.',
 
+  /* -- Plans and billing -------------------------------------------------- */
+  'plans.free.name': 'Bezpłatny',
+  'plans.free.tagline':
+    'Jedna osoba, codzienne konta i dane, które zawsze zostają Twoje.',
+  'plans.plus.name': 'Plus',
+  'plans.plus.tagline':
+    'Jedna osoba, żadnych limitów i tyle walut, ile trzymasz.',
+  'plans.household.name': 'Dom',
+  'plans.household.tagline': 'Kto dzieli pieniądze, ten dzieli też rachunki.',
+  'plans.feature.free.people': 'Tylko Ty',
+  'plans.feature.free.accounts': 'Trzy konta i jedna waluta',
+  'plans.feature.free.currency':
+    'Budżety, cele i rachunki cykliczne w niewielkiej liczbie',
+  'plans.feature.free.planning': 'Wczytanie wyciągu dwa razy w miesiącu',
+  'plans.feature.export': 'Eksport wszystkiego, kiedy tylko chcesz',
+  'plans.feature.plus.people': 'Tylko Ty',
+  'plans.feature.plus.unlimited': 'Konta, budżety i cele bez limitu',
+  'plans.feature.plus.currencies': 'Tyle walut, w ilu trzymasz pieniądze',
+  'plans.feature.plus.rules':
+    'Dwadzieścia reguł opisywania i comiesięczne importy',
+  'plans.feature.plus.storage': 'Gigabajt na paragony',
+  'plans.feature.household.people': 'Do sześciu osób w jednym domu',
+  'plans.feature.household.unlimited': 'Nic w produkcie nie jest ograniczone',
+  'plans.feature.household.roles':
+    'Właściciele i administratorzy decydują, kto co zmienia',
+  'plans.feature.household.storage': 'Pięć gigabajtów na paragony',
+  'plans.interval.monthly': 'Miesięcznie',
+  'plans.interval.yearly': 'Rocznie',
+  'plans.price.monthly': '{amount} miesięcznie',
+  'plans.price.yearly': '{amount} rocznie',
+  'plans.price.free': 'Zawsze bezpłatnie',
+  'plans.saving': 'Oszczędzasz {percent}%',
+  'plans.current': 'Twój plan',
+  'billing.title': 'Plan i płatności',
+  'billing.subtitle':
+    'Na czym stoi ten dom, ile z tego wykorzystujesz i dokąd idą pieniądze. Ceny pokazujemy dokładnie tak, jak są pobierane.',
+  'billing.plan.title': 'Obecny plan',
+  'billing.state.free':
+    'Korzystasz z planu bezpłatnego. Nic nie pobieramy i nic nie wygasa.',
+  'billing.state.entitled': 'Aktywny. Odnowi się {date}.',
+  'billing.state.trialing': 'Okres próbny. Stanie się planem płatnym {date}.',
+  'billing.state.cancelling': 'Anulowany. Działa do {date} i możesz to cofnąć.',
+  'billing.state.grace':
+    'Ostatnia płatność się nie powiodła. Plan działa do {date}.',
+  'billing.state.lapsed':
+    'Subskrypcja się zakończyła, więc dom wrócił do planu bezpłatnego.',
+  'billing.state.confirming':
+    'Płatność przyjęta. Plan przełączy się, gdy tylko potwierdzi to dostawca — zwykle w ciągu minuty.',
+  'billing.action.upgrade': 'Wybierz ten plan',
+  'billing.action.portal': 'Metody płatności i faktury',
+  'billing.action.cancel': 'Anuluj subskrypcję',
+  'billing.action.resume': 'Zostaw subskrypcję',
+  'billing.action.refresh': 'Sprawdź ponownie',
+  'billing.cancel.title': 'Anulować tę subskrypcję?',
+  'billing.cancel.body':
+    'Plan działa do {date}, czyli do dnia, za który zapłacono. Potem dom wraca do planu bezpłatnego; nic nie zostaje usunięte.',
+  'billing.cancel.confirm': 'Anuluj ją',
+  'billing.cancel.keep': 'Zostaw ją',
+  'billing.usage.title': 'Co wykorzystujesz',
+  'billing.usage.description':
+    'To te same liczby, które produkt sprawdza, zanim pozwoli coś dodać.',
+  'billing.usage.value': '{used} z {limit}',
+  'billing.usage.unlimited': '{used}, bez limitu',
+  'billing.usage.metric.members': 'Osoby',
+  'billing.usage.metric.accounts': 'Konta',
+  'billing.usage.metric.currencies': 'Waluty',
+  'billing.usage.metric.budgets': 'Budżety',
+  'billing.usage.metric.goals': 'Cele',
+  'billing.usage.metric.rules': 'Reguły opisywania',
+  'billing.usage.metric.recurringSeries': 'Rachunki cykliczne',
+  'billing.usage.metric.transactions': 'Wpisy',
+  'billing.usage.metric.importsPerMonth': 'Importy w tym miesiącu',
+  'billing.usage.metric.storageBytes': 'Paragony',
+  'billing.overLimit.title': 'Powyżej limitu tego planu',
+  'billing.overLimit.body':
+    'Wszystko, co już masz, nadal czytasz, edytujesz i eksportujesz. Odmawiamy tylko dodawania kolejnych pozycji tam, gdzie limit jest przekroczony — dopóki czegoś nie usuniesz albo nie zmienisz planu.',
+  'billing.notConfigured':
+    'Płatności są w tym wdrożeniu wyłączone, więc dostępny jest tu wyłącznie plan bezpłatny.',
+  'billing.error.title': 'Nie udało się wczytać strony płatności',
+  'billing.error.unknownPlan': 'Takiego planu nie sprzedajemy.',
+  'billing.error.noCustomer':
+    'Nic tu jeszcze nie kupiono, więc nie ma faktur do pokazania.',
+
+  /* -- People in the household -------------------------------------------- */
+  'members.title': 'Osoby',
+  'members.subtitle':
+    'Każdy tutaj widzi te same konta, wpisy i budżety. Właściciele i administratorzy mogą dodatkowo zmieniać skład domu.',
+  'members.list.title': 'W tym domu',
+  'members.column.person': 'Osoba',
+  'members.column.role': 'Rola',
+  'members.column.joined': 'Dołączenie',
+  'members.column.actions': 'Działania',
+  'members.you': 'Ty',
+  'members.alone':
+    'Jesteś tu sam na sam z domem. Zaproś kogoś, żeby dzielić go z Tobą.',
+  'members.role.change': 'Zmień rolę: {name}',
+  'members.role.description.owner':
+    'Wszystko, łącznie z płatnościami i własnością.',
+  'members.role.description.admin':
+    'Wszystko poza własnością i usuwaniem właściciela.',
+  'members.role.description.member':
+    'Czyta i zapisuje pieniądze; nie zmienia składu domu.',
+  'members.seats.title': 'Miejsca',
+  'members.seats.value': 'Zajęte {used} z {limit}',
+  'members.seats.full':
+    'Wszystkie miejsca w tym planie są zajęte. Zmień plan, żeby zaprosić kogoś jeszcze.',
+  'members.seats.upgrade': 'Zobacz plany',
+  'members.invite.action': 'Zaproś kogoś',
+  'members.invite.title': 'Zaproś kogoś do tego domu',
+  'members.invite.description':
+    'Dostanie link, który zadziała wyłącznie z podanego tu adresu i wygaśnie po tygodniu.',
+  'members.invite.email': 'Adres e-mail',
+  'members.invite.role': 'Dołącza jako',
+  'members.invite.submit': 'Wyślij zaproszenie',
+  'members.invite.sent': 'Zaproszenie jest w drodze na adres {email}.',
+  'members.pending.title': 'Zaproszeni, jeszcze nieobecni',
+  'members.pending.empty': 'Żadne zaproszenie nie czeka.',
+  'members.pending.expires': 'Wygasa {date}',
+  'members.pending.expired': 'Wygasło',
+  'members.pending.resend': 'Wyślij ponownie',
+  'members.pending.resent': 'Zaproszenie zostało wysłane ponownie.',
+  'members.pending.revoke': 'Wycofaj',
+  'members.pending.revoked': 'Zaproszenie zostało wycofane.',
+  'members.remove.action': 'Usuń: {name}',
+  'members.remove.title': 'Usunąć osobę {name} z tego domu?',
+  'members.remove.body':
+    'Straci dostęp od razu. Wszystko, co wpisała, zostaje — konta, wpisy i budżety należą do domu, a nie do osoby.',
+  'members.remove.confirm': 'Usuń tę osobę',
+  'members.removed': 'Osoba {name} nie ma już dostępu.',
+  'members.leave.action': 'Opuść ten dom',
+  'members.leave.title': 'Opuścić ten dom?',
+  'members.leave.body':
+    'Stracisz dostęp do jego kont i wpisów. To, co wpisano, zostaje przy domu.',
+  'members.leave.confirm': 'Opuść',
+  'members.error.title': 'Nie udało się wczytać listy osób',
+  'members.error.lastOwner':
+    'W domu musi zostać przynajmniej jeden właściciel. Najpierw uczyń właścicielem kogoś innego.',
+  'members.error.alreadyHere': 'Ta osoba już jest w tym domu.',
+  'members.error.alreadyInvited': 'Na ten adres czeka już zaproszenie.',
+  'members.error.notAllowed': 'Twoja rola na to nie pozwala.',
+  'members.error.seatsFull':
+    'W tym planie nie ma wolnego miejsca. Zmień plan albo najpierw wycofaj jedno zaproszenie.',
+  'members.error.generic': 'Nie udało się. Nic nie zostało zmienione.',
+
+  /* -- Accepting an invitation -------------------------------------------- */
+  'invite.title': 'Dołącz do domu {workspace}',
+  'invite.body':
+    'Masz zaproszenie do wspólnych kont, wpisów i budżetów tego domu.',
+  'invite.invitedAs': 'Zaproszenie na adres {email}',
+  'invite.accept': 'Dołącz do domu',
+  'invite.joined': 'Jesteś w środku. Witaj w domu {workspace}.',
+  'invite.signIn': 'Zaloguj się, aby kontynuować',
+  'invite.signInBody':
+    'Zaloguj się adresem {email}, na który wysłano zaproszenie, a link wróci Cię w to miejsce.',
+  'invite.state.expired':
+    'To zaproszenie wygasło. Poproś osobę, która je wysłała, o kolejne.',
+  'invite.state.revoked': 'To zaproszenie zostało wycofane.',
+  'invite.state.accepted': 'To zaproszenie zostało już wykorzystane.',
+  'invite.state.alreadyMember': 'Jesteś już w tym domu.',
+  'invite.state.wrongAccount':
+    'Zaproszenie wysłano na adres {email}. Wyloguj się i zaloguj tym adresem, aby je przyjąć.',
+  'invite.notFound': 'Ten link z zaproszeniem donikąd nie prowadzi.',
+  'invite.goToApp': 'Przejdź do domu',
+
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Każda kwota co do grosza.',
   'auth.aside.body':

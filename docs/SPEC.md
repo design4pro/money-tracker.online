@@ -160,9 +160,15 @@ index**. All SQL lives in `src/server/repos` and goes through the tenant-scoped 
 which appends the tenant predicate from a `TenantScope`. Callers may add predicates; they cannot
 remove that one. Forgetting the tenant filter is not expressible.
 
-`src/server/catalog` is the **single stated exception** — global tables with no `organization_id`
+`src/server/catalog` is the **first stated exception** — global tables with no `organization_id`
 (currencies, exchange rates, brand logos) — guarded instead by `requirePermission` plus a
 `platform_audit_log` write.
+
+`billing_events` is the **second and last** (`docs/plans/22-billing.md`, stage `22-S1`): a webhook
+delivery arrives before we know which workspace it belongs to, so its `organization_id` is nullable
+and the two writes that record and close a delivery take a bare `Database`. They are reachable only
+from the webhook endpoint and its queue handler, never from a server function; the one read a
+workspace can reach goes through `tenantFilter` like every other read in the directory.
 
 `assertScopedWrite` throws when a write composes to an empty predicate list. Transaction reads and
 writes additionally require **explicit policies** — planned, balance-adjustment, transfer and
@@ -178,11 +184,17 @@ never mixed, never compared, and never resolved by one helper.
 
 ### 5.4 Billing surface
 
-`src/lib/plans.ts` is an isomorphic catalogue with no bindings. `resolveLimits()` is the single
-authority: does the row entitle at all → which plan → catalogue limits → **row ceilings win** (so
-grandfathering is possible). `assertWithinLimit()` is the only enforcement point and it is called
-**inside the repository, before the write**. The published number is the enforced number, and a test
-fails when a catalogue metric has no resolver entry.
+`src/lib/plans.ts` is an isomorphic catalogue with no bindings. `resolveLimits()`
+(`src/server/billing/resolve-limits.ts`) is the single authority: does the row entitle at all →
+which plan → catalogue limits → **row ceilings win** (so grandfathering is possible).
+`assertWithinLimit()` is the only enforcement point and it is called **inside the repository,
+before the write**. The published number is the enforced number, and a test fails when a catalogue
+metric has no resolver entry.
+
+The resolver is installed into the repository seam once per isolate, by the Worker entry's
+`import './billing/install'`. Without that import the seam keeps its permissive default and every
+quota in the product is silently unenforced, which is why the import is a side-effect import beside
+`./ledger` rather than a call somewhere in a request path.
 
 ### 5.5 The money and FX contract
 

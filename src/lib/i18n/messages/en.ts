@@ -1380,6 +1380,176 @@ const messages = {
   'settings.payees.description':
     'Who the money went to, and the names an import should fold into them.',
 
+  /* -- Plans and billing -------------------------------------------------- */
+  // The catalogue in `src/lib/plans.ts` holds the numbers; these are the words
+  // beside them. Nothing here states a limit as prose — a sentence and a
+  // ceiling that disagree is a refund, so every figure on the screen is
+  // rendered from the catalogue.
+  'plans.free.name': 'Free',
+  'plans.free.tagline':
+    'One person, the everyday accounts, and your data always yours.',
+  'plans.plus.name': 'Plus',
+  'plans.plus.tagline':
+    'One person, no ceilings, and as many currencies as you keep.',
+  'plans.household.name': 'Household',
+  'plans.household.tagline': 'Everyone who shares the money shares the books.',
+  'plans.feature.free.people': 'Just you',
+  'plans.feature.free.accounts': 'Three accounts and one currency',
+  'plans.feature.free.currency':
+    'Budgets, goals and recurring bills, in small numbers',
+  'plans.feature.free.planning': 'Load a statement twice a month',
+  'plans.feature.export': 'Export everything, whenever you ask',
+  'plans.feature.plus.people': 'Just you',
+  'plans.feature.plus.unlimited':
+    'Accounts, budgets and goals without a ceiling',
+  'plans.feature.plus.currencies': 'As many currencies as you keep money in',
+  'plans.feature.plus.rules': 'Twenty filing rules and monthly imports',
+  'plans.feature.plus.storage': 'A gigabyte of receipts',
+  'plans.feature.household.people': 'Up to six people in one household',
+  'plans.feature.household.unlimited': 'Nothing in the product is capped',
+  'plans.feature.household.roles':
+    'Owners and admins decide who may change what',
+  'plans.feature.household.storage': 'Five gigabytes of receipts',
+  'plans.interval.monthly': 'Monthly',
+  'plans.interval.yearly': 'Yearly',
+  'plans.price.monthly': '{amount} a month',
+  'plans.price.yearly': '{amount} a year',
+  'plans.price.free': 'Always free',
+  'plans.saving': 'Save {percent}%',
+  'plans.current': 'Your plan',
+  'billing.title': 'Plan and payment',
+  'billing.subtitle':
+    'What this household is on, how much of it you are using, and where the money goes. Prices are shown exactly as they are charged.',
+  'billing.plan.title': 'Current plan',
+  'billing.state.free':
+    'You are on the free plan. Nothing is charged and nothing expires.',
+  'billing.state.entitled': 'Active. Renews on {date}.',
+  'billing.state.trialing': 'Trial. It becomes a paid plan on {date}.',
+  'billing.state.cancelling':
+    'Cancelled. It stays active until {date}, and you can undo that.',
+  'billing.state.grace':
+    'The last payment did not go through. The plan keeps working until {date}.',
+  'billing.state.lapsed':
+    'The subscription ended, so the household is on the free plan again.',
+  'billing.state.confirming':
+    'Payment received. The plan switches over as soon as the provider confirms it — usually within a minute.',
+  'billing.action.upgrade': 'Choose this plan',
+  'billing.action.portal': 'Payment methods and invoices',
+  'billing.action.cancel': 'Cancel subscription',
+  'billing.action.resume': 'Keep the subscription',
+  'billing.action.refresh': 'Check again',
+  'billing.cancel.title': 'Cancel this subscription?',
+  'billing.cancel.body':
+    'The plan keeps working until {date}, the day you have paid up to. After that the household goes back to the free plan; nothing is deleted.',
+  'billing.cancel.confirm': 'Cancel it',
+  'billing.cancel.keep': 'Keep it',
+  'billing.usage.title': 'What you are using',
+  'billing.usage.description':
+    'The same numbers the product checks before it lets you add anything.',
+  'billing.usage.value': '{used} of {limit}',
+  'billing.usage.unlimited': '{used}, no limit',
+  'billing.usage.metric.members': 'People',
+  'billing.usage.metric.accounts': 'Accounts',
+  'billing.usage.metric.currencies': 'Currencies',
+  'billing.usage.metric.budgets': 'Budgets',
+  'billing.usage.metric.goals': 'Goals',
+  'billing.usage.metric.rules': 'Filing rules',
+  'billing.usage.metric.recurringSeries': 'Recurring bills',
+  'billing.usage.metric.transactions': 'Entries',
+  'billing.usage.metric.importsPerMonth': 'Imports this month',
+  'billing.usage.metric.storageBytes': 'Receipts',
+  'billing.overLimit.title': 'Over the limit on this plan',
+  'billing.overLimit.body':
+    'Everything you already have stays readable, editable and exportable. Only adding more of what is over the line is refused until you remove some or move up a plan.',
+  'billing.notConfigured':
+    'Payments are switched off on this deployment, so only the free plan is available here.',
+  'billing.error.title': 'The billing page did not load',
+  'billing.error.unknownPlan': 'That plan is not one we sell.',
+  'billing.error.noCustomer':
+    'Nothing has been bought here yet, so there are no invoices to show.',
+
+  /* -- People in the household -------------------------------------------- */
+  'members.title': 'People',
+  'members.subtitle':
+    'Everyone here sees the same accounts, entries and budgets. Owners and admins can also change who is in the household.',
+  'members.list.title': 'In this household',
+  'members.column.person': 'Person',
+  'members.column.role': 'Role',
+  'members.column.joined': 'Joined',
+  'members.column.actions': 'Actions',
+  'members.you': 'You',
+  'members.alone':
+    'It is just you here. Invite someone to share the household.',
+  'members.role.change': 'Change {name}’s role',
+  'members.role.description.owner':
+    'Everything, including billing and ownership.',
+  'members.role.description.admin':
+    'Everything except ownership and removing an owner.',
+  'members.role.description.member':
+    'Reads and writes the money; does not change who is here.',
+  'members.seats.title': 'Seats',
+  'members.seats.value': '{used} of {limit} used',
+  'members.seats.full':
+    'Every seat on this plan is taken. Move up a plan to invite anyone else.',
+  'members.seats.upgrade': 'See the plans',
+  'members.invite.action': 'Invite someone',
+  'members.invite.title': 'Invite someone to this household',
+  'members.invite.description':
+    'They get a link that only works from the address you type here, and it lasts a week.',
+  'members.invite.email': 'Email address',
+  'members.invite.role': 'They join as',
+  'members.invite.submit': 'Send the invitation',
+  'members.invite.sent': 'The invitation is on its way to {email}.',
+  'members.pending.title': 'Invited, not here yet',
+  'members.pending.empty': 'No invitations are waiting.',
+  'members.pending.expires': 'Expires {date}',
+  'members.pending.expired': 'Expired',
+  'members.pending.resend': 'Send again',
+  'members.pending.resent': 'The invitation was sent again.',
+  'members.pending.revoke': 'Withdraw',
+  'members.pending.revoked': 'The invitation was withdrawn.',
+  'members.remove.action': 'Remove {name}',
+  'members.remove.title': 'Remove {name} from this household?',
+  'members.remove.body':
+    'They lose access straight away. Everything they entered stays — the accounts, entries and budgets belong to the household, not to the person.',
+  'members.remove.confirm': 'Remove them',
+  'members.removed': '{name} no longer has access.',
+  'members.leave.action': 'Leave this household',
+  'members.leave.title': 'Leave this household?',
+  'members.leave.body':
+    'You lose access to its accounts and entries. What you entered stays with the household.',
+  'members.leave.confirm': 'Leave',
+  'members.error.title': 'The people list did not load',
+  'members.error.lastOwner':
+    'A household has to keep at least one owner. Make somebody else an owner first.',
+  'members.error.alreadyHere': 'That person is already in this household.',
+  'members.error.alreadyInvited':
+    'That address already has an invitation waiting.',
+  'members.error.notAllowed': 'Your role does not allow that.',
+  'members.error.seatsFull':
+    'This plan has no seat left. Move up a plan, or withdraw an invitation first.',
+  'members.error.generic': 'That did not work. Nothing was changed.',
+
+  /* -- Accepting an invitation -------------------------------------------- */
+  'invite.title': 'Join {workspace}',
+  'invite.body':
+    'You have been invited to share this household’s accounts, entries and budgets.',
+  'invite.invitedAs': 'Invited as {email}',
+  'invite.accept': 'Join the household',
+  'invite.joined': 'You are in. Welcome to {workspace}.',
+  'invite.signIn': 'Sign in to continue',
+  'invite.signInBody':
+    'Sign in with {email} — the address this invitation was sent to — and the link will bring you back here.',
+  'invite.state.expired':
+    'This invitation has expired. Ask whoever invited you to send it again.',
+  'invite.state.revoked': 'This invitation was withdrawn.',
+  'invite.state.accepted': 'This invitation has already been used.',
+  'invite.state.alreadyMember': 'You are already in this household.',
+  'invite.state.wrongAccount':
+    'This invitation was sent to {email}. Sign out and sign in with that address to accept it.',
+  'invite.notFound': 'This invitation link does not lead anywhere.',
+  'invite.goToApp': 'Go to the household',
+
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Every figure, down to the minor unit.',
   'auth.aside.body':
