@@ -15,6 +15,15 @@ import type { MessageCatalogueSource } from '../types'
  * reads naturally beside a bare numeral (`3 / 12`) is a plain string; a count
  * that appears inside a sentence gets branches, because Polish needs four of
  * them and a sentence built by concatenation cannot have four.
+ *
+ * **Household words, not accountancy.** The reader keeps a household budget and
+ * is not a bookkeeper, so the surface says `expense` or `entry` rather than
+ * `transaction`, `household` rather than `workspace`, `everyday account` rather
+ * than `current account`, and never `ledger` or `envelope`. Words a consumer
+ * bank already uses with them (`balance`, `payee`, `rule`, `budget`) stay,
+ * because replacing those buys nothing. The keys keep the domain names
+ * (`transactions.*`, `payees.*`, `settings.workspace.*`): this rule governs what
+ * is displayed, not what is stored.
  */
 const messages = {
   /* -- The document itself ------------------------------------------------ */
@@ -24,8 +33,7 @@ const messages = {
   // an English search result.
   'meta.title': 'Money Tracker — know where your money goes',
   'meta.description':
-    'A personal finance tracker for accounts, transactions, budgets, recurring bills and multi-currency reporting. Manual entry and file import only — no bank connectors, ever.',
-
+    'A household budget: accounts, spending, category limits, recurring bills and several currencies at once. You type it in or load a file yourself, and we never connect to your bank.',
   /* -- The shell ---------------------------------------------------------- */
   'app.name': 'Money Tracker',
   'app.tagline': 'Know where your money goes.',
@@ -41,9 +49,9 @@ const messages = {
   'app.theme.system': 'Match system',
   'app.language.label': 'Language',
   'app.language.change': 'Change language',
-  'app.workspace.label': 'Workspace',
-  'app.workspace.switch': 'Switch workspace',
-  'app.workspace.create': 'New workspace',
+  'app.workspace.label': 'Household',
+  'app.workspace.switch': 'Switch household',
+  'app.workspace.create': 'New household',
   'app.account.menu': 'Your account',
   'app.signOut': 'Sign out',
 
@@ -51,7 +59,7 @@ const messages = {
   'nav.primary': 'Main navigation',
   'nav.dashboard': 'Dashboard',
   'nav.accounts': 'Accounts',
-  'nav.transactions': 'Transactions',
+  'nav.transactions': 'Spending',
   'nav.budgets': 'Budgets',
   'nav.categories': 'Categories',
   'nav.tags': 'Tags',
@@ -231,13 +239,13 @@ const messages = {
   'accounts.create': 'New account',
   'accounts.edit': 'Edit account',
   'accounts.delete.confirm':
-    'Delete {name}? Its transactions are deleted with it and this cannot be undone.',
+    'Delete {name}? Everything recorded on it goes with it, and this cannot be undone.',
   'accounts.field.name': 'Account name',
   'accounts.field.category': 'Kind of account',
   'accounts.field.currency': 'Currency',
   'accounts.field.initialBalance': 'Opening balance',
   'accounts.field.initialBalance.help':
-    'What the account held on the day before your first transaction.',
+    'What the account held on the day before your first entry.',
   'accounts.field.creditLimit': 'Credit limit',
   'accounts.field.note': 'Note',
   'accounts.field.excludeFromStats': 'Leave out of reports',
@@ -245,7 +253,7 @@ const messages = {
     'The account still works normally; it just does not count towards totals or charts.',
   'accounts.category.general': 'General',
   'accounts.category.cash': 'Cash',
-  'accounts.category.current': 'Current account',
+  'accounts.category.current': 'Everyday account',
   'accounts.category.creditCard': 'Credit card',
   'accounts.category.savings': 'Savings',
   'accounts.category.investment': 'Investments',
@@ -255,7 +263,7 @@ const messages = {
   'accounts.balance.available': 'Available',
   'accounts.balance.adjust': 'Correct the balance',
   'accounts.balance.adjust.help':
-    'A correction is recorded as its own transaction, so the history stays honest.',
+    'A correction is recorded as an entry of its own, so the history stays honest.',
   'accounts.totalBalance': 'Total balance',
   'accounts.netWorth': 'Net worth',
   'accounts.hideZeroBalance': 'Hide accounts with a zero balance',
@@ -268,7 +276,7 @@ const messages = {
   },
   'accounts.empty.title': 'No accounts yet',
   'accounts.empty.body':
-    'Add the first account you want to track — a current account, a wallet, a card.',
+    'Add the first account you want to track: a bank account, a wallet, a card.',
   'accounts.empty.action': 'Add your first account',
   'accounts.archived.empty.title': 'Nothing archived',
   'accounts.archived.empty.body':
@@ -296,7 +304,7 @@ const messages = {
   'accounts.list.loading': 'Loading your accounts…',
   'accounts.error.title': 'The accounts did not load',
   'accounts.error.body':
-    'Nothing was changed. Try again — and if it keeps failing, the workspace is briefly unreachable.',
+    'Nothing was changed. Try again, and if it keeps failing, the household is briefly unreachable.',
   'accounts.balance.missing': 'Balance unavailable',
   'accounts.balance.inBase': 'In {currency}',
   'accounts.empty.pick.title': 'Or start from one of these',
@@ -311,8 +319,8 @@ const messages = {
   'accounts.detail.tab.settings': 'Settings',
   'accounts.detail.balanceToday': 'Balance today',
   'accounts.detail.transactions': {
-    one: '{count} transaction on this account',
-    other: '{count} transactions on this account',
+    one: '{count} entry on this account',
+    other: '{count} entries on this account',
   },
   'accounts.detail.note.empty': 'No note on this account yet.',
   'accounts.detail.error.title': 'This account did not load',
@@ -330,15 +338,15 @@ const messages = {
   /* -- Accounts: the lifecycle -------------------------------------------- */
   'accounts.archive.title': 'Archive {name}?',
   'accounts.archive.body':
-    'It leaves your totals and the pickers and keeps every transaction. You can restore it whenever you like.',
+    'It leaves your totals and the pickers and keeps everything recorded on it. You can restore it whenever you like.',
   'accounts.archive.action': 'Archive account',
   'accounts.restore.action': 'Restore account',
   'accounts.delete.title': 'Delete {name}?',
   'accounts.delete.action': 'Delete permanently',
   'accounts.delete.blocked': {
-    one: 'There is {count} transaction on this account, so it cannot be deleted. Archive it instead and the history stays.',
+    one: 'There is {count} entry on this account, so it cannot be deleted. Archive it instead and the history stays.',
     other:
-      'There are {count} transactions on this account, so it cannot be deleted. Archive it instead and the history stays.',
+      'There are {count} entries on this account, so it cannot be deleted. Archive it instead and the history stays.',
   },
   'accounts.actions.label': 'Actions for {name}',
   'accounts.toast.created': '{name} was added.',
@@ -359,20 +367,18 @@ const messages = {
   'accounts.field.creditLimit.help':
     'A positive figure. Leave it empty when there is no limit.',
   'accounts.field.currency.help':
-    'Only the currencies your workspace holds are offered.',
-
+    'Only the currencies your household holds are offered.',
   /* -- Accounts: correcting a balance ------------------------------------- */
   'accounts.adjust.body':
-    'State what the balance should be. The difference is written as a transaction you can find, edit and export.',
+    'State what the balance should be. The difference is written as an entry you can find, edit and export.',
   'accounts.adjust.field.target': 'What the balance should be',
   'accounts.adjust.field.date': 'As at the end of',
   'accounts.adjust.field.note': 'Reason',
   'accounts.adjust.field.note.help':
-    'Kept on the transaction, so the reason survives with the correction.',
+    'Kept on the entry, so the reason survives with the correction.',
   'accounts.adjust.preview.title': 'What will be recorded',
-  'accounts.adjust.preview.income': 'An income of {amount}, booked on {date}.',
-  'accounts.adjust.preview.expense':
-    'An expense of {amount}, booked on {date}.',
+  'accounts.adjust.preview.income': 'Money in of {amount}, dated {date}.',
+  'accounts.adjust.preview.expense': 'An expense of {amount}, dated {date}.',
   'accounts.adjust.preview.none':
     'Nothing. The balance on {date} already reads {amount}.',
   'accounts.adjust.preview.past':
@@ -380,29 +386,28 @@ const messages = {
   'accounts.adjust.action': 'Record the correction',
   'accounts.adjust.result.title': 'Recorded',
   'accounts.adjust.result.income':
-    'An income of {amount} was booked on {date}.',
+    'Money in of {amount} was recorded, dated {date}.',
   'accounts.adjust.result.expense':
-    'An expense of {amount} was booked on {date}.',
+    'An expense of {amount} was recorded, dated {date}.',
   'accounts.adjust.result.unchanged':
     'Nothing was written — the balance on {date} already read {amount}.',
   'accounts.adjust.error.title': 'The correction was not recorded',
 
   /* -- Transactions ------------------------------------------------------- */
-  'transactions.title': 'Transactions',
-  'transactions.create': 'New transaction',
+  'transactions.title': 'Spending',
+  'transactions.create': 'New expense',
   'transactions.createIncome': 'Record income',
   'transactions.createExpense': 'Record an expense',
   'transactions.createTransfer': 'Record a transfer',
-  'transactions.edit': 'Edit transaction',
-  'transactions.delete.confirm':
-    'Delete this transaction? This cannot be undone.',
+  'transactions.edit': 'Edit expense',
+  'transactions.delete.confirm': 'Delete this entry? This cannot be undone.',
   'transactions.direction.income': 'Income',
   'transactions.direction.expense': 'Expense',
   'transactions.field.amount': 'Amount',
   'transactions.field.date': 'Date',
   'transactions.field.account': 'Account',
   'transactions.field.category': 'Category',
-  'transactions.field.payee': 'Payee',
+  'transactions.field.payee': 'Paid to',
   'transactions.field.note': 'Note',
   'transactions.field.tags': 'Tags',
   'transactions.field.paymentMethod': 'Payment method',
@@ -424,7 +429,7 @@ const messages = {
   'transactions.splits.title': 'Split across categories',
   'transactions.splits.add': 'Add a line',
   'transactions.splits.remainder': 'Left to assign: {amount}',
-  'transactions.splits.balanced': 'Every part of this transaction is assigned.',
+  'transactions.splits.balanced': 'The whole amount is assigned.',
   'transactions.refund.title': 'Refunds',
   'transactions.refund.link': 'Link a refund',
   'transactions.refund.unlink': 'Unlink refund',
@@ -435,8 +440,8 @@ const messages = {
   'transactions.filter.title': 'Filters',
   'transactions.filter.reset': 'Reset filters',
   'transactions.count': {
-    one: '{count} transaction',
-    other: '{count} transactions',
+    one: '{count} entry',
+    other: '{count} entries',
   },
   'transactions.selected': {
     one: '{count} selected',
@@ -444,16 +449,16 @@ const messages = {
   },
   'transactions.empty.title': 'Nothing recorded yet',
   'transactions.empty.body':
-    'Record your first transaction, or import a statement you already have.',
-  'transactions.empty.action': 'Record a transaction',
-  'transactions.noResults.title': 'No transactions match',
+    'Record your first expense, or load a statement you already have.',
+  'transactions.empty.action': 'Record an expense',
+  'transactions.noResults.title': 'Nothing matches these filters',
   'transactions.noResults.body': 'Try a wider date range or fewer filters.',
 
   /* -- Transactions: the ledger surface ----------------------------------- */
-  'transactions.list.label': 'Transaction ledger',
-  'transactions.list.caption.all': 'All {count} transactions, {sort}.',
+  'transactions.list.label': 'Money out and money in',
+  'transactions.list.caption.all': 'All {count} entries, {sort}.',
   'transactions.list.caption.filtered':
-    '{count} transactions matching {filters}, {sort}.',
+    '{count} entries matching {filters}, {sort}.',
   'transactions.list.caption.sort': 'sorted by {field}, {order}',
   'transactions.sort.label': 'Sort by',
   'transactions.sort.ascending': 'oldest first',
@@ -461,24 +466,24 @@ const messages = {
   'transactions.column.description': 'Description',
   'transactions.column.actions': 'Actions',
   'transactions.day.net': 'Day total',
-  'transactions.loading': 'Loading transactions…',
+  'transactions.loading': 'Loading your spending…',
   'transactions.loadMore': 'Load more',
-  'transactions.loadingMore': 'Loading more transactions…',
+  'transactions.loadingMore': 'Loading more…',
   'transactions.loadedOf': '{loaded} of {total} loaded',
-  'transactions.selectAllLoaded': 'Select every loaded transaction',
+  'transactions.selectAllLoaded': 'Select every loaded entry',
   'transactions.excludedFromTotals': 'Outside totals',
   'transactions.amount.income': 'Income of {amount}',
   'transactions.amount.expense': 'Expense of {amount}',
-  'transactions.row.select': 'Select the {amount} transaction of {date}',
+  'transactions.row.select': 'Select the {amount} entry of {date}',
   'transactions.row.actions': 'Actions for {name}',
   'transactions.row.open': 'Open',
   'transactions.totals.label': 'Totals for the filtered set',
   'transactions.totals.currency': 'Totals in {currency}',
-  'transactions.bulk.label': 'Actions for the selected transactions',
+  'transactions.bulk.label': 'Actions for the selected entries',
   'transactions.bulk.delete': 'Delete selected',
   'transactions.bulk.confirm': {
-    one: 'Delete {count} transaction? This cannot be undone.',
-    other: 'Delete {count} transactions? This cannot be undone.',
+    one: 'Delete {count} entry? This cannot be undone.',
+    other: 'Delete {count} entries? This cannot be undone.',
   },
   'transactions.keyboard.title': 'Keyboard shortcuts',
   'transactions.keyboard.column.key': 'Key',
@@ -491,16 +496,16 @@ const messages = {
   'transactions.keyboard.keys.delete': 'Delete',
   'transactions.keyboard.keys.help': '?',
   'transactions.keyboard.move': 'Move between cells',
-  'transactions.keyboard.open': 'Open the transaction',
+  'transactions.keyboard.open': 'Open the entry',
   'transactions.keyboard.select': 'Select the row',
-  'transactions.keyboard.edit': 'Edit the transaction',
+  'transactions.keyboard.edit': 'Edit the entry',
   'transactions.keyboard.duplicate': 'Copy into a new entry',
-  'transactions.keyboard.remove': 'Delete the transaction',
+  'transactions.keyboard.remove': 'Delete the entry',
   'transactions.keyboard.help': 'Show this list',
 
   /* -- Transactions: filters ---------------------------------------------- */
   'transactions.filter.description':
-    'Narrow the ledger. Everything set here stays in the address, so the view can be shared.',
+    'Narrow the list. Everything set here stays in the address, so the view can be shared.',
   'transactions.filter.activeLabel': 'Active filters',
   'transactions.filter.remove': 'Remove {name}',
   'transactions.filter.direction': 'Money in or out',
@@ -522,7 +527,7 @@ const messages = {
   'transactions.chip.accounts': 'Account: {value}',
   'transactions.chip.accountGroups': 'Group: {value}',
   'transactions.chip.categories': 'Category: {value}',
-  'transactions.chip.payees': 'Payee: {value}',
+  'transactions.chip.payees': 'Paid to: {value}',
   'transactions.chip.tags': 'Tag: {value}',
   'transactions.chip.direction': 'Direction: {value}',
   'transactions.chip.paymentMethods': 'Paid by: {value}',
@@ -532,10 +537,10 @@ const messages = {
   'transactions.chip.withoutReceipt': 'Without a receipt',
 
   /* -- Transactions: the entry form --------------------------------------- */
-  'transactions.form.newTitle': 'New transaction',
+  'transactions.form.newTitle': 'New expense',
   'transactions.form.newSubtitle':
     'The amount comes first. Everything below it is optional except the account and the date.',
-  'transactions.form.editTitle': 'Edit transaction',
+  'transactions.form.editTitle': 'Edit expense',
   'transactions.form.details': 'Details',
   'transactions.form.moreDetails': 'More',
   'transactions.form.saveAndNew': 'Save and add another',
@@ -547,42 +552,42 @@ const messages = {
   'transactions.form.noPayees': 'No payees yet',
   'transactions.form.noCategories': 'No categories yet',
   'transactions.form.conversionNote':
-    'Recorded in {currency} and converted to {base} at the rate for the booking date.',
-  'transactions.form.error.title': 'The transaction was not saved',
+    'Recorded in {currency} and converted to {base} at the rate for the date of the entry.',
+  'transactions.form.error.title': 'The entry was not saved',
   'transactions.form.error.amount': 'Enter an amount greater than zero.',
   'transactions.form.error.account': 'Choose the account this belongs to.',
   'transactions.form.error.date': 'Enter a date in the form {example}.',
   'transactions.form.error.note': 'Keep the note to {max} characters or fewer.',
   'transactions.form.noAccounts.title': 'An account comes first',
   'transactions.form.noAccounts.body':
-    'A transaction has to belong to an account. Create one, then come back.',
+    'Every entry has to belong to an account. Create one, then come back.',
   'transactions.form.noAccounts.action': 'Create an account',
-  'transactions.saved': 'Transaction saved.',
-  'transactions.deleted': 'Transaction deleted.',
+  'transactions.saved': 'Saved.',
+  'transactions.deleted': 'Deleted.',
   'transactions.deletedMany': {
-    one: '{count} transaction deleted.',
-    other: '{count} transactions deleted.',
+    one: '{count} entry deleted.',
+    other: '{count} entries deleted.',
   },
   'transactions.duplicated': 'Copied into a new entry. Nothing is saved yet.',
 
   /* -- Transactions: the detail screen ------------------------------------ */
-  'transactions.detail.title': 'Transaction',
-  'transactions.detail.back': 'Back to transactions',
+  'transactions.detail.title': 'Expense',
+  'transactions.detail.back': 'Back to your spending',
   'transactions.detail.summary': 'Summary',
   'transactions.detail.recordedAt': 'Recorded {datetime}',
   'transactions.detail.rate': 'Converted at {rate}, the rate for {date}.',
   'transactions.detail.identityRate':
     'Recorded in the reporting currency, so no conversion was needed.',
-  'transactions.detail.noTags': 'No tags on this transaction.',
+  'transactions.detail.noTags': 'No tags on this entry.',
   'transactions.detail.noAttachments': 'No receipt attached.',
   'transactions.detail.noRefunds': 'No refund linked.',
-  'transactions.detail.notFound.title': 'That transaction is not here',
+  'transactions.detail.notFound.title': 'That entry is not here',
   'transactions.detail.notFound.body':
     'It may have been deleted, or the address may be wrong.',
   /* -- Transactions: the split editor -------------------------------------- */
-  'splits.title': 'Split this transaction',
+  'splits.title': 'Split this expense',
   'splits.description':
-    'Divide one payment across several categories. The lines have to add up to the transaction before the split can be saved.',
+    'Divide one payment across several categories. The lines have to add up to the full amount before the split can be saved.',
   'splits.lines.label': 'Split lines',
   'splits.row.legend': 'Line {position}',
   'splits.row.category': 'Category',
@@ -595,7 +600,7 @@ const messages = {
   'splits.add': 'Add a line',
   'splits.assigned': 'Assigned {assigned} of {total}.',
   'splits.remaining': '{amount} left to assign.',
-  'splits.over': '{amount} more than the transaction.',
+  'splits.over': '{amount} more than the expense.',
   'splits.balanced': 'Everything is assigned.',
   'splits.assignRemainder': 'Assign the remainder',
   'splits.save': 'Save the split',
@@ -609,31 +614,31 @@ const messages = {
     'Its amount belongs to the movement between the two accounts, not to a breakdown by category.',
 
   /* -- Transactions: groups (11-S2) ---------------------------------------- */
-  'groups.title': 'Transaction groups',
+  'groups.title': 'Spending groups',
   'groups.subtitle':
-    'Several transactions read as one thing — a holiday, a renovation, a move. A group is a way of reading rows; deleting it never deletes them.',
+    'Several expenses read as one thing: a holiday, a renovation, a move. A group is a way of reading rows; deleting it never deletes them.',
   'groups.create': 'New group',
-  'groups.loading': 'Loading your transaction groups…',
-  'groups.error.title': 'Transaction groups could not be loaded',
+  'groups.loading': 'Loading your groups…',
+  'groups.error.title': 'Your groups could not be loaded',
   'groups.empty.title': 'No groups yet',
   'groups.empty.body':
-    'A group holds transactions you want to read together — every payment for a holiday, or every invoice for a renovation. Its total is worked out from the members each time you look, and is never stored.',
-  'groups.table.label': 'Transaction groups',
+    'A group holds expenses you want to read together: every payment for a holiday, or every invoice for a renovation. Its total is worked out from the members each time you look, and is never stored.',
+  'groups.table.label': 'Spending groups',
   'groups.table.summary': {
     one: '{count} group. Every total below is in {currency}.',
     other: '{count} groups. Every total below is in {currency}.',
   },
   'groups.column.name': 'Group',
-  'groups.column.members': 'Transactions',
+  'groups.column.members': 'Expenses',
   'groups.column.total': 'Total',
   'groups.column.actions': 'Actions',
   'groups.members': {
-    one: '{count} transaction',
-    other: '{count} transactions',
+    one: '{count} expense',
+    other: '{count} expenses',
   },
   'groups.total.summary': {
-    one: '{name} — {count} transaction, {amount}',
-    other: '{name} — {count} transactions, {amount}',
+    one: '{name}: {count} expense, {amount}',
+    other: '{name}: {count} expenses, {amount}',
   },
   'groups.actions.label': 'Actions for {name}',
   'groups.rename': 'Rename',
@@ -646,14 +651,14 @@ const messages = {
     'What this group is for. It cannot be changed later.',
   'groups.delete.title': 'Delete {name}?',
   'groups.delete.body':
-    'The group goes. The transactions in it stay exactly where they are.',
+    'The group goes. The expenses in it stay exactly where they are.',
   'groups.toast.created': '{name} created.',
   'groups.toast.renamed': 'Renamed to {name}.',
   'groups.toast.deleted': '{name} deleted.',
   'groups.panel.title': 'Groups',
   'groups.panel.description':
-    'The groups this transaction is read as part of. Every total is in your reporting currency.',
-  'groups.panel.empty': 'This transaction is not in any group.',
+    'The groups this expense is read as part of. Every total is in your reporting currency.',
+  'groups.panel.empty': 'This expense is not in any group.',
   'groups.panel.add.label': 'Add to a group',
   'groups.panel.add.placeholder': 'Choose a group',
   'groups.panel.add.action': 'Add',
@@ -662,7 +667,7 @@ const messages = {
   'groups.panel.added': 'Added to {name}.',
   'groups.panel.removed': 'Removed from {name}.',
   'groups.panel.dissolved':
-    '{name} had only two transactions, so removing one dissolved the group.',
+    '{name} had only two expenses, so removing one dissolved the group.',
   'groups.panel.error.title': 'The group was not changed',
 
   /* -- Transactions: templates (11-S2) ------------------------------------- */
@@ -681,36 +686,36 @@ const messages = {
   // to subtract for themselves.
   'refunds.title': 'Refunds',
   'refunds.description':
-    'Money that came back for this transaction. Linking a refund never changes what was originally paid; it changes what it ended up costing.',
+    'Money that came back for this expense. Linking a refund never changes what was originally paid; it changes what it ended up costing.',
   'refunds.effective':
     'Original {original}, refunded {refunded}, effective {effective}.',
   'refunds.empty': 'No refunds linked.',
   'refunds.loading': 'Loading the refunds…',
   'refunds.error.title': 'The refunds did not load',
-  'refunds.list.label': 'Refunds of this transaction',
+  'refunds.list.label': 'Refunds of this expense',
   'refunds.column.date': 'Date',
   'refunds.column.amount': 'Amount',
   'refunds.column.origin': 'Refunds',
   'refunds.column.actions': 'Actions',
-  'refunds.origin.whole': 'The whole transaction',
+  'refunds.origin.whole': 'The whole expense',
   'refunds.origin.line': 'One line of the split',
   'refunds.unlink': 'Unlink',
   'refunds.unlink.label': 'Unlink the refund of {amount} from {date}',
   'refunds.unlinked': 'Refund link removed.',
   'refunds.linked': 'Refund linked.',
-  'refunds.given.title': 'What this transaction refunds',
+  'refunds.given.title': 'What this refunds',
   'refunds.given.transaction': 'It gives back part of {amount} paid on {date}.',
   'refunds.given.external':
-    'It refunds something bought outside this workspace, so it counts as ordinary income and is netted against nothing.',
+    'It refunds something bought outside this household, so it counts as ordinary income and is netted against nothing.',
   'refunds.given.unlink': 'Remove this refund link',
   'refunds.link': 'Record this as a refund',
-  'refunds.dialog.title': 'What does this transaction refund?',
+  'refunds.dialog.title': 'What is this refund for?',
   'refunds.dialog.description':
     'A refund gives back money that went out earlier. Pick what it gives back, so the original shows what it ended up costing.',
-  'refunds.dialog.field': 'What this transaction refunds',
+  'refunds.dialog.field': 'What this refunds',
   'refunds.dialog.ranking':
     'Closest in amount first, then closest in date. Every option says why it is here.',
-  'refunds.dialog.external': 'Something outside this workspace',
+  'refunds.dialog.external': 'Something outside this household',
   'refunds.dialog.external.help':
     'The purchase was never recorded here. The money still arrived, and it is counted as ordinary income.',
   'refunds.dialog.option': '{amount} on {date}',
@@ -723,19 +728,19 @@ const messages = {
   'refunds.suggest.reason.exact': 'Same payee, exactly this amount, {when}.',
   'refunds.suggest.reason.larger':
     'Same payee, {surplus} larger than this refund, {when}.',
-  'refunds.suggest.when.sameDay': 'booked the same day',
+  'refunds.suggest.when.sameDay': 'recorded the same day',
   'refunds.suggest.when.earlier': {
-    one: 'booked 1 day earlier',
-    other: 'booked {count} days earlier',
+    one: 'recorded 1 day earlier',
+    other: 'recorded {count} days earlier',
   },
   'refunds.suggest.alreadyRefunded': '{amount} of it is already refunded.',
 
-  'transactions.planned.title': 'Planned transactions',
+  'transactions.planned.title': 'Planned',
   'transactions.planned.subtitle':
-    'Entries booked for a date that has not happened yet. They stay out of your balances until you confirm them.',
+    'Entries dated for a day that has not happened yet. They stay out of your balances until you confirm them.',
   'transactions.planned.empty.title': 'Nothing planned',
   'transactions.planned.empty.body':
-    'Record a transaction with a future date and mark it planned to see it here.',
+    'Record an expense with a future date and mark it planned to see it here.',
   /* -- Colours (the eight measured category hues) ------------------------- */
   'colour.blue': 'Blue',
   'colour.teal': 'Teal',
@@ -771,7 +776,7 @@ const messages = {
   'categories.filter.showArchived': 'Show archived categories',
   'categories.field.kind': 'Used for',
   'categories.field.kind.help':
-    'Which side of the ledger this category is offered on.',
+    'Whether this category is offered on money out or on money in.',
   'categories.field.parent': 'Inside',
   'categories.field.parent.help':
     'Leave it at the top level, or file it under an existing category.',
@@ -785,16 +790,16 @@ const messages = {
   'categories.error.title': 'Could not load your categories',
   'categories.empty.title': 'No categories yet',
   'categories.empty.body':
-    'A category is how a transaction answers "what was this for". Add the first one and the reports have something to group by.',
+    'A category answers "what was this for". Add the first one and the reports have something to group by.',
   'categories.archive.title': 'Archive {name}?',
   'categories.archive.body':
-    'It stops being offered on new transactions, and anything already filed under it keeps its label. Subcategories are archived with it. You can restore it at any time.',
+    'It stops being offered on new entries, and anything already filed under it keeps its label. Subcategories are archived with it. You can restore it at any time.',
   'categories.delete.title': 'Delete {name}?',
   'categories.delete.body':
     'This cannot be undone. A category that has ever been used cannot be deleted — archive it instead.',
   'categories.delete.refused': 'That category cannot be deleted',
   'categories.delete.refused.body':
-    'It is already on transactions, and deleting it would leave them without a label. Archive it instead: it disappears from the pickers and keeps its history.',
+    'It is already in use, and deleting it would leave those entries without a label. Archive it instead: it disappears from the pickers and keeps its history.',
   'categories.toast.created': '{name} added.',
   'categories.toast.updated': '{name} saved.',
   'categories.toast.archived': '{name} archived.',
@@ -815,7 +820,7 @@ const messages = {
   'payees.error.title': 'Could not load your payees',
   'payees.empty.title': 'No payees yet',
   'payees.empty.body':
-    'A payee turns "ZABKA NANO 4471" on a statement into a name you recognise. Add the first one, or let an import create them for you.',
+    'A payee turns "ZABKA NANO 4471" on a statement into a name you recognise. Add the first one, or let a loaded file create them for you.',
   'payees.noMatches.title': 'Nothing matches that',
   'payees.noMatches.body': 'Try a shorter piece of the name.',
   'payees.defaultCategory.summary': 'Suggests {name}',
@@ -824,10 +829,10 @@ const messages = {
   'payees.detail.notFound.title': 'That payee is not here',
   'payees.detail.notFound.body':
     'It may have been deleted or merged into another one, or the address may be wrong.',
-  'payees.field.name.help': 'The name you want to read in the ledger.',
+  'payees.field.name.help': 'The name you want to see on your entries.',
   'payees.field.defaultCategory': 'Suggested category',
   'payees.field.defaultCategory.help':
-    'What a new transaction with this payee is filed under.',
+    'What a new expense with this payee is filed under.',
   'payees.field.mode': 'How firmly to apply it',
   'payees.field.logoDomain': 'Website',
   'payees.field.logoDomain.help':
@@ -836,18 +841,18 @@ const messages = {
   'payees.mode.off.help': 'This payee never touches the category field.',
   'payees.mode.hint': 'Pre-fill it',
   'payees.mode.hint.help':
-    'New transactions start with the suggested category, and you can change it.',
+    'New expenses start with the suggested category, and you can change it.',
   'payees.mode.enforce': 'Always use it',
   'payees.mode.enforce.help':
-    'New transactions take the suggested category, and saving this re-files the ones already recorded under this payee.',
+    'New expenses take the suggested category, and saving this re-files the ones already recorded under this payee.',
   'payees.form.create.body':
     'A name is all it needs. The suggestion settings can wait.',
   'payees.form.edit.body':
-    'Renaming a payee renames it on every transaction it appears on.',
+    'Renaming a payee renames it on every entry it appears on.',
   'payees.form.error.title': 'The payee was not saved',
   'payees.aliases.title': 'Statement text',
   'payees.aliases.body':
-    'The strings a bank uses for this payee. Each one is stored in its matched form — lower case, without accents, and with reference numbers stripped — because that is what an import actually compares.',
+    'The strings a bank uses for this payee. Each one is stored in its matched form: lower case, without accents, and with reference numbers stripped, because that is what a loaded file actually compares.',
   'payees.aliases.count': {
     one: '{count} alias',
     other: '{count} aliases',
@@ -860,7 +865,7 @@ const messages = {
   'payees.aliases.failed': 'That text was not added',
   'payees.ignored.title': 'Text that is never a payee',
   'payees.ignored.body':
-    'Strings an import must not turn into a payee — "CARD PAYMENT", "SEPA DD" and anything else your bank writes on every line.',
+    'Strings that must never become a payee: "CARD PAYMENT", "SEPA DD" and anything else your bank writes on every line.',
   'payees.ignored.add': 'Add text to ignore',
   'payees.ignored.remove': 'Stop ignoring {name}',
   'payees.ignored.empty': 'Nothing is being ignored.',
@@ -869,12 +874,12 @@ const messages = {
   'payees.merge.title': 'Merge {name}',
   'payees.merge.into': 'Keep this payee',
   'payees.merge.body':
-    'Every transaction, alias and tag on {from} moves to {into}, and “{from}” is kept as statement text so future imports still match it. This cannot be undone.',
+    'Every entry, alias and tag on {from} moves to {into}, and “{from}” is kept as statement text so future files still match it. This cannot be undone.',
   'payees.merge.noTargets': 'There is no other payee to merge into.',
   'payees.merge.failed': 'The payees were not merged',
   'payees.delete.title': 'Delete {name}?',
   'payees.delete.body':
-    'This cannot be undone. Transactions keep their amounts and dates and simply lose the payee’s name.',
+    'This cannot be undone. Your entries keep their amounts and dates and simply lose the payee’s name.',
   'payees.toast.created': '{name} added.',
   'payees.toast.updated': '{name} saved.',
   'payees.toast.deleted': '{name} deleted.',
@@ -891,7 +896,7 @@ const messages = {
   'dashboard.widget.netWorth': 'Net worth',
   'dashboard.widget.cashFlow': 'Cash flow',
   'dashboard.widget.spendingByCategory': 'Spending by category',
-  'dashboard.widget.recentTransactions': 'Latest transactions',
+  'dashboard.widget.recentTransactions': 'Latest entries',
   'dashboard.widget.upcomingBills': 'Coming up',
   'dashboard.widget.budgetProgress': 'Budgets',
   'dashboard.widget.savingsGoals': 'Savings goals',
@@ -928,7 +933,7 @@ const messages = {
     'Selected period: {month}. Earlier months are context.',
   'dashboard.cashFlow.empty.title': 'No money moved in this period',
   'dashboard.cashFlow.empty.body':
-    'Record a transaction, or pick a longer period.',
+    'Record an expense, or pick a longer period.',
   'dashboard.spending.other': 'Everything else',
   'dashboard.spending.showOther': 'Show the smaller categories',
   'dashboard.spending.hideOther': 'Hide the smaller categories',
@@ -939,7 +944,7 @@ const messages = {
     'Give an expense a category and its share of the period shows up here.',
   'dashboard.accounts.viewAll': 'All accounts',
   'dashboard.accounts.owed': 'Owed',
-  'dashboard.recent.viewAll': 'All transactions',
+  'dashboard.recent.viewAll': 'All your spending',
   'dashboard.firstRun.title':
     'Welcome. Three steps and the numbers start working.',
   'dashboard.firstRun.body':
@@ -947,8 +952,8 @@ const messages = {
   'dashboard.firstRun.steps.label': 'Getting started',
   'dashboard.firstRun.step.account.title': 'Add an account',
   'dashboard.firstRun.step.account.body':
-    'A current account, a wallet, a card — whatever you want to follow.',
-  'dashboard.firstRun.step.transaction.title': 'Record a transaction',
+    'A bank account, a wallet, a card: whatever you want to follow.',
+  'dashboard.firstRun.step.transaction.title': 'Record an expense',
   'dashboard.firstRun.step.transaction.body':
     'One is enough for the cash-flow chart to have something to draw.',
   'dashboard.firstRun.step.review.title': 'Come back here',
@@ -957,7 +962,7 @@ const messages = {
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budgets',
-  'budgets.subtitle': 'What is left, envelope by envelope.',
+  'budgets.subtitle': 'What is left in each category.',
   'budgets.spentOf': '{spent} of {limit}',
   'budgets.remaining': '{amount} left',
   'budgets.overspent': '{amount} over',
@@ -986,11 +991,10 @@ const messages = {
   'budgets.kind.label': 'What it follows',
   'budgets.kind.category': 'Categories',
   'budgets.kind.category.help':
-    'Counts every transaction filed in the categories you choose, and their subcategories.',
+    'Counts every expense filed in the categories you choose, and their subcategories.',
   'budgets.kind.manual': 'Chosen by hand',
   'budgets.kind.manual.help':
-    'Counts only the transactions you put in it yourself. For a trip, a renovation, a one-off.',
-
+    'Counts only the expenses you put in it yourself. For a trip, a renovation, a one-off.',
   'budgets.period.label': 'Billing period',
   'budgets.period.one_off': 'One-off',
   'budgets.period.weekly': 'Weekly',
@@ -1004,7 +1008,7 @@ const messages = {
     'Whatever is left, or overspent, is forgotten when the period rolls.',
   'budgets.rollover.carry_surplus': 'Carry the surplus forward',
   'budgets.rollover.carry_surplus.help':
-    'Money left over is added to the next period. An overspend is absorbed, and the ledger says so.',
+    'Money left over is added to the next period. An overspend is absorbed, and the history says so.',
   'budgets.rollover.carry_all': 'Carry the whole balance forward',
   'budgets.rollover.carry_all.help':
     'The next period opens with what is left — or in the red, if you overspent.',
@@ -1012,7 +1016,7 @@ const messages = {
   'budgets.status.archived': 'Archived',
   'budgets.status.closed': 'Closed',
   'budgets.status.open': 'Open',
-  'budgets.autoInclude': 'Counts new transactions automatically',
+  'budgets.autoInclude': 'Counts new expenses automatically',
   'budgets.categories.count': {
     one: '{count} category',
     other: '{count} categories',
@@ -1037,7 +1041,7 @@ const messages = {
 
   'budgets.empty.title': 'No budgets yet',
   'budgets.empty.body':
-    'A budget is an envelope with a limit and a period. Follow a set of categories and it fills itself, or put transactions in by hand for a one-off.',
+    'A budget is a limit on a set of categories for a period. Follow a set of categories and it fills itself, or put expenses in by hand for a one-off.',
   'budgets.empty.action': 'Create your first budget',
   'budgets.empty.archived.title': 'Nothing archived',
   'budgets.empty.archived.body':
@@ -1050,7 +1054,7 @@ const messages = {
   'budgets.detail.refunded': 'Refunded elsewhere',
   'budgets.detail.net': 'Counted against the budget',
 
-  'budgets.ledger.title': 'Rollover ledger',
+  'budgets.ledger.title': 'Rollover history',
   'budgets.ledger.caption':
     'Every period of this budget: what it opened with, what it spent, and what it handed on.',
   'budgets.ledger.col.period': 'Period',
@@ -1061,8 +1065,7 @@ const messages = {
   'budgets.ledger.col.status': 'Status',
   'budgets.ledger.overBy': 'over by {amount}',
   'budgets.ledger.empty':
-    'This budget has one period so far, and it is still open. The ledger fills in as periods close.',
-
+    'This budget has one period so far, and it is still open. The history fills in as periods close.',
   'budgets.timeline.title': 'Spending against the limit, period by period',
   'budgets.timeline.categoryHeader': 'Period',
   'budgets.timeline.spent': 'Spent',
@@ -1080,9 +1083,9 @@ const messages = {
 
   'budgets.allocation.title': 'Categories in this budget',
   'budgets.allocation.body':
-    'Every transaction filed in one of these, or in one of their subcategories, counts against the limit.',
+    'Every expense filed in one of these, or in one of their subcategories, counts against the limit.',
   'budgets.allocation.manual':
-    'This budget counts only the transactions you put in it by hand.',
+    'This budget counts only the expenses you put in it by hand.',
   'budgets.allocation.edit': 'Change categories',
   'budgets.transactions.title': 'What counted this period',
   'budgets.transactions.empty': 'Nothing has counted against this budget yet.',
@@ -1206,7 +1209,7 @@ const messages = {
     'This page does not exist, or it is no longer shared with you.',
   'empty.notFound.action': 'Back to the dashboard',
   'empty.forbidden.title': 'No access',
-  'empty.forbidden.body': 'Ask a workspace owner to give you access to this.',
+  'empty.forbidden.body': 'Ask a household owner to give you access to this.',
   'empty.offline.title': 'You are offline',
   'empty.offline.body':
     'What you record now is saved and sent when you are back.',
@@ -1216,7 +1219,7 @@ const messages = {
   'notifications.markAllRead': 'Mark everything as read',
   'notifications.empty.title': 'Nothing new',
   'notifications.empty.body':
-    'Alerts about budgets, bills and shared workspaces land here.',
+    'Alerts about budgets, bills and shared households land here.',
   'notifications.unread': {
     one: '{count} unread notification',
     other: '{count} unread notifications',
@@ -1233,44 +1236,114 @@ const messages = {
   'a11y.showSuggestions': 'Show suggestions',
 
   /* -- Marketing (public pages) ------------------------------------------- */
-  'marketing.nav.features': 'Features',
-  'marketing.nav.security': 'Security',
+  'marketing.nav.how': 'How it works',
+  'marketing.nav.ledger': 'Spending',
+  'marketing.nav.scope': 'Scope',
   'marketing.nav.signIn': 'Sign in',
-  'marketing.nav.getStarted': 'Get started free',
-  'marketing.hero.title':
-    'One ledger for every account, in every currency you hold.',
+  'marketing.nav.getStarted': 'Start free',
+
+  'marketing.hero.title.lead': 'No bank login.',
+  'marketing.hero.title.rest': 'Not now, not ever.',
   'marketing.hero.body':
-    'Money Tracker records what you spend and what you owe from what you type or from a file you export yourself. No bank logins, no screen scraping, nobody else holding your credentials.',
+    'Money Tracker is a household budget for one person or a whole home: accounts, budgets, and every currency you hold.',
   'marketing.hero.cta.primary': 'Start tracking free',
-  'marketing.hero.cta.secondary': 'See what is included',
-  'marketing.hero.note':
-    'Free plan, no card. Export everything you enter, at any time.',
-  'marketing.features.title': 'What is in the box',
-  'marketing.feature.multiCurrency.title': 'Multi-currency that adds up',
-  'marketing.feature.multiCurrency.body':
-    'Amounts are stored as whole minor units at each currency’s own scale and converted at the rate of the day they were booked, so a March expense stays valued at March.',
-  'marketing.feature.manual.title': 'Manual entry and file import',
-  'marketing.feature.manual.body':
-    'Record a transaction in seconds, or bring a CSV, OFX or QIF export across. Nothing here ever asks for a bank password.',
-  'marketing.feature.budgets.title': 'Budgets that carry over',
-  'marketing.feature.budgets.body':
-    'Set a limit per category or per envelope, and decide what happens to a surplus when the period closes.',
-  'marketing.feature.recurring.title': 'Bills before they land',
-  'marketing.feature.recurring.body':
-    'Subscriptions, instalments and salaries are kept as series, with a reminder ahead of each due date.',
-  'marketing.feature.reports.title': 'Reports you can interrogate',
-  'marketing.feature.reports.body':
-    'Cash flow, net worth, spending by category and a pivot you arrange yourself — every figure drills through to the transactions behind it.',
-  'marketing.feature.household.title': 'Shared with the household',
-  'marketing.feature.household.body':
-    'Invite the people you actually share money with and keep one set of figures instead of two spreadsheets.',
-  'marketing.privacy.title': 'Your records stay yours',
-  'marketing.privacy.body':
-    'There are no bank connectors and there never will be. Everything in a workspace was put there by somebody in it, and the whole of it exports as JSON or CSV whenever you ask.',
+  'marketing.hero.note': 'Export everything you enter, at any time.',
+
+  'marketing.instead.title': 'So how does anything get into it?',
+  'marketing.instead.body':
+    'Four ways, and not one of them involves handing your banking credentials to us or to anybody else.',
+  'marketing.instead.entry.title': 'You type it, in about ten seconds',
+  'marketing.instead.entry.body':
+    'Amount, payee, category. The amount field takes the number of decimals that currency actually has, and shows you the value it will store before you submit it.',
+  'marketing.instead.import.title': 'You bring a file you already have',
+  'marketing.instead.import.body':
+    'CSV with a column mapping you save and reuse, OFX, QIF, or an export from another tracker. Duplicates are found before anything is written, and a whole batch can be reverted.',
+  'marketing.instead.recurring.title': 'A series records itself',
+  'marketing.instead.recurring.body':
+    'Subscriptions, instalments, bills and salaries are set up once as recurring series. They can record themselves, or only remind you.',
+  'marketing.instead.rules.title': 'Rules tidy up straight away',
+  'marketing.instead.rules.body':
+    'Conditions and actions in an order you set, with a live match count before you save. A rule whose category was deleted pauses itself and says so.',
+
+  'marketing.ledger.title':
+    'One expense, six months on, still valued at the day it happened.',
+  'marketing.ledger.body':
+    'A household kept in Polish zloty, holding an expense made in euro. The figure you entered never changes, and the converted figure beneath it was frozen at the rate of that day, not recalculated today and not recalculated next year.',
+  'marketing.ledger.caption':
+    'Five example rows from a household kept in Polish zloty.',
+  'marketing.ledger.sample':
+    'Example rows. Nothing here comes from a real account.',
+  'marketing.ledger.figure.label': 'Spent in euro, held in zloty',
+  'marketing.ledger.figure.caption':
+    '27.40 € converted at 4.3218, the rate on 14 March 2026, and left there.',
+  'marketing.ledger.row.groceries': 'Grocery shop, Berlin',
+  'marketing.ledger.row.salary': 'Salary',
+  'marketing.ledger.row.streaming': 'Streaming subscription',
+  'marketing.ledger.row.savings': 'Moved to savings',
+  'marketing.ledger.row.rent': 'Rent',
+  'marketing.ledger.category.groceries': 'Groceries',
+  'marketing.ledger.category.income': 'Income',
+  'marketing.ledger.category.subscriptions': 'Subscriptions',
+  'marketing.ledger.category.transfer': 'Transfer',
+  'marketing.ledger.category.housing': 'Housing',
+
+  'marketing.meter.title':
+    'You can tell that you are over budget with the colour switched off.',
+  'marketing.meter.body':
+    'Every state changes four things at once: the word, the icon, the remaining figure, and the hatching on the fill. Measured separation between our green and our red under deuteranopia falls to 1.14:1, so colour is the last channel here and never the first.',
+  'marketing.meter.caption':
+    'The headline is what is left rather than what is spent, because what is left is the figure you need while standing in a shop.',
+  'marketing.meter.groceries': 'Groceries',
+  'marketing.meter.fuel': 'Fuel',
+  'marketing.meter.eatingOut': 'Eating out',
+
+  'marketing.scope.title': 'What is in it',
+  'marketing.scope.accounts':
+    'Accounts in eight categories, with groups, archiving and credit limits',
+  'marketing.scope.transactions':
+    'Spending with splits, refunds, attachments and bulk editing',
+  'marketing.scope.classification':
+    'Two-level categories, tags, and payees with aliases',
+  'marketing.scope.budgets':
+    'Budgets with periods, alert thresholds and rollover',
+  'marketing.scope.recurring': 'Recurring series, savings goals, and rules',
+  'marketing.scope.currency':
+    'A currency set per household, one base currency, rates per day',
+  'marketing.scope.reports':
+    'Cash flow, net worth, spending by category, and a pivot report',
+  'marketing.scope.dashboard':
+    'A dashboard grid you rearrange by dragging or by keyboard',
+  'marketing.scope.data':
+    'CSV, OFX and QIF import; JSON and CSV export; a full backup',
+  'marketing.scope.household':
+    'A household of two to six people on one set of figures',
+
+  'marketing.never.title': 'What it will never be',
+  'marketing.never.connectors.title': 'A bank connection',
+  'marketing.never.connectors.body':
+    'There are none and there will be none. That decision is written down and dated, not left standing as a plan for later.',
+  'marketing.never.investments.title': 'An investment portfolio',
+  'marketing.never.investments.body':
+    'An investment account holds a balance. It does not hold positions, lots, cost basis or dividends.',
+  'marketing.never.tax.title': 'A tax tool, or financial advice',
+  'marketing.never.tax.body':
+    'No tax reporting, no invoicing, and nothing that could be read as advice about what to do with your money.',
+  'marketing.never.realtime.title': 'A document edited live',
+  'marketing.never.realtime.body':
+    'People sharing a household see each other’s rows when the page reloads, not as they are being typed.',
+  'marketing.commit.title': 'Two things we put in writing',
+  'marketing.commit.export.title': 'Everything leaves whenever you want it to',
+  'marketing.commit.export.body':
+    'Full JSON and CSV export on every plan, the free one included, with nothing to click through and no offer standing in the way.',
+  'marketing.commit.a11y.title':
+    'Accessibility is a build gate, not a paragraph',
+  'marketing.commit.a11y.body':
+    'WCAG 2.2 AA is checked by an automated audit that fails the build, on every route in the visual spec, and a named list of AAA criteria is held to AAA above it. We do not claim AAA across the product.',
+
   'marketing.cta.title': 'Start with this month',
   'marketing.cta.body':
     'Add one account, import a statement, and see where the money actually went.',
-  'marketing.cta.action': 'Create a free workspace',
+  'marketing.cta.action': 'Create a free household',
   'marketing.footer.legal': 'All rights reserved.',
 
   /* -- The authenticated shell -------------------------------------------- */
@@ -1280,7 +1353,7 @@ const messages = {
   'app.nav.section.plan': 'Planning',
   'app.nav.section.insight': 'Insight',
   'app.signedInAs': 'Signed in as {email}',
-  'app.workspace.current': 'Current workspace',
+  'app.workspace.current': 'Current household',
   'app.workspace.role.owner': 'Owner',
   'app.workspace.role.admin': 'Admin',
   'app.workspace.role.member': 'Member',
@@ -1290,9 +1363,9 @@ const messages = {
 
   /* -- Settings ----------------------------------------------------------- */
   'settings.subtitle':
-    'How the product reads for you, and what this workspace holds. Each card says whose setting it is.',
+    'How the product reads for you, and what this household holds. Each card says whose setting it is.',
   'settings.scope.you': 'Yours alone',
-  'settings.scope.workspace': 'Shared with the workspace',
+  'settings.scope.workspace': 'Shared with the household',
   'settings.appearance.description':
     'Light, dark, or whatever this device is set to. Kept on the device, so a phone and a laptop can differ.',
   'settings.language.description':
@@ -1300,23 +1373,23 @@ const messages = {
   'settings.account.title': 'Your account',
   'settings.account.description': 'From the account you signed in with.',
   'settings.workspace.description':
-    'The books everyone here shares. These two lists are what a transaction is filed against.',
-  'settings.workspace.name': 'Workspace name',
+    'The lists everyone here shares. These two are what every entry is filed against.',
+  'settings.workspace.name': 'Household name',
   'settings.categories.description':
-    'The two-level tree every transaction is filed under.',
+    'The two-level tree every entry is filed under.',
   'settings.payees.description':
     'Who the money went to, and the names an import should fold into them.',
 
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Every figure, down to the minor unit.',
   'auth.aside.body':
-    'Amounts are held as whole minor units and converted at the rate of the day they were booked, so last March still adds up the way last March did.',
+    'Amounts are held to the penny and converted at the rate of the day they happened, so last March still adds up the way last March did.',
   'auth.aside.point.privacy':
     'No bank connectors. Nothing is read that you did not enter or import.',
   'auth.aside.point.currency':
     'Accounts in several currencies, reported against one base currency.',
   'auth.aside.point.export':
-    'The whole workspace exports as CSV or JSON whenever you ask for it.',
+    'The whole household exports as CSV or JSON whenever you ask for it.',
   'auth.continueWith': 'or',
   'auth.provider.google': 'Continue with Google',
   'auth.provider.apple': 'Continue with Apple',
@@ -1453,15 +1526,13 @@ const messages = {
   /* -- Mark paid ------------------------------------------------------------ */
   'recurring.markPaid.title': 'Mark this period paid',
   'recurring.markPaid.body':
-    'Pick the transaction that settled it. Nothing here creates a transaction — if the payment is not recorded yet, record it first.',
-  'recurring.markPaid.field': 'The transaction that settled it',
-  'recurring.markPaid.placeholder': 'Search your transactions',
+    'Pick the expense that settled it. Nothing here creates an entry: if the payment is not recorded yet, record it first.',
+  'recurring.markPaid.field': 'The expense that settled it',
+  'recurring.markPaid.placeholder': 'Search your spending',
   'recurring.markPaid.empty':
-    'No transaction in this window matches. Record the payment first, then come back.',
+    'Nothing in this window matches. Record the payment first, then come back.',
   'recurring.markPaid.confirm': 'Link it',
-  'recurring.markPaid.never':
-    'Marking a period paid never creates a transaction.',
-
+  'recurring.markPaid.never': 'Marking a period paid never creates an entry.',
   /* -- Automation ----------------------------------------------------------- */
   'recurring.automation.label': 'Automation',
   'recurring.automation.none': 'Off — you record each one yourself',
@@ -1469,10 +1540,10 @@ const messages = {
     'The series reminds you and tracks what is outstanding. Nothing is written without you.',
   'recurring.automation.auto': 'Record it for me',
   'recurring.automation.auto.help':
-    'On the due date, a transaction is written for the expected amount into the chosen account. You can edit it afterwards like any other.',
+    'On the due date, an expense is written for the expected amount into the chosen account. You can edit it afterwards like any other.',
   'recurring.automation.match': 'Match what I record',
   'recurring.automation.match.help':
-    'Nothing is written. A transaction you record that fits the rule below is linked to the period it settles.',
+    'Nothing is written. An expense you record that fits the rule below is linked to the period it settles.',
   'recurring.automation.exclusive':
     'A series either records for you or matches what you record. It cannot do both — an automatic entry has nothing left to match.',
   'recurring.automation.needsAccount':
@@ -1582,10 +1653,9 @@ const messages = {
   'recurring.toast.periodPaid': 'Period marked paid',
   'recurring.toast.periodSkipped': 'Period skipped',
   'recurring.toast.periodReverted': 'Period reopened',
-  'recurring.toast.unlinked': 'Transaction unlinked',
-
+  'recurring.toast.unlinked': 'Entry unlinked',
   /* -- Linked transactions --------------------------------------------------- */
-  'recurring.links.title': 'Linked transactions',
+  'recurring.links.title': 'Linked entries',
   'recurring.links.caption':
     'What this series has adopted, and how each link came about.',
   'recurring.links.empty': 'Nothing linked yet.',
@@ -1599,7 +1669,7 @@ const messages = {
   'recurring.candidates.title': 'Series we noticed',
   'recurring.candidates.subtitle':
     'Patterns in what you already recorded. Each one is a suggestion, not something we did.',
-  'recurring.candidates.loading': 'Looking through your transactions…',
+  'recurring.candidates.loading': 'Looking through your spending…',
   'recurring.candidates.detect': 'Look again',
   'recurring.candidates.detecting': 'Looking…',
   'recurring.candidates.link': 'Series we noticed',
@@ -1623,8 +1693,8 @@ const messages = {
   'recurring.candidate.confidence.medium': 'Medium',
   'recurring.candidate.confidence.low': 'Low',
   'recurring.candidate.evidence': {
-    one: 'From {count} transaction',
-    other: 'From {count} transactions',
+    one: 'From {count} entry',
+    other: 'From {count} entries',
   },
   'recurring.candidate.because.occurrences':
     'Confidence is held back by how few times this has happened.',
@@ -1637,7 +1707,7 @@ const messages = {
   'recurring.candidate.dismiss.for': 'Dismiss the suggestion for {name}',
   'recurring.candidate.accept.for': 'Set up a series for {name}',
   'recurring.candidate.creates':
-    'Setting it up creates the plan only. None of the transactions it was found from is changed.',
+    'Setting it up creates the plan only. None of the entries it was found from is changed.',
   'recurring.candidate.toast.dismissed': 'Suggestion dismissed',
   'recurring.candidate.toast.accepted': 'Series created from the suggestion',
 
@@ -1666,7 +1736,7 @@ const messages = {
 
   'goals.empty.title': 'No savings goals yet',
   'goals.empty.body':
-    'A goal is a target amount and, if you want one, a date. Progress comes from transactions you already recorded — nothing here creates money or moves it.',
+    'A goal is a target amount and, if you want one, a date. Progress comes from entries you already recorded: nothing here creates money or moves it.',
   'goals.empty.action': 'Create your first goal',
   'goals.empty.filtered.title': 'Nothing here',
   'goals.empty.filtered.body':
@@ -1766,7 +1836,7 @@ const messages = {
   'goals.chart.series.monthly': 'Added that month',
   'goals.chart.empty.title': 'Nothing to plot yet',
   'goals.chart.empty.body':
-    'Count a transaction towards this goal and its history appears here.',
+    'Count an entry towards this goal and its history appears here.',
   'goals.chart.noData': 'Nothing',
   'goals.chart.zeroNote':
     'A month with no bar is a month nothing went in — a real zero, not a missing reading.',
@@ -1779,15 +1849,14 @@ const messages = {
   },
   'goals.contributions.empty.title': 'No contributions yet',
   'goals.contributions.empty.body':
-    'A contribution points at a transaction you already recorded. Nothing new is created and no money moves.',
+    'A contribution points at an entry you already recorded. Nothing new is created and no money moves.',
   'goals.contributions.column.date': 'Date',
   'goals.contributions.column.amount': 'Amount',
-  'goals.contributions.column.detail': 'Transaction',
+  'goals.contributions.column.detail': 'Entry',
   'goals.contributions.column.actions': 'Actions',
   'goals.contributions.linkedOn': 'Counted on {date}',
   'goals.contributions.remove': 'Remove {amount} from this goal',
-  'goals.contributions.add': 'Count a transaction',
-
+  'goals.contributions.add': 'Count an entry',
   /* -- Suggestions, which are offers and never links ----------------------- */
   'goals.suggestions.heading': 'Transfers that look like contributions',
   'goals.suggestions.body':
@@ -1826,23 +1895,22 @@ const messages = {
   'goals.form.error': 'The goal could not be saved',
 
   /* -- The contribution flow ------------------------------------------------ */
-  'goals.contribute.title': 'Count a transaction towards {name}',
+  'goals.contribute.title': 'Count an entry towards {name}',
   'goals.contribute.description':
-    'Pick a transaction that already happened. It stays exactly as it is — this only records what it was for.',
-  'goals.contribute.field': 'Transaction',
+    'Pick something that already happened. It stays exactly as it is: this only records what it was for.',
+  'goals.contribute.field': 'Entry',
   'goals.contribute.field.help':
-    'Only transactions in {currency} can be counted, because the goal is measured in {currency}.',
+    'Only entries in {currency} can be counted, because the goal is measured in {currency}.',
   'goals.contribute.option': '{date} · {amount}',
   'goals.contribute.empty':
-    'No unlinked {currency} transaction is available to count. Record one first, or change the account this goal is held in.',
+    'No unlinked {currency} entry is available to count. Record one first, or change the account this goal is held in.',
   'goals.contribute.submit': 'Count it',
   'goals.contribute.cancel': 'Cancel',
-  'goals.contribute.error': 'The transaction could not be counted',
+  'goals.contribute.error': 'The entry could not be counted',
   'goals.contribute.error.currency':
-    'That transaction is in {transaction} and this goal is in {goal}. Converting it would need a rate nobody chose, so it is refused rather than guessed.',
+    'That entry is in {transaction} and this goal is in {goal}. Converting it would need a rate nobody chose, so it is refused rather than guessed.',
   'goals.contribute.error.direction':
-    'This goal is funded by {expected} transactions, and that one is {received}. Counting it would reduce the progress instead of adding to it.',
-
+    'This goal is funded by {expected} entries, and that one is {received}. Counting it would reduce the progress instead of adding to it.',
   /* -- Actions and confirmations -------------------------------------------- */
   'goals.actions.label': 'Actions for {name}',
   'goals.actions.edit': 'Edit',
@@ -1857,11 +1925,11 @@ const messages = {
   'goals.confirm.archive.action': 'Archive',
   'goals.confirm.delete.title': 'Delete this goal?',
   'goals.confirm.delete.body':
-    'The goal and its record of which transactions counted towards it are removed for good. The transactions themselves are untouched.',
+    'The goal and its record of which entries counted towards it are removed for good. The entries themselves are untouched.',
   'goals.confirm.delete.action': 'Delete',
   'goals.confirm.remove.title': 'Remove this contribution?',
   'goals.confirm.remove.body':
-    'The transaction stays exactly as it is. Only the note that it was for this goal is removed, and the progress drops by that amount.',
+    'The entry stays exactly as it is. Only the note that it was for this goal is removed, and the progress drops by that amount.',
   'goals.confirm.remove.action': 'Remove',
 
   'goals.toast.created': 'Goal created',
@@ -1903,7 +1971,7 @@ const messages = {
   // last write to a field wins. See `src/server/rules/apply.ts`.
   'rules.title': 'Rules',
   'rules.subtitle':
-    'Rules run top to bottom on every transaction that fires their trigger. All of the matching ones run, and a later rule overwrites what an earlier one set.',
+    'Rules run top to bottom on every entry that fires their trigger. All of the matching ones run, and a later rule overwrites what an earlier one set.',
   'rules.new': 'New rule',
   'rules.list.label': 'Rules, in the order they run',
   'rules.back': 'Back to the rules',
@@ -1915,10 +1983,10 @@ const messages = {
 
   'rules.empty.title': 'No rules yet',
   'rules.empty.body':
-    'A rule watches for transactions you describe and changes them for you — categorising the shop you visit every week, or tagging the subscription you keep forgetting about.',
+    'A rule watches for entries you describe and changes them for you: categorising the shop you visit every week, or tagging the subscription you keep forgetting about.',
   'rules.empty.locked.title': 'Automation is not part of this plan',
   'rules.empty.locked.body':
-    'Rules categorise, tag and rename transactions as they arrive. Upgrading switches them on; nothing you have already entered changes.',
+    'Rules categorise, tag and rename new entries as they arrive. Upgrading switches them on; nothing you have already entered changes.',
   'rules.empty.locked.action': 'See the plans',
 
   'rules.row.actions': 'Actions for {name}',
@@ -1934,7 +2002,7 @@ const messages = {
 
   'rules.confirm.delete.title': 'Delete this rule?',
   'rules.confirm.delete.body':
-    'It stops running from now on. Nothing it has already written to a transaction is undone.',
+    'It stops running from now on. Nothing it has already written is undone.',
   'rules.confirm.delete.action': 'Delete',
 
   'rules.toast.reordered': 'Order saved',
@@ -1969,11 +2037,11 @@ const messages = {
   'rules.editor.conditions.full': 'A rule holds at most {count} conditions.',
   'rules.editor.actions.full': 'A rule holds at most {count} actions.',
   'rules.editor.runOn': 'Run this rule',
-  'rules.editor.runOn.manual_create': 'When I add a transaction',
+  'rules.editor.runOn.manual_create': 'When I add an entry',
   'rules.editor.runOn.import': 'When I import a file',
-  'rules.editor.runOn.edit': 'When I edit a transaction',
+  'rules.editor.runOn.edit': 'When I edit an entry',
   'rules.editor.runOn.none':
-    'This rule runs on nothing, so it will never change a transaction. It still saves.',
+    'This rule runs on nothing, so it will never change anything. It still saves.',
   'rules.editor.sentence.label': 'What this rule does',
   'rules.editor.save': 'Save the rule',
   'rules.editor.delete': 'Delete this rule',
@@ -2007,7 +2075,7 @@ const messages = {
   // nobody chose (`src/server/rules/evaluate.ts`), so the editor says so here
   // instead of letting somebody discover it from an empty preview.
   'rules.condition.currency.description':
-    'An amount is compared in one currency and never converted, so a transaction in any other currency does not match.',
+    'An amount is compared in one currency and never converted, so an entry in any other currency does not match.',
   'rules.condition.direction': 'Direction',
   'rules.condition.direction.income': 'Money in',
   'rules.condition.direction.expense': 'Money out',
@@ -2059,15 +2127,15 @@ const messages = {
   // Both counts, always. "12 matches" is not a fact somebody can act on; "12 of
   // the last 2 000" is. See `-server/preview.ts`.
   'rules.preview.title': 'Preview',
-  'rules.preview.counts': '{matched} of the last {scanned} transactions match.',
-  'rules.preview.empty': 'No matches in the last {scanned} transactions.',
+  'rules.preview.counts': '{matched} of the last {scanned} entries match.',
+  'rules.preview.empty': 'No matches in the last {scanned} entries.',
   'rules.preview.incomplete':
     'Add a condition and an action, and the preview appears here.',
   'rules.preview.loading': 'Checking…',
-  'rules.preview.samples.label': 'Matching transactions',
+  'rules.preview.samples.label': 'Matching entries',
   'rules.preview.samples.shown': 'The first {shown} are listed.',
   'rules.preview.scanCap':
-    'Only the {limit} most recent transactions are checked, so this is a sample of your ledger rather than all of it.',
+    'Only the {limit} most recent entries are checked, so this is a sample of your history rather than all of it.',
   'rules.preview.error.title': 'The preview could not run',
   'rules.preview.error.body':
     'Nothing was changed — a preview never writes. The rule itself is still here to save or edit.',
@@ -2118,13 +2186,13 @@ const messages = {
   /* -- Attachments (11-S3) -------------------------------------------------- */
   'attachments.title': 'Receipts',
   'attachments.description':
-    'Photos and PDFs kept with this transaction. Only people in this workspace can open them.',
+    'Photos and PDFs kept with this entry. Only people in this household can open them.',
   'attachments.list.label': 'Attached receipts',
   'attachments.link': '{name} · {size} · {kind}',
   'attachments.remove': 'Remove {name}',
   'attachments.empty.title': 'No receipts attached',
   'attachments.empty.body':
-    'Keep the till slip, the invoice or the transfer confirmation with the transaction it belongs to.',
+    'Keep the till slip, the invoice or the transfer confirmation with the expense it belongs to.',
   'attachments.attach': 'Attach a receipt',
   'attachments.dropzone.label': 'Drop receipts here to attach them',
   'attachments.dropzone.hint': 'Drop files here, or choose them:',
@@ -2144,7 +2212,7 @@ const messages = {
   'attachments.type.other': 'File',
   'attachments.confirm.title': 'Remove this receipt?',
   'attachments.confirm.body':
-    '{name} is deleted for good. The transaction itself is untouched.',
+    '{name} is deleted for good. The entry itself is untouched.',
   'attachments.confirm.action': 'Remove',
   'attachments.toast.deleted': 'Receipt removed',
   /* -- Why an import refused a row (19-S2) ---------------------------------- */
@@ -2164,11 +2232,11 @@ const messages = {
   'import.error.amount_too_precise':
     'This amount has more decimal places than the currency has, so it was not rounded.',
   'import.error.amount_out_of_range': 'This amount is too large to store.',
-  'import.error.amount_zero': 'An imported transaction cannot be for zero.',
+  'import.error.amount_zero': 'A loaded entry cannot be for zero.',
   'import.error.amount_both_empty':
     'Neither the debit nor the credit column has a figure on this row.',
   'import.error.amount_debit_and_credit':
-    'This row has both a debit and a credit, so it is not one transaction.',
+    'This row has both a debit and a credit, so it is not one entry.',
   'import.error.row_currency_mismatch':
     'This row is in a different currency from the account it would be imported into.',
 
@@ -2178,8 +2246,7 @@ const messages = {
   // nothing could be read, and a seam for the commit that lands later.
   'import.title': 'Import',
   'import.lead':
-    'Bring a statement or another tracker’s export into this workspace. Nothing is written until you have seen what the file would do.',
-
+    'Bring a statement or another tracker’s export into this household. Nothing is written until you have seen what the file would do.',
   'import.group.file.title': 'From your bank or a spreadsheet',
   'import.group.file.body':
     'A statement you downloaded, or a sheet you keep yourself. The format is worked out from the file — there is nothing to pick from a list of acronyms.',
@@ -2200,9 +2267,8 @@ const messages = {
   'import.upload.state.uploading': 'Sending {name}…',
   'import.upload.state.sniffing': 'Working out what the file is…',
   'import.upload.noAccounts':
-    'Make an account first — an imported transaction has to land in one.',
-  'import.upload.error.account':
-    'Choose the account these transactions belong to.',
+    'Make an account first: a loaded entry has to land in one.',
+  'import.upload.error.account': 'Choose the account these entries belong to.',
   'import.upload.error.file': 'Choose a file to import.',
   'import.upload.error.extension':
     '{name} does not end in a file type this import can read, so there is no parser for it.',
@@ -2212,7 +2278,7 @@ const messages = {
 
   'import.history.title': 'Import history',
   'import.history.body':
-    'Every file this workspace has brought in, newest first.',
+    'Every file this household has brought in, newest first.',
   'import.history.empty.title': 'No imports yet',
   'import.history.empty.body':
     'A file you bring in stays here with what it did, so an import can be found again months later.',
@@ -2330,8 +2396,7 @@ const messages = {
   'import.mapping.save.label': 'Call this mapping',
   'import.mapping.save.description':
     'The mapping is remembered for the next file with the same columns, and offered rather than applied. The name is what you call this bank.',
-  'import.mapping.save.placeholder': 'My bank, current account',
-
+  'import.mapping.save.placeholder': 'My bank, everyday account',
   'import.mapping.problems': 'Before continuing',
   'import.mapping.error.account':
     'Choose the account these rows would be imported into.',
@@ -2352,7 +2417,7 @@ const messages = {
 
   'import.preview.title': 'Review what this would do',
   'import.preview.body':
-    'Nothing has been written. Every row below is a transaction as it would be created, and the figures are the ones that would be stored.',
+    'Nothing has been written. Every row below is an entry as it would be created, and the figures are the ones that would be stored.',
   'import.preview.pending': 'Working out what this file would do…',
   'import.preview.failed.title': 'The preview did not run',
   'import.preview.failed.body':
@@ -2386,7 +2451,7 @@ const messages = {
   'import.preview.match.probable': 'Possible duplicate',
   'import.preview.match.none': 'New',
   'import.preview.reason.source_ref':
-    'The row id this file stamped is already on a transaction in this account.',
+    'The row id this file stamped is already on an entry in this account.',
   'import.preview.reason.exact_match':
     'Same day, same amount and the same description.',
   'import.preview.reason.amount_and_date':
@@ -2397,7 +2462,7 @@ const messages = {
   'import.preview.sourceRef.used':
     'This file stamps its own row ids, so duplicates were matched on those rather than guessed at.',
   'import.preview.quota':
-    'Importing these rows would take you {excess} transactions past your plan’s limit of {limit}.',
+    'Loading these rows would take you {excess} entries past your plan’s limit of {limit}.',
   'import.preview.decisions.note':
     'What you choose per row is held in this browser. Writing the rows arrives with the last step of this flow.',
 
@@ -2414,7 +2479,7 @@ const messages = {
 
   'import.done.title': 'Import the rows',
   'import.done.body':
-    'Nothing has been written yet. Writing a reviewed import into the ledger is not available in this workspace yet, so the review above is safe to leave open or to come back to.',
+    'Nothing has been written yet. Writing a reviewed file into your spending is not available in this household yet, so the review above is safe to leave open or to come back to.',
   'import.done.back': 'Back to the review',
 } as const satisfies MessageCatalogueSource
 

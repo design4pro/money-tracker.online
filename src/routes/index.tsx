@@ -1,22 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  ArrowRight,
-  CalendarClock,
-  ChartNoAxesCombined,
-  FileUp,
-  Globe,
-  ShieldCheck,
-  Users,
-  Wallet,
-} from 'lucide-react'
+import { ArrowRight, FileUp, Filter, PencilLine, Repeat } from 'lucide-react'
 
-import { Card } from '#/components/ui'
+import { amountReading } from '#/components/app/money'
 import { cn } from '#/lib/cn'
-import { useTranslate } from '#/lib/i18n'
+import { useLocale, useTranslate } from '#/lib/i18n'
+import { formatMoney, makeMoney } from '#/lib/money'
+import { BudgetStates } from './-ui/budget-states'
+import { LedgerPreview } from './-ui/ledger-preview'
 import { MAIN_CONTENT_ID } from './__root'
 
-import type { ComponentType } from 'react'
 import type { MessageKey } from '#/lib/i18n'
+import type { CSSProperties, ComponentType } from 'react'
 
 /**
  * The landing page.
@@ -27,127 +21,294 @@ import type { MessageKey } from '#/lib/i18n'
  * marketing page is English-only" is how a product ends up with a Polish app behind an English
  * front door.
  *
- * The blueprint's full marketing surface — the comparison table, the pricing cards, the feature
- * deep-dive, the changelog — is a later plan. What is here is complete rather than sketched: a
- * nav, a hero with a real proposition, the six things this product actually does, the privacy
- * position that is the reason it exists, a closing call to action and a footer.
+ * ## Why it opens on a refusal, with the product already under it
+ *
+ * The loudest true thing this product can say is a negative: nobody here will ever ask for a bank
+ * login. So the headline is the refusal, split across two tones — the claim in ink, the promise
+ * that it will not be walked back in the quieter one. Directly beneath it, still inside the first
+ * viewport, sits the ledger itself, crossing the band boundary into the section that explains it.
+ * A visitor therefore reads the promise and sees the thing the promise is about without scrolling,
+ * which is what the earlier arrangement — a headline alone above a screenful of nothing — could
+ * not do.
+ *
+ * ## Why the evidence is components rather than pictures
+ *
+ * The page's claim is that the arithmetic is right. A screenshot of correct arithmetic is a claim;
+ * the arithmetic itself is a demonstration. So the ledger fragment and the three budget meters are
+ * the product's own components handed static props — which means they carry the U+2212 minus, the
+ * tabular figures, the spoken sentence and the four-channel overspend encoding for free, they
+ * cannot drift out of date, and the axe suite reads them the same way it reads the signed-in
+ * screens. `PRODUCT.md` forbids fabricated evidence, so both blocks label their rows as examples.
+ *
+ * ## Why nothing on it moves
+ *
+ * There is no entrance sequence and no scroll-linked reveal. The design system's position is that
+ * a surface is flat and still at rest and spends its motion on what the reader did, and a landing
+ * page that animates itself into place contradicts the product it is selling. The composition
+ * carries the page: full-bleed bands in four different grounds, one card crossing a boundary,
+ * asymmetric rows that alternate side, and an inverted panel at the end.
+ *
+ * ## What may not appear here, ever
+ *
+ * Testimonials, customer logos, ratings, adoption or uptime figures, security certifications,
+ * prices, plan limits, and any claim that the product is installable or works offline. None of
+ * those are true yet and several never will be. `PRODUCT.md` is the list.
  */
 export const Route = createFileRoute('/')({
   component: LandingPage,
 })
 
-/** One feature card. The icon is a component so the card decides its own size. */
-interface Feature {
-  readonly id: string
-  readonly Icon: ComponentType<{ className?: string }>
-  readonly title: MessageKey
-  readonly body: MessageKey
-}
-
-const FEATURES: ReadonlyArray<Feature> = [
-  {
-    id: 'multi-currency',
-    Icon: Globe,
-    title: 'marketing.feature.multiCurrency.title',
-    body: 'marketing.feature.multiCurrency.body',
-  },
-  {
-    id: 'manual',
-    Icon: FileUp,
-    title: 'marketing.feature.manual.title',
-    body: 'marketing.feature.manual.body',
-  },
-  {
-    id: 'budgets',
-    Icon: Wallet,
-    title: 'marketing.feature.budgets.title',
-    body: 'marketing.feature.budgets.body',
-  },
-  {
-    id: 'recurring',
-    Icon: CalendarClock,
-    title: 'marketing.feature.recurring.title',
-    body: 'marketing.feature.recurring.body',
-  },
-  {
-    id: 'reports',
-    Icon: ChartNoAxesCombined,
-    title: 'marketing.feature.reports.title',
-    body: 'marketing.feature.reports.body',
-  },
-  {
-    id: 'household',
-    Icon: Users,
-    title: 'marketing.feature.household.title',
-    body: 'marketing.feature.household.body',
-  },
-]
-
 /**
- * Shared link chrome for the two calls to action.
+ * Shared link chrome for the calls to action.
  *
- * Plain anchors rather than the design system's `Button`: both of these leave the marketing shell
+ * Plain anchors rather than the design system's `Button`: each of these leaves the marketing shell
  * for the authenticated one, which has to be a document load rather than a client navigation so
  * the app shell's loader sees the session cookie on its first run.
  */
 const CTA_BASE =
-  'target-min-h inline-flex items-center justify-center gap-2 rounded-md px-5 text-label font-semibold whitespace-nowrap no-underline transition-[color,background-color,box-shadow] duration-fast ease-out-quint focus-ring'
-const CTA_PRIMARY = `${CTA_BASE} bg-brand text-on-brand shadow-card hover:bg-brand-hover hover:shadow-elevated`
-const CTA_SECONDARY = `${CTA_BASE} border border-border-strong bg-surface text-ink hover:bg-surface-sunken`
+  'target-min-h inline-flex items-center justify-center gap-2 rounded-md px-5 text-label font-semibold whitespace-nowrap no-underline transition-[color,background-color,box-shadow,translate] duration-fast ease-out-quint focus-ring'
+/**
+ * `translate` is named in the transition list on purpose: Tailwind v4 compiles `translate-y-px` to
+ * the standalone `translate` property rather than to `transform`, so a list that stops at
+ * `box-shadow` leaves the press snapping while the class says otherwise. The press itself is the
+ * design system's one-pixel rule — down a pixel and one shadow step back, never a bounce.
+ */
+const CTA_PRIMARY = `${CTA_BASE} bg-brand text-on-brand shadow-card hover:bg-brand-hover hover:shadow-elevated active:translate-y-px active:shadow-card`
+/**
+ * The outlined pair to it. The header uses it because the first viewport gets exactly one
+ * brand-coloured action and the hero owns it; the hero uses it for the anchor that answers the
+ * refusal, so the two actions read as different weights of the same offer rather than as a choice
+ * between two ways into the same place.
+ */
+const CTA_QUIET = `${CTA_BASE} border border-border-strong bg-transparent text-ink hover:bg-hover active:translate-y-px`
+/** The one action inside the inverted panel, where the page's own brand blue has no contrast left. */
+const CTA_INVERTED = `${CTA_BASE} bg-canvas text-ink shadow-card hover:bg-surface hover:shadow-elevated active:translate-y-px active:shadow-card`
+
+/** The well every band's content sits in. The marketing measure, not the app shell's. */
+const WELL = 'mx-auto w-full max-w-6xl px-4 sm:px-6'
+
+/**
+ * The atmosphere behind the hero and behind the closing panel: the ruled baseline of an account
+ * book, masked to nothing at both ends so it never draws a line the reader could mistake for a
+ * border. It is the one ornament on the page and it is the product's own subject — a page about
+ * money kept by hand is allowed to look like the paper it replaces.
+ *
+ * Written as a style object rather than as arbitrary utilities because the value is two
+ * multi-stop gradients: as a class it would be one unreadable string, and the token references
+ * inside it would be invisible to anyone grepping for them.
+ */
+const RULED_FIELD: CSSProperties = {
+  backgroundImage:
+    'repeating-linear-gradient(to bottom, var(--color-border-panel) 0 1px, transparent 1px 2.5rem)',
+  maskImage:
+    'linear-gradient(to bottom, transparent, #000 20%, #000 62%, transparent)',
+  WebkitMaskImage:
+    'linear-gradient(to bottom, transparent, #000 20%, #000 62%, transparent)',
+}
+
+/**
+ * The same ruling inside the inverted panel, drawn in that panel's own foreground rather than in
+ * a border token: on an inverted ground a border colour is on the wrong side of the contrast and
+ * disappears in one theme or shouts in the other. Held down to a tenth by the wrapper's opacity.
+ */
+const PANEL_RULES: CSSProperties = {
+  backgroundImage:
+    'repeating-linear-gradient(to bottom, var(--color-on-accent) 0 1px, transparent 1px 2.5rem)',
+  maskImage:
+    'linear-gradient(to bottom, transparent, #000 20%, #000 62%, transparent)',
+  WebkitMaskImage:
+    'linear-gradient(to bottom, transparent, #000 20%, #000 62%, transparent)',
+}
+
+/**
+ * A haze of `--color-brand-soft` in the top corner of the hero. It is the same token the rule
+ * chips and info callouts are filled with, so the page's one atmospheric colour is a colour the
+ * product already uses rather than a marketing gradient, and it inverts with the theme by itself.
+ */
+const BRAND_WASH: CSSProperties = {
+  backgroundImage:
+    'radial-gradient(56rem 30rem at 82% -12%, var(--color-brand-soft), transparent 68%)',
+}
+
+/** One of the four answers to "so how does anything get into it?". */
+interface Answer {
+  readonly id: string
+  readonly icon: ComponentType<{ className?: string }>
+  readonly title: MessageKey
+  readonly body: MessageKey
+}
+
+const ANSWERS: ReadonlyArray<Answer> = [
+  {
+    id: 'entry',
+    icon: PencilLine,
+    title: 'marketing.instead.entry.title',
+    body: 'marketing.instead.entry.body',
+  },
+  {
+    id: 'import',
+    icon: FileUp,
+    title: 'marketing.instead.import.title',
+    body: 'marketing.instead.import.body',
+  },
+  {
+    id: 'recurring',
+    icon: Repeat,
+    title: 'marketing.instead.recurring.title',
+    body: 'marketing.instead.recurring.body',
+  },
+  {
+    id: 'rules',
+    icon: Filter,
+    title: 'marketing.instead.rules.title',
+    body: 'marketing.instead.rules.body',
+  },
+]
+
+/** The scope list. Deliberately dense and deliberately not a grid of cards. */
+const SCOPE: ReadonlyArray<MessageKey> = [
+  'marketing.scope.accounts',
+  'marketing.scope.transactions',
+  'marketing.scope.classification',
+  'marketing.scope.budgets',
+  'marketing.scope.recurring',
+  'marketing.scope.currency',
+  'marketing.scope.reports',
+  'marketing.scope.dashboard',
+  'marketing.scope.data',
+  'marketing.scope.household',
+]
+
+/** A heading over a body. Used by the two bands that are prose rather than product. */
+interface Passage {
+  readonly id: string
+  readonly title: MessageKey
+  readonly body: MessageKey
+}
+
+/** The four things this product refuses to become. The hero's promise, itemised. */
+const NEVER: ReadonlyArray<Passage> = [
+  {
+    id: 'connectors',
+    title: 'marketing.never.connectors.title',
+    body: 'marketing.never.connectors.body',
+  },
+  {
+    id: 'investments',
+    title: 'marketing.never.investments.title',
+    body: 'marketing.never.investments.body',
+  },
+  {
+    id: 'tax',
+    title: 'marketing.never.tax.title',
+    body: 'marketing.never.tax.body',
+  },
+  {
+    id: 'realtime',
+    title: 'marketing.never.realtime.title',
+    body: 'marketing.never.realtime.body',
+  },
+]
+
+const COMMITMENTS: ReadonlyArray<Passage> = [
+  {
+    id: 'export',
+    title: 'marketing.commit.export.title',
+    body: 'marketing.commit.export.body',
+  },
+  {
+    id: 'a11y',
+    title: 'marketing.commit.a11y.title',
+    body: 'marketing.commit.a11y.body',
+  },
+]
+
+/** The three anchors the header and the footer both offer. */
+const SECTION_LINKS: ReadonlyArray<{ href: string; label: MessageKey }> = [
+  { href: '#how', label: 'marketing.nav.how' },
+  { href: '#ledger', label: 'marketing.nav.ledger' },
+  { href: '#scope', label: 'marketing.nav.scope' },
+]
+
+/**
+ * A heading over a body, with a hairline above it.
+ *
+ * The rule is what gives these items their structure. A card would give them a scaffold instead,
+ * and a page whose every section is a grid of equal cards has no hierarchy left to spend.
+ */
+function RuledItem({ title, body }: { title: MessageKey; body: MessageKey }) {
+  const t = useTranslate()
+
+  return (
+    <div className="border-t border-border-subtle pt-4">
+      <h3 className="text-subtitle text-ink">{t(title)}</h3>
+      <p className="prose-measure mt-2 text-body text-ink-2">{t(body)}</p>
+    </div>
+  )
+}
+
+/** The wordmark, in the header and again at the top of the footer. */
+function Wordmark() {
+  const t = useTranslate()
+
+  return (
+    <a
+      href="/"
+      className="target-min-h inline-flex items-center gap-2 rounded-md text-subtitle font-semibold whitespace-nowrap text-ink no-underline focus-ring"
+    >
+      <span
+        aria-hidden="true"
+        className="grid size-7 place-items-center rounded-lg bg-brand text-caption font-bold text-on-brand"
+      >
+        M
+      </span>
+      {t('app.name')}
+    </a>
+  )
+}
 
 function LandingPage() {
   const t = useTranslate()
+  const locale = useLocale()
   const year = new Date().getUTCFullYear()
+
+  /**
+   * The euro expense as the workspace holds it. Written down rather than converted: the stored
+   * `ref_amount_minor` is a historical value fixed at the booking date's rate, and recomputing it
+   * on a marketing page would contradict the very sentence beside it.
+   */
+  const heldValue = makeMoney(11842, 'PLN')
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
       <header className="sticky top-0 z-nav border-b border-border-subtle bg-canvas/90 backdrop-blur-sm">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <a
-            href="/"
-            className="target-min-h inline-flex items-center gap-2 rounded-md text-subtitle font-semibold whitespace-nowrap no-underline text-ink focus-ring"
-          >
-            <span
-              aria-hidden="true"
-              className="grid size-7 place-items-center rounded-lg bg-brand text-on-brand text-caption font-bold"
-            >
-              M
-            </span>
-            {t('app.name')}
-          </a>
+        <div
+          className={cn(WELL, 'flex h-16 items-center justify-between gap-3')}
+        >
+          <Wordmark />
 
           <nav
             aria-label={t('nav.primary')}
             className="flex items-center gap-1 sm:gap-2"
           >
-            <a
-              href="#features"
-              className="target-min-h hidden items-center rounded-md px-3 text-label whitespace-nowrap text-ink-2 no-underline hover:text-ink focus-ring sm:inline-flex"
-            >
-              {t('marketing.nav.features')}
-            </a>
-            <a
-              href="#privacy"
-              className="target-min-h hidden items-center rounded-md px-3 text-label whitespace-nowrap text-ink-2 no-underline hover:text-ink focus-ring sm:inline-flex"
-            >
-              {t('marketing.nav.security')}
-            </a>
+            {SECTION_LINKS.map(({ href, label }) => (
+              <a
+                key={href}
+                href={href}
+                className="target-min-h hidden items-center rounded-md px-3 text-label whitespace-nowrap text-ink-2 no-underline hover:bg-hover hover:text-ink focus-ring md:inline-flex"
+              >
+                {t(label)}
+              </a>
+            ))}
             <a
               href="/login"
-              className="target-min-h inline-flex items-center rounded-md px-3 text-label font-medium whitespace-nowrap text-ink no-underline focus-ring hover:bg-hover"
+              className="target-min-h hidden items-center rounded-md px-3 text-label font-medium whitespace-nowrap text-ink no-underline hover:bg-hover focus-ring sm:inline-flex"
             >
               {t('marketing.nav.signIn')}
             </a>
-            <a
-              href="/login"
-              // `cn` rather than interpolation: `CTA_BASE` already sets
-              // `inline-flex`, so a plain template leaves both that and `hidden`
-              // on the element and lets stylesheet order pick the winner. It
-              // picked `inline-flex`, which is why this button was on screen at
-              // every width despite saying otherwise. `tailwind-merge` settles
-              // the `display` group by argument order instead.
-              className={cn(CTA_PRIMARY, 'h-10 hidden sm:inline-flex')}
-            >
+            {/* Always on screen, at every width. A header whose only action disappears below
+                `sm` leaves a phone visitor with a page and no way into it. */}
+            <a href="/register" className={cn(CTA_QUIET, 'h-10')}>
               {t('marketing.nav.getStarted')}
             </a>
           </nav>
@@ -157,94 +318,313 @@ function LandingPage() {
       {/* `tabIndex={-1}` is what makes the skip link in the shell actually move focus here:
           without it the browser scrolls to the anchor and leaves focus where it was. */}
       <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 outline-none">
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <div className="max-w-3xl">
-            <p className="text-micro tracking-label text-ink-2 uppercase">
-              {t('app.tagline')}
-            </p>
-            <h1 className="mt-4 text-display sm:text-hero">
-              {t('marketing.hero.title')}
-            </h1>
-            <p className="prose-measure mt-6 text-subtitle text-ink-2">
-              {t('marketing.hero.body')}
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a href="/login" className={`${CTA_PRIMARY} h-12`}>
+        {/* -- The refusal, with the ledger already under it ---------------- */}
+        {/* No `overflow-hidden`: the ledger card is meant to leave this band. Both decorative
+            layers are `inset-0`, so they cannot leave it either way. */}
+        <div className="relative border-b border-border-subtle bg-surface-sunken">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={BRAND_WASH}
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={RULED_FIELD}
+          />
+
+          <section className={cn(WELL, 'relative pt-16 sm:pt-24')}>
+            <div className="grid gap-x-12 gap-y-8 lg:grid-cols-12 lg:items-end">
+              <h1 className="text-balance text-hero lg:col-span-7">
+                <span className="block">{t('marketing.hero.title.lead')}</span>
+                <span className="block text-ink-2">
+                  {t('marketing.hero.title.rest')}
+                </span>
+              </h1>
+              <p className="prose-measure text-subtitle text-ink-2 lg:col-span-5">
+                {t('marketing.hero.body')}
+              </p>
+            </div>
+
+            <div className="mt-10 flex flex-wrap items-center gap-3">
+              <a href="/register" className={cn(CTA_PRIMARY, 'h-12')}>
                 {t('marketing.hero.cta.primary')}
                 <ArrowRight aria-hidden="true" className="size-4" />
               </a>
-              <a href="#features" className={`${CTA_SECONDARY} h-12`}>
-                {t('marketing.hero.cta.secondary')}
+              <a href="#how" className={cn(CTA_QUIET, 'h-12')}>
+                {t('marketing.nav.how')}
               </a>
             </div>
             <p className="mt-4 text-caption text-ink-2">
               {t('marketing.hero.note')}
             </p>
+
+            {/* The product, crossing the band boundary. The negative margin shortens this band by
+                exactly what the card then hangs below it, so the section underneath only has to
+                carry enough top padding to clear it. */}
+            <div className="relative -mb-20 mt-12 sm:-mb-32 sm:mt-16">
+              <div className="rounded-xl shadow-elevated">
+                <LedgerPreview />
+              </div>
+              <p className="mt-3 text-caption text-ink-2">
+                {t('marketing.ledger.sample')}
+              </p>
+            </div>
+          </section>
+        </div>
+
+        {/* -- Why that figure will never move ----------------------------- */}
+        <section
+          id="ledger"
+          aria-labelledby="ledger-heading"
+          className={cn(WELL, 'scroll-mt-16 pt-32 pb-20 sm:pt-40 sm:pb-28')}
+        >
+          <div className="grid gap-10 lg:grid-cols-12">
+            <div className="lg:col-span-6">
+              <h2 id="ledger-heading" className="text-balance text-display">
+                {t('marketing.ledger.title')}
+              </h2>
+              <p className="prose-measure mt-5 text-body text-ink-2">
+                {t('marketing.ledger.body')}
+              </p>
+            </div>
+
+            {/* The micro-over-display Two-Step, given a surface of its own so the one number on
+                the page that never changes is also the one that is lifted off it. */}
+            <div className="lg:col-span-5 lg:col-start-8">
+              <div className="rounded-xl border border-border-subtle bg-surface p-6 shadow-card sm:p-8">
+                <p className="text-micro tracking-label uppercase text-ink-2">
+                  {t('marketing.ledger.figure.label')}
+                </p>
+                <p className="mt-3 font-display text-display font-bold tabular text-ink">
+                  <span aria-hidden="true">
+                    {formatMoney(locale, heldValue)}
+                  </span>
+                  <span className="sr-only">
+                    {amountReading(t, locale, heldValue)}
+                  </span>
+                </p>
+                <p className="mt-3 text-caption text-ink-2">
+                  {t('marketing.ledger.figure.caption')}
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
+        {/* -- So how does anything get into it? --------------------------- */}
+        <div className="border-y border-border-subtle bg-surface">
+          <section
+            id="how"
+            aria-labelledby="how-heading"
+            className={cn(WELL, 'scroll-mt-16 py-20 sm:py-28')}
+          >
+            <div className="grid gap-x-12 gap-y-5 lg:grid-cols-12 lg:items-end">
+              <h2
+                id="how-heading"
+                className="text-balance text-display lg:col-span-5"
+              >
+                {t('marketing.instead.title')}
+              </h2>
+              <p className="prose-measure text-subtitle text-ink-2 lg:col-span-6 lg:col-start-7">
+                {t('marketing.instead.body')}
+              </p>
+            </div>
+
+            <dl className="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+              {ANSWERS.map(({ id, icon: Icon, title, body }) => (
+                <div key={id} className="border-t border-border-panel pt-5">
+                  <span
+                    aria-hidden="true"
+                    className="mb-4 grid size-9 place-items-center rounded-md bg-brand-soft text-brand"
+                  >
+                    <Icon className="size-5" />
+                  </span>
+                  <dt className="text-subtitle text-ink">{t(title)}</dt>
+                  <dd className="mt-2 text-body text-ink-2">{t(body)}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+
+        {/* -- The budget meter, with the colour switched off -------------- */}
+        {/* The side the product sits on flips here: the ledger row above put the figure on the
+            right, so the meters take the left and the prose answers them. */}
         <section
-          id="features"
-          aria-labelledby="features-heading"
-          className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 pb-16 sm:px-6 sm:pb-24"
+          aria-labelledby="meter-heading"
+          className={cn(WELL, 'py-20 sm:py-28')}
         >
-          <h2 id="features-heading" className="text-title">
-            {t('marketing.features.title')}
+          <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
+            <div className="lg:col-span-5 lg:col-start-8 lg:row-start-1">
+              <h2 id="meter-heading" className="text-balance text-display">
+                {t('marketing.meter.title')}
+              </h2>
+              <p className="mt-5 text-body text-ink-2">
+                {t('marketing.meter.body')}
+              </p>
+              <p className="mt-4 text-caption text-ink-2">
+                {t('marketing.meter.caption')}
+              </p>
+            </div>
+            <div className="lg:col-span-6 lg:row-start-1">
+              <div className="rounded-xl border border-border-subtle bg-surface p-6 shadow-card sm:p-8">
+                <BudgetStates />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* -- What it is, facing what it will never be -------------------- */}
+        <div
+          id="scope"
+          className="scroll-mt-16 border-y border-border-subtle bg-surface-panel"
+        >
+          <div
+            className={cn(WELL, 'grid gap-12 py-20 lg:grid-cols-12 sm:py-28')}
+          >
+            <section aria-labelledby="scope-heading" className="lg:col-span-7">
+              <h2 id="scope-heading" className="text-title">
+                {t('marketing.scope.title')}
+              </h2>
+              {/* Two flowing columns rather than a grid: the entries are of very different
+                  lengths and a grid would rule ten boxes of ten different heights. */}
+              <ul className="mt-6 sm:columns-2 sm:gap-x-10">
+                {SCOPE.map((key) => (
+                  <li
+                    key={key}
+                    className="break-inside-avoid border-t border-border-panel py-3 text-body text-ink"
+                  >
+                    {t(key)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section aria-labelledby="never-heading" className="lg:col-span-5">
+              <div className="rounded-xl border border-border-subtle bg-surface p-6 shadow-card sm:p-8">
+                <h2 id="never-heading" className="text-title">
+                  {t('marketing.never.title')}
+                </h2>
+                <div className="mt-6 grid gap-6">
+                  {NEVER.map(({ id, title, body }) => (
+                    <RuledItem key={id} title={title} body={body} />
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        {/* -- The two commitments, then the way in ------------------------ */}
+        <section
+          aria-labelledby="commit-heading"
+          className={cn(WELL, 'py-20 sm:py-28')}
+        >
+          <h2 id="commit-heading" className="text-balance text-display">
+            {t('marketing.commit.title')}
           </h2>
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(({ id, Icon, title, body }) => (
-              <li key={id}>
-                <Card as="article" padding="lg" className="h-full">
-                  <Icon aria-hidden="true" className="size-5 text-brand" />
-                  <h3 className="mt-4 text-subtitle">{t(title)}</h3>
-                  <p className="mt-2 text-body text-ink-2">{t(body)}</p>
-                </Card>
-              </li>
+          <div className="mt-10 grid gap-10 lg:grid-cols-2">
+            {COMMITMENTS.map(({ id, title, body }) => (
+              <div key={id}>
+                <h3 className="text-title">{t(title)}</h3>
+                <p className="prose-measure mt-3 text-body text-ink-2">
+                  {t(body)}
+                </p>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
 
-        <section
-          id="privacy"
-          aria-labelledby="privacy-heading"
-          className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 pb-16 sm:px-6 sm:pb-24"
-        >
-          <Card variant="brand" padding="lg" className="sm:p-10">
-            <ShieldCheck aria-hidden="true" className="size-6 text-brand" />
-            <h2 id="privacy-heading" className="mt-4 text-title">
-              {t('marketing.privacy.title')}
-            </h2>
-            <p className="prose-measure mt-3 text-body text-ink-2">
-              {t('marketing.privacy.body')}
-            </p>
-          </Card>
-        </section>
-
+        {/* -- The way in, on the page's one inverted ground ---------------- */}
+        {/* Inset rather than full-bleed, so the last thing on the page is an object on the paper
+            rather than another band of it. `--color-accent` is the inverse of the page in both
+            themes, so this panel is near-black on the light one and near-white on the dark one
+            without a second palette. */}
         <section
           aria-labelledby="cta-heading"
-          className="mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 sm:pb-28"
+          className={cn(WELL, 'pb-20 sm:pb-28')}
         >
-          <div className="border-t border-border-subtle pt-12 text-center">
-            <h2 id="cta-heading" className="text-title">
-              {t('marketing.cta.title')}
-            </h2>
-            <p className="prose-measure mx-auto mt-3 text-body text-ink-2">
-              {t('marketing.cta.body')}
-            </p>
-            <a href="/login" className={`${CTA_PRIMARY} mt-8 h-12`}>
-              {t('marketing.cta.action')}
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </a>
+          <div className="relative overflow-hidden rounded-2xl bg-accent px-6 py-16 text-center sm:px-12 sm:py-20">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 opacity-10"
+              style={PANEL_RULES}
+            />
+            <div className="relative">
+              <h2
+                id="cta-heading"
+                className="mx-auto max-w-2xl text-balance text-display text-on-accent"
+              >
+                {t('marketing.cta.title')}
+              </h2>
+              <p className="mx-auto mt-5 max-w-xl text-pretty text-body text-on-accent/85">
+                {t('marketing.cta.body')}
+              </p>
+              <a href="/register" className={cn(CTA_INVERTED, 'mt-10 h-12')}>
+                {t('marketing.cta.action')}
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </a>
+              <p className="mt-5 text-caption text-on-accent/85">
+                {t('marketing.hero.note')}
+              </p>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-border-subtle">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-8 text-caption text-ink-2 sm:px-6">
-          <p>
-            © {year} {t('app.name')}
-          </p>
-          <p>{t('marketing.footer.legal')}</p>
+      <footer className="border-t border-border-subtle bg-surface-sunken">
+        {/* The link lists are plain `ul`s inside `contentinfo` rather than `nav` landmarks: two
+            further navigation landmarks would need two further accessible names, and a footer
+            column list is not a landmark a screen-reader user wants to land on. */}
+        <div className={cn(WELL, 'py-14')}>
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="lg:col-span-2">
+              <Wordmark />
+              <p className="prose-measure mt-4 text-caption text-ink-2">
+                {t('marketing.hero.body')}
+              </p>
+            </div>
+
+            <ul className="grid content-start gap-1">
+              {SECTION_LINKS.map(({ href, label }) => (
+                <li key={href}>
+                  <a
+                    href={href}
+                    className="target-min-h inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
+                  >
+                    {t(label)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+
+            <ul className="grid content-start gap-1">
+              <li>
+                <a
+                  href="/login"
+                  className="target-min-h inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
+                >
+                  {t('marketing.nav.signIn')}
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/register"
+                  className="target-min-h inline-flex items-center rounded-md text-label font-medium text-ink no-underline hover:text-brand focus-ring"
+                >
+                  {t('marketing.nav.getStarted')}
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="mt-12 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border-subtle pt-6 text-caption text-ink-2">
+            <p>
+              © {year} {t('app.name')}
+            </p>
+            <p>{t('marketing.footer.legal')}</p>
+          </div>
         </div>
       </footer>
     </div>
