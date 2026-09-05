@@ -109,14 +109,26 @@ Five claims, all five checkable:
 | Export and backup | JSON and CSV by group and date range, R2 artefacts with expiry, full backup and restore                                |
 | SaaS layer        | Auth, workspaces and members, notifications, billing, settings, a platform console                                     |
 
+**Planned, and landing after v1's last wave:**
+
+| Area  | What ships                                                                                                                                                 |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loans | Terms, an integer amortisation schedule, principal/interest per instalment, settlement against real transactions, extra repayments and a payoff projection |
+
+Loan management was moved out of _Out of scope_ on 2026-09-05 at the product owner's request. It is
+decomposed as `docs/plans/28-loans.md`, its stages open at wave 7, and no v1 surface waits on it —
+so it is listed apart from the table above rather than inside it, because "in scope for v1" is a
+claim about a release and this is not in that release.
+
 **Out of scope, deliberately:**
 
 - **Bank connectors, screen-scraping and aggregators — permanently.** Not "later", not "if a
   customer asks". `docs/adr/0008-no-bank-connectors.md` is the record.
 - **Investment position tracking** (lots, cost basis, dividends). An `investment` account holds a
   balance; it does not hold a portfolio.
-- **Loan amortisation schedules and vehicle-cost flows.** The `loan` account category exists as a
-  balance; the dedicated flows do not ship in v1.
+- **Vehicle-cost flows and depreciating assets with a value curve.** A car is an `other` account
+  with a balance a person adjusts; there is no vehicle account category and no modelled value curve
+  (`docs/plans/99-boundaries-and-blockers.md` BND-11).
 - **Tax reporting, invoicing, and anything that could be read as regulated financial advice.**
 - **Realtime multi-user editing.** Household members see each other's rows on reload, not live.
 
