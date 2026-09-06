@@ -32,6 +32,14 @@ want a second cockpit - it wants `cezar projects add <repo root>`. Two cockpits 
 mode worth naming: the second silently binds :4322, every sweeper on the host keeps reading 4321
 and never sees it, and both write the same `.ai/cezar/` state.
 
+**The `<id>` is `money-tracker-online`**, and it is not a name anybody chose: cezar slugs it from
+the checkout's directory basename (lowercased, every run of characters outside `[a-z0-9-]` becoming
+one dash), so `money-tracker.online` registers as `money-tracker-online`. Every script here defaults
+to it and takes `CEZ_PROJECT` as the override; `GET /api/v1/projects` is the authority when a host
+disagrees. Getting it wrong is quiet by construction - the API answers 404 and `sweep.mjs` cannot
+tell that apart from a cockpit that is down, which is why it now says so on stderr rather than
+returning an empty run list.
+
 Started by hand it does not survive a reboot, and the sweeper does - which leaves the host looking
 alive while nothing dispatches. Install it as a launchd job instead (template in
 `scripts/agent/launchd/`, installed once per host; every repo running this protocol carries the
@@ -102,7 +110,7 @@ claude-code-action.
 | `cez-docs-pr.sh`                                | agent (allowlist)                   | cherry-picks the run's `CONTEXT.md` / `docs/adr/` commits onto `claude/docs-<n>-<run8>` off `origin/develop` and opens a draft PR labelled `agent-docs`                                                                                                                                  |
 | `floor-guard.mjs [--base]`                      | ladder                              | refuses added `@ts-*` / eslint suppressions, skipped or focused tests, deleted test files                                                                                                                                                                                                |
 | `state.mjs`                                     | sweeper, tests                      | the invariants I-1…I-10 and the PR-driven transitions as a pure function of a snapshot and `now`                                                                                                                                                                                         |
-| `sweep.mjs [--fix] [--json] [--strict]`         | launchd on the host                 | gathers GitHub + `GET /api/v1/p/money-tracker/runs`, reports, applies the mechanical fixes with `--fix`                                                                                                                                                                                  |
+| `sweep.mjs [--fix] [--json] [--strict]`         | launchd on the host                 | gathers GitHub + `GET /api/v1/p/money-tracker-online/runs`, reports, applies the mechanical fixes with `--fix`                                                                                                                                                                           |
 | `validate.sh`, `setup-e2e.sh`, `narrow-e2e.ts`  | ladder                              | the deterministic ladder: route-tree gate, migration-drift gate, typecheck, lint, vitest, `--build`, and chromium e2e when the diff touches UI                                                                                                                                           |
 | `labels-migrate.sh`                             | operator                            | the one-off label migration of ADR 0014, dry-run by default                                                                                                                                                                                                                              |
 
@@ -250,7 +258,7 @@ one. So register the project first, and check it answers:
 
 ```bash
 cezar projects add <repo root>   # `cezar projects` lists what the cockpit serves
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4321/api/v1/p/money-tracker/runs   # want 200
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4321/api/v1/p/money-tracker-online/runs   # want 200
 ```
 
 Read the `cezar` field of the report, not just the violation count.
