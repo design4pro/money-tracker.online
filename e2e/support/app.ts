@@ -93,7 +93,7 @@ export const LABELS: Readonly<Record<AppLocale, UiLabels>> = {
  *
  * It is written for **both** loopback names, and that is not belt and braces. A cookie is scoped
  * to the host it names, and this suite is run against either: `playwright.config.ts` defaults to
- * `localhost:3010`, while `scripts/agent/setup-e2e.sh` prints `PLAYWRIGHT_BASE_URL` on
+ * `localhost:3010`, while `.ai/scripts/test-env-up.sh` prints `PLAYWRIGHT_BASE_URL` on
  * `127.0.0.1` — for a reason of its own, that the seed's `fetch` resolves `localhost` to v4 while
  * a default Vite bind can be v6-only. Naming one host meant that following the setup script's own
  * instruction left every `pl` test looking at an English document: `<html lang>` read `en`, the

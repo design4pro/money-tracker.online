@@ -1,6 +1,6 @@
 {
   "defaultRunner": "claude",
-  "reviewGate": false,
+  "reviewGate": true,
   "baseBranch": "develop",
   "worktreeRetention": 10,
   "maxParallel": 2,

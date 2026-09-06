@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
-# Register the automations in docs/agents/cezar-automations.json with the running cezar
-# through its API (never by editing .ai/cezar/automations.json by hand). Idempotent: an
-# automation with the same name is updated in place, a new one is created enabled.
+# Register docs/agents/cezar-automations.json with the running cezar through its API (never by
+# editing .ai/cezar/automations.json by hand). Idempotent: an automation with the same name is
+# updated in place and re-enabled, a new one is created enabled. Automations the cockpit holds
+# that the file no longer names are listed, never touched: retiring one is the operator's call
+# (docs/agents/cezar.md).
 #
-#   scripts/agent/cez-automations.sh [--dry-run]
+#   scripts/cezar/automations.sh [--dry-run]
 #
 # Needs the service started with CEZ_AUTOMATIONS=1; a 409 from the API says it was not.
 set -euo pipefail
-. "$(dirname "$0")/cez-lib.sh"
 
 API="${CEZ_API:-http://localhost:4321}/api/v1/p/${CEZ_PROJECT:-money-tracker-online}/automations"
 # The checkout this script lives in, not the main one: the worktree that carries the definitions.
 FILE="$(cd "$(dirname "$0")/../.." && pwd)/docs/agents/cezar-automations.json"
 DRY=0
 [ "${1:-}" = "--dry-run" ] && DRY=1
+
+say() { printf '%s\n' "$*" >&2; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 EXISTING=$(curl -sS "$API" -w '\n%{http_code}') || die "cezar unreachable at $API"
 CODE=$(tail -1 <<<"$EXISTING")
@@ -41,4 +45,10 @@ jq -c '.[]' "$FILE" | while read -r def; do
     [ "$(tail -1 <<<"$out")" = "201" ] || die "POST $name -> $(tail -1 <<<"$out"): $(sed '$d' <<<"$out")"
     say "created $name ($(sed '$d' <<<"$out" | jq -r .automation.id))"
   fi
+done
+
+# Definitions the cockpit still holds that the file no longer names.
+known=$(jq -r '.[].name' "$FILE")
+jq -r '.automations[]? | "\(.name) \(.enabled)"' <<<"$LIST" | while read -r name enabled; do
+  grep -qx "$name" <<<"$known" || say "not in file: $name (enabled: $enabled) - disable it in the cockpit if it is retired"
 done

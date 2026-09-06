@@ -1,5 +1,7 @@
 // The Claude Code hooks in .claude/hooks/ as black boxes: JSON on stdin, exit 2 = blocked.
-// Agent mode is CEZ_TASK_ID (cezar) or GITHUB_ACTIONS; without either a developer keeps gh and pnpm.
+// Agent mode is CEZ_TASK_ID (cezar) or GITHUB_ACTIONS; without either a developer keeps pnpm
+// and env. GitHub mutations and `git add -A` are open in both modes since ADR 0017: the om-*
+// skills perform them through the tracker descriptor.
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -7,7 +9,7 @@ import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const HOOKS = resolve(__dirname, '../../../.claude/hooks')
+const HOOKS = resolve(__dirname, '..')
 const AGENT = { CEZ_TASK_ID: '0123456789ab-test' }
 
 function hook(
@@ -40,37 +42,43 @@ describe('git-guardrails.sh', () => {
     expect(bash('git status').status).toBe(0)
   })
 
-  it('leaves gh, pnpm and env alone outside agent runs', () => {
+  it.each([
+    'git commit --no-verify -m "x"',
+    'git commit -m "x" --no-verify',
+    'git push --no-verify origin HEAD',
+    'git commit -n -m "x"',
+  ])('blocks %s for everyone', (command) => {
+    const r = bash(command)
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--no-verify')
+  })
+
+  it('leaves GitHub mutations, git add and pnpm exec open in both modes', () => {
     for (const c of [
-      'gh issue edit 1 --add-label x',
-      'gh api --method POST repos/x/y/issues',
-      'pnpm exec vitest',
+      'gh issue edit 1 --add-label bug',
+      'gh pr create --title x --body y',
+      'gh api --method POST repos/x/y/issues/1/comments -f body=hi',
       'git add -A',
-      'env',
+      'git commit -m "fix: x\n\nCloses #12"',
+      'pnpm exec vitest run',
+      'pnpm run build',
+      'npx prettier --check .',
     ]) {
       expect(bash(c).status).toBe(0)
+      expect(bash(c, AGENT).status).toBe(0)
     }
   })
 
+  it('leaves pnpm add and env alone outside agent runs', () => {
+    expect(bash('pnpm add zod').status).toBe(0)
+    expect(bash('env').status).toBe(0)
+  })
+
   it.each([
-    ['git add -A', 'git add -A|.'],
-    ['git add .', 'git add -A|.'],
-    ['git add --all', 'git add -A|.'],
-    ['git commit -m "fix: x\n\nCloses #12"', 'closing keyword'],
-    ['git commit -m "Fixes #7"', 'closing keyword'],
-    ['gh issue edit 1 --add-label "status: ready"', 'gh issue|pr mutation'],
-    ['gh pr create --draft', 'gh issue|pr mutation'],
-    ['gh issue comment 1 -b hi', 'gh issue|pr mutation'],
-    ['gh label delete x', 'gh mutation surface'],
-    ['gh api --method POST repos/x/y/issues/1/comments', 'gh api non-GET'],
-    ['gh api -X PATCH repos/x/y/issues/1', 'gh api non-GET'],
-    ['gh api repos/x/y/issues/1/comments -f body=hi', 'gh api non-GET'],
-    ['gh api repos/x/y/issues -F title=@f', 'gh api non-GET'],
-    ['gh api --input body.json repos/x/y/issues', 'gh api non-GET'],
-    ['pnpm exec playwright test', 'pnpm dlx|exec|run'],
-    ['pnpm dlx cowsay', 'pnpm dlx|exec|run'],
-    ['pnpm run build', 'pnpm dlx|exec|run'],
-    ['npx prettier .', 'pnpm dlx|exec|run'],
+    ['pnpm add zod', 'pnpm add|remove|update'],
+    ['pnpm remove zod', 'pnpm add|remove|update'],
+    ['pnpm update', 'pnpm add|remove|update'],
+    ['pnpm up -L', 'pnpm add|remove|update'],
     ['printenv', 'printenv'],
     ['env', 'env dump'],
     ['env | grep TOKEN', 'env dump'],
@@ -81,27 +89,19 @@ describe('git-guardrails.sh', () => {
   })
 
   it.each([
-    'git add src/x.ts',
-    'git add scripts/agent/../../src/x.ts',
-    'git commit -m "feat: closer look at #12"',
-    'git commit -m "fix(map): rings (refs #12)"',
-    'gh issue view 12 --json body',
-    'gh issue list --label "status: ready"',
-    'gh pr list',
-    'gh api repos/x/y/issues/1',
-    'gh api --method GET repos/x/y/issues/1 --paginate',
     'pnpm typecheck',
     'pnpm test',
-    'pnpm lint',
+    'pnpm install --frozen-lockfile',
+    'pnpm install-skills',
     'env -i PATH=/bin true',
-    'bash scripts/agent/cez-ladder.sh',
-    'scripts/agent/gh-ro.sh issues/1',
+    'gh pr view 12 --json state',
+    'git push -u origin fix/issue-12-x',
   ])('agent mode allows %s', (command) => {
     expect(bash(command, AGENT).status).toBe(0)
   })
 
   it('treats GITHUB_ACTIONS as agent mode too', () => {
-    expect(bash('git add -A', { GITHUB_ACTIONS: 'true' }).status).toBe(2)
+    expect(bash('printenv', { GITHUB_ACTIONS: 'true' }).status).toBe(2)
   })
 })
 
@@ -121,9 +121,17 @@ describe('guard-generated.sh', () => {
     '.claude/settings.json',
     '.husky/pre-commit',
     '.ai/cezar/config.json',
-    'scripts/agent/cez-lib.sh',
+    '.ai/cezar/workflows/om-fix-issue.yml',
+    '.ai/agentic.config.json',
+    '.ai/trackers/github.md',
+    '.ai/browsers/playwright.md',
+    '.ai/skills/om-code-review/SKILL.md',
+    '.ai/scripts/test-env-up.sh',
+    'scripts/cezar/automations.sh',
     '.npmrc',
     'pnpm-workspace.yaml',
+    'docs/agents/reference.md',
+    'docs/agents/out-of-scope.md',
   ])('agent mode blocks %s', (rel) => {
     const r = hook(
       'guard-generated.sh',
@@ -139,6 +147,9 @@ describe('guard-generated.sh', () => {
       'src/x.ts',
       'scripts/seed/seed.mjs',
       'docs/agents/cezar.md',
+      '.ai/specs/2026-09-06-x.md',
+      '.ai/runs/x.md',
+      '.ai/qa/report.md',
       'src/.npmrc-ish.ts',
     ]) {
       expect(
@@ -160,9 +171,11 @@ describe('guard-read.sh', () => {
   const root = mkdtempSync(join(tmpdir(), 'guard-read-'))
   mkdirSync(join(root, 'src'), { recursive: true })
   mkdirSync(join(root, '.ai', 'cezar', 'runs'), { recursive: true })
-  mkdirSync(join(root, '.agent'), { recursive: true })
+  mkdirSync(join(root, '.ai', 'qa'), { recursive: true })
   writeFileSync(join(root, '.dev.vars'), 'SECRET=1')
   writeFileSync(join(root, '.dev.vars.example'), 'SECRET=')
+  writeFileSync(join(root, '.ai', 'qa', 'test-env.env'), 'TEST_OWNER_PASSWORD=x')
+  writeFileSync(join(root, '.ai', 'qa', 'test-env.json'), '{}')
   writeFileSync(join(root, 'src', 'a.ts'), '')
   const read = (
     input: Record<string, string>,
@@ -178,6 +191,8 @@ describe('guard-read.sh', () => {
     expect(read({ file_path: 'src/new.ts' }).status).toBe(0)
     expect(read({ path: root, pattern: '**/*.ts' }).status).toBe(0)
     expect(read({ file_path: join(root, '.dev.vars.example') }).status).toBe(0)
+    expect(read({ file_path: '.ai/qa/test-env.json' }).status).toBe(0)
+    expect(read({ file_path: '.ai/runs/x.md' }).status).toBe(0)
   })
 
   it.each([
@@ -188,7 +203,7 @@ describe('guard-read.sh', () => {
     ['.env.local', 'environment file'],
     ['.ai/cezar/runs/x.json', 'cezar run state'],
     ['.ai/cezar/runs.json', 'cezar run state'],
-    ['.agent/handoff.md', 'handoff file'],
+    ['.ai/qa/test-env.env', 'test-env credentials'],
     ['.git/config', 'git internals'],
   ])('denies %s', (file_path, reason) => {
     const r = read({ file_path })
@@ -200,5 +215,6 @@ describe('guard-read.sh', () => {
     expect(read({ pattern: '../**/*.ts' }).status).toBe(2)
     expect(read({ path: root, pattern: '**/.dev.vars' }).status).toBe(2)
     expect(read({ path: root, pattern: '*.env.local' }).status).toBe(2)
+    expect(read({ path: root, pattern: '**/test-env.env' }).status).toBe(2)
   })
 })
