@@ -52,7 +52,33 @@ const e2eServerToday =
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
-  build: { sourcemap: uploadsSourceMaps ? 'hidden' : false },
+  build: {
+    sourcemap: uploadsSourceMaps ? 'hidden' : false,
+    rolldownOptions: {
+      treeshake: {
+        /**
+         * The design system has no module-level side effects, and the bundler has to be told.
+         *
+         * `src/components/ui/index.ts` re-exports every primitive, and 130-odd modules import
+         * from it. Rolldown drops a re-export edge nobody uses only when it can prove the
+         * target module pure; a wrapper whose top level calls `cva()` or `cn()`, or that
+         * imports a package without a `sideEffects` declaration, cannot be proved pure, so
+         * every one of those edges stays live for every importer. The result was one 614 kB
+         * `ui` chunk - calendar, date picker, table, grid list, number field, sonner and
+         * their React Aria hooks - loaded by the login page.
+         *
+         * Declaring the directory side-effect free is the same contract a component library
+         * states with `"sideEffects": false`, and it is true here: every module in it only
+         * defines components and class strings (the directory's own rules in `index.ts`
+         * forbid anything that fetches or registers). With it, each route reaches only the
+         * primitives it renders, and the rarely used ones land in chunks of their own.
+         */
+        moduleSideEffects: [
+          { test: /\/src\/components\/ui\//, sideEffects: false },
+        ],
+      },
+    },
+  },
   define: { __E2E_SERVER_TODAY__: e2eServerToday },
 
   /**
