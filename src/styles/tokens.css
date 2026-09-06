@@ -534,7 +534,8 @@
      capped so a line never exceeds ~80 characters, line height inside a
      paragraph is at least 1.5, and paragraph spacing is at least 1.5× that
      again. `--measure` is applied by the `prose-measure` utility in `app.css`.
-     64ch of a monospace at 16px is 614px. */
+     `ch` follows the element's own size: 64ch of Courier Prime (0.6em advance)
+     is 576px under `text-body` (15px) and 461px under `text-caption` (12px). */
   --measure: 64ch;
   --leading-reading: 1.6;
   --paragraph-gap: 1.5em;

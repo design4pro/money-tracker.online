@@ -415,8 +415,9 @@ few characters but never by a pixel of height. `h1`-`h3` take the display face a
   largest hand inside the app.
 - **Title** (700, 32px, 1.1): page titles and the margin note beside the passbook.
 - **Subtitle** (700, 20px, 1.25): card titles, entry titles in a ruled list, dialog titles.
-- **Body** (400, 15px, 1.55): prose and form labels. Running text is capped at `--measure` (64ch,
-  which is 614px of this monospace at 16px) with 1.6 leading and 1.5em paragraph spacing.
+- **Body** (400, 15px, 1.55): prose and form labels. Running text is capped at `--measure` (64ch;
+  `ch` follows the element's own size, so 576px under `text-body` and 461px under `text-caption`)
+  with 1.6 leading (`--leading-reading`) and 1.5em paragraph spacing (`--paragraph-gap`).
 - **Label** (400, 13px, 1.5): the default inside controls and the typed line of the passbook -
   button labels, field text, table cells, the rail.
 - **Caption** (400, 12px, 1.5): dates, metadata, helper text, the converted amount under a figure.
@@ -483,7 +484,10 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
   like the line that produced it, and the page is not stamped.
 - **The summary strip**: three typed lines in a `dl`, label at the start, figure at the end, a
   `border-t` rule under each - never three tiles.
-- **Reading measure**: `prose-measure` caps running text at 64ch.
+- **Reading measure**: `prose-measure` caps running text at 64ch and sets the reading leading
+  (1.6) and paragraph gap (1.5em). A handful of descriptions cap themselves inline at 60-68ch
+  instead (`max-w-prose` is 65ch) and keep the body leading; every cap sits under the 80-character
+  ceiling of WCAG 1.4.8, and no running text is uncapped.
 
 ### Named Rules
 
