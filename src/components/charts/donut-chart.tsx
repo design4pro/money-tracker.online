@@ -319,13 +319,13 @@ function DonutRing({
       {/* The centre repeats what the focused slice already announced, so it is hidden from
           assistive technology and exists for the reader who is looking at the ring. */}
       <g aria-hidden="true" transform={`translate(${cx} ${cy})`}>
-        <text textAnchor="middle" y={-4} className="fill-ink-2 text-[11px]">
+        <text textAnchor="middle" y={-4} className="fill-ink-2 text-caption">
           {centreTitle}
         </text>
         <text
           textAnchor="middle"
           y={16}
-          className="fill-ink text-[15px] font-semibold tabular-nums"
+          className="fill-ink text-body font-semibold tabular-nums"
         >
           {centreValue}
         </text>

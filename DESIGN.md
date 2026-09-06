@@ -83,12 +83,12 @@ typography:
     fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
     fontSize: '0.8125rem'
     fontWeight: 400
-    lineHeight: 1.4
+    lineHeight: 1.5
   caption:
     fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
     fontSize: '0.75rem'
     fontWeight: 400
-    lineHeight: 1.4
+    lineHeight: 1.5
   micro:
     fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
     fontSize: '0.6875rem'
@@ -417,9 +417,9 @@ few characters but never by a pixel of height. `h1`-`h3` take the display face a
 - **Subtitle** (700, 20px, 1.25): card titles, entry titles in a ruled list, dialog titles.
 - **Body** (400, 15px, 1.55): prose and form labels. Running text is capped at `--measure` (64ch,
   which is 614px of this monospace at 16px) with 1.6 leading and 1.5em paragraph spacing.
-- **Label** (400, 13px, 1.4): the default inside controls and the typed line of the passbook -
+- **Label** (400, 13px, 1.5): the default inside controls and the typed line of the passbook -
   button labels, field text, table cells, the rail.
-- **Caption** (400, 12px, 1.4): dates, metadata, helper text, the converted amount under a figure.
+- **Caption** (400, 12px, 1.5): dates, metadata, helper text, the converted amount under a figure.
   Set in `ink-2`, which still clears 7:1.
 - **Micro** (700, 11px, 1.2, 0.06em, uppercase): column headings, `dt` terms in a description
   list, the small badge. It sits beside or above a figure on the same line and never above a

@@ -74,8 +74,9 @@ Five, each with what makes it true and how it is verified.
   `prose-measure` utility in `src/styles/app.css`, and the few descriptions that cap themselves
   inline stop at 68ch.
 - Text is **not justified**; every text block is start-aligned.
-- Line spacing is at least **1.5** within paragraphs (`body` is 1.55) and paragraph spacing is at
-  least 1.5× the line spacing.
+- Line spacing is at least **1.5** within paragraphs (`body` is 1.55; `label` and `caption`, which
+  also carry helper text and descriptions, are 1.5) and paragraph spacing is at least 1.5× the
+  line spacing.
 - Text resizes to **200%** without horizontal scrolling on a full-screen window; that is a 1280px
   viewport reflowed to 320px CSS width.
 

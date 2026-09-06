@@ -45,7 +45,7 @@ export function GoalEmptyState({
         <Heading className="text-title font-semibold text-ink">
           {t('goals.empty.title')}
         </Heading>
-        <p className="mt-1 text-body text-ink-2">{t('goals.empty.body')}</p>
+        <p className="text-body text-ink-2">{t('goals.empty.body')}</p>
       </div>
 
       <Button

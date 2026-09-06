@@ -512,12 +512,16 @@
   --text-body: 0.9375rem;
   --text-body--line-height: 1.55;
 
+  /* Label and caption are also set as prose - helper text, descriptions, a
+     dialog body - so they hold the 1.5 floor of WCAG 2.2 §1.4.8 rather than a
+     tighter control leading; a control is a fixed-height box and never
+     reads the ratio. */
   --text-label: 0.8125rem;
-  --text-label--line-height: 1.4;
+  --text-label--line-height: 1.5;
   --text-label--font-weight: 400;
 
   --text-caption: 0.75rem;
-  --text-caption--line-height: 1.4;
+  --text-caption--line-height: 1.5;
 
   --text-micro: 0.6875rem;
   --text-micro--line-height: 1.2;

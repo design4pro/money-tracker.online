@@ -47,7 +47,7 @@ export function BudgetEmptyState({
         <Heading className="text-title font-semibold text-ink">
           {t('budgets.empty.title')}
         </Heading>
-        <p className="mt-1 text-body text-ink-2">{t('budgets.empty.body')}</p>
+        <p className="text-body text-ink-2">{t('budgets.empty.body')}</p>
       </div>
 
       <ul className="grid w-full max-w-2xl gap-3 sm:grid-cols-2">
