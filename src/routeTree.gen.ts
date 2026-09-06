@@ -17,6 +17,7 @@ import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as authRegisterRouteImport } from './routes/(auth)/register'
 import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
 import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
 import { Route as AppBudgetsIndexRouteImport } from './routes/_app/budgets/index'
@@ -33,13 +34,19 @@ import { Route as AppRecurringIndexRouteImport } from './routes/_app/recurring/i
 import { Route as AppRecurringSeriesIdRouteImport } from './routes/_app/recurring/$seriesId'
 import { Route as AppRecurringCandidatesRouteImport } from './routes/_app/recurring/candidates'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsBillingRouteImport } from './routes/_app/settings/billing'
+import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as AppTransactionsIndexRouteImport } from './routes/_app/transactions/index'
 import { Route as AppTransactionsTransactionIdRouteImport } from './routes/_app/transactions/$transactionId'
 import { Route as AppTransactionsGroupsRouteImport } from './routes/_app/transactions/groups'
 import { Route as AppTransactionsNewRouteImport } from './routes/_app/transactions/new'
 import { Route as AppTransactionsPlannedRouteImport } from './routes/_app/transactions/planned'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiBillingCheckoutRouteImport } from './routes/api/billing/checkout'
+import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
+import { Route as ApiBillingReturnRouteImport } from './routes/api/billing/return'
 import { Route as ApiFilesIdRouteImport } from './routes/api/files/$id'
+import { Route as ApiWebhooksPolarRouteImport } from './routes/api/webhooks/polar'
 import { Route as AppTransactionsRulesIndexRouteImport } from './routes/_app/transactions/rules/index'
 import { Route as AppTransactionsRulesRuleIdRouteImport } from './routes/_app/transactions/rules/$ruleId'
 import { Route as AppTransactionsRulesNewRouteImport } from './routes/_app/transactions/rules/new'
@@ -80,6 +87,11 @@ const authResetPasswordRoute = authResetPasswordRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteInvitationIdRoute = InviteInvitationIdRouteImport.update({
+  id: '/invite/$invitationId',
+  path: '/invite/$invitationId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
@@ -162,6 +174,16 @@ const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsBillingRoute = AppSettingsBillingRouteImport.update({
+  id: '/settings/billing',
+  path: '/settings/billing',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
+  id: '/settings/members',
+  path: '/settings/members',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTransactionsIndexRoute = AppTransactionsIndexRouteImport.update({
   id: '/transactions/',
   path: '/transactions/',
@@ -193,9 +215,29 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBillingCheckoutRoute = ApiBillingCheckoutRouteImport.update({
+  id: '/api/billing/checkout',
+  path: '/api/billing/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
+  id: '/api/billing/portal',
+  path: '/api/billing/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingReturnRoute = ApiBillingReturnRouteImport.update({
+  id: '/api/billing/return',
+  path: '/api/billing/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFilesIdRoute = ApiFilesIdRouteImport.update({
   id: '/api/files/$id',
   path: '/api/files/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksPolarRoute = ApiWebhooksPolarRouteImport.update({
+  id: '/api/webhooks/polar',
+  path: '/api/webhooks/polar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppTransactionsRulesIndexRoute =
@@ -223,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof authRegisterRoute
   '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
@@ -230,12 +273,18 @@ export interface FileRoutesByFullPath {
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/settings/billing': typeof AppSettingsBillingRoute
+  '/settings/members': typeof AppSettingsMembersRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/transactions/groups': typeof AppTransactionsGroupsRoute
   '/transactions/new': typeof AppTransactionsNewRoute
   '/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/return': typeof ApiBillingReturnRoute
   '/api/files/$id': typeof ApiFilesIdRoute
+  '/api/webhooks/polar': typeof ApiWebhooksPolarRoute
   '/accounts/': typeof AppAccountsIndexRoute
   '/budgets/': typeof AppBudgetsIndexRoute
   '/categories/': typeof AppCategoriesIndexRoute
@@ -257,6 +306,7 @@ export interface FileRoutesByTo {
   '/register': typeof authRegisterRoute
   '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
@@ -264,12 +314,18 @@ export interface FileRoutesByTo {
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/settings/billing': typeof AppSettingsBillingRoute
+  '/settings/members': typeof AppSettingsMembersRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/transactions/groups': typeof AppTransactionsGroupsRoute
   '/transactions/new': typeof AppTransactionsNewRoute
   '/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/return': typeof ApiBillingReturnRoute
   '/api/files/$id': typeof ApiFilesIdRoute
+  '/api/webhooks/polar': typeof ApiWebhooksPolarRoute
   '/accounts': typeof AppAccountsIndexRoute
   '/budgets': typeof AppBudgetsIndexRoute
   '/categories': typeof AppCategoriesIndexRoute
@@ -294,6 +350,7 @@ export interface FileRoutesById {
   '/(auth)/register': typeof authRegisterRoute
   '/(auth)/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/_app/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/_app/goals/$goalId': typeof AppGoalsGoalIdRoute
@@ -301,12 +358,18 @@ export interface FileRoutesById {
   '/_app/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/_app/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/_app/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/_app/settings/billing': typeof AppSettingsBillingRoute
+  '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/_app/transactions/groups': typeof AppTransactionsGroupsRoute
   '/_app/transactions/new': typeof AppTransactionsNewRoute
   '/_app/transactions/planned': typeof AppTransactionsPlannedRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/return': typeof ApiBillingReturnRoute
   '/api/files/$id': typeof ApiFilesIdRoute
+  '/api/webhooks/polar': typeof ApiWebhooksPolarRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
   '/_app/budgets/': typeof AppBudgetsIndexRoute
   '/_app/categories/': typeof AppCategoriesIndexRoute
@@ -330,6 +393,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/api/health'
+    | '/invite/$invitationId'
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
@@ -337,12 +401,18 @@ export interface FileRouteTypes {
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
+    | '/settings/billing'
+    | '/settings/members'
     | '/transactions/$transactionId'
     | '/transactions/groups'
     | '/transactions/new'
     | '/transactions/planned'
     | '/api/auth/$'
+    | '/api/billing/checkout'
+    | '/api/billing/portal'
+    | '/api/billing/return'
     | '/api/files/$id'
+    | '/api/webhooks/polar'
     | '/accounts/'
     | '/budgets/'
     | '/categories/'
@@ -364,6 +434,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/api/health'
+    | '/invite/$invitationId'
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
@@ -371,12 +442,18 @@ export interface FileRouteTypes {
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
+    | '/settings/billing'
+    | '/settings/members'
     | '/transactions/$transactionId'
     | '/transactions/groups'
     | '/transactions/new'
     | '/transactions/planned'
     | '/api/auth/$'
+    | '/api/billing/checkout'
+    | '/api/billing/portal'
+    | '/api/billing/return'
     | '/api/files/$id'
+    | '/api/webhooks/polar'
     | '/accounts'
     | '/budgets'
     | '/categories'
@@ -400,6 +477,7 @@ export interface FileRouteTypes {
     | '/(auth)/register'
     | '/(auth)/reset-password'
     | '/api/health'
+    | '/invite/$invitationId'
     | '/_app/accounts/$accountId'
     | '/_app/budgets/$budgetId'
     | '/_app/goals/$goalId'
@@ -407,12 +485,18 @@ export interface FileRouteTypes {
     | '/_app/payees/$payeeId'
     | '/_app/recurring/$seriesId'
     | '/_app/recurring/candidates'
+    | '/_app/settings/billing'
+    | '/_app/settings/members'
     | '/_app/transactions/$transactionId'
     | '/_app/transactions/groups'
     | '/_app/transactions/new'
     | '/_app/transactions/planned'
     | '/api/auth/$'
+    | '/api/billing/checkout'
+    | '/api/billing/portal'
+    | '/api/billing/return'
     | '/api/files/$id'
+    | '/api/webhooks/polar'
     | '/_app/accounts/'
     | '/_app/budgets/'
     | '/_app/categories/'
@@ -433,8 +517,13 @@ export interface RootRouteChildren {
   authRouteRoute: typeof authRouteRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
   ApiHealthRoute: typeof ApiHealthRoute
+  InviteInvitationIdRoute: typeof InviteInvitationIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiBillingCheckoutRoute: typeof ApiBillingCheckoutRoute
+  ApiBillingPortalRoute: typeof ApiBillingPortalRoute
+  ApiBillingReturnRoute: typeof ApiBillingReturnRoute
   ApiFilesIdRoute: typeof ApiFilesIdRoute
+  ApiWebhooksPolarRoute: typeof ApiWebhooksPolarRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -493,6 +582,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$invitationId': {
+      id: '/invite/$invitationId'
+      path: '/invite/$invitationId'
+      fullPath: '/invite/$invitationId'
+      preLoaderRoute: typeof InviteInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/accounts/': {
@@ -607,6 +703,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/billing': {
+      id: '/_app/settings/billing'
+      path: '/settings/billing'
+      fullPath: '/settings/billing'
+      preLoaderRoute: typeof AppSettingsBillingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/members': {
+      id: '/_app/settings/members'
+      path: '/settings/members'
+      fullPath: '/settings/members'
+      preLoaderRoute: typeof AppSettingsMembersRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/transactions/': {
       id: '/_app/transactions/'
       path: '/transactions'
@@ -649,11 +759,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/checkout': {
+      id: '/api/billing/checkout'
+      path: '/api/billing/checkout'
+      fullPath: '/api/billing/checkout'
+      preLoaderRoute: typeof ApiBillingCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/portal': {
+      id: '/api/billing/portal'
+      path: '/api/billing/portal'
+      fullPath: '/api/billing/portal'
+      preLoaderRoute: typeof ApiBillingPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/return': {
+      id: '/api/billing/return'
+      path: '/api/billing/return'
+      fullPath: '/api/billing/return'
+      preLoaderRoute: typeof ApiBillingReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/files/$id': {
       id: '/api/files/$id'
       path: '/api/files/$id'
       fullPath: '/api/files/$id'
       preLoaderRoute: typeof ApiFilesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/polar': {
+      id: '/api/webhooks/polar'
+      path: '/api/webhooks/polar'
+      fullPath: '/api/webhooks/polar'
+      preLoaderRoute: typeof ApiWebhooksPolarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/transactions/rules/': {
@@ -706,6 +844,8 @@ interface AppRouteChildren {
   AppPayeesPayeeIdRoute: typeof AppPayeesPayeeIdRoute
   AppRecurringSeriesIdRoute: typeof AppRecurringSeriesIdRoute
   AppRecurringCandidatesRoute: typeof AppRecurringCandidatesRoute
+  AppSettingsBillingRoute: typeof AppSettingsBillingRoute
+  AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppTransactionsTransactionIdRoute: typeof AppTransactionsTransactionIdRoute
   AppTransactionsGroupsRoute: typeof AppTransactionsGroupsRoute
   AppTransactionsNewRoute: typeof AppTransactionsNewRoute
@@ -733,6 +873,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppPayeesPayeeIdRoute: AppPayeesPayeeIdRoute,
   AppRecurringSeriesIdRoute: AppRecurringSeriesIdRoute,
   AppRecurringCandidatesRoute: AppRecurringCandidatesRoute,
+  AppSettingsBillingRoute: AppSettingsBillingRoute,
+  AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppTransactionsTransactionIdRoute: AppTransactionsTransactionIdRoute,
   AppTransactionsGroupsRoute: AppTransactionsGroupsRoute,
   AppTransactionsNewRoute: AppTransactionsNewRoute,
@@ -759,8 +901,13 @@ const rootRouteChildren: RootRouteChildren = {
   authRouteRoute: authRouteRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   ApiHealthRoute: ApiHealthRoute,
+  InviteInvitationIdRoute: InviteInvitationIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiBillingCheckoutRoute: ApiBillingCheckoutRoute,
+  ApiBillingPortalRoute: ApiBillingPortalRoute,
+  ApiBillingReturnRoute: ApiBillingReturnRoute,
   ApiFilesIdRoute: ApiFilesIdRoute,
+  ApiWebhooksPolarRoute: ApiWebhooksPolarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
