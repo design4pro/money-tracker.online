@@ -103,8 +103,9 @@ const RAIL_MEASURE = 'w-full max-w-[22rem]'
 /**
  * The distance between the `<h1>`'s box top and the `<h2>`'s, when their first baselines agree.
  *
- * Measured in the browser, not guessed: `display` renders 40px on a 41.6px line and `title` 24px on
- * a 28.32px line, and at the display font's metrics the two first-baseline offsets differ by 12px.
+ * Computed from the scale and the hand's metrics, not guessed: `display` renders 48px on a 50.4px
+ * line at 1440 and 46px on a 48.3px line at 1024, `title` 32px on a 35.2px line, and with Caveat's
+ * 0.96em ascent the two first-baseline offsets differ by 13px and 11px; 12px is the midpoint.
  * It is a constant of the type scale, so it lives here rather than inline in the markup — if
  * `--text-display` or `--text-title` moves, re-measure this.
  */

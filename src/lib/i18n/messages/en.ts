@@ -1270,10 +1270,13 @@ const messages = {
   'marketing.ledger.body':
     'A household kept in Polish zloty, holding an expense made in euro. The figure you entered never changes, and the converted figure beneath it was frozen at the rate of that day, not recalculated today and not recalculated next year.',
   'marketing.ledger.caption':
-    'Five example rows from a household kept in Polish zloty.',
+    'Six example rows from a household kept in Polish zloty.',
   'marketing.ledger.sample':
     'Example rows. Nothing here comes from a real account.',
-  'marketing.ledger.figure.label': 'Spent in euro, held in zloty',
+  'marketing.ledger.col.balance': 'Balance after',
+  'marketing.ledger.opening': 'Carried over from February',
+  'marketing.ledger.note': 'Every line, and what is left after it.',
+  'marketing.ledger.figure.label': 'Held in zloty',
   'marketing.ledger.figure.caption':
     '27.40 € converted at 4.3218, the rate on 14 March 2026, and left there.',
   'marketing.ledger.row.groceries': 'Grocery shop, Berlin',
@@ -1281,11 +1284,13 @@ const messages = {
   'marketing.ledger.row.streaming': 'Streaming subscription',
   'marketing.ledger.row.savings': 'Moved to savings',
   'marketing.ledger.row.rent': 'Rent',
+  'marketing.ledger.row.electricity': 'Electricity bill',
   'marketing.ledger.category.groceries': 'Groceries',
   'marketing.ledger.category.income': 'Income',
   'marketing.ledger.category.subscriptions': 'Subscriptions',
   'marketing.ledger.category.transfer': 'Transfer',
   'marketing.ledger.category.housing': 'Housing',
+  'marketing.ledger.category.utilities': 'Utilities',
 
   'marketing.meter.title':
     'You can tell that you are over budget with the colour switched off.',
@@ -1293,6 +1298,8 @@ const messages = {
     'Every state changes four things at once: the word, the icon, the remaining figure, and the hatching on the fill. Measured separation between our green and our red under deuteranopia falls to 1.14:1, so colour is the last channel here and never the first.',
   'marketing.meter.caption':
     'The headline is what is left rather than what is spent, because what is left is the figure you need while standing in a shop.',
+  'marketing.meter.sample':
+    'Example budgets. Nothing here comes from a real household.',
   'marketing.meter.groceries': 'Groceries',
   'marketing.meter.fuel': 'Fuel',
   'marketing.meter.eatingOut': 'Eating out',

@@ -1,6 +1,8 @@
+import { amountReading } from '#/components/app/money'
 import { AmountText, ConvertedAmount } from '#/components/app/transactions'
+import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
-import { asCurrencyCode, asMinor } from '#/lib/money'
+import { asCurrencyCode, asMinor, formatMoney, makeMoney } from '#/lib/money'
 
 import type {
   LedgerDirection,
@@ -9,22 +11,57 @@ import type {
 import type { MessageKey } from '#/lib/i18n'
 
 /**
- * Five rows of a ledger, on the page a visitor sees before they have one.
+ * A page of the passbook, on the landing page a visitor sees before they have one.
  *
  * The landing page's whole argument is that the arithmetic is right, and the only honest way to
  * make that argument is to run it. So this is not a picture of the product: it is
  * {@link AmountText} and {@link ConvertedAmount}, the same components the signed-in ledger uses,
- * handed static props. Every rule they carry comes with them — the U+2212 minus, the tabular
- * figures, the four tones with weight and glyph doing the work colour cannot, and the `sr-only`
- * sentence that names the currency in full.
+ * handed static props. Every rule they carry comes with them - the U+2212 minus, the four tones
+ * with weight and glyph doing the work colour cannot, and the `sr-only` sentence that names the
+ * currency in full.
+ *
+ * ## Why every line ends in a balance
+ *
+ * A passbook is read line by line, and after every line it says what is left. That column is the
+ * spine of this table - the heavier rule before it and the bold figures in it are the form's own
+ * emphasis - and the rows run oldest first, because a balance that is carried forward only makes
+ * sense read downwards. The balances are literals, not sums: the component's contract everywhere
+ * in the product is that the caller has already done the arithmetic in minor units and the
+ * component only draws it, and a marketing page gets no exemption from that.
+ *
+ * ## Typed on the form, not on a card
+ *
+ * There is no box around this table. The page beneath it is ruled at 2.5rem, every line of type in
+ * it is a 2.5rem box ({@link TYPED_LINE}), and each cell draws the rule under itself on the same
+ * pixel row the printed ruling already occupies - so the two are one ruling where the paper's
+ * rule is visible, and the table keeps its rules where the paper's is faint. A row is therefore
+ * always a whole number of rules tall: one for an entry, its category typed after the payee on the
+ * same line, and a second only where a converted figure sits under the amount.
+ *
+ * ## The narrow page
+ *
+ * Below `sm` there is no room for four columns, and a column a hundred pixels wide turns every
+ * entry into a stack of single words. So the same rows are set the way a pocket passbook sets
+ * them: two full-width lines per entry, the payee and the amount on the first, the date, the
+ * category and the balance on the second, each line one rule, with no column rules of its own.
+ * That is the `<tr>` as a two-column grid with its cells placed in it. A table part whose display
+ * is not a table's loses its semantics in WebKit, so every part carries its ARIA role explicitly
+ * and a screen reader keeps the table at every width.
+ *
+ * ## Pencil before ink
+ *
+ * The last entry is planned rather than booked. It is the same row in the secondary ink - pencil -
+ * with the word beside its category: the two channels the ledger inside the product gives a
+ * planned line. The stamp violet is spent on what is settled and never on what is not.
  *
  * **The rows are invented and the page says so.** `PRODUCT.md` forbids fabricating evidence, and a
  * ledger fragment with no label is exactly the kind of thing a visitor could read as somebody's
  * real account. The caption under the table names it as an example, in both locales.
  *
- * The euro row is the point of the section. `refAmountMinor` is 118.42 zł because 27.40 € was
- * booked at 4.3218 on 14 March 2026 and frozen there; it is a literal here for the same reason it
- * is a stored column in the database — a figure recomputed today would be a different claim.
+ * The euro row is the point of the section beneath. `refAmountMinor` is 118.42 zł because 27.40 €
+ * was booked at 4.3218 on 14 March 2026 and frozen there; it is a literal here for the same
+ * reason it is a stored column in the database - a figure recomputed today would be a different
+ * claim - and the balance after it is the one that figure produced.
  */
 
 interface PreviewRow {
@@ -37,38 +74,39 @@ interface PreviewRow {
   readonly currencyCode: string
   readonly direction: LedgerDirection
   readonly transferKind?: LedgerTransferKind
+  /** Written in pencil: not booked yet. */
+  readonly isPlanned?: boolean
   /** Set only where the row's currency is not the workspace's base. */
   readonly refAmountMinor?: number
+  /** The workspace balance once this line is written, in minor units of the base currency. */
+  readonly balanceAfterMinor: number
 }
+
+/** The line carried over from the previous page: a date and a balance, nothing else. */
+const OPENING = { bookedOn: '2026-03-01', balanceMinor: 481260 } as const
+
+/**
+ * The euro line, shared with the section that explains it: the amount as typed and the złoty
+ * figure it was frozen at are the same literals in both places, so they cannot drift apart.
+ */
+export const EURO_ENTRY = {
+  bookedOn: '2026-03-14',
+  payee: 'marketing.ledger.row.groceries',
+  amountMinor: 2740,
+  currencyCode: 'EUR',
+  refAmountMinor: 11842,
+} as const
 
 const ROWS: ReadonlyArray<PreviewRow> = [
   {
-    id: 'groceries',
-    bookedOn: '2026-03-14',
-    payee: 'marketing.ledger.row.groceries',
-    category: 'marketing.ledger.category.groceries',
-    amountMinor: 2740,
-    currencyCode: 'EUR',
-    direction: 'expense',
-    refAmountMinor: 11842,
-  },
-  {
-    id: 'salary',
-    bookedOn: '2026-03-12',
-    payee: 'marketing.ledger.row.salary',
-    category: 'marketing.ledger.category.income',
-    amountMinor: 940000,
-    currencyCode: 'PLN',
-    direction: 'income',
-  },
-  {
-    id: 'streaming',
-    bookedOn: '2026-03-11',
-    payee: 'marketing.ledger.row.streaming',
-    category: 'marketing.ledger.category.subscriptions',
-    amountMinor: 4300,
+    id: 'rent',
+    bookedOn: '2026-03-05',
+    payee: 'marketing.ledger.row.rent',
+    category: 'marketing.ledger.category.housing',
+    amountMinor: 325000,
     currencyCode: 'PLN',
     direction: 'expense',
+    balanceAfterMinor: 156260,
   },
   {
     id: 'savings',
@@ -79,90 +117,297 @@ const ROWS: ReadonlyArray<PreviewRow> = [
     currencyCode: 'PLN',
     direction: 'expense',
     transferKind: 'internal',
+    balanceAfterMinor: 36260,
   },
   {
-    id: 'rent',
-    bookedOn: '2026-03-05',
-    payee: 'marketing.ledger.row.rent',
-    category: 'marketing.ledger.category.housing',
-    amountMinor: 325000,
+    id: 'streaming',
+    bookedOn: '2026-03-11',
+    payee: 'marketing.ledger.row.streaming',
+    category: 'marketing.ledger.category.subscriptions',
+    amountMinor: 4300,
     currencyCode: 'PLN',
     direction: 'expense',
+    balanceAfterMinor: 31960,
+  },
+  {
+    id: 'salary',
+    bookedOn: '2026-03-12',
+    payee: 'marketing.ledger.row.salary',
+    category: 'marketing.ledger.category.income',
+    amountMinor: 940000,
+    currencyCode: 'PLN',
+    direction: 'income',
+    balanceAfterMinor: 971960,
+  },
+  {
+    id: 'groceries',
+    ...EURO_ENTRY,
+    category: 'marketing.ledger.category.groceries',
+    direction: 'expense',
+    balanceAfterMinor: 960118,
+  },
+  {
+    id: 'electricity',
+    bookedOn: '2026-03-20',
+    payee: 'marketing.ledger.row.electricity',
+    category: 'marketing.ledger.category.utilities',
+    amountMinor: 18500,
+    currencyCode: 'PLN',
+    direction: 'expense',
+    isPlanned: true,
+    balanceAfterMinor: 941618,
   },
 ]
+
+/**
+ * One typed line of the form.
+ *
+ * The page is ruled at 2.5rem, so every line of type is a 2.5rem box and a description that wraps
+ * takes two rules rather than breaking the pitch. In that box the baseline would sit centred, 17px
+ * above the rule; a typewriter sets its type on the line. Courier Prime's baseline lies half the
+ * box plus 0.22em below the box's top (measured in the browser), so painting the box 1rem minus
+ * 0.22em lower puts the baseline 3px above the rule at every size the table uses - and a transform
+ * moves paint rather than layout, so a row stays exactly as many rules tall as it has lines.
+ *
+ * In `cn()` it goes **after** the size class: tailwind-merge drops a `leading-*` that precedes a
+ * `text-*` size, since the size utility sets a line-height of its own.
+ */
+export const TYPED_LINE = 'block leading-10 translate-y-[calc(1rem-0.22em)]'
+
+/** The form's vertical ruling on the wide page: a hairline after every cell but the last. */
+const RULED = 'sm:border-e sm:border-border-subtle sm:last:border-e-0'
+
+/** The spine. A heavier rule in front of the balance column, and it wins the collapse. */
+const SPINE = 'sm:border-s-2 sm:border-border-panel'
+
+/**
+ * A cell: no vertical padding, so the row is exactly as tall as its lines, and the rule under it
+ * drawn as an inset shadow, which paints on the cell's last pixel row - the printed rule's - and
+ * adds no height of its own where a border would add one and walk the table off the pitch. On
+ * the narrow page it draws nothing: the paper's ruling is the form there.
+ */
+const CELL = cn(
+  'py-0 align-top sm:px-4 sm:shadow-[inset_0_-1px_0_0_var(--color-border-subtle)]',
+  RULED,
+)
+
+/** A column heading: the same cell with the heavier rule under it. */
+const HEAD = cn(
+  'py-0 text-start align-top sm:px-4 sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]',
+  RULED,
+)
+
+/** The row on the narrow page: a grid of two columns, the second sized to its figures. */
+const ROW = 'max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-x-4'
+
+/** The heading row keeps its heavier rule there too, drawn by the row since its cells draw none. */
+const HEAD_ROW = cn(
+  ROW,
+  'max-sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]',
+)
+
+/**
+ * Where each cell lands in that grid. The description spans both lines; `min-w-0` lets it shrink
+ * to the column so its lines truncate instead of widening the row.
+ */
+const AT_DESCRIPTION =
+  'max-sm:col-start-1 max-sm:row-start-1 max-sm:row-span-2 max-sm:min-w-0'
+const AT_AMOUNT = 'max-sm:col-start-2 max-sm:row-start-1'
+const AT_BALANCE = 'max-sm:col-start-2 max-sm:row-start-2'
+
+const HEAD_TEXT = cn(
+  'text-micro tracking-label uppercase text-ink-2',
+  TYPED_LINE,
+)
+
+const DATE_CELL = cn(CELL, 'hidden sm:table-cell')
+
+const DATE_TEXT = cn(
+  'text-caption whitespace-nowrap text-ink-2 tabular',
+  TYPED_LINE,
+)
+
+/**
+ * U+00B7 between two facts typed on one line. The dot binds to the word after it, so a
+ * line may break before the separator and never after: no line is ever a lone dot.
+ */
+const SEPARATOR = ' ·\u00a0'
+
+/**
+ * The balance after a line, as a typed figure with its spoken sentence.
+ *
+ * Bold because it is the spine, `tabular` for the decimal, and the sentence beside it so a reader
+ * hears the złoty and grosze named rather than a string of digits. After a planned line it is
+ * pencil like the line.
+ */
+function BalanceCell({
+  amountMinor,
+  isPlanned = false,
+  className,
+}: {
+  amountMinor: number
+  isPlanned?: boolean
+  className?: string
+}) {
+  const t = useTranslate()
+  const locale = useLocale()
+  const balance = makeMoney(amountMinor, 'PLN')
+
+  return (
+    <td
+      role="cell"
+      className={cn(
+        CELL,
+        'text-end font-bold whitespace-nowrap tabular',
+        isPlanned ? 'text-ink-2' : 'text-ink',
+        SPINE,
+        AT_BALANCE,
+        className,
+      )}
+    >
+      <span className={cn('text-label', TYPED_LINE)}>
+        <span aria-hidden="true">{formatMoney(locale, balance)}</span>
+        <span className="sr-only">{amountReading(t, locale, balance)}</span>
+      </span>
+    </td>
+  )
+}
 
 export function LedgerPreview() {
   const t = useTranslate()
   const locale = useLocale()
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-card">
-      <table className="w-full border-collapse">
-        <caption className="sr-only">{t('marketing.ledger.caption')}</caption>
-        <thead>
-          <tr className="border-b border-border-subtle bg-surface-sunken">
-            <th
-              scope="col"
-              className="hidden px-4 py-2 text-start text-micro tracking-label uppercase text-ink-2 sm:table-cell sm:px-6"
-            >
-              {t('common.date')}
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-2 text-start text-micro tracking-label uppercase text-ink-2 sm:px-6"
-            >
-              {t('common.description')}
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-2 text-end text-micro tracking-label uppercase text-ink-2 sm:px-6"
-            >
-              {t('common.amount')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {ROWS.map((row) => (
-            <tr
-              key={row.id}
-              className="border-b border-border-subtle last:border-b-0"
-            >
-              <td className="hidden px-4 py-3 align-top tabular text-caption whitespace-nowrap text-ink-2 sm:table-cell sm:px-6">
+    <table role="table" className="w-full border-collapse max-sm:block">
+      <caption className="sr-only">{t('marketing.ledger.caption')}</caption>
+      <thead role="rowgroup" className="max-sm:block">
+        <tr role="row" className={HEAD_ROW}>
+          <th
+            role="columnheader"
+            scope="col"
+            className={cn(HEAD, 'hidden sm:table-cell')}
+          >
+            <span className={HEAD_TEXT}>{t('common.date')}</span>
+          </th>
+          <th
+            role="columnheader"
+            scope="col"
+            className={cn(HEAD, AT_DESCRIPTION)}
+          >
+            <span className={HEAD_TEXT}>{t('common.description')}</span>
+          </th>
+          <th
+            role="columnheader"
+            scope="col"
+            className={cn(HEAD, 'text-end', AT_AMOUNT)}
+          >
+            <span className={HEAD_TEXT}>{t('common.amount')}</span>
+          </th>
+          <th
+            role="columnheader"
+            scope="col"
+            className={cn(HEAD, 'text-end', SPINE, AT_BALANCE)}
+          >
+            <span className={HEAD_TEXT}>
+              {t('marketing.ledger.col.balance')}
+            </span>
+          </th>
+        </tr>
+      </thead>
+      <tbody role="rowgroup" className="max-sm:block">
+        {/* The line every page of a passbook opens on: what came over from the last one. It has
+            no second line, so on the narrow page its balance sits on the first. */}
+        <tr role="row" className={ROW}>
+          <td role="cell" className={DATE_CELL}>
+            <span className={DATE_TEXT}>
+              {formatCalendarDate(locale, OPENING.bookedOn, 'medium')}
+            </span>
+          </td>
+          <td role="cell" className={cn(CELL, AT_DESCRIPTION)}>
+            <span className={cn('text-label text-ink-2', TYPED_LINE)}>
+              {t('marketing.ledger.opening')}
+            </span>
+          </td>
+          <td role="cell" className={cn(CELL, AT_AMOUNT)} />
+          <BalanceCell
+            amountMinor={OPENING.balanceMinor}
+            className="max-sm:row-start-1"
+          />
+        </tr>
+
+        {ROWS.map((row) => (
+          <tr key={row.id} role="row" className={ROW}>
+            <td role="cell" className={DATE_CELL}>
+              <span className={DATE_TEXT}>
                 {formatCalendarDate(locale, row.bookedOn, 'medium')}
-              </td>
-              <td className="px-4 py-3 align-top sm:px-6">
-                {/* Below `sm` the date column is gone and the date rides here instead: three
-                    columns inside 360px turns a ledger into a word-wrapped mess, and the design
-                    system already stacks this row rather than squeezing it. `hidden` is
-                    `display: none`, so only one of the two ever reaches the accessibility tree. */}
-                <span className="block tabular text-caption text-ink-2 sm:hidden">
-                  {formatCalendarDate(locale, row.bookedOn, 'medium')}
-                </span>
-                <span className="block text-label font-medium text-ink">
-                  {t(row.payee)}
-                </span>
-                <span className="block text-caption text-ink-2">
+              </span>
+            </td>
+            <td role="cell" className={cn(CELL, AT_DESCRIPTION)}>
+              <span
+                className={cn(
+                  'text-label max-sm:truncate',
+                  row.isPlanned ? 'text-ink-2' : 'text-ink',
+                  TYPED_LINE,
+                )}
+              >
+                {t(row.payee)}
+                {/* The category, typed after the payee in the secondary ink. On the narrow page
+                    it is the entry's second line, and the date - whose column is gone there -
+                    is typed in front of it. `hidden` is `display: none`, so only one of the
+                    two dates ever reaches the accessibility tree. */}
+                <span className="text-ink-2 max-sm:block max-sm:truncate">
+                  <span className="sm:hidden">
+                    {formatCalendarDate(locale, row.bookedOn, 'medium')}
+                  </span>
+                  {SEPARATOR}
+                  {/* The word before the category, so a narrow line that has to lose its end
+                      loses the category's tail and never the status. */}
+                  {row.isPlanned ? (
+                    <>
+                      {t('transactions.planned')}
+                      {SEPARATOR}
+                    </>
+                  ) : null}
                   {t(row.category)}
                 </span>
-              </td>
-              <td className="px-4 py-3 text-end align-top sm:px-6">
+              </span>
+            </td>
+            <td role="cell" className={cn(CELL, 'text-end', AT_AMOUNT)}>
+              <span className={cn('text-label', TYPED_LINE)}>
+                {/*
+                  The amount is an inline-flex box. On a transfer its first item is
+                  the glyph, centred, whose bottom edge would become the box's
+                  baseline and push the line four pixels off the rule. Top-aligned,
+                  the box shares the line's own baseline instead.
+                */}
                 <AmountText
                   amountMinor={asMinor(row.amountMinor)}
                   currencyCode={asCurrencyCode(row.currencyCode)}
                   direction={row.direction}
+                  isPlanned={row.isPlanned ?? false}
                   transferKind={row.transferKind ?? 'none'}
+                  className="align-top"
                 />
+                {/* The złoty figure under the euro one on the wide page; beside it where a
+                    second line would push the balance off the entry's second rule. Top-
+                    aligned there so its smaller box shares the line rather than stretching
+                    it by a pixel. */}
                 {row.refAmountMinor === undefined ? null : (
                   <ConvertedAmount
                     refAmountMinor={asMinor(row.refAmountMinor)}
                     refCurrencyCode={asCurrencyCode('PLN')}
+                    className="leading-10 max-sm:inline max-sm:ps-2 max-sm:align-top"
                   />
                 )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              </span>
+            </td>
+            <BalanceCell
+              amountMinor={row.balanceAfterMinor}
+              isPlanned={row.isPlanned}
+            />
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }

@@ -1297,10 +1297,13 @@ const messages = {
   'marketing.ledger.body':
     'Dom prowadzony w złotych, w którym siedzi wydatek zrobiony w euro. Wpisana kwota nigdy się nie zmienia, a przeliczona pod nią została zapisana po kursie z tamtego dnia i nie jest przeliczana ani dziś, ani za rok.',
   'marketing.ledger.caption':
-    'Pięć przykładowych wpisów z domu prowadzonego w złotych.',
+    'Sześć przykładowych wpisów z domu prowadzonego w złotych.',
   'marketing.ledger.sample':
     'Wiersze przykładowe. Nic tutaj nie pochodzi z prawdziwego konta.',
-  'marketing.ledger.figure.label': 'Wydane w euro, trzymane w złotych',
+  'marketing.ledger.col.balance': 'Stan po zapisie',
+  'marketing.ledger.opening': 'Przeniesione z lutego',
+  'marketing.ledger.note': 'Każdy zapis i to, co po nim zostaje.',
+  'marketing.ledger.figure.label': 'Trzymane w złotych',
   'marketing.ledger.figure.caption':
     '27,40 € przeliczone po kursie 4,3218 z 14 marca 2026 i tam zostawione.',
   'marketing.ledger.row.groceries': 'Sklep spożywczy, Berlin',
@@ -1308,11 +1311,13 @@ const messages = {
   'marketing.ledger.row.streaming': 'Subskrypcja streamingowa',
   'marketing.ledger.row.savings': 'Przeniesione na oszczędności',
   'marketing.ledger.row.rent': 'Czynsz',
+  'marketing.ledger.row.electricity': 'Rachunek za prąd',
   'marketing.ledger.category.groceries': 'Zakupy spożywcze',
   'marketing.ledger.category.income': 'Przychód',
   'marketing.ledger.category.subscriptions': 'Subskrypcje',
   'marketing.ledger.category.transfer': 'Przelew',
   'marketing.ledger.category.housing': 'Mieszkanie',
+  'marketing.ledger.category.utilities': 'Media',
 
   'marketing.meter.title':
     'To, że przekraczasz budżet, widać także z wyłączonym kolorem.',
@@ -1320,6 +1325,8 @@ const messages = {
     'Każdy stan zmienia cztery rzeczy naraz: słowo, ikonę, pozostałą kwotę i kreskowanie wypełnienia. Zmierzona odległość między naszą zielenią a czerwienią przy deuteranopii spada do 1,14:1, więc kolor jest tu ostatnim kanałem, a nigdy pierwszym.',
   'marketing.meter.caption':
     'Nagłówkiem jest to, co zostało, a nie to, co wydane: właśnie tej liczby potrzebujesz, stojąc w sklepie.',
+  'marketing.meter.sample':
+    'Budżety przykładowe. Nic tutaj nie pochodzi z prawdziwego domu.',
   'marketing.meter.groceries': 'Zakupy spożywcze',
   'marketing.meter.fuel': 'Paliwo',
   'marketing.meter.eatingOut': 'Jedzenie na mieście',

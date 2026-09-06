@@ -1,16 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowRight, FileUp, Filter, PencilLine, Repeat } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 
 import { amountReading } from '#/components/app/money'
+import { AmountText } from '#/components/app/transactions'
 import { cn } from '#/lib/cn'
-import { useLocale, useTranslate } from '#/lib/i18n'
-import { formatMoney, makeMoney } from '#/lib/money'
+import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
+import { asCurrencyCode, asMinor, formatMoney, makeMoney } from '#/lib/money'
 import { BudgetStates } from './-ui/budget-states'
-import { LedgerPreview } from './-ui/ledger-preview'
+import { EURO_ENTRY, LedgerPreview, TYPED_LINE } from './-ui/ledger-preview'
 import { MAIN_CONTENT_ID } from './__root'
 
 import type { MessageKey } from '#/lib/i18n'
-import type { CSSProperties, ComponentType } from 'react'
+import type { CSSProperties } from 'react'
 
 /**
  * The landing page.
@@ -21,32 +22,30 @@ import type { CSSProperties, ComponentType } from 'react'
  * marketing page is English-only" is how a product ends up with a Polish app behind an English
  * front door.
  *
- * ## Why it opens on a refusal, with the product already under it
+ * ## Why it opens on a page of the book
  *
- * The loudest true thing this product can say is a negative: nobody here will ever ask for a bank
- * login. So the headline is the refusal, split across two tones — the claim in ink, the promise
- * that it will not be walked back in the quieter one. Directly beneath it, still inside the first
- * viewport, sits the ledger itself, crossing the band boundary into the section that explains it.
- * A visitor therefore reads the promise and sees the thing the promise is about without scrolling,
- * which is what the earlier arrangement — a headline alone above a screenful of nothing — could
- * not do.
+ * The product is a passbook kept by hand, and the page says so by being one: ruled paper from the
+ * first pixel, the refusal written across the top of it in the hand, and directly beneath - still
+ * inside the first viewport - the ledger typed on the same form, with the balance after every line
+ * standing in its own column on the right. A visitor reads the promise and sees the book the
+ * promise is about without scrolling. There is no hero image and no screenshot: the thing itself
+ * is smaller and truer than a picture of it.
  *
  * ## Why the evidence is components rather than pictures
  *
  * The page's claim is that the arithmetic is right. A screenshot of correct arithmetic is a claim;
- * the arithmetic itself is a demonstration. So the ledger fragment and the three budget meters are
- * the product's own components handed static props — which means they carry the U+2212 minus, the
+ * the arithmetic itself is a demonstration. So the ledger page and the three budget meters are the
+ * product's own components handed static props - which means they carry the U+2212 minus, the
  * tabular figures, the spoken sentence and the four-channel overspend encoding for free, they
  * cannot drift out of date, and the axe suite reads them the same way it reads the signed-in
  * screens. `PRODUCT.md` forbids fabricated evidence, so both blocks label their rows as examples.
  *
  * ## Why nothing on it moves
  *
- * There is no entrance sequence and no scroll-linked reveal. The design system's position is that
- * a surface is flat and still at rest and spends its motion on what the reader did, and a landing
- * page that animates itself into place contradicts the product it is selling. The composition
- * carries the page: full-bleed bands in four different grounds, one card crossing a boundary,
- * asymmetric rows that alternate side, and an inverted panel at the end.
+ * There is no entrance sequence and no scroll-linked reveal. A page of a book lies still, and a
+ * landing page that animates itself into place contradicts the product it is selling. The
+ * composition carries the page: the ruled first page, bands in the paper's four grounds, rows and
+ * slips separated by rules rather than lifted by shadows, and one violet stamp at the end.
  *
  * ## What may not appear here, ever
  *
@@ -66,50 +65,59 @@ export const Route = createFileRoute('/')({
  * the app shell's loader sees the session cookie on its first run.
  */
 const CTA_BASE =
-  'target-min-h inline-flex items-center justify-center gap-2 rounded-md px-5 text-label font-semibold whitespace-nowrap no-underline transition-[color,background-color,box-shadow,translate] duration-fast ease-out-quint focus-ring'
+  'target-min-h inline-flex items-center justify-center gap-2 rounded-sm px-5 text-label font-bold whitespace-nowrap no-underline transition-[color,background-color,box-shadow,translate] duration-fast ease-out-quint focus-ring'
 /**
+ * The stamp. Uppercase and tracked like the printed impression it is, in the one violet ink the
+ * product spends on actions, and the only filled control in the first viewport.
+ *
  * `translate` is named in the transition list on purpose: Tailwind v4 compiles `translate-y-px` to
  * the standalone `translate` property rather than to `transform`, so a list that stops at
  * `box-shadow` leaves the press snapping while the class says otherwise. The press itself is the
- * design system's one-pixel rule — down a pixel and one shadow step back, never a bounce.
+ * design system's one-pixel rule - down a pixel and the hairline shadow gone, never a bounce.
  */
-const CTA_PRIMARY = `${CTA_BASE} bg-brand text-on-brand shadow-card hover:bg-brand-hover hover:shadow-elevated active:translate-y-px active:shadow-card`
+const CTA_PRIMARY = `${CTA_BASE} bg-accent text-on-accent uppercase tracking-label shadow-card hover:bg-accent-hover hover:shadow-elevated active:translate-y-px active:shadow-card`
 /**
- * The outlined pair to it. The header uses it because the first viewport gets exactly one
- * brand-coloured action and the hero owns it; the hero uses it for the anchor that answers the
+ * The typed pair to it: a ruled box on the paper. The header uses it because the first viewport
+ * gets exactly one stamp and the hero owns it; the hero uses it for the anchor that answers the
  * refusal, so the two actions read as different weights of the same offer rather than as a choice
  * between two ways into the same place.
  */
-const CTA_QUIET = `${CTA_BASE} border border-border-strong bg-transparent text-ink hover:bg-hover active:translate-y-px`
-/** The one action inside the inverted panel, where the page's own brand blue has no contrast left. */
-const CTA_INVERTED = `${CTA_BASE} bg-canvas text-ink shadow-card hover:bg-surface hover:shadow-elevated active:translate-y-px active:shadow-card`
+const CTA_QUIET = `${CTA_BASE} border border-border-strong bg-surface text-ink hover:bg-hover active:translate-y-px`
+/** The one action inside the violet panel, where the stamp ink itself has no contrast left. */
+const CTA_INVERTED = `${CTA_BASE} bg-canvas text-ink uppercase tracking-label shadow-card hover:bg-surface hover:shadow-elevated active:translate-y-px active:shadow-card`
 
 /** The well every band's content sits in. The marketing measure, not the app shell's. */
 const WELL = 'mx-auto w-full max-w-6xl px-4 sm:px-6'
 
 /**
- * The atmosphere behind the hero and behind the closing panel: the ruled baseline of an account
- * book, masked to nothing at both ends so it never draws a line the reader could mistake for a
- * border. It is the one ornament on the page and it is the product's own subject — a page about
- * money kept by hand is allowed to look like the paper it replaces.
+ * The first page of the book: printed ruling at a 2.5rem pitch, edge to edge, in the same green the
+ * form's hairlines use everywhere else. It is the page's one ornament and it is the product's own
+ * subject. The last 4rem fade so the final rule never sits a pixel above the band's own border
+ * and reads as a double line.
  *
- * Written as a style object rather than as arbitrary utilities because the value is two
- * multi-stop gradients: as a class it would be one unreadable string, and the token references
- * inside it would be invisible to anyone grepping for them.
+ * It is painted twice, on two zones that each start their own pitch: the refusal's, where the hand
+ * sits on the rules, and the ledger's, where the typed rows are the rules. One continuous ruling
+ * would need everything between the two - prose, buttons, a caption - to be a multiple of the
+ * pitch tall, which flowing text at a fluid size never is; the first zone's fade is what makes the
+ * seam invisible.
+ *
+ * Written as a style object rather than as arbitrary utilities because the value is a multi-stop
+ * gradient plus a mask: as a class it would be one unreadable string, and the token reference
+ * inside it would be invisible to anyone grepping for it.
  */
-const RULED_FIELD: CSSProperties = {
+const RULED_PAGE: CSSProperties = {
   backgroundImage:
-    'repeating-linear-gradient(to bottom, var(--color-border-panel) 0 1px, transparent 1px 2.5rem)',
-  maskImage:
-    'linear-gradient(to bottom, transparent, #000 20%, #000 62%, transparent)',
+    'repeating-linear-gradient(to bottom, transparent 0 calc(2.5rem - 1px), var(--color-border-subtle) calc(2.5rem - 1px) 2.5rem)',
+  maskImage: 'linear-gradient(to bottom, #000 calc(100% - 4rem), transparent)',
   WebkitMaskImage:
-    'linear-gradient(to bottom, transparent, #000 20%, #000 62%, transparent)',
+    'linear-gradient(to bottom, #000 calc(100% - 4rem), transparent)',
 }
 
 /**
- * The same ruling inside the inverted panel, drawn in that panel's own foreground rather than in
- * a border token: on an inverted ground a border colour is on the wrong side of the contrast and
- * disappears in one theme or shouts in the other. Held down to a tenth by the wrapper's opacity.
+ * The same ruling inside the violet panel, drawn in that panel's own foreground rather than in a
+ * border token: on a stamp-coloured ground a border colour is on the wrong side of the contrast
+ * and disappears in one theme or shouts in the other. Held down to a tenth by the wrapper's
+ * opacity.
  */
 const PANEL_RULES: CSSProperties = {
   backgroundImage:
@@ -121,45 +129,36 @@ const PANEL_RULES: CSSProperties = {
 }
 
 /**
- * A haze of `--color-brand-soft` in the top corner of the hero. It is the same token the rule
- * chips and info callouts are filled with, so the page's one atmospheric colour is a colour the
- * product already uses rather than a marketing gradient, and it inverts with the theme by itself.
+ * The hand on the rules.
+ *
+ * Caveat's baseline sits half the line box plus 0.33em below the box's top (measured in the
+ * browser, at both weights), so a line of it in a 5rem or a 2.5rem box is centred between two
+ * rules rather than on one. Painting it 2.5rem minus 0.33em lower in the 5rem box, or 1.25rem
+ * minus 0.33em lower in the 2.5rem box, lands every baseline on a printed rule at any size the
+ * clamp reaches; a transform moves paint rather than layout, so the boxes still stack on the pitch.
  */
-const BRAND_WASH: CSSProperties = {
-  backgroundImage:
-    'radial-gradient(56rem 30rem at 82% -12%, var(--color-brand-soft), transparent 68%)',
-}
+const HAND_ON_RULES_HERO = 'translate-y-[calc(2.5rem-0.33em)]'
+const HAND_ON_RULES_TITLE = 'leading-10 translate-y-[calc(1.25rem-0.33em)]'
 
-/** One of the four answers to "so how does anything get into it?". */
-interface Answer {
-  readonly id: string
-  readonly icon: ComponentType<{ className?: string }>
-  readonly title: MessageKey
-  readonly body: MessageKey
-}
-
-const ANSWERS: ReadonlyArray<Answer> = [
+/** The four answers to "so how does anything get into it?". Entries on the form, not icon tiles. */
+const ANSWERS: ReadonlyArray<Passage> = [
   {
     id: 'entry',
-    icon: PencilLine,
     title: 'marketing.instead.entry.title',
     body: 'marketing.instead.entry.body',
   },
   {
     id: 'import',
-    icon: FileUp,
     title: 'marketing.instead.import.title',
     body: 'marketing.instead.import.body',
   },
   {
     id: 'recurring',
-    icon: Repeat,
     title: 'marketing.instead.recurring.title',
     body: 'marketing.instead.recurring.body',
   },
   {
     id: 'rules',
-    icon: Filter,
     title: 'marketing.instead.rules.title',
     body: 'marketing.instead.rules.body',
   },
@@ -247,18 +246,21 @@ function RuledItem({ title, body }: { title: MessageKey; body: MessageKey }) {
   )
 }
 
-/** The wordmark, in the header and again at the top of the footer. */
+/**
+ * The wordmark, in the header and again at the top of the footer. Typed, with the mark as a small
+ * square stamp. One size step down below `sm`, where it shares 360px with the way-in button.
+ */
 function Wordmark() {
   const t = useTranslate()
 
   return (
     <a
       href="/"
-      className="target-min-h inline-flex items-center gap-2 rounded-md text-subtitle font-semibold whitespace-nowrap text-ink no-underline focus-ring"
+      className="target-min-h inline-flex items-center gap-2 rounded-md text-body font-bold whitespace-nowrap text-ink no-underline focus-ring sm:text-subtitle"
     >
       <span
         aria-hidden="true"
-        className="grid size-7 place-items-center rounded-lg bg-brand text-caption font-bold text-on-brand"
+        className="grid size-7 place-items-center rounded-sm bg-accent text-caption font-bold text-on-accent"
       >
         M
       </span>
@@ -277,11 +279,13 @@ function LandingPage() {
    * `ref_amount_minor` is a historical value fixed at the booking date's rate, and recomputing it
    * on a marketing page would contradict the very sentence beside it.
    */
-  const heldValue = makeMoney(11842, 'PLN')
+  const heldValue = makeMoney(EURO_ENTRY.refAmountMinor, 'PLN')
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
-      <header className="sticky top-0 z-nav border-b border-border-subtle bg-canvas/90 backdrop-blur-sm">
+      {/* The form's printed header rule. Solid, never a blur: text over a blurred copy of
+          whatever scrolled underneath it has no computable contrast ratio. */}
+      <header className="sticky top-0 z-nav border-b border-border-panel bg-canvas">
         <div
           className={cn(WELL, 'flex h-16 items-center justify-between gap-3')}
         >
@@ -302,7 +306,7 @@ function LandingPage() {
             ))}
             <a
               href="/login"
-              className="target-min-h hidden items-center rounded-md px-3 text-label font-medium whitespace-nowrap text-ink no-underline hover:bg-hover focus-ring sm:inline-flex"
+              className="target-min-h hidden items-center rounded-md px-3 text-label whitespace-nowrap text-ink no-underline hover:bg-hover focus-ring sm:inline-flex"
             >
               {t('marketing.nav.signIn')}
             </a>
@@ -318,66 +322,90 @@ function LandingPage() {
       {/* `tabIndex={-1}` is what makes the skip link in the shell actually move focus here:
           without it the browser scrolls to the anchor and leaves focus where it was. */}
       <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 outline-none">
-        {/* -- The refusal, with the ledger already under it ---------------- */}
-        {/* No `overflow-hidden`: the ledger card is meant to leave this band. Both decorative
-            layers are `inset-0`, so they cannot leave it either way. */}
-        <div className="relative border-b border-border-subtle bg-surface-sunken">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={BRAND_WASH}
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={RULED_FIELD}
-          />
+        {/* -- The first page: the refusal in the hand, the ledger typed under it ---- */}
+        <div className="border-b border-border-panel">
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={RULED_PAGE}
+            />
 
-          <section className={cn(WELL, 'relative pt-16 sm:pt-24')}>
-            <div className="grid gap-x-12 gap-y-8 lg:grid-cols-12 lg:items-end">
-              <h1 className="text-balance text-hero lg:col-span-7">
-                <span className="block">{t('marketing.hero.title.lead')}</span>
-                <span className="block text-ink-2">
-                  {t('marketing.hero.title.rest')}
-                </span>
-              </h1>
-              <p className="prose-measure text-subtitle text-ink-2 lg:col-span-5">
-                {t('marketing.hero.body')}
-              </p>
-            </div>
+            {/* One rule of paper above the hand, two from `sm`: the h1's box then starts on the
+                pitch, and each of its 5rem lines takes two rules. */}
+            <section className={cn(WELL, 'relative pt-10 pb-10 sm:pt-20')}>
+              <div className="grid gap-x-12 gap-y-6 lg:grid-cols-12 lg:items-end">
+                <h1
+                  className={cn(
+                    'text-balance text-hero lg:col-span-8',
+                    HAND_ON_RULES_HERO,
+                  )}
+                >
+                  <span className="block">
+                    {t('marketing.hero.title.lead')}
+                  </span>
+                  <span className="block text-ink-2">
+                    {t('marketing.hero.title.rest')}
+                  </span>
+                </h1>
+                <p className="prose-measure text-body text-ink-2 lg:col-span-4">
+                  {t('marketing.hero.body')}
+                </p>
+              </div>
 
-            <div className="mt-10 flex flex-wrap items-center gap-3">
-              <a href="/register" className={cn(CTA_PRIMARY, 'h-12')}>
-                {t('marketing.hero.cta.primary')}
-                <ArrowRight aria-hidden="true" className="size-4" />
-              </a>
-              <a href="#how" className={cn(CTA_QUIET, 'h-12')}>
-                {t('marketing.nav.how')}
-              </a>
-            </div>
-            <p className="mt-4 text-caption text-ink-2">
-              {t('marketing.hero.note')}
-            </p>
-
-            {/* The product, crossing the band boundary. The negative margin shortens this band by
-                exactly what the card then hangs below it, so the section underneath only has to
-                carry enough top padding to clear it. */}
-            <div className="relative -mb-20 mt-12 sm:-mb-32 sm:mt-16">
-              <div className="rounded-xl shadow-elevated">
-                <LedgerPreview />
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <a href="/register" className={cn(CTA_PRIMARY, 'h-12')}>
+                  {t('marketing.hero.cta.primary')}
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </a>
+                <a href="#how" className={cn(CTA_QUIET, 'h-12')}>
+                  {t('marketing.nav.how')}
+                </a>
               </div>
               <p className="mt-3 text-caption text-ink-2">
-                {t('marketing.ledger.sample')}
+                {t('marketing.hero.note')}
               </p>
+            </section>
+          </div>
+
+          {/* The ledger, typed on the form, with a note in the margin. This zone starts its own
+              pitch one rule above the column headings, so every row of the table is a whole
+              number of rules and its cell rules and the printed ruling are one line. From `lg`
+              the margin is a real column with the page's margin rule at its end, and the note
+              starts two rules down so its first baseline shares the first entry's rule; below
+              `lg` it precedes the table, on the rules, with one rule of paper between them. */}
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={RULED_PAGE}
+            />
+            <div
+              className={cn(
+                WELL,
+                'relative grid gap-y-10 pt-10 pb-16 sm:pb-20 lg:grid-cols-12 lg:gap-x-10',
+              )}
+            >
+              <p className="font-display text-title text-ink lg:col-span-3 lg:border-e lg:border-border-panel lg:pe-6 lg:pt-20">
+                <span className={cn('block', HAND_ON_RULES_TITLE)}>
+                  {t('marketing.ledger.note')}
+                </span>
+              </p>
+              <div className="lg:col-span-9">
+                <LedgerPreview />
+                <p className={cn('text-caption text-ink-2', TYPED_LINE)}>
+                  {t('marketing.ledger.sample')}
+                </p>
+              </div>
             </div>
-          </section>
+          </div>
         </div>
 
         {/* -- Why that figure will never move ----------------------------- */}
         <section
           id="ledger"
           aria-labelledby="ledger-heading"
-          className={cn(WELL, 'scroll-mt-16 pt-32 pb-20 sm:pt-40 sm:pb-28')}
+          className={cn(WELL, 'scroll-mt-16 py-20 sm:py-28')}
         >
           <div className="grid gap-10 lg:grid-cols-12">
             <div className="lg:col-span-6">
@@ -389,31 +417,53 @@ function LandingPage() {
               </p>
             </div>
 
-            {/* The micro-over-display Two-Step, given a surface of its own so the one number on
-                the page that never changes is also the one that is lifted off it. */}
+            {/* The one figure on the page that never changes, as the entry it is: the euro line
+                as it was typed, and under it, on the next rule, what the book holds it as. No
+                label over a large number: the figure is the second line of a two-line entry. */}
             <div className="lg:col-span-5 lg:col-start-8">
-              <div className="rounded-xl border border-border-subtle bg-surface p-6 shadow-card sm:p-8">
-                <p className="text-micro tracking-label uppercase text-ink-2">
-                  {t('marketing.ledger.figure.label')}
-                </p>
-                <p className="mt-3 font-display text-display font-bold tabular text-ink">
-                  <span aria-hidden="true">
-                    {formatMoney(locale, heldValue)}
-                  </span>
-                  <span className="sr-only">
-                    {amountReading(t, locale, heldValue)}
-                  </span>
-                </p>
-                <p className="mt-3 text-caption text-ink-2">
-                  {t('marketing.ledger.figure.caption')}
-                </p>
-              </div>
+              <dl className="border-y border-border-panel">
+                <div className="flex items-baseline justify-between gap-4 py-3">
+                  <dt className="text-label text-ink">
+                    {t(EURO_ENTRY.payee)}
+                    <span className="block text-caption text-ink-2">
+                      {formatCalendarDate(
+                        locale,
+                        EURO_ENTRY.bookedOn,
+                        'medium',
+                      )}
+                    </span>
+                  </dt>
+                  <dd className="text-label">
+                    <AmountText
+                      amountMinor={asMinor(EURO_ENTRY.amountMinor)}
+                      currencyCode={asCurrencyCode(EURO_ENTRY.currencyCode)}
+                      direction="expense"
+                    />
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-4 border-t border-border-subtle py-3">
+                  <dt className="text-label text-ink-2">
+                    {t('marketing.ledger.figure.label')}
+                  </dt>
+                  <dd className="text-title font-bold text-ink tabular">
+                    <span aria-hidden="true">
+                      {formatMoney(locale, heldValue)}
+                    </span>
+                    <span className="sr-only">
+                      {amountReading(t, locale, heldValue)}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-caption text-ink-2">
+                {t('marketing.ledger.figure.caption')}
+              </p>
             </div>
           </div>
         </section>
 
         {/* -- So how does anything get into it? --------------------------- */}
-        <div className="border-y border-border-subtle bg-surface">
+        <div className="border-y border-border-panel bg-surface">
           <section
             id="how"
             aria-labelledby="how-heading"
@@ -426,21 +476,19 @@ function LandingPage() {
               >
                 {t('marketing.instead.title')}
               </h2>
-              <p className="prose-measure text-subtitle text-ink-2 lg:col-span-6 lg:col-start-7">
+              <p className="prose-measure text-body text-ink-2 lg:col-span-6 lg:col-start-7">
                 {t('marketing.instead.body')}
               </p>
             </div>
 
-            <dl className="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-              {ANSWERS.map(({ id, icon: Icon, title, body }) => (
-                <div key={id} className="border-t border-border-panel pt-5">
-                  <span
-                    aria-hidden="true"
-                    className="mb-4 grid size-9 place-items-center rounded-md bg-brand-soft text-brand"
-                  >
-                    <Icon className="size-5" />
-                  </span>
-                  <dt className="text-subtitle text-ink">{t(title)}</dt>
+            {/* Four entries between rules, two abreast: the answer in the hand, the detail typed
+                under it. Not a grid of icon tiles; the thesis refuses that one. */}
+            <dl className="mt-14 grid gap-x-10 border-b border-border-panel sm:grid-cols-2">
+              {ANSWERS.map(({ id, title, body }) => (
+                <div key={id} className="border-t border-border-panel py-5">
+                  <dt className="font-display text-subtitle text-ink">
+                    {t(title)}
+                  </dt>
                   <dd className="mt-2 text-body text-ink-2">{t(body)}</dd>
                 </div>
               ))}
@@ -468,9 +516,10 @@ function LandingPage() {
               </p>
             </div>
             <div className="lg:col-span-6 lg:row-start-1">
-              <div className="rounded-xl border border-border-subtle bg-surface p-6 shadow-card sm:p-8">
-                <BudgetStates />
-              </div>
+              <BudgetStates />
+              <p className="mt-3 text-caption text-ink-2">
+                {t('marketing.meter.sample')}
+              </p>
             </div>
           </div>
         </section>
@@ -478,7 +527,7 @@ function LandingPage() {
         {/* -- What it is, facing what it will never be -------------------- */}
         <div
           id="scope"
-          className="scroll-mt-16 border-y border-border-subtle bg-surface-panel"
+          className="scroll-mt-16 border-y border-border-panel bg-surface-panel"
         >
           <div
             className={cn(WELL, 'grid gap-12 py-20 lg:grid-cols-12 sm:py-28')}
@@ -502,15 +551,13 @@ function LandingPage() {
             </section>
 
             <section aria-labelledby="never-heading" className="lg:col-span-5">
-              <div className="rounded-xl border border-border-subtle bg-surface p-6 shadow-card sm:p-8">
-                <h2 id="never-heading" className="text-title">
-                  {t('marketing.never.title')}
-                </h2>
-                <div className="mt-6 grid gap-6">
-                  {NEVER.map(({ id, title, body }) => (
-                    <RuledItem key={id} title={title} body={body} />
-                  ))}
-                </div>
+              <h2 id="never-heading" className="text-title">
+                {t('marketing.never.title')}
+              </h2>
+              <div className="mt-6 grid gap-6">
+                {NEVER.map(({ id, title, body }) => (
+                  <RuledItem key={id} title={title} body={body} />
+                ))}
               </div>
             </section>
           </div>
@@ -536,16 +583,16 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* -- The way in, on the page's one inverted ground ---------------- */}
+        {/* -- The way in, stamped -------------------------------------------- */}
         {/* Inset rather than full-bleed, so the last thing on the page is an object on the paper
-            rather than another band of it. `--color-accent` is the inverse of the page in both
-            themes, so this panel is near-black on the light one and near-white on the dark one
-            without a second palette. */}
+            rather than another band of it. `--color-accent` is the stamp ink in both themes -
+            violet on the light paper, lilac on the slate - so this is the page's one stamp,
+            pressed at the end where the book is signed. */}
         <section
           aria-labelledby="cta-heading"
           className={cn(WELL, 'pb-20 sm:pb-28')}
         >
-          <div className="relative overflow-hidden rounded-2xl bg-accent px-6 py-16 text-center sm:px-12 sm:py-20">
+          <div className="relative overflow-hidden rounded-xl bg-accent px-6 py-16 text-center sm:px-12 sm:py-20">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 opacity-10"
@@ -573,7 +620,7 @@ function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-border-subtle bg-surface-sunken">
+      <footer className="border-t border-border-panel bg-surface-sunken">
         {/* The link lists are plain `ul`s inside `contentinfo` rather than `nav` landmarks: two
             further navigation landmarks would need two further accessible names, and a footer
             column list is not a landmark a screen-reader user wants to land on. */}
@@ -611,7 +658,7 @@ function LandingPage() {
               <li>
                 <a
                   href="/register"
-                  className="target-min-h inline-flex items-center rounded-md text-label font-medium text-ink no-underline hover:text-brand focus-ring"
+                  className="target-min-h inline-flex items-center rounded-md text-label font-bold text-ink no-underline hover:text-brand focus-ring"
                 >
                   {t('marketing.nav.getStarted')}
                 </a>

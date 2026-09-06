@@ -6,7 +6,7 @@ import type { VariantProps } from 'class-variance-authority'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 export const badgeVariants = cva(
-  'inline-flex shrink-0 items-center gap-1 rounded-full border font-semibold whitespace-nowrap [&_svg]:size-3',
+  'inline-flex shrink-0 items-center gap-1 rounded-sm border font-semibold whitespace-nowrap [&_svg]:size-3',
   {
     variants: {
       tone: {
