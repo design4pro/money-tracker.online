@@ -1,5 +1,5 @@
 /* ==========================================================================
-   money-tracker.online — design tokens
+   money-tracker.online - design tokens
    ==========================================================================
 
    The single source of truth for every colour, space, radius, shadow, easing,
@@ -15,44 +15,48 @@
    of utilities and no `dark:` duplication in component code.
 
    ---------------------------------------------------------------------------
-   HOW COLOUR IS DECLARED — the three-site rule
+   THE WORLD THESE VALUES COME FROM
+   ---------------------------------------------------------------------------
+   A passbook kept at the kitchen table: off-white form paper ruled in printed
+   green, entries typed on it, headings and margin notes written by hand, and
+   one violet stamp ink for every action and every "settled" mark. Nothing on
+   the page floats: a slip lies on the paper, it does not hover over it, so the
+   resting shadow is a hairline under-edge and the radii are the corners of a
+   cut sheet, not of a pill. The dark theme is the same book read on a phone at
+   night: slate paper, bone ink, lilac stamp. It is designed as a set, not
+   inverted from the light one.
+
+   ---------------------------------------------------------------------------
+   HOW COLOUR IS DECLARED - the three-site rule
    ---------------------------------------------------------------------------
    Every themed colour is declared in exactly three places:
 
-     1. bare `:root`                                   — the light palette
+     1. bare `:root`                                   - the light palette
      2. `@media (prefers-color-scheme: dark)` guarded by
-        `:root:not([data-theme="light"])`              — the OS-follows case
-     3. `:root[data-theme="dark"]`                     — the explicit choice
+        `:root:not([data-theme="light"])`              - the OS-follows case
+     3. `:root[data-theme="dark"]`                     - the explicit choice
 
    Site 2 is guarded so that a user who explicitly picked *light* keeps light on
    a dark-mode OS; site 3 exists so an explicit *dark* choice wins on a
    light-mode OS. Declaring in fewer than three places produces a toggle that
    works in one direction only.
 
-   Dark is a designed system, not an inversion. Its neutrals are warm charcoal,
-   its chromatic values are lifted rather than flipped, and its shadows are
-   re-declared opaque rather than reused. A dark value computed from a light one
-   is a defect.
-
    ---------------------------------------------------------------------------
    THE CONTRAST CONTRACT
    ---------------------------------------------------------------------------
    Body and UI text clears **7:1** (WCAG 2.2 §1.4.6 AAA) in both themes,
-   measured against every ground the value can actually land on — not against a
+   measured against every ground the value can actually land on - not against a
    convenient one. The binding ground is stated per token as a trailing comment
    and is:
 
-     light theme → `surface-sunken` (#f1eee9), the darkest ground light text
+     light theme -> `surface-sunken` (#ebeae1), the darkest ground light text
                     can sit on;
-     dark theme  → `surface-raised` (#272622), the lightest ground dark text
+     dark theme  -> `surface-raised` (#262930), the lightest ground dark text
                     can sit on.
 
-   Every ratio in this file was computed, not estimated: the ramps were built in
-   OKLCH (perceptually uniform, so a step of L is a step of apparent lightness at
-   every hue) and each pair was measured with the WCAG 2.x relative-luminance
-   formula. Chroma is set to 96% of the sRGB gamut boundary for the given
-   lightness and hue, which is why the chromatic values look saturated without
-   clipping a channel.
+   Every ratio in this file was computed with the WCAG 2.x relative-luminance
+   formula, not estimated, and `src/styles/__tests__/tokens-contrast.test.ts`
+   recomputes every one of them on each run.
 
    Non-text contrast (WCAG 1.4.11) has its own floor of 3:1 and applies to
    `border-strong`, the focus indicator, and the category series fills.
@@ -60,337 +64,178 @@
    A token added without a measured ratio beside it is not finished.
    ========================================================================== */
 
+/* -------------------------------------------------------------------------
+   LIGHT - site 1 of 3. The form paper.
+   ---------------------------------------------------------------------- */
 :root {
   color-scheme: light;
 
-  /* ------------------------------------------------------------------------
-     GROUNDS — the four surfaces, warm rather than clinical.
-
-     `canvas` is the page. `surface` is a card face. `surface-raised` is a layer
-     genuinely above the page (popover, menu, dialog). `surface-sunken` is a
-     recessed well (an inset panel, a track, a table header).
-
-     In light, `raised` and `surface` deliberately share a value: white is the
-     top of the range, so elevation there is carried by shadow, not by tone. In
-     dark the two separate, because a shadow against charcoal reads as nothing
-     and tone is the only honest elevation channel. That asymmetry is the point
-     of having both tokens.
-     --------------------------------------------------------------------- */
-  --color-canvas: #fbf9f5;
-  --color-surface: #ffffff;
+  /* Grounds. `canvas` is the paper; `surface` is a slip laid on it; `raised`
+     is the one pure white, kept for the layers that float (menus, dialogs);
+     `sunken` and `panel` are the form's own printed tint, one step down. */
+  --color-canvas: #f5f4ee;
+  --color-surface: #fbfaf6;
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #f1eee9;
+  --color-surface-sunken: #ebeae1;
+  --color-surface-panel: #ebeae1; /* 1.10:1 step from canvas · ink 12.83:1 · ink-2 7.47:1 */
 
-  /* `surface-panel` is the fifth ground and the only one whose *direction*
-     flips between themes. It is for a plane that fills a whole region of the
-     composition — the auth rail, a half-screen split — and whose only job is to
-     read as a second plane beside `canvas`.
+  /* Typed ink. */
+  --color-ink: #262420; /* 12.83:1 on sunken, 15.49:1 on raised */
+  --color-ink-2: #4b4941; /* 7.47:1 on sunken, 9.02:1 on raised */
+  --color-on-accent: #ffffff; /* 10.80:1 on accent, 14.43:1 on accent-hover */
 
-     `surface-sunken` cannot do that job. A well is defined by going darker than
-     the page, which in light is a 1.10 luminance step away from `canvas` and in
-     dark is a 1.04 step *towards* black — a split that structures a whole
-     desktop layout and is then invisible on the theme half the product is read
-     in. So light recesses this plane and dark lifts it:
+  /* Rules. `subtle` is the printed green ruling of the form - decorative, and
+     deliberately faint (1.44:1 on canvas) so a page full of it reads as paper
+     rather than as a grid. `strong` is a control boundary and clears 3:1 on
+     every ground. `panel` separates two grounds that are both paper. */
+  --color-border-subtle: #c3d1c4;
+  --color-border-panel: #a8b5a9; /* 1.94:1 on canvas, 1.77:1 on panel */
+  --color-border-strong: #6f7d71; /* 4.33:1 on raised, 3.59:1 on sunken */
 
-       light  #f1eee9 on #fbf9f5 → 1.10 : 1
-       dark   #22201c on #12110f → 1.16 : 1
+  /* The stamp. `accent` is the fill every commanding action is pressed in;
+     `brand` is the same ink used as text - links, the current destination,
+     the focus ring. One ink, two jobs. */
+  --color-accent: #4a2a82; /* white on it: 10.80:1 */
+  --color-accent-hover: #35195f; /* white on it: 14.43:1 */
+  --color-accent-press: #26113f; /* white on it: 17.01:1 */
 
-     The two steps are deliberately *not* equal, and the asymmetry is forced by
-     the contrast contract rather than chosen for looks. In light this plane is
-     the darkest ground text lands on, and `positive` already sits at 7.01:1 on
-     it — one more step of recession drops a chromatic token below AAA, so 1.10
-     is the whole budget. In dark the plane is lifted away from text-bearing
-     black and has 8.2:1 of headroom, and it *needs* the larger step: near black
-     a 1.10 ratio is a couple of display codes, which reads as a rendering seam
-     beside a form rather than as a second plane. So dark spends the headroom
-     light does not have.
+  --color-brand: #4a2a82; /* 8.94:1 on sunken, 10.80:1 on raised */
+  --color-brand-hover: #35195f; /* 14.43:1 on raised */
+  --color-brand-soft: #ece4f7; /* carries --color-brand as text at 8.75:1 */
+  --color-on-brand: #ffffff; /* 10.80:1 on brand */
 
-     Tone is therefore not the only channel. `--color-border-panel` below draws
-     the same boundary as a rule, so the split survives a theme in which the
-     tonal step is at its weakest — the same not-by-one-channel-alone rule this
-     file applies to money direction, applied to layout.
+  /* Coloured inks for state. Green ink for what is in hand, red ink for what
+     is overdrawn, brown ink for a warning. Each is text-grade at 7:1. */
+  --color-positive: #0b5136; /* 7.75:1 on sunken, 9.36:1 on raised */
+  --color-positive-soft: #dcf2e4; /* carries --color-positive at 7.96:1 */
+  --color-on-positive: #ffffff; /* 9.36:1 on positive */
 
-     The light value coincides with `surface-sunken` by construction, not by
-     accident: this token names the *role*, so a later change to that one cannot
-     silently flatten the split. */
-  --color-surface-panel: #f1eee9; /* ink 14.03:1 · ink-2 7.15:1 */
+  --color-negative: #8a1a0d; /* 7.78:1 on sunken, 9.40:1 on raised */
+  --color-negative-soft: #f8e3df; /* carries --color-negative at 7.63:1 */
+  --color-on-negative: #ffffff; /* 9.40:1 on negative */
 
-  /* The one edge of that plane. Decorative — it separates two grounds, not two
-     controls — so it carries no 3:1 claim; what it does carry is a floor of
-     1.5:1 against *both* grounds it divides, in both themes, which is what
-     makes the boundary stated rather than implied. `border-subtle` cannot do
-     this job: at 1.32:1 against the dark panel it disappears exactly where the
-     tonal step is weakest. */
-  --color-border-panel: #c5c0b7; /* 1.72:1 on canvas, 1.57:1 on panel */
+  --color-warning: #614106; /* 7.67:1 on sunken, 9.26:1 on raised */
+  --color-warning-soft: #f7ead3; /* carries --color-warning at 7.79:1 */
+  --color-on-warning: #ffffff; /* 9.26:1 on warning */
 
-  /* ------------------------------------------------------------------------
-     TEXT — two tiers, both AAA.
+  --color-info: #4a2a82; /* = brand. 8.94:1 on sunken */
+  --color-info-soft: #ece4f7; /* carries --color-info at 8.75:1 */
+  --color-on-info: #ffffff; /* 10.80:1 on info */
 
-     `ink-2` is the secondary tier and it still clears 7:1. It is *not* a 4.5:1
-     grey: hierarchy in this product comes from weight, size and position, never
-     from making the less important thing harder to read. There is no third,
-     fainter tier — if a design needs one, the design has too many tiers.
-     --------------------------------------------------------------------- */
-  --color-ink: #23201a; /* 14.03:1 on sunken, 15.99:1 on surface */
-  --color-ink-2: #524e46; /* 7.15:1 on sunken, 8.15:1 on surface */
+  /* Interaction washes, drawn in ink at low alpha so they read the same on
+     every ground. */
+  --color-hover: rgb(38 36 32 / 0.06);
+  --color-press: rgb(38 36 32 / 0.1);
+  --color-selection: #e3d9f2;
+  --color-scrim: rgb(22 20 30 / 0.55);
+  --color-skeleton: #e6e5dc;
+  --color-skeleton-sheen: rgb(255 255 255 / 0.6);
+  --color-chart-emphasis: rgb(38 36 32 / 0.06);
 
-  /* Foreground for a near-black or saturated fill. */
-  --color-on-accent: #ffffff; /* 16.24:1 on accent, 12.74:1 on accent-hover */
-
-  /* ------------------------------------------------------------------------
-     BORDERS
-
-     `subtle` is decoration: a hairline that separates two things which are not
-     interactive. `strong` is the boundary of anything that can be clicked, and
-     it holds 3:1 on every ground in both themes so a control reads as a control
-     without a heavy border (WCAG 1.4.11). If a box can be pressed its border is
-     `strong`; if it cannot, `subtle`. Readers parse that difference before they
-     parse the label.
-     --------------------------------------------------------------------- */
-  --color-border-subtle: #e3dfd8; /* decorative only — no contrast claim */
-  --color-border-strong: #838078; /* 3.41:1 on sunken, 3.94:1 on surface */
-
-  /* ------------------------------------------------------------------------
-     ACCENT — near-black. The product's authority: whatever is painted in it is
-     the thing to do next. Rationed to one primary button per decision.
-     --------------------------------------------------------------------- */
-  --color-accent: #23201a; /* white on it: 16.24:1 */
-  --color-accent-hover: #36322b; /* white on it: 12.74:1 */
-  --color-accent-press: #16140f; /* white on it: 18.36:1 */
-
-  /* ------------------------------------------------------------------------
-     BRAND — deep azure. Links, active navigation, selection, the focus ring.
-     It points; the accent commands.
-     --------------------------------------------------------------------- */
-  --color-brand: #064f89; /* 7.30:1 on sunken, 8.44:1 on surface */
-  --color-brand-hover: #033c6a; /* 9.79:1 on sunken, 11.30:1 on surface */
-  --color-brand-soft: #e6f2fe; /* carries --color-brand as text at 7.44:1 */
-  --color-on-brand: #ffffff; /* 8.44:1 on brand */
-
-  /* ------------------------------------------------------------------------
-     INTENT — four verdicts.
-
-     Hues were chosen for dichromatic separation, not for convention: the
-     positive/negative pair is bluish-green (168°) against vermillion (30°),
-     the Okabe-Ito axis that survives protanopia and deuteranopia best, rather
-     than the textbook green-vs-red pair that collapses entirely.
-
-     It still is not enough, and this file says so out loud. Measured separation
-     between `positive` and `negative` after dichromat simulation
-     (Viénot-Brettel-Mollon):
-
-       light theme — protanopia 1.89:1 · deuteranopia 1.14:1 · tritanopia 1.14:1
-       dark theme  — protanopia 1.12:1 · deuteranopia 1.28:1 · tritanopia 1.68:1
-
-     A 1.14:1 separation is invisible. Therefore **money direction is never
-     encoded by colour alone**: every amount carries an explicit sign (`+` / `−`
-     via the money formatter), every intent surface carries an icon, and inflow
-     is set at a heavier weight than outflow. Colour is the third channel, and
-     the product remains correct with all colour removed. This is a hard rule,
-     not a preference — see `docs/ACCESS.md`.
-
-     `info` deliberately takes the brand hue. A notice with no verdict speaks in
-     the product's own voice, and giving it a fifth hue would have put a second
-     blue next to the brand blue for no informational gain.
-     --------------------------------------------------------------------- */
-  --color-positive: #085b44; /* 7.01:1 on sunken, 8.11:1 on surface */
-  --color-positive-soft: #dbf8ec; /* carries --color-positive at 7.20:1 */
-  --color-on-positive: #ffffff; /* 8.11:1 on positive */
-
-  --color-negative: #7d0a03; /* 9.47:1 on sunken, 10.96:1 on surface */
-  --color-negative-soft: #feebe8; /* carries --color-negative at 9.53:1 */
-  --color-on-negative: #ffffff; /* 10.96:1 on negative */
-
-  --color-warning: #6c4806; /* 7.07:1 on sunken, 8.18:1 on surface */
-  --color-warning-soft: #feedd7; /* carries --color-warning at 7.13:1 */
-  --color-on-warning: #ffffff; /* 8.18:1 on warning */
-
-  --color-info: #064f89; /* = brand. 7.30:1 on sunken, 8.44:1 on surface */
-  --color-info-soft: #e6f2fe; /* carries --color-info at 7.44:1 */
-  --color-on-info: #ffffff; /* 8.44:1 on info */
-
-  /* ------------------------------------------------------------------------
-     WASHES & SCRIMS — alpha over whatever ground they land on, so one value
-     works on all four surfaces.
-     --------------------------------------------------------------------- */
-  --color-hover: rgb(35 32 26 / 0.055);
-  --color-press: rgb(35 32 26 / 0.1);
-  --color-selection: #cfe3f7;
-  --color-scrim: rgb(28 25 20 / 0.55);
-  --color-skeleton: #ece8e2;
-  --color-skeleton-sheen: rgb(255 255 255 / 0.75);
-
-  /* The band behind the categories a chart is *about*, when it also draws
-     categories that are only context. An **alpha** over the plot rather than an
-     opaque well: the gridlines that pass under it stay visible through it, and
-     an opaque fill hid them exactly inside the one group the reader had been
-     sent to — a scale that stops being readable where it matters most.
-
-     Decorative, and it carries no contrast claim, because it is never the only
-     channel: the marked category is also stated by its axis label at the
-     primary ink and a heavier weight, and by the note under the legend. Neutral
-     rather than chromatic (`accent`'s own ink, at 6%), so it recesses in light
-     and lifts in dark without inventing a ninth hue beside the series ramp. */
-  --color-chart-emphasis: rgb(35 32 26 / 0.06);
-
-  /* ------------------------------------------------------------------------
-     FOCUS (WCAG 2.2 §2.4.11 / §2.4.13, and §2.4.12 AAA "not obscured")
-
-     Two rings, drawn *outside* the control: a `--color-focus-gap`-coloured
-     inner band that separates the indicator from whatever fill sits underneath,
-     and the `--color-focus` band itself. The gap is what makes the indicator
-     survive on a brand-filled button, where a single brand ring would be
-     invisible. `--focus-width` is 2px and `--focus-gap` is 2px, which puts the
-     indicator's own contrast at 7.30:1 (light) and 7.22:1 (dark) against the
-     page — far past the 3:1 the criterion asks for.
-
-     The two rings are drawn by two different properties, and that is deliberate.
-     The `--color-focus` ring is an `outline`, which no ancestor's
-     `overflow: hidden` can crop. The band is a `box-shadow`, which one can. So
-     under a clipping ancestor the indicator degrades to the outline alone —
-     still 7.30:1 against the page, still conformant, only weaker on a fill of
-     its own colour. It never degrades to nothing, which is what a
-     `box-shadow`-only indicator would do.
-
-     Nothing in this product may clip a focus ring regardless: any scroll
-     container that could crop one reserves `--focus-reserve` of padding. The
-     split above is the floor under that rule, not a licence to stop applying it.
-
-     `focus-ring-inset` mirrors the same two rings inward, for a control that
-     sits flush against an edge and has no room outside itself. There the band
-     lands between the ring and the page rather than between the ring and the
-     fill, so it is the band, not the ring, that carries the contrast when the
-     control is filled with `--color-focus`'s own value.
-     --------------------------------------------------------------------- */
-  --color-focus: #064f89; /* 7.30:1 on sunken, 8.44:1 on surface */
+  /* Focus. The stamp ink, so the ring and the current destination are one
+     mark; the gap is white so the ring survives on a violet fill. */
+  --color-focus: #4a2a82; /* 8.94:1 on sunken, 9.80:1 on canvas */
   --color-focus-gap: #ffffff;
 
-  /* ------------------------------------------------------------------------
-     CATEGORY SERIES — 8 hues for charts, category chips and legends.
+  /* Category series - eight hues a colour-blind reader can still separate by
+     lightness, every one >= 3:1 on every light ground. These are the values
+     stored on categories (`components/app/categories/palette.ts`) and must
+     not move without a data migration. */
+  --color-series-1: #0d6abb; /* 4.58:1 min vs grounds */
+  --color-series-2: #0a646a; /* 5.71:1 */
+  --color-series-3: #0f7b62; /* 4.31:1 */
+  --color-series-4: #436f0a; /* 4.94:1 */
+  --color-series-5: #625106; /* 6.44:1 */
+  --color-series-6: #b1440c; /* 4.70:1 */
+  --color-series-7: #a60d47; /* 6.28:1 */
+  --color-series-8: #9724b5; /* 5.37:1 */
 
-     ### Read this before using a series colour.
-
-     Eight hues that are simultaneously (a) mutually distinguishable, (b) at 7:1
-     against both a near-white and a near-black ground, and (c) stable under
-     dichromacy do not exist inside sRGB. That is not a limitation of this
-     palette; it is the size of the gamut. What this ramp actually guarantees:
-
-       · every series value clears **3:1 against every ground in its own theme**
-         (measured minimum: 4.50:1 light, 4.87:1 dark), which is the WCAG 1.4.11
-         floor for a graphical object — enough for a fill, a stroke or a swatch;
-       · it does **not** guarantee 7:1, so a series colour is never used as text;
-       · the worst-case pair separates by only **1.03:1 in luminance** (series 1
-         against series 6 in light, 1 against 8 in dark), and under simulated
-         deuteranopia the worst pair falls to **1.02:1** — indistinguishable.
-
-     Therefore: **series colour is a secondary encoding, always.** Every chart,
-     legend, donut segment and category chip that paints with this ramp must
-     also carry a text label, a value, or a pattern. A chart whose only channel
-     is series colour is a defect and the chart primitives in `src/components/
-     charts` are built so it cannot be expressed. See `docs/ACCESS.md` §4.
-
-     Hues: 252° 202° 172° 132° 95° 42° 8° 318°.
-     --------------------------------------------------------------------- */
-  --color-series-1: #0d6abb; /* 4.78:1 min vs grounds */
-  --color-series-2: #0a646a; /* 5.96:1 */
-  --color-series-3: #0f7b62; /* 4.50:1 */
-  --color-series-4: #436f0a; /* 5.16:1 */
-  --color-series-5: #625106; /* 6.72:1 */
-  --color-series-6: #b1440c; /* 4.90:1 */
-  --color-series-7: #a60d47; /* 6.55:1 */
-  --color-series-8: #9724b5; /* 5.61:1 */
-
-  /* ------------------------------------------------------------------------
-     SHADOWS — restrained. No glassmorphism, no blur panels, no coloured glow.
-
-     Surfaces are flat at rest: depth comes from the ground ladder (canvas →
-     surface → sunken) and a hairline. Shadow is reserved for things that are
-     genuinely on another layer, plus a single step of hover lift.
-     --------------------------------------------------------------------- */
-  --shadow-card:
-    0 1px 2px rgb(35 32 26 / 0.04), 0 1px 3px -1px rgb(35 32 26 / 0.05);
+  /* Shadows. A slip on the page has an under-edge and nothing more: `card` is
+     a one-pixel hairline. The four above it belong to things that genuinely
+     leave the paper - a hovered action, a menu, a popover, a dialog. */
+  --shadow-card: 0 1px 0 0 rgb(38 36 32 / 0.08);
   --shadow-elevated:
-    0 1px 2px rgb(35 32 26 / 0.05), 0 10px 24px -8px rgb(35 32 26 / 0.12);
+    0 1px 2px rgb(38 36 32 / 0.08), 0 8px 20px -8px rgb(38 36 32 / 0.18);
   --shadow-dropdown:
-    0 2px 6px -1px rgb(35 32 26 / 0.06), 0 12px 32px -10px rgb(35 32 26 / 0.18);
+    0 2px 6px -1px rgb(38 36 32 / 0.1), 0 12px 32px -10px rgb(38 36 32 / 0.22);
   --shadow-popover:
-    0 2px 8px -2px rgb(35 32 26 / 0.07), 0 16px 44px -12px rgb(35 32 26 / 0.2);
+    0 2px 8px -2px rgb(38 36 32 / 0.12), 0 16px 44px -12px rgb(38 36 32 / 0.24);
   --shadow-modal:
-    0 2px 8px -2px rgb(35 32 26 / 0.1), 0 32px 72px -16px rgb(35 32 26 / 0.28);
+    0 2px 8px -2px rgb(38 36 32 / 0.14), 0 32px 72px -16px rgb(38 36 32 / 0.3);
 }
 
 /* -------------------------------------------------------------------------
-   DARK — site 2 of 3. Applies when the OS asks for dark and the user has not
-   explicitly chosen light.
+   DARK - site 2 of 3. Follows the OS unless the user chose light.
+   The same book read at night: slate paper, bone ink, lilac stamp.
    ---------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
 
-    --color-canvas: #12110f;
-    --color-surface: #1d1b18;
-    --color-surface-raised: #272622;
-    --color-surface-sunken: #0b0b09;
-    --color-surface-panel: #22201c; /* ink 13.05:1 · ink-2 8.23:1 */
+    --color-canvas: #16171a;
+    --color-surface: #1d1f23;
+    --color-surface-raised: #262930;
+    --color-surface-sunken: #111214;
+    --color-surface-panel: #232529; /* 1.17:1 step from canvas · ink 13.00:1 · ink-2 7.49:1 */
 
-    --color-ink: #e9e6df; /* 12.15:1 on raised, 14.98:1 on canvas */
-    --color-ink-2: #bcb8b0; /* 7.66:1 on raised, 9.45:1 on canvas */
-    --color-on-accent: #23201a; /* 13.03:1 on accent, 10.25:1 on accent-hover */
+    --color-ink: #ebe8df; /* 11.88:1 on raised, 14.63:1 on canvas */
+    --color-ink-2: #b9b5aa; /* 7.11:1 on raised, 8.75:1 on canvas */
+    --color-on-accent: #16171a; /* 9.14:1 on accent, 11.33:1 on accent-hover */
 
-    --color-border-subtle: #33312d;
-    --color-border-panel: #494640; /* 2.01:1 on canvas, 1.73:1 on panel */
-    --color-border-strong: #7e7b75; /* 3.59:1 on raised, 4.41:1 on canvas */
+    --color-border-subtle: #2f3a33;
+    --color-border-panel: #4a5249; /* 2.21:1 on canvas, 1.90:1 on panel */
+    --color-border-strong: #7f8a80; /* 4.06:1 on raised, 4.99:1 on canvas */
 
-    --color-accent: #e9e6df; /* ink on it: 13.03:1 */
-    --color-accent-hover: #d1cdc5; /* ink on it: 10.25:1 */
-    --color-accent-press: #f8f5ef; /* ink on it: 14.78:1 */
+    --color-accent: #c5aef2; /* canvas ink on it: 9.14:1 */
+    --color-accent-hover: #d6c6f7; /* canvas ink on it: 11.33:1 */
+    --color-accent-press: #b094e8; /* canvas ink on it: 7.04:1 */
 
-    --color-brand: #75b8fc; /* 7.22:1 on raised, 8.90:1 on canvas */
-    --color-brand-hover: #a3cffd; /* 9.30:1 on raised */
-    --color-brand-soft: #152433; /* carries --color-brand as text at 7.52:1 */
-    --color-on-brand: #23201a; /* 7.75:1 on brand */
+    --color-brand: #c5aef2; /* 7.43:1 on raised, 9.14:1 on canvas */
+    --color-brand-hover: #d6c6f7; /* 11.33:1 on canvas */
+    --color-brand-soft: #2b2438; /* carries --color-brand as text at 7.58:1 */
+    --color-on-brand: #16171a; /* 9.14:1 on brand */
 
-    --color-positive: #21cb9c; /* 7.27:1 on raised, 8.96:1 on canvas */
-    --color-positive-soft: #102820; /* carries --color-positive at 7.49:1 */
-    --color-on-positive: #23201a; /* 7.80:1 on positive */
+    --color-positive: #7fd9a8; /* 8.59:1 on raised, 10.58:1 on canvas */
+    --color-positive-soft: #17302a; /* carries --color-positive at 8.30:1 */
+    --color-on-positive: #16171a; /* 10.58:1 on positive */
 
-    --color-negative: #fdaa9c; /* 8.23:1 on raised, 10.14:1 on canvas */
-    --color-negative-soft: #321c19; /* carries --color-negative at 8.67:1 */
-    --color-on-negative: #23201a; /* 8.82:1 on negative */
+    --color-negative: #f5a08f; /* 7.15:1 on raised, 8.80:1 on canvas */
+    --color-negative-soft: #3a201b; /* carries --color-negative at 7.35:1 */
+    --color-on-negative: #16171a; /* 8.80:1 on negative */
 
-    --color-warning: #efa51e; /* 7.26:1 on raised, 8.95:1 on canvas */
-    --color-warning-soft: #2d200f; /* carries --color-warning at 7.60:1 */
-    --color-on-warning: #23201a; /* 7.79:1 on warning */
+    --color-warning: #e9c46a; /* 8.71:1 on raised, 10.73:1 on canvas */
+    --color-warning-soft: #332a12; /* carries --color-warning at 8.49:1 */
+    --color-on-warning: #16171a; /* 10.73:1 on warning */
 
-    --color-info: #75b8fc; /* = brand. 7.22:1 on raised */
-    --color-info-soft: #152433; /* carries --color-info at 7.52:1 */
-    --color-on-info: #23201a; /* 7.75:1 on info */
+    --color-info: #c5aef2; /* = brand. 7.43:1 on raised */
+    --color-info-soft: #2b2438; /* carries --color-info at 7.58:1 */
+    --color-on-info: #16171a; /* 9.14:1 on info */
 
-    --color-hover: rgb(233 230 223 / 0.07);
-    --color-press: rgb(233 230 223 / 0.12);
-    --color-selection: #17324a;
-    --color-scrim: rgb(6 6 5 / 0.68);
-    --color-skeleton: #262421;
-    --color-skeleton-sheen: rgb(233 230 223 / 0.08);
-    --color-chart-emphasis: rgb(233 230 223 / 0.07);
+    --color-hover: rgb(235 232 223 / 0.07);
+    --color-press: rgb(235 232 223 / 0.12);
+    --color-selection: #2f2745;
+    --color-scrim: rgb(0 0 0 / 0.68);
+    --color-skeleton: #24262b;
+    --color-skeleton-sheen: rgb(235 232 223 / 0.08);
+    --color-chart-emphasis: rgb(235 232 223 / 0.07);
 
-    --color-focus: #75b8fc; /* 7.22:1 on raised, 8.90:1 on canvas */
-    --color-focus-gap: #12110f;
+    --color-focus: #c5aef2; /* 7.43:1 on raised, 9.14:1 on canvas */
+    --color-focus-gap: #16171a;
 
     /* Series, re-tuned for a dark ground rather than reused. */
-    --color-series-1: #4da2fb; /* 5.68:1 min vs grounds */
-    --color-series-2: #23cfda; /* 7.94:1 */
-    --color-series-3: #1fbf9b; /* 6.48:1 */
-    --color-series-4: #8fe326; /* 9.51:1 */
-    --color-series-5: #cbac1c; /* 6.82:1 */
-    --color-series-6: #f76316; /* 4.87:1 */
-    --color-series-7: #fd9eb0; /* 7.71:1 */
-    --color-series-8: #dd74fc; /* 5.75:1 */
+    --color-series-1: #4da2fb; /* 5.46:1 min vs grounds */
+    --color-series-2: #23cfda; /* 7.63:1 */
+    --color-series-3: #1fbf9b; /* 6.23:1 */
+    --color-series-4: #8fe326; /* 9.14:1 */
+    --color-series-5: #cbac1c; /* 6.56:1 */
+    --color-series-6: #f76316; /* 4.68:1 */
+    --color-series-7: #fd9eb0; /* 7.41:1 */
+    --color-series-8: #dd74fc; /* 5.53:1 */
 
-    /* Re-declared, an order of magnitude more opaque: a 4% shadow is invisible
-       against charcoal, so reusing the light values would silently delete
-       every layer boundary in the product. */
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 1px 1px rgb(0 0 0 / 0.3);
+    /* Re-declared, an order of magnitude more opaque: an 8% shadow is
+       invisible against slate, so reusing the light values would silently
+       delete every layer boundary in the product. */
+    --shadow-card: 0 1px 0 0 rgb(0 0 0 / 0.5);
     --shadow-elevated:
       0 1px 2px rgb(0 0 0 / 0.5), 0 10px 24px -8px rgb(0 0 0 / 0.6);
     --shadow-dropdown:
@@ -403,61 +248,61 @@
 }
 
 /* -------------------------------------------------------------------------
-   DARK — site 3 of 3. The explicit choice, which must win even on a
+   DARK - site 3 of 3. The explicit choice, which must win even on a
    light-mode OS. Values are identical to site 2 by construction.
    ---------------------------------------------------------------------- */
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --color-canvas: #12110f;
-  --color-surface: #1d1b18;
-  --color-surface-raised: #272622;
-  --color-surface-sunken: #0b0b09;
-  --color-surface-panel: #22201c; /* ink 13.05:1 · ink-2 8.23:1 */
+  --color-canvas: #16171a;
+  --color-surface: #1d1f23;
+  --color-surface-raised: #262930;
+  --color-surface-sunken: #111214;
+  --color-surface-panel: #232529; /* 1.17:1 step from canvas · ink 13.00:1 · ink-2 7.49:1 */
 
-  --color-ink: #e9e6df; /* 12.15:1 on raised, 14.98:1 on canvas */
-  --color-ink-2: #bcb8b0; /* 7.66:1 on raised, 9.45:1 on canvas */
-  --color-on-accent: #23201a; /* 13.03:1 on accent */
+  --color-ink: #ebe8df; /* 11.88:1 on raised, 14.63:1 on canvas */
+  --color-ink-2: #b9b5aa; /* 7.11:1 on raised, 8.75:1 on canvas */
+  --color-on-accent: #16171a; /* 9.14:1 on accent */
 
-  --color-border-subtle: #33312d;
-  --color-border-panel: #494640; /* 2.01:1 on canvas, 1.73:1 on panel */
-  --color-border-strong: #7e7b75; /* 3.59:1 on raised */
+  --color-border-subtle: #2f3a33;
+  --color-border-panel: #4a5249; /* 2.21:1 on canvas, 1.90:1 on panel */
+  --color-border-strong: #7f8a80; /* 4.06:1 on raised */
 
-  --color-accent: #e9e6df;
-  --color-accent-hover: #d1cdc5;
-  --color-accent-press: #f8f5ef;
+  --color-accent: #c5aef2;
+  --color-accent-hover: #d6c6f7;
+  --color-accent-press: #b094e8;
 
-  --color-brand: #75b8fc; /* 7.22:1 on raised */
-  --color-brand-hover: #a3cffd;
-  --color-brand-soft: #152433; /* carries --color-brand at 7.52:1 */
-  --color-on-brand: #23201a; /* 7.75:1 on brand */
+  --color-brand: #c5aef2; /* 7.43:1 on raised */
+  --color-brand-hover: #d6c6f7;
+  --color-brand-soft: #2b2438; /* carries --color-brand at 7.58:1 */
+  --color-on-brand: #16171a; /* 9.14:1 on brand */
 
-  --color-positive: #21cb9c; /* 7.27:1 on raised */
-  --color-positive-soft: #102820; /* 7.49:1 */
-  --color-on-positive: #23201a; /* 7.80:1 */
+  --color-positive: #7fd9a8; /* 8.59:1 on raised */
+  --color-positive-soft: #17302a; /* 8.30:1 */
+  --color-on-positive: #16171a; /* 10.58:1 */
 
-  --color-negative: #fdaa9c; /* 8.23:1 on raised */
-  --color-negative-soft: #321c19; /* 8.67:1 */
-  --color-on-negative: #23201a; /* 8.82:1 */
+  --color-negative: #f5a08f; /* 7.15:1 on raised */
+  --color-negative-soft: #3a201b; /* 7.35:1 */
+  --color-on-negative: #16171a; /* 8.80:1 */
 
-  --color-warning: #efa51e; /* 7.26:1 on raised */
-  --color-warning-soft: #2d200f; /* 7.60:1 */
-  --color-on-warning: #23201a; /* 7.79:1 */
+  --color-warning: #e9c46a; /* 8.71:1 on raised */
+  --color-warning-soft: #332a12; /* 8.49:1 */
+  --color-on-warning: #16171a; /* 10.73:1 */
 
-  --color-info: #75b8fc; /* = brand. 7.22:1 on raised */
-  --color-info-soft: #152433; /* carries --color-info at 7.52:1 */
-  --color-on-info: #23201a; /* 7.75:1 */
+  --color-info: #c5aef2; /* = brand. 7.43:1 on raised */
+  --color-info-soft: #2b2438; /* carries --color-info at 7.58:1 */
+  --color-on-info: #16171a; /* 9.14:1 */
 
-  --color-hover: rgb(233 230 223 / 0.07);
-  --color-press: rgb(233 230 223 / 0.12);
-  --color-selection: #17324a;
-  --color-scrim: rgb(6 6 5 / 0.68);
-  --color-skeleton: #262421;
-  --color-skeleton-sheen: rgb(233 230 223 / 0.08);
-  --color-chart-emphasis: rgb(233 230 223 / 0.07);
+  --color-hover: rgb(235 232 223 / 0.07);
+  --color-press: rgb(235 232 223 / 0.12);
+  --color-selection: #2f2745;
+  --color-scrim: rgb(0 0 0 / 0.68);
+  --color-skeleton: #24262b;
+  --color-skeleton-sheen: rgb(235 232 223 / 0.08);
+  --color-chart-emphasis: rgb(235 232 223 / 0.07);
 
-  --color-focus: #75b8fc;
-  --color-focus-gap: #12110f;
+  --color-focus: #c5aef2;
+  --color-focus-gap: #16171a;
 
   --color-series-1: #4da2fb;
   --color-series-2: #23cfda;
@@ -468,7 +313,7 @@
   --color-series-7: #fd9eb0;
   --color-series-8: #dd74fc;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 1px 1px rgb(0 0 0 / 0.3);
+  --shadow-card: 0 1px 0 0 rgb(0 0 0 / 0.5);
   --shadow-elevated:
     0 1px 2px rgb(0 0 0 / 0.5), 0 10px 24px -8px rgb(0 0 0 / 0.6);
   --shadow-dropdown:
@@ -482,50 +327,50 @@
 /* ==========================================================================
    FACES
 
-   Both families are served from this origin, out of `public/fonts`. The
-   dependency freeze in `docs/SPEC.md` §3.1 rules out `@fontsource/*`, and a
-   `<link>` to a font CDN would put a third-party origin in front of every
-   first paint, break the offline story `PRODUCT.md` still owes, and hand a
-   visitor's IP to that origin on a page the visitor never asked to share.
-   Font files are assets, not packages, so vendoring them keeps the freeze.
+   Two voices, both self-hosted from `public/fonts/` under the SIL Open Font
+   Licence (the licence text sits beside each file):
 
-   Both faces are SIL OFL 1.1. The licences ship beside them, which is what
-   the licence requires of a redistributor.
+     Caveat        - the hand. Headings and margin notes. A quick adult hand
+                     rather than a schoolroom one; the bold weight is what gives
+                     a heading its presence at display size.
+     Courier Prime - the typewriter. Body, controls, and every figure. Regular
+                     and bold only, which is all a typewriter ever had; a
+                     `font-weight: 500` resolves to regular and `600` to bold.
 
-   Two subsets each. `latin-ext` is not optional here: every Polish diacritic
-   except `ó` lives in U+0100-02BA, so the PL catalogue is unreadable without
-   it. `unicode-range` is what keeps an EN reader from paying for it.
+   Each family is split by `unicode-range`: `latin` is every page's first
+   request and `latin-ext` is fetched only when a Polish diacritic is actually
+   on the page. `src/routes/__root.tsx` preloads both files for a Polish
+   document and only the first for an English one.
 
-   Only the `wght` axis is requested. Nothing in this product sets
-   `font-stretch`, `font-variation-settings` or `font-optical-sizing`, and
-   dropping the unused `wdth` and `opsz` axes took the four files from 383 KB
-   to 189 KB. Weights actually used are 400, 500, 600 and 700; the ranges are
-   wider because narrowing them saves nothing (the axis ships whole either
-   way) and a wider range costs nothing.
+   ## The fallback faces
 
-   `font-display: swap` never blocks the text. The two `latin` files are
-   preloaded by the document shell in `src/routes/__root.tsx`, so the request
-   starts with the HTML rather than one round trip behind this stylesheet.
+   Each stack names a metric-compensated local face *immediately* after its
+   web face. `ascent-override`, `descent-override` and `line-gap-override` are
+   the web face's own vertical metrics, measured from its `hhea` table, so a
+   line set in the fallback is exactly as tall as the same line set in the
+   real face and the swap cannot shift anything below it. Advance widths are
+   not compensated: `size-adjust` would fit one glyph width and break another,
+   and a line that reflows by a few characters during the swap is a smaller
+   defect than a line that reflows by a few *pixels of height* everywhere.
    ========================================================================== */
 
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Caveat';
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 400 700;
   font-display: swap;
-  src: url('/fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  src: url('/fonts/caveat-latin.woff2') format('woff2');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
     U+2215, U+FEFF, U+FFFD;
 }
-
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Caveat';
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 400 700;
   font-display: swap;
-  src: url('/fonts/bricolage-grotesque-latin-ext.woff2') format('woff2');
+  src: url('/fonts/caveat-latin-ext.woff2') format('woff2');
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
@@ -533,74 +378,79 @@
 }
 
 @font-face {
-  font-family: 'Inter';
+  font-family: 'Courier Prime';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400;
   font-display: swap;
-  src: url('/fonts/inter-latin.woff2') format('woff2');
+  src: url('/fonts/courier-prime-latin.woff2') format('woff2');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
     U+2215, U+FEFF, U+FFFD;
 }
-
 @font-face {
-  font-family: 'Inter';
+  font-family: 'Courier Prime';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400;
   font-display: swap;
-  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  src: url('/fonts/courier-prime-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Courier Prime';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/courier-prime-bold-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Courier Prime';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/courier-prime-bold-latin-ext.woff2') format('woff2');
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
     U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* --------------------------------------------------------------------------
-   THE FALLBACK FACES
-
-   These are what the type stacks below name second. They are not fonts: each
-   is a local face whose *vertical* metrics have been replaced with the ones
-   measured out of the web font's own `head` and `hhea` tables, so the line
-   box is the same height before and after the swap and a heading does not
-   move the paragraph under it when the web font lands.
-
-   Because `ascent-override` and friends replace the metrics outright rather
-   than scaling them, it does not matter which `local()` source actually
-   answers. The same line box is produced on every platform.
-
-     Bricolage Grotesque   unitsPerEm 1000, ascent  930, descent -270
-     Inter                 unitsPerEm 2048, ascent 1984, descent -494
-
-   There is deliberately no `size-adjust`. Matching advance widths needs the
-   average character width of whichever local face substitutes, and that is
-   both platform-dependent and unmeasurable from this repository. The OS/2
-   `xAvgCharWidth` field is not a usable stand-in: foundries compute it to
-   two different specifications, and for these two files it moved when the
-   unused axes were dropped without a single glyph changing. A number nobody
-   can derive is how the dead `Fallback` names got here in the first place,
-   and one guess is not repaid by another.
-
-   So the swap still reflows text horizontally. It no longer changes the
-   height of a line, which is the shift a reader actually notices.
-   -------------------------------------------------------------------------- */
-
+/* Caveat: unitsPerEm 1000, hhea ascender 960, descender -300, lineGap 0. The
+   local hands are the ones macOS and Windows ship. */
 @font-face {
-  font-family: 'Bricolage Grotesque Fallback';
-  src:
-    local('Avenir Next'), local('Segoe UI'), local('Roboto'),
-    local('Helvetica Neue'), local('Arial');
-  ascent-override: 93%;
-  descent-override: 27%;
+  font-family: 'Caveat Fallback';
+  src: local('Bradley Hand'), local('Segoe Script');
+  ascent-override: 96%;
+  descent-override: 30%;
   line-gap-override: 0%;
 }
 
+/* Courier Prime: unitsPerEm 2048, hhea ascender 1600, descender -700,
+   lineGap 0. The bold face is declared separately so a bold run falls back to
+   a real bold rather than to a synthesised one. */
 @font-face {
-  font-family: 'Inter Fallback';
+  font-family: 'Courier Prime Fallback';
+  font-weight: 400;
+  src: local('Courier New'), local('Courier');
+  ascent-override: 78.125%;
+  descent-override: 34.18%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Courier Prime Fallback';
+  font-weight: 700;
   src:
-    local('Helvetica Neue'), local('Segoe UI'), local('Roboto'), local('Arial');
-  ascent-override: 96.875%;
-  descent-override: 24.121%;
+    local('Courier New Bold'), local('CourierNewPS-BoldMT'),
+    local('Courier-Bold');
+  ascent-override: 78.125%;
+  descent-override: 34.18%;
   line-gap-override: 0%;
 }
 
@@ -613,78 +463,80 @@
   /* ------------------------------------------------------------------------
      TYPE
 
-     Two faces: a geometric display face for the few large things and a neutral
-     text face for the many small ones. Both stacks name their fallback face
-     *immediately* after the web face, so the swap cannot change the height of
-     a line. Those two faces, and the limit of what they compensate for, are
-     declared under FACES above.
+     Two voices: the hand for headings and margin notes, the typewriter for
+     everything that is read as a record - body, controls, and every figure.
+     Both stacks name their fallback face *immediately* after the web face, so
+     the swap cannot change the height of a line. The faces and the limit of
+     what they compensate for are declared under FACES above.
 
-     There is no third face for numbers. A number that can change keeps the
-     face it inherits and changes only its figures, through the `.tabular`
-     rule in `app.css` — `font-variant-numeric: tabular-nums`. That is what
-     stops a re-rendered total shifting the row it sits in and what makes a
-     column of money align on the decimal.
+     There is no third face for numbers and no monospace distinct from the
+     body: the body *is* monospaced, which is what makes a column of money
+     align on its decimal without any help. `.tabular` in `app.css` is kept so
+     a re-rendered total still asks for tabular figures should the face ever
+     change under it.
      --------------------------------------------------------------------- */
   --font-display:
-    'Bricolage Grotesque', 'Bricolage Grotesque Fallback', 'Avenir Next',
-    ui-sans-serif, system-ui, sans-serif;
+    'Caveat', 'Caveat Fallback', 'Bradley Hand', 'Segoe Script', cursive;
   --font-sans:
-    'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    ui-sans-serif, system-ui, sans-serif;
+    'Courier Prime', 'Courier Prime Fallback', 'Courier New', Courier, monospace;
   --font-mono:
-    ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Mono', Menlo, monospace;
+    'Courier Prime', 'Courier Prime Fallback', 'Courier New', Courier, monospace;
 
-  /* The type scale. Nine steps, and the jump from `micro` to `display` is
-     deliberate: an 11px uppercase label sitting directly above a 40px numeral
-     is the product's signature composition, and softening it with an
-     intermediate size is what makes a dashboard read as generic. */
-  --text-hero: clamp(2.5rem, 6.8vw, 4.5rem);
-  --text-hero--line-height: 0.98;
-  --text-hero--letter-spacing: -0.032em;
+  /* The type scale. The hand needs a third more size than a sans to read at
+     the same weight - its x-height is small - so the four display steps are
+     set for Caveat and the five text steps for Courier Prime. No negative
+     tracking anywhere: a typewriter cannot kern and a hand does not. */
+  --text-hero: clamp(3.25rem, 8vw, 5rem);
+  /* Two rules of the form per line. The hero is written on ruled paper, so its
+     line box is a length rather than a ratio and stays on the pitch at every
+     width the clamp reaches. */
+  --text-hero--line-height: 5rem;
+  --text-hero--letter-spacing: 0;
   --text-hero--font-weight: 700;
 
-  --text-display: clamp(1.875rem, 4.4vw, 2.5rem);
-  --text-display--line-height: 1.04;
-  --text-display--letter-spacing: -0.028em;
+  --text-display: clamp(2rem, 4.5vw, 3rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: 0;
   --text-display--font-weight: 700;
 
-  --text-title: 1.5rem;
-  --text-title--line-height: 1.18;
-  --text-title--letter-spacing: -0.02em;
+  --text-title: 2rem;
+  --text-title--line-height: 1.1;
+  --text-title--letter-spacing: 0;
   --text-title--font-weight: 700;
 
-  --text-subtitle: 1.125rem;
-  --text-subtitle--line-height: 1.4;
-  --text-subtitle--letter-spacing: -0.012em;
-  --text-subtitle--font-weight: 600;
+  --text-subtitle: 1.25rem;
+  --text-subtitle--line-height: 1.25;
+  --text-subtitle--letter-spacing: 0;
+  --text-subtitle--font-weight: 700;
 
   --text-body: 0.9375rem;
   --text-body--line-height: 1.55;
 
   --text-label: 0.8125rem;
   --text-label--line-height: 1.4;
-  --text-label--font-weight: 500;
+  --text-label--font-weight: 400;
 
   --text-caption: 0.75rem;
-  --text-caption--line-height: 1.35;
+  --text-caption--line-height: 1.4;
 
   --text-micro: 0.6875rem;
   --text-micro--line-height: 1.2;
-  --text-micro--letter-spacing: 0.08em;
-  --text-micro--font-weight: 600;
+  --text-micro--letter-spacing: 0.06em;
+  --text-micro--font-weight: 700;
 
-  --tracking-label: 0.08em;
+  --tracking-label: 0.06em;
 
-  /* WCAG 2.2 §1.4.8 AAA — visual presentation. The measure of running text is
+  /* WCAG 2.2 §1.4.8 AAA - visual presentation. The measure of running text is
      capped so a line never exceeds ~80 characters, line height inside a
      paragraph is at least 1.5, and paragraph spacing is at least 1.5× that
-     again. `--measure` is applied by the `prose-measure` utility in `app.css`. */
-  --measure: 68ch;
+     again. `--measure` is applied by the `prose-measure` utility in `app.css`.
+     64ch of a monospace at 16px is 614px. */
+  --measure: 64ch;
   --leading-reading: 1.6;
   --paragraph-gap: 1.5em;
 
   /* ------------------------------------------------------------------------
-     SPACE — a strict 4px rhythm.
+     SPACE - a strict 4px rhythm.
 
      `--spacing: 0.25rem` pins Tailwind's own numeric scale to the same grid, so
      `p-6`, `gap-6` and `--space-6` are always the same 24px. A one-off value in
@@ -705,7 +557,7 @@
   --space-24: 6rem;
 
   /* ------------------------------------------------------------------------
-     TARGET SIZE — WCAG 2.2 §2.5.5 AAA.
+     TARGET SIZE - WCAG 2.2 §2.5.5 AAA.
 
      44 CSS px minimum in both axes for every pointer target. The `target-min`
      utility in `app.css` enforces it without changing a control's visual box:
@@ -719,16 +571,18 @@
   --control-h-lg: 3rem; /* 48px */
 
   /* ------------------------------------------------------------------------
-     RADII — radius as a category signal, not decoration.
-     xl = a sheet · lg = a floating layer · md = a control · sm = a nested inset
-     full = "this is a token you can pick up" (chip, badge, avatar). Never on a
-     panel.
+     RADII - the corners of a cut sheet.
+     Every step is near-square: a slip, a control and a stamp all have the
+     corner a guillotine leaves, and the steps exist so a nested inset is
+     still one notch tighter than the sheet around it. `full` is kept for the
+     things that genuinely are round - an avatar, a swatch, a switch thumb -
+     and never for a chip, a badge or a panel.
      --------------------------------------------------------------------- */
-  --radius-sm: 0.5rem; /* 8px */
-  --radius-md: 0.75rem; /* 12px */
-  --radius-lg: 1rem; /* 16px */
-  --radius-xl: 1.25rem; /* 20px */
-  --radius-2xl: 1.75rem; /* 28px */
+  --radius-sm: 0.125rem; /* 2px */
+  --radius-md: 0.125rem; /* 2px */
+  --radius-lg: 0.1875rem; /* 3px */
+  --radius-xl: 0.25rem; /* 4px */
+  --radius-2xl: 0.25rem; /* 4px */
   --radius-full: 9999px;
 
   /* Focus geometry. See the focus colour block above. */
@@ -740,7 +594,7 @@
      MOTION
 
      Four durations and four easings, and **every one of them collapses under
-     `prefers-reduced-motion: reduce`** — see the block at the end of this file.
+     `prefers-reduced-motion: reduce`** - see the block at the end of this file.
      Because the durations are tokens rather than literals, that collapse
      reaches every animation in the product, including ones written after this
      file was, and including third-party CSS that consumes the variables.
@@ -760,7 +614,7 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   /* ------------------------------------------------------------------------
-     LAYERING — one closed ladder. Nothing in the product may invent a z-index;
+     LAYERING - one closed ladder. Nothing in the product may invent a z-index;
      `src/lib/cn.ts` registers these names with tailwind-merge so an override
      genuinely wins instead of leaving two classes and letting stylesheet order
      decide.
@@ -775,7 +629,7 @@
   --z-toast: 80;
 
   /* ------------------------------------------------------------------------
-     CHROME GEOMETRY — named rows, composed rather than hand-calculated. Every
+     CHROME GEOMETRY - named rows, composed rather than hand-calculated. Every
      piece of chrome geometry adds `--impersonation-h` unconditionally: with no
      bar it resolves to 0 and the layout is exactly what it was.
      --------------------------------------------------------------------- */
@@ -795,7 +649,7 @@
   --safe-start: env(safe-area-inset-left, 0px);
   --safe-end: env(safe-area-inset-right, 0px);
 
-  /* WCAG 2.2 §2.2.6 AAA — timeouts. No inactivity timer in this product may be
+  /* WCAG 2.2 §2.2.6 AAA - timeouts. No inactivity timer in this product may be
      shorter than 20 hours without warning the user first, and the warning
      itself must be dismissible and extendable. The value is a token so the
      session layer and the "you will be signed out" dialog cannot drift apart. */

@@ -47,7 +47,9 @@ const TONE_CLASS: Record<AmountTone, string> = {
   income: 'text-positive font-semibold',
   expense: 'text-negative',
   transfer: 'text-ink-2',
-  planned: 'text-info',
+  // A planned line is written in pencil: the secondary ink, never the stamp violet the product
+  // spends on what is settled. The word beside the row is the channel; the grey only agrees.
+  planned: 'text-ink-2',
 }
 
 function toneOf(

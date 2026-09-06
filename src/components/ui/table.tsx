@@ -121,7 +121,7 @@ export function Column({
       {...props}
       className={composeTw(
         className,
-        'px-3 py-2 font-semibold whitespace-nowrap',
+        'px-3 py-2 font-semibold whitespace-nowrap border-e border-border-subtle last:border-e-0',
         align === 'end' ? 'text-end' : 'text-start',
         'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
       )}
@@ -186,9 +186,9 @@ export function Row<T extends object>({ className, ...props }: RowProps<T>) {
         'border-b border-border-subtle last:border-b-0',
         transitionBase,
         'data-[hovered]:bg-hover',
-        // Selection carries a left rule as well as a wash: a 1.05:1 tint is not
-        // a signal, it is a hint that a signal exists.
-        'data-[selected]:bg-brand-soft data-[selected]:shadow-[inset_3px_0_0_0_var(--color-brand)]',
+        // Selection carries a one-pixel frame in the stamp ink as well as a
+        // wash: a 1.05:1 tint is not a signal, it is a hint that a signal exists.
+        'data-[selected]:bg-brand-soft data-[selected]:shadow-[inset_0_0_0_1px_var(--color-brand)]',
         'data-[disabled]:opacity-45',
         'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
       )}
@@ -213,7 +213,7 @@ export function Cell({
       {...props}
       className={composeTw(
         className,
-        'px-3 py-2.5 align-middle text-ink',
+        'px-3 py-2.5 align-middle text-ink border-e border-border-subtle last:border-e-0',
         align === 'end' ? 'text-end' : 'text-start',
         numeric && 'tabular',
         'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',

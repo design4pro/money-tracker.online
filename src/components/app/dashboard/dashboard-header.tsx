@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 
 import { Amount } from '#/components/app/accounts'
-import { Card } from '#/components/ui'
 import {
   formatCalendarDateRange,
   formatPercent,
@@ -56,11 +55,12 @@ import type { PeriodRange } from './period'
  * icon channel on the row where it is doing the most work. Three states, three glyphs, and none
  * of them shared with another tile.
  *
- * ## The tiles are cards, like everything under them
+ * ## Three typed lines, not three tiles
  *
- * They used to be borderless grey chips above a grid of bordered white panels — two card idioms
- * on one screen, and the reader has to learn both before deciding which is the important one.
- * One token now: `Card`, the same fill, hairline and radius the widget frames use.
+ * The strip used to be three cards, each a label over a large figure: the metric template, and
+ * the one idiom the form refuses. The three figures are now lines of the book - the label at the
+ * start of the line, the figure at its end, a rule under each - the way the net-worth panel already
+ * sets what is held against what is owed, and the difference keeps its sentence under its figure.
  */
 export interface DashboardHeaderProps {
   readonly baseCurrencyCode: CurrencyCode
@@ -106,8 +106,7 @@ export function DashboardHeader({
         move around a page. It is visually hidden because the figures below already say it.
       */}
       <h2 className="sr-only">{t('dashboard.summary.label')}</h2>
-      {/* `gap-4` is the widget grid's gap: the strip and the panels below it are one rhythm. */}
-      <dl className="grid gap-4 sm:grid-cols-3">
+      <dl className="max-w-xl border-b border-border-subtle">
         <Figure
           icon={<ArrowDownLeft aria-hidden="true" className="size-4" />}
           label={t('dashboard.income')}
@@ -209,12 +208,12 @@ interface FigureProps {
 
 function Figure({ icon, label, detail, children }: FigureProps) {
   return (
-    <Card padding="sm">
+    <div className="flex items-baseline justify-between gap-4 border-t border-border-subtle py-3">
       <dt className="flex items-center gap-2 text-micro tracking-label uppercase text-ink-2">
         <span className="text-ink-2">{icon}</span>
         {label}
       </dt>
-      <dd className="mt-1">
+      <dd className="min-w-0 text-end">
         {children}
         {detail === undefined ? null : (
           <span className="mt-1 block text-caption font-normal text-ink-2">
@@ -222,6 +221,6 @@ function Figure({ icon, label, detail, children }: FigureProps) {
           </span>
         )}
       </dd>
-    </Card>
+    </div>
   )
 }

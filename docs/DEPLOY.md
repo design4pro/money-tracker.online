@@ -356,7 +356,25 @@ signing secret into `POLAR_WEBHOOK_SECRET`.
 
 The handler verifies a Standard Webhooks HMAC-SHA256 over `${id}.${timestamp}.${raw}` with a 300s
 tolerance, tolerates multiple `v1,<sig>` entries so a secret can be rotated without downtime, and
-compares in constant time. Status codes are a contract:
+compares in constant time.
+
+**It tries two key derivations, and it has to.** Polar changed how a secret becomes an HMAC key:
+
+| Secret issued   | Key                                                                  | Endpoint reports                         |
+| --------------- | -------------------------------------------------------------------- | ---------------------------------------- |
+| from 2026-09-08 | base64-decode of the `whsec_` remainder (Standard Webhooks)          | `uses_standard_webhook_signature: true`  |
+| before that     | the literal UTF-8 of the **whole** `whsec_…` string, prefix included | `uses_standard_webhook_signature: false` |
+
+The older behaviour is Polar base64-encoding the complete secret before handing it to its
+`standardwebhooks` library, which then had no `whsec_` prefix to strip (polarsource/polar#13519).
+The flag is read-only: it cannot be set at creation and cannot be updated, so an organization whose
+secrets predate the cutover cannot be migrated by re-creating the endpoint. Polar's own SDKs try
+both from 1.0.0-alpha.19 and so does `src/server/billing/webhook-verify.ts`.
+
+This was walked, not assumed: on 2026-09-06 every delivery to the staging endpoint answered **401**
+with a correct secret configured, and it looked exactly like "Polar is not sending webhooks".
+
+Status codes are a contract:
 
 - **400** — unsigned or badly signed. Never processed, never retried into a loop.
 - **200** — accepted, duplicate, or an event kind we deliberately ignore.
