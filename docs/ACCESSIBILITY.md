@@ -116,9 +116,17 @@ padding or a pseudo-element — so a caller cannot forget to do it.
 
 Dense mode reduces row height and body size; it never reduces a hit area below 44px.
 
-_Verified by:_ an axe rule plus a dedicated e2e case that enumerates every element matching the
-interactive-role selector on every route in the visual spec and asserts
-`rect.width >= 44 && rect.height >= 44`, including the pseudo-element expansion.
+Rows inside a floating collection - a menu item, a select option, a combobox suggestion - are held
+at 44px by a real `min-height` on the shared item base (`collectionItemBase` in
+`src/components/ui/shared.ts`) rather than by the pseudo-element: stacked rows with overlapping hit
+areas would each take the other's edge pixels, and a real height is what a finger actually lands on.
+
+_Verified by:_ `.github/a11y/axe-scan.mjs`, which on every route in `.github/a11y/routes.json`
+enumerates every element matching the interactive-role selector and reports any whose bounding rect
+is under 44 CSS px on its smaller edge, honouring the in-sentence exception and
+`data-a11y-target-exempt`. That scan measures what is on the page when the route loads, so the rows
+of a closed menu or select are outside it; those are covered by the primitive above, and
+`src/components/ui/__tests__/menu.test.tsx` pins the class that provides the height.
 
 ### 3.5 — 3.3.9 Accessible Authentication (Enhanced)
 

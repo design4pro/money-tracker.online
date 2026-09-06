@@ -142,4 +142,20 @@ describe('Menu', () => {
     expect(onAction).toHaveBeenCalledTimes(1)
     expect(onAction.mock.calls[0]?.[0]).toBe('delete')
   })
+
+  it('holds every row at the 44px target height', async () => {
+    const user = userEvent.setup()
+    render(<Example />)
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }))
+
+    // jsdom lays nothing out and loads no stylesheet, so the box cannot be
+    // measured here; the CI axe scan cannot measure it either, because a menu
+    // is closed on every route it loads. What can be pinned is the utility
+    // that provides the height (`target-min-h`, docs/ACCESSIBILITY.md §3.4),
+    // on every row rather than on a sample of them.
+    for (const item of screen.getAllByRole('menuitem')) {
+      expect(item.classList.contains('target-min-h')).toBe(true)
+    }
+  })
 })
