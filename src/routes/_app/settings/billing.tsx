@@ -31,6 +31,7 @@ import { UsageMeters } from './-ui/usage-meters'
 import type { BillingInterval } from '#/lib/plans'
 import type { BillingView } from '#/server/fns/billing'
 import type { MessageKey } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/settings/billing` — the plan, what it costs, and how much of it is in use.
@@ -63,6 +64,7 @@ export const Route = createFileRoute('/_app/settings/billing')({
   loader: async () => ({ billing: await loadBilling() }),
   pendingComponent: BillingSkeleton,
   errorComponent: BillingError,
+  head: ({ matches }) => pageHead(matches, (t) => t('billing.title')),
   component: BillingRoute,
 })
 

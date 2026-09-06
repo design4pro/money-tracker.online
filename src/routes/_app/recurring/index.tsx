@@ -31,6 +31,7 @@ import { SeriesFormDialog } from './-ui/series-form-dialog'
 import type { Key } from 'react-aria-components'
 import type { RecurringSeries } from '#/server/db/types'
 import type { UpcomingPeriod } from '#/server/repos/recurring'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/recurring` - the list, and the one question it answers.
@@ -75,6 +76,7 @@ export const Route = createFileRoute('/_app/recurring/')({
   },
   pendingComponent: RecurringListSkeleton,
   errorComponent: RecurringListError,
+  head: ({ matches }) => pageHead(matches, (t) => t('recurring.title')),
   component: RecurringListRoute,
 })
 

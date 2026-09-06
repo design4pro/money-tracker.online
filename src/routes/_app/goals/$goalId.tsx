@@ -34,6 +34,7 @@ import { GoalFormDialog } from './-ui/goal-form-dialog'
 
 import type { ReactNode } from 'react'
 import type { GoalContribution } from '#/server/repos/goals'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/goals/$goalId` — one goal, its history, and an honest guess about when it lands.
@@ -74,6 +75,11 @@ export const Route = createFileRoute('/_app/goals/$goalId')({
   },
   pendingComponent: GoalDetailSkeleton,
   errorComponent: GoalDetailError,
+  head: ({ matches, loaderData }) =>
+    pageHead(
+      matches,
+      (t) => loaderData?.detail.summary.name ?? t('goals.title'),
+    ),
   component: GoalDetailRoute,
 })
 

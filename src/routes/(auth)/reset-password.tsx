@@ -7,6 +7,7 @@ import { RouteError } from '#/components/app/shell/route-error'
 import { cn } from '#/lib/cn'
 import { resetPassword, toAuthFailure } from '#/lib/auth-client'
 import { useTranslate } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 import { authFailureMessage } from './-lib/auth-messages'
 import {
   MIN_PASSWORD_LENGTH,
@@ -71,6 +72,7 @@ export const Route = createFileRoute('/(auth)/reset-password')({
     error: typeof search.error === 'string' ? search.error : undefined,
   }),
   errorComponent: ({ reset }) => <RouteError onRetry={reset} />,
+  head: ({ matches }) => pageHead(matches, (t) => t('auth.reset.title')),
   component: ResetPasswordScreen,
 })
 

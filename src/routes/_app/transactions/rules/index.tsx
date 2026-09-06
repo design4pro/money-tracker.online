@@ -48,6 +48,7 @@ import { ruleSentence } from './-lib/sentence'
 import { PausedBanner } from './-ui/paused-banner'
 
 import type { Rule } from '#/server/repos/rules'
+import { pageHead } from '#/routes/-lib/page-title'
 import type { PausedRefType } from './-ui/paused-banner'
 
 /**
@@ -98,6 +99,7 @@ export const Route = createFileRoute('/_app/transactions/rules/')({
     return { rules, reference }
   },
   errorComponent: RulesListError,
+  head: ({ matches }) => pageHead(matches, (t) => t('rules.title')),
   component: RulesListRoute,
 })
 

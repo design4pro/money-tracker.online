@@ -28,6 +28,7 @@ import { CategoryFormDialog } from './-ui/category-form-dialog'
 import type { CategoryMove, CategoryTreeItem } from '#/components/app/categories'
 import type { CategoryKind } from '#/server/db/schema'
 import type { Category } from '#/server/repos/categories'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/categories` — the two-level tree.
@@ -65,6 +66,7 @@ export const Route = createFileRoute('/_app/categories/')({
     listCategories({ data: { includeArchived: deps.status === 'all' } }),
   pendingComponent: CategoryTreeSkeleton,
   errorComponent: CategoriesError,
+  head: ({ matches }) => pageHead(matches, (t) => t('categories.title')),
   component: CategoriesRoute,
 })
 

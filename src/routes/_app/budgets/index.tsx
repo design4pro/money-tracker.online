@@ -22,6 +22,7 @@ import { BudgetFormDialog } from './-ui/budget-form-dialog'
 import type { Key } from 'react-aria-components'
 import type { BudgetKind } from '#/server/db/schema'
 import type { BudgetSummary } from '#/server/budgets/summary'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/budgets` — the list, and the one question it answers.
@@ -64,6 +65,7 @@ export const Route = createFileRoute('/_app/budgets/')({
   },
   pendingComponent: BudgetListSkeleton,
   errorComponent: BudgetsListError,
+  head: ({ matches }) => pageHead(matches, (t) => t('budgets.title')),
   component: BudgetsListRoute,
 })
 

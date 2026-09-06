@@ -34,6 +34,7 @@ import { PayeeFormDialog } from './-ui/payee-form-dialog'
 
 import type { PayeeListItem } from '#/components/app/payees'
 import type { PayeeRow } from '#/server/db/schema'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/payees` — the list, the merge, and the strings the importer must ignore.
@@ -71,6 +72,7 @@ export const Route = createFileRoute('/_app/payees/')({
   },
   pendingComponent: PayeeListSkeleton,
   errorComponent: PayeesError,
+  head: ({ matches }) => pageHead(matches, (t) => t('payees.title')),
   component: PayeesRoute,
 })
 

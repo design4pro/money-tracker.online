@@ -29,6 +29,7 @@ import type { Minor } from '#/lib/money'
 import type { Transaction } from '#/server/db/types'
 import type { TransactionDraft } from '#/server/repos/transaction-templates'
 import type { TransactionPolicies } from '#/server/repos/transactions'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/transactions/new` — the entry form.
@@ -78,6 +79,8 @@ const newSearchSchema = z.object({
 
 export const Route = createFileRoute('/_app/transactions/new')({
   validateSearch: newSearchSchema,
+  head: ({ matches }) =>
+    pageHead(matches, (t) => t('transactions.form.newTitle')),
   component: NewTransactionRoute,
 })
 

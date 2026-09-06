@@ -10,6 +10,7 @@ import { loadTransactionReference } from '../-server/list'
 import { RuleEditor, ruleEditorReference } from './-ui/rule-editor'
 
 import type { RuleDefinition } from '#/server/rules/schema'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/transactions/rules/new` — a rule that does not exist yet.
@@ -29,6 +30,7 @@ import type { RuleDefinition } from '#/server/rules/schema'
  */
 export const Route = createFileRoute('/_app/transactions/rules/new')({
   loader: async () => ({ reference: await loadTransactionReference() }),
+  head: ({ matches }) => pageHead(matches, (t) => t('rules.editor.new.title')),
   component: NewRuleRoute,
 })
 

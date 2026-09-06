@@ -21,6 +21,7 @@ import { Notice } from './-ui/notice'
 import { PreviewStep } from './-ui/preview-step'
 
 import type { MessageKey } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 import type { ImportStep } from './-lib/flow'
 
 /**
@@ -54,6 +55,7 @@ import type { ImportStep } from './-lib/flow'
 export const Route = createFileRoute('/_app/import/$batchId')({
   validateSearch: importStepSearchSchema,
   loader: ({ params }) => getImport({ data: { id: params.batchId } }),
+  head: ({ matches }) => pageHead(matches, (t) => t('import.title')),
   component: ImportBatchRoute,
 })
 

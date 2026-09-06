@@ -31,6 +31,7 @@ import { BudgetActionsMenu } from './-ui/budget-actions-menu'
 import { BudgetFormDialog } from './-ui/budget-form-dialog'
 
 import type { MessageKey } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/budgets/$budgetId` — one envelope, and the record of every period it has had.
@@ -65,6 +66,11 @@ export const Route = createFileRoute('/_app/budgets/$budgetId')({
   },
   pendingComponent: BudgetDetailSkeleton,
   errorComponent: BudgetDetailError,
+  head: ({ matches, loaderData }) =>
+    pageHead(
+      matches,
+      (t) => loaderData?.detail.summary.name ?? t('budgets.title'),
+    ),
   component: BudgetDetailRoute,
 })
 

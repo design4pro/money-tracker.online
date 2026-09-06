@@ -21,6 +21,7 @@ import { useTranslate } from '#/lib/i18n'
 import { loadDashboard } from './-server/load-dashboard'
 
 import type { DashboardPeriod } from '#/components/app/dashboard'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/dashboard` — the workspace home, and the first screen a signed-in person sees.
@@ -59,6 +60,7 @@ export const Route = createFileRoute('/_app/dashboard/')({
   loader: async ({ deps }) => loadDashboard({ data: { period: deps.period } }),
   pendingComponent: DashboardSkeleton,
   errorComponent: DashboardError,
+  head: ({ matches }) => pageHead(matches, (t) => t('dashboard.title')),
   component: DashboardRoute,
 })
 

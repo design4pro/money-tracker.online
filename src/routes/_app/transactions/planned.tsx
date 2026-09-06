@@ -9,6 +9,7 @@ import { transactionSearchSchema } from './-lib/filters'
 import { TransactionsScreen } from './-ui/transactions-screen'
 
 import type { TransactionPolicies } from '#/server/repos/transactions'
+import { pageHead } from '#/routes/-lib/page-title'
 import type { TransactionSearch } from './-lib/filters'
 
 /**
@@ -38,6 +39,8 @@ const PLANNED_POLICIES: TransactionPolicies = {
 
 export const Route = createFileRoute('/_app/transactions/planned')({
   validateSearch: transactionSearchSchema,
+  head: ({ matches }) =>
+    pageHead(matches, (t) => t('transactions.planned.title')),
   component: PlannedTransactionsRoute,
 })
 

@@ -28,6 +28,7 @@ import {
   deleteAccount,
   restoreAccount,
 } from '#/server/fns/accounts'
+import { pageHead } from '#/routes/-lib/page-title'
 
 import { useDataRefresh } from '../-lib/refresh'
 import { loadAccountDetail } from './-server/detail'
@@ -65,6 +66,8 @@ export const Route = createFileRoute('/_app/accounts/$accountId')({
     loadAccountDetail({ data: { accountId: params.accountId } }),
   pendingComponent: AccountDetailSkeleton,
   errorComponent: AccountDetailError,
+  head: ({ matches, loaderData }) =>
+    pageHead(matches, (t) => loaderData?.account.name ?? t('accounts.title')),
   component: AccountDetailRoute,
 })
 

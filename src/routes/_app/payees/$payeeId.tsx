@@ -23,6 +23,7 @@ import { useDataRefresh } from '../-lib/refresh'
 import { PayeeFormDialog } from './-ui/payee-form-dialog'
 
 import type { MessageKey } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/payees/$payeeId` — one payee and every string that resolves to it.
@@ -49,6 +50,11 @@ export const Route = createFileRoute('/_app/payees/$payeeId')({
     return { detail, categories }
   },
   errorComponent: PayeeDetailError,
+  head: ({ matches, loaderData }) =>
+    pageHead(
+      matches,
+      (t) => loaderData?.detail.payee.name ?? t('payees.title'),
+    ),
   component: PayeeDetailRoute,
 })
 

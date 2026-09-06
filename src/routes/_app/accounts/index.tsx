@@ -31,6 +31,7 @@ import type { Key } from 'react-aria-components'
 import type { AccountCategory } from '#/server/db/schema'
 import type { Account } from '#/server/db/types'
 import type { AccountGroupWithMembers } from '#/server/repos/accounts'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/accounts` — the list.
@@ -80,6 +81,7 @@ export const Route = createFileRoute('/_app/accounts/')({
   },
   pendingComponent: AccountListSkeleton,
   errorComponent: AccountsListError,
+  head: ({ matches }) => pageHead(matches, (t) => t('accounts.title')),
   component: AccountsListRoute,
 })
 

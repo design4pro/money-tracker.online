@@ -3,7 +3,7 @@
 **Status:** authoritative. This document wins over `docs/SPEC.md`, `DESIGN.md`, `PRODUCT.md` and
 over every line of user-facing copy on any point of accessibility conformance.
 
-**Last reviewed:** 2026-09-01 · **Standard:** WCAG 2.2 · **Scope:** the whole product — the
+**Last reviewed:** 2026-09-06 · **Standard:** WCAG 2.2 · **Scope:** the whole product — the
 marketing site, the authentication screens, the application, the settings surfaces and the platform
 console — in both supported locales (English, Polish) and both themes.
 
@@ -70,42 +70,60 @@ Five, each with what makes it true and how it is verified.
 
 - Foreground and background colours are user-selectable via the theme control (light, dark, system)
   and the product honours the OS setting when no explicit choice is made.
-- Body text blocks are capped at **80 characters** (`max-width: 68ch` on reading surfaces).
+- Body text blocks are capped at **80 characters**: `--measure` is 64ch, applied by the
+  `prose-measure` utility in `src/styles/app.css`, and the few descriptions that cap themselves
+  inline stop at 68ch.
 - Text is **not justified**; every text block is start-aligned.
-- Line spacing is at least **1.5** within paragraphs (`body` is 1.6) and paragraph spacing is at
+- Line spacing is at least **1.5** within paragraphs (`body` is 1.55) and paragraph spacing is at
   least 1.5× the line spacing.
-- Text resizes to **200%** without horizontal scrolling on a full-screen window; verified at 320px
-  CSS width at 200% zoom, which is the 1280px viewport reflowed.
+- Text resizes to **200%** without horizontal scrolling on a full-screen window; that is a 1280px
+  viewport reflowed to 320px CSS width.
 
-_Verified by:_ the `visual-presentation` e2e case, which sets 200% zoom at 1280px and asserts no
-horizontal document scroll on every route in the visual spec, plus a lint rule forbidding
-`text-align: justify`.
+_Verified by:_ the 1.4.8 probe in `.github/a11y/axe-scan.mjs`. On every route in
+`.github/a11y/routes.json`, at 393px in the light theme, it reads the computed style of every
+paragraph, list item, definition and quotation longer than 60 characters and reports a line height
+under 1.5×, justified text, a paragraph gap under 1.5× the line height, and an estimated line
+longer than 80 characters. The probe is advisory (§5.2): it reports, and does not fail the build.
+Nothing automated exercises 200% zoom and no lint rule forbids justification; the reflow is the
+manual check in §5.3.
 
 ### 3.2 — 2.2.6 Timeouts
 
-The only timeout in the product is the authenticated session. The person is told its duration during
-authentication and in Settings → Security; inactivity does not silently discard work; and unsaved
-form state in the transaction, budget and rule editors survives a re-authentication because it is
-held in the form state and restored after the sign-in round trip.
+The only timeout in the product is the authenticated session, and it is long: **30 days**, moved
+forward a day at a time while the person keeps using the product (`SESSION_EXPIRES_IN` and
+`SESSION_UPDATE_AGE` in `src/server/auth/config.ts`). No period of inactivity shorter than that
+signs anybody out or discards anything, which is the criterion's own exception - data preserved
+for more than 20 hours of inactivity needs no warning - and it is the whole of why 2.2.6 holds.
+There is no idle warning, and there is no draft that survives a re-authentication: a form open
+when the 30 days run out is lost, and a person is told so only by the sign-in screen.
 
-No in-app flow expires a person's data without warning. The import preview, the export job and the
-backup artefact each state their own expiry on the screen that creates them.
+The other things that expire are links and invitations, not the person's data. A reset or
+verification link works for an hour and the screen that sends it says so; a pending invitation
+shows its expiry date in Settings → People.
 
-_Verified by:_ the `session-timeout` e2e case, which expires a session mid-form and asserts the form
-values are still present after re-authentication.
+_Verified by:_ nothing automated. `.github/a11y/axe-scan.mjs` records 2.2.6 as a manual item on
+every run because a session lifetime can only be judged against what the product tells the person,
+and that is prose. The two constants above are the evidence; changing either is a change to this
+section.
 
 ### 3.3 — 2.4.11 Focus Not Obscured (Minimum) and 2.4.12 Focus Not Obscured (Enhanced)
 
 **No part** of a focused component is hidden by author-created content. The product has a sticky
-header, a sticky table header band, a bottom bar on mobile and a floating entry button — every one of
-which is a candidate obscurer. Each sticky region declares `scroll-margin` on its scroll container
-sized to its own height, and the floating button yields (moves out of the way) when focus enters the
-region beneath it.
+header, a sticky table header band and a bottom bar on mobile — every one of which is a candidate
+obscurer. The document reserves their heights once, for every route: `<html>` carries
+`scroll-padding` for the 64px header and, below `lg`, for the bottom bar (`src/routes/__root.tsx`),
+and the ledger's rows add their own `scroll-margin` for the table header band above them. Anything
+the browser scrolls into view — a focused control, a fragment target — comes to rest inside those
+edges rather than under them.
 
-_Verified by:_ the `focus-visibility` e2e case, which tabs through every route in the visual spec at
-360px, 1280px and 2560px in both themes, and for each focused element asserts its bounding rect is
-fully inside the viewport and that `document.elementFromPoint` at each of its corners resolves to the
-element itself or a descendant.
+_Verified by:_ the 2.4.11 / 2.4.12 probe in `.github/a11y/axe-scan.mjs`. On every route in
+`.github/a11y/routes.json`, at 393px in the light theme, signed in where the route needs it, it
+focuses up to the first 80 focusable elements in DOM order and asks `document.elementFromPoint` at
+the four inset corners of each one's bounding rect whether the answer is the element, a descendant
+or an ancestor. A corner off-screen or answered by something else is reported as 2.4.12; all four
+as 2.4.11. The probe is advisory (§5.2). Nothing automated covers the dark theme, other widths or
+a real Tab traversal: `e2e/keyboard.spec.ts` tabs through the ledger and the entry form at the
+three project viewports, but it asserts reachability and focus order, not obscuring.
 
 ### 3.4 — 2.5.5 Target Size (Enhanced)
 
@@ -132,19 +150,26 @@ of a closed menu or select are outside it; those are covered by the primitive ab
 
 No cognitive function test is required at any step of authentication or account recovery:
 
-- **Passkeys** (WebAuthn) are a first-class sign-in method, not an add-on.
-- Password fields **permit paste** and permit password managers; nothing blocks autofill.
-- The two-factor code field permits paste of the whole code and does not split it into six inputs
-  that swallow a paste.
-- **There is no CAPTCHA anywhere.** Rate limiting is done server-side per path.
+- Sign-in is email and password. Every credential field carries the `autocomplete` token a
+  password manager needs (`email`, `current-password`, `new-password`), **permits paste** and
+  blocks nothing a browser would fill in.
+- **There is no CAPTCHA anywhere.** Abuse is held off server-side, per path, by the rate limits in
+  `src/server/auth/config.ts`.
 - Email verification and password reset are link-based; no code must be transcribed from one device
-  to another. Where a code is offered as an alternative, it is copy-pasteable and the link is the
-  default.
+  to another.
 - No puzzle, no image identification, no "type the characters", no memory test beyond the person's
   own credential.
+- Two-step verification is configured on the server but has no screen yet, and passkeys are
+  catalogue strings without a sign-in path. Neither is a step a person can reach today, so neither
+  is claimed here; when either ships, its code field is held to the same rules.
 
-_Verified by:_ the `auth-accessibility` e2e case, which asserts paste succeeds in every credential
-field and that no `data-captcha` or third-party challenge frame is present on any auth route.
+_Verified by:_ the 3.3.9 probe in `.github/a11y/axe-scan.mjs`, on the four routes
+`.github/a11y/routes.json` marks `access: form` (`/login`, `/register`, `/forgot-password`,
+`/reset-password`). It asserts every visible password field carries a `current-password` or
+`new-password` token and installs no `onpaste` handler, every identifier field carries a
+`username` or `email` token, and no element or frame that looks like a reCAPTCHA, hCaptcha or
+Turnstile challenge is visible. The probe is advisory (§5.2). That a paste actually lands in the
+field is not asserted anywhere; it is a manual item in §5.3.
 
 ---
 
@@ -208,10 +233,21 @@ project that has ever run it.
 
 ### 5.2 Automated, criterion-specific
 
-Four e2e cases exist solely to hold the claimed AAA criteria, named in §3: `visual-presentation`,
-`session-timeout`, `focus-visibility`, `target-size` and `auth-accessibility`. They run in CI with
-the rest of the e2e suite. A change that breaks one of them breaks a published claim, so they are
-treated as contract tests, not as UI tests.
+There is no e2e case per AAA criterion. What holds the criteria in §3 is the second pass of
+`.github/a11y/axe-scan.mjs`, which the `a11y` workflow runs on every pull request after the A/AA
+gate: every route in `.github/a11y/routes.json`, at 393px in the light theme, probed for 2.5.5,
+2.4.11 / 2.4.12, 1.4.8 and (on the four auth routes) 3.3.9, then scanned with axe's own
+AAA-tagged rules, which is where 1.4.6 enhanced contrast is measured. Every finding from that pass
+is **advisory**: it lands in the run's summary and its artifact and does not fail the build. Only
+the A/AA pass can. The named probes are heuristics over the rendered DOM, each described under its
+criterion above; 2.2.6 has no automated form and the run records it as a manual item on every run.
+2.5.5 is the one criterion with a second, failing hold: `src/components/ui/__tests__/menu.test.tsx`
+pins the row height of the menu and list-box primitives.
+
+2.4.2 Page Titled, which is Level A, is held by a failing assertion rather than an advisory one:
+`e2e/accessibility.spec.ts` asserts on every scanned surface, in both locales, that the document
+title is the screen's own `<h1>` followed by the product name, as `src/routes/-lib/page-title.ts`
+composes it.
 
 ### 5.3 Manual, per stage
 
@@ -222,6 +258,8 @@ Every stage's Verification block owes, and an auditor checks:
 - The chart text equivalent read, not assumed.
 - Light and dark parity at three widths.
 - `prefers-reduced-motion: reduce` set, and the surface still usable and still legible.
+- Text at 200% zoom in a 1280px window, with no horizontal scroll (§3.1).
+- A generated password pasted into each credential field on the auth routes, and accepted (§3.5).
 - Zero console errors or warnings; zero layout shift after paint.
 
 ### 5.4 Not yet done, and stated as such

@@ -6,6 +6,7 @@ import { Button, Form, TextField, linkVariants } from '#/components/ui'
 import { RouteError } from '#/components/app/shell/route-error'
 import { requestPasswordReset, toAuthFailure } from '#/lib/auth-client'
 import { useTranslate } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 import { authFailureMessage } from './-lib/auth-messages'
 import { createAuthSchemas, fieldErrorsOf } from './-lib/schemas'
 import { AuthCard } from './-ui/auth-card'
@@ -34,6 +35,7 @@ const RESET_PATH = '/reset-password'
 
 export const Route = createFileRoute('/(auth)/forgot-password')({
   errorComponent: ({ reset }) => <RouteError onRetry={reset} />,
+  head: ({ matches }) => pageHead(matches, (t) => t('auth.forgot.title')),
   component: ForgotPasswordScreen,
 })
 
