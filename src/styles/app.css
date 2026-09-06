@@ -21,7 +21,7 @@
    downloaded and parsed, which puts the font request a full round trip behind
    first paint. The faces are self-hosted and declared under FACES in
    `tokens.css`, and the document shell in `src/routes/__root.tsx` preloads the
-   two files every visitor needs, so the request still starts with the HTML.
+   files every visitor needs, so the request still starts with the HTML.
    ========================================================================== */
 
 @import 'tailwindcss';
@@ -286,7 +286,6 @@
     font-family: var(--font-sans);
     font-size: var(--text-body);
     line-height: var(--text-body--line-height);
-    font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }

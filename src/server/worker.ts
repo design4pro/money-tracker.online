@@ -23,6 +23,11 @@ import {
 // moved would stay stale until the nightly sweep.
 import './ledger'
 
+// Side effect only: installs the plan-limit resolver into the repository layer. Without it the
+// seam in `./repos/base` keeps its permissive default and every quota in the product is
+// unenforced — silently, which is the failure mode this import exists to prevent.
+import './billing/install'
+
 import { runBudgetPeriodSweep } from './cron/budget-periods'
 import { runBudgetThresholdSweep } from './cron/budget-thresholds'
 import {
@@ -31,6 +36,8 @@ import {
   runRecurringReminderSweep,
 } from './cron/recurring'
 import { dbFromEnv } from './db/from-env'
+import { handleBillingEvent } from './queue/handlers/billing-event'
+import { parseTaskMessage } from './queue/messages'
 import { createKvMarkerStore } from './recurring/markers'
 import { listCronScopes } from './repos/recurring'
 import { loggerFromEnv } from './observability/logger'
@@ -88,11 +95,14 @@ export default {
   /**
    * The task queue consumer.
    *
-   * No task kind has a handler yet, so every message is acknowledged with a warn rather than
-   * retried: retrying a message nothing can process spends five attempts to reach the
-   * dead-letter queue with no more information than the first attempt had. The warn carries the
-   * batch's queue name and size, which is what tells you a producer started running before its
-   * consumer landed.
+   * Messages are acknowledged or retried **one at a time**, never with `ackAll`: a batch of ten in
+   * which one message throws would otherwise redeliver the nine that already succeeded, and a
+   * redelivered billing event is a second chance to apply one state change.
+   *
+   * A body no handler in this deploy recognises is acknowledged with a warn rather than retried —
+   * five attempts at a message nothing can process reach the dead-letter queue with no more
+   * information than the first attempt had. A handler that *throws* is a different thing: that is
+   * infrastructure, and it is retried.
    */
   async queue(
     batch: MessageBatch<unknown>,
@@ -103,15 +113,38 @@ export default {
       context: { component: 'queue', route: batch.queue },
     })
 
-    logger.warn('queue batch has no handler yet', {
-      queue: batch.queue,
-      messages: batch.messages.length,
-    })
+    for (const message of batch.messages) {
+      const task = parseTaskMessage(message.body)
+      if (!task) {
+        logger.warn('queue message has no handler', {
+          queue: batch.queue,
+          messageId: message.id,
+        })
+        message.ack()
+        continue
+      }
 
-    // Acknowledged explicitly rather than by returning: an unacknowledged message is redelivered
-    // to a consumer that will make the same non-decision, and `max_retries` of those is the only
-    // thing standing between this and a full dead-letter queue.
-    batch.ackAll()
+      try {
+        const outcome = await handleBillingEvent({
+          db: dbFromEnv(env),
+          eventId: task.eventId,
+          now: new Date(),
+          logger,
+        })
+        logger.debug('queue message handled', { kind: task.kind, outcome })
+        message.ack()
+      } catch (error) {
+        // Reaching here means the handler could not complete for a reason another attempt might
+        // resolve — a database that did not answer. Every *logical* failure is recorded on the
+        // billing event row and acknowledged inside the handler, so a retry here is never a
+        // second attempt at the same rejected payload.
+        logger.error('queue message failed', error, {
+          kind: task.kind,
+          messageId: message.id,
+        })
+        message.retry()
+      }
+    }
   },
 
   /**

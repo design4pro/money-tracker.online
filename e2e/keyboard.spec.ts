@@ -160,7 +160,7 @@ test.describe('the ledger, from the keyboard', () => {
 
     await page.keyboard.press(' ')
     const bulkBar = page.getByRole('toolbar', {
-      name: 'Actions for the selected transactions',
+      name: 'Actions for the selected entries',
     })
     await expect(bulkBar).toBeVisible()
 

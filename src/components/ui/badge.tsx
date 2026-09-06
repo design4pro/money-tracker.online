@@ -6,7 +6,7 @@ import type { VariantProps } from 'class-variance-authority'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 export const badgeVariants = cva(
-  'inline-flex shrink-0 items-center gap-1 rounded-full border font-semibold whitespace-nowrap [&_svg]:size-3',
+  'inline-flex shrink-0 items-center gap-1 rounded-sm border font-semibold whitespace-nowrap [&_svg]:size-3',
   {
     variants: {
       tone: {
@@ -19,6 +19,12 @@ export const badgeVariants = cva(
         warning: 'border-transparent bg-warning-soft text-warning',
         /** Neutral status. Renders identically to `brand` — see the note below. */
         info: 'border-transparent bg-info-soft text-info',
+        /**
+         * The stamp: a typed word framed by a one-pixel rule in the stamp ink, on the paper itself
+         * rather than on a wash. It is the mark the product puts on what is settled, and the one
+         * status that may carry the brand colour. Never on what is planned.
+         */
+        settled: 'border-brand text-brand',
       },
       size: {
         sm: 'h-5 px-1.5 text-micro tracking-label uppercase',

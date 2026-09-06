@@ -44,7 +44,7 @@ const SITE_NAME = 'money-tracker.online'
  */
 const FALLBACK_TITLE = 'Money Tracker — know where your money goes'
 const FALLBACK_DESCRIPTION =
-  'A personal finance tracker for accounts, transactions, budgets, recurring bills and multi-currency reporting. Manual entry and file import only — no bank connectors, ever.'
+  'A household budget: accounts, spending, category limits, recurring bills and several currencies at once. You type it in or load a file yourself, and we never connect to your bank.'
 
 /** The brand mark, inlined so the tab icon costs no request and never 404s. */
 const FAVICON_SVG =
@@ -223,14 +223,21 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           rel: 'preload',
           as: 'font',
           type: 'font/woff2',
-          href: '/fonts/bricolage-grotesque-latin.woff2',
+          href: '/fonts/caveat-latin.woff2',
           crossOrigin: 'anonymous' as const,
         },
         {
           rel: 'preload',
           as: 'font',
           type: 'font/woff2',
-          href: '/fonts/inter-latin.woff2',
+          href: '/fonts/courier-prime-latin.woff2',
+          crossOrigin: 'anonymous' as const,
+        },
+        {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
+          href: '/fonts/courier-prime-bold-latin.woff2',
           crossOrigin: 'anonymous' as const,
         },
         // For a Polish document `latin-ext` is not an extra subset, it is the
@@ -243,14 +250,21 @@ export const Route = createRootRouteWithContext<RouterContext>()({
                 rel: 'preload',
                 as: 'font',
                 type: 'font/woff2',
-                href: '/fonts/bricolage-grotesque-latin-ext.woff2',
+                href: '/fonts/caveat-latin-ext.woff2',
                 crossOrigin: 'anonymous' as const,
               },
               {
                 rel: 'preload',
                 as: 'font',
                 type: 'font/woff2',
-                href: '/fonts/inter-latin-ext.woff2',
+                href: '/fonts/courier-prime-latin-ext.woff2',
+                crossOrigin: 'anonymous' as const,
+              },
+              {
+                rel: 'preload',
+                as: 'font',
+                type: 'font/woff2',
+                href: '/fonts/courier-prime-bold-latin-ext.woff2',
                 crossOrigin: 'anonymous' as const,
               },
             ]
