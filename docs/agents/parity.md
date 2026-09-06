@@ -239,8 +239,10 @@ payment, a projected payoff, real payments linked to the schedule, and a settled
 **Why it matters.** Debt is a large share of most households' financial picture, and an account with
 a balance says nothing about when it ends or what it costs.
 
-**Natural owner.** No plan today. `06-accounts.md` already carries the account row it hangs off.
-Recorded as **defer** under `BND-11`, which names it as a plan of its own.
+**Natural owner.** `28-loans.md`, added 2026-09-05. This line said "no plan today" and recorded the
+gap as **defer** under `BND-11`; the product owner lifted that deferral and the plan now exists, so
+the gap is **planned, not closed** — a plan is a promise and this register only ever recorded
+promises on both sides. `06-accounts.md` still carries the account row it hangs off.
 
 ### 11. Depreciating assets with a value curve
 

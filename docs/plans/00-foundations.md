@@ -38,8 +38,9 @@ Read a row as: _in this wave, this concern is held by this stage, and by nobody 
 | 4    | `00-S11`     | `00-S12`                | —           | `00-S13`        | —                   |
 | 5    | `00-S14`     | —                       | —           | —               | `00-S15`            |
 | 6    | —            | —                       | —           | `00-S16`        | —                   |
+| 7    | `00-S17`     | —                       | —           | —               | —                   |
 
-Sixteen stages, and every one of them exists because a named feature stage requisitioned it. The
+Seventeen stages, and every one of them exists because a named feature stage requisitioned it. The
 requisitions are listed inside each stage below. A stage in this register with no requisition is
 deleted, not filled.
 
@@ -1310,6 +1311,96 @@ are held by `27-S2`'s tests.
 ### Definition of done
 
 All seven §7 items and all ten §2 clauses.
+
+### Blockers
+
+None.
+
+---
+
+## Stage 00-S17 — Schema: the loan tables
+
+### Stage id
+
+`00-S17` · Wave 7 · effort **S**.
+
+### Reference rows
+
+`FND-32 missing → done` — `loans`: the borrowing, its terms and its status.
+`FND-33 missing → done` — `loan_instalments`: the materialised schedule, with the settlement link
+and the evidence `CHECK`.
+`FND-34 missing → done` — `loan_extra_repayments`: the link table for a repayment outside the
+schedule.
+
+Requisitioned by `28-S1`.
+
+### Owned paths
+
+- `src/server/db/schema.ts` — edit
+- `drizzle/0006_loans.sql` — new (generated)
+
+### Data and migration
+
+The full column list, the enums and the four indexes are specified by `28-loans.md` → `28-S1` →
+_Data and migration_, and this stage implements that requirement without amending it. Three points
+are restated here because they are schema decisions rather than feature ones:
+
+- **`annual_rate_e10` reuses the integer-scaled-by-10^10 convention** of `exchange_rates`. It is not
+  an exchange rate and it never resolves through the rate tables — it is scaled that way so this
+  schema carries one scaling convention for a fraction and not two (`docs/MONEY.md` §2.1).
+- **`loan_instalments` carries `status <> 'paid' or settled_transaction_id is not null`**, the same
+  evidence `CHECK` as `recurring_periods`. Both tables answer "was this paid", and a claim without a
+  row to point at is how a schedule quietly stops describing reality.
+- **`loan_extra_repayments` holds no amount.** It is `(organization_id, loan_id, transaction_id)`
+  and a timestamp; the amount lives on the transaction. A second copy of an amount is a second
+  ledger.
+
+Enums added: `LOAN_STATUSES`, `LOAN_REPAYMENT_SHAPES` and `LOAN_PAYMENT_FREQUENCIES`, the last one a
+narrowing of `RECURRING_FREQUENCIES` to the four that divide a year exactly. It is declared as a
+subset of that array rather than a new literal list, so a frequency added to the recurring
+vocabulary cannot silently fail to appear here.
+
+Migration `drizzle/0006_loans.sql`, additive, backfilling nothing. Three new tables and no change to
+an existing one, so `docs/DEPLOY.md` §5's non-additive register is unchanged and the previous
+Worker's SQL keeps working against the new schema.
+
+### Server (repo, server function, Zod)
+
+None. The repository is `28-S1`'s.
+
+### UI (route, components)
+
+None.
+
+### Quota
+
+No countable row is created by this stage. The `loans` metric that `28-S1` asserts is a catalogue
+and resolver change, requisitioned there, not here.
+
+### Tenant isolation test
+
+Mechanical via `conventions.test.ts`: all three tables are tenant-scoped with `organization_id`
+leading every index, and the repository cases belong to `28-S1`.
+
+### Money invariant
+
+Three amount columns are added — `principal_minor`, `ref_principal_minor` and the instalment's
+`principal_minor`, `interest_minor` and `closing_balance_minor` — all `integer` minor units in the
+loan's own currency, with `ref_principal_minor` the single historical base-currency figure written
+once at `opened_on`'s rate (`docs/MONEY.md` §3.1). The invariant this schema must not tempt anyone
+into breaking is that **the instalment columns are a plan and never a ledger**: no report sums them
+to answer what was paid. Held by `money-invariants.test.ts` → _paid-to-date sums transactions, not
+instalments_, added by `28-S3`.
+
+### Verification
+
+- Command gate; one migration; clean diff; local apply with `pnpm db:migrate:local` against the
+  seeded database, and the applied table list read back rather than assumed.
+- No browser evidence, no axe run: no surface.
+
+### Definition of done
+
+§7 items 1–3 and 5–7. Item 4 does not apply.
 
 ### Blockers
 

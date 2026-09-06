@@ -16,7 +16,7 @@ import { ownedPathsOf, sweep } from './state.mjs'
 
 const REPO = process.env.GH_REPO ?? 'design4pro/money-tracker.online'
 const CEZ_API = process.env.CEZ_API ?? 'http://localhost:4321'
-const CEZ_PROJECT = process.env.CEZ_PROJECT ?? 'money-tracker'
+const CEZ_PROJECT = process.env.CEZ_PROJECT ?? 'money-tracker-online'
 const ZWSP = '​'
 
 const args = new Set(process.argv.slice(2))
@@ -130,6 +130,16 @@ async function loadRuns() {
     const res = await fetch(`${CEZ_API}/api/v1/p/${CEZ_PROJECT}/runs`, {
       signal: AbortSignal.timeout(5000),
     })
+    // A 404 is not a down cockpit: it is a project id this host does not know, and it costs
+    // every run-aware invariant silently, because `null` is also what an unreachable cezar
+    // returns. Say which id was asked for; `CEZ_PROJECT` is how it gets corrected.
+    if (res.status === 404) {
+      console.error(
+        `WARN: cezar does not know project '${CEZ_PROJECT}' (404). ` +
+          `Set CEZ_PROJECT to the id in GET ${CEZ_API}/api/v1/projects.`,
+      )
+      return null
+    }
     if (!res.ok) return null
     const data = await res.json()
     const list = Array.isArray(data) ? data : (data.runs ?? data.items ?? null)

@@ -80,7 +80,9 @@ describe('the credit utilisation block', () => {
   })
 
   it('names the meter with the whole sentence, verdict first once there is one', () => {
-    const resting = withI18n(<CreditUtilisation {...WITHIN} currencyCode="PLN" />)
+    const resting = withI18n(
+      <CreditUtilisation {...WITHIN} currencyCode="PLN" />,
+    )
     // The shape `e2e/accessibility.spec.ts` matches on. A meter announced as "17%" alone tells a
     // reader nothing about what is measured, or against what.
     expect(resting.getByRole('meter').getAttribute('aria-label')).toMatch(
@@ -182,7 +184,7 @@ describe('the accounts overview card', () => {
     const hero = screen
       .getByRole('heading', { name: 'Net worth' })
       .parentElement?.querySelector('p > span')
-    // `text-display` against the sub-figures' `text-subtitle`: 40px against 18px, rather than
+    // `text-display` against the sub-figures' `text-body`: 32px against 15px on a phone, rather than
     // the 28-against-20 that let the larger *number* win the first fixation.
     expect(hero?.getAttribute('class')).toContain('text-display')
 
@@ -190,7 +192,7 @@ describe('the accounts overview card', () => {
       const figure = screen
         .getByText(label)
         .parentElement?.querySelector('dd > span')
-      expect(figure?.getAttribute('class')).toContain('text-subtitle')
+      expect(figure?.getAttribute('class')).toContain('text-body')
       // Weight and colour step down with the size, so the hero wins on three channels at once.
       expect(figure?.getAttribute('class')).toContain('font-medium')
       expect(figure?.getAttribute('class')).toContain('text-ink-2')

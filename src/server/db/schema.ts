@@ -344,6 +344,71 @@ export const subscriptions = sqliteTable(
 export type SubscriptionRow = typeof subscriptions.$inferSelect
 export type SubscriptionInsert = typeof subscriptions.$inferInsert
 
+/**
+ * Lifecycle of one webhook delivery. `ignored` is a *success*: an event type this product does
+ * not act on is stored and acknowledged, because answering 4xx to an unknown type makes the
+ * provider retry it forever and eventually disable the endpoint.
+ */
+export const BILLING_EVENT_STATUSES = [
+  'received',
+  'processed',
+  'ignored',
+  'failed',
+] as const
+export type BillingEventStatus = (typeof BILLING_EVENT_STATUSES)[number]
+
+/**
+ * Every webhook Polar has delivered, keyed by **the provider's own event id**.
+ *
+ * That primary key is the whole idempotency strategy, not a convenience: providers redeliver, and
+ * a duplicate delivery must be an insert conflict handled with a 200 rather than a second
+ * application of the same state change. A subscription upgraded twice from one event is a support
+ * incident.
+ *
+ * **This is platform data, not tenant data** — it arrives before we know which workspace it
+ * belongs to, which is why `organization_id` is nullable and why the table is deliberately outside
+ * the tenant-scoped repository boundary (`docs/plans/22-billing.md`, stage `22-S1`; the boundary
+ * itself is `docs/SPEC.md` §5.2). No workspace-facing query reads it unscoped: the billing screen
+ * reads it through the one predicate in `src/server/repos/billing-events.ts` that filters on the
+ * caller's own workspace.
+ *
+ * `payload_json` is the body **as verified**, kept verbatim: a support question six weeks later is
+ * answered from what the provider actually said, not from what we mapped it to.
+ */
+export const billingEvents = sqliteTable(
+  'billing_events',
+  {
+    /** The provider's event id. Not generated here — see the docblock. */
+    id: id(),
+    type: text('type').notNull(),
+    /** Resolved from the checkout's `metadata.workspaceId`, and null until it is. */
+    organizationId: text('organization_id').references(() => organization.id, {
+      onDelete: 'set null',
+    }),
+    payloadJson: text('payload_json').notNull(),
+    /** The signature's own timestamp, kept so a replay window can be audited after the fact. */
+    signatureTs: integer('signature_ts', { mode: 'timestamp_ms' }),
+    status: text('status').notNull().default('received'),
+    /** Why processing failed, in this codebase's vocabulary. Null on every other status. */
+    errorCode: text('error_code'),
+    receivedAt: integer('received_at', { mode: 'timestamp_ms' }).notNull(),
+    processedAt: integer('processed_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    index('billing_events_organization_id_idx').on(table.organizationId),
+    index('billing_events_status_idx').on(table.status),
+    index('billing_events_received_at_idx').on(table.receivedAt),
+    enumCheck(
+      'billing_events_status_check',
+      table.status,
+      BILLING_EVENT_STATUSES,
+    ),
+  ],
+)
+
+export type BillingEventRow = typeof billingEvents.$inferSelect
+export type BillingEventInsert = typeof billingEvents.$inferInsert
+
 /* -------------------------------------------------------------------------- */
 /* Catalog — global, no organization_id                                       */
 /* -------------------------------------------------------------------------- */

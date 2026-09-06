@@ -11,9 +11,14 @@ and the two account screens.
 simplification worth naming, because it removes a whole editability matrix and the bugs that live in
 it (`00-S5`'s schema comment says the same thing at the table).
 
-Two categories are deliberately shallow in v1: `loan` and `vehicle` have no dedicated flow
-(`99-boundaries-and-blockers.md` BND-11). They are account categories with balances, and the
-amortisation product is not v1's.
+`vehicle` is deliberately absent: `ACCOUNT_CATEGORIES` has eight members and a vehicle is not one of
+them, so a car is an `other` account with a balance somebody adjusts. The depreciation flow that
+would justify its own category is deferred (`99-boundaries-and-blockers.md` BND-11).
+
+`loan` was shallow here too, and is no longer: `28-loans.md` hangs the terms, the amortisation
+schedule and the settlement of an instalment off the account row this plan ships. **Nothing in this
+plan changes** — the loan row still carries `category`, `credit_limit_minor` and a note, and plan
+`28` adds tables beside it rather than columns to it.
 
 ---
 

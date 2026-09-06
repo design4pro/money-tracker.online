@@ -131,7 +131,7 @@ test.describe('the core flow', () => {
     /* ---- And it is on the dashboard --------------------------------------- */
 
     await gotoApp(page, '/dashboard')
-    const recent = page.getByRole('region', { name: 'Latest transactions' })
+    const recent = page.getByRole('region', { name: 'Latest entries' })
     await expect(recent).toBeVisible()
     await expect(recent).toContainText(note)
   })

@@ -91,6 +91,11 @@ const ACCOUNTS: Surface = {
 }
 
 const SURFACES: readonly Surface[] = [
+  // The landing page is first because it is the only surface most visitors ever load, and
+  // because its own copy now states that WCAG 2.2 AA is enforced by a gate that fails the build.
+  // A page making that claim while sitting outside the gate would be the one accessibility
+  // falsehood this product cannot afford.
+  { name: 'landing', path: '/', session: undefined },
   { name: 'sign in', path: '/login', session: undefined },
   { name: 'dashboard', path: '/dashboard', session: 'demo' },
   ACCOUNTS,

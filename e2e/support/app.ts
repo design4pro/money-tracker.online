@@ -69,7 +69,7 @@ export const LABELS: Readonly<Record<AppLocale, UiLabels>> = {
     newAccount: 'Nowe konto',
     accountName: 'Nazwa konta',
     currency: 'Waluta',
-    openingBalance: 'Saldo początkowe',
+    openingBalance: 'Stan początkowy',
     create: 'Utwórz',
     amount: 'Kwota',
     account: 'Konto',

@@ -126,10 +126,12 @@ addition so far (ADR 0015); a `### Blockers` row is still how a stage reports ne
 
 Owned by `DESIGN.md`; this section states only what other sections must not contradict.
 
-Cool paper, near-black ink, one deep teal brand, tabular figures everywhere. The palette is designed
-to a **7:1 contrast floor on text** in both themes, with two named exceptions (disabled control text;
-non-text chart gridlines at 3:1). Four reserved amount hues (`income`, `expense`, `transfer`,
-`planned`) that may never be used decoratively. An eight-hue categorical series palette that is
+Off-white form paper ruled at 2.5rem, near-black typed ink, headings and margin notes by hand, one
+violet stamp brand, tabular figures everywhere. The palette is designed to a **7:1 contrast floor on
+text** in both themes, with two named exceptions (disabled control text; non-text chart gridlines at
+3:1). Four reserved amount tones (`income`, `expense`, `transfer`, `planned`) that may never be
+used decoratively; `planned` is pencil - the secondary ink with the word beside it - and never the
+stamp colour, which is spent only on what is settled. An eight-hue categorical series palette that is
 **never the sole channel of information**, for a measured reason: two series can both clear 7:1
 against the surface while measuring 1.00:1 against each other.
 
@@ -160,9 +162,15 @@ index**. All SQL lives in `src/server/repos` and goes through the tenant-scoped 
 which appends the tenant predicate from a `TenantScope`. Callers may add predicates; they cannot
 remove that one. Forgetting the tenant filter is not expressible.
 
-`src/server/catalog` is the **single stated exception** — global tables with no `organization_id`
+`src/server/catalog` is the **first stated exception** — global tables with no `organization_id`
 (currencies, exchange rates, brand logos) — guarded instead by `requirePermission` plus a
 `platform_audit_log` write.
+
+`billing_events` is the **second and last** (`docs/plans/22-billing.md`, stage `22-S1`): a webhook
+delivery arrives before we know which workspace it belongs to, so its `organization_id` is nullable
+and the two writes that record and close a delivery take a bare `Database`. They are reachable only
+from the webhook endpoint and its queue handler, never from a server function; the one read a
+workspace can reach goes through `tenantFilter` like every other read in the directory.
 
 `assertScopedWrite` throws when a write composes to an empty predicate list. Transaction reads and
 writes additionally require **explicit policies** — planned, balance-adjustment, transfer and
@@ -178,11 +186,17 @@ never mixed, never compared, and never resolved by one helper.
 
 ### 5.4 Billing surface
 
-`src/lib/plans.ts` is an isomorphic catalogue with no bindings. `resolveLimits()` is the single
-authority: does the row entitle at all → which plan → catalogue limits → **row ceilings win** (so
-grandfathering is possible). `assertWithinLimit()` is the only enforcement point and it is called
-**inside the repository, before the write**. The published number is the enforced number, and a test
-fails when a catalogue metric has no resolver entry.
+`src/lib/plans.ts` is an isomorphic catalogue with no bindings. `resolveLimits()`
+(`src/server/billing/resolve-limits.ts`) is the single authority: does the row entitle at all →
+which plan → catalogue limits → **row ceilings win** (so grandfathering is possible).
+`assertWithinLimit()` is the only enforcement point and it is called **inside the repository,
+before the write**. The published number is the enforced number, and a test fails when a catalogue
+metric has no resolver entry.
+
+The resolver is installed into the repository seam once per isolate, by the Worker entry's
+`import './billing/install'`. Without that import the seam keeps its permissive default and every
+quota in the product is silently unenforced, which is why the import is a side-effect import beside
+`./ledger` rather than a call somewhere in a request path.
 
 ### 5.5 The money and FX contract
 

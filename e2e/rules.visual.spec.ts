@@ -105,15 +105,15 @@ const LABELS: Readonly<Record<AppLocale, RuleLabels>> = {
     directionOption: 'Direction',
     moveUp: 'Move up',
     moveBottom: 'Move to the bottom',
-    countsFragment: /of the last .* transactions match/i,
+    countsFragment: /of the last .* entries match/i,
     emptyFragment: /no matches in the last/i,
   },
   pl: {
-    title: 'Reguły',
-    list: 'Reguły w kolejności działania',
-    newRule: 'Nowa reguła',
-    newTitle: 'Nowa reguła',
-    sentenceLabel: 'Co robi ta reguła',
+    title: 'Zasady',
+    list: 'Zasady w kolejności działania',
+    newRule: 'Nowa zasada',
+    newTitle: 'Nowa zasada',
+    sentenceLabel: 'Co robi ta zasada',
     preview: 'Podgląd',
     field: 'Pole',
     keywords: 'Słowa kluczowe',
@@ -122,7 +122,7 @@ const LABELS: Readonly<Record<AppLocale, RuleLabels>> = {
     directionOption: 'Kierunek',
     moveUp: 'Przenieś wyżej',
     moveBottom: 'Przenieś na dół',
-    countsFragment: /z ostatnich .* transakcji/i,
+    countsFragment: /z ostatnich .* wpisów/i,
     emptyFragment: /brak dopasowań/i,
   },
 }
@@ -256,7 +256,7 @@ test('the preview states both counts, never a bare number of matches', async ({
   await expect(status).toHaveText(labels.countsFragment, { timeout: 15_000 })
 
   // Both halves, explicitly. A denominator with no numerator would satisfy a looser regex, and
-  // "12 transactions match" is exactly the sentence this stage exists to not ship.
+  // "12 entries match" is exactly the sentence this stage exists to not ship.
   const text = await status.innerText()
   // `\u00A0` is written as an escape rather than typed: a Polish thousands separator is a
   // non-breaking space, and a literal one in source is invisible to the next reader.

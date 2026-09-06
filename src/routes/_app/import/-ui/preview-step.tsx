@@ -315,7 +315,7 @@ export function PreviewStep({
                     id={row.rowIndex}
                     className={
                       row.flagged
-                        ? 'shadow-[inset_3px_0_0_0_var(--color-warning)] max-md:grid max-md:gap-2 max-md:py-3'
+                        ? 'shadow-[inset_0_0_0_1px_var(--color-warning)] max-md:grid max-md:gap-2 max-md:py-3'
                         : 'max-md:grid max-md:gap-2 max-md:py-3'
                     }
                   >

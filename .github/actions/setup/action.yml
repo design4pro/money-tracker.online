@@ -22,7 +22,7 @@ runs:
     # behaviour we want: one pnpm version resolves the lockfile, and CI must be
     # using the one the lockfile was written by.
     - name: Set up pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v6
       with:
         version: 10.15.0
 
@@ -32,7 +32,7 @@ runs:
     # seconds and is deliberately not cached, so a corrupted tree can never be
     # restored from a previous run.
     - name: Set up Node
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: 24.x
         cache: pnpm

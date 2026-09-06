@@ -69,7 +69,7 @@ export function RecentTransactionsWidget({
     <div className="flex flex-col gap-3">
       <ul
         role="list"
-        className="grid list-none grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4"
+        className="grid list-none grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3"
       >
         {transactions.map((entry) => (
           <li
@@ -78,7 +78,7 @@ export function RecentTransactionsWidget({
           >
             <div className="min-w-0">
               <p className="truncate text-body text-ink">{entry.title}</p>
-              <p className="text-caption tabular text-ink-2">
+              <p className="text-caption whitespace-nowrap tabular text-ink-2">
                 {formatCalendarDate(locale, entry.bookedOn)}
               </p>
             </div>
