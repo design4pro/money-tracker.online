@@ -91,6 +91,7 @@ claude-code-action.
 | `cez-claim.sh`                                  | workflow `implement-ticket` (claim) | per-issue lock, refresh onto `origin/develop`, one-call preflight (open, `run: implement`, `ready`/`needs-human`, leaf, no open blocker, no open agent PR); a refusal drops `run:` and comments `refused`; a claim swaps to `in-progress` and adopts a clean `claude/issue-<n>-*` branch |
 | `cez-handback.sh [--blocked --reason]`          | agent (allowlist)                   | green: push `claude/issue-<n>-<run8>`, draft PR `agent-pr`, `status: review`, `CEZ:PR=<n>`; blocked: WIP pushed, digest, `status: needs-human`; protected paths or `package.json` scripts never push; frees the port                                                                     |
 | `cez-automations.sh [--dry-run]`                | operator                            | registers `docs/agents/cezar-automations.json` with the running cezar over its API (create enabled or update in place)                                                                                                                                                                   |
+| `cez-prompt-templates.sh [--dry-run]`           | operator                            | replaces the cockpit's `promptTemplates` with `docs/agents/cezar-prompt-templates.json` over the same API; every other ui-state key is left alone                                                                                                                                        |
 | `cez-triage-claim.sh`                           | workflow `triage` (claim)           | per-issue lock, refresh onto `origin/develop`, preflight (open, leaf, not held, not in review); without `run: triage` only `status: triage` without the `<!-- agent-triage -->` marker qualifies, and a stand-down writes nothing                                                        |
 | `triage-apply.sh [--check]`                     | agent (allowlist)                   | the only writer of a verdict: `.agent/triage.json` + `triage/notes.md` (+ `triage/brief.md`, a `ticket/v2` body, for `promoted`) → the `<!-- agent-triage -->` comment, the brief into the body, `status: ready \| needs-info \| backlog \| needs-human`; never closes                   |
 | `triage-batch.sh [--limit N] [--dry-run]`       | operator                            | adds `run: triage` to the oldest `status: triage` issues that lack it, N at a time                                                                                                                                                                                                       |
@@ -107,6 +108,51 @@ claude-code-action.
 
 Everything under `scripts/agent/__tests__/` runs in the `tooling` vitest project (`pnpm test`), which
 is what keeps the claim preflight, the label decisions, the ladder shape and the hooks honest.
+
+## Prompt templates
+
+A run is started from the GitHub tab as **issue → "Hand this to the agent" → a workflow, skills, a
+prompt**. The prompt box is not empty: the cockpit pre-fills it with the item's reference block -
+`Fix GitHub issue #<n>: <title>` and the URL - and the **templates** dropdown beside it inserts a
+snippet at the caret, separated by a blank line. A template therefore _extends_ the reference, it
+never replaces it, and the composed text is what reaches the workflow's `{{task}}`.
+
+That is how a `plan` run is told which mode to run. `/plan-feature` reads the issue from the first
+integer and the mode from the word `spec`, `prd` or `tickets` anywhere in its arguments; with the
+pre-filled box alone there is no such word, so the skill falls back to inferring the mode from the
+issue body's `<!-- schema: … -->` marker. That inference is right most of the time and silent when
+it is not - which is why the three templates exist and why each one names exactly one mode.
+
+| Template         | What it inserts                                     |
+| ---------------- | --------------------------------------------------- |
+| `plan · spec`    | `Plan mode: spec.` plus the stop-at-review reminder |
+| `plan · prd`     | `Plan mode: prd.` plus the same                     |
+| `plan · tickets` | `Plan mode: tickets.` plus the same                 |
+
+`triage` and `implement-ticket` need no template: both skills take the issue and nothing else, and a
+template restating what the skill already does is one more thing to keep in sync.
+
+**Where they live, and why they are seeded rather than committed.** Templates are cockpit UI state,
+not repository configuration: the cockpit keeps them in `.ai/cezar/ui-state.json` under
+`promptTemplates`, beside personal preferences (appearance, the last-used source, skill usage) it
+rewrites on nearly every interaction. So that file is **gitignored**, the tracked source of truth is
+`docs/agents/cezar-prompt-templates.json`, and `scripts/agent/cez-prompt-templates.sh` pushes it to
+the running cockpit the way `cez-automations.sh` pushes the automations:
+
+```bash
+scripts/agent/cez-prompt-templates.sh --dry-run   # what would change
+scripts/agent/cez-prompt-templates.sh             # PUT it
+```
+
+The PUT replaces the whole `promptTemplates` list and merges shallowly at the top level, so a
+template deleted from the file disappears from the dropdown and nothing else in ui-state is touched.
+Editing the list in **Settings → Prompt templates** works too and is what a quick experiment should
+use - but the cockpit is then ahead of the repository, and the next run of this script overwrites it.
+`scripts/agent/__tests__/prompt-templates.test.ts` holds the bounds and the one-mode-per-template
+rule, because a template naming two modes fails nowhere: the skill picks one on its own and the run
+publishes the wrong artefact to a real issue.
+
+---
 
 ## Workflow `plan`
 

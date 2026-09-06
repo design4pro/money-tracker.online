@@ -1,0 +1,17 @@
+[
+  {
+    "id": "plan-spec",
+    "label": "plan · spec",
+    "text": "Plan mode: spec. Grill me one question per round, log every round, and stop at status: review — publish through publish-spec.sh and write nothing to GitHub yourself."
+  },
+  {
+    "id": "plan-prd",
+    "label": "plan · prd",
+    "text": "Plan mode: prd. Grill me one question per round, log every round, and stop at status: review — publish through publish-prd.sh and write nothing to GitHub yourself."
+  },
+  {
+    "id": "plan-tickets",
+    "label": "plan · tickets",
+    "text": "Plan mode: tickets. Grill me one question per round, log every round, and stop at status: review — publish through publish-tickets.sh and write nothing to GitHub yourself."
+  }
+]
