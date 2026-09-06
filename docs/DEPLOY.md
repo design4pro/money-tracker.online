@@ -339,15 +339,26 @@ webhooks", not like an access-control problem.
 
 Create, in the production organization and again in the sandbox organization:
 
-| Product             | Plan        | Interval |
-| ------------------- | ----------- | -------- |
-| Plus — monthly      | `plus`      | monthly  |
-| Plus — yearly       | `plus`      | yearly   |
-| Household — monthly | `household` | monthly  |
-| Household — yearly  | `household` | yearly   |
+| Product             | Plan        | Interval | Price (EUR) |
+| ------------------- | ----------- | -------- | ----------- |
+| Plus — monthly      | `plus`      | monthly  | 3.99        |
+| Plus — yearly       | `plus`      | yearly   | 39.00       |
+| Household — monthly | `household` | monthly  | 6.99        |
+| Household — yearly  | `household` | yearly   | 69.00       |
 
 Their UUIDs become the four `VITE_POLAR_PRODUCT_*` values of §10. **Sandbox and production ids never
 match**; keeping two sets straight is what `POLAR_SERVER` exists for.
+
+Three properties of each product are load-bearing rather than cosmetic, and both organizations carry
+them identically so that a sandbox walk says something about production:
+
+- **One fixed price, in EUR, and no second currency.** The plan card renders the catalogue's EUR
+  amount, so a USD price beside it charges one figure while the screen states another. The amounts
+  are `src/lib/plans.ts`'s and nothing else may restate them.
+- **Not seat-based.** `subscriptionStateFrom` stores `seats: 1` and reads `amount`; a per-seat price
+  would be recorded as something nobody was charged. The household ceiling of six people is enforced
+  by `assertWithinLimit`, not billed per seat.
+- **A 14-day trial.** `trialing` entitles (§9.4), and the billing screen has its own state for it.
 
 ### 9.2 The webhook
 
@@ -406,16 +417,16 @@ Hand-rolled `fetch` + WebCrypto, never the SDK. `POLAR_MAX_RETRIES = 2`,
 Eight rows. **Not one is green.** Walk them on staging against the sandbox organization before
 production takes a card, and tick them here.
 
-| #   | Scenario                   | Expected                                                                       | Walked |
-| --- | -------------------------- | ------------------------------------------------------------------------------ | ------ |
-| 1   | Subscribe to Plus monthly  | Checkout completes; `subscriptions` row `active`; entitlements flip within 60s | ☐      |
-| 2   | Upgrade Plus → Household   | Proration as Polar computes it; `seats` ceiling rises; no double charge        | ☐      |
-| 3   | Downgrade Household → Plus | `pending_plan` set with `pending_effective_at`; current period unchanged       | ☐      |
-| 4   | Cancel at period end       | `cancel_at_period_end = true`; access holds until `current_period_end`         | ☐      |
-| 5   | Resume before period end   | Cancellation cleared; no new charge                                            | ☐      |
-| 6   | Failed payment             | Status `past_due`; **access retained**; the dunning notification is sent       | ☐      |
-| 7   | Orders list renders        | Invoices listed with amounts in the subscription's own currency                | ☐      |
-| 8   | Customer Portal round trip | Portal opens for the right customer and returns to the app                     | ☐      |
+| #   | Scenario                   | Expected                                                                                                                                                              | Walked |
+| --- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | Subscribe to Plus monthly  | Checkout completes; `subscriptions` row `trialing` (the products carry a 14-day trial, §9.1), then `active` when it converts; entitlements flip within 60s either way | ☐      |
+| 2   | Upgrade Plus → Household   | Proration as Polar computes it; `seats` ceiling rises; no double charge                                                                                               | ☐      |
+| 3   | Downgrade Household → Plus | `pending_plan` set with `pending_effective_at`; current period unchanged                                                                                              | ☐      |
+| 4   | Cancel at period end       | `cancel_at_period_end = true`; access holds until `current_period_end`                                                                                                | ☐      |
+| 5   | Resume before period end   | Cancellation cleared; no new charge                                                                                                                                   | ☐      |
+| 6   | Failed payment             | Status `past_due`; **access retained**; the dunning notification is sent                                                                                              | ☐      |
+| 7   | Orders list renders        | Invoices listed with amounts in the subscription's own currency                                                                                                       | ☐      |
+| 8   | Customer Portal round trip | Portal opens for the right customer and returns to the app                                                                                                            | ☐      |
 
 ---
 
