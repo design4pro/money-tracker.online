@@ -86,7 +86,7 @@ describe('RolloverLedger', () => {
       <RolloverLedger rows={[ledgerRow()]} policy="none" currencyCode="PLN" />,
     )
 
-    const region = screen.getByRole('region', { name: 'Rollover ledger' })
+    const region = screen.getByRole('region', { name: 'Rollover history' })
     expect(region.className).toContain('overflow-x-auto')
     // A scroll container a keyboard cannot reach hides its off-screen columns from anybody
     // without a pointer (WCAG 2.1.1).

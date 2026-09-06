@@ -60,7 +60,7 @@ validation.
 
 ---
 
-## The thirty-two files
+## The thirty-three files
 
 Every authored file in this directory is listed here. There are no others, and nothing outside this
 list may be added without amending this table first. One file sits beside the table rather than in
@@ -99,6 +99,7 @@ from this table and from the filename scheme.
 | `25-marketing.md`                 | Landing, pricing, features, security, changelog and legal — EN and PL, SSR, SEO, OG images                          |
 | `26-onboarding.md`                | The guided first run and the empty states across the app                                                            |
 | `27-pwa-and-mobile.md`            | The installable shell, the offline entry queue, the mobile keypad, the designed 360px layouts                       |
+| `28-loans.md`                     | The loan model, the integer amortisation engine, the schedule, settlement against a transaction, extra repayments   |
 | `98-verification-protocol.md`     | **Protocol.** What a stage executes and what it leaves behind. Owns the evidence format; plans no feature           |
 | `99-boundaries-and-blockers.md`   | **Boundary.** Where a dropped row goes and why. Carries no build work                                               |
 
@@ -127,7 +128,7 @@ point at a feature owned by another.
 | 06   | `ACCT` | 16   | `CHART` | 26   | `ONB`   |
 | 07   | `TXN`  | 17   | `ANL`   | 27   | `PWA`   |
 | 08   | `CLS`  | 18   | `DASH`  |      |         |
-| 09   | `BAL`  | 19   | `IMP`   |      |         |
+| 09   | `BAL`  | 19   | `IMP`   | 28   | `LOAN`  |
 
 A row is closed by **exactly one stage**. A row that is only partly addressed says which behaviour is
 deferred and to which stage id.
@@ -168,6 +169,7 @@ Read it as: _this plan's stages may start once every wave above it is closed._
 | 6    | 25  | `25-marketing.md`                 | Landing, pricing, features, security, changelog, legal                  | 01, 02, 22         |
 | 6    | 26  | `26-onboarding.md`                | The guided first run and empty states                                   | 06, 07, 12, 19     |
 | 6    | 27  | `27-pwa-and-mobile.md`            | Installable shell, offline queue, mobile keypad, 360px layouts          | 01, 07             |
+| 7    | 28  | `28-loans.md`                     | Loans: the amortisation engine, the schedule, settlement, payoff        | 06, 07, 13, 21, 22 |
 
 **Not plans:** `98-verification-protocol.md` owns the evidence format and carries no row;
 `99-boundaries-and-blockers.md` is where dropped rows go.
@@ -185,6 +187,13 @@ missing edge:
 - **`27-pwa-and-mobile.md` is wave 6**, not wave 2 with transactions, because the offline entry queue
   needs the final shape of the transaction write path and the 360px layouts need every surface that
   has to fit into them.
+- **`28-loans.md` enters at wave 7 and its stages span waves 7 to 10**, which is the only plan in
+  this set that spans more than two. It is post-v1 work on a v1 codebase, so nothing in it can share
+  a wave with what it depends on: `00-S17` lands the tables (wave 7), `28-S1` the engine and the
+  repository that need them (wave 8), `28-S2` and `28-S3` the two screens that need the engine
+  (wave 9, disjoint from each other), and `28-S4` the payoff work that edits the detail route
+  `28-S3` owns (wave 10). The wave column above records where the plan **opens**; the stage ids
+  record the rest.
 
 ---
 
@@ -261,7 +270,7 @@ Commits: Conventional Commits in English, agent runs included. There is no agent
 
 The register states its completeness claim once, here, so no plan has to carry it:
 
-- Plans `00`–`27` plan the **in-scope surface** of `PRODUCT.md` → _Capabilities_, area by area.
+- Plans `00`–`28` plan the **in-scope surface** of `PRODUCT.md` → _Capabilities_, area by area.
 - `99-boundaries-and-blockers.md` **bounds** everything `PRODUCT.md` → _Out of scope_ names, each
   with a recorded disposition and, where one exists, a named alternative.
 - `98-verification-protocol.md` is **protocol**: it owns how every stage proves itself and plans no

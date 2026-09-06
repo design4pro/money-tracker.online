@@ -44,7 +44,7 @@ const SITE_NAME = 'money-tracker.online'
  */
 const FALLBACK_TITLE = 'Money Tracker — know where your money goes'
 const FALLBACK_DESCRIPTION =
-  'A personal finance tracker for accounts, transactions, budgets, recurring bills and multi-currency reporting. Manual entry and file import only — no bank connectors, ever.'
+  'A household budget: accounts, spending, category limits, recurring bills and several currencies at once. You type it in or load a file yourself, and we never connect to your bank.'
 
 /** The brand mark, inlined so the tab icon costs no request and never 404s. */
 const FAVICON_SVG =

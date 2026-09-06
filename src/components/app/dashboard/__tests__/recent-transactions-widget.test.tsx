@@ -92,7 +92,7 @@ describe('RecentTransactionsWidget', () => {
     expect(screen.getByText('Nothing recorded yet')).toBeTruthy()
     expect(
       screen
-        .getByRole('link', { name: 'Record a transaction' })
+        .getByRole('link', { name: 'Record an expense' })
         .getAttribute('href'),
     ).toBe('/transactions')
   })

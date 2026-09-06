@@ -77,7 +77,7 @@ interface SplitLabels {
 
 const LABELS: Readonly<Record<AppLocale, SplitLabels>> = {
   en: {
-    panel: 'Split this transaction',
+    panel: 'Split this expense',
     lines: 'Split lines',
     addLine: 'Add a line',
     amount: 'Amount',
@@ -87,7 +87,7 @@ const LABELS: Readonly<Record<AppLocale, SplitLabels>> = {
     remainingFragment: /left to assign/i,
   },
   pl: {
-    panel: 'Podziel tę transakcję',
+    panel: 'Podziel ten wydatek',
     lines: 'Wiersze podziału',
     addLine: 'Dodaj wiersz',
     amount: 'Kwota',
