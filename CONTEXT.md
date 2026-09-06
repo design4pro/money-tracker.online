@@ -88,6 +88,25 @@ already caused, or would obviously cause, two people to mean two things by one w
   interchangeably in one document; "filter".
 - **Goal** — a savings target with an amount, an optional date, and contributions linked to real
   transactions. _Avoid_: "goal" for a budget.
+- **Loan** — a borrowing drawn on one account of the `loan` category, with a principal, a nominal
+  annual interest rate, a term, a payment frequency and a repayment shape. It is `active`,
+  `settled` (repaid) or `closed`. The account holds the balance; the loan holds the terms. _Avoid_:
+  "loan" for the account it is drawn on; "debt" and "loan" used interchangeably in one document;
+  "loan" for money the workspace lent to somebody else, which this product does not model.
+- **Instalment** — one row of a loan's schedule: a due date, the part of the payment that reduces
+  the principal, the part that is interest, and the balance left after it. It is upcoming, paid or
+  overdue, and it is **paid only by pointing at a transaction**. Overdue is derived from the due
+  date, never stored. _Avoid_: "instalment" for a recurring period, which is a different table and
+  a different feature; "payment" for the planned row when the real transaction is meant.
+- **Interest rate** — the nominal annual rate of a loan, stored as an integer scaled by 10^10, and
+  divided by the number of payments in a year to get one period's rate. It is not an exchange
+  **rate** and never resolves through the rate tables; it shares only the scaling convention.
+  _Avoid_: "rate" without saying which of the two; "APR", which is a different, regulated figure
+  this product does not compute.
+- **Extra repayment** — a transaction repaying a loan outside its schedule. It shortens the term or
+  lowers the remaining instalments, at the person's choice, and it rewrites only the unpaid tail of
+  the schedule. _Avoid_: "overpayment" for a payment that merely exceeded one instalment, which is
+  a variance on that instalment and not this.
 - **Import batch** — one file's journey from upload through parse, mapping, duplicate detection,
   preview and execution, with a per-row error register and a revert. _Avoid_: "sync"; "connection".
 - **Duplicate** — a candidate transaction whose account, date, amount and normalised payee match an

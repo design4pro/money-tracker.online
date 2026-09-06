@@ -73,12 +73,20 @@ Precondition to unblock: a decided answer to `PRODUCT.md` → _Undecided_ → _h
 granularity_, and a design for how a scoped member's net-worth figure is described on screen.
 Plan `04` ships the membership model that v2 would extend; nothing in it forecloses this.
 
-### BND-11 — `loan` and `vehicle` dedicated account flows
+### BND-11 — `vehicle` dedicated account flows
 
-**defer.** `loan` survives as an account **category** with a balance and a credit limit; the
-dedicated flow — amortisation schedule, principal/interest split per payment, payoff projection —
-is a small product of its own and would be plan `28`. Nothing in plan `06` blocks it: the account
-row already carries `category`, `credit_limit_minor` and a note.
+**defer.** A vehicle whose value declines on a modelled curve, with manual overrides recorded as
+history rather than overwriting, is a real component of a net-worth figure that otherwise has to be
+maintained by hand through repeated balance adjustments. It is still not v1's: it needs a valuation
+model, a curve the person can argue with, and an override history, and none of those has an owner.
+Nothing in plan `06` blocks it — the account row already carries `category` and a note.
+
+**The `loan` half of this entry was lifted on 2026-09-05** by the product owner, who asked for loan
+management as a feature rather than an account category. It is now planned as `28-loans.md`, with
+its schema requisitioned as `00-S17`, and it is no longer a boundary. `PRODUCT.md` → _Capabilities_
+carries the scope change and `docs/agents/parity.md` → gap 10 records that its register line moved.
+This paragraph stays because a lifted deferral that leaves no trace reads, six months later, like
+a boundary nobody ever set.
 
 ### BND-12 — XLSX import and export
 
