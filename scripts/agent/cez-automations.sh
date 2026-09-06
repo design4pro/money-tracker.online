@@ -9,7 +9,7 @@
 set -euo pipefail
 . "$(dirname "$0")/cez-lib.sh"
 
-API="${CEZ_API:-http://localhost:4321}/api/v1/p/${CEZ_PROJECT:-money-tracker}/automations"
+API="${CEZ_API:-http://localhost:4321}/api/v1/p/${CEZ_PROJECT:-money-tracker-online}/automations"
 # The checkout this script lives in, not the main one: the worktree that carries the definitions.
 FILE="$(cd "$(dirname "$0")/../.." && pwd)/docs/agents/cezar-automations.json"
 DRY=0
