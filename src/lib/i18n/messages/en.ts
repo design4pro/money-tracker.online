@@ -1275,6 +1275,8 @@ const messages = {
     'Example rows. Nothing here comes from a real account.',
   'marketing.ledger.col.balance': 'Balance after',
   'marketing.ledger.opening': 'Carried over from February',
+  'marketing.ledger.closing': 'Carried forward to April',
+  'marketing.ledger.settled': 'Settled',
   'marketing.ledger.note': 'Every line, and what is left after it.',
   'marketing.ledger.figure.label': 'Held in zloty',
   'marketing.ledger.figure.caption':
@@ -1316,14 +1318,20 @@ const messages = {
   'marketing.scope.recurring': 'Recurring series, savings goals, and rules',
   'marketing.scope.currency':
     'A currency set per household, one base currency, rates per day',
-  'marketing.scope.reports':
-    'Cash flow, net worth, spending by category, and a pivot report',
   'marketing.scope.dashboard':
-    'A dashboard grid you rearrange by dragging or by keyboard',
+    'A dashboard of cash flow, net worth and spending by category, for the period you pick',
   'marketing.scope.data':
-    'CSV, OFX and QIF import; JSON and CSV export; a full backup',
+    'CSV, OFX and QIF import, checked in a preview before anything is written',
   'marketing.scope.household':
     'A household of two to six people on one set of figures',
+  // Planned, not built. Written in pencil on the page (see SCOPE in `src/routes/index.tsx`);
+  // an entry moves up into the list above only once a visitor can open it.
+  'marketing.scope.plannedLabel': 'Planned',
+  'marketing.scope.planned.pivot':
+    'A configurable pivot report and an annual overview',
+  'marketing.scope.planned.reorder':
+    'Rearranging the dashboard by dragging or by keyboard',
+  'marketing.scope.planned.export': 'JSON and CSV export, and a full backup',
 
   'marketing.never.title': 'What it will never be',
   'marketing.never.connectors.title': 'A bank connection',

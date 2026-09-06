@@ -1,3 +1,15 @@
 {
-  "buildPath": "code"
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "#000",
+        "createdAt": "2026-09-06T15:11:16.446Z",
+        "reason": "Claude: #000 is a mask-image gradient stop in src/routes/index.tsx, where only alpha is read; not a palette colour"
+      }
+    ]
+  }
 }

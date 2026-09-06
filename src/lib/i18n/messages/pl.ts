@@ -1302,6 +1302,8 @@ const messages = {
     'Wiersze przykładowe. Nic tutaj nie pochodzi z prawdziwego konta.',
   'marketing.ledger.col.balance': 'Stan po zapisie',
   'marketing.ledger.opening': 'Przeniesione z lutego',
+  'marketing.ledger.closing': 'Do przeniesienia na kwiecień',
+  'marketing.ledger.settled': 'Rozliczono',
   'marketing.ledger.note': 'Każdy zapis i to, co po nim zostaje.',
   'marketing.ledger.figure.label': 'Trzymane w złotych',
   'marketing.ledger.figure.caption':
@@ -1344,14 +1346,19 @@ const messages = {
     'Płatności cykliczne, cele oszczędnościowe i zasady',
   'marketing.scope.currency':
     'Zestaw walut na dom, jedna waluta główna, kursy na każdy dzień',
-  'marketing.scope.reports':
-    'Przepływy, wartość netto, wydatki według kategorii i tabela przestawna',
   'marketing.scope.dashboard':
-    'Siatka pulpitu, którą przestawiasz myszą albo z klawiatury',
+    'Pulpit z przepływami, wartością netto i wydatkami według kategorii, za wybrany okres',
   'marketing.scope.data':
-    'Import CSV, OFX i QIF, eksport JSON i CSV, pełna kopia zapasowa',
+    'Import CSV, OFX i QIF, sprawdzany w podglądzie, zanim cokolwiek zostanie zapisane',
   'marketing.scope.household':
     'Dom liczący od dwóch do sześciu osób na jednym zestawie liczb',
+  'marketing.scope.plannedLabel': 'W planach',
+  'marketing.scope.planned.pivot':
+    'Konfigurowalna tabela przestawna i przegląd roczny',
+  'marketing.scope.planned.reorder':
+    'Przestawianie pulpitu myszą albo z klawiatury',
+  'marketing.scope.planned.export':
+    'Eksport JSON i CSV oraz pełna kopia zapasowa',
 
   'marketing.never.title': 'Czym nigdy nie będzie',
   'marketing.never.connectors.title': 'Połączeniem z bankiem',

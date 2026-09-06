@@ -164,19 +164,37 @@ const ANSWERS: ReadonlyArray<Passage> = [
   },
 ]
 
-/** The scope list. Deliberately dense and deliberately not a grid of cards. */
-const SCOPE: ReadonlyArray<MessageKey> = [
-  'marketing.scope.accounts',
-  'marketing.scope.transactions',
-  'marketing.scope.classification',
-  'marketing.scope.budgets',
-  'marketing.scope.recurring',
-  'marketing.scope.currency',
-  'marketing.scope.reports',
-  'marketing.scope.dashboard',
-  'marketing.scope.data',
-  'marketing.scope.household',
+/**
+ * The scope list. Deliberately dense and deliberately not a grid of cards.
+ *
+ * Every entry names something a visitor can open today. The three that are planned but not yet
+ * built are written the way the passbook writes a planned line - in the pencil ink, with the word
+ * beside them - and they sit last, so the page never claims a capability the product does not
+ * hold. When one of them ships, drop the flag; when a new one is promised, it lands here as
+ * planned, never as booked.
+ */
+interface ScopeEntry {
+  readonly key: MessageKey
+  readonly isPlanned?: boolean
+}
+
+const SCOPE: ReadonlyArray<ScopeEntry> = [
+  { key: 'marketing.scope.accounts' },
+  { key: 'marketing.scope.transactions' },
+  { key: 'marketing.scope.classification' },
+  { key: 'marketing.scope.budgets' },
+  { key: 'marketing.scope.recurring' },
+  { key: 'marketing.scope.currency' },
+  { key: 'marketing.scope.dashboard' },
+  { key: 'marketing.scope.data' },
+  { key: 'marketing.scope.household' },
+  { key: 'marketing.scope.planned.pivot', isPlanned: true },
+  { key: 'marketing.scope.planned.reorder', isPlanned: true },
+  { key: 'marketing.scope.planned.export', isPlanned: true },
 ]
+
+/** The same separator the ledger types between a payee and its category. */
+const SCOPE_SEPARATOR = ' · '
 
 /** A heading over a body. Used by the two bands that are prose rather than product. */
 interface Passage {
@@ -539,12 +557,23 @@ function LandingPage() {
               {/* Two flowing columns rather than a grid: the entries are of very different
                   lengths and a grid would rule ten boxes of ten different heights. */}
               <ul className="mt-6 sm:columns-2 sm:gap-x-10">
-                {SCOPE.map((key) => (
+                {SCOPE.map(({ key, isPlanned = false }) => (
                   <li
                     key={key}
-                    className="break-inside-avoid border-t border-border-panel py-3 text-body text-ink"
+                    className={cn(
+                      'break-inside-avoid border-t border-border-panel py-3 text-body',
+                      // The Pencil Rule: a planned line is the second ink and the word beside it
+                      // is the channel. The grey only agrees; the word is what a reader hears.
+                      isPlanned ? 'text-ink-2' : 'text-ink',
+                    )}
                   >
                     {t(key)}
+                    {isPlanned ? (
+                      <span className="text-caption">
+                        {SCOPE_SEPARATOR}
+                        {t('marketing.scope.plannedLabel')}
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

@@ -143,9 +143,16 @@ export const popMotion = [
  * a single virtual focus through a collection for both pointer and keyboard, so
  * styling the hovered state separately would light two rows at once when a
  * mouse rests over a list the keyboard is also driving.
+ *
+ * `target-min-h` is what holds the row at 44px (WCAG 2.2 §2.5.5). A row is
+ * already full-width, so only its height needs the guarantee, and it has to be
+ * real height rather than the `target-min` pseudo-element: stacked rows with
+ * overlapping hit areas would each steal the other's top and bottom five
+ * pixels, and a menu is never on the page during the CI target-size scan, so
+ * the primitive is the only place the floor can be enforced.
  */
 export const collectionItemBase = [
-  'relative flex cursor-default select-none items-center gap-2.5 rounded-md px-2.5 py-2',
+  'relative flex cursor-default select-none items-center gap-2.5 rounded-md px-2.5 py-2 target-min-h',
   'text-label text-ink-2 outline-hidden',
   transitionBase,
   'data-[focused]:bg-hover data-[focused]:text-ink',
