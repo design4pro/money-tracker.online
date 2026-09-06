@@ -28,23 +28,42 @@ const SECRET = `whsec_${btoa('not a real secret: webhook-verify test key')}`
 const OTHER_SECRET = `whsec_${btoa('not a real secret: the wrong key')}`
 const NOW = new Date('2026-03-15T10:00:00.000Z')
 
-/** What Polar does before it sends: HMAC over `{id}.{timestamp}.{body}`, base64. */
-async function sign(input: {
-  id: string
-  timestamp: number
-  body: string
-  secret?: string
-}): Promise<string> {
-  const secret = input.secret ?? SECRET
+/**
+ * The two key derivations Polar signs with, named as its documentation names them.
+ *
+ * `standard` is Standard Webhooks proper and is what secrets issued from 2026-09-08 use. `polar` is
+ * the older one: the HMAC key is the literal UTF-8 of the whole `whsec_…` string, prefix included
+ * (polarsource/polar#13519). Endpoints created before that date sign this way and report
+ * `uses_standard_webhook_signature: false`.
+ */
+type Derivation = 'standard' | 'polar'
+
+function keyBytesFor(secret: string, derivation: Derivation): Uint8Array {
+  if (derivation === 'polar') return new TextEncoder().encode(secret)
   const raw = secret.startsWith('whsec_') ? secret.slice(6) : secret
   const binary = atob(raw)
   const bytes = new Uint8Array(binary.length)
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index)
   }
+  return bytes
+}
+
+/** What Polar does before it sends: HMAC over `{id}.{timestamp}.{body}`, base64. */
+async function sign(input: {
+  id: string
+  timestamp: number
+  body: string
+  secret?: string
+  derivation?: Derivation
+}): Promise<string> {
+  const secret = input.secret ?? SECRET
+  const bytes = keyBytesFor(secret, input.derivation ?? 'standard')
   const key = await crypto.subtle.importKey(
     'raw',
-    bytes,
+    // The same widening the module under test performs: `@cloudflare/workers-types` and the DOM lib
+    // disagree about `Uint8Array`'s buffer type, and neither is wrong about the bytes.
+    bytes as unknown as BufferSource,
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],
@@ -67,6 +86,7 @@ async function verify(overrides: {
   timestamp?: number
   signature?: string
   secret?: string
+  derivation?: Derivation
   now?: Date
 }) {
   const body = overrides.body ?? '{"type":"subscription.active"}'
@@ -76,7 +96,14 @@ async function verify(overrides: {
     headers: {
       id,
       timestamp: String(timestamp),
-      signature: overrides.signature ?? (await sign({ id, timestamp, body })),
+      signature:
+        overrides.signature ??
+        (await sign({
+          id,
+          timestamp,
+          body,
+          derivation: overrides.derivation,
+        })),
     },
     body,
     secret: overrides.secret ?? SECRET,
@@ -127,6 +154,50 @@ describe('a delivery is accepted only when every part of it checks out', () => {
     const result = await verify({ body: reserialised, signature })
     expect(result).toEqual({ ok: false, reason: 'signature-mismatch' })
   })
+})
+
+describe('both of Polar\u2019s key derivations verify', () => {
+  /**
+   * The case this file exists for. An endpoint created before 2026-09-08 signs with the whole
+   * `whsec_\u2026` string as the key, and a verifier that only implements Standard Webhooks answers
+   * 401 to every delivery it will ever receive \u2014 which is what happened against the sandbox
+   * organization on 2026-09-06 and looked exactly like "Polar is not sending webhooks".
+   */
+  it('accepts a delivery signed the way a pre-2026-09-08 secret is signed', async () => {
+    const id = 'evt_1'
+    const body = '{"type":"subscription.active"}'
+    const signature = await sign({
+      id,
+      timestamp: seconds,
+      body,
+      derivation: 'polar',
+    })
+
+    const result = await verify({ body, signature })
+    expect(result.ok).toBe(true)
+  })
+
+  it('still accepts a delivery signed the Standard Webhooks way', async () => {
+    const result = await verify({ derivation: 'standard' })
+    expect(result.ok).toBe(true)
+  })
+
+  /** Accepting two derivations must not mean accepting two secrets. */
+  it.each(['standard', 'polar'] as const)(
+    'rejects the wrong secret under the %s derivation',
+    async (derivation) => {
+      const signature = await sign({
+        id: 'evt_1',
+        timestamp: seconds,
+        body: '{"type":"subscription.active"}',
+        secret: OTHER_SECRET,
+        derivation,
+      })
+
+      const result = await verify({ signature })
+      expect(result).toEqual({ ok: false, reason: 'signature-mismatch' })
+    },
+  )
 })
 
 describe('the replay window', () => {

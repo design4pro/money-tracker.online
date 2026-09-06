@@ -20,9 +20,13 @@
  * a future timestamp is as suspicious as an ancient one, and clock skew between two hosts is
  * measured in seconds, not hours.
  *
- * The scheme itself: `HMAC-SHA256(secret, "{id}.{timestamp}.{body}")`, base64-encoded, presented in
+ * The scheme itself: `HMAC-SHA256(key, "{id}.{timestamp}.{body}")`, base64-encoded, presented in
  * the `webhook-signature` header as one or more space-separated `v1,<signature>` pairs — plural
  * because a secret rotation publishes both for a window, and any one match verifies.
+ *
+ * `key` is deliberately not "the secret": Polar derives it two different ways depending on when the
+ * secret was issued, and both are accepted here. {@link candidateKeys} is where that lives, and it
+ * is the difference between a working endpoint and a 401 on every delivery.
  *
  * `crypto.subtle` only, so this runs unchanged in workerd and in Node's test runner.
  */
@@ -58,26 +62,57 @@ export function webhookHeadersOf(request: Request): WebhookHeaders {
 }
 
 /**
- * The signing key.
+ * The signing keys to try — **two of them**, because Polar derives the key two different ways.
  *
- * Polar presents the secret as `whsec_`-prefixed base64. The prefix is stripped and the remainder
- * decoded; a secret that is not valid base64 is used as raw UTF-8, which is what a hand-minted
- * `openssl rand -base64 32` value ends up being when it is pasted without the prefix. Both forms
- * verify, and neither is guessed at silently — the fallback is the documented one.
+ * The scheme is Standard Webhooks in every other respect: the same three headers, the same
+ * `{id}.{timestamp}.{body}` signed content, the same `v1,<base64>` presentation. The one thing that
+ * differs is how the secret becomes an HMAC key, and it differs by the secret's *age*:
+ *
+ * - **Secrets issued from 2026-09-08** are Standard Webhooks proper: strip the `whsec_` prefix,
+ *   base64-decode the remainder, and that is the key.
+ * - **Secrets issued before that** are what Polar's own documentation calls "Polar HMAC": the key is
+ *   the literal UTF-8 bytes of the **whole secret string, prefix included**. Polar base64-encoded
+ *   the complete `whsec_…` string before handing it to its `standardwebhooks` library, which then
+ *   saw no `whsec_` prefix to strip and base64-decoded it straight back into those literal bytes
+ *   (polarsource/polar#13519). `webhook_endpoints.uses_standard_webhook_signature` is `false` on
+ *   exactly those endpoints.
+ *
+ * So both are tried, which is what Polar's own SDKs do from 1.0.0-alpha.19. It costs one extra HMAC
+ * per delivery and it is not a weakening: both keys are derived from the same secret, so forging a
+ * signature under either still requires holding it. The alternative — pinning one derivation — means
+ * every delivery to an endpoint created on the wrong side of that date answers 401, which is
+ * indistinguishable from "Polar is not sending webhooks" (this repository lost an afternoon to
+ * exactly that; `docs/DEPLOY.md` §9.2 carries the note).
+ *
+ * A prefix-less secret is covered by the second derivation on its own: with nothing to strip, the
+ * whole string is the key, which is what a hand-minted `openssl rand -base64 32` value pasted bare
+ * amounts to.
  */
-function secretBytes(secret: string): Uint8Array {
-  const body = secret.startsWith('whsec_')
+function candidateKeys(secret: string): ReadonlyArray<Uint8Array> {
+  const keys: Array<Uint8Array> = []
+
+  const remainder = secret.startsWith('whsec_')
     ? secret.slice('whsec_'.length)
     : secret
+  const decoded = decodeBase64(remainder)
+  if (decoded) keys.push(decoded)
+
+  keys.push(new TextEncoder().encode(secret))
+
+  return keys
+}
+
+/** The bytes behind a base64 string, or `null` when it is not base64 at all. */
+function decodeBase64(value: string): Uint8Array | null {
   try {
-    const binary = atob(body)
+    const binary = atob(value)
     const bytes = new Uint8Array(binary.length)
     for (let index = 0; index < binary.length; index += 1) {
       bytes[index] = binary.charCodeAt(index)
     }
     return bytes
   } catch {
-    return new TextEncoder().encode(body)
+    return null
   }
 }
 
@@ -147,27 +182,30 @@ export async function verifyWebhook(input: {
     return { ok: false, reason: 'no-signature-candidates' }
   }
 
-  const key = await crypto.subtle.importKey(
-    'raw',
-    secretBytes(input.secret) as unknown as BufferSource,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
+  const signedContent = new TextEncoder().encode(
+    `${id}.${timestamp}.${input.body}`,
   )
-  const expected = base64(
-    await crypto.subtle.sign(
-      'HMAC',
-      key,
-      new TextEncoder().encode(`${id}.${timestamp}.${input.body}`),
-    ),
+  const expected = await Promise.all(
+    candidateKeys(input.secret).map(async (keyBytes) => {
+      const key = await crypto.subtle.importKey(
+        'raw',
+        keyBytes as unknown as BufferSource,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign'],
+      )
+      return base64(await crypto.subtle.sign('HMAC', key, signedContent))
+    }),
   )
 
-  // Every candidate is compared, and the loop does not exit early on a match: a rotation window
-  // publishes two signatures, and short-circuiting on the first would time the position of the
-  // one that matched.
+  // Every candidate is compared against every derivation, and neither loop exits early on a match:
+  // a rotation window publishes two signatures, and short-circuiting on the first would time the
+  // position of the one that matched.
   let matched = false
   for (const candidate of offered) {
-    matched = timingSafeEqual(candidate, expected) || matched
+    for (const signature of expected) {
+      matched = timingSafeEqual(candidate, signature) || matched
+    }
   }
 
   if (!matched) return { ok: false, reason: 'signature-mismatch' }
