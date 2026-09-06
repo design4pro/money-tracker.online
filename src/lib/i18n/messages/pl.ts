@@ -1302,6 +1302,8 @@ const messages = {
     'Wiersze przykładowe. Nic tutaj nie pochodzi z prawdziwego konta.',
   'marketing.ledger.col.balance': 'Stan po zapisie',
   'marketing.ledger.opening': 'Przeniesione z lutego',
+  'marketing.ledger.closing': 'Do przeniesienia na kwiecień',
+  'marketing.ledger.settled': 'Rozliczono',
   'marketing.ledger.note': 'Każdy zapis i to, co po nim zostaje.',
   'marketing.ledger.figure.label': 'Trzymane w złotych',
   'marketing.ledger.figure.caption':

@@ -1275,6 +1275,8 @@ const messages = {
     'Example rows. Nothing here comes from a real account.',
   'marketing.ledger.col.balance': 'Balance after',
   'marketing.ledger.opening': 'Carried over from February',
+  'marketing.ledger.closing': 'Carried forward to April',
+  'marketing.ledger.settled': 'Settled',
   'marketing.ledger.note': 'Every line, and what is left after it.',
   'marketing.ledger.figure.label': 'Held in zloty',
   'marketing.ledger.figure.caption':

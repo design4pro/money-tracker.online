@@ -1,5 +1,6 @@
 import { amountReading } from '#/components/app/money'
 import { AmountText, ConvertedAmount } from '#/components/app/transactions'
+import { Badge } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { asCurrencyCode, asMinor, formatMoney, makeMoney } from '#/lib/money'
@@ -29,6 +30,16 @@ import type { MessageKey } from '#/lib/i18n'
  * in the product is that the caller has already done the arithmetic in minor units and the
  * component only draws it, and a marketing page gets no exemption from that.
  *
+ * ## The two ends of the page
+ *
+ * A page of a passbook opens on what came over from the last page and closes on what goes to the
+ * next, so the table does both. The opening line carries February's balance in. The closing line
+ * carries the last balance out, under the heavier rule that is the foot of the form - the same
+ * rule the column headings sit on - and it reads that balance from the last row rather than typing
+ * it a second time, so the two cannot disagree. Here the last line is planned, so what goes to
+ * April is written in pencil like the line that produced it: the figure that will be carried, not
+ * yet the one that was.
+ *
  * ## Typed on the form, not on a card
  *
  * There is no box around this table. The page beneath it is ruled at 2.5rem, every line of type in
@@ -48,11 +59,16 @@ import type { MessageKey } from '#/lib/i18n'
  * is not a table's loses its semantics in WebKit, so every part carries its ARIA role explicitly
  * and a screen reader keeps the table at every width.
  *
- * ## Pencil before ink
+ * ## Pencil before ink, and one stamp
  *
  * The last entry is planned rather than booked. It is the same row in the secondary ink - pencil -
  * with the word beside its category: the two channels the ledger inside the product gives a
- * planned line. The stamp violet is spent on what is settled and never on what is not.
+ * planned line. The stamp violet is spent on what is settled and never on what is not, and on
+ * this page it is spent once, on the word beside the opening line: February is closed, and the
+ * balance it handed over is the one figure here that nothing can move. The mark is a typed word
+ * inside a one-pixel rule in the stamp ink ({@link Badge} in its `settled` tone), not a drawing of
+ * a rubber stamp - the metaphor lives in rules and type - and a page that closes in pencil is not
+ * stamped.
  *
  * **The rows are invented and the page says so.** `PRODUCT.md` forbids fabricating evidence, and a
  * ledger fragment with no label is exactly the kind of thing a visitor could read as somebody's
@@ -85,6 +101,9 @@ interface PreviewRow {
 /** The line carried over from the previous page: a date and a balance, nothing else. */
 const OPENING = { bookedOn: '2026-03-01', balanceMinor: 481260 } as const
 
+/** The day the page closes. What it carries forward is whatever its last line left. */
+const CLOSING_ON = '2026-03-31'
+
 /**
  * The euro line, shared with the section that explains it: the amount as typed and the złoty
  * figure it was frozen at are the same literals in both places, so they cannot drift apart.
@@ -96,6 +115,19 @@ export const EURO_ENTRY = {
   currencyCode: 'EUR',
   refAmountMinor: 11842,
 } as const
+
+/** The last line on the page, named because the closing line reads its balance. */
+const LAST_ROW: PreviewRow = {
+  id: 'electricity',
+  bookedOn: '2026-03-20',
+  payee: 'marketing.ledger.row.electricity',
+  category: 'marketing.ledger.category.utilities',
+  amountMinor: 18500,
+  currencyCode: 'PLN',
+  direction: 'expense',
+  isPlanned: true,
+  balanceAfterMinor: 941618,
+}
 
 const ROWS: ReadonlyArray<PreviewRow> = [
   {
@@ -146,17 +178,7 @@ const ROWS: ReadonlyArray<PreviewRow> = [
     direction: 'expense',
     balanceAfterMinor: 960118,
   },
-  {
-    id: 'electricity',
-    bookedOn: '2026-03-20',
-    payee: 'marketing.ledger.row.electricity',
-    category: 'marketing.ledger.category.utilities',
-    amountMinor: 18500,
-    currencyCode: 'PLN',
-    direction: 'expense',
-    isPlanned: true,
-    balanceAfterMinor: 941618,
-  },
+  LAST_ROW,
 ]
 
 /**
@@ -181,6 +203,12 @@ const RULED = 'sm:border-e sm:border-border-subtle sm:last:border-e-0'
 const SPINE = 'sm:border-s-2 sm:border-border-panel'
 
 /**
+ * The heavier rule under a cell on the wide page. The column headings sit on it and the page
+ * closes on it; merged after `CELL`, it replaces the hairline that cell would draw.
+ */
+const HEAVY_RULE = 'sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]'
+
+/**
  * A cell: no vertical padding, so the row is exactly as tall as its lines, and the rule under it
  * drawn as an inset shadow, which paints on the cell's last pixel row - the printed rule's - and
  * adds no height of its own where a border would add one and walk the table off the pitch. On
@@ -192,16 +220,16 @@ const CELL = cn(
 )
 
 /** A column heading: the same cell with the heavier rule under it. */
-const HEAD = cn(
-  'py-0 text-start align-top sm:px-4 sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]',
-  RULED,
-)
+const HEAD = cn(CELL, 'text-start', HEAVY_RULE)
 
 /** The row on the narrow page: a grid of two columns, the second sized to its figures. */
 const ROW = 'max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-x-4'
 
-/** The heading row keeps its heavier rule there too, drawn by the row since its cells draw none. */
-const HEAD_ROW = cn(
+/**
+ * The heading row and the closing row keep their heavier rule on the narrow page too, drawn by
+ * the row since its cells draw none there.
+ */
+const HEAVY_ROW = cn(
   ROW,
   'max-sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]',
 )
@@ -281,7 +309,7 @@ export function LedgerPreview() {
     <table role="table" className="w-full border-collapse max-sm:block">
       <caption className="sr-only">{t('marketing.ledger.caption')}</caption>
       <thead role="rowgroup" className="max-sm:block">
-        <tr role="row" className={HEAD_ROW}>
+        <tr role="row" className={HEAVY_ROW}>
           <th
             role="columnheader"
             scope="col"
@@ -316,7 +344,7 @@ export function LedgerPreview() {
       </thead>
       <tbody role="rowgroup" className="max-sm:block">
         {/* The line every page of a passbook opens on: what came over from the last one. It has
-            no second line, so on the narrow page its balance sits on the first. */}
+            no amount, so on the narrow page its balance sits on its first line. */}
         <tr role="row" className={ROW}>
           <td role="cell" className={DATE_CELL}>
             <span className={DATE_TEXT}>
@@ -325,7 +353,18 @@ export function LedgerPreview() {
           </td>
           <td role="cell" className={cn(CELL, AT_DESCRIPTION)}>
             <span className={cn('text-label text-ink-2', TYPED_LINE)}>
-              {t('marketing.ledger.opening')}
+              {t('marketing.ledger.opening')}{' '}
+              {/* The one stamp on the page. Beside the line where there is room for it; on the
+                  narrow page it takes the entry's second line, where a category would go, so
+                  the row keeps the two-line shape of every other entry rather than wrapping
+                  at whatever width the word happens to run out. */}
+              <span className="sm:ms-1 max-sm:block">
+                {/* Raised four pixels so the frame stands on the printed rule instead of
+                    crossing it: a stamp lands on the line, it is not typed on the baseline. */}
+                <Badge tone="settled" size="sm" className="relative -top-1">
+                  {t('marketing.ledger.settled')}
+                </Badge>
+              </span>
             </span>
           </td>
           <td role="cell" className={cn(CELL, AT_AMOUNT)} />
@@ -407,6 +446,29 @@ export function LedgerPreview() {
             />
           </tr>
         ))}
+
+        {/* The line every page closes on: what goes over to the next one. Its balance is the
+            last line's, read rather than retyped, and the heavier rule under it is the foot of
+            the form. Like the opening line it has no amount, so on the narrow page its balance
+            sits on its first line. */}
+        <tr role="row" className={HEAVY_ROW}>
+          <td role="cell" className={cn(DATE_CELL, HEAVY_RULE)}>
+            <span className={DATE_TEXT}>
+              {formatCalendarDate(locale, CLOSING_ON, 'medium')}
+            </span>
+          </td>
+          <td role="cell" className={cn(CELL, HEAVY_RULE, AT_DESCRIPTION)}>
+            <span className={cn('text-label text-ink-2', TYPED_LINE)}>
+              {t('marketing.ledger.closing')}
+            </span>
+          </td>
+          <td role="cell" className={cn(CELL, HEAVY_RULE, AT_AMOUNT)} />
+          <BalanceCell
+            amountMinor={LAST_ROW.balanceAfterMinor}
+            isPlanned={LAST_ROW.isPlanned}
+            className={cn(HEAVY_RULE, 'max-sm:row-start-1')}
+          />
+        </tr>
       </tbody>
     </table>
   )
