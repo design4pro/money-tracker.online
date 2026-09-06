@@ -213,6 +213,13 @@ components:
     height: '1.5rem'
     padding: '0 {spacing.2}'
     typography: '{typography.caption}'
+  badge-settled:
+    backgroundColor: 'transparent'
+    textColor: '{colors.brand}'
+    rounded: '{rounded.sm}'
+    height: '1.25rem'
+    padding: '0 {spacing.1}'
+    typography: '{typography.micro}'
   typed-line:
     backgroundColor: 'transparent'
     textColor: '{colors.ink}'
@@ -255,7 +262,9 @@ components:
 
 Derived, not chosen: the direction contract's FORM is "Książeczka" (the passbook) and its OWN-WORLD
 block names off-white form paper, printed green ruling, typed entries, a handwritten heading and one
-violet stamp. Every line of the product is an entry and a balance stands after each one. The
+violet stamp. Every line of the product is an entry and a balance stands after each one, and a
+page has both ends: a balance carried in on its first line and a balance carried forward on its
+last. The
 paper is form paper, not a dashboard: printed rules at a 2.5rem pitch carry the structure that a
 grid of cards would otherwise carry, the entries are typed in a typewriter face so that a column of
 money aligns on its decimal without help, and the headings and margin notes are written by hand,
@@ -263,8 +272,10 @@ pinned to a printed rule rather than floating above the text. The book is kept b
 hand is quick, not a schoolroom script, and the typewriter is a working tool, not a prop.
 
 There is one stamp. Violet is the colour of a commanding action and of anything the product has
-settled: a primary button, a link, the current destination, the focus ring, the selected row. It is
-never spent on what is planned. A planned line is written in pencil - the second ink at
+settled: a primary button, a link, the current destination, the focus ring, the selected row, and
+the one "settled" mark itself - a typed word inside a one-pixel frame of stamp ink on the paper,
+beside the line that was carried in. It is never spent on what is planned: a page whose last
+entry is planned closes in pencil and is not stamped. A planned line is written in pencil - the second ink at
 `ink-2` - and the word "Planned" beside it is the channel; the grey only agrees. Nothing is ever
 struck through, because the product has no voided line. Green ink is money in hand, red ink is
 money overdrawn, brown ink is a warning, and each is text-grade at 7:1 on the darkest ground it can
@@ -357,8 +368,10 @@ is never text.
 
 **The One Stamp Rule.** Violet is spent on what commands and on what is settled - the primary
 action, a link, the current destination, the focus ring, the selected row. It is never spent on a
-planned line, a decoration, a heading or a divider. If a screen needs a second violet thing, one of
-them is not an action.
+planned line, a decoration, a heading or a divider. "Settled" has its own mark now - the `settled`
+badge tone, a typed word in a one-pixel `brand` frame on the paper, not on a wash - and it is the
+only status that may carry `brand`. If a screen needs a second violet thing, one of them is not an
+action.
 
 **The Pencil Rule.** A planned entry is written in `ink-2` with the word beside it; a booked entry
 is written in `ink`. State is line form before hue, and nothing is ever struck through.
@@ -462,7 +475,12 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
   `border-subtle` vertical rule. Below `sm` the row becomes a two-column grid (`1fr auto`): the
   description and its date over the amount and balance, the date column hidden, the paper's own
   ruling standing in for the cell rules. Explicit ARIA table roles keep it a table when the CSS
-  display changes.
+  display changes. The page has both ends: the opening line carries last month's balance in and
+  wears the settled mark; the closing line ("Carried forward to April", dated the last day of the
+  month) reads its balance from the last line rather than retyping it, and sits over the heavier
+  `border-panel` rule that is the foot of the form - the same rule that sits under the column
+  headings. When the last entry is planned, the balance carried forward is written in pencil
+  like the line that produced it, and the page is not stamped.
 - **The summary strip**: three typed lines in a `dl`, label at the start, figure at the end, a
   `border-t` rule under each - never three tiles.
 - **Reading measure**: `prose-measure` caps running text at 64ch.
@@ -614,9 +632,15 @@ A slip laid on the paper, for content that needs its own ground. Not the scaffol
 
 `sm` radius (2px), 20px (sm, micro uppercase) or 24px (md, caption) height, bold. Tones: `neutral`
 (the only ruled one, `border-strong` on `surface`), `accent`, `brand`, `positive`, `negative`,
-`warning`, `info`; every tinted tone pairs a `-soft` ground with its own ink at 7:1 or better. A
-category carries its series colour as a dot beside its name; the colour is never the only
-identifier.
+`warning`, `info`, and `settled`; every tinted tone pairs a `-soft` ground with its own ink at 7:1
+or better. **`settled`** is the stamp mark: `brand` text inside a one-pixel `brand` rule with no
+wash, on the paper rather than on a tint, typed at the small size (micro, uppercase, 0.06em, 20px
+high). It is the only status that carries `brand` and the only "settled" mark in the product; it
+is never placed on a planned line. On the landing it stands once, beside the passbook's opening
+line, raised 4px (`relative -top-1`) so the frame's bottom edge sits on the printed rule instead
+of crossing it; on the narrow page it is the second line of the opening entry. No rotation, no
+texture, no double rule - it is a badge, not a drawing of a stamp. A category carries its series
+colour as a dot beside its name; the colour is never the only identifier.
 
 ### Tables
 
@@ -659,8 +683,11 @@ The unit the whole world is built from (`TYPED_LINE` in `src/routes/-ui/ledger-p
 no vertical padding, the rule drawn as an inset one-pixel shadow on the cell's last pixel row. On
 the wide page every entry is one such line: date in caption `ink-2`, description in `ink` with its
 category after a middle dot in `ink-2`, amount end-aligned in its tone, and the balance-after column
-behind the 2px `border-panel` spine. The opening balance is a line with no amount. A planned line
-is the same line in `ink-2` with the word beside it.
+behind the 2px `border-panel` spine. The opening balance is a line with no amount, and it wears
+the settled mark. The closing line carries the last balance forward under the heavier
+`border-panel` rule that is the foot of the form; it reads that balance, it does not retype it,
+and when the last entry is planned the carried-forward figure is pencil too. A planned line is
+the same line in `ink-2` with the word beside it.
 
 ### Signature: the four amount tones
 
@@ -698,6 +725,9 @@ still fire.
 - **Do** spend violet on actions and on what is settled - the primary button, links, the current
   destination, the focus ring, the selected row - and nowhere else.
 - **Do** write a planned line in `ink-2` with the word beside it, and a booked line in `ink`.
+- **Do** mark what is settled with the `settled` badge - a typed word in a one-pixel `brand`
+  frame on the paper - and give a page both ends: a balance carried in on the first line and a
+  balance carried forward, read not retyped, on the last, over the heavier `border-panel` rule.
 - **Do** give every amount an explicit sign (U+2212 for out, `+` for in), set inflow bold and
   outflow regular, and mark a transfer with the repeat glyph.
 - **Do** mark a current or selected thing with a one-pixel frame or a one-pixel rule in `brand`.
@@ -725,7 +755,8 @@ still fire.
 - **Don't** put a radius above 4px on a rectangle; no pills on chips, badges or panels.
 - **Don't** use emoji, a glyph icon set, or a system display face; icons are lucide and the faces
   are the two self-hosted ones.
-- **Don't** spend violet on a planned line, a decoration, a heading or a divider; and don't strike
+- **Don't** spend violet on a planned line, a decoration, a heading or a divider; never put the
+  `settled` mark on a planned line or stamp a page that closes in pencil; and don't strike
   anything through - there is no voided line.
 - **Don't** add texture, aged paper, a faux stamp graphic, or a decorative flourish; the metaphor
   lives in rules and type, and the world must not read as retro or as a schoolbook.
