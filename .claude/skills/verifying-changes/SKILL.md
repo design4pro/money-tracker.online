@@ -88,6 +88,11 @@ These are hard-won and each one has cost somebody an afternoon.
 - **A failing gate that was not captured leaves a count and no shape.** Pipe it:
   `pnpm test 2>&1 | tee <file>` before quoting a summary to anybody. The same five failures,
   re-run four minutes later against the same tree, were 2197 passed in 21.43 s.
+- **Do not edit source while `pnpm e2e` is running.** The dev server renders the next request from
+  the edited file while the browser still holds the old client chunk, and the run then reports
+  console hydration mismatches (`data-tsd-source` line numbers that differ by the lines you added)
+  on every screen that mounts the changed component. They look like product defects and are not.
+  Finish every edit, then start the run; edit again only after it has ended.
 - **Anything that deletes or moves a source file must restart the dev server before the gate
   runs.** A server that already loaded a module answers 500 on unrelated routes after the file goes
   away - measured as five failures while typecheck, lint, vitest and build were all clean.

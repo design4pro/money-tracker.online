@@ -18,7 +18,7 @@ export function BrandMark({ className }: { className?: string }) {
       aria-hidden="true"
       className={cn('size-7', className)}
     >
-      <rect width="28" height="28" rx="9" className="fill-accent" />
+      <rect width="28" height="28" rx="2" className="fill-accent" />
       <path
         d="M7 19.5V9.2l4.4 5.6L15.8 9.2v10.3"
         fill="none"
@@ -55,7 +55,7 @@ export function Wordmark({ name, className }: WordmarkProps) {
   return (
     <span
       className={cn(
-        'inline-flex min-w-0 items-center gap-2.5 text-subtitle font-semibold text-ink',
+        'inline-flex min-w-0 items-center gap-2.5 text-body font-bold text-ink',
         className,
       )}
     >

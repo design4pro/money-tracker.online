@@ -126,10 +126,12 @@ addition so far (ADR 0015); a `### Blockers` row is still how a stage reports ne
 
 Owned by `DESIGN.md`; this section states only what other sections must not contradict.
 
-Cool paper, near-black ink, one deep teal brand, tabular figures everywhere. The palette is designed
-to a **7:1 contrast floor on text** in both themes, with two named exceptions (disabled control text;
-non-text chart gridlines at 3:1). Four reserved amount hues (`income`, `expense`, `transfer`,
-`planned`) that may never be used decoratively. An eight-hue categorical series palette that is
+Off-white form paper ruled at 2.5rem, near-black typed ink, headings and margin notes by hand, one
+violet stamp brand, tabular figures everywhere. The palette is designed to a **7:1 contrast floor on
+text** in both themes, with two named exceptions (disabled control text; non-text chart gridlines at
+3:1). Four reserved amount tones (`income`, `expense`, `transfer`, `planned`) that may never be
+used decoratively; `planned` is pencil - the secondary ink with the word beside it - and never the
+stamp colour, which is spent only on what is settled. An eight-hue categorical series palette that is
 **never the sole channel of information**, for a measured reason: two series can both clear 7:1
 against the surface while measuring 1.00:1 against each other.
 

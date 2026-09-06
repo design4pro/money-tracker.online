@@ -282,7 +282,7 @@ function TransactionRowImpl({
         'border-t border-t-border-subtle bg-surface text-ink transition-[background-color] duration-fast',
         'hover:bg-hover',
         isSelected &&
-          'bg-brand-soft shadow-[inset_3px_0_0_0_var(--color-brand)] hover:bg-brand-soft',
+          'bg-brand-soft shadow-[inset_0_0_0_1px_var(--color-brand)] hover:bg-brand-soft',
       )}
     >
       {/* ---- Selection ---------------------------------------------------- */}
