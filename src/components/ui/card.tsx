@@ -75,8 +75,6 @@ export interface CardHeaderProps extends Omit<
   ComponentPropsWithoutRef<'div'>,
   'title'
 > {
-  /** The quiet uppercase opener. 11px, the smallest type in the system. */
-  eyebrow?: ReactNode
   title?: ReactNode
   description?: ReactNode
   /** Trailing controls — a menu button, a period selector. */
@@ -87,7 +85,6 @@ export interface CardHeaderProps extends Omit<
 
 export function CardHeader({
   className,
-  eyebrow,
   title,
   description,
   action,
@@ -103,11 +100,6 @@ export function CardHeader({
       className={cn('flex items-start justify-between gap-3', className)}
     >
       <div className="min-w-0">
-        {eyebrow ? (
-          <p className="text-micro tracking-label uppercase text-ink-2">
-            {eyebrow}
-          </p>
-        ) : null}
         {title ? (
           <Heading className="text-subtitle font-semibold text-ink">
             {title}

@@ -148,26 +148,25 @@ const TAB_SHAPE =
   'relative flex h-16 w-full flex-col items-center justify-center gap-1 px-1 text-caption'
 
 /**
- * The current tab is marked three ways — `aria-current`, a 3px rule along the top edge, and a
- * weight-plus-colour change — for the reason spelled out in `nav-link.tsx`.
+ * The current tab is marked three ways - `aria-current`, a one-pixel rule along the top edge, and
+ * its glyph and label in `brand` at the heavier weight - for the reason spelled out in
+ * `nav-link.tsx`.
  *
- * The rule is painted in `ink`, not in the brand blue. A single saturated hue on the one active
- * tab was the only chromatic mark in a warm-monochrome system, and it read as an unstyled
- * framework default rather than as a decision; `negative` on an overdrawn balance is the one
- * chromatic event the surface is allowed.
+ * The rule is a line, not a bar, in the stamp ink the rail's frame spends on its words: one violet
+ * marks everything the product has settled, and *current* is one of those things.
  */
 function ActiveRule() {
   return (
     <span
       aria-hidden="true"
-      className="absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-ink"
+      className="absolute inset-x-4 top-0 h-px bg-brand"
     />
   )
 }
 
 function tabTone(isActive: boolean): string {
   return isActive
-    ? 'font-semibold text-ink'
+    ? 'font-semibold text-brand'
     : 'font-medium text-ink-2 data-[hovered]:text-ink'
 }
 

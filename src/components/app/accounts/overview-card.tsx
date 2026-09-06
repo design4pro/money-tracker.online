@@ -24,7 +24,7 @@ import type { AccountOverview } from '#/server/repos/accounts'
  *
  * ## One hero, and it is twice the mass of anything beside it
  *
- * Net worth is the display step; held and owed are the subtitle step in the secondary ink. They
+ * Net worth is the display step; held and owed are the body step in the secondary ink. They
  * used to be one step apart, and because *what you hold* is numerically the larger figure it won
  * the first fixation on a card whose entire subject is the number above it. Hierarchy here is
  * size, weight and colour together — three channels, all of which survive a greyscale print.
@@ -125,7 +125,7 @@ export function AccountOverviewCard({
               locale={locale}
               amountMinor={overview.totalBalanceMinor}
               currencyCode={currency}
-              size="lg"
+              size="md"
               className="font-medium text-ink-2"
             />
           </dd>
@@ -143,7 +143,7 @@ export function AccountOverviewCard({
               locale={locale}
               amountMinor={owedMinor(overview.liabilitiesMinor)}
               currencyCode={currency}
-              size="lg"
+              size="md"
               className="font-medium text-ink-2"
             />
           </dd>

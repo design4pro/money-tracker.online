@@ -157,10 +157,10 @@ export function Meter({
 
             {captionPlacement === 'above' ? captionLine : null}
 
-            <div className="h-2 w-full overflow-hidden rounded-full bg-border-subtle">
+            <div className="h-2 w-full overflow-hidden rounded-sm bg-border-subtle">
               <div
                 className={cn(
-                  'h-full rounded-full',
+                  'h-full rounded-sm',
                   transitionBase,
                   state === 'danger' && 'bg-negative',
                   state === 'warning' && 'bg-warning',

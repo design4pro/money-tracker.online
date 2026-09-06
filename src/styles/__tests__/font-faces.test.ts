@@ -47,6 +47,7 @@ const PLATFORM_FAMILIES = new Set([
   'sans-serif',
   'serif',
   'monospace',
+  'cursive',
   'system-ui',
   'ui-sans-serif',
   'ui-serif',
@@ -58,9 +59,14 @@ const PLATFORM_FAMILIES = new Set([
   'Helvetica Neue',
   'SF Mono',
   'Menlo',
+  'Courier',
+  'Bradley Hand',
   // Microsoft.
   'Segoe UI',
   'Cascadia Mono',
+  'Segoe Script',
+  // Both.
+  'Courier New',
   // Commonly installed, never assumed to be present alone.
   'Arial',
   'Roboto',
@@ -121,7 +127,7 @@ it('declares both halves of every self-hosted face', () => {
   // Latin-ext is what carries every Polish diacritic but `ó`. A face that ships
   // only its `latin` subset renders the PL catalogue in a fallback, one glyph
   // at a time, which reads as a broken font rather than as a missing one.
-  for (const family of ['Bricolage Grotesque', 'Inter']) {
+  for (const family of ['Caveat', 'Courier Prime']) {
     const subsets = [...TOKENS.matchAll(/@font-face\s*\{([^}]*)\}/g)]
       .map((block) => block[1])
       .filter((block) => block.includes(`font-family: '${family}'`))

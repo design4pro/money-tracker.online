@@ -339,15 +339,26 @@ webhooks", not like an access-control problem.
 
 Create, in the production organization and again in the sandbox organization:
 
-| Product             | Plan        | Interval |
-| ------------------- | ----------- | -------- |
-| Plus — monthly      | `plus`      | monthly  |
-| Plus — yearly       | `plus`      | yearly   |
-| Household — monthly | `household` | monthly  |
-| Household — yearly  | `household` | yearly   |
+| Product             | Plan        | Interval | Price (EUR) |
+| ------------------- | ----------- | -------- | ----------- |
+| Plus — monthly      | `plus`      | monthly  | 3.99        |
+| Plus — yearly       | `plus`      | yearly   | 39.00       |
+| Household — monthly | `household` | monthly  | 6.99        |
+| Household — yearly  | `household` | yearly   | 69.00       |
 
 Their UUIDs become the four `VITE_POLAR_PRODUCT_*` values of §10. **Sandbox and production ids never
 match**; keeping two sets straight is what `POLAR_SERVER` exists for.
+
+Three properties of each product are load-bearing rather than cosmetic, and both organizations carry
+them identically so that a sandbox walk says something about production:
+
+- **One fixed price, in EUR, and no second currency.** The plan card renders the catalogue's EUR
+  amount, so a USD price beside it charges one figure while the screen states another. The amounts
+  are `src/lib/plans.ts`'s and nothing else may restate them.
+- **Not seat-based.** `subscriptionStateFrom` stores `seats: 1` and reads `amount`; a per-seat price
+  would be recorded as something nobody was charged. The household ceiling of six people is enforced
+  by `assertWithinLimit`, not billed per seat.
+- **A 14-day trial.** `trialing` entitles (§9.4), and the billing screen has its own state for it.
 
 ### 9.2 The webhook
 
@@ -356,7 +367,25 @@ signing secret into `POLAR_WEBHOOK_SECRET`.
 
 The handler verifies a Standard Webhooks HMAC-SHA256 over `${id}.${timestamp}.${raw}` with a 300s
 tolerance, tolerates multiple `v1,<sig>` entries so a secret can be rotated without downtime, and
-compares in constant time. Status codes are a contract:
+compares in constant time.
+
+**It tries two key derivations, and it has to.** Polar changed how a secret becomes an HMAC key:
+
+| Secret issued   | Key                                                                  | Endpoint reports                         |
+| --------------- | -------------------------------------------------------------------- | ---------------------------------------- |
+| from 2026-09-08 | base64-decode of the `whsec_` remainder (Standard Webhooks)          | `uses_standard_webhook_signature: true`  |
+| before that     | the literal UTF-8 of the **whole** `whsec_…` string, prefix included | `uses_standard_webhook_signature: false` |
+
+The older behaviour is Polar base64-encoding the complete secret before handing it to its
+`standardwebhooks` library, which then had no `whsec_` prefix to strip (polarsource/polar#13519).
+The flag is read-only: it cannot be set at creation and cannot be updated, so an organization whose
+secrets predate the cutover cannot be migrated by re-creating the endpoint. Polar's own SDKs try
+both from 1.0.0-alpha.19 and so does `src/server/billing/webhook-verify.ts`.
+
+This was walked, not assumed: on 2026-09-06 every delivery to the staging endpoint answered **401**
+with a correct secret configured, and it looked exactly like "Polar is not sending webhooks".
+
+Status codes are a contract:
 
 - **400** — unsigned or badly signed. Never processed, never retried into a loop.
 - **200** — accepted, duplicate, or an event kind we deliberately ignore.
@@ -388,16 +417,16 @@ Hand-rolled `fetch` + WebCrypto, never the SDK. `POLAR_MAX_RETRIES = 2`,
 Eight rows. **Not one is green.** Walk them on staging against the sandbox organization before
 production takes a card, and tick them here.
 
-| #   | Scenario                   | Expected                                                                       | Walked |
-| --- | -------------------------- | ------------------------------------------------------------------------------ | ------ |
-| 1   | Subscribe to Plus monthly  | Checkout completes; `subscriptions` row `active`; entitlements flip within 60s | ☐      |
-| 2   | Upgrade Plus → Household   | Proration as Polar computes it; `seats` ceiling rises; no double charge        | ☐      |
-| 3   | Downgrade Household → Plus | `pending_plan` set with `pending_effective_at`; current period unchanged       | ☐      |
-| 4   | Cancel at period end       | `cancel_at_period_end = true`; access holds until `current_period_end`         | ☐      |
-| 5   | Resume before period end   | Cancellation cleared; no new charge                                            | ☐      |
-| 6   | Failed payment             | Status `past_due`; **access retained**; the dunning notification is sent       | ☐      |
-| 7   | Orders list renders        | Invoices listed with amounts in the subscription's own currency                | ☐      |
-| 8   | Customer Portal round trip | Portal opens for the right customer and returns to the app                     | ☐      |
+| #   | Scenario                   | Expected                                                                                                                                                              | Walked |
+| --- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | Subscribe to Plus monthly  | Checkout completes; `subscriptions` row `trialing` (the products carry a 14-day trial, §9.1), then `active` when it converts; entitlements flip within 60s either way | ☐      |
+| 2   | Upgrade Plus → Household   | Proration as Polar computes it; `seats` ceiling rises; no double charge                                                                                               | ☐      |
+| 3   | Downgrade Household → Plus | `pending_plan` set with `pending_effective_at`; current period unchanged                                                                                              | ☐      |
+| 4   | Cancel at period end       | `cancel_at_period_end = true`; access holds until `current_period_end`                                                                                                | ☐      |
+| 5   | Resume before period end   | Cancellation cleared; no new charge                                                                                                                                   | ☐      |
+| 6   | Failed payment             | Status `past_due`; **access retained**; the dunning notification is sent                                                                                              | ☐      |
+| 7   | Orders list renders        | Invoices listed with amounts in the subscription's own currency                                                                                                       | ☐      |
+| 8   | Customer Portal round trip | Portal opens for the right customer and returns to the app                                                                                                            | ☐      |
 
 ---
 

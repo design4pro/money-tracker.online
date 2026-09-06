@@ -158,6 +158,48 @@ export class RateUnavailableError extends RepositoryError {
   }
 }
 
+/**
+ * The workspace would be left with nobody who can administer it.
+ *
+ * Separate from {@link ConflictError} because the surface needs its own sentence: "you are the last
+ * owner" is advice about what to do next (hand ownership over first), not a collision to retry.
+ */
+export class LastOwnerError extends RepositoryError {
+  constructor() {
+    super('A workspace must keep at least one owner.', 'LAST_OWNER')
+  }
+}
+
+/**
+ * An invitation exists, and the account presenting it is not the one it was addressed to.
+ *
+ * Distinct from {@link NotFoundError} on purpose, and the distinction is safe: reaching this state
+ * requires holding the invitation's single-use id, so it confirms nothing to somebody who was not
+ * sent it. Telling the reader *which* address was invited is what lets them sign out and sign in
+ * as the right person, which is the whole recovery path.
+ */
+export class InvitationAddresseeError extends RepositoryError {
+  readonly invitedEmail: string
+
+  constructor(invitedEmail: string) {
+    super(
+      `The invitation was issued to ${invitedEmail}.`,
+      'INVITATION_ADDRESSEE',
+    )
+    this.invitedEmail = invitedEmail
+  }
+}
+
+/** The invitation is real and can no longer be accepted: expired, revoked or already used. */
+export class InvitationClosedError extends RepositoryError {
+  readonly state: 'expired' | 'revoked' | 'accepted'
+
+  constructor(state: 'expired' | 'revoked' | 'accepted') {
+    super(`The invitation is ${state}.`, 'INVITATION_CLOSED')
+    this.state = state
+  }
+}
+
 export function isRepositoryError(error: unknown): error is RepositoryError {
   return error instanceof RepositoryError
 }

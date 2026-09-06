@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ChevronRight, Shapes, Store } from 'lucide-react'
+import { ChevronRight, CreditCard, Shapes, Store, Users } from 'lucide-react'
 
 import { writeLocaleCookie } from '#/components/app/shell'
 import {
+  Badge,
   Card,
   CardBody,
   CardHeader,
@@ -36,7 +37,7 @@ import type { ThemeMode } from '#/lib/theme'
  *
  * The settings area's rule is that a control changing something *for you* and a control changing
  * something *for everyone in the workspace* never sit in the same unlabelled group. Each card
- * carries its scope as its eyebrow, which is also the grouping plan 23's nav will use.
+ * carries its scope as a badge under its title, which is also the grouping plan 23's nav will use.
  *
  * ## Nothing here writes to the server
  *
@@ -50,7 +51,7 @@ export const Route = createFileRoute('/_app/settings/')({
   component: SettingsRoute,
 })
 
-/** The scope each card belongs to. The eyebrow, and the reason the cards are ordered as they are. */
+/** The scope each card belongs to. The badge under each title, and the reason the cards are ordered as they are. */
 type Scope = 'you' | 'workspace'
 
 const SCOPE_LABEL: Readonly<Record<Scope, MessageKey>> = {
@@ -119,6 +120,22 @@ function SettingsRoute() {
                 Icon={Store}
                 label={t('nav.payees')}
                 description={t('settings.payees.description')}
+              />
+            </li>
+            <li className="border-b border-border-subtle last:border-b-0">
+              <RecordLink
+                href="/settings/members"
+                Icon={Users}
+                label={t('members.title')}
+                description={t('members.subtitle')}
+              />
+            </li>
+            <li className="border-b border-border-subtle last:border-b-0">
+              <RecordLink
+                href="/settings/billing"
+                Icon={CreditCard}
+                label={t('billing.title')}
+                description={t('billing.subtitle')}
               />
             </li>
           </ul>
@@ -224,9 +241,15 @@ function SettingsCard({
     <Card padding="lg">
       <CardHeader
         headingLevel={2}
-        eyebrow={t(SCOPE_LABEL[scope])}
         title={title}
-        description={description}
+        description={
+          <>
+            <Badge tone="info" size="sm">
+              {t(SCOPE_LABEL[scope])}
+            </Badge>
+            <span className="mt-2 block">{description}</span>
+          </>
+        }
       />
       <CardBody>{children}</CardBody>
     </Card>

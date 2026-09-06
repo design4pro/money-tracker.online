@@ -44,6 +44,12 @@ const PROPER_NOUNS: ReadonlyArray<string> = [
   'nav.import',
   'import.title',
   'import.step.done',
+  // A plan name, and a brand of its own: the tier is called `Plus` on the
+  // pricing page, in the checkout and on the invoice, in both languages.
+  // Translating it here would mean a Polish reader was billed for something
+  // named differently from what they chose. `plans.free.name` and
+  // `plans.household.name` are ordinary words and are translated.
+  'plans.plus.name',
   // Key caps, not copy. A shortcut sheet has to print what is engraved on the
   // key the reader is being asked to press, and a Polish keyboard is engraved
   // `Enter`, `Delete`, `E` and `D`. The rest of the sheet — `Strzałki`,

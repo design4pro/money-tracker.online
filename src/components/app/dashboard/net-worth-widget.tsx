@@ -77,7 +77,7 @@ export function NetWorthWidget({
             locale={locale}
             amountMinor={netWorthMinor}
             currencyCode={baseCurrencyCode}
-            size="2xl"
+            size="xl"
             tone="value"
           />
         </p>

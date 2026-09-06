@@ -70,7 +70,11 @@ Five claims, all five checkable:
   Durable Object. Two long-lived environments: staging from `develop`, production from `main`.
 - **Two locales: English (source) and Polish.** Both LTR. Every user-facing string lives in a
   catalogue and a new key lands in both locales in the same change.
-- **Billing through Polar**, three plans (`free`, `plus`, `household`), monthly or yearly.
+- **Billing through Polar**, three plans (`free`, `plus`, `household`), monthly or yearly. The
+  tiers are separated by **people, scale and multi-currency**: free is one person, three accounts
+  and one currency; `plus` is one person without ceilings and with as many currencies as they
+  keep; `household` is up to six people sharing one workspace with nothing capped. The numbers
+  live in `src/lib/plans.ts` and are the ones enforced.
 - **Authentication through Better Auth**, sessions in KV, with passkeys, TOTP two-factor and
   optional Google / Apple sign-in.
 - **The reference product** (an open-source budget tracker and a commercial competitor's public
@@ -109,14 +113,26 @@ Five claims, all five checkable:
 | Export and backup | JSON and CSV by group and date range, R2 artefacts with expiry, full backup and restore                                |
 | SaaS layer        | Auth, workspaces and members, notifications, billing, settings, a platform console                                     |
 
+**Planned, and landing after v1's last wave:**
+
+| Area  | What ships                                                                                                                                                 |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loans | Terms, an integer amortisation schedule, principal/interest per instalment, settlement against real transactions, extra repayments and a payoff projection |
+
+Loan management was moved out of _Out of scope_ on 2026-09-05 at the product owner's request. It is
+decomposed as `docs/plans/28-loans.md`, its stages open at wave 7, and no v1 surface waits on it —
+so it is listed apart from the table above rather than inside it, because "in scope for v1" is a
+claim about a release and this is not in that release.
+
 **Out of scope, deliberately:**
 
 - **Bank connectors, screen-scraping and aggregators — permanently.** Not "later", not "if a
   customer asks". `docs/adr/0008-no-bank-connectors.md` is the record.
 - **Investment position tracking** (lots, cost basis, dividends). An `investment` account holds a
   balance; it does not hold a portfolio.
-- **Loan amortisation schedules and vehicle-cost flows.** The `loan` account category exists as a
-  balance; the dedicated flows do not ship in v1.
+- **Vehicle-cost flows and depreciating assets with a value curve.** A car is an `other` account
+  with a balance a person adjusts; there is no vehicle account category and no modelled value curve
+  (`docs/plans/99-boundaries-and-blockers.md` BND-11).
 - **Tax reporting, invoicing, and anything that could be read as regulated financial advice.**
 - **Realtime multi-user editing.** Household members see each other's rows on reload, not live.
 
@@ -124,12 +140,12 @@ Five claims, all five checkable:
 
 These are open and **must not be presented as settled** in copy, in a plan, or in code:
 
-1. **Is multi-currency a paid module or a core capability?** The working assumption has been
-   paid, but nothing implements it — there is no plan or entitlement catalogue in the codebase
-   yet, so the assumption rests on no code. It is also the single sharpest differentiator from a
-   spreadsheet. Changing it later is a migration across four Polar products, the pricing page and
-   the comparison table.
-2. **The free tier's account ceiling** (3 or 5) and the exact quota table.
+1. **Per-plan pricing.** The amounts in `src/lib/plans.ts` are the product owner's first answer,
+   not a market-tested one. Changing them is a one-file edit plus four Polar products; changing
+   _which metric separates the tiers_ is the expensive change, and that is settled below.
+2. **Whether the household tier's six seats is the right number.** The ceiling is one entry in the
+   catalogue and is enforced from it, so the cost of moving it is a number and a migration of
+   nobody's data.
 3. **Per-account sharing inside a household** (`transactionsWriteScope: all | own`). The current
    plan is workspace-level membership only, with per-account scoping deferred; that deferral is
    also the main justification for the Household tier and needs confirming.
@@ -157,9 +173,14 @@ carry_all`; what the budget detail screen does with an overspend is a product an
 
 - **Real:** the product itself — actual screens, the seeded demo workspace, the Playwright suites
   under `e2e/`, and the axe results the verification protocol requires every stage to produce.
-- **Not yet real, and so not citable as proof:** the plan, quota and entitlement catalogue. The
-  plan names (`free`, `plus`, `household`) are settled; the table behind them is not written, so
-  no surface may state a limit, a price or a per-plan feature list as fact.
+- **Real, and citable as of this change:** the plan, quota and entitlement catalogue.
+  `src/lib/plans.ts` holds the three tiers, their ceilings and their prices; `resolveLimits()`
+  reads real subscription rows and `assertWithinLimit()` enforces the published numbers inside the
+  repositories. A surface may state a limit or a price **only** by rendering the catalogue — a
+  figure retyped into copy is the one thing that can still drift, and drifted pricing is a refund.
+- **Not yet real, and so not citable as proof:** the four Polar products themselves. The ids are
+  build-time values; a deployment without them renders the pricing honestly and refuses to open a
+  checkout rather than half-working.
 - **Does not exist and must never be fabricated:** users, testimonials, quotes, customer logos,
   press mentions, ratings, awards, adoption or usage numbers, uptime or performance claims,
   security certifications (we hold none — no SOC 2, no ISO 27001), case studies, named partners,
