@@ -185,3 +185,10 @@ Every workflow's skill runs the same way in a local `claude` session, with the d
 `/om-merge-buddy`, `/om-approve-merge-pr <pr>`, `/om-close-fixed-issues`. Hand-worked branches go
 through `/om-check-and-commit` and `/om-open-pr`. The hooks are the project's, so nothing depends
 on the host's user-level configuration.
+
+A workflow can also run headless without the cockpit: `npx -y @open-mercato/cezar@0.10.1 run "21"
+--workflow om-manage-issue --repo .`. It creates the same isolated worktree, cut from
+`baseBranch`, not from the checkout you run it in, so a workflow or om config that only exists on a
+feature branch is not in that worktree until the branch merges (the 2026-09-06 trial of
+`om-manage-issue` on #21 pointed `baseBranch` at the branch for the run and reverted it). The run
+uses your own `gh` identity, and `review` is terminal for it.
