@@ -161,7 +161,13 @@ function ResetPasswordScreen() {
         title={t('auth.reset.invalid.title')}
         description={t('auth.reset.invalid.body')}
         footer={
-          <Link to="/login" className={linkVariants({ variant: 'quiet' })}>
+          <Link
+            to="/login"
+            className={linkVariants({
+              variant: 'quiet',
+              className: 'target-min-h',
+            })}
+          >
             {t('auth.backToSignIn')}
           </Link>
         }
@@ -188,7 +194,13 @@ function ResetPasswordScreen() {
       title={t('auth.reset.title')}
       description={t('auth.reset.subtitle')}
       footer={
-        <Link to="/login" className={linkVariants({ variant: 'quiet' })}>
+        <Link
+          to="/login"
+          className={linkVariants({
+            variant: 'quiet',
+            className: 'target-min-h',
+          })}
+        >
           {t('auth.backToSignIn')}
         </Link>
       }

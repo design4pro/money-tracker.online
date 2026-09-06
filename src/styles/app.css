@@ -440,6 +440,12 @@
   min-height: var(--target-min);
 }
 
+/* And the other axis — a short word in a stacked list of links, where the row
+   is already 44px tall and "Scope" is 39px wide. */
+@utility target-min-w {
+  min-width: var(--target-min);
+}
+
 /* --------------------------------------------------------------------------
    FOCUS — the one focus treatment in the product.
 

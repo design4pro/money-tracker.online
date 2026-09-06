@@ -1,8 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 
-import { amountReading } from '#/components/app/money'
-import { AmountText } from '#/components/app/transactions'
+// Module paths rather than the directory barrels on purpose. This page must load without the
+// application: the transactions barrel reaches the filter bar, the form and the drag-and-drop
+// grid, and through them React Aria; the budgets barrel reaches the charts, and through them d3.
+// Each module below carries only what the landing page renders.
+import { amountReading } from '#/components/app/money/amount-reading'
+import { AmountText } from '#/components/app/transactions/amount-text'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { asCurrencyCode, asMinor, formatMoney, makeMoney } from '#/lib/money'
@@ -667,7 +671,7 @@ function LandingPage() {
                 <li key={href}>
                   <a
                     href={href}
-                    className="target-min-h inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
+                    className="target-min-h target-min-w inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
                   >
                     {t(label)}
                   </a>
@@ -679,7 +683,7 @@ function LandingPage() {
               <li>
                 <a
                   href="/login"
-                  className="target-min-h inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
+                  className="target-min-h target-min-w inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
                 >
                   {t('marketing.nav.signIn')}
                 </a>
@@ -687,7 +691,7 @@ function LandingPage() {
               <li>
                 <a
                   href="/register"
-                  className="target-min-h inline-flex items-center rounded-md text-label font-bold text-ink no-underline hover:text-brand focus-ring"
+                  className="target-min-h target-min-w inline-flex items-center rounded-md text-label font-bold text-ink no-underline hover:text-brand focus-ring"
                 >
                   {t('marketing.nav.getStarted')}
                 </a>

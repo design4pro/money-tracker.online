@@ -343,7 +343,15 @@ function TransactionRowImpl({
               event.preventDefault()
               actions.onOpen(row.id)
             }}
-            className="block truncate text-label leading-5 font-medium text-ink no-underline hover:underline"
+            // The row's one tap path. `py-3 -my-3` makes the link's own box 44px tall around its
+            // 20px line without moving a pixel of layout: the negative margins give back exactly
+            // what the padding took, above `lg` through the block's collapsing margins and from
+            // `lg` up as a grid item whose baseline is unchanged. Below `lg` that box reaches 12px
+            // into the meta line under it, and `relative` keeps the link above that static text, so
+            // the whole box is the link and not only its top 32px. `target-min` would not do: its
+            // pseudo-element is a centred 44×44 square, which on a 300px-wide title is a hit area
+            // in the middle of the word and nothing at either end.
+            className="relative -my-3 block truncate py-3 text-label leading-5 font-medium text-ink no-underline hover:underline"
           >
             {title}
           </a>

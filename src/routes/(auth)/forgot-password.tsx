@@ -82,7 +82,11 @@ function ForgotPasswordScreen() {
   }
 
   const backToSignIn = (
-    <Link to="/login" className={linkVariants({ variant: 'quiet' })}>
+    <Link
+      to="/login"
+      // Standing alone under the card, the link is the row: 44px tall for a thumb, not 18.
+      className={linkVariants({ variant: 'quiet', className: 'target-min-h' })}
+    >
       <ArrowLeft aria-hidden="true" className="size-4" />
       {t('auth.backToSignIn')}
     </Link>
