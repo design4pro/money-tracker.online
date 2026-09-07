@@ -5,6 +5,7 @@ import {
   createTransactionThroughUi,
   gotoApp,
   uniqueToken,
+  waitForHydration,
 } from './support/app'
 import { storageStateFor } from './support/session'
 
@@ -96,16 +97,33 @@ test.describe('tenant isolation', () => {
       b.getByRole('heading', { name: 'Accounts', level: 1 }),
     ).toBeVisible()
 
-    await gotoApp(b, `/accounts/${accountId}`)
-    await expect(
-      b.getByRole('heading', { name: 'This account did not load' }),
-    ).toBeVisible()
+    // Issue #16 moved this refusal from the generic error panel to the router's not-found
+    // surface, so the two answers below have to be compared rather than asserted one at a time:
+    // A's real account id and an id that exists in no workspace at all must be the same response.
+    const foreign = await b.goto(`/accounts/${accountId}`, {
+      waitUntil: 'commit',
+    })
+    await waitForHydration(b)
+    const foreignBody = await b.locator('body').innerText()
+
+    await expect(b.getByRole('heading', { name: 'Not here' })).toBeVisible()
     await expect(b.locator('body')).not.toContainText(accountName)
     // A `403` would confirm the row exists in *some* workspace. The product answers `NotFoundError`
-    // and the message that reaches the panel must not name a permission.
+    // and nothing that reaches the reader may name a permission.
     await expect(b.locator('body')).not.toContainText(
       /forbidden|not allowed|permission/i,
     )
+
+    const missing = await b.goto('/accounts/does-not-exist', {
+      waitUntil: 'commit',
+    })
+    await waitForHydration(b)
+
+    // The oracle this whole spec exists to close: same status, same body. A difference of any
+    // kind — a status, a heading, an id echoed back — answers "does workspace X have this row?"
+    expect(foreign?.status()).toBe(404)
+    expect(missing?.status()).toBe(foreign?.status())
+    expect(await b.locator('body').innerText()).toBe(foreignBody)
 
     await gotoApp(b, `/transactions/${transactionId}`)
     await expect(

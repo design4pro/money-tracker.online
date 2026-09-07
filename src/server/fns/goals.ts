@@ -35,6 +35,7 @@ import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
 import { serverToday } from '#/server/clock'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { monthlyContributionSeries } from '#/server/goals/history'
 import { dispatchGoalReached } from '#/server/goals/reached'
 import { projectCompletion } from '#/server/goals/project'
@@ -123,8 +124,9 @@ export const loadGoalDetail = createServerFn({ method: 'GET' })
     const scope = await requireOrg()
     const today = serverToday()
     // The goal is loaded first and on its own: a foreign id must fail here, before anything else
-    // is read, so no partial payload can be assembled around a row the caller may not see.
-    const goal = await getGoalRow(scope, data.goalId)
+    // is read, so no partial payload can be assembled around a row the caller may not see. And it
+    // fails as a 404, because a row that is not there does not come back on a retry.
+    const goal = await getGoalRow(scope, data.goalId).catch(rethrowAsNotFound)
 
     const [contributions, conversion, totals] = await Promise.all([
       listContributionsRow(scope, goal.id),

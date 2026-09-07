@@ -1,3 +1,11 @@
+# A cezar run (CEZ_TASK_ID is set; cezar forwards only an allowlist plus CEZ_* into the agent's
+# env, so HUSKY=0 from the service env never reaches this hook) is gated by validation.commands
+# in .ai/agentic.config.json, not by pre-commit: the full test run per commit doubled run time
+# and flaked under load (docs/agents/cezar.md, Agent mode).
+if [ -n "${CEZ_TASK_ID-}" ]; then
+  exit 0
+fi
+
 npx lint-staged
 pnpm typecheck
 pnpm test
