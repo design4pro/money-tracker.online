@@ -80,7 +80,7 @@
     "@axe-core/playwright": "^4.10.2",
     "@cloudflare/vite-plugin": "^1.54.4",
     "@cloudflare/vitest-pool-workers": "0.22.0",
-    "@cloudflare/workers-types": "^5.20260903.1",
+    "@cloudflare/workers-types": "^5.20260904.1",
     "@playwright/test": "^1.62.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@tanstack/devtools-vite": "^0.8.3",
