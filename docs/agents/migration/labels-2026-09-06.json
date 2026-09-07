@@ -1,0 +1,97 @@
+[
+  {
+    "color": "1d76db",
+    "description": "A run holds this issue; only a claim script writes it",
+    "name": "status: in-progress"
+  },
+  {
+    "color": "fbca04",
+    "description": "Triage needs an answer from the reporter",
+    "name": "status: needs-info"
+  },
+  {
+    "color": "d4c5f9",
+    "description": "Ticket waiting on an open blocker",
+    "name": "status: queued"
+  },
+  {
+    "color": "5319e7",
+    "description": "An artefact (PR, spec, PRD, tickets) waits for a human",
+    "name": "status: review"
+  },
+  {
+    "color": "fef2c0",
+    "description": "New and untriaged; a triage run picks it up",
+    "name": "status: triage"
+  },
+  {
+    "color": "d73a4a",
+    "description": "App is not working correctly",
+    "name": "type: bug"
+  },
+  {
+    "color": "84b6eb",
+    "description": "Improvement upon an existing feature",
+    "name": "type: enhancement"
+  },
+  {
+    "color": "1d76db",
+    "description": "New capability; needs a spec and a PRD before tickets",
+    "name": "type: feature"
+  },
+  {
+    "color": "c2e0c6",
+    "description": "Internal work with no user-visible behaviour change",
+    "name": "type: maintenance"
+  },
+  {
+    "color": "0e8a16",
+    "description": "Run the Playwright visual gate on this PR (ci.yml e2e escape hatch)",
+    "name": "needs-e2e"
+  },
+  {
+    "color": "ededed",
+    "description": "Idea or feature waiting for a plan or a decision",
+    "name": "status: backlog"
+  },
+  {
+    "color": "e11d21",
+    "description": "A workflow could not finish; a human decides what happens next",
+    "name": "status: needs-human"
+  },
+  {
+    "color": "0e8a16",
+    "description": "Specified and unblocked; run: implement may claim it",
+    "name": "status: ready"
+  },
+  {
+    "color": "f9a825",
+    "description": "Command: implement this ticket; the claim removes it",
+    "name": "run: implement"
+  },
+  {
+    "color": "f9a825",
+    "description": "Command: (re)triage this issue; the claim removes it",
+    "name": "run: triage"
+  },
+  {
+    "color": "8250df",
+    "description": "PRD only: the sweeper adds run: implement to each child as it unblocks",
+    "name": "auto-advance"
+  },
+  {
+    "color": "6f42c1",
+    "description": "Parent issue: title PRD:, body prd/v1, its sub-issues are the tickets",
+    "name": "prd"
+  },
+  {
+    "color": "0e8a16",
+    "description": "Draft PR opened by an implement run",
+    "name": "agent-pr"
+  },
+  {
+    "color": "c5def5",
+    "description": "PR carrying CONTEXT.md or ADR changes from a plan run",
+    "name": "agent-docs"
+  }
+]

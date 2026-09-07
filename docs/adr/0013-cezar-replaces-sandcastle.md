@@ -61,3 +61,14 @@ with them.
 
 `setup-e2e.sh` is the half that was real, and it exists: `scripts/agent/setup-e2e.sh`, under
 `scripts/` where this record said such a thing belongs.
+
+## Amendment 2026-09-06
+
+**The port this record asked for was built, and then replaced.** Cezar stayed, as the only
+orchestrator; what went was the second process layer the repository grew on top of it - the
+`scripts/agent/` claim, ladder, handback and sweeper scripts, the three bespoke workflows and the
+label protocol of ADR 0014. ADR 0017 puts the `om-*` skills in their place: Cezar runs a workflow
+that is one command step and one `/om-…` slash command, and every write to GitHub goes through the
+tracker descriptor. `setup-e2e.sh` became `.ai/scripts/test-env-up.sh` and `test-env-down.sh`, the
+`om-prepare-test-env` contract; still the repository's own file, not an orchestrator's, which is
+what this record asked for. The cockpit template moved to `scripts/cezar/launchd/`.

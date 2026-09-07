@@ -1,76 +1,82 @@
 # The label vocabulary, in one place.
 #
-# Labels are the backlog's state machine (docs/adr/0014-label-protocol.md). The vocabulary is
-# closed at the 18 labels below and any label outside it is deleted by
-# scripts/agent/labels-migrate.sh. It was 19 until ADR 0016 retired `needs-e2e` along with the
-# visual gate it rationed: the browser suite now runs on every pull request, so there is nothing
-# left to opt into.
+# Labels are the lifecycle's state machine (SDLC.md; decision in
+# docs/adr/0017-om-skills-replace-the-bespoke-agent-layer.md). The vocabulary is the 26 labels
+# `.ai/agentic.config.json` declares under `labels`, plus `do-not-close`, which the om skills
+# honour without declaring. It replaced the 18 `status:`/`run:`/`type:` labels of ADR 0014.
 #
 # This file is documentation, not automation: nothing syncs it. It exists because the issue forms
 # under .github/ISSUE_TEMPLATE/ apply labels by name, and GitHub silently drops a label that does
 # not exist on the repository - so a missing label here shows up as a form that quietly applies
 # nothing.
 #
-# To create or repair the whole set on a repository, run the migration:
-#
-#   scripts/agent/labels-migrate.sh            # plan only
-#   scripts/agent/labels-migrate.sh --apply    # perform
-#
-# It carries the colours and descriptions, so this file states meaning and nothing else.
+# To create or repair the whole set on a repository, run the `ensure-label-taxonomy` operation of
+# `.ai/trackers/github.md` (`/om-setup-agent-pipeline` does it on a re-run). It carries the colours
+# and descriptions, so this file states meaning and nothing else.
 
-# ── where an issue stands: exactly one of these on every open issue ───────────────────────────
-status:
-  - name: 'status: triage'
-    description: 'New, not yet reproduced. A triage run picks it up.'
-  - name: 'status: needs-info'
-    description: 'Triage needs an answer from the reporter. The questions are in a comment.'
-  - name: 'status: backlog'
-    description: 'A feature or idea waiting for a plan run, or for a decision.'
-  - name: 'status: queued'
-    description: 'A ticket with an open native blocker. The sweeper opens it when the blocker closes.'
-  - name: 'status: ready'
-    description: 'Specified and unblocked. `run: implement` may claim it.'
-  - name: 'status: in-progress'
-    description: 'A run holds it. Written by the claim scripts and by nothing else.'
-  - name: 'status: review'
-    description: 'An artefact waits for a human: a draft PR, a spec, a PRD, a set of tickets.'
-  - name: 'status: needs-human'
-    description: 'A workflow could not finish. The comment says why.'
+# ── pipeline: where a pull request stands, at most one at a time ──────────────────────────────
+# Written by the review, QA and merge skills. `blocked` and `do-not-merge` are a human's hold.
+pipeline:
+  - name: review
+    description: 'Ready for review, or under review by om-auto-review-pr.'
+  - name: changes-requested
+    description: 'The review found a blocker or a major; om-auto-fix-pr or a human addresses it.'
+  - name: qa
+    description: 'In manual QA. Set by a human; om-auto-qa-pr posts its evidence here.'
+  - name: qa-failed
+    description: 'Manual QA found a defect. Back to the fix chain.'
+  - name: merge-queue
+    description: 'Reviewed and, if it needed QA, approved. om-merge-buddy reports it; a human merges.'
+  - name: blocked
+    description: 'Waits on something outside the pull request. The comment says what.'
+  - name: do-not-merge
+    description: 'A human hold. No skill merges, and the autopilot stays out.'
 
-# ── commands a human gives; a script consumes them ────────────────────────────────────────────
-# A command is not a state. The claim script removes the `run:` label as its first action, so a
-# command still sitting there is a command nobody has taken.
-run:
-  - name: 'run: triage'
-    description: 'Command: (re)triage this issue. Bypasses the already-triaged marker.'
-  - name: 'run: implement'
-    description: 'Command: implement this ticket.'
-
-# ── what kind of change: mandatory on every issue without a parent ────────────────────────────
-# Tickets inherit their PRD's type and carry none of their own.
-type:
-  - name: 'type: bug'
+# ── category: what kind of change, exactly one on every issue ─────────────────────────────────
+# The issue forms set `bug`, `feature` and `refactor`; Dependabot sets `dependencies`;
+# om-prepare-issue and om-auto-manage-issues set the rest.
+category:
+  - name: bug
     description: 'Behaviour that is wrong against a stated expectation.'
-  - name: 'type: feature'
-    description: 'A new capability. Needs a spec and a PRD before tickets.'
-  - name: 'type: enhancement'
-    description: 'Better behaviour that was never promised.'
-  - name: 'type: maintenance'
-    description: 'Dependencies, tooling, refactoring, docs. No user-visible behaviour change.'
+  - name: feature
+    description: 'A new capability. More than one run of work means a spec in .ai/specs/ first.'
+  - name: refactor
+    description: 'Tooling, structure, dependencies chosen by hand, docs. No user-visible change.'
+  - name: security
+    description: 'A vulnerability or a hardening. Priority follows from the exposure.'
+  - name: dependencies
+    description: 'A dependency bump. Dependabot applies it.'
+  - name: documentation
+    description: 'Documentation only.'
 
-# ── the parent, and the one place autonomy widens ─────────────────────────────────────────────
-structure:
-  - name: 'prd'
-    description: 'Parent issue: title `PRD:`, body `prd/v1`, its sub-issues are the tickets.'
-  - name: 'auto-advance'
-    description: 'On an open PRD only: the sweeper adds `run: implement` to each child as it unblocks.'
+# ── meta: routing flags the skills read ───────────────────────────────────────────────────────
+meta:
+  - name: needs-qa
+    description: 'The pull request changes a screen; a human QA-approves it before merge.'
+  - name: skip-qa
+    description: 'No screen changed; the merge gate does not wait for QA.'
+  - name: qa-approved
+    description: 'A human checked the screens. Only a human sets it.'
+  - name: qa-self-verified
+    description: 'om-auto-qa-pr walked the screens and posted evidence. Not a substitute for qa-approved.'
+  - name: in-progress
+    description: 'A run holds this item (assignee + label + claim comment). Nothing else starts on it.'
+  - name: ci-monitoring
+    description: 'A run is waiting for CI on this pull request. Not a lock.'
+  - name: do-not-close
+    description: 'om-close-fixed-issues leaves this issue open even when a merged PR names it.'
 
-# ── pull-request labels ───────────────────────────────────────────────────────────────────────
-pull_request:
-  - name: 'agent-pr'
-    description: 'A draft pull request opened by an implement run.'
-  - name: 'agent-docs'
-    description: 'A pull request carrying CONTEXT.md or ADR changes from a plan run.'
+# ── priority and risk: one of each on every issue ─────────────────────────────────────────────
+# Set by om-prepare-issue from the report, or by om-auto-manage-issues on an issue that lacks them.
+priority:
+  - name: priority-low
+  - name: priority-medium
+  - name: priority-high
+  - name: priority-extreme
+risk:
+  - name: risk-low
+  - name: risk-medium
+  - name: risk-high
 
-# There is no priority axis, and "visual change expected" is a body section
-# (`## Visual change expected`), not a label.
+# "Visual change expected" is a body section (`## Visual change expected`), not a label; on a pull
+# request it becomes `needs-qa`.

@@ -55,7 +55,7 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
 
 ## Branch model
 
-- Feature branches (`feat/*`, `fix/*`, `claude/*`) open a pull request to
+- Feature branches (`feat/*`, `fix/*`, `spec/*`, `claude/*`) open a pull request to
   **`develop`**.
 - Merging `develop` deploys **staging**: https://staging.money-tracker.online
   (`deploy-staging.yml`).
@@ -82,14 +82,14 @@ missing — is `docs/DEPLOY.md`.
 
 ## Working with agents
 
-- New work flows through the three Cezar workflows, one fresh context each: `plan`, `triage` and
-  `implement-ticket`. Every artefact stops at `status: review` for a human. `docs/agents/cezar.md`.
-- The backlog contract, label vocabulary and triage rules are `docs/agents/issue-tracker.md` and
-  `docs/agents/triage-labels.md`.
-- `claude-code-review.yml` reviews every pull request, when `CLAUDE_CODE_OAUTH_TOKEN` is set. It is
-  deliberately hard to leave red for a reason that is not a finding: a missing credential and a
-  spent usage limit both end the job green with a warning
-  (`scripts/ci/claude-usage-limit.mjs`).
+- Agent work is done by the `om-*` skills from
+  [open-mercato/skills](https://github.com/open-mercato/skills) (`pnpm install-skills`) and
+  orchestrated by Cezar (`docs/agents/cezar.md`). The lifecycle, the label state machine and the
+  QA gate are `SDLC.md`; the backlog contract is `docs/agents/issue-tracker.md`.
+- A human starts implementation from the cockpit (issue → "Hand this to the agent" →
+  `om-fix-issue`, the issue number as the task) or locally with `/om-auto-fix-issue <n>`. Every
+  pull request is reviewed by `om-auto-review-pr` and stops at `review` or `merge-queue` for a
+  human; `needs-qa` without `qa-approved` never merges.
 
 ## Documentation
 

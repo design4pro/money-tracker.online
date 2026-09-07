@@ -30,7 +30,8 @@ config or anything under `src/server/`.
 ## Branches and commits
 
 - Cut from `develop`. Never commit to `develop` or `main` directly.
-- Branch names: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`, `claude/<slug>`.
+- Branch names: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`, `claude/<slug>`; the om skills cut
+  `fix/issue-<n>-<slug>` and `spec/<slug>`.
 - **Conventional Commits, in English**, always: `feat(transactions): add split editor`. The scope
   is the plan area or the module, not a file name.
 - One pull request targets `develop`. Promotion to production is a separate pull request
@@ -106,15 +107,17 @@ Every surface you ship owes, in the same pull request:
 
 ## Working on the backlog
 
-The backlog is GitHub Issues on `design4pro/money-tracker.online`. A PRD is a parent issue and its
-sub-issues are vertical slices in execution order. Every open issue carries exactly one `status:`
-label, and `status: ready` on a slice is the gate: it is set by a triage or plan run, never by a
-reporter, and never on a PRD. Ticket bodies must not contain `Closes #n` — closing is the merger's
-job. Full contract: `docs/agents/issue-tracker.md`; labels: `docs/agents/triage-labels.md`.
+The backlog is GitHub Issues on `design4pro/money-tracker.online`. An issue is ready when it
+carries one category label, a priority, a risk and the sections `om-prepare-issue` writes (Summary,
+Spec, Analysis, How to implement, Out of scope); `om-auto-manage-issues` checks that Definition of
+Ready and fills in the labels. A feature that needs more than one run gets a spec in `.ai/specs/`
+first and one issue per phase. Every pull request carries `Closes #n`: merging to `develop` does
+not close an issue natively, `om-close-fixed-issues` does. Full contract:
+`docs/agents/issue-tracker.md`; lifecycle and labels: `SDLC.md`.
 
 The staged plan set in `docs/plans/` is where a slice's scope comes from. If you are implementing a
-stage, its **Owned paths** list is your whole permitted diff, and its **Verification** block is what
-you have to leave behind.
+stage, its twelve headings are the issue body, and its **Verification** block is what you have to
+leave behind.
 
 ## Reporting a security issue
 
