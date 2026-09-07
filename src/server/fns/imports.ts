@@ -31,6 +31,7 @@
 import { createServerFn } from '@tanstack/react-start'
 
 import { requireOrg } from '#/server/auth/guards'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { resolveParser } from '#/server/import/registry'
 import { IMPORT_MAX_ROWS } from '#/server/import/types'
 import { readImportUpload } from '#/server/import/upload'
@@ -138,5 +139,5 @@ export const getImport = createServerFn({ method: 'GET' })
   .inputValidator(importBatchIdSchema)
   .handler(async ({ data }): Promise<ImportBatchRow> => {
     const scope = await requireOrg()
-    return getImportBatch(scope, data)
+    return getImportBatch(scope, data).catch(rethrowAsNotFound)
   })

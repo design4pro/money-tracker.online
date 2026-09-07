@@ -1,94 +1,87 @@
 # Issue tracker contract
 
-The backlog lives in **GitHub Issues** on `design4pro/money-tracker.online`. PRDs are parent issues;
-tickets are sub-issues. Sub-issue list order is execution order. Issues are closed when their work
-merges — a closed issue is the only record we keep, so there is no doc to rot.
+The backlog lives in **GitHub Issues** on `design4pro/money-tracker.online`. `docs/plans/` is the
+backlog _source_ (the staged plans); an issue is the execution surface for one stage, one defect or
+one idea. Issues are closed when their work merges; a closed issue is the only record we keep, so
+there is no doc to rot.
 
-Set once per session if needed: `GH_REPO=design4pro/money-tracker.online`.
+The process around an issue is `SDLC.md` (stages, labels, the QA gate, the claim protocol). This
+file is what an issue must contain and how it is written. The `status:`/`run:` vocabulary of ADR
+0014 is retired by `docs/adr/0017-om-skills-replace-the-bespoke-agent-layer.md`.
 
 ## Reading
 
 ```bash
 gh issue list --state open --json number,title,labels,body
 gh issue view <n> --comments
-gh api "repos/$GH_REPO/issues/<n>/sub_issues" --jq '.[].number'   # children, in execution order
 ```
 
 ## Writing
 
-**Under an agent run nothing here is available.** `.claude/hooks/git-guardrails.sh` blocks every
-`gh issue|pr` mutation and every non-GET `gh api` when `CEZ_TASK_ID` or `GITHUB_ACTIONS` is set: a
-run writes through `scripts/agent/` (`triage-apply.sh`, `publish-*.sh`, `cez-handback.sh`) and reads
-through `scripts/agent/gh-ro.sh`. The commands below are a human's, at their own keyboard.
+An agent writes to the tracker through the operations in `.ai/trackers/github.md`, never through
+ad-hoc `gh` calls, so every label lands through a guard and every comment carries an idempotent
+`🤖` marker. A person uses the same skills or the `gh` commands below.
+
+- **A new issue** comes from `om-prepare-issue <brief>`: it dedupes against open issues and PRs,
+  links or authors the covering spec, writes the body below and applies the category, priority and
+  risk labels. `.ai/skills/om-prepare-issue/SKILL.md` adds the sections this repository requires.
+- **An existing issue** is brought up to standard by `om-auto-manage-issues <n>` (labels, the
+  Definition of Ready, a read-only implementation analysis). The issue forms under
+  `.github/ISSUE_TEMPLATE/` file with the category label only; the rest is added on triage.
+- **Closing** is `om-close-fixed-issues`, run after a merge into `develop`: a merge into a
+  non-default branch does not close an issue natively, so the PR body's `Closes #n` is a promise the
+  skill keeps. `do-not-close` on an issue makes housekeeping leave it alone.
 
 ```bash
-gh issue create --title "PRD: <title>" --label "type: feature,prd" --body-file <file>   # parent
-gh issue create --title "<ticket>" --label "status: queued" --body-file <file>          # sub-issue
-gh issue comment <n> --body "<text>"
-gh issue edit <n> --add-label "run: implement"                                          # a command
-gh issue close <n>
+gh issue comment <n> --body-file <file>
+gh issue edit <n> --add-label "bug,priority-high,risk-medium"
+gh issue close <n> --comment "<why>"
 ```
 
-A sub-issue is created `status: queued` and reaches `status: ready` only once its `sub_issues` and
-`blocked_by` links are verified - which is what `scripts/agent/publish-tickets.sh` does, and the
-reason to prefer it over the two lines above (`docs/adr/0014-label-protocol.md`).
+## What an issue body must contain
 
-## Sub-issues (PRD → tickets)
+`om-prepare-issue` writes these sections, in this order. A person filing by hand writes the same
+ones; `om-auto-manage-issues` reports which are missing.
 
-```bash
-ISSUE_ID=$(gh api "repos/$GH_REPO/issues/<child>" --jq '.id')
-gh api -X POST "repos/$GH_REPO/issues/<parent>/sub_issues" -f sub_issue_id="$ISSUE_ID"
-```
+- **Summary**: the problem or need and who has it. When the issue implements a stage of a plan,
+  `Plan stage: NN-Sk` on its own line.
+- **Spec**: a link to the covering spec under `.ai/specs/` (features), or `none` with the reason.
+- **Analysis**: current behaviour, desired behaviour, and where in the code the seam is, named by
+  type, function signature, message key or config shape. _Never file paths or line numbers: they go
+  stale while the issue waits._
+- **How to implement**: the approach, not the diff.
+- **Tenant isolation test**: the case to add to
+  `src/server/repos/__tests__/tenant-isolation.test.ts` for every new repository read or write
+  path.
+- **Money invariant**: the arithmetic property the change must not break and the case in
+  `src/server/repos/__tests__/money-invariants.test.ts` that holds it. Mandatory whenever an
+  amount, a rate, a currency or a date bucket is touched.
+- **Visual change expected**: `none`, or the screens and states whose rendered output changes on
+  purpose. Nothing in CI compares a pixel (ADR 0016), so this is the reviewer's only notice.
+- **Compatibility notes**: the surfaces in `BACKWARD_COMPATIBILITY.md` the change touches and the
+  path it takes.
+- **How to pick this up**: the first command to run and the first file to read.
+- **Out of scope**: what a reader might reasonably assume is included and is not. Check
+  `docs/agents/out-of-scope.md` before filing; a rejected request is not re-filed in new words.
+- **Open questions**: each marked blocking or non-blocking. A blocking one unanswered means the
+  issue is not ready.
 
-Check `gh api "repos/$GH_REPO/issues/<parent>/sub_issues" --jq 'length'` before adding, to stay
-idempotent.
+## Definition of Ready
+
+`SDLC.md` → Definition of Ready. In short: a human supplied the problem, the expected outcome and
+how it will be checked, the out-of-scope list, and answered every blocking question; a spec (or the
+Analysis section for a bug) supplies the rest. `om-auto-fix-issue` stops on an issue that fails
+the human tier instead of speccing around the gap.
 
 ## Dependencies
 
-Blocking relationships use native GitHub issue dependencies (GraphQL `blockedBy` / `blocking`). A
-ticket is workable only when it has zero open blockers and is not itself a PRD with sub-issues.
+Ordering lives in the plan (`docs/plans/NN-area.md`, stage order) and in the issue body as prose
+(`Depends on #n`). There are no native sub-issues or blocking relations to maintain: a stage that
+depends on another is filed when the other merges, or names it and waits. Two issues that would
+write the same file are one issue (`docs/SPEC.md` §8).
 
-Because a PRD is never workable, it never carries `run: implement`: a PRD is marked `prd` and stays
-`status: in-progress` while any child is open. `auto-advance` on a PRD is how a human delegates the
-per-child command to the sweeper.
+## Migration snapshots
 
-**Ticket bodies must NOT contain `Closes #n` directives** — closing is the merger's job, and a
-`Closes` in a body closes the ticket the moment any branch mentioning it merges, including a branch
-that only did half of it.
-
-## What a ticket body must contain
-
-A ticket is a vertical slice, and a slice an agent can act on states all of:
-
-A ticket body is the `ticket/v2` schema, validated by `scripts/agent/plan.mjs` (`check-body`), and
-its sections appear in this order:
-
-- One-paragraph **Summary**.
-- **Current** behaviour and **Desired** behaviour.
-- **Fix direction** — the approach, not the diff.
-- **Key interfaces** — the types, function signatures and config shapes to look for. _Never file
-  paths or line numbers: they go stale while the issue waits._
-- **Definition of Done**, which inherits `docs/SPEC.md` §7 unchanged and adds anything specific.
-- **Owned paths** — the whole permitted diff, as `` `path` — new|edit `` bullets.
-- **Tenant isolation test** — the case that must be added.
-- **Money invariant** — the arithmetic property this slice must not break, and the test that holds
-  it. Mandatory on every slice that touches an amount, a rate, a currency or a date bucket.
-- **Verification** — what to run and what evidence to leave.
-- **Out of scope** — what a reader might reasonably assume is included and is not.
-
-**Owned paths** are additionally checked: repo-relative, never under the agent's own configuration
-(`.github/`, `.claude/`, `.husky/`, `.ai/cezar/`, `scripts/agent/`), and disjoint between two tickets
-the dependency graph does not order. **Definition of Done** carries one to three acceptance criteria
-and no more; a longer list is a decomposition problem (`docs/SPEC.md` §8).
-
-A slice that maps onto a plan stage in `docs/plans/` copies these from the stage rather than
-re-deriving them; the stage's twelve headings are shaped to fill exactly this list.
-
-## Relationship to `docs/plans/`
-
-The plan set is the **backlog source**; GitHub Issues is the **execution surface**. A plan stage
-becomes one PRD (the plan area) plus one sub-issue per stage, published by
-`scripts/agent/publish-tickets.sh` at the end of a `/plan-feature … tickets` run.
-The plan file remains the authority for scope and acceptance criteria; the issue is where state
-lives. When the two disagree, the issue that has already been worked wins and the plan is amended to
-say so.
+`docs/agents/migration/` holds the `gh label list` and `gh issue list` snapshots taken before each
+label migration (`labels-<date>.json`, `issues-<date>.json`), so a relabelled issue can always be
+traced back to what it was.

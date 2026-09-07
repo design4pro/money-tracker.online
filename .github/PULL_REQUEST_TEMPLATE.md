@@ -1,11 +1,15 @@
 <!--
 Conventional Commits in the title, in English: feat(transactions): …, fix(budgets): …,
-chore(deps): … . A Cezar run follows the same convention: there is no agent-only prefix.
+chore(deps): … . An om-* run follows the same convention (`fix(area): … (#n)`).
 -->
 
 ## What changed
 
-<!-- One paragraph. What a reviewer needs to know before reading a diff, not a restatement of it. -->
+<!--
+One paragraph. What a reviewer needs to know before reading a diff, not a restatement of it.
+`Closes #n` is required: merging to `develop` does not close an issue natively, and
+`om-close-fixed-issues` closes exactly the issues this line names.
+-->
 
 Closes #
 
@@ -59,6 +63,17 @@ and say which screens you shot. Frames belong outside the repository.
 
 - [ ] No visual change
 - [ ] Visual change is intended, declared in the ticket's `## Visual change expected`, pair captured
+
+## QA routing
+
+<!--
+One label, per SDLC.md: `needs-qa` when the change touches a screen (src/routes, src/components,
+styles, copy), `skip-qa` when it cannot. `needs-qa` without `qa-approved` never merges, and only a
+human sets `qa-approved`; `om-auto-qa-pr` posts evidence, it does not approve.
+-->
+
+- [ ] `needs-qa` - a screen changed; QA evidence and a human's `qa-approved` before merge
+- [ ] `skip-qa` - no screen changed
 
 ## Risk
 

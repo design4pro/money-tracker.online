@@ -131,6 +131,7 @@ export default defineConfig({
           // in the browser gate.
           include: [
             'scripts/**/__tests__/*.test.{ts,mjs}',
+            '.claude/hooks/__tests__/*.test.ts',
             'e2e/support/__tests__/*.test.ts',
           ],
           restoreMocks: true,

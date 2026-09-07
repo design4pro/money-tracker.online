@@ -16,6 +16,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import {
   addAlias as addAliasRow,
   addAliasSchema,
@@ -76,7 +77,7 @@ export const getPayee = createServerFn({ method: 'GET' })
   .inputValidator(payeeIdSchema)
   .handler(async ({ data }): Promise<PayeeDetail> => {
     const scope = await requireOrg()
-    return getPayeeRow(scope, data.payeeId)
+    return getPayeeRow(scope, data.payeeId).catch(rethrowAsNotFound)
   })
 
 /** The strings this workspace has told the importer never to turn into a payee. */

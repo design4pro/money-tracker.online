@@ -24,6 +24,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { RULE_TRIGGERS } from '#/server/rules/schema'
 import { applyRules as applyRulesToTransactions } from '#/server/rules/apply'
 import {
@@ -60,7 +61,7 @@ export const loadRule = createServerFn({ method: 'GET' })
   .inputValidator(ruleIdSchema)
   .handler(async ({ data }): Promise<Rule> => {
     const scope = await requireOrg()
-    return getRuleRow(scope, data.ruleId)
+    return getRuleRow(scope, data.ruleId).catch(rethrowAsNotFound)
   })
 
 /* -------------------------------------------------------------------------- */

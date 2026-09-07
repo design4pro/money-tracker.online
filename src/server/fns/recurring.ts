@@ -33,6 +33,7 @@ import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
 import { serverToday } from '#/server/clock'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { confidenceBand, detectCandidates } from '#/server/recurring/detect'
 import { materializeSeries } from '#/server/recurring/materialize'
 import {
@@ -180,7 +181,9 @@ export const loadSeriesDetail = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<SeriesDetail> => {
     const scope = await requireOrg()
     const today = serverToday()
-    const series = await getSeriesRow(scope, data.seriesId)
+    const series = await getSeriesRow(scope, data.seriesId).catch(
+      rethrowAsNotFound,
+    )
     if (series.isActive) {
       await materializeSeries(scope, {
         seriesId: series.id,

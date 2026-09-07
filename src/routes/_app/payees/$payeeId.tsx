@@ -52,14 +52,22 @@ export const Route = createFileRoute('/_app/payees/$payeeId')({
   component: PayeeDetailRoute,
 })
 
+/**
+ * A genuine failure, and only that.
+ *
+ * A payee id that names no row in this workspace no longer arrives here: `getPayee` classifies it
+ * as the router's not-found sentinel, so it renders the root's `notFoundComponent` under a 404.
+ * What is left is a request that did not come back, which is why the copy says so and offers the
+ * disclosure rather than telling the reader the payee is gone.
+ */
 function PayeeDetailError({ error }: { error: Error }) {
   const t = useTranslate()
   return (
     <div className="flex flex-col gap-4">
       <BackLink />
       <ErrorPanel
-        title={t('payees.detail.notFound.title')}
-        body={t('payees.detail.notFound.body')}
+        title={t('payees.detail.error.title')}
+        body={t('payees.detail.error.body')}
         detail={error.message}
       />
     </div>

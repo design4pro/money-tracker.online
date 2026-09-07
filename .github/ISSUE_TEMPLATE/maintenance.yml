@@ -1,7 +1,7 @@
 name: Maintenance
 description: Dependencies, tooling, refactoring, docs. No user-visible behaviour change.
 title: 'chore: '
-labels: ['type: maintenance', 'status: triage']
+labels: ['refactor']
 body:
   - type: markdown
     attributes:

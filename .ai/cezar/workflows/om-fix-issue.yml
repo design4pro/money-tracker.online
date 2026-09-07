@@ -1,0 +1,18 @@
+# A human hands one issue to the agent from the cockpit (issue → "Hand this to the agent" →
+# this workflow; the task is the issue number). om-auto-fix-issue classifies it and drives the
+# whole chain (verify, root cause, fix, PR, review, QA for UI changes) to a reviewed PR on
+# develop (ADR 0017). No bashAllowlist by design: the tracker descriptor is shell functions and
+# jq; the hooks in .claude/hooks/ and the PAT scopes are the gate. HUSKY=0 skips the `prepare`
+# hook install, so the run never rewrites core.hooksPath on the host clone; .husky/pre-commit
+# skips itself under CEZ_TASK_ID, so commits in the run are gated by validation.commands only.
+name: om-fix-issue
+description: Fix or implement one issue end to end with om-auto-fix-issue (autonomous).
+steps:
+  - id: setup
+    name: Install dependencies and the om skills
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm install-skills
+  - id: fix
+    name: om-auto-fix-issue
+    prompt: '/om-auto-fix-issue {{task}}'
+    model: opus
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
