@@ -1,0 +1,16 @@
+# The interactive front door (ADR 0017). Start it from the cockpit with the idea as the task and
+# "Autonomous" OFF: om-brainstorm questions the problem one round at a time through CEZ:ASK,
+# including the option of building nothing, and converges on a `Next:` line - usually
+# om-prepare-issue (files the issue) or om-spec-writing. Read-only on the repository except the
+# handoff brief, so the step holds Write but not Edit.
+name: brainstorm
+description: Interactive om-brainstorm on an idea; ends with a routing decision (Next- om-prepare-issue or om-spec-writing).
+steps:
+  - id: setup
+    name: Install dependencies and the om skills
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm install-skills
+  - id: brainstorm
+    name: om-brainstorm
+    prompt: '/om-brainstorm {{task}}'
+    model: opus
+    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite, Write]

@@ -1,0 +1,18 @@
+# Every issue a maintainer opens, and every issue that gets the `groom` label, receives SDLC
+# labels (category, priority, risk), a Definition of Ready check and a read-only
+# implementation-prep comment (ADR 0017). The agent step holds Bash with no allowlist (the
+# tracker descriptor needs it), and the issue body is the prompt, so the triggers are gated on
+# who can write them: `issue.opened` is filtered to maintainers and `groom` can only be set by a
+# collaborator (docs/agents/cezar-automations.json). The skill never edits source files, so the
+# step holds no Edit or Write.
+name: issue-groom
+description: om-auto-manage-issues on one issue - labels, Definition of Ready, implementation notes; never code.
+steps:
+  - id: setup
+    name: Install dependencies and the om skills
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm install-skills
+  - id: groom
+    name: om-auto-manage-issues
+    prompt: '/om-auto-manage-issues {{task}} --prep-impl'
+    model: sonnet
+    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]

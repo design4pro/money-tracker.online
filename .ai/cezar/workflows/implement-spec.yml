@@ -1,0 +1,15 @@
+# Started by a human from the cockpit (or `cezar run`) after the spec PR merged: the task is the
+# spec path, name, issue number or spec-PR number. om-auto-implement-spec builds it on one
+# implementation PR (om-auto-create-pr, or the loop variant past engine.loopStepThreshold),
+# then reviews and verifies it (ADR 0017).
+name: implement-spec
+description: Build a merged spec on one implementation PR to develop; review loop and UI verification included.
+steps:
+  - id: setup
+    name: Install dependencies and the om skills
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm install-skills
+  - id: implement
+    name: om-auto-implement-spec
+    prompt: '/om-auto-implement-spec {{task}}'
+    model: opus
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
