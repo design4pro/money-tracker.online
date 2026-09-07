@@ -102,6 +102,7 @@
   --color-brand: #4a2a82; /* 8.94:1 on sunken, 10.80:1 on raised */
   --color-brand-hover: #35195f; /* 14.43:1 on raised */
   --color-brand-soft: #ece4f7; /* carries --color-brand as text at 8.75:1 */
+  --color-highlighter: #ece4f7; /* the settled mark's wash; carries --color-ink as text at 12.55:1 */
   --color-on-brand: #ffffff; /* 10.80:1 on brand */
 
   /* Coloured inks for state. Green ink for what is in hand, red ink for what
@@ -195,6 +196,7 @@
     --color-brand: #c5aef2; /* 7.43:1 on raised, 9.14:1 on canvas */
     --color-brand-hover: #d6c6f7; /* 11.33:1 on canvas */
     --color-brand-soft: #2b2438; /* carries --color-brand as text at 7.58:1 */
+    --color-highlighter: #523e7c; /* a lilac pen, not the selection wash; carries --color-ink at 7.33:1 */
     --color-on-brand: #16171a; /* 9.14:1 on brand */
 
     --color-positive: #7fd9a8; /* 8.59:1 on raised, 10.58:1 on canvas */
@@ -277,6 +279,7 @@
   --color-brand: #c5aef2; /* 7.43:1 on raised */
   --color-brand-hover: #d6c6f7;
   --color-brand-soft: #2b2438; /* carries --color-brand at 7.58:1 */
+  --color-highlighter: #523e7c; /* carries --color-ink at 7.33:1 */
   --color-on-brand: #16171a; /* 9.14:1 on brand */
 
   --color-positive: #7fd9a8; /* 8.59:1 on raised */

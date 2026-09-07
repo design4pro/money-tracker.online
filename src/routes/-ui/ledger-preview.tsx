@@ -65,16 +65,15 @@ import type { MessageKey } from '#/lib/i18n'
  * is not a table's loses its semantics in WebKit, so every part carries its ARIA role explicitly
  * and a screen reader keeps the table at every width.
  *
- * ## Pencil before ink, and one stamp
+ * ## Pencil before ink, and one mark
  *
  * The last entry is planned rather than booked. It is the same row in the secondary ink - pencil -
  * with the word beside its category: the two channels the ledger inside the product gives a
  * planned line. The stamp violet is spent on what is settled and never on what is not, and on
  * this page it is spent once, on the word beside the opening line: February is closed, and the
  * balance it handed over is the one figure here that nothing can move. The mark is a typed word
- * inside a one-pixel rule in the stamp ink ({@link Badge} in its `settled` tone), not a drawing of
- * a rubber stamp - the metaphor lives in rules and type - and a page that closes in pencil is not
- * stamped.
+ * with a run of highlighter behind it ({@link Badge} in its `settled` tone) - the gesture of
+ * checking a line off - and a page that closes in pencil is not marked.
  *
  * **The rows are invented and the page says so.** `PRODUCT.md` forbids fabricating evidence, and a
  * ledger fragment with no label is exactly the kind of thing a visitor could read as somebody's
@@ -351,14 +350,13 @@ export function LedgerPreview() {
           <td role="cell" className={cn(CELL, AT_DESCRIPTION)}>
             <span className={cn('text-label text-ink-2', TYPED_LINE)}>
               {t('marketing.ledger.opening')}{' '}
-              {/* The one stamp on the page. Beside the line where there is room for it; on the
+              {/* The one mark on the page. Beside the line where there is room for it; on the
                   narrow page it takes the entry's second line, where a category would go, so
                   the row keeps the two-line shape of every other entry rather than wrapping
-                  at whatever width the word happens to run out. */}
+                  at whatever width the word happens to run out. It sits on the baseline like
+                  the word it covers: a highlighter is run over the line, not placed above it. */}
               <span className="sm:ms-1 max-sm:block">
-                {/* Raised four pixels so the frame stands on the printed rule instead of
-                    crossing it: a stamp lands on the line, it is not typed on the baseline. */}
-                <Badge tone="settled" size="sm" className="relative -top-1">
+                <Badge tone="settled" size="sm">
                   {t('marketing.ledger.settled')}
                 </Badge>
               </span>

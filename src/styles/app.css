@@ -513,6 +513,73 @@
   }
 }
 
+/* --------------------------------------------------------------------------
+   HIGHLIGHTER — the settled mark.
+
+   A run of highlighter over a typed word. The wash is `highlighter` - the
+   stamp wash in light, a lilac pen in dark, because `brand-soft` there is the
+   selection tint and a highlighter has to read as a pen run over the line,
+   not as a selected row. It is drawn behind the text so the ink stays ink,
+   and it runs past both ends of the word the way a pen does: further where
+   it lifted. Its trailing edge is darker where the pen pressed, its outline
+   is roughened by the `#mark-pen-rough` displacement filter that
+   `__root.tsx` mounts once (a displacement, not a blur), and a small blob
+   sits where the pen paused before lifting. Nothing here is a raster and
+   every colour is a token, so the same rule inverts for dark.
+
+   Contrast: the text is `ink` on `highlighter` (12.55:1 light, 7.33:1 dark
+   at full strength, measured beside the token); the 75% wash only moves the
+   ground toward the page, so the pair never falls below that. In forced
+   colours the pseudo-elements lose their paint and the typed word stands
+   alone, which is what the badge means anyway.
+   -------------------------------------------------------------------------- */
+@utility mark-pen {
+  --mark-pen-pooled: color-mix(
+    in oklab,
+    var(--color-highlighter),
+    var(--color-brand) 30%
+  );
+  --mark-pen-paused: color-mix(
+    in oklab,
+    var(--color-highlighter),
+    var(--color-brand) 45%
+  );
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -5% -0.75ch -5% -0.25ch;
+    border-end-end-radius: 20px 30px;
+    background-color: var(--color-highlighter);
+    opacity: 0.75;
+    box-shadow:
+      inset -2px 0 1px var(--mark-pen-pooled),
+      inset -4px 0 5px var(--mark-pen-pooled);
+    filter: url('#mark-pen-rough');
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 2px;
+    right: -0.25em;
+    width: 0.5ch;
+    height: 1ch;
+    background: radial-gradient(
+      var(--mark-pen-paused),
+      var(--color-highlighter)
+    );
+    opacity: 0.4;
+    border-radius: 10px 0 50px / 200px 0;
+    rotate: 15deg;
+    filter: url('#mark-pen-rough');
+  }
+}
+
 /* Visible only to assistive technology. Used by every chart's data table and
    by the live regions the toast host and the field errors write into. */
 @utility sr-only-focusable {

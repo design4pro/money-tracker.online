@@ -19,6 +19,7 @@ colors:
   brand: '#4a2a82'
   brand-hover: '#35195f'
   brand-soft: '#ece4f7'
+  highlighter: '#ece4f7'
   on-brand: '#ffffff'
   positive: '#0b5136'
   positive-soft: '#dcf2e4'
@@ -214,8 +215,8 @@ components:
     padding: '0 {spacing.2}'
     typography: '{typography.caption}'
   badge-settled:
-    backgroundColor: 'transparent'
-    textColor: '{colors.brand}'
+    backgroundColor: '{colors.highlighter}'
+    textColor: '{colors.ink}'
     rounded: '{rounded.sm}'
     height: '1.25rem'
     padding: '0 {spacing.1}'
@@ -273,9 +274,9 @@ hand is quick, not a schoolroom script, and the typewriter is a working tool, no
 
 There is one stamp. Violet is the colour of a commanding action and of anything the product has
 settled: a primary button, a link, the current destination, the focus ring, the selected row, and
-the one "settled" mark itself - a typed word inside a one-pixel frame of stamp ink on the paper,
-beside the line that was carried in. It is never spent on what is planned: a page whose last
-entry is planned closes in pencil and is not stamped. A planned line is written in pencil - the second ink at
+the one "settled" mark itself - a typed word with a run of highlighter in the stamp wash behind
+it, beside the line that was carried in. It is never spent on what is planned: a page whose last
+entry is planned closes in pencil and is not marked. A planned line is written in pencil - the second ink at
 `ink-2` - and the word "Planned" beside it is the channel; the grey only agrees. Nothing is ever
 struck through, because the product has no voided line. Green ink is money in hand, red ink is
 money overdrawn, brown ink is a warning, and each is text-grade at 7:1 on the darkest ground it can
@@ -288,7 +289,8 @@ as paper rather than as a grid. Dark is the same book read on a phone at night -
 ink, lilac stamp - designed as a second set of values rather than inverted from the first. The
 three risks the world was built to avoid are: reading as school-like or childish (so the hand is
 bold, adult and never decorated), as retro or nostalgic (so there is no texture, no aged paper, no
-faux stamp graphic - the metaphor lives in rules and type only), and as too little like an
+faux stamp graphic - the metaphor lives in rules and type, and the one drawn gesture is the
+highlighter run over a settled line), and as too little like an
 application (so every control is a React Aria primitive with a 3:1 boundary, a 44px target and a
 two-ring focus indicator).
 
@@ -322,6 +324,10 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   `#c5aef2` (7.43:1 on raised) and the fill carries slate ink on it at 9.14:1.
 - **Stamp Wash** (`brand-soft`): the tint under a selected row and a brand card. It carries
   `brand` as readable text at 8.75:1 (dark: 7.58:1), so it is a real ground rather than decoration.
+- **Highlighter** (`highlighter`): the wash of the settled mark. In light it is the stamp wash
+  itself (`#ece4f7`, carrying `ink` at 12.55:1); in dark it is a lilac pen (`#523e7c`, carrying
+  `ink` at 7.33:1) rather than the selection tint, because a highlighter run over a line has to
+  read as a pen and not as a selected row. It is spent on the `settled` badge and nowhere else.
 
 ### Tertiary - the coloured inks
 
@@ -370,10 +376,10 @@ is never text.
 
 **The One Stamp Rule.** Violet is spent on what commands and on what is settled - the primary
 action, a link, the current destination, the focus ring, the selected row. It is never spent on a
-planned line, a decoration, a heading or a divider. "Settled" has its own mark now - the `settled`
-badge tone, a typed word in a one-pixel `brand` frame on the paper, not on a wash - and it is the
-only status that may carry `brand`. If a screen needs a second violet thing, one of them is not an
-action.
+planned line, a decoration, a heading or a divider. "Settled" has its own mark - the `settled`
+badge tone, a typed word in `ink` with a run of `highlighter` wash behind it - and it is the
+only status that may spend the stamp ink. If a screen needs a second violet thing, one of them is
+not an action.
 
 **The Pencil Rule.** A planned entry is written in `ink-2` with the word beside it; a booked entry
 is written in `ink`. State is line form before hue, and nothing is ever struck through.
@@ -483,7 +489,7 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
   month) reads its balance from the last line rather than retyping it, and sits over the heavier
   `border-panel` rule that is the foot of the form - the same rule that sits under the column
   headings. When the last entry is planned, the balance carried forward is written in pencil
-  like the line that produced it, and the page is not stamped.
+  like the line that produced it, and the page is not marked.
 - **The summary strip**: three typed lines in a `dl`, label at the start, figure at the end, a
   `border-t` rule under each - never three tiles.
 - **Reading measure**: `prose-measure` caps running text at 64ch and sets the reading leading
@@ -640,14 +646,17 @@ A slip laid on the paper, for content that needs its own ground. Not the scaffol
 (ruled, `border-strong` on `surface`), `accent`, `brand`, `positive`, `negative`, `warning`,
 `info`, and `settled`; every tinted tone pairs a `-soft` ground with its own ink at 7:1 or better.
 **`info`** is the typed status - "Hidden", "Planned", "Auto" - in `ink-2` inside a one-pixel
-`border-panel` rule on whatever ground it lands on, no wash: the same construction as the stamp,
-in pencil and a neutral rule, so it can never be mistaken for one. **`settled`** is the stamp mark: `brand` text inside a one-pixel `brand` rule with no
-wash, on the paper rather than on a tint, typed at the small size (micro, uppercase, 0.06em, 20px
-high). It is the only status that carries `brand` and the only "settled" mark in the product; it
-is never placed on a planned line. On the landing it stands once, beside the passbook's opening
-line, raised 4px (`relative -top-1`) so the frame's bottom edge sits on the printed rule instead
-of crossing it; on the narrow page it is the second line of the opening entry. No rotation, no
-texture, no double rule - it is a badge, not a drawing of a stamp. A category carries its series
+`border-panel` rule on whatever ground it lands on, no wash: a ruled label, so it can never be
+mistaken for the mark. **`settled`** is the highlighter (`mark-pen` in `app.css`): the word typed
+in `ink` at the small size (micro, uppercase, 0.06em, 20px high) with a run of `highlighter` drawn
+behind it at 75%, past both ends of the word and further where the pen lifted, pooled darker at
+its trailing edge, its outline roughened by the one SVG displacement filter in the product
+(mounted once in `__root.tsx`), and a small blob where the pen paused. Every colour in it is a
+token, so it inverts for dark; in forced colours the wash drops and the typed word remains. It is
+the only status that spends the stamp ink and the only "settled" mark in the product; it is never
+placed on a planned line. On the landing it stands once, beside the passbook's opening line, on
+the baseline of the word it follows, the wash crossing the printed rule the way a pen does; on the
+narrow page it is the second line of the opening entry. A category carries its series
 colour as a dot beside its name; the colour is never the only identifier.
 
 ### Tables
@@ -733,8 +742,8 @@ still fire.
 - **Do** spend violet on actions and on what is settled - the primary button, links, the current
   destination, the focus ring, the selected row - and nowhere else.
 - **Do** write a planned line in `ink-2` with the word beside it, and a booked line in `ink`.
-- **Do** mark what is settled with the `settled` badge - a typed word in a one-pixel `brand`
-  frame on the paper - and give a page both ends: a balance carried in on the first line and a
+- **Do** mark what is settled with the `settled` badge - a typed word with a run of `highlighter`
+  wash behind it - and give a page both ends: a balance carried in on the first line and a
   balance carried forward, read not retyped, on the last, over the heavier `border-panel` rule.
 - **Do** give every amount an explicit sign (U+2212 for out, `+` for in), set inflow bold and
   outflow regular, and mark a transfer with the repeat glyph.
@@ -764,10 +773,11 @@ still fire.
 - **Don't** use emoji, a glyph icon set, or a system display face; icons are lucide and the faces
   are the two self-hosted ones.
 - **Don't** spend violet on a planned line, a decoration, a heading or a divider; never put the
-  `settled` mark on a planned line or stamp a page that closes in pencil; and don't strike
+  `settled` mark on a planned line or mark a page that closes in pencil; and don't strike
   anything through - there is no voided line.
 - **Don't** add texture, aged paper, a faux stamp graphic, or a decorative flourish; the metaphor
-  lives in rules and type, and the world must not read as retro or as a schoolbook.
+  lives in rules and type, the highlighter run over a settled line is the one drawn gesture, and
+  the world must not read as retro or as a schoolbook.
 - **Don't** paint text in a series colour, encode direction or status by colour alone, abbreviate
   money outside a chart axis, or render an amount from a float.
 - **Don't** use negative tracking on either face.

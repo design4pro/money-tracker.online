@@ -20,15 +20,17 @@ export const badgeVariants = cva(
         /**
          * A neutral status with no verdict - "Hidden", "Planned", "Auto". Typed in pencil inside
          * a one-pixel `border-panel` rule on whatever ground it lands on: a ruled label, not a
-         * stamp and not a wash. Only `settled` carries the stamp ink.
+         * wash. Only `settled` carries the stamp ink.
          */
         info: 'border-border-panel text-info',
         /**
-         * The stamp: a typed word framed by a one-pixel rule in the stamp ink, on the paper itself
-         * rather than on a wash. It is the mark the product puts on what is settled, and the one
-         * status that may carry the brand colour. Never on what is planned.
+         * The highlighter: the typed word stays in `ink`, and a run of `highlighter` is drawn
+         * behind it the way a pen is run over a line that has been checked - past both ends,
+         * pooled where it pressed, roughened at the edge (`mark-pen` in app.css). It is the mark
+         * the product puts on what is settled, and the one status that spends the stamp ink.
+         * Never on what is planned.
          */
-        settled: 'border-brand text-brand',
+        settled: 'mark-pen border-transparent text-ink',
       },
       size: {
         sm: 'h-5 px-1.5 text-micro tracking-label uppercase',
@@ -58,13 +60,14 @@ export interface BadgeProps
  * A badge is not a button. If it can be clicked it is a `Button` with
  * `shape="pill"`, so it gets a focus ring and a 44px hit area.
  *
- * ### `info` is pencil, `settled` is the stamp
+ * ### `info` is pencil, `settled` is the highlighter
  *
  * Violet is spent on what commands and on what is settled, so a status never
  * wears it: `info` is `ink-2` inside a neutral rule, and `settled` is the one
- * tone that carries `brand`. Pick by meaning: `brand` is for the rare badge
- * that is part of the product's own voice and would follow a rebrand; a status
- * with no valence is `info`. **When in doubt the answer is `info`.**
+ * tone that spends the stamp ink, as the wash behind the word. Pick by
+ * meaning: `brand` is for the rare badge that is part of the product's own
+ * voice and would follow a rebrand; a status with no valence is `info`.
+ * **When in doubt the answer is `info`.**
  */
 export function Badge({
   className,

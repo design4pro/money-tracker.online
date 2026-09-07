@@ -345,6 +345,22 @@ function RootDocument({ children }: { children: ReactNode }) {
           <SkipLink />
           {children}
         </I18nProvider>
+        {/* The one SVG filter in the product: the roughened edge of the highlighter mark
+            (`mark-pen` in app.css). A `filter: url(#id)` has to find its definition in the same
+            document - WebKit resolves neither an external nor a data-URI reference - so it is
+            mounted once here rather than beside each mark. It paints nothing itself. */}
+        <svg aria-hidden="true" focusable="false" className="absolute size-0">
+          <defs>
+            <filter id="mark-pen-rough">
+              <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.08"
+                numOctaves="4"
+              />
+              <feDisplacementMap in="SourceGraphic" scale="5" />
+            </filter>
+          </defs>
+        </svg>
         <Scripts />
       </body>
     </html>
