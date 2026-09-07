@@ -218,3 +218,17 @@ describe('guard-read.sh', () => {
     expect(read({ path: root, pattern: '**/test-env.env' }).status).toBe(2)
   })
 })
+
+describe('.husky/pre-commit', () => {
+  // Cezar forwards CEZ_* into the agent's env and drops HUSKY, so the hook itself is what keeps
+  // lint-staged, typecheck and the full test run out of a run's commits (ADR 0017, Husky).
+  it('exits at once, without running anything, inside a cezar run', () => {
+    const r = spawnSync('/bin/sh', ['-e', resolve(HOOKS, '../../.husky/pre-commit')], {
+      encoding: 'utf8',
+      env: { PATH: '/nonexistent', ...AGENT }, // no pnpm, no npx: a fall-through would fail
+      timeout: 5_000,
+    })
+    expect(r.status).toBe(0)
+    expect(r.stdout + r.stderr).toBe('')
+  })
+})

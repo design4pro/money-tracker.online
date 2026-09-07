@@ -84,9 +84,11 @@ PR.
 upgrade, `om-apply-upgrade-notes` reconciles the descriptors.
 
 **Husky.** `package.json` runs `husky` on `prepare`, and every `pnpm install` in a worktree rewrites
-`core.hooksPath` in the git config the worktrees share. The setup step of every Cezar workflow and
-the cockpit's service environment carry `HUSKY=0`; the gate is `validation.commands`, not a
-pre-commit hook.
+`core.hooksPath` in the git config the worktrees share. The setup step of every Cezar workflow
+carries `HUSKY=0`, and `.husky/pre-commit` exits at once when `CEZ_TASK_ID` is set; the gate is
+`validation.commands`, not a pre-commit hook. (Amended 2026-09-07: the first draft also put
+`HUSKY=0` in the cockpit's service environment, but Cezar 0.10 forwards only an allowlist plus
+`CEZ_*` into the agent's env, so the hook ran on every commit of the first `om-fix-issue` run.)
 
 ## Migration
 

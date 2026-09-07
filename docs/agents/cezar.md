@@ -20,12 +20,17 @@ the rules of `SDLC.md`.
   `om-*` skill into `.claude/skills/`; both are gitignored, so every worktree installs its own copy
   in the workflow's setup step. Repo specifics live in `.ai/skills/om-<name>/SKILL.md` as
   extensions of the installed skill. After an upgrade, read the diff with `/om-apply-upgrade-notes`.
-- Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, `HUSKY=0`, and never
-  `GH_TOKEN`, `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar copies its own env into the agent's,
-  so a token in the service env is a token in every run. `HUSKY=0` keeps a worktree's
-  `pnpm install` from running `prepare`, which would rewrite `core.hooksPath` in the host clone's
-  shared config, and makes husky skip its hooks inside a run: the gate a run passes is
-  `validation.commands` in `.ai/agentic.config.json`, not pre-commit.
+- Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, and never `GH_TOKEN`,
+  `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar builds the agent's env from an allowlist
+  (`PATH`, `HOME`, toolchain prefixes such as `NODE_*`/`PNPM_*`, `GH_TOKEN`, `ANTHROPIC_*`,
+  `CLAUDE_*`, `CEZ_*`), so a token in the service env is a token in every run, and any other
+  variable set there (`HUSKY=0` for one) never reaches the agent. Husky is therefore handled in
+  the repo: `HUSKY=0` inline in every workflow's setup step keeps `pnpm install` from running
+  `prepare`, which would rewrite `core.hooksPath` in the host clone's shared config, and
+  `.husky/pre-commit` exits at once when `CEZ_TASK_ID` is set. The gate a run passes is
+  `validation.commands` in `.ai/agentic.config.json`, not pre-commit: the first `om-fix-issue`
+  run (PR #64) paid for lint-staged, typecheck and the full test run on every commit, and the
+  test run flaked under the load of a second worktree.
 - Host identity: a dedicated `HOME` whose `gh` holds a fine-grained PAT (Contents, Issues and Pull
   requests read/write; **no Workflows, no Administration**: a run cannot push under
   `.github/workflows/` or delete a label), over HTTPS. Commits carry `user.name
@@ -60,8 +65,9 @@ edit to the plist. Once it is installed, stop running bare `cezar` in a repo. Lo
 
 ## Agent mode
 
-A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTIONS` is set. The
-hooks in `.claude/hooks/` then tighten:
+A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTIONS` is set.
+`.husky/pre-commit` skips itself under `CEZ_TASK_ID` (`validation.commands` is the run's gate),
+and the hooks in `.claude/hooks/` tighten:
 
 - `git-guardrails.sh` also blocks `pnpm add|remove|update` (the stack is pinned, `docs/SPEC.md`
   §3), `printenv` and `env` dumps. For everyone it blocks force-pushes to `develop`/`main`,
@@ -163,11 +169,12 @@ claiming issues the new ones handle.
 
    Then `/om-auto-manage-issues` over the open issues adds the missing priority and risk.
 
-4. Re-render the cockpit plist from the template (it pins 0.10.1 and adds `HUSKY=0`),
+4. Re-render the cockpit plist from the template (it pins 0.10.1),
    `launchctl bootout gui/$(id -u)/dev.cezar.cockpit`, `bootstrap` it again, and check
    `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4321/api/v1/p/money-tracker-online/runs`
    answers 200. On the host clone, `git config core.hooksPath` should be unset or `.husky/_`;
-   either is fine with `HUSKY=0`.
+   either is fine, since the hook skips itself inside a run. An installed copy that still
+   carries `HUSKY=0` can stay: cezar drops it before the agent starts.
 5. `scripts/cezar/automations.sh --dry-run`, then without the flag: `issue-opened` and `pr-opened`
    are created enabled.
 6. Verify end to end: open a test issue with the Bug form → within a minute an `om-manage-issue`
