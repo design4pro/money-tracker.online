@@ -116,7 +116,7 @@ export function GoalCard({ goal, actions }: GoalCardProps) {
           </p>
         </div>
 
-        <div className="relative flex shrink-0 items-center gap-2">
+        <div className="relative z-10 flex shrink-0 items-center gap-2">
           {isArchived ? (
             <Badge tone="neutral">{t('goals.status.archived')}</Badge>
           ) : null}

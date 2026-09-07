@@ -172,6 +172,7 @@ export type {
   CategoryKind,
   TagReminderKind,
   TagReminderFrequency,
+  PayeeCategorizationMode,
   PayeeLogoSource,
   AccountCategory,
   AccountStatus,
@@ -187,6 +188,7 @@ export type {
   RecurringPeriodStatus,
   RecurringMatchSource,
   RecurringLinkStatus,
+  RecurringCandidateStatus,
   BudgetKind,
   BudgetStatus,
   BudgetPeriod,
@@ -879,9 +881,6 @@ export const tagReminders = sqliteTable(
 )
 
 export type TagReminderRow = typeof tagReminders.$inferSelect
-
-export type PayeeCategorizationMode =
-  (typeof PAYEE_CATEGORIZATION_MODES)[number]
 
 /** Who was paid, or who paid. */
 export const payees = sqliteTable(
@@ -2207,9 +2206,6 @@ export const recurringLinks = sqliteTable(
 )
 
 export type RecurringLinkRow = typeof recurringLinks.$inferSelect
-
-export type RecurringCandidateStatus =
-  (typeof RECURRING_CANDIDATE_STATUSES)[number]
 
 /**
  * "These four rows look like a monthly subscription. Shall I make it one?"

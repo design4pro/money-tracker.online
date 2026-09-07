@@ -87,6 +87,8 @@ export type TagReminderFrequency = (typeof TAG_REMINDER_FREQUENCIES)[number]
  * Groceries are different facts.
  */
 export const PAYEE_CATEGORIZATION_MODES = ['enforce', 'hint', 'off'] as const
+export type PayeeCategorizationMode =
+  (typeof PAYEE_CATEGORIZATION_MODES)[number]
 
 /** Where a payee's brand mark came from. `manual` is never overwritten by the fetcher. */
 export const PAYEE_LOGO_SOURCES = ['auto', 'manual'] as const
@@ -246,6 +248,8 @@ export const RECURRING_CANDIDATE_STATUSES = [
   'accepted',
   'dismissed',
 ] as const
+export type RecurringCandidateStatus =
+  (typeof RECURRING_CANDIDATE_STATUSES)[number]
 
 /** `category` follows a set of categories; `manual` follows transactions added by hand. */
 export const BUDGET_KINDS = ['manual', 'category'] as const

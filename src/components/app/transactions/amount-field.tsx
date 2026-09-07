@@ -150,7 +150,7 @@ export function AmountField({
           minimumFractionDigits: digits,
           maximumFractionDigits: digits,
         }}
-        suffix={<span className="pe-1 tabular">{currencyCode}</span>}
+        suffix={<span className="tabular">{currencyCode}</span>}
         aria-describedby={currencyId}
       />
       <span id={currencyId} className="sr-only">
