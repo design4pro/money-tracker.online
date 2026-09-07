@@ -57,7 +57,7 @@ export function YAxis({
           x={plot.left - 8}
           y={plot.top - 8}
           textAnchor="end"
-          className="fill-ink-2 text-[11px]"
+          className="fill-ink-2 text-caption"
         >
           {unit}
         </text>
@@ -79,7 +79,7 @@ export function YAxis({
               y={y}
               textAnchor="end"
               dominantBaseline="middle"
-              className="fill-ink-2 text-[11px] tabular-nums"
+              className="fill-ink-2 text-caption tabular-nums"
             >
               {format(tick)}
             </text>
@@ -142,8 +142,8 @@ export function XAxis({
           textAnchor="middle"
           className={
             emphasis?.[index] === true
-              ? 'fill-ink text-[11px] font-semibold'
-              : 'fill-ink-2 text-[11px]'
+              ? 'fill-ink text-caption font-semibold'
+              : 'fill-ink-2 text-caption'
           }
         >
           {labels[index]}

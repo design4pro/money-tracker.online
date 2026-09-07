@@ -3,7 +3,6 @@ import { ChevronRight, CreditCard, Shapes, Store, Users } from 'lucide-react'
 
 import { writeLocaleCookie } from '#/components/app/shell'
 import {
-  Badge,
   Card,
   CardBody,
   CardHeader,
@@ -17,6 +16,7 @@ import { THEME_MODES, useTheme } from '#/lib/theme'
 import type { ComponentType, ReactNode } from 'react'
 import type { Locale, MessageKey } from '#/lib/i18n'
 import type { ThemeMode } from '#/lib/theme'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/settings` — where the product is configured.
@@ -48,6 +48,7 @@ import type { ThemeMode } from '#/lib/theme'
  * pressed. A Save button with nothing to save would be a lie about where the value went.
  */
 export const Route = createFileRoute('/_app/settings/')({
+  head: ({ matches }) => pageHead(matches, (t) => t('nav.settings')),
   component: SettingsRoute,
 })
 
@@ -244,9 +245,9 @@ function SettingsCard({
         title={title}
         description={
           <>
-            <Badge tone="info" size="sm">
+            <span className="block text-micro tracking-label uppercase text-ink-2">
               {t(SCOPE_LABEL[scope])}
-            </Badge>
+            </span>
             <span className="mt-2 block">{description}</span>
           </>
         }

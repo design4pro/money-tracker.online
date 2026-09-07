@@ -44,6 +44,7 @@ import { InviteDialog } from './-ui/invite-dialog'
 import type { WorkspaceRole } from '#/components/app/shell'
 import type { MessageKey } from '#/lib/i18n'
 import type { WorkspaceMember } from '#/server/repos/members'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/settings/members` — who shares this household, and who may change that.
@@ -71,6 +72,7 @@ export const Route = createFileRoute('/_app/settings/members')({
   loader: async () => ({ members: await loadMembers() }),
   pendingComponent: MembersSkeleton,
   errorComponent: MembersError,
+  head: ({ matches }) => pageHead(matches, (t) => t('members.title')),
   component: MembersRoute,
 })
 

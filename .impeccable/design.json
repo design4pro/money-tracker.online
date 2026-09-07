@@ -883,6 +883,11 @@
         "purpose": "The landing page well (max-w-6xl)."
       },
       {
+        "name": "reading-measure",
+        "value": "64ch; line-height 1.6; paragraph gap 1.5em",
+        "purpose": "prose-measure caps running text at --measure (576px under text-body, 461px under text-caption) with --leading-reading and --paragraph-gap. Inline caps of 60-68ch remain on a few descriptions; all sit under the 80-character ceiling of WCAG 1.4.8."
+      },
+      {
         "name": "target-min",
         "value": "2.75rem",
         "purpose": "44px hit area grown inside the primitive."
@@ -973,7 +978,7 @@
       "refersTo": "typography.title",
       "description": "A Caveat heading pinned to the printed rules by a translate, with the typed body beneath it. The unit of every section on the landing.",
       "html": "<section class=\"ds-ruled\"><h2 class=\"ds-hand\">Every line, and<br>what is left after it.</h2><p class=\"ds-typed\">A household kept in Polish zloty, holding an expense made in euro. The figure you entered never changes.</p></section>",
-      "css": ".ds-ruled { max-width: 30rem; padding: 0 0 2.5rem; font-family: var(--font-sans); color: var(--color-ink); background-image: repeating-linear-gradient(to bottom, transparent 0 calc(2.5rem - 1px), var(--color-border-subtle) calc(2.5rem - 1px) 2.5rem); } .ds-hand { margin: 0; font-family: var(--font-display); font-size: var(--text-title); font-weight: 700; line-height: 2.5rem; letter-spacing: 0; translate: 0 calc(1.25rem - 0.33em); } .ds-typed { margin: 1.25rem 0 0; font-size: var(--text-body); line-height: 1.55; max-width: 64ch; }"
+      "css": ".ds-ruled { max-width: 30rem; padding: 0 0 2.5rem; font-family: var(--font-sans); color: var(--color-ink); background-image: repeating-linear-gradient(to bottom, transparent 0 calc(2.5rem - 1px), var(--color-border-subtle) calc(2.5rem - 1px) 2.5rem); } .ds-hand { margin: 0; font-family: var(--font-display); font-size: var(--text-title); font-weight: 700; line-height: 2.5rem; letter-spacing: 0; translate: 0 calc(1.25rem - 0.33em); } .ds-typed { margin: 1.25rem 0 0; font-size: var(--text-body); line-height: var(--leading-reading); max-width: var(--measure); }"
     }
   ],
   "narrative": {

@@ -6,6 +6,7 @@ import { useTranslate } from '#/lib/i18n'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
 import type { InvitationView } from '#/server/repos/members'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/invite/$invitationId` — the screen an invited person lands on.
@@ -52,6 +53,12 @@ export const Route = createFileRoute('/invite/$invitationId')({
     }
   },
   errorComponent: InvitationMissing,
+  head: ({ matches, loaderData }) =>
+    pageHead(matches, (t) =>
+      loaderData === undefined
+        ? undefined
+        : t('invite.title', { workspace: loaderData.invitation.workspaceName }),
+    ),
   component: InvitationRoute,
 })
 

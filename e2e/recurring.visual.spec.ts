@@ -81,18 +81,22 @@ test('what is due is said in words, not carried by a colour', async ({
 }) => {
   await gotoApp(page, '/recurring?status=all')
 
-  // The due-soon table prints a status word in its own cell on every row. Which word depends on
-  // where the fixture's dates fall relative to the day the suite runs, so the assertion is that
-  // one of the four is there - a row carrying its state only as a tint would match none of them
-  // and leave a greyscale reader with nothing.
+  // The due-soon table prints a status word in its own cell on every row whenever a row is late;
+  // when every row is merely upcoming the column is left out, because one word repeated down the
+  // table says nothing. Which case the fixture lands in depends on where its dates fall relative to
+  // the day the suite runs, so the assertion is: if the column is there, one of the four words is
+  // on every row - a row carrying its state only as a tint would match none of them and leave a
+  // greyscale reader with nothing.
   const table = page
     .getByRole('region', { name: 'Due soon' })
     .getByRole('table')
   await expect(table).toBeVisible()
   const rows = await table.getByRole('row').allTextContents()
   expect(rows.length).toBeGreaterThan(1)
-  for (const row of rows.slice(1)) {
-    expect(row).toMatch(/Upcoming|Overdue|Paid|Skipped/)
+  if (rows[0]?.includes('Status')) {
+    for (const row of rows.slice(1)) {
+      expect(row).toMatch(/Upcoming|Overdue|Paid|Skipped/)
+    }
   }
 
   // And every series card says where its next period stands as a sentence, not as a bare date the

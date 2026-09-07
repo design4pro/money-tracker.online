@@ -58,7 +58,7 @@ export function CategoryAllocation({
             {categories.map((category) => (
               <li
                 key={category.id}
-                className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface px-2.5 py-1 text-caption text-ink"
+                className="inline-flex h-6 items-center gap-2 rounded-sm border border-border-strong bg-surface px-2 text-caption text-ink"
               >
                 <span
                   aria-hidden="true"

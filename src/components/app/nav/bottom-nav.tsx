@@ -1,5 +1,5 @@
-import { Ellipsis } from 'lucide-react'
-import { useState } from 'react'
+import { Ellipsis, Plus } from 'lucide-react'
+import { Fragment, useState } from 'react'
 
 import {
   Button,
@@ -25,13 +25,22 @@ export interface BottomNavProps {
 }
 
 /**
- * The phone's primary navigation: three tabs and a *More* sheet.
+ * The phone's primary navigation: three tabs, the one stamp, and a *More* sheet.
  *
- * This is a designed layout rather than a squeezed rail. At 360px four cells get 90px each, which
- * is comfortably enough for a 20px glyph over a 12px label that stays whole in Polish as well as
- * in English — `Transakcje` is the longest of the four and it fits. A fifth cell takes that to
- * 72px, where it does not, and that measurement rather than the count is what fixes
- * `BOTTOM_BAR_TAB_COUNT` at three.
+ * This is a designed layout rather than a squeezed rail. At 360px the four labelled cells get
+ * 78px each once the 48px stamp cell in the middle has taken its share, and 74px of that is
+ * label room: enough for a 20px glyph over a 12px label that stays whole in Polish as well as
+ * in English — `Transakcje` is the longest of the four at 72px and it fits. A fifth *labelled*
+ * cell would take that to 62px, where it does not, and that measurement rather than the count
+ * is what fixes `BOTTOM_BAR_TAB_COUNT` at three.
+ *
+ * ## The stamp in the middle
+ *
+ * "New transaction" is an action, not a destination, so it is not a row of `destinations.ts` and never
+ * carries `aria-current`: it is a link to the new-entry form drawn as the primary button, the one
+ * violet fill on the bar. It sits between the tabs so a thumb reaches it from either side, and
+ * it is a plain `<a>` with an accessible name rather than a floating button over the content -
+ * nothing floats at rest, and a thing that covers the last row of a list is not reachable.
  *
  * The overflow sheet is here because there is now something to put in it. The bar carried every
  * destination as a tab while budgets, recurring and goals were unbuilt; with seven rows a sheet is
@@ -69,19 +78,48 @@ export function BottomNav({ pathname }: BottomNavProps) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-nav border-t border-border-subtle bg-canvas pb-[var(--safe-bottom)] lg:hidden">
       <nav aria-label={t('nav.primary')}>
-        <ul className="grid grid-cols-4">
-          {BOTTOM_BAR_DESTINATIONS.map((destination) => (
-            <li key={destination.id} className="min-w-0">
-              <Link
-                href={destination.href}
-                variant="unstyled"
-                aria-current={destination.id === activeId ? 'page' : undefined}
-                className={cn(TAB_SHAPE, tabTone(destination.id === activeId))}
-              >
-                {destination.id === activeId ? <ActiveRule /> : null}
-                <TabFace Icon={destination.Icon} label={t(destination.label)} />
-              </Link>
-            </li>
+        <ul className="grid grid-cols-[1fr_1fr_auto_1fr_1fr]">
+          {BOTTOM_BAR_DESTINATIONS.map((destination, index) => (
+            // The stamp is inserted in the DOM where it is drawn, so the tab order and the
+            // visual order agree; a `grid-column` or `order` trick would separate them.
+            <Fragment key={destination.id}>
+              {index === CREATE_CELL_AT ? (
+                <li className="min-w-0">
+                  <Link
+                    href="/transactions/new"
+                    variant="unstyled"
+                    aria-label={t('transactions.create')}
+                    className="flex h-16 w-12 items-center justify-center"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="grid size-10 place-items-center rounded-md bg-accent text-on-accent shadow-card"
+                    >
+                      <Plus className="size-5" />
+                    </span>
+                  </Link>
+                </li>
+              ) : null}
+              <li className="min-w-0">
+                <Link
+                  href={destination.href}
+                  variant="unstyled"
+                  aria-current={
+                    destination.id === activeId ? 'page' : undefined
+                  }
+                  className={cn(
+                    TAB_SHAPE,
+                    tabTone(destination.id === activeId),
+                  )}
+                >
+                  {destination.id === activeId ? <ActiveRule /> : null}
+                  <TabFace
+                    Icon={destination.Icon}
+                    label={t(destination.label)}
+                  />
+                </Link>
+              </li>
+            </Fragment>
           ))}
           <li className="min-w-0">
             {/*
@@ -143,9 +181,12 @@ export function BottomNav({ pathname }: BottomNavProps) {
   )
 }
 
+/** Which tab the stamp cell is drawn before: the middle of the four labelled cells. */
+const CREATE_CELL_AT = Math.ceil(BOTTOM_BAR_DESTINATIONS.length / 2)
+
 /** The cell both tab kinds fill. Identical for the link and the button, so they cannot drift. */
 const TAB_SHAPE =
-  'relative flex h-16 w-full flex-col items-center justify-center gap-1 px-1 text-caption'
+  'relative flex h-16 w-full flex-col items-center justify-center gap-1 px-0.5 text-caption'
 
 /**
  * The current tab is marked three ways - `aria-current`, a one-pixel rule along the top edge, and

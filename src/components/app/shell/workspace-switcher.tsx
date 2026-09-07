@@ -23,6 +23,15 @@ const ROLE_LABEL: Readonly<Record<WorkspaceRole, MessageKey>> = {
 
 export interface WorkspaceSwitcherProps {
   shell: ShellData
+  /**
+   * Whether the household's initials are drawn before its name. Defaults to on, for the rail.
+   * The phone header turns it off: there the switcher sits inches from the account menu, whose
+   * trigger is also an initials disc, and a household called "Demo Household" beside a person
+   * called "Demo Household" is two identical "DH" marks with nothing to tell them apart. The
+   * name, the role and the chevron are the switcher's own identity; the disc stays on the
+   * account menu, where it is the only mark.
+   */
+  showAvatar?: boolean
 }
 
 /**
@@ -49,20 +58,26 @@ export interface WorkspaceSwitcherProps {
  * the whole tree is rebuilt against the new scope at once, and it is what the sign-in path does for
  * the same reason.
  */
-export function WorkspaceSwitcher({ shell }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({
+  shell,
+  showAvatar = true,
+}: WorkspaceSwitcherProps) {
   const t = useTranslate()
   const [isSwitching, setSwitching] = useState(false)
   const roleLabel = t(ROLE_LABEL[shell.role])
+  const avatar = showAvatar ? (
+    <Avatar
+      size="md"
+      name={shell.workspace.name}
+      src={shell.workspace.logo}
+      isDecorative
+    />
+  ) : null
 
   if (shell.workspaces.length < 2) {
     return (
       <div className="flex min-w-0 items-center gap-2.5 py-1">
-        <Avatar
-          size="md"
-          name={shell.workspace.name}
-          src={shell.workspace.logo}
-          isDecorative
-        />
+        {avatar}
         <WorkspaceIdentity name={shell.workspace.name} role={roleLabel} />
       </div>
     )
@@ -77,14 +92,7 @@ export function WorkspaceSwitcher({ shell }: WorkspaceSwitcherProps) {
         className="h-auto min-w-0 max-w-64 gap-2.5 px-2 py-1.5"
         isPending={isSwitching}
         aria-label={`${t('app.workspace.switch')}: ${shell.workspace.name}`}
-        icon={
-          <Avatar
-            size="md"
-            name={shell.workspace.name}
-            src={shell.workspace.logo}
-            isDecorative
-          />
-        }
+        icon={avatar}
         iconAfter={
           <ChevronsUpDown aria-hidden="true" className="size-4 text-ink-2" />
         }

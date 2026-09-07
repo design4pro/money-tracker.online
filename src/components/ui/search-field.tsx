@@ -6,8 +6,15 @@ import {
 import { Search, X } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { Description, FieldError, FieldGroup, Label, fieldRow } from './field'
-import { composeTw, fieldSizes, transitionBase } from './shared'
+import {
+  Description,
+  FieldError,
+  FieldGroup,
+  Label,
+  fieldEndButton,
+  fieldRow,
+} from './field'
+import { composeTw, fieldSizes } from './shared'
 
 import type { SearchFieldProps as RACSearchFieldProps } from 'react-aria-components'
 import type { ReactNode } from 'react'
@@ -57,7 +64,7 @@ export function SearchField({
     >
       {label === undefined ? null : <Label>{label}</Label>}
 
-      <FieldGroup className={cn(fieldSizes[size], 'gap-2')}>
+      <FieldGroup className={cn(fieldSizes[size], 'gap-2 pe-0')}>
         <Search aria-hidden="true" className="size-4 shrink-0 text-ink-2" />
         <RACInput
           placeholder={placeholder}
@@ -66,15 +73,12 @@ export function SearchField({
         <RACButton
           aria-label={clearLabel}
           className={cn(
-            'grid size-6 shrink-0 place-items-center rounded-full text-ink-2 cursor-pointer target-min',
-            transitionBase,
-            'data-[hovered]:bg-hover data-[hovered]:text-ink',
-            'data-[pressed]:bg-press',
-            'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:outline-offset-2',
+            // The field's end cap, the same box as the date picker's trigger: see `fieldEndButton`
+            // for why a small round button here was a touch defect.
+            fieldEndButton,
             // Hidden rather than unmounted: an unmount while the button holds
             // focus drops the keyboard user back to the document body.
             'group-data-[empty]/search:invisible group-data-[empty]/search:pointer-events-none',
-            '[&_svg]:size-3.5',
           )}
         >
           <X />

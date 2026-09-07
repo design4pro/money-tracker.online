@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 
 import { requireOrg } from '#/server/auth/guards'
-import { IMPORT_SOURCES } from '#/server/db/schema'
+import { IMPORT_SOURCES } from '#/lib/enums'
 import { hasParser } from '#/server/import/registry'
 import { IMPORT_MAX_BYTES } from '#/server/import/types'
 

@@ -88,7 +88,8 @@ describe('BudgetMeter', () => {
     })
     const fill = track.firstElementChild as HTMLElement
 
-    expect(fill.style.width).toBe('100%')
+    // The fill is the full track slid back by what is left; at the end of the track that is nothing.
+    expect(fill.style.getPropertyValue('--meter-fill')).toBe('0%')
     expect(track.getAttribute('aria-valuenow')).toBe('100')
     // A bar that overflows its own track says nothing a full bar does not; the percentage does.
     expect(screen.getByText('116%')).toBeTruthy()

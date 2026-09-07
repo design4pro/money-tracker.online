@@ -33,6 +33,7 @@ import type {
   TransactionDirection,
 } from '#/server/db/schema'
 import type { PeriodView } from '#/server/repos/recurring'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/recurring/$seriesId` - one series, and the record of every period it has produced.
@@ -68,6 +69,11 @@ export const Route = createFileRoute('/_app/recurring/$seriesId')({
   },
   pendingComponent: SeriesDetailSkeleton,
   errorComponent: SeriesDetailError,
+  head: ({ matches, loaderData }) =>
+    pageHead(
+      matches,
+      (t) => loaderData?.detail.series.name ?? t('recurring.title'),
+    ),
   component: SeriesDetailRoute,
 })
 

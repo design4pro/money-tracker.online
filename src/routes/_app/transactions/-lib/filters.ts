@@ -33,18 +33,21 @@
 
 import { z } from 'zod'
 
+// The module, not the barrel: `transactionSearchSchema` is the ledger's `validateSearch`, which
+// sits in the entry chunk every visitor downloads, and the barrel would bring the whole ledger
+// surface, and React Aria under it, along. See `src/routes/__root.tsx`.
 import {
   DEFAULT_LEDGER_SORT,
   LEDGER_DIRECTIONS,
   LEDGER_PAYMENT_METHODS,
   LEDGER_SORT_FIELDS,
-} from '#/components/app/transactions'
+} from '#/components/app/transactions/types'
 
 import type {
   LedgerFilters,
   LedgerPaymentMethod,
   LedgerSort,
-} from '#/components/app/transactions'
+} from '#/components/app/transactions/types'
 import type { TransactionFilters } from '#/server/repos/transaction-queries'
 
 /* -------------------------------------------------------------------------- */

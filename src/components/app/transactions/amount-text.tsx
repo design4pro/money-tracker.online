@@ -216,3 +216,45 @@ export function NetAmount({
     </span>
   )
 }
+
+export interface BalanceAmountProps {
+  readonly amountMinor: Minor
+  readonly currencyCode: CurrencyCode
+  /** After a planned line the balance is pencil like the line: what will be, not what is. */
+  readonly isPlanned?: boolean
+  readonly className?: string
+}
+
+/**
+ * The balance after a line: the passbook's spine.
+ *
+ * Bold because the spine is the form's own emphasis, `tabular` for the decimal, unsigned because a
+ * balance is a state and not a movement, and negative only through the formatter's own U+2212. The
+ * figure is handed in: it was summed by the repository from stored minor units, and nothing here
+ * adds a grosz to it.
+ */
+export function BalanceAmount({
+  amountMinor,
+  currencyCode,
+  isPlanned = false,
+  className,
+}: BalanceAmountProps) {
+  const locale = useLocale()
+  const t = useTranslate()
+  const value = money(amountMinor, currencyCode)
+
+  return (
+    <span
+      className={cn(
+        'font-bold whitespace-nowrap tabular',
+        isPlanned ? 'text-ink-2' : 'text-ink',
+        className,
+      )}
+    >
+      <span aria-hidden="true">
+        {formatMoney(locale, value, { display: 'narrowSymbol' })}
+      </span>
+      <span className="sr-only">{amountReading(t, locale, value)}</span>
+    </span>
+  )
+}

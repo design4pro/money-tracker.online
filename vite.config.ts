@@ -52,7 +52,33 @@ const e2eServerToday =
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
-  build: { sourcemap: uploadsSourceMaps ? 'hidden' : false },
+  build: {
+    sourcemap: uploadsSourceMaps ? 'hidden' : false,
+    rolldownOptions: {
+      treeshake: {
+        /**
+         * The design system has no module-level side effects, and the bundler has to be told.
+         *
+         * `src/components/ui/index.ts` re-exports every primitive, and 130-odd modules import
+         * from it. Rolldown drops a re-export edge nobody uses only when it can prove the
+         * target module pure; a wrapper whose top level calls `cva()` or `cn()`, or that
+         * imports a package without a `sideEffects` declaration, cannot be proved pure, so
+         * every one of those edges stays live for every importer. The result was one 614 kB
+         * `ui` chunk - calendar, date picker, table, grid list, number field, sonner and
+         * their React Aria hooks - loaded by the login page.
+         *
+         * Declaring the directory side-effect free is the same contract a component library
+         * states with `"sideEffects": false`, and it is true here: every module in it only
+         * defines components and class strings (the directory's own rules in `index.ts`
+         * forbid anything that fetches or registers). With it, each route reaches only the
+         * primitives it renders, and the rarely used ones land in chunks of their own.
+         */
+        moduleSideEffects: [
+          { test: /\/src\/components\/ui\//, sideEffects: false },
+        ],
+      },
+    },
+  },
   define: { __E2E_SERVER_TODAY__: e2eServerToday },
 
   /**
@@ -103,7 +129,29 @@ const config = defineConfig({
     devtools(),
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        codeSplittingOptions: {
+          /**
+           * `pendingComponent` is split off each route along with the other three.
+           *
+           * The plugin's own default leaves it in the route's reference part, which is the part
+           * every route contributes to the entry chunk. Seventeen routes declare a skeleton, and
+           * a skeleton imports the surface it stands in for - the shell, the dashboard widgets,
+           * the charts - so with the default the entry carried the whole application, React Aria,
+           * d3 and sonner included, to the marketing page. A skeleton is only ever shown after
+           * `pendingMs`, which is far longer than fetching its chunk takes, and `defaultPreload`
+           * is `intent`, so the chunk is usually there before the click lands anyway.
+           */
+          defaultBehavior: [
+            ['component'],
+            ['pendingComponent'],
+            ['errorComponent'],
+            ['notFoundComponent'],
+          ],
+        },
+      },
+    }),
     viteReact(),
     // Last on purpose: it reads the bundle the other plugins produced, so it has to run after
     // them. Inert without a token — `disable` short-circuits it before it looks for anything.

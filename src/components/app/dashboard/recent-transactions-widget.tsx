@@ -1,5 +1,8 @@
 import { EmptyState } from '#/components/ui'
 import { DirectionalAmount } from '#/components/app/accounts'
+// The module, not the transactions barrel: the barrel reaches the filter bar, the form and the
+// drag-and-drop grid, none of which a dashboard panel has any business downloading.
+import { ConvertedAmount } from '#/components/app/transactions/amount-text'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 
 import { WidgetLink } from './widget-link'
@@ -17,10 +20,13 @@ import type { DashboardTransaction } from './types'
  * the rows stay readable in greyscale, in a forced-colours theme, and to a reader with
  * deuteranopia (`docs/ACCESSIBILITY.md` §1).
  *
- * ## The row shows the amount that was entered
+ * ## The row shows the amount that was entered, and what the book holds it as
  *
- * Not its base-currency equivalent. A person recognises the transaction by the figure they typed;
- * the converted figure is what the totals are built from, and it is stated where a total is.
+ * A person recognises the transaction by the figure they typed, so that is the row's figure. When
+ * it was typed in another currency the stored base-currency equivalent is set under it in the
+ * caption, exactly as the ledger row does with `ConvertedAmount`: a `−€115.95` with no zloty line
+ * beneath it is a figure the totals on the same screen cannot be reconciled with. The equivalent
+ * is the row's stored `refAmountMinor` and is never recomputed here.
  *
  * ## The date is a calendar date
  *
@@ -40,12 +46,13 @@ import type { DashboardTransaction } from './types'
  */
 export interface RecentTransactionsWidgetProps {
   readonly transactions: ReadonlyArray<DashboardTransaction>
-  /** Kept for symmetry with the other widgets; the rows are drawn in their own currency. */
+  /** The currency of the caption under a foreign-currency row; a row in it carries no caption. */
   readonly baseCurrencyCode: CurrencyCode
 }
 
 export function RecentTransactionsWidget({
   transactions,
+  baseCurrencyCode,
 }: RecentTransactionsWidgetProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -76,7 +83,9 @@ export function RecentTransactionsWidget({
             key={entry.id}
             className="col-span-full grid grid-cols-subgrid items-baseline border-t border-border-subtle py-2.5 first:border-t-0"
           >
-            <div className="min-w-0">
+            {/* Spans both of the row's lines, so the caption under the amount sits directly
+                beneath it rather than a date line lower. */}
+            <div className="min-w-0 row-span-2">
               <p className="truncate text-body text-ink">{entry.title}</p>
               <p className="text-caption whitespace-nowrap tabular text-ink-2">
                 {formatCalendarDate(locale, entry.bookedOn)}
@@ -94,6 +103,13 @@ export function RecentTransactionsWidget({
                   : 'transactions.direction.expense',
               )}
             />
+            {entry.currencyCode === baseCurrencyCode ? null : (
+              <ConvertedAmount
+                refAmountMinor={entry.refAmountMinor}
+                refCurrencyCode={baseCurrencyCode}
+                className="col-start-3 text-end"
+              />
+            )}
           </li>
         ))}
       </ul>

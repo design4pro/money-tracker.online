@@ -170,7 +170,7 @@ export function Sparkline({
                     )}
                     y={project(reading.amountMinor) + dy}
                     textAnchor="middle"
-                    className="fill-ink-2 text-[10px]"
+                    className="fill-ink-2 text-caption"
                   >
                     {chartAmount(locale, currencyCode, reading.amountMinor)}
                   </text>

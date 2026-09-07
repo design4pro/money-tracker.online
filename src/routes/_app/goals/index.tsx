@@ -21,6 +21,7 @@ import { GoalFormDialog } from './-ui/goal-form-dialog'
 import type { Key } from 'react-aria-components'
 import type { GoalSummary } from '#/server/goals/summary'
 import { useTranslate } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/goals` — every savings goal, and how far along each one is.
@@ -64,6 +65,7 @@ export const Route = createFileRoute('/_app/goals/')({
   },
   pendingComponent: GoalListSkeleton,
   errorComponent: GoalsListError,
+  head: ({ matches }) => pageHead(matches, (t) => t('goals.title')),
   component: GoalsListRoute,
 })
 

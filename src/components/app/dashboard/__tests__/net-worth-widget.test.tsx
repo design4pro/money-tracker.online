@@ -22,22 +22,37 @@ function renderNetWorth(accountCount: number, liabilitiesMinor = -89050) {
 }
 
 describe('NetWorthWidget', () => {
-  it('keeps held and owed under their own labels', () => {
+  it('writes the total and its breakdown as three lines of one list', () => {
     renderNetWorth(3)
 
+    // Net worth is the head line of the same `dl`, not a hero figure over the pair.
     expect(screen.getAllByRole('term').map((node) => node.textContent)).toEqual(
-      ['What you hold', 'What you owe'],
+      ['Net worth', 'What you hold', 'What you owe'],
     )
     // The magnitude, not the stored sign. `liabilitiesMinor` is negative while there is debt —
     // that sign is what `netWorth = held + liabilities` is built on — but under a label that
     // already says *owe*, printing it makes the reader negate it back to learn what they owe.
     const values = screen.getAllByRole('definition')
-    expect(values.map(drawn)).toEqual(['zł 17,820.00', 'zł 890.50'])
+    expect(values.map(drawn)).toEqual([
+      'zł 16,929.50',
+      'zł 17,820.00',
+      'zł 890.50',
+    ])
     // …and the figure is spoken with its currency named, not as bare digits.
     expect(values.map(reading)).toEqual([
+      '16,929.50 Polish zlotys',
       '17,820.00 Polish zlotys',
       '890.50 Polish zlotys',
     ])
+  })
+
+  it('sets the total one step above the lines under it, never at a display size', () => {
+    renderNetWorth(3)
+    const [total, held] = screen
+      .getAllByRole('definition')
+      .map((node) => node.querySelector('span')?.getAttribute('class') ?? '')
+    expect(total).toContain('text-subtitle')
+    expect(held).toContain('text-body')
   })
 
   it('owes nothing when the liability accounts are collectively in credit', () => {
@@ -45,6 +60,7 @@ describe('NetWorthWidget', () => {
     // restating a credit as the amount owed.
     renderNetWorth(3, 64054)
     expect(screen.getAllByRole('definition').map(drawn)).toEqual([
+      'zł 18,460.54',
       'zł 17,820.00',
       'zł 0.00',
     ])

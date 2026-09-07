@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, ArrowUp } from 'lucide-react'
@@ -14,22 +15,29 @@ import { Button, Checkbox, Spinner } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 
-import { NetAmount } from './amount-text'
+import { BalanceAmount, NetAmount } from './amount-text'
 import {
-  COLUMN_COUNT,
-  COLUMN_INDEX,
-  DAY_HEADER_HEIGHT_PX,
+  DAY_BAND_HEIGHT_PX,
   HEADER_ROW,
+  bandSideFor,
+  columnIndexFor,
+  columnsFor,
   groupByDay,
   nextPosition,
+  rowHeightFor,
   samePosition,
-  virtualItemHeight,
 } from './grid-model'
-import { DESCRIPTION_TRACKS, TransactionRow } from './transaction-row'
+import {
+  CELL_BASE,
+  CELL_RULE,
+  CELL_SPINE,
+  TransactionRow,
+  descriptionTracks,
+} from './transaction-row'
+import { TYPED_LINE } from './typed-line'
 import { nameIndex } from './types'
 
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import type { CurrencyCode, Minor } from '#/lib/money'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { CellPosition } from './grid-model'
 import type { TransactionRowActions } from './transaction-row'
 import type { LedgerRow, LedgerSort, TransactionReference } from './types'
@@ -37,10 +45,17 @@ import type { LedgerRow, LedgerSort, TransactionReference } from './types'
 /**
  * The ledger: a virtualised `role="grid"` over keyset pages, grouped by day, with one tab stop.
  *
+ * ## Two books, one grid
+ *
+ * The all-accounts ledger and the passbook of one account are the same component. The passbook
+ * has a balance after every line, so it has one more column (`columnsFor`), its day band carries
+ * the balance forward instead of totalling the day, and it names no account since every line is
+ * the same one. Everything else - selection, the keyboard map, paging - is shared.
+ *
  * ## Virtualisation without lying about the size
  *
  * `@tanstack/react-virtual` keeps roughly thirty rows in the DOM, which is what makes ten thousand
- * of them scroll at frame rate — and what would otherwise tell a screen reader that the table has
+ * of them scroll at frame rate - and what would otherwise tell a screen reader that the table has
  * thirty rows in it. `aria-rowcount` is therefore the count of the **whole filtered set** (from a
  * SQL `COUNT`, not from the page) and every `<tr>` carries its true `aria-rowindex`. The two
  * spacer rows that produce the scroll height are `aria-hidden`, so they occupy pixels and not
@@ -70,7 +85,7 @@ import type { LedgerRow, LedgerSort, TransactionReference } from './types'
 
 export interface TransactionListProps {
   readonly rows: ReadonlyArray<LedgerRow>
-  /** How many rows match the filters in total — the figure `aria-rowcount` reports. */
+  /** How many rows match the filters in total - the figure `aria-rowcount` reports. */
   readonly totalRows: number
   readonly reference: TransactionReference
   readonly sort: LedgerSort
@@ -87,99 +102,133 @@ export interface TransactionListProps {
   readonly hrefFor: (id: string) => string
   /** Names the active filters, so the table's caption says what is being looked at. */
   readonly caption: string
+  /** The passbook of one account: every row carries `balanceAfterMinor` and the spine is drawn. */
+  readonly hasBalance?: boolean
+  /** Whether the rows span more than one account, so naming the account on each says something. */
+  readonly showAccount?: boolean
 }
 
 /**
- * The column headings, pinned directly beneath the app header.
+ * The wide page, where an entry is one rule. Tailwind's `lg`, read once as an external store so
+ * the virtualiser's row heights agree with the CSS that draws them. The server has no viewport and
+ * reports the wide page; a phone corrects it in the first effect and the virtualiser re-measures.
+ */
+const WIDE_QUERY = '(min-width: 64rem)'
+
+function subscribeWide(onChange: () => void): () => void {
+  const list = window.matchMedia(WIDE_QUERY)
+  list.addEventListener('change', onChange)
+  return () => list.removeEventListener('change', onChange)
+}
+
+function useIsWide(): boolean {
+  return useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia(WIDE_QUERY).matches,
+    () => true,
+  )
+}
+
+/**
+ * The column headings: one typed rule on `surface-sunken`, pinned directly beneath the app header
+ * from `sm` up, over the heavier rule the headings sit on.
  *
  * The offset composes the shell's chrome rather than restating a number: `top-0` alone pinned this
- * row at the *viewport* top, which is inside the 64px app header — same `z-nav`, later in the
- * document, so the ledger painted over the product header and the headings sat on top of the
- * workspace switcher.
- *
- * There used to be a second sticky bar above this one, naming the day of whichever row happened to
- * be at the top of the window and printing that day's net beside it. It read as a group header
- * presiding over everything below it — eight rows spanning eight different days — while its figure
- * summed only one of them. A total that does not add up the rows under it is the one mistake a
- * ledger may not make, so the running bar is gone and each day now has a real heading of its own,
- * immediately above the rows it is the total of.
+ * row at the *viewport* top, which is inside the 64px app header. Below `sm` the header is two
+ * rules (see {@link HEADER_ROW_GRID}) and is not pinned: eighty pixels of headings under sixty-four
+ * of chrome would leave a phone a third of its height to read the ledger in.
  */
-const HEADER_CELL =
-  'sticky top-[calc(var(--nav-h)+var(--impersonation-h))] z-nav bg-surface-sunken px-2 py-2 text-micro font-semibold tracking-label uppercase text-ink-2 outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
+const HEADER_CELL = cn(
+  CELL_BASE,
+  'sm:sticky sm:top-[calc(var(--nav-h)+var(--impersonation-h))] z-nav sm:bg-surface-sunken sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]',
+)
+
+/**
+ * The header below `sm`, on the same tracks as the rows: the description heading over the date
+ * (which is the sort control) on the left, the amount over the balance on the right, so it mirrors
+ * the entry it heads. The heavier rule is drawn by the row there, since its cells draw none (and
+ * paint no background, or they would cover it).
+ */
+const HEADER_ROW_GRID =
+  'max-sm:grid max-sm:grid-cols-[2.5rem_minmax(0,1fr)_auto_2.75rem] max-sm:grid-rows-[2.5rem_2.5rem] max-sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]'
+
+const HEAD_TEXT = cn(
+  'text-micro font-semibold tracking-label uppercase text-ink-2',
+  TYPED_LINE,
+)
 
 function positionKey(position: CellPosition): string {
   return `${position.row}:${position.column}`
 }
 
-interface DayHeadingProps {
-  readonly label: string
-  /** The day's signed net, or `null` while some of its rows are still to be paged in. */
-  readonly netMinor: Minor | null
-  readonly currencyCode: CurrencyCode
-  readonly netLabel: string
+interface DayBandProps {
+  readonly columnCount: number
+  readonly label: ReactNode
+  /** The words before the figure: the day's total, or what it carries forward. */
+  readonly figureLabel: string
+  readonly figure: ReactNode
 }
 
 /**
- * The heading that opens one calendar day, immediately above that day's rows.
+ * The band that opens a day in the ledger and carries the balance forward in the passbook.
  *
  * Two properties it does not get to break:
  *
- * - **It presides over exactly the rows beneath it.** Every row under this heading and above the
- *   next one shares its date, because the rows are ordered by date and the heading is emitted at
- *   each boundary.
+ * - **It presides over exactly the rows beside it.** Every row under this band and above the next
+ *   one shares its date, because the rows are ordered by date and the band is emitted at each
+ *   boundary.
  * - **The figure is the sum of those rows.** `groupByDay` nets the day, and it withholds the total
  *   for a day that is still half loaded rather than printing a number that would grow as somebody
- *   read it. A finance product that prints a total which does not add up the rows under it has
- *   failed at the only thing it is for.
+ *   read it. In the passbook the figure is the balance after the day's newest line, summed by the
+ *   repository from stored amounts, and it is pencil when that line is planned.
  *
- * It is a `<tr aria-hidden>` rather than a row of the grid — like the two virtualiser spacers — so
+ * It is a `<tr aria-hidden>` rather than a row of the grid - like the two virtualiser spacers - so
  * `aria-rowcount` and `aria-rowindex` keep describing transactions and only transactions. Nothing
  * is lost to a listener: every row speaks its own full date, and the totals under the list are the
  * authority on any sum.
  *
- * ## The total shares a right edge with the amounts it sums
+ * ## The figure shares a right edge with the column it sums
  *
- * The heading spans all five columns, so `justify-between` alone parked its figure at the table's
- * own padding edge while every row amount stopped 44px short of it — the width of the actions
- * column, which the heading does not have. A subtotal that does not line up with its addends breaks
- * the one vertical scan a ledger exists for, so the heading carries the actions column back as a
- * trailing spacer: `pe-13` is 8px of cell padding plus the 44px (`w-11`) actions track. Change one
- * of the two and this must change with it.
+ * The band spans every column, so `justify-between` alone would park its figure at the table's own
+ * edge while every row figure stops short of it by the actions column. The band carries that column
+ * back as trailing padding and the select column as leading padding, so the label starts where the
+ * titles start and the figure ends where the amounts end. Change a track and this changes with it.
  *
  * ## It is the recessed band, not another page-coloured one
  *
- * `bg-canvas` put the band 1.10:1 from the row beneath it in dark and 1.02:1 in light — a grouping
- * that is invisible on the theme half the product is read in. The band is now `surface-sunken`, the
- * darkest ground in both themes, so the ledger reads band → page → row as three distinct planes.
- * Two near-black fills cannot be pushed past ~1.24:1 without dropping the band's own label below
- * the 7:1 text floor, so the separation is not asked to come from tone alone: the top rule is a
- * full-strength `border-strong` hairline (3.6:1 in dark, 3.9:1 in light) rather than a 45%-opacity
- * one, and that rule is what survives a dim laptop screen.
+ * `surface-sunken` is the darkest ground in both themes, so the ledger reads band → page → row as
+ * three distinct planes. Two near-black fills cannot be pushed far apart without dropping the
+ * band's own label below the 7:1 text floor, so the separation is not asked to come from tone
+ * alone: the top rule is a full-strength `border-strong` hairline and the bottom one is the heavier
+ * `border-panel` rule, both inset so the band stays exactly one rule tall.
  */
-function DayHeading({
-  label,
-  netMinor,
-  currencyCode,
-  netLabel,
-}: DayHeadingProps) {
+function DayBand({ columnCount, label, figureLabel, figure }: DayBandProps) {
   return (
-    <tr aria-hidden="true">
-      <td colSpan={COLUMN_COUNT} className="p-0">
+    <tr aria-hidden="true" className="max-sm:block">
+      <td colSpan={columnCount} className="p-0 max-sm:block">
         <div
-          style={{ height: DAY_HEADER_HEIGHT_PX }}
-          className="flex items-center justify-between gap-3 border-t border-t-border-strong bg-surface-sunken ps-2 pe-13"
+          style={{ height: DAY_BAND_HEIGHT_PX }}
+          className="flex justify-between gap-3 bg-surface-sunken ps-12 pe-13 shadow-[inset_0_1px_0_0_var(--color-border-strong),inset_0_-1px_0_0_var(--color-border-panel)] sm:ps-15 sm:pe-14"
         >
-          <span className="truncate text-caption font-semibold text-ink">
+          <span
+            className={cn(
+              'truncate text-caption font-semibold text-ink',
+              TYPED_LINE,
+            )}
+          >
             {label}
           </span>
-          {netMinor === null ? null : (
-            <span className="flex shrink-0 items-center gap-1.5 text-caption text-ink-2">
-              <span>{netLabel}</span>
-              <NetAmount
-                amountMinor={netMinor}
-                currencyCode={currencyCode}
-                className="text-caption"
-              />
+          {figure === null ? null : (
+            <span
+              className={cn(
+                'text-caption text-ink-2',
+                TYPED_LINE,
+                'flex shrink-0 gap-1.5',
+              )}
+            >
+              {/* A phone line has room for the date and the figure, not for the word too. */}
+              <span className="max-sm:sr-only">{figureLabel}</span>
+              {figure}
             </span>
           )}
         </div>
@@ -205,9 +254,16 @@ export function TransactionList({
   onDelete,
   hrefFor,
   caption,
+  hasBalance = false,
+  showAccount = true,
 }: TransactionListProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const isWide = useIsWide()
+  const columns = columnsFor(hasBalance)
+  const column = columnIndexFor(columns)
+  const isGrouped = sort.field === 'bookedOn'
+  const bandSide = bandSideFor(sort, hasBalance)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const cellRefs = useRef(new Map<string, HTMLElement>())
@@ -216,7 +272,7 @@ export function TransactionList({
 
   const [active, setActive] = useState<CellPosition>({
     row: HEADER_ROW,
-    column: COLUMN_INDEX.description,
+    column: column.description,
   })
   const [pendingFocus, setPendingFocus] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -231,13 +287,23 @@ export function TransactionList({
     [rows, sort, hasMore],
   )
 
+  const bandAt = useCallback(
+    (index: number) =>
+      bandSide === 'before'
+        ? grouping.startsDay[index] === true
+        : grouping.endsDay[index] === true,
+    [bandSide, grouping],
+  )
+
   const virtualizer = useWindowVirtualizer({
     count: rows.length,
-    // Still arithmetic rather than measurement — see `ROW_HEIGHT_PX` — but no longer one constant:
-    // the row that opens a day carries that day's heading, so its virtual item is taller by exactly
-    // the heading. Nothing is measured, so the scrollbar stays honest at ten thousand rows.
+    // Still arithmetic rather than measurement - see `rowHeightFor` - but no longer one constant:
+    // a row is one rule or two, and the row that opens or closes a day carries that day's band, so
+    // its virtual item is taller by exactly the band. Nothing is measured, so the scrollbar stays
+    // honest at ten thousand rows.
     estimateSize: (index) =>
-      virtualItemHeight(grouping.startsDay[index] === true),
+      rowHeightFor(rows[index], isWide) +
+      (bandAt(index) ? DAY_BAND_HEIGHT_PX : 0),
     overscan: 10,
     scrollMargin,
     // Without a rect the server renders an empty tbody and the first paint has no ledger in it.
@@ -245,6 +311,12 @@ export function TransactionList({
     initialRect: { width: 1280, height: 960 },
     getItemKey: (index) => rows[index]?.id ?? index,
   })
+
+  // The estimates depend on the page width and on where the bands fall; when either changes the
+  // virtualiser is told to forget what it had rather than keep the old offsets.
+  useEffect(() => {
+    virtualizer.measure()
+  }, [virtualizer, isWide, bandAt])
 
   const virtualItems = virtualizer.getVirtualItems()
   const accountNames = useMemo(
@@ -300,8 +372,8 @@ export function TransactionList({
   /* ---- Focus ------------------------------------------------------------- */
 
   const registerCell = useCallback(
-    (row: number, column: number, element: HTMLElement | null) => {
-      const key = `${row}:${column}`
+    (row: number, columnIndex: number, element: HTMLElement | null) => {
+      const key = `${row}:${columnIndex}`
       if (element === null) {
         cellRefs.current.delete(key)
         return
@@ -311,11 +383,11 @@ export function TransactionList({
     [],
   )
 
-  const onCellFocus = useCallback((row: number, column: number) => {
+  const onCellFocus = useCallback((row: number, columnIndex: number) => {
     setActive((current) =>
-      current.row === row && current.column === column
+      current.row === row && current.column === columnIndex
         ? current
-        : { row, column },
+        : { row, column: columnIndex },
     )
   }, [])
 
@@ -356,29 +428,29 @@ export function TransactionList({
   /* ---- Keyboard ---------------------------------------------------------- */
 
   const activateHeader = useCallback(() => {
-    if (active.column === COLUMN_INDEX.select) {
+    if (active.column === column.select) {
       toggleSelectAll()
       return
     }
-    if (active.column === COLUMN_INDEX.date) {
+    if (active.column === column.date) {
       toggleDateSort()
     }
-  }, [active.column, toggleDateSort, toggleSelectAll])
+  }, [active.column, column, toggleDateSort, toggleSelectAll])
 
   const activateRow = useCallback(
     (row: LedgerRow) => {
       switch (active.column) {
-        case COLUMN_INDEX.select:
+        case column.select:
           toggleSelect(row.id)
           return
-        case COLUMN_INDEX.actions:
+        case column.actions:
           setOpenMenuId(row.id)
           return
         default:
           onOpen(row.id)
       }
     },
-    [active.column, onOpen, toggleSelect],
+    [active.column, column, onOpen, toggleSelect],
   )
 
   const handleKeyDown = useCallback(
@@ -389,7 +461,7 @@ export function TransactionList({
         return
       }
 
-      const moved = nextPosition(active, event, rows.length)
+      const moved = nextPosition(active, event, rows.length, columns.length)
       if (moved !== null) {
         event.preventDefault()
         if (!samePosition(moved, active)) {
@@ -445,6 +517,7 @@ export function TransactionList({
       activateHeader,
       activateRow,
       active,
+      columns.length,
       moveTo,
       onDelete,
       onDuplicate,
@@ -491,15 +564,15 @@ export function TransactionList({
           0,
         )
 
-  const headerCellProps = (column: number) => ({
+  const headerCellProps = (columnIndex: number) => ({
     role: 'columnheader' as const,
     scope: 'col' as const,
-    'aria-colindex': column + 1,
+    'aria-colindex': columnIndex + 1,
     'data-grid-cell': 'true',
-    tabIndex: tabStopOnHeader && active.column === column ? 0 : -1,
+    tabIndex: tabStopOnHeader && active.column === columnIndex ? 0 : -1,
     ref: (element: HTMLTableCellElement | null) =>
-      registerCell(HEADER_ROW, column, element),
-    onFocus: () => onCellFocus(HEADER_ROW, column),
+      registerCell(HEADER_ROW, columnIndex, element),
+    onFocus: () => onCellFocus(HEADER_ROW, columnIndex),
   })
 
   const dateSortState = () => {
@@ -511,62 +584,127 @@ export function TransactionList({
       : ('descending' as const)
   }
 
+  const dayBand = (row: LedgerRow) => {
+    const dayLabel = (
+      <>
+        <span className="sm:hidden">
+          {formatCalendarDate(locale, row.bookedOn, 'medium')}
+        </span>
+        <span className="max-sm:hidden">
+          {formatCalendarDate(locale, row.bookedOn, 'long')}
+        </span>
+      </>
+    )
+    if (hasBalance) {
+      return (
+        <DayBand
+          columnCount={columns.length}
+          label={dayLabel}
+          figureLabel={t('transactions.day.carried')}
+          figure={
+            row.balanceAfterMinor === undefined ? null : (
+              <BalanceAmount
+                amountMinor={row.balanceAfterMinor}
+                currencyCode={row.currencyCode}
+                isPlanned={row.isPlanned}
+              />
+            )
+          }
+        />
+      )
+    }
+    const net = grouping.netByDay.get(row.bookedOn)
+    return (
+      <DayBand
+        columnCount={columns.length}
+        label={dayLabel}
+        figureLabel={t('transactions.day.net')}
+        figure={
+          net === undefined ? null : (
+            <NetAmount
+              amountMinor={net}
+              currencyCode={reference.baseCurrencyCode}
+            />
+          )
+        }
+      />
+    )
+  }
+
   return (
     <div ref={containerRef} className="relative">
       <table
         role="grid"
         aria-label={t('transactions.list.label')}
         aria-rowcount={totalRows + 1}
-        aria-colcount={COLUMN_COUNT}
+        aria-colcount={columns.length}
         aria-multiselectable="true"
         aria-busy={isLoadingMore}
         onKeyDown={handleKeyDown}
-        className="w-full table-fixed border-collapse border-separate border-spacing-0"
+        // Below `sm` the table parts are blocks and each row lays itself out as a grid; the
+        // explicit ARIA roles on every part keep it a table for assistive technology there.
+        className="w-full table-fixed border-separate border-spacing-0 max-sm:block"
       >
         <caption className="sr-only">{caption}</caption>
         {/*
-          The date track is sized for the string it actually holds. `w-16` was 64px against a
-          ten-character `31.12.2025` set in 12px tabular figures — about 68px of glyphs — so every
-          date in the ledger printed straight over the payee beside it. Below `sm` the row prints
-          the day of the month alone, which fits 44px with room to spare; from `sm` up it prints the
-          whole date and gets 96px to do it in.
+          The date track is sized for the string it actually holds: the day of the month under a
+          day band, the whole date under any other sort. Below `sm` the row is a grid of its own
+          and these widths do not apply.
         */}
         <colgroup>
-          <col className="w-10 sm:w-12" />
-          <col className="w-9 sm:w-24" />
+          <col className="w-12" />
+          <col className={isGrouped ? 'w-14' : 'w-28'} />
           <col />
-          <col className="w-28 sm:w-40" />
+          <col className="w-36" />
+          {hasBalance ? <col className="w-40" /> : null}
           <col className="w-11" />
         </colgroup>
 
-        <thead>
-          <tr role="row" aria-rowindex={1}>
+        <thead className="max-sm:block">
+          <tr
+            role="row"
+            aria-rowindex={1}
+            className={cn(HEADER_ROW_GRID, 'bg-surface-sunken')}
+          >
             <th
-              {...headerCellProps(COLUMN_INDEX.select)}
-              className={cn(HEADER_CELL, 'text-center')}
+              {...headerCellProps(column.select)}
+              className={cn(
+                HEADER_CELL,
+                'text-center max-sm:col-start-1 max-sm:row-start-1 max-sm:row-span-2',
+              )}
             >
-              <Checkbox
-                excludeFromTabOrder
-                // See `transaction-row.tsx`: a label-less checkbox is 18px wide, and
-                // `target-min-h` only grows the axis that was already big enough.
-                className="target-min"
-                isSelected={allLoadedSelected}
-                isIndeterminate={someSelected}
-                onChange={toggleSelectAll}
-                aria-label={t('transactions.selectAllLoaded')}
-              />
+              <span className="flex h-10 items-center justify-center max-sm:h-full">
+                <Checkbox
+                  excludeFromTabOrder
+                  // See `transaction-row.tsx`: a label-less checkbox is 18px wide, and
+                  // `target-min-h` only grows the axis that was already big enough.
+                  className="target-min"
+                  isSelected={allLoadedSelected}
+                  isIndeterminate={someSelected}
+                  onChange={toggleSelectAll}
+                  aria-label={t('transactions.selectAllLoaded')}
+                />
+              </span>
             </th>
             <th
-              {...headerCellProps(COLUMN_INDEX.date)}
+              {...headerCellProps(column.date)}
               aria-sort={dateSortState()}
-              className={cn(HEADER_CELL, 'text-start')}
+              className={cn(
+                HEADER_CELL,
+                CELL_RULE,
+                'text-start max-sm:col-start-2 max-sm:row-start-2',
+              )}
             >
+              {/* The sort control fills the rule. Its line box is the arrow's height, so the arrow
+                  is sized to the type and the box set on the rule, which puts the word on the
+                  same baseline as the typed headings beside it. `flex` rather than inline, or the
+                  cell's own line box would add a descender under the forty pixels. */}
               <Button
                 variant="ghost"
                 size="sm"
                 excludeFromTabOrder
                 onPress={toggleDateSort}
-                className="-mx-1 h-7 px-1 text-micro tracking-label uppercase"
+                className="-mx-1 flex h-10 items-end px-1 text-micro leading-none tracking-label uppercase [&_svg]:size-3.5"
                 iconAfter={
                   sort.field === 'bookedOn' && sort.direction === 'asc' ? (
                     <ArrowUp />
@@ -575,42 +713,69 @@ export function TransactionList({
                   )
                 }
               >
-                {/* Below `sm` the date column is 36px wide — room for `29`, and none for the word
-                    beside an arrow. The heading keeps its accessible name and drops to the sort
-                    arrow alone; the 44px hit area is the button's own and does not shrink with it. */}
-                <span className="sr-only sm:not-sr-only">
-                  {t('transactions.field.date')}
-                </span>
+                {t('transactions.field.date')}
               </Button>
             </th>
             {/*
-              One heading cell, three labels — the mirror of the row's own description cell. The
-              column still holds the description, the category and the account; from `lg` up they
-              are drawn on tracks instead of stacked, and this is what they line up under.
+              One heading cell, up to three labels - the mirror of the row's own description cell.
+              The column still holds the description, the category and the account; from `lg` up
+              they are drawn on tracks instead of stacked, and this is what they line up under.
             */}
             <th
-              {...headerCellProps(COLUMN_INDEX.description)}
-              className={cn(HEADER_CELL, 'text-start')}
+              {...headerCellProps(column.description)}
+              className={cn(
+                HEADER_CELL,
+                CELL_RULE,
+                'text-start max-sm:col-start-2 max-sm:row-start-1',
+              )}
             >
-              <div className={DESCRIPTION_TRACKS}>
-                <span>{t('transactions.column.description')}</span>
-                <span className="hidden lg:block">
+              <div className={descriptionTracks(showAccount)}>
+                <span className={cn(HEAD_TEXT, 'truncate')}>
+                  {t('transactions.column.description')}
+                </span>
+                <span className={cn(HEAD_TEXT, 'hidden truncate lg:block')}>
                   {t('transactions.field.category')}
                 </span>
-                <span className="hidden lg:block">
-                  {t('transactions.field.account')}
-                </span>
+                {showAccount ? (
+                  <span className={cn(HEAD_TEXT, 'hidden truncate lg:block')}>
+                    {t('transactions.field.account')}
+                  </span>
+                ) : null}
               </div>
             </th>
             <th
-              {...headerCellProps(COLUMN_INDEX.amount)}
-              className={cn(HEADER_CELL, 'text-end')}
+              {...headerCellProps(column.amount)}
+              className={cn(
+                HEADER_CELL,
+                CELL_RULE,
+                'text-end max-sm:col-start-3 max-sm:row-start-1',
+              )}
             >
-              {t('transactions.field.amount')}
+              <span className={HEAD_TEXT}>
+                {t('transactions.field.amount')}
+              </span>
             </th>
+            {hasBalance ? (
+              <th
+                {...headerCellProps(column.balance)}
+                className={cn(
+                  HEADER_CELL,
+                  CELL_SPINE,
+                  'text-end max-sm:col-start-3 max-sm:row-start-2',
+                )}
+              >
+                <span className={HEAD_TEXT}>
+                  {t('transactions.column.balance')}
+                </span>
+              </th>
+            ) : null}
             <th
-              {...headerCellProps(COLUMN_INDEX.actions)}
-              className={cn(HEADER_CELL, 'text-center')}
+              {...headerCellProps(column.actions)}
+              className={cn(
+                HEADER_CELL,
+                CELL_RULE,
+                'text-center max-sm:col-start-4 max-sm:row-start-1 max-sm:row-span-2',
+              )}
             >
               <span className="sr-only">
                 {t('transactions.column.actions')}
@@ -619,10 +784,14 @@ export function TransactionList({
           </tr>
         </thead>
 
-        <tbody>
+        <tbody className="max-sm:block">
           {paddingTop > 0 ? (
-            <tr aria-hidden="true">
-              <td colSpan={COLUMN_COUNT} style={{ height: paddingTop }} />
+            <tr aria-hidden="true" className="max-sm:block">
+              <td
+                colSpan={columns.length}
+                className="max-sm:block"
+                style={{ height: paddingTop }}
+              />
             </tr>
           ) : null}
 
@@ -636,17 +805,10 @@ export function TransactionList({
                 ? undefined
                 : categories.get(row.categoryId)
             const gridRow = item.index + 1
-            const opensDay = grouping.startsDay[item.index] === true
+            const band = bandAt(item.index) ? dayBand(row) : null
             return (
               <Fragment key={row.id}>
-                {opensDay ? (
-                  <DayHeading
-                    label={formatCalendarDate(locale, row.bookedOn, 'long')}
-                    netMinor={grouping.netByDay.get(row.bookedOn) ?? null}
-                    currencyCode={reference.baseCurrencyCode}
-                    netLabel={t('transactions.day.net')}
-                  />
-                ) : null}
+                {bandSide === 'before' ? band : null}
                 <TransactionRow
                   row={row}
                   rowIndex={gridRow}
@@ -654,6 +816,10 @@ export function TransactionList({
                   isSelected={selectedIds.has(row.id)}
                   activeColumn={active.row === gridRow ? active.column : null}
                   isMenuOpen={openMenuId === row.id}
+                  columns={columns}
+                  isGrouped={isGrouped}
+                  showAccount={showAccount}
+                  isWide={isWide}
                   accountName={
                     accountNames.get(row.accountId) ?? t('common.unknown')
                   }
@@ -668,13 +834,18 @@ export function TransactionList({
                   onCellFocus={onCellFocus}
                   actions={actions}
                 />
+                {bandSide === 'after' ? band : null}
               </Fragment>
             )
           })}
 
           {paddingBottom > 0 ? (
-            <tr aria-hidden="true">
-              <td colSpan={COLUMN_COUNT} style={{ height: paddingBottom }} />
+            <tr aria-hidden="true" className="max-sm:block">
+              <td
+                colSpan={columns.length}
+                className="max-sm:block"
+                style={{ height: paddingBottom }}
+              />
             </tr>
           ) : null}
         </tbody>

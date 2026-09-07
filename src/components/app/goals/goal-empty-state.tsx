@@ -36,7 +36,7 @@ export function GoalEmptyState({
     >
       <span
         aria-hidden="true"
-        className="grid size-14 place-items-center rounded-full bg-brand-soft text-brand"
+        className="grid size-14 place-items-center rounded-full bg-surface-sunken text-ink-2"
       >
         <Target className="size-6" />
       </span>
@@ -45,7 +45,7 @@ export function GoalEmptyState({
         <Heading className="text-title font-semibold text-ink">
           {t('goals.empty.title')}
         </Heading>
-        <p className="mt-1 text-body text-ink-2">{t('goals.empty.body')}</p>
+        <p className="text-body text-ink-2">{t('goals.empty.body')}</p>
       </div>
 
       <Button

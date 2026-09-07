@@ -36,6 +36,15 @@ export default [
               message:
                 'SQL lives in server/repos via the tenant base repository. Call a server function instead.',
             },
+            {
+              // The schema module carries every table and drizzle-orm with it; a value import
+              // from client code put both into the chunk every visitor downloads. The tuples
+              // live in src/lib/enums and the types are free to import from either.
+              group: ['#/server/db/schema', '**/server/db/schema'],
+              allowTypeImports: true,
+              message:
+                'The enumerated tuples live in #/lib/enums. A value import of the schema ships every table and drizzle-orm to the browser.',
+            },
           ],
         },
       ],

@@ -173,6 +173,14 @@ async function openSurface(
   await expect(page.locator('main')).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', locale)
 
+  // WCAG 2.2 §2.4.2: the tab names the page before the product, in the reader's language - the
+  // same words as the screen's own `<h1>`, composed by `src/routes/-lib/page-title.ts`. The
+  // landing page is the one surface that keeps the root's sentence, by design.
+  if (surface.path !== '/') {
+    const heading = (await page.locator('h1').first().innerText()).trim()
+    await expect(page).toHaveTitle(`${heading} · Money Tracker`)
+  }
+
   return { context, page }
 }
 

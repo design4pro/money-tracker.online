@@ -61,7 +61,7 @@ export function GoalCard({ goal, actions }: GoalCardProps) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-subtitle font-semibold text-ink">
+          <h2 className="text-subtitle font-semibold text-ink">
             {/*
               The whole card is the target: the name is a real link with a real accessible name,
               stretched over the row by a pseudo-element. The actions trigger sits above that
@@ -78,7 +78,7 @@ export function GoalCard({ goal, actions }: GoalCardProps) {
             >
               {goal.name}
             </Link>
-          </h3>
+          </h2>
 
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
             <span className="inline-flex items-center gap-1.5">

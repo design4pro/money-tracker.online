@@ -9,7 +9,14 @@ import { CalendarDays } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
 import { Calendar, RangeCalendar } from './calendar'
-import { Description, FieldError, FieldGroup, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  FieldGroup,
+  Label,
+  fieldEndButton,
+  fieldRow,
+} from './field'
 import { Popover } from './popover'
 import { composeTw, fieldSizes, transitionBase } from './shared'
 
@@ -92,15 +99,7 @@ export function DateInput({ className, ...props }: DateInputProps) {
  * standing next to a search pill; there it has to open with a 16px stroked icon exactly as the
  * search field opens with its magnifier, or it reads as the one control on the bar nobody drew.
  */
-const triggerButton = cn(
-  'grid w-9 shrink-0 place-items-center self-stretch text-ink-2 cursor-pointer target-min',
-  transitionBase,
-  'data-[hovered]:bg-hover data-[hovered]:text-ink',
-  'data-[pressed]:bg-press',
-  'data-[disabled]:opacity-45 data-[disabled]:pointer-events-none',
-  'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
-  '[&_svg]:size-4',
-)
+const triggerButton = fieldEndButton
 
 export interface DatePickerProps<T extends DateValue> extends Omit<
   RACDatePickerProps<T>,

@@ -86,7 +86,7 @@ export function CandidateListSkeleton() {
                 <Skeleton shape="text" className="h-4 w-40" />
                 <Skeleton shape="text" className="mt-2 h-3 w-48" />
               </div>
-              <Skeleton shape="block" className="h-6 w-28 rounded-full" />
+              <Skeleton shape="block" className="h-6 w-28 rounded-sm" />
             </div>
             <Skeleton shape="text" className="h-4 w-28" />
             <Skeleton shape="text" lines={2} />

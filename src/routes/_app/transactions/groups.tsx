@@ -41,6 +41,7 @@ import { useDataRefresh } from '../-lib/refresh'
 import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 
 import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/transactions/groups` — the groups a person has made, what is in them, and what they come to.
@@ -75,6 +76,7 @@ export const Route = createFileRoute('/_app/transactions/groups')({
   loader: async () => ({ groups: await listGroups({ data: {} }) }),
   pendingComponent: GroupsSkeleton,
   errorComponent: GroupsError,
+  head: ({ matches }) => pageHead(matches, (t) => t('groups.title')),
   component: GroupsRoute,
 })
 

@@ -5,6 +5,7 @@ import { Button, Form, TextField, linkVariants } from '#/components/ui'
 import { RouteError } from '#/components/app/shell/route-error'
 import { signIn, toAuthFailure } from '#/lib/auth-client'
 import { useTranslate } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 import { authFailureMessage } from './-lib/auth-messages'
 import { safeRedirect } from './-lib/safe-redirect'
 import { createAuthSchemas, fieldErrorsOf } from './-lib/schemas'
@@ -45,6 +46,7 @@ export const Route = createFileRoute('/(auth)/login')({
     return typeof requested === 'string' ? { redirect: requested } : {}
   },
   errorComponent: ({ reset }) => <RouteError onRetry={reset} />,
+  head: ({ matches }) => pageHead(matches, (t) => t('auth.signIn.title')),
   component: SignInScreen,
 })
 

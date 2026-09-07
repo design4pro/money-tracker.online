@@ -164,18 +164,22 @@ export function AttachmentList({
               return (
                 <li
                   key={file.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle px-3 py-1.5"
                 >
                   {/*
                     `/api/files/$id` is the only read path. The href is built from the id alone —
                     there is no bucket URL to build one from, which is the point.
+
+                    The link takes the row's width and its 44px height: on a phone the receipt
+                    is opened by tapping its line, not by hitting an 18px run of text beside a
+                    40px delete button. `py-1.5` on the row keeps it at the 56px it already had.
                   */}
                   <Link
                     href={`/api/files/${file.id}`}
                     target="_blank"
                     rel="noreferrer"
                     size="sm"
-                    className="min-w-0 break-all"
+                    className="target-min-h min-w-0 flex-1 break-all"
                   >
                     <ExternalLink aria-hidden="true" className="size-4" />
                     <span>
