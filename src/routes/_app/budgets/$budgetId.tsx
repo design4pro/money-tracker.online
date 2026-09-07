@@ -190,7 +190,7 @@ function BudgetDetailRoute() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2
             id="budget-period"
-            className="text-micro tracking-label uppercase text-ink-2"
+            className="text-subtitle font-semibold text-ink"
           >
             {t('budgets.detail.thisPeriod')}
           </h2>

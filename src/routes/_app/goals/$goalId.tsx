@@ -154,7 +154,7 @@ function GoalDetailRoute() {
         </Link>
       </div>
 
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-title font-bold text-ink">{summary.name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
@@ -496,7 +496,9 @@ function Figure({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <dt className="text-caption text-ink-2">{label}</dt>
+      <dt className="text-micro tracking-label uppercase text-ink-2">
+        {label}
+      </dt>
       <dd>{children}</dd>
     </div>
   )

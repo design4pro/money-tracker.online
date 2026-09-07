@@ -66,7 +66,7 @@ export function BudgetCard({ budget, actions }: BudgetCardProps) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-subtitle font-semibold text-ink">
+          <h2 className="text-subtitle font-semibold text-ink">
             {/*
               The whole card is the target: the name is a real link with a real accessible name,
               stretched over the row by a pseudo-element. The actions trigger sits above that
@@ -83,7 +83,7 @@ export function BudgetCard({ budget, actions }: BudgetCardProps) {
             >
               {budget.name}
             </Link>
-          </h3>
+          </h2>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
             <span>
               {t(PERIOD_LABELS[budget.period] ?? 'budgets.period.monthly')}
@@ -110,7 +110,7 @@ export function BudgetCard({ budget, actions }: BudgetCardProps) {
           </p>
         </div>
 
-        <div className="relative z-10 flex shrink-0 items-center gap-2">
+        <div className="relative flex shrink-0 items-center gap-2">
           {isArchived ? (
             <Badge tone="neutral">{t('budgets.status.archived')}</Badge>
           ) : null}
