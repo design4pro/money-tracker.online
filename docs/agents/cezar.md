@@ -13,7 +13,9 @@ the rules of `SDLC.md`.
 - Pinned version: `@open-mercato/cezar@0.10.1` (`npx -y @open-mercato/cezar@0.10.1 serve`). The
   project entry in `~/.cezar/config.json` points at the main checkout; the versioned part is
   `.ai/cezar/config.json` (`baseBranch: develop`, `worktreeRetention: 10`, `maxParallel: 2`,
-  `reviewGate: true`, which gates only non-autonomous runs, `skillsRepos: []`). Cezar's own
+  `reviewGate: false`, so a finished run settles straight to `done` rather than parking at
+  `review` for a human to accept the diff; the gate only ever applied to non-autonomous runs,
+  and partial automation is the point, `skillsRepos: []`). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked.
 - Skills: `pnpm install-skills` installs the collection into `.agents/skills/` and links every
