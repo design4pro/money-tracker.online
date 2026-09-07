@@ -131,8 +131,12 @@ file no longer names). Two definitions:
   maintainers. The agent step holds Bash with no allowlist and the issue body is its input, so an
   issue anyone on GitHub can open must not start a run by itself; an outside report is handled
   from the cockpit by a human.
-- `pr-opened` (`pull_request.opened`) → `om-review-pr`, again with `authors`. Agent PRs are
-  reviewed inside their own chain and Dependabot's carry nothing to review by hand.
+- `pr-opened` (`pull_request.opened`) → `om-review-pr`, again with `authors`. Dependabot's PRs
+  carry nothing to review by hand. Agent PRs are reviewed inside their own chain, but the host's
+  `gh` is the maintainer's account, so `authors` cannot tell them apart and the poller re-checks
+  labels on every poll: the first `om-fix-issue` run got a second review the moment its
+  `in-progress` lock lifted. `merge-queue` and `changes-requested` are therefore excluded too,
+  as the marks of a PR the chain has already reviewed.
 
 Every filter excludes `in-progress`; `lookbackDays: 3` and `maxRecords` bound a mistaken burst to
 a handful of runs. The poller needs `CEZ_AUTOMATIONS=1` in the service env (a 409 from the API
