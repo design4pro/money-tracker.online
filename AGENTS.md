@@ -97,10 +97,10 @@ repo) is not a gate either; keep what you touch prettier-clean.
 
 ## Process and skills
 
-- The pipeline is the `om-*` skill collection, installed per checkout with `pnpm install-skills`
-  (into `.agents/skills/`, linked into `.claude/skills/`) and configured by
-  `.ai/agentic.config.json`. Tracker operations are defined in `.ai/trackers/github.md`, browser
-  operations in `.ai/browsers/playwright.md`.
+- The pipeline is the `om-*` skill collection, vendored in `.claude/skills/om-*` at the SHA pinned
+  in `.ai/cezar/config.json` and `skills-lock.json` (`pnpm install-skills` refreshes it; the pin
+  moves in the same commit) and configured by `.ai/agentic.config.json`. Tracker operations are
+  defined in `.ai/trackers/github.md`, browser operations in `.ai/browsers/playwright.md`.
 - Repo-specific rules for a skill live in `.ai/skills/om-<name>/SKILL.md` and extend the installed
   skill; they never relax its safety rules.
 - Repo-local skills: `verifying-changes`, `i18n-messages`, `tdd` (`.ai/skills/`).

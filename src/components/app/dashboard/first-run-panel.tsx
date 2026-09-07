@@ -1,4 +1,5 @@
-import { Card } from '#/components/ui'
+import { useId } from 'react'
+
 import { useTranslate } from '#/lib/i18n'
 
 import { WidgetLink } from './widget-link'
@@ -12,8 +13,16 @@ import type { WidgetLinkProps } from './widget-link'
  * ## It is a designed screen, not a fallback
  *
  * A dashboard whose every widget says "nothing yet" reads as broken, and it is the very first
- * thing a new person sees. So the panels are replaced — not decorated — by an ordered list of the
+ * thing a new person sees. So the panels are replaced - not decorated - by an ordered list of the
  * three things that make the numbers start working, in the order they have to happen.
+ *
+ * ## A ruled section, not a brand card
+ *
+ * It used to be a `brand-soft` card holding three white tiles. The wash spent the page's one
+ * violet on a decoration, and three equal tiles are the scaffold the form refuses. It is now a
+ * heading over a body on a rule, and each step is a line of the book under its own rule with its
+ * number at the start and its link at the end; the violet goes on the links, which is where it is
+ * allowed.
  *
  * ## A step with nowhere to go has no button
  *
@@ -60,11 +69,15 @@ export const FIRST_RUN_STEPS: ReadonlyArray<FirstRunStep> = [
 
 export function FirstRunPanel() {
   const t = useTranslate()
+  const headingId = useId()
 
   return (
-    <Card variant="brand" padding="lg" className="flex flex-col gap-5">
+    <section
+      aria-labelledby={headingId}
+      className="border-t border-border-panel pt-4"
+    >
       <div className="max-w-prose">
-        <h2 className="text-subtitle font-semibold text-ink">
+        <h2 id={headingId} className="text-subtitle font-bold text-ink">
           {t('dashboard.firstRun.title')}
         </h2>
         <p className="mt-1 text-body text-ink-2">
@@ -74,28 +87,53 @@ export function FirstRunPanel() {
 
       <ol
         aria-label={t('dashboard.firstRun.steps.label')}
-        className="grid list-none gap-3 sm:grid-cols-3"
+        className="mt-4 list-none border-b border-border-subtle"
       >
         {FIRST_RUN_STEPS.map((step, index) => (
           <li
             key={step.id}
-            className="flex flex-col gap-2 rounded-lg bg-surface px-4 py-3"
+            className="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-2 gap-y-1 border-t border-border-subtle py-3 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-baseline"
           >
-            <p className="text-micro tracking-label uppercase text-ink-2">
+            {/* The number sits beside its step on the same line, as a `dt` sits beside its
+                figure - never above the heading. */}
+            <p className="tabular text-micro tracking-label uppercase text-ink-2">
               {index + 1}
             </p>
-            <h3 className="text-label font-semibold text-ink">
-              {t(step.titleKey)}
-            </h3>
-            <p className="flex-1 text-caption text-ink-2">{t(step.bodyKey)}</p>
+            <div className="min-w-0">
+              <h3 className="text-subtitle font-bold text-ink">
+                {t(step.titleKey)}
+              </h3>
+              <p className="text-caption text-ink-2">{t(step.bodyKey)}</p>
+            </div>
             {step.to === undefined || step.actionKey === undefined ? null : (
-              <p>
+              <p className="col-start-2 sm:col-start-3">
                 <WidgetLink to={step.to}>{t(step.actionKey)}</WidgetLink>
               </p>
             )}
           </li>
         ))}
       </ol>
-    </Card>
+    </section>
+  )
+}
+
+/**
+ * The line a workspace sees once it has accounts and not one transaction against them.
+ *
+ * `FirstRunPanel` covers the workspace with nothing in it; this is the step after, when the book
+ * has been opened and nothing has been written. One ruled line, the sentence at the start and the
+ * link at the end, going where the header's "New transaction" goes - the same action said in the
+ * keeper's own words rather than a second stamp on a page that already has one.
+ */
+export function FirstEntryPrompt() {
+  const t = useTranslate()
+
+  return (
+    <p className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-y border-border-subtle py-3 text-body text-ink">
+      <span>{t('dashboard.firstEntry.lead')}</span>
+      <WidgetLink to="/transactions/new" className="text-body">
+        {t('dashboard.firstEntry.action')}
+      </WidgetLink>
+    </p>
   )
 }

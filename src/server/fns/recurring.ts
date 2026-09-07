@@ -60,7 +60,6 @@ import {
   replacePendingCandidates,
   resumeSeries as resumeSeriesRow,
   revertPeriod as revertPeriodRow,
-  terminationOf,
   unlinkTransaction as unlinkTransactionRow,
   updateSeries as updateSeriesRow,
   updateSeriesSchema,
@@ -474,8 +473,10 @@ export const acceptCandidate = createServerFn({ method: 'POST' })
     return { seriesId: series.id }
   })
 
-/** The termination a stored series carries, in the shape the form speaks. Re-exported for routes. */
-export { terminationOf }
+// No route imports `terminationOf` from here, and a re-export of a repository function is the one
+// thing the client compiler cannot strip: the import it keeps alive carries `repos/recurring`, every
+// table and drizzle-orm into the entry chunk every visitor downloads. A route that needs it imports
+// it from a drizzle-free module, never through this file.
 
 /** `YYYY-MM-DD`, `months` earlier, on the calendar. Never `Date` arithmetic. */
 function monthsBefore(day: string, months: number): string {

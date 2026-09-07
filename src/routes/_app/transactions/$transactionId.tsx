@@ -36,6 +36,7 @@ import type { Transaction, TransactionSplit } from '#/server/db/types'
 import type { RefundSummary } from '#/server/repos/refunds'
 import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
 import type { TransactionPolicies } from '#/server/repos/transactions'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/transactions/$transactionId` — one transaction, read and edited at the same address.
@@ -89,6 +90,8 @@ const detailSearchSchema = z.object({
 
 export const Route = createFileRoute('/_app/transactions/$transactionId')({
   validateSearch: detailSearchSchema,
+  head: ({ matches }) =>
+    pageHead(matches, (t) => t('transactions.detail.title')),
   component: TransactionDetailRoute,
 })
 

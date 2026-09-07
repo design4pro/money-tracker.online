@@ -6,6 +6,7 @@ import { Button, Form, TextField, linkVariants } from '#/components/ui'
 import { RouteError } from '#/components/app/shell/route-error'
 import { requestPasswordReset, toAuthFailure } from '#/lib/auth-client'
 import { useTranslate } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 import { authFailureMessage } from './-lib/auth-messages'
 import { createAuthSchemas, fieldErrorsOf } from './-lib/schemas'
 import { AuthCard } from './-ui/auth-card'
@@ -34,6 +35,7 @@ const RESET_PATH = '/reset-password'
 
 export const Route = createFileRoute('/(auth)/forgot-password')({
   errorComponent: ({ reset }) => <RouteError onRetry={reset} />,
+  head: ({ matches }) => pageHead(matches, (t) => t('auth.forgot.title')),
   component: ForgotPasswordScreen,
 })
 
@@ -80,7 +82,11 @@ function ForgotPasswordScreen() {
   }
 
   const backToSignIn = (
-    <Link to="/login" className={linkVariants({ variant: 'quiet' })}>
+    <Link
+      to="/login"
+      // Standing alone under the card, the link is the row: 44px tall for a thumb, not 18.
+      className={linkVariants({ variant: 'quiet', className: 'target-min-h' })}
+    >
       <ArrowLeft aria-hidden="true" className="size-4" />
       {t('auth.backToSignIn')}
     </Link>

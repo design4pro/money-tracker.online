@@ -32,6 +32,7 @@ import type {
   LedgerSortField,
 } from '#/components/app/transactions'
 import type { MessageKey } from '#/lib/i18n'
+import type { TransactionFilters } from '#/server/repos/transaction-queries'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 import type { TransactionSearch } from '../-lib/filters'
 
@@ -119,6 +120,15 @@ export interface TransactionsScreenProps {
   ) => void
   /** Shown when the workspace has no rows for this view **and** no filters are narrowing it. */
   readonly emptyState: ReactNode
+  /**
+   * Narrowing the view is *about* rather than one the reader chose: the passbook of one account
+   * fixes `accountIds`. Merged into the query only, so no chip offers to remove it.
+   */
+  readonly fixedFilters?: TransactionFilters
+  /** The passbook of one account: rows carry a balance after each line and the spine is drawn. */
+  readonly hasBalance?: boolean
+  readonly showFilterBar?: boolean
+  readonly showSummary?: boolean
 }
 
 export function TransactionsScreen({
@@ -126,6 +136,10 @@ export function TransactionsScreen({
   search,
   onSearchChange,
   emptyState,
+  fixedFilters,
+  hasBalance = false,
+  showFilterBar = true,
+  showSummary = true,
 }: TransactionsScreenProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -150,8 +164,11 @@ export function TransactionsScreen({
   const reference = referenceQuery.data ?? emptyReference(asCurrencyCode('EUR'))
 
   const queryFilters = useMemo(
-    () => toQueryFilters(filters, reference.baseCurrencyCode),
-    [filters, reference.baseCurrencyCode],
+    () => ({
+      ...toQueryFilters(filters, reference.baseCurrencyCode),
+      ...fixedFilters,
+    }),
+    [filters, fixedFilters, reference.baseCurrencyCode],
   )
 
   const pageQuery = useInfiniteQuery({
@@ -164,6 +181,7 @@ export function TransactionsScreen({
           sort,
           cursor: pageParam,
           limit: PAGE_SIZE,
+          includeBalanceAfter: hasBalance,
         },
       }),
     initialPageParam: null as string | null,
@@ -173,10 +191,16 @@ export function TransactionsScreen({
   const rows = useMemo(
     () =>
       (pageQuery.data?.pages ?? []).flatMap((page) =>
-        page.rows.map(toLedgerRow),
+        page.rows.map((row) => ({
+          ...toLedgerRow(row),
+          balanceAfterMinor: page.balances?.[row.id],
+        })),
       ),
     [pageQuery.data],
   )
+  // Naming the account on every line says nothing when every line is the same account.
+  const showAccount =
+    queryFilters.accountIds === undefined || queryFilters.accountIds.length > 1
 
   const head = pageQuery.data?.pages.at(0)
   const total = head?.total ?? 0
@@ -289,7 +313,7 @@ export function TransactionsScreen({
     }
     return (
       <>
-        {totals === undefined ? null : (
+        {totals === undefined || !showSummary ? null : (
           <ListSummary totals={totals} matchCount={total} />
         )}
         <TransactionList
@@ -323,6 +347,8 @@ export function TransactionsScreen({
           onDelete={(id) => setPendingDelete([id])}
           hrefFor={(id) => `/transactions/${id}`}
           caption={caption}
+          hasBalance={hasBalance}
+          showAccount={showAccount}
         />
       </>
     )
@@ -332,7 +358,7 @@ export function TransactionsScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      {bar}
+      {showFilterBar ? bar : null}
       <BulkActions
         selectedCount={selectedIds.size}
         onClearSelection={() => setSelectedIds(new Set())}

@@ -89,7 +89,7 @@ export function ToastHost({
           cancelButton:
             'rounded-md bg-surface-sunken px-2.5 py-1 text-caption font-semibold text-ink',
           closeButton:
-            'rounded-full border border-border-subtle bg-surface text-ink-2',
+            'rounded-md border border-border-subtle bg-surface text-ink-2',
           icon: 'shrink-0',
         },
       }}

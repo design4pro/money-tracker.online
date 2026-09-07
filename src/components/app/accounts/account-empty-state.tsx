@@ -57,7 +57,7 @@ export function AccountEmptyState({
       >
         <span
           aria-hidden="true"
-          className="grid size-14 place-items-center rounded-full bg-brand-soft text-brand"
+          className="grid size-14 place-items-center rounded-full bg-surface-sunken text-ink-2"
         >
           <Banknote className="size-6" />
         </span>
@@ -97,7 +97,7 @@ export function AccountEmptyState({
                 className="h-auto flex-col items-start gap-2 py-4 text-start"
                 onPress={() => onCreate(category)}
               >
-                <Icon aria-hidden="true" className="size-5 text-brand" />
+                <Icon aria-hidden="true" className="size-5 text-ink-2" />
                 <span className="text-label font-semibold text-ink">
                   {t(accountCategoryFacts(category).labelKey)}
                 </span>

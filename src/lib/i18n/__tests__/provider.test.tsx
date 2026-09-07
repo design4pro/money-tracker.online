@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import { useLocale as useReactAriaLocale } from 'react-aria-components'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -39,16 +38,6 @@ function Probe() {
   )
 }
 
-/** What React Aria's own primitives read when they format a number or a date. */
-function ReactAriaProbe() {
-  const { locale, direction } = useReactAriaLocale()
-  return (
-    <p data-testid="react-aria">
-      {locale}/{direction}
-    </p>
-  )
-}
-
 describe('I18nProvider', () => {
   it('renders one language, with the conventions that go with it', () => {
     render(
@@ -64,20 +53,8 @@ describe('I18nProvider', () => {
     expect(screen.getByTestId('stored').textContent).toBe('Konta')
   })
 
-  /**
-   * The load-bearing half. Without React Aria's own provider, a `NumberField`
-   * in a Polish workspace groups with the browser's separators and a `Calendar`
-   * opens its weeks on the browser's first day — neither of which the message
-   * catalogue can reach.
-   */
-  it('hands the negotiated locale to React Aria as well', () => {
-    render(
-      <I18nProvider locale="pl" messages={catalogue}>
-        <ReactAriaProbe />
-      </I18nProvider>,
-    )
-    expect(screen.getByTestId('react-aria').textContent).toBe('pl/ltr')
-  })
+  // The React Aria half of the locale story is `AriaI18nProvider` in the shell,
+  // asserted in `src/components/app/shell/__tests__/aria-i18n.test.tsx`.
 
   it('throws outside a provider rather than quietly rendering English', () => {
     // React logs the thrown error; the assertion is that it is thrown at all.

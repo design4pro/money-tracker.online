@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
@@ -28,8 +28,11 @@ import {
   deleteAccount,
   restoreAccount,
 } from '#/server/fns/accounts'
+import { pageHead } from '#/routes/-lib/page-title'
 
 import { useDataRefresh } from '../-lib/refresh'
+import { EMPTY_SEARCH } from '../transactions/-lib/filters'
+import { TransactionsScreen } from '../transactions/-ui/transactions-screen'
 import { loadAccountDetail } from './-server/detail'
 import { AccountActionsMenu } from './-ui/account-actions-menu'
 import { AccountFormDialog } from './-ui/account-form-dialog'
@@ -37,6 +40,8 @@ import { AdjustBalanceDialog } from './-ui/adjust-balance-dialog'
 import { ConfirmDialog } from './-ui/confirm-dialog'
 
 import type { Key } from 'react-aria-components'
+import type { TransactionPolicies } from '#/server/repos/transactions'
+import type { TransactionSearch } from '../transactions/-lib/filters'
 
 /**
  * `/accounts/$accountId` — one account.
@@ -53,7 +58,23 @@ import type { Key } from 'react-aria-components'
  * Settings is a link somebody sends and a place the back button returns to. `?tab=settings`
  * costs one search param and buys all of that; a `useState` would make the back button leave the
  * account instead of leaving the tab.
+ *
+ * ## The passbook is the overview
+ *
+ * The overview tab is this account's page of the passbook: the same ledger as `/transactions`,
+ * narrowed to the account and with the balance after every line, which the all-accounts ledger
+ * cannot print because it mixes currencies. Planned lines are included here, in pencil, because a
+ * passbook is read forward as well as back. Its sort lives in component state rather than the
+ * URL: the tab already holds the address, and a second search param for the order of one panel
+ * would give the back button two things to undo on one screen.
  */
+
+const PASSBOOK_POLICIES: TransactionPolicies = {
+  planned: 'include',
+  adjustments: 'include',
+  transfers: 'include',
+  completeness: 'any',
+}
 
 const searchSchema = z.object({
   tab: z.enum(['overview', 'settings']).default('overview'),
@@ -65,6 +86,8 @@ export const Route = createFileRoute('/_app/accounts/$accountId')({
     loadAccountDetail({ data: { accountId: params.accountId } }),
   pendingComponent: AccountDetailSkeleton,
   errorComponent: AccountDetailError,
+  head: ({ matches, loaderData }) =>
+    pageHead(matches, (t) => loaderData?.account.name ?? t('accounts.title')),
   component: AccountDetailRoute,
 })
 
@@ -99,6 +122,12 @@ function AccountDetailRoute() {
   const navigate = Route.useNavigate()
 
   const [pending, setPending] = useState<Pending>('none')
+  const [ledgerSearch, setLedgerSearch] =
+    useState<TransactionSearch>(EMPTY_SEARCH)
+  const passbookFilters = useMemo(
+    () => ({ accountIds: [account.id] }),
+    [account.id],
+  )
   const close = () => setPending('none')
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
@@ -198,20 +227,30 @@ function AccountDetailRoute() {
         </TabList>
 
         <TabPanel id="overview">
-          <Card className="flex flex-col gap-4">
-            <p className="text-body text-ink-2">
-              {t('accounts.detail.transactions', { count: transactionCount })}
-            </p>
-            <Separator />
-            <div>
+          <div className="flex flex-col gap-6">
+            <TransactionsScreen
+              policies={PASSBOOK_POLICIES}
+              search={ledgerSearch}
+              onSearchChange={(next) => setLedgerSearch(next)}
+              fixedFilters={passbookFilters}
+              hasBalance
+              showFilterBar={false}
+              showSummary={false}
+              emptyState={
+                <p className="text-body text-ink-2">
+                  {t('accounts.detail.ledger.empty')}
+                </p>
+              }
+            />
+            <section className="border-t border-border-subtle pt-4">
               <h2 className="text-micro tracking-label uppercase text-ink-2">
                 {t('common.note')}
               </h2>
               <p className="mt-1 prose-measure text-body text-ink">
                 {account.note ?? t('accounts.detail.note.empty')}
               </p>
-            </div>
-          </Card>
+            </section>
+          </div>
         </TabPanel>
 
         <TabPanel id="settings">

@@ -48,9 +48,9 @@ import type { MessageKey } from '#/lib/i18n'
 /**
  * The tiers, cheapest first.
  *
- * Mirrored by `PLAN_IDS` in `#/server/db/schema` — the column needs the tuple for its `CHECK`
- * constraint and the schema may not import a browser module. `plan-catalogue.test.ts` asserts the
- * two lists are identical, so the mirror cannot drift.
+ * Mirrored by `PLAN_IDS` in `#/lib/enums` (re-exported by `#/server/db/schema`) — the column
+ * needs the tuple for its `CHECK` constraint and the enum module imports nothing.
+ * `plan-catalogue.test.ts` asserts the two lists are identical, so the mirror cannot drift.
  */
 export const PLAN_IDS = ['free', 'plus', 'household'] as const
 export type PlanId = (typeof PLAN_IDS)[number]

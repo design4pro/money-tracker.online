@@ -6,7 +6,7 @@ description: Repo-local extension of om-prepare-test-env - how this app boots fo
 # om-prepare-test-env (money-tracker.online)
 
 This file extends the shared `om-prepare-test-env` skill installed at
-`.agents/skills/om-prepare-test-env/SKILL.md`. The generated entrypoints are **committed**:
+`.claude/skills/om-prepare-test-env/SKILL.md`. The generated entrypoints are **committed**:
 `.ai/scripts/test-env-up.sh` and `.ai/scripts/test-env-down.sh`. Run them. Regenerate only with
 `--regenerate`, and keep every fact below when you do.
 

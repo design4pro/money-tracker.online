@@ -2,6 +2,7 @@ import { ToastHost } from '#/components/ui'
 import { BottomNav, SidebarNav } from '#/components/app/nav'
 import { useTranslate } from '#/lib/i18n'
 import { AppHeader } from './app-header'
+import { AriaI18nProvider } from './aria-i18n'
 import { Wordmark } from './brand-mark'
 import { WorkspaceSwitcher } from './workspace-switcher'
 import { MAIN_CONTENT_ID } from './main-content'
@@ -52,18 +53,20 @@ export function AppShell({ shell, pathname, children }: AppShellProps) {
   const t = useTranslate()
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      {/* The rail. `aria-hidden` is deliberately absent below `lg`: it is `display: none` there, so
+    // React Aria's locale is repeated here rather than in the document shell - see `aria-i18n.tsx`.
+    <AriaI18nProvider>
+      <div className="min-h-dvh bg-canvas">
+        {/* The rail. `aria-hidden` is deliberately absent below `lg`: it is `display: none` there, so
           it is out of the accessibility tree already, and the bottom bar carries the same links. */}
-      <div className="fixed inset-y-0 start-0 z-nav hidden w-55 flex-col border-e border-border-subtle bg-surface-sunken lg:flex">
-        <div className="flex h-16 shrink-0 items-center px-5">
-          <Wordmark name={t('app.name')} />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 focus-safe">
-          <SidebarNav pathname={pathname} />
-        </div>
+        <div className="fixed inset-y-0 start-0 z-nav hidden w-55 flex-col border-e border-border-subtle bg-surface-sunken lg:flex">
+          <div className="flex h-16 shrink-0 items-center px-5">
+            <Wordmark name={t('app.name')} />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 focus-safe">
+            <SidebarNav pathname={pathname} />
+          </div>
 
-        {/*
+          {/*
           The household, pinned to the foot of the rail.
 
           It used to sit in the top bar, where it was the first thing on the line and took the
@@ -76,31 +79,32 @@ export function AppShell({ shell, pathname, children }: AppShellProps) {
           — the same component, one instance visible at a time, which is the arrangement the rail
           and the bottom bar already use for navigation.
         */}
-        <div className="shrink-0 border-t border-border-subtle p-3">
-          <WorkspaceSwitcher shell={shell} />
+          <div className="shrink-0 border-t border-border-subtle p-3">
+            <WorkspaceSwitcher shell={shell} />
+          </div>
         </div>
+
+        <div className="flex min-h-dvh flex-col lg:ps-55">
+          <AppHeader shell={shell} />
+
+          <main
+            id={MAIN_CONTENT_ID}
+            tabIndex={-1}
+            className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-28 outline-none sm:px-6 lg:px-8 lg:pb-12"
+          >
+            {children}
+          </main>
+        </div>
+
+        <BottomNav pathname={pathname} />
+
+        {/* One toast region for the whole product, mounted once so two screens cannot each own one. */}
+        <ToastHost
+          regionLabel={t('notifications.title')}
+          closeLabel={t('action.close')}
+        />
       </div>
-
-      <div className="flex min-h-dvh flex-col lg:ps-55">
-        <AppHeader shell={shell} />
-
-        <main
-          id={MAIN_CONTENT_ID}
-          tabIndex={-1}
-          className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-28 outline-none sm:px-6 lg:px-8 lg:pb-12"
-        >
-          {children}
-        </main>
-      </div>
-
-      <BottomNav pathname={pathname} />
-
-      {/* One toast region for the whole product, mounted once so two screens cannot each own one. */}
-      <ToastHost
-        regionLabel={t('notifications.title')}
-        closeLabel={t('action.close')}
-      />
-    </div>
+    </AriaI18nProvider>
   )
 }
 
@@ -124,29 +128,31 @@ export function AppShellFallback({ children }: AppShellFallbackProps) {
   const t = useTranslate()
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      <div
-        aria-hidden="true"
-        className="fixed inset-y-0 start-0 z-nav hidden w-55 flex-col border-e border-border-subtle bg-surface-sunken lg:flex"
-      >
-        <div className="flex h-16 shrink-0 items-center px-5">
-          <Wordmark name={t('app.name')} />
-        </div>
-      </div>
-
-      <div className="flex min-h-dvh flex-col lg:ps-55">
+    <AriaI18nProvider>
+      <div className="min-h-dvh bg-canvas">
         <div
           aria-hidden="true"
-          className="sticky top-0 z-nav h-16 shrink-0 border-b border-border-subtle bg-canvas"
-        />
-        <main
-          id={MAIN_CONTENT_ID}
-          tabIndex={-1}
-          className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-12 outline-none sm:px-6 lg:px-8"
+          className="fixed inset-y-0 start-0 z-nav hidden w-55 flex-col border-e border-border-subtle bg-surface-sunken lg:flex"
         >
-          {children}
-        </main>
+          <div className="flex h-16 shrink-0 items-center px-5">
+            <Wordmark name={t('app.name')} />
+          </div>
+        </div>
+
+        <div className="flex min-h-dvh flex-col lg:ps-55">
+          <div
+            aria-hidden="true"
+            className="sticky top-0 z-nav h-16 shrink-0 border-b border-border-subtle bg-canvas"
+          />
+          <main
+            id={MAIN_CONTENT_ID}
+            tabIndex={-1}
+            className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-12 outline-none sm:px-6 lg:px-8"
+          >
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </AriaI18nProvider>
   )
 }

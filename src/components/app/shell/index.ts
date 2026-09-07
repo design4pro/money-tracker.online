@@ -12,17 +12,22 @@ export type { AppShellFallbackProps, AppShellProps } from './app-shell'
 export { AppHeader } from './app-header'
 export type { AppHeaderProps } from './app-header'
 
+export { AriaI18nProvider } from './aria-i18n'
+
 export { BrandMark, Wordmark } from './brand-mark'
 export type { WordmarkProps } from './brand-mark'
 
 export {
   LOCALE_COOKIE,
   readLocaleCookieValue,
+  switchLocale,
   writeLocaleCookie,
 } from './locale-cookie'
 export { LocaleSwitcher } from './locale-switcher'
 
 export { MAIN_CONTENT_ID } from './main-content'
+
+export { NotFound } from './not-found'
 
 export { RouteError } from './route-error'
 export type { RouteErrorProps } from './route-error'

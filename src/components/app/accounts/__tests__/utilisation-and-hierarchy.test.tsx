@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { I18nProvider } from '#/lib/i18n'
@@ -178,46 +178,41 @@ const OVERVIEW: AccountOverview = {
 }
 
 describe('the accounts overview card', () => {
-  it('sets the hero two type steps above the figures beside it', () => {
+  it('writes net worth as the head line of the same list as held and owed', () => {
     withI18n(<AccountOverviewCard overview={OVERVIEW} headingId="overview" />)
 
-    const hero = screen
-      .getByRole('heading', { name: 'Net worth' })
-      .parentElement?.querySelector('p > span')
-    // `text-display` against the sub-figures' `text-body`: 32px against 15px on a phone, rather than
-    // the 28-against-20 that let the larger *number* win the first fixation.
-    expect(hero?.getAttribute('class')).toContain('text-display')
-
-    for (const label of ['What you hold', 'What you owe']) {
-      const figure = screen
-        .getByText(label)
-        .parentElement?.querySelector('dd > span')
-      expect(figure?.getAttribute('class')).toContain('text-body')
-      // Weight and colour step down with the size, so the hero wins on three channels at once.
-      expect(figure?.getAttribute('class')).toContain('font-medium')
-      expect(figure?.getAttribute('class')).toContain('text-ink-2')
-    }
+    // Three typed lines, label at the start and figure at the end: never an eyebrow over a hero
+    // figure with the pair on the floor.
+    expect(screen.getAllByRole('term').map((node) => node.textContent)).toEqual(
+      ['Net worth', 'What you hold', 'What you owe'],
+    )
+    const [total, held, owed] = screen
+      .getAllByRole('definition')
+      .map((node) => node.querySelector('span')?.getAttribute('class') ?? '')
+    // One type step, not two: the total leads by position and size, and no figure is set at
+    // the display step.
+    expect(total).toContain('text-subtitle')
+    expect(held).toContain('text-body')
+    expect(owed).toContain('text-body')
+    expect(total).not.toContain('text-display')
   })
 
-  it('does not nest a rounded tile inside the rounded card', () => {
+  it('puts each line on a rule rather than in a tile', () => {
     const { container } = withI18n(
       <AccountOverviewCard overview={OVERVIEW} headingId="overview" />,
     )
 
-    // Two columns and a hairline rule. A filled box at the parent's own radius reads as a
-    // component wrapped in itself.
-    const list = container.querySelector('dl')
-    expect(list?.getAttribute('class')).toContain('grid-cols-2')
+    const rows = [...(container.querySelector('dl')?.children ?? [])]
+    expect(rows).toHaveLength(3)
+    for (const row of rows) {
+      const classes = row.getAttribute('class') ?? ''
+      expect(classes).toContain('border-t')
+      expect(classes).not.toContain('bg-surface-sunken')
+    }
+    // The section's heading is the first line's own words, hidden rather than repeated above it.
     expect(
-      [...(list?.children ?? [])].some((column) =>
-        (column.getAttribute('class') ?? '').includes('bg-surface-sunken'),
-      ),
-    ).toBe(false)
-    expect(
-      [...(list?.children ?? [])].some((column) =>
-        (column.getAttribute('class') ?? '').includes('border-s'),
-      ),
-    ).toBe(true)
+      screen.getByRole('heading', { name: 'Net worth' }).getAttribute('class'),
+    ).toContain('sr-only')
   })
 
   it('moves the footnote behind a named control instead of two lines of copy', () => {
@@ -232,21 +227,5 @@ describe('the accounts overview card', () => {
     expect(
       screen.queryByText(/Archived accounts, and accounts left out/u),
     ).toBeNull()
-  })
-})
-
-describe('the overview card on a phone', () => {
-  it('keeps the two figures side by side at every width', () => {
-    const { container } = withI18n(
-      <AccountOverviewCard overview={OVERVIEW} headingId="overview" />,
-    )
-
-    // `grid-cols-2` with no breakpoint prefix: stacking them cost ~90px on the first viewport of
-    // the accounts screen, and no account survived it.
-    const list = container.querySelector('dl')
-    const classes = list?.getAttribute('class') ?? ''
-    expect(classes).toContain('grid-cols-2')
-    expect(classes).not.toContain('sm:grid-cols-2')
-    expect(within(must(list)).getAllByRole('term')).toHaveLength(2)
   })
 })

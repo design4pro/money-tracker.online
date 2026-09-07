@@ -5,6 +5,7 @@ import { Card } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { listAccounts } from '#/server/fns/accounts'
 import { listImports } from '#/server/fns/imports'
+import { pageHead } from '#/routes/-lib/page-title'
 
 import { loadImportSources } from './-server/sources'
 import { ImportHistory } from './-ui/import-history'
@@ -48,6 +49,7 @@ export const Route = createFileRoute('/_app/import/')({
     ])
     return { catalogue, accounts, history }
   },
+  head: ({ matches }) => pageHead(matches, (t) => t('import.title')),
   component: ImportIndexRoute,
 })
 

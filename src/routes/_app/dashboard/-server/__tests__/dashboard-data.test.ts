@@ -21,6 +21,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { organization, user } from '#/server/db/auth-schema'
+// A Node-run test seeding real tables, never bundled for the browser - the one case the rule
+// against value imports of the schema from a route directory does not mean.
+// eslint-disable-next-line no-restricted-imports
 import {
   accounts,
   categories,

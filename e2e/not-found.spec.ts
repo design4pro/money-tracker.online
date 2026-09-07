@@ -180,7 +180,7 @@ test.describe('a missing row answers 404', () => {
 
     await waitForHydration(page)
     await expect(
-      page.getByRole('heading', { name: 'That entry is not here' }),
+      page.getByRole('heading', { name: 'That transaction is not here' }),
     ).toBeVisible()
 
     // Nothing was refused at the document level here, so not even the 404 sentence is allowed.

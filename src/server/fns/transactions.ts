@@ -73,6 +73,8 @@ const loadTransactionsSchema = z.strictObject({
   sort: transactionSortSchema,
   cursor: z.string().min(1).nullable(),
   limit: z.number().int().positive().optional(),
+  /** The per-account passbook asks for the balance-after column; the all-accounts ledger does not. */
+  includeBalanceAfter: z.boolean().optional(),
 })
 
 export interface TransactionListPage extends TransactionPage {
@@ -111,6 +113,7 @@ export const loadTransactions = createServerFn({ method: 'GET' })
         sort: data.sort,
         cursor: data.cursor,
         limit: data.limit,
+        includeBalanceAfter: data.includeBalanceAfter,
       }),
       countTransactions(query),
       sumTransactions({

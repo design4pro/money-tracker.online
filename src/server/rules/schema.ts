@@ -39,11 +39,13 @@
 import { z } from 'zod'
 
 import { MAX_MINOR } from '#/lib/money'
+// From the enum module, not the table schema: this file is imported by the rule editor in the
+// browser, and the schema module would bring every table and drizzle-orm with it.
 import {
   PAYMENT_METHODS,
   RULE_MATCH_MODES,
   TRANSACTION_DIRECTIONS,
-} from '#/server/db/schema'
+} from '#/lib/enums'
 
 /* -------------------------------------------------------------------------- */
 /* The ceilings                                                               */

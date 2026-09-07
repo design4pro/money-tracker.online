@@ -1,7 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
-import { DASHBOARD_PERIODS } from '#/components/app/dashboard'
+// The module, not the barrel: this loader is in the entry chunk every visitor downloads, and the
+// barrel would bring the widgets, the charts and d3 with it. See `src/routes/__root.tsx`.
+import { DASHBOARD_PERIODS } from '#/components/app/dashboard/period'
 import { requireOrg } from '#/server/auth/guards'
 
 import { dashboardFor } from './dashboard-data'

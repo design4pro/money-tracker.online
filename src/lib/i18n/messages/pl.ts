@@ -58,13 +58,13 @@ const messages = {
   'nav.primary': 'Nawigacja główna',
   'nav.dashboard': 'Pulpit',
   'nav.accounts': 'Konta',
-  'nav.transactions': 'Wydatki',
+  'nav.transactions': 'Transakcje',
   'nav.budgets': 'Budżety',
   'nav.categories': 'Kategorie',
   'nav.tags': 'Tagi',
   'nav.payees': 'Odbiorcy',
-  'nav.recurring': 'Płatności cykliczne',
-  'nav.goals': 'Cele oszczędnościowe',
+  'nav.recurring': 'Cykliczne',
+  'nav.goals': 'Cele',
   'nav.reports': 'Raporty',
   'nav.rules': 'Zasady',
   'nav.import': 'Import',
@@ -330,6 +330,7 @@ const messages = {
     other: '{count} wydatku na tym koncie',
   },
   'accounts.detail.note.empty': 'To konto nie ma jeszcze notatki.',
+  'accounts.detail.ledger.empty': 'Na tym koncie nie ma jeszcze transakcji.',
   'accounts.detail.error.title': 'Nie udało się wczytać tego konta',
   'accounts.detail.danger': 'Archiwizacja i usuwanie',
   'accounts.credit.title': 'Wykorzystany limit',
@@ -402,8 +403,8 @@ const messages = {
   'accounts.adjust.error.title': 'Nie udało się zapisać korekty',
 
   /* -- Transactions ------------------------------------------------------- */
-  'transactions.title': 'Wydatki',
-  'transactions.create': 'Nowy wydatek',
+  'transactions.title': 'Transakcje',
+  'transactions.create': 'Nowa transakcja',
   'transactions.createIncome': 'Zapisz wpływ',
   'transactions.createExpense': 'Zapisz wydatek',
   'transactions.createTransfer': 'Zapisz przelew',
@@ -445,13 +446,14 @@ const messages = {
   'transactions.attachment.add': 'Dołącz paragon',
   'transactions.attachment.remove': 'Usuń załącznik',
   'transactions.search.placeholder': 'Szukaj w notatkach, odbiorcach i kwotach',
+  'transactions.search.placeholder.short': 'Szukaj',
   'transactions.filter.title': 'Filtry',
   'transactions.filter.reset': 'Wyczyść filtry',
   'transactions.count': {
-    one: '{count} wydatek',
-    few: '{count} wydatki',
-    many: '{count} wydatków',
-    other: '{count} wydatku',
+    one: '{count} transakcja',
+    few: '{count} transakcje',
+    many: '{count} transakcji',
+    other: '{count} transakcji',
   },
   'transactions.selected': {
     one: 'zaznaczono {count}',
@@ -478,7 +480,9 @@ const messages = {
   'transactions.sort.descending': 'od najnowszych',
   'transactions.column.description': 'Opis',
   'transactions.column.actions': 'Działania',
-  'transactions.day.net': 'Razem w tym dniu',
+  'transactions.day.net': 'Razem',
+  'transactions.day.carried': 'Do przeniesienia',
+  'transactions.column.balance': 'Saldo',
   'transactions.loading': 'Wczytywanie wydatków…',
   'transactions.loadMore': 'Wczytaj więcej',
   'transactions.loadingMore': 'Wczytywanie kolejnych wydatków…',
@@ -552,10 +556,10 @@ const messages = {
   'transactions.chip.withoutReceipt': 'Bez paragonu',
 
   /* -- Transactions: the entry form --------------------------------------- */
-  'transactions.form.newTitle': 'Nowy wydatek',
+  'transactions.form.newTitle': 'Nowa transakcja',
   'transactions.form.newSubtitle':
     'Zaczynamy od kwoty. Poza kontem i datą reszta pól jest opcjonalna.',
-  'transactions.form.editTitle': 'Edycja wydatku',
+  'transactions.form.editTitle': 'Edytuj transakcję',
   'transactions.form.details': 'Szczegóły',
   'transactions.form.moreDetails': 'Więcej',
   'transactions.form.saveAndNew': 'Zapisz i dodaj kolejną',
@@ -590,7 +594,7 @@ const messages = {
 
   /* -- Transactions: the detail screen ------------------------------------ */
   'transactions.detail.title': 'Wydatek',
-  'transactions.detail.back': 'Wróć do wydatków',
+  'transactions.detail.back': 'Wróć do transakcji',
   'transactions.detail.summary': 'Podsumowanie',
   'transactions.detail.recordedAt': 'Zapisano {datetime}',
   'transactions.detail.rate': 'Przeliczono po kursie {rate} z dnia {date}.',
@@ -599,7 +603,7 @@ const messages = {
   'transactions.detail.noTags': 'Ten wpis nie ma etykiet.',
   'transactions.detail.noAttachments': 'Nie dołączono paragonu.',
   'transactions.detail.noRefunds': 'Nie powiązano zwrotu.',
-  'transactions.detail.notFound.title': 'Nie ma takiego wpisu',
+  'transactions.detail.notFound.title': 'Nie ma takiej transakcji',
   'transactions.detail.notFound.body':
     'Mogła zostać usunięta albo adres jest nieprawidłowy.',
   /* -- Transakcje: podział transakcji -------------------------------------- */
@@ -696,10 +700,7 @@ const messages = {
 
   /* -- Transakcje: szablony (11-S2) ---------------------------------------- */
   'templates.picker.title': 'Zacznij od szablonu',
-  'templates.picker.description':
-    'Szablon wypełnia ten formularz. Nic nie zostaje zapisane, dopóki sam nie zapiszesz, a kurs wymiany jest z wybranej przez Ciebie daty.',
   'templates.picker.label': 'Szablony',
-  'templates.picker.noAmount': 'Kwotę wpisujesz sam',
   'templates.picker.error.title': 'Nie udało się zastosować szablonu',
   'templates.applied':
     'Formularz został wypełniony z szablonu {name}. Nic nie zostało jeszcze zapisane.',
@@ -922,7 +923,7 @@ const messages = {
   'dashboard.widget.netWorth': 'Wartość netto',
   'dashboard.widget.cashFlow': 'Przepływy pieniężne',
   'dashboard.widget.spendingByCategory': 'Wydatki według kategorii',
-  'dashboard.widget.recentTransactions': 'Ostatnie wydatki',
+  'dashboard.widget.recentTransactions': 'Ostatnie transakcje',
   'dashboard.widget.upcomingBills': 'Nadchodzące płatności',
   'dashboard.widget.budgetProgress': 'Budżety',
   'dashboard.widget.savingsGoals': 'Cele oszczędnościowe',
@@ -983,6 +984,9 @@ const messages = {
   'dashboard.firstRun.step.review.title': 'Wróć tutaj',
   'dashboard.firstRun.step.review.body':
     'Panele poniżej wypełnią się, gdy tylko będzie co pokazać.',
+  'dashboard.firstEntry.lead':
+    'Konta już są. Nie ma przy nich jeszcze żadnej transakcji.',
+  'dashboard.firstEntry.action': 'Zapisz pierwszą transakcję',
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budżety',
@@ -1158,6 +1162,8 @@ const messages = {
   'budgets.confirm.archive.body':
     'Zniknie z listy i zachowa wszystkie zamknięte okresy. Możesz go przywrócić w każdej chwili.',
   'budgets.confirm.archive.action': 'Archiwizuj budżet',
+  'budgets.confirm.restore.body':
+    'Wraca na listę i działa dalej. Zamknięte okresy zostają bez zmian.',
   'budgets.confirm.delete.title': 'Usunąć ten budżet?',
   'budgets.confirm.delete.body':
     'Tej operacji nie da się cofnąć. Budżetu, który zamknął choć jeden okres, nie można usunąć — zarchiwizuj go zamiast tego.',
@@ -1238,7 +1244,7 @@ const messages = {
   'empty.notFound.title': 'Nie ma tu nic',
   'empty.notFound.body':
     'Ta strona nie istnieje albo nie jest już Tobie udostępniona.',
-  'empty.notFound.action': 'Wróć na pulpit',
+  'empty.notFound.home': 'Strona główna',
   'empty.forbidden.title': 'Brak dostępu',
   'empty.forbidden.body': 'Poproś właściciela tego domu o nadanie Ci dostępu.',
   'empty.offline.title': 'Jesteś offline',
@@ -1886,13 +1892,13 @@ const messages = {
   'recurring.links.unlinked': 'Odłączone',
 
   /* -- Propozycje --------------------------------------------------------------- */
-  'recurring.candidates.title': 'Zauważone serie',
+  'recurring.candidates.title': 'Powtarzające się wzorce w transakcjach',
   'recurring.candidates.subtitle':
-    'Wzorce w tym, co masz już zapisane. Każdy z nich to propozycja, a nie coś, co zrobiliśmy.',
-  'recurring.candidates.loading': 'Przeglądanie wydatków…',
+    'Płatności, które powtarzają się w tym, co masz zapisane: ten sam odbiorca, zbliżona kwota, stały odstęp. Każda z nich to propozycja - załóż z niej serię albo oznacz, że to nie seria.',
+  'recurring.candidates.loading': 'Przeglądanie transakcji…',
   'recurring.candidates.detect': 'Poszukaj ponownie',
   'recurring.candidates.detecting': 'Szukanie…',
-  'recurring.candidates.link': 'Zauważone serie',
+  'recurring.candidates.link': 'Znajdź wzorce w transakcjach',
   'recurring.candidates.pending': {
     one: '{count} propozycja',
     few: '{count} propozycje',

@@ -1,10 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Languages } from 'lucide-react'
 
-import { amountReading } from '#/components/app/money'
-import { AmountText } from '#/components/app/transactions'
+// Module paths rather than the directory barrels on purpose. This page must load without the
+// application: the transactions barrel reaches the filter bar, the form and the drag-and-drop
+// grid, and through them React Aria; the budgets barrel reaches the charts, and through them d3.
+// Each module below carries only what the landing page renders.
+import { amountReading } from '#/components/app/money/amount-reading'
+import { switchLocale } from '#/components/app/shell/locale-cookie'
+import { AmountText } from '#/components/app/transactions/amount-text'
 import { cn } from '#/lib/cn'
-import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
+import {
+  SUPPORTED_LOCALES,
+  formatCalendarDate,
+  useLocale,
+  useTranslate,
+} from '#/lib/i18n'
 import { asCurrencyCode, asMinor, formatMoney, makeMoney } from '#/lib/money'
 import { BudgetStates } from './-ui/budget-states'
 import { EURO_ENTRY, LedgerPreview, TYPED_LINE } from './-ui/ledger-preview'
@@ -64,8 +74,13 @@ export const Route = createFileRoute('/')({
  * for the authenticated one, which has to be a document load rather than a client navigation so
  * the app shell's loader sees the session cookie on its first run.
  */
+/*
+ * `py-2` inside a fixed `h-10` / `h-12` box moves nothing - the label is centred either way and
+ * the border box keeps its height - but it is the padding a 13px label on a filled or ruled
+ * ground needs so the ink never sits on the edge of its box when the label wraps at 200% zoom.
+ */
 const CTA_BASE =
-  'target-min-h inline-flex items-center justify-center gap-2 rounded-sm px-5 text-label font-bold whitespace-nowrap no-underline transition-[color,background-color,box-shadow,translate] duration-fast ease-out-quint focus-ring'
+  'target-min-h inline-flex items-center justify-center gap-2 rounded-sm px-5 py-2 text-label font-bold whitespace-nowrap no-underline transition-[color,background-color,box-shadow,translate] duration-fast ease-out-quint focus-ring'
 /**
  * The stamp. Uppercase and tracked like the printed impression it is, in the one violet ink the
  * product spends on actions, and the only filled control in the first viewport.
@@ -287,6 +302,56 @@ function Wordmark() {
   )
 }
 
+/**
+ * The language switch, for a visitor whose negotiated language is the wrong one.
+ *
+ * Not the app's `LocaleSwitcher`: that is a React Aria menu, and this page is the one that must
+ * load without React Aria (see the imports above). With two shipped languages a menu is also
+ * more control than the choice needs, so each language other than the current one is a plain
+ * button named in its own language - "Polski" on the English page, "English" on the Polish one -
+ * from the frozen table in `src/lib/i18n/locales.ts`, never `Intl.DisplayNames`, so the one
+ * control whose job is to rescue somebody from a language they cannot read is not written in it.
+ * The choice is applied the way the app's menu applies it: a cookie and a document load.
+ *
+ * It stands in the header beside the way in and again in the footer's list beside Sign in, the
+ * way every other header link is repeated there. The header instance is `compact`: below `sm`
+ * the name is dropped and the glyph carries the control, with `aria-label` keeping the name and
+ * `lang` on the button making a screen reader say it with the right phonemes. Below 392px even
+ * the glyph leaves the header - at 360px the printed rule holds the wordmark and "Zacznij za
+ * darmo" with four pixels to spare, and the brief puts those two on it before anything else -
+ * and the footer instance is the one that remains.
+ */
+function LanguageSwitch({
+  className,
+  compact = false,
+}: {
+  className?: string
+  compact?: boolean
+}) {
+  const locale = useLocale()
+
+  return SUPPORTED_LOCALES.filter(
+    (descriptor) => descriptor.tag !== locale,
+  ).map((descriptor) => (
+    <button
+      key={descriptor.tag}
+      type="button"
+      lang={descriptor.tag}
+      aria-label={descriptor.nativeName}
+      onClick={() => switchLocale(descriptor.tag)}
+      className={cn(
+        'target-min inline-flex cursor-pointer items-center gap-2 rounded-md text-label whitespace-nowrap text-ink-2 hover:text-ink focus-ring',
+        className,
+      )}
+    >
+      <Languages aria-hidden="true" className="size-[1.125rem]" />
+      <span className={cn(compact && 'hidden sm:inline')}>
+        {descriptor.nativeName}
+      </span>
+    </button>
+  ))
+}
+
 function LandingPage() {
   const t = useTranslate()
   const locale = useLocale()
@@ -305,7 +370,10 @@ function LandingPage() {
           whatever scrolled underneath it has no computable contrast ratio. */}
       <header className="sticky top-0 z-nav border-b border-border-panel bg-canvas">
         <div
-          className={cn(WELL, 'flex h-16 items-center justify-between gap-3')}
+          className={cn(
+            WELL,
+            'flex h-16 items-center justify-between gap-2 sm:gap-3',
+          )}
         >
           <Wordmark />
 
@@ -322,6 +390,10 @@ function LandingPage() {
                 {t(label)}
               </a>
             ))}
+            <LanguageSwitch
+              compact
+              className="hidden h-10 px-2 hover:bg-hover min-[24.5rem]:inline-flex sm:px-3"
+            />
             <a
               href="/login"
               className="target-min-h hidden items-center rounded-md px-3 text-label whitespace-nowrap text-ink no-underline hover:bg-hover focus-ring sm:inline-flex"
@@ -330,7 +402,7 @@ function LandingPage() {
             </a>
             {/* Always on screen, at every width. A header whose only action disappears below
                 `sm` leaves a phone visitor with a page and no way into it. */}
-            <a href="/register" className={cn(CTA_QUIET, 'h-10')}>
+            <a href="/register" className={cn(CTA_QUIET, 'h-10 px-4 sm:px-5')}>
               {t('marketing.nav.getStarted')}
             </a>
           </nav>
@@ -667,7 +739,7 @@ function LandingPage() {
                 <li key={href}>
                   <a
                     href={href}
-                    className="target-min-h inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
+                    className="target-min-h target-min-w inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
                   >
                     {t(label)}
                   </a>
@@ -679,7 +751,7 @@ function LandingPage() {
               <li>
                 <a
                   href="/login"
-                  className="target-min-h inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
+                  className="target-min-h target-min-w inline-flex items-center rounded-md text-label text-ink-2 no-underline hover:text-ink focus-ring"
                 >
                   {t('marketing.nav.signIn')}
                 </a>
@@ -687,10 +759,14 @@ function LandingPage() {
               <li>
                 <a
                   href="/register"
-                  className="target-min-h inline-flex items-center rounded-md text-label font-bold text-ink no-underline hover:text-brand focus-ring"
+                  className="target-min-h target-min-w inline-flex items-center rounded-md text-label font-bold text-ink no-underline hover:text-brand focus-ring"
                 >
                   {t('marketing.nav.getStarted')}
                 </a>
+              </li>
+              {/* One item: the switch is one control, however many languages it lists. */}
+              <li>
+                <LanguageSwitch className="target-min-w" />
               </li>
             </ul>
           </div>

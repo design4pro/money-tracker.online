@@ -11,7 +11,7 @@ import {
 } from '#/components/app/categories'
 import { Button, Switch, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
-import { CATEGORY_KINDS } from '#/server/db/schema'
+import { CATEGORY_KINDS } from '#/lib/enums'
 import {
   archiveCategory,
   deleteCategory,
@@ -25,9 +25,13 @@ import { useDataRefresh } from '../-lib/refresh'
 import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 import { CategoryFormDialog } from './-ui/category-form-dialog'
 
-import type { CategoryMove, CategoryTreeItem } from '#/components/app/categories'
+import type {
+  CategoryMove,
+  CategoryTreeItem,
+} from '#/components/app/categories'
 import type { CategoryKind } from '#/server/db/schema'
 import type { Category } from '#/server/repos/categories'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/categories` — the two-level tree.
@@ -65,10 +69,17 @@ export const Route = createFileRoute('/_app/categories/')({
     listCategories({ data: { includeArchived: deps.status === 'all' } }),
   pendingComponent: CategoryTreeSkeleton,
   errorComponent: CategoriesError,
+  head: ({ matches }) => pageHead(matches, (t) => t('categories.title')),
   component: CategoriesRoute,
 })
 
-function CategoriesError({ error, reset }: { error: Error; reset: () => void }) {
+function CategoriesError({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
   const t = useTranslate()
   return (
     <ErrorPanel
@@ -138,7 +149,9 @@ function CategoriesRoute() {
           <h1 className="text-title font-bold text-ink">
             {t('categories.title')}
           </h1>
-          <p className="mt-1 text-body text-ink-2">{t('categories.subtitle')}</p>
+          <p className="mt-1 text-body text-ink-2">
+            {t('categories.subtitle')}
+          </p>
         </div>
         <Button
           variant="primary"
@@ -191,7 +204,8 @@ function CategoriesRoute() {
             }
             onArchive={(id) => {
               const category = byId.get(id)
-              if (category !== undefined) setPending({ kind: 'archive', category })
+              if (category !== undefined)
+                setPending({ kind: 'archive', category })
             }}
             onRestore={(id) =>
               withRefusal(async () => {
@@ -201,7 +215,8 @@ function CategoriesRoute() {
             }
             onDelete={(id) => {
               const category = byId.get(id)
-              if (category !== undefined) setPending({ kind: 'delete', category })
+              if (category !== undefined)
+                setPending({ kind: 'delete', category })
             }}
             onMove={applyMove}
           />

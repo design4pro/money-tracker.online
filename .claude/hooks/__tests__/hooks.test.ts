@@ -17,10 +17,13 @@ function hook(
   toolInput: Record<string, string>,
   env: Record<string, string> = {},
   cwd?: string,
+  toolName?: string,
 ) {
   const { PATH, HOME } = process.env
   const r = spawnSync('bash', [join(HOOKS, name)], {
-    input: JSON.stringify({ tool_input: toolInput }),
+    // `tool_name` is omitted unless a case names it, so the hooks stay exercised on the shape
+    // they see when a harness does not send it: `pattern` is then read as a path, the safe read.
+    input: JSON.stringify({ ...(toolName ? { tool_name: toolName } : {}), tool_input: toolInput }),
     encoding: 'utf8',
     env: {
       PATH: PATH ?? '',
@@ -100,6 +103,72 @@ describe('git-guardrails.sh', () => {
     expect(bash(command, AGENT).status).toBe(0)
   })
 
+  // The Cloudflare rules that replaced the `permissions.deny` list `.claude/settings.json` used
+  // to carry. Tier one is refused in every session: a secret named on a command line is already
+  // in the transcript, and a deleted store does not come back.
+  it('blocks secret writes and store deletion in both modes', () => {
+    for (const env of [{}, AGENT]) {
+      expect(bash('wrangler secret put BETTER_AUTH_SECRET', env).status).toBe(2)
+      expect(bash('pnpm exec wrangler secret list', env).status).toBe(2)
+      expect(bash('wrangler d1 delete money-tracker-db', env).status).toBe(2)
+      expect(bash('wrangler r2 bucket delete uploads', env).status).toBe(2)
+      expect(bash('wrangler kv namespace delete --namespace-id=1', env).status).toBe(2)
+      expect(bash('wrangler delete money-tracker', env).status).toBe(2)
+    }
+  })
+
+  // Tier two: shipping is undone by shipping again, so a developer keeps the ordinary prompt and
+  // only an unattended run - which has nobody to answer it - is refused.
+  const SHIPPING = [
+    'wrangler deploy',
+    'npx wrangler deploy',
+    './node_modules/.bin/wrangler deploy',
+    'wrangler versions upload',
+    'wrangler versions deploy',
+    'wrangler triggers deploy',
+    'wrangler rollback',
+    'wrangler d1 execute money-tracker-db --remote --command "DROP TABLE transactions"',
+    'wrangler d1 migrations apply money-tracker-db --remote',
+    'pnpm deploy',
+    'pnpm run deploy',
+    'pnpm -s run deploy',
+    'pnpm -r deploy',
+    'pnpm --filter web deploy',
+    'pnpm deploy:staging',
+    'pnpm db:migrate:prod',
+    'pnpm db:migrate:staging',
+  ]
+  it.each(SHIPPING)('blocks %s in an agent run', (command) => {
+    expect(bash(command, AGENT).status).toBe(2)
+  })
+  it.each(SHIPPING)('leaves %s to the prompt outside an agent run', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  it('leaves the local database alone in both modes', () => {
+    for (const env of [{}, AGENT]) {
+      expect(bash('pnpm db:migrate:local', env).status).toBe(0)
+      expect(bash('wrangler d1 migrations apply money-tracker-db --local', env).status).toBe(0)
+      expect(bash('wrangler d1 migrations list money-tracker-db', env).status).toBe(0)
+    }
+  })
+
+  // A rule matches the command, not prose about it: `docs/DEPLOY.md` documents `wrangler secret
+  // put`, so grepping, rewriting or writing a commit message about that file has to stay possible.
+  it('reads a quoted mention as text, not as an invocation', () => {
+    expect(bash('grep -rn "wrangler secret" docs/').status).toBe(0)
+    expect(bash('git commit -m "docs: say why wrangler secret put is denied"').status).toBe(0)
+    expect(bash(`sed -i '' 's/wrangler secret/x/' docs/DEPLOY.md`).status).toBe(0)
+    expect(bash('git commit -m "chore: fix the pnpm deploy script"', AGENT).status).toBe(0)
+    expect(bash("git commit -F - <<'EOF'\nchore: document pnpm deploy\nEOF", AGENT).status).toBe(0)
+  })
+
+  it('still reads a string a shell will execute as the command', () => {
+    expect(bash('bash -c "wrangler deploy"', AGENT).status).toBe(2)
+    expect(bash(`sh -c 'wrangler secret put X'`).status).toBe(2)
+    expect(bash(`eval "wrangler d1 delete money-tracker-db"`).status).toBe(2)
+  })
+
   it('treats GITHUB_ACTIONS as agent mode too', () => {
     expect(bash('printenv', { GITHUB_ACTIONS: 'true' }).status).toBe(2)
   })
@@ -121,7 +190,7 @@ describe('guard-generated.sh', () => {
     '.claude/settings.json',
     '.husky/pre-commit',
     '.ai/cezar/config.json',
-    '.ai/cezar/workflows/om-fix-issue.yml',
+    '.ai/cezar/workflows/issue-autofix.yml',
     '.ai/agentic.config.json',
     '.ai/trackers/github.md',
     '.ai/browsers/playwright.md',
@@ -180,10 +249,43 @@ describe('guard-read.sh', () => {
   const read = (
     input: Record<string, string>,
     env: Record<string, string> = AGENT,
-  ) => hook('guard-read.sh', input, env, root)
+    toolName?: string,
+  ) => hook('guard-read.sh', input, env, root, toolName)
 
-  it('is inert outside agent runs', () => {
+  // Two tiers. The secret files are refused to every caller - since `.claude/settings.json`
+  // became hooks-only this is the only thing enforcing AGENTS.md's `## Never` on them.
+  it('denies the secret files in every session', () => {
+    for (const env of [{}, AGENT]) {
+      expect(read({ file_path: '.dev.vars' }, env).status).toBe(2)
+      expect(read({ file_path: '.env.local' }, env).status).toBe(2)
+      expect(read({ file_path: '.ai/qa/test-env.env' }, env).status).toBe(2)
+      expect(read({ file_path: join(root, '.dev.vars.example') }, env).status).toBe(0)
+      expect(read({ file_path: join(root, 'src/a.ts') }, env).status).toBe(0)
+    }
+  })
+
+  // Confinement is the agent-run tier: a developer legitimately reads outside the checkout.
+  it('confines a run to the worktree in agent runs only', () => {
     expect(read({ file_path: '/etc/passwd' }, {}).status).toBe(0)
+    expect(read({ file_path: '.git/config' }, {}).status).toBe(0)
+    expect(read({ file_path: '.ai/cezar/runs/x.json' }, {}).status).toBe(0)
+    expect(read({ file_path: '/etc/passwd' }, AGENT).status).toBe(2)
+    expect(read({ file_path: '.git/config' }, AGENT).status).toBe(2)
+  })
+
+  // Grep's `pattern` searches file *contents* and is a regex; `process.env` is not a request to
+  // read `.env`. Its `glob` input is the path filter, and that is what gets checked.
+  it.each(['process.env', 'import.meta.env', 'import.meta.env.VITE_APP_URL', 'c.env.DB'])(
+    'allows the Grep content regex %s in every session',
+    (pattern) => {
+      expect(read({ pattern }, {}, 'Grep').status).toBe(0)
+      expect(read({ pattern }, AGENT, 'Grep').status).toBe(0)
+    },
+  )
+
+  it('checks the Grep glob filter, which is a path', () => {
+    expect(read({ pattern: 'SECRET', glob: '**/.dev.vars' }, {}, 'Grep').status).toBe(2)
+    expect(read({ pattern: 'SECRET', glob: '**/*.ts' }, {}, 'Grep').status).toBe(0)
   })
 
   it('allows reads inside the worktree, including files that do not exist yet', () => {
@@ -212,10 +314,24 @@ describe('guard-read.sh', () => {
   })
 
   it('denies Glob patterns that escape or name a secret', () => {
-    expect(read({ pattern: '../**/*.ts' }).status).toBe(2)
+    expect(read({ pattern: '../**/*.ts' }, AGENT, 'Glob').status).toBe(2)
+    expect(read({ path: root, pattern: '**/.dev.vars' }, AGENT, 'Glob').status).toBe(2)
+    expect(read({ path: root, pattern: '*.env.local' }, AGENT, 'Glob').status).toBe(2)
+    expect(read({ path: root, pattern: '**/test-env.env' }, AGENT, 'Glob').status).toBe(2)
+  })
+
+  // A harness that sends no `tool_name` leaves `pattern` ambiguous, so its shape decides: a
+  // separator or a glob metacharacter makes it a path, and a bare regex stays a content search.
+  // Nothing is lost by the second half - the file itself is still refused when it is read.
+  it('reads an unlabelled path-shaped pattern as a path', () => {
     expect(read({ path: root, pattern: '**/.dev.vars' }).status).toBe(2)
-    expect(read({ path: root, pattern: '*.env.local' }).status).toBe(2)
-    expect(read({ path: root, pattern: '**/test-env.env' }).status).toBe(2)
+    expect(read({ pattern: '../**/*.ts' }).status).toBe(2)
+    expect(read({ pattern: '*.env.local' }).status).toBe(2)
+  })
+
+  it('reads an unlabelled bare pattern as a content search', () => {
+    expect(read({ pattern: 'process.env' }).status).toBe(0)
+    expect(read({ pattern: 'import.meta.env' }).status).toBe(0)
   })
 })
 

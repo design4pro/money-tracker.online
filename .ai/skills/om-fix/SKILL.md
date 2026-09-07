@@ -5,7 +5,7 @@ description: Repo-local extension of om-fix - test-first at the seam, catalogue 
 
 # om-fix (money-tracker.online)
 
-This file extends the shared `om-fix` skill installed at `.agents/skills/om-fix/SKILL.md`. Follow
+This file extends the shared `om-fix` skill installed at `.claude/skills/om-fix/SKILL.md`. Follow
 its full workflow (claim, minimal change, regression tests, validation loop, output contract) with
 the rules below layered on top.
 

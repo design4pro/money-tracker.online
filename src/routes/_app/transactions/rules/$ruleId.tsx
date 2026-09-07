@@ -12,6 +12,7 @@ import { loadTransactionReference } from '../-server/list'
 import { RuleEditor, ruleEditorReference } from './-ui/rule-editor'
 
 import type { RuleDefinition } from '#/server/rules/schema'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/transactions/rules/$ruleId` — one rule, open for editing.
@@ -45,6 +46,11 @@ export const Route = createFileRoute('/_app/transactions/rules/$ruleId')({
     return { rule, reference }
   },
   errorComponent: RuleDetailError,
+  head: ({ matches, loaderData }) =>
+    pageHead(
+      matches,
+      (t) => loaderData?.rule.name ?? t('rules.editor.edit.title'),
+    ),
   component: RuleDetailRoute,
 })
 

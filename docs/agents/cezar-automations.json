@@ -1,9 +1,9 @@
 [
   {
-    "name": "issue-opened",
-    "description": "A maintainer opens an issue; om-auto-manage-issues adds the SDLC labels, checks the Definition of Ready and comments its analysis (ADR 0017). `authors` is the gate: the run holds Bash with no allowlist and the issue body is its input, so an issue from anyone else is handled from the cockpit by a human. Issues a run holds or a human put on hold never match.",
+    "name": "issue-groom",
+    "description": "A maintainer opens an issue; om-auto-manage-issues adds SDLC labels, a Definition of Ready check and implementation notes (ADR 0017). `authors` is the gate: the run holds Bash with no allowlist and the issue body is its input, so an issue from anyone else is groomed only when a maintainer adds `groom`. Issues a run holds or a human put on hold never match.",
     "events": ["issue.opened"],
-    "intervalSeconds": 60,
+    "intervalSeconds": 120,
     "filters": {
       "authors": ["rafalwolak"],
       "excludeLabels": ["in-progress", "blocked", "do-not-close"],
@@ -12,7 +12,7 @@
     },
     "task": {
       "prompt": "{{github.number}}",
-      "workflow": "om-manage-issue",
+      "workflow": "issue-groom",
       "autonomous": true,
       "worktree": true,
       "variants": 1,
@@ -20,25 +20,90 @@
     }
   },
   {
-    "name": "pr-opened",
-    "description": "A maintainer opens a pull request; om-auto-review-pr reviews it and moves the pipeline label, never merges (ADR 0017). Dependabot's PRs carry nothing to review by hand, so `authors` keeps them out. Agent PRs are authored by `design4pro-agent` (the cockpit's `gh` identity) and reviewed inside their own chain, so `authors` keeps them out; `merge-queue` / `changes-requested` stay excluded as the marks of a PR the chain has already reviewed, since the poller re-checks labels on every poll. `in-progress` and `ci-monitoring` are a run still working; `do-not-merge` is a human hold.",
-    "events": ["pull_request.opened"],
+    "name": "issue-regroom",
+    "description": "A label only a collaborator can set: `groom` re-runs om-auto-manage-issues on one issue (an external report a maintainer vouches for, an edit, a reply). The repo-local override removes the label as its first mutation, so a label still present is a run nobody took.",
+    "events": ["issue.labeled"],
+    "intervalSeconds": 120,
+    "filters": {
+      "changedLabels": ["groom"],
+      "excludeLabels": ["in-progress"],
+      "lookbackDays": 3,
+      "maxRecords": 10
+    },
+    "task": {
+      "prompt": "{{github.number}}",
+      "workflow": "issue-groom",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1,
+      "generateFollowups": false
+    }
+  },
+  {
+    "name": "issue-autofix",
+    "description": "A human adds `autofix`; om-auto-fix-issue drives the issue to a reviewed PR on develop (ADR 0017). Held, blocked, do-not-merge or spec-pending issues never match.",
+    "events": ["issue.labeled"],
     "intervalSeconds": 60,
+    "filters": {
+      "changedLabels": ["autofix"],
+      "excludeLabels": ["in-progress", "blocked", "do-not-merge", "spec"],
+      "lookbackDays": 3,
+      "maxRecords": 5
+    },
+    "task": {
+      "prompt": "{{github.number}}",
+      "workflow": "issue-autofix",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1,
+      "generateFollowups": false
+    }
+  },
+  {
+    "name": "issue-spec",
+    "description": "A human adds `spec` to a `feature` issue; om-auto-write-spec lands .ai/specs/<date>-<slug>.md on a design-only PR (ADR 0017).",
+    "events": ["issue.labeled"],
+    "intervalSeconds": 60,
+    "filters": {
+      "changedLabels": ["spec"],
+      "allLabels": ["feature"],
+      "excludeLabels": ["in-progress", "blocked"],
+      "lookbackDays": 3,
+      "maxRecords": 5
+    },
+    "task": {
+      "prompt": "{{github.number}}",
+      "workflow": "spec",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1,
+      "generateFollowups": false
+    }
+  },
+  {
+    "name": "pr-autopilot",
+    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; the pipeline labels exclude the race with om-open-pr, since the poller re-checks labels on every poll.",
+    "events": ["pull_request.opened"],
+    "intervalSeconds": 300,
     "filters": {
       "authors": ["rafalwolak"],
       "excludeLabels": [
         "in-progress",
-        "ci-monitoring",
-        "do-not-merge",
+        "review",
+        "changes-requested",
         "merge-queue",
-        "changes-requested"
+        "qa",
+        "qa-failed",
+        "blocked",
+        "do-not-merge",
+        "ci-monitoring"
       ],
       "lookbackDays": 3,
       "maxRecords": 5
     },
     "task": {
       "prompt": "{{github.number}}",
-      "workflow": "om-review-pr",
+      "workflow": "pr-autopilot",
       "autonomous": true,
       "worktree": true,
       "variants": 1,

@@ -1,0 +1,206 @@
+[
+  {
+    "id": "om-brainstorm",
+    "skills": ["om-brainstorm"],
+    "label": "om-brainstorm - talk an idea through before anything is built",
+    "text": "<the idea, question or itch - what you noticed and why it might matter>\n\nNo flags. Ask one open question at a time and wait for the answer; never batch them.\nWeigh building nothing as a real option, and check docs/agents/out-of-scope.md before shaping one:\na request listed there is not re-litigated. Stay read-only on the repository apart from the handoff\nbrief. End with a `Next:` line - usually `om-prepare-issue` or `om-spec-writing` - and say what the\ndecision rests on."
+  },
+  {
+    "id": "om-discover",
+    "skills": ["om-discover"],
+    "label": "om-discover - build the product brief every later skill reads",
+    "text": "<the product, area or idea to discover>\n\nFlags: --mode existing|client|own · --refresh (update, superseding decisions, never deleting) ·\n--research <dir> (default .ai/specs/research) · --quick (one bounded round).\nWork only from material that exists - tag every claim with its evidence and give every decision an\nowner. Invent nothing. Writes .ai/specs/product-brief.md, whose Non-goals, Business rules and\nDecisions tables become a protected contract (SDLC.md). docs/plans/ is the existing backlog source\nand docs/adr/ the existing decision record: read both before adding a claim."
+  },
+  {
+    "id": "om-prepare-issue",
+    "skills": ["om-prepare-issue"],
+    "label": "om-prepare-issue - file one well-formed issue, implement nothing",
+    "text": "<what is wrong or missing, who it affects, and how you would check it is fixed>\n\nFlags: --priority low|medium|high|extreme · --risk low|medium|high · --assignee <login>.\nFile the issue only - do not implement it. Dedupe against open issues and PRs first.\nMeet the ticket-level Definition of Ready in SDLC.md: the problem and who has it, the expected\noutcome and how it is checked, what is out of scope, and open questions marked blocking or\nnon-blocking. Apply SDLC labels on creation; never add the command labels groom, autofix or spec."
+  },
+  {
+    "id": "om-spec-writing",
+    "skills": ["om-spec-writing"],
+    "label": "om-spec-writing - write or review a spec to staff-engineer standard",
+    "text": "<the feature goal, or the path of an existing spec to review>\n\nFlags: --autonomous (resolve Open Questions with documented defaults instead of stopping).\nSkeleton first, then STOP at the Open Questions gate until they are answered - that gate is hard\nunless --autonomous. Break the work into phases and steps that om-auto-create-pr can execute.\nEvery spec here also carries \"Visual change expected\" and \"Copy\" (each en key with its text;\nimplementation lands EN and PL in the same change, skill i18n-messages)."
+  },
+  {
+    "id": "om-auto-create-pr",
+    "skills": ["om-auto-create-pr"],
+    "label": "om-auto-create-pr - run a task end to end and ship a PR",
+    "text": "<the task - one sentence or several paragraphs>\n\nFlags: --spec <ref> · --slug <kebab-case> · --skill-url <url> (repeatable, reference only) ·\n--loop · --force.\nTarget develop, never main. Blockers: float arithmetic on any amount (docs/MONEY.md); a new i18n\nkey missing from EN or PL; SQL outside src/server/repos (src/server/catalog excepted); a repo\nmethod without a tenant-isolation test; components/ui fetching data or importing from server/; a\nserver function whose input is not validated with Zod; generated files edited by hand instead of\npnpm generate-routes / pnpm db:generate. Never run pnpm add|remove|update - the stack is pinned\n(docs/SPEC.md §3); stop with Status: blocked instead. Fast loop: pnpm typecheck && pnpm lint &&\npnpm test."
+  },
+  {
+    "id": "om-auto-create-pr-loop",
+    "skills": ["om-auto-create-pr-loop"],
+    "label": "om-auto-create-pr-loop - long spec implementation, step by step",
+    "text": "<the multi-step task or spec to implement>\n\nFlags: --slug <kebab-case> · --skill-url <url> (repeatable, reference only) · --force.\nUse this over om-auto-create-pr only for long work needing resumability: a run folder\n(PLAN/HANDOFF/NOTIFY), one lean commit per Step, a checkpoint every ~5 Steps with integration\ntests and UI screenshots, the full gate at completion. Check for an existing run folder, branch or\nopen PR first and hand off to om-auto-continue-pr-loop rather than starting a duplicate.\nThe same repo gate applies as om-auto-create-pr: integer minor units everywhere, EN + PL parity,\nSQL only in src/server/repos, Zod on every server-function input, generated files only via their\ngenerators."
+  },
+  {
+    "id": "om-create-skill",
+    "skills": ["om-create-skill"],
+    "label": "om-create-skill - author a new om skill or split an oversized one",
+    "text": "<what the skill should do, or the name of an existing skill to split>\n\nFlags: --mode author|split (auto-detected otherwise) · --dry-run.\nMatch house conventions: the layering philosophy, the lint invariants, the tracker abstraction and\nthe cross-skill contract. Stay behind the lint + completeness gate. Repo-specific rules belong in\n.ai/skills/om-<name>/SKILL.md as an extension, never as a fork of the installed skill - the\ncollection here is vendored in .claude/skills/om-* at a pinned SHA and is write-protected in\nagent runs."
+  },
+  {
+    "id": "om-ux-shape",
+    "skills": ["om-ux-shape"],
+    "label": "om-ux-shape - turn a vague feature idea into a decided direction",
+    "text": "<the idea, the product area to review, or the decided direction to detail>\n\nNo flags. Pick a mode: Shape (default), Review (an existing flow or area), or Handoff\n(implementation-ready behaviour). Judge against this repo's design contract in .uxproof/ - run\nom-ux-setup first if it is missing - together with DESIGN.md and docs/ACCESSIBILITY.md.\nName the riskiest assumption and how it would be tested, and define every screen state including\nempty, loading and error, plus the keyboard path. AA is the gate; never widen the accessibility\nclaim."
+  },
+  {
+    "id": "om-integration-tests",
+    "skills": ["om-integration-tests"],
+    "label": "om-integration-tests - run or write E2E tests against the live app",
+    "text": "<the scenario or suite to run or create - leave empty to run what exists>\n\nNo flags. Attach to the descriptor om-prepare-test-env wrote at .ai/qa/test-env.json; provision it\nby invoking that skill if it is missing or stale. Never guess selectors or flows - explore the\nrunning app. Use the repo's own runner (pnpm e2e, Playwright, e2e/support/). Credentials are\nreferences: load the env file and write \"$TEST_OWNER_PASSWORD\" literally, never a password value -\n.ai/qa/test-env.env is never read. A red console message fails a browser run. Diagnose failures\nfrom artifacts, never from a guess."
+  },
+  {
+    "id": "om-prepare-test-env",
+    "skills": ["om-prepare-test-env"],
+    "label": "om-prepare-test-env - bring the app up for QA and integration tests",
+    "text": "Flags: --mode auto|reuse|ephemeral|dev|docker|prod · --stop / --down (tear down) · --browser on|off ·\n--browser-provider <name> · --force-rebuild · --regenerate.\nProvisioning is .ai/scripts/test-env-up.sh and nothing else. Bind 127.0.0.1 on a free port in\n3011-3020 only - 3010 is the developer's dev server (docs/agents/shared-checkout.md) - start with\nE2E=1 and vite dev --strictPort, seed and verify, then write .ai/qa/test-env.json with\nbrowser.provider playwright. No Docker - the runtime is Miniflare. .ai/scripts/ is write-protected\nin agent runs: report a broken script as blocked, never patch it."
+  },
+  {
+    "id": "om-merge-buddy",
+    "skills": ["om-merge-buddy"],
+    "label": "om-merge-buddy - report which open PRs can merge right now",
+    "text": "Report only - never merge, comment, label or edit anything.\nTreat changes-requested, qa-failed, blocked, do-not-merge and in-progress as hard blocks, and with\nthe QA gate on, needs-qa without qa-approved - only a human sets qa-approved. An unresolved review\nthread also blocks: the develop ruleset merges nothing with one open, whatever the review decision\nsays. For each PR that cannot merge, name exactly what it is waiting for."
+  },
+  {
+    "id": "om-review-prs",
+    "skills": ["om-review-prs"],
+    "label": "om-review-prs - sweep every unreviewed open PR, newest first",
+    "text": "Flags: --autofix (pass it only when the sweep should also fix; by default other authors' PRs get a\nverdict and a handoff, nothing more).\nSkip drafts, PRs this account authored, and any PR another actor holds with in-progress - never\nforce-claim in a sweep. Report a claim that outlived its run instead of repairing it."
+  },
+  {
+    "id": "om-close-fixed-issues",
+    "skills": ["om-close-fixed-issues"],
+    "label": "om-close-fixed-issues - post-merge housekeeping on the tracker",
+    "text": "--limit 50\n\nOther flags: --since <ISO date|git ref|last-release> · --dry-run · --repo <owner>/<name>.\nClose only issues a merged PR authoritatively fixed - a fixes/closes/resolves keyword or\nclosingIssuesReferences. Never act on a bare #N mention. do-not-close wins over everything.\nHere PRs merge into develop while the default branch is main, so GitHub never auto-closes: this\nrun is what actually closes them. Comment, do not close, when the PR was closed unmerged or merged\ninto a non-base branch."
+  },
+  {
+    "id": "om-check-and-commit",
+    "skills": ["om-check-and-commit"],
+    "label": "om-check-and-commit - run the full gate, then commit and push",
+    "text": "Run every command in validation.commands from .ai/agentic.config.json, in order: pnpm\ngenerate-routes with a clean git diff on src/routeTree.gen.ts, pnpm db:generate with a clean git\ndiff on drizzle/, pnpm typecheck, pnpm lint, pnpm test, pnpm build.\nThe list is authoritative - do not substitute your own commands and do not skip one because it\n\"probably passes\". A generated file is regenerated, never hand-edited. Fix and re-run until green\nbefore publishing; never use --no-verify. Do not revert unrelated changes in the worktree. Commit\nmessages: Conventional Commits, in English, scope = module or plan area."
+  },
+  {
+    "id": "om-auto-update-changelog",
+    "skills": ["om-auto-update-changelog"],
+    "label": "om-auto-update-changelog - draft the release entry as a docs PR",
+    "text": "Flags: --version <x.y.z> · --since <ISO date|git ref|last-release> · --release-ref <ref> ·\n--date <YYYY-MM-DD> · --dry-run · --slug <kebab-case>.\nCover every PR merged since the last release. Honour the Supersede Credit Rule and verify every\ncredit against commit authorship - a carry-forward or umbrella merge credits the contributor, not\nthe merger. The PR itself ships through om-auto-create-pr against develop."
+  },
+  {
+    "id": "om-pipeline-retro",
+    "skills": ["om-pipeline-retro"],
+    "label": "om-pipeline-retro - rank what second passes cost the pipeline",
+    "text": "Flags: --since <YYYY-MM-DD> (default 30 days ago) · --limit <n> (default 30 per state) ·\n--gap-minutes <n> (default 60) · --in-progress-label.\nRead-only: classify each finished run as a clean single pass, a hard recovery, loop checkpoints, or\ncause not recorded, and rank the causes by wall-clock hours lost. Hand the top cause to\nom-prepare-issue rather than fixing anything here. Every number you write down came from a command\nwhose output you read (docs/SPEC.md §7.7)."
+  },
+  {
+    "id": "om-ux-setup",
+    "skills": ["om-ux-setup"],
+    "label": "om-ux-setup - extract this repo's design contract into .uxproof/",
+    "text": "No arguments; read the working tree.\nCapture the tokens, component registry, screen archetypes and conventions this repo actually uses,\nso every later UX skill judges against THIS design system: shadcn-shaped UI on React Aria\nComponents, not Radix (DESIGN.md, docs/SPEC.md §4). Produce the contract only - review nothing.\nRun once per repository, and again after the design system changes."
+  },
+  {
+    "id": "om-setup-agent-pipeline",
+    "skills": ["om-setup-agent-pipeline"],
+    "label": "om-setup-agent-pipeline - reconfigure the pipeline (rarely needed)",
+    "text": "Flags: --defaults (skip the questions and write the auto-detected config).\nThis repo is already configured: .ai/agentic.config.json, .ai/trackers/github.md, SDLC.md,\nCODE_REVIEW.md and BACKWARD_COMPATIBILITY.md all exist. Re-run only when the toolchain or the\nlabel taxonomy changes, and report the diff before writing - do not silently overwrite the base\nbranch (develop), the validation gate or the label taxonomy."
+  },
+  {
+    "id": "om-apply-upgrade-notes",
+    "skills": ["om-apply-upgrade-notes"],
+    "label": "om-apply-upgrade-notes - migrate after a skills-collection upgrade",
+    "text": "Flags: --dry-run · --tracker <name> · --browser <name> · --yes (apply purely additive changes).\nRead the collection's UPGRADE_NOTES.md and re-sync the installed tracker and browser descriptors\nwhile preserving local edits. Report every custom-provider gap rather than papering over it.\nTouch only .ai/ artifacts. The pin in .ai/cezar/config.json (skillsRepos[0].ref) and\nskills-lock.json must move in the same commit as the vendored .claude/skills/om-* files."
+  },
+  {
+    "id": "om-auto-fix-issue",
+    "label": "om-auto-fix-issue - fix or implement an issue end to end",
+    "text": "<issue number only on this line - e.g. 1234>\n\nRead the line above as a tracker issue id, not as a problem description.\nFlags: --interactive · --no-ui · --loop · --force · --slug <kebab-case>.\nRemove the `autofix` label as the first tracker mutation; never add autofix, spec or groom.\nA bug runs verify -> root cause -> fix -> PR -> review -> QA; a feature runs spec -> implement.\nCheck docs/agents/out-of-scope.md before the feature route: a request listed there is closed with\nthe row's ADR as the reason, never implemented.\nA diff touching src/routes, src/components, src/styles or src/lib/i18n/messages is UI-touching:\nom-auto-qa-pr is mandatory and the PR carries needs-qa.\nBranch fix/issue-<n>-<slug> or feat/issue-<n>-<slug>, cut from origin/develop. Keep `Closes #<n>`\nin the PR body - housekeeping's om-close-fixed-issues is what acts on it, since PRs merge into\ndevelop while the default branch is main."
+  },
+  {
+    "id": "om-auto-manage-issues",
+    "label": "om-auto-manage-issues - groom issues to standard, implement nothing",
+    "text": "<issue number only on this line, or leave this line empty to groom a batch>\n\nRead the line above as a tracker issue id, not as a problem description.\nFlags: --limit <n> (25) · --state open|closed|all · --label <name> (-name = missing) ·\n--author <login> · --relabel-only · --prep-impl / --no-prep · --write-missing-specs · --dry-run.\nNever implement anything. Remove the `groom` label as the first mutation and never add a command\nlabel. Skip any issue held by blocked, do-not-close or do-not-merge.\nMap the category from .github/ISSUE_TEMPLATE (bug report -> bug, enhancement -> feature,\nmaintenance -> refactor, Dependabot -> dependencies). Record READY_STATUS against the Definition\nof Ready in SDLC.md and name what is missing. Implementation notes must name the owning module\n(docs/SPEC.md §8) and flag any BACKWARD_COMPATIBILITY.md surface."
+  },
+  {
+    "id": "om-auto-write-spec",
+    "label": "om-auto-write-spec - land a spec on a design-only PR",
+    "text": "<issue number only on this line, or a feature brief instead>\n\nFlags: --slug <kebab-case> · --no-mockups · --force.\nRemove the `spec` label as the first mutation; never add a command label.\nThe spec lands in .ai/specs/<YYYY-MM-DD>-<slug>.md and carries two sections this repo requires\nbeyond the standard ones: \"Visual change expected\", and \"Copy\" listing each en key with its text\n(implementation lands EN and PL in the same change).\nRead CONTEXT.md for the vocabulary and docs/SPEC.md for the architecture the spec must respect;\nan amount is integer minor units at every layer (docs/MONEY.md).\nThe PR is design-only: branch spec/<slug>, body `Refs #<n>`, labels review, documentation,\nskip-qa, one priority and one risk. Ship no implementation on it - that is a separate run through\nom-auto-implement-spec once a human merges this PR."
+  },
+  {
+    "id": "om-auto-implement-spec",
+    "label": "om-auto-implement-spec - build a merged spec and ship a PR",
+    "text": "<spec path, spec name, issue number, or spec-PR number - one reference on this line>\n\nFlags: --no-ui · --loop · --force.\nResolve the reference in order: path, then name in .ai/specs/, then issue-body links, then the\nspec-PR branch. If it does not resolve, stop and list the closest candidates - never guess.\nThe spec PR stays design-only: the implementation ships on its own PR against develop carrying\n`Refs #<specPr>` and a `Source doc:` line. A new repository function ships with a tenant-isolation\ncase, a new money-touching write path with a money-invariants case. Finish with the review loop\nand, for user-facing work, UI verification with screenshots."
+  },
+  {
+    "id": "om-auto-continue-pr",
+    "label": "om-auto-continue-pr - resume an open PR from its plan",
+    "text": "<PR number only on this line - e.g. 312>\n\nFlags: --force (take over another actor's claim) · --from <phase.step> · --adopt ask|auto|off ·\n--goal \"<text>\".\nResume from the first unchecked step of the PR's `Tracking plan:`. A PR with no plan is adopted:\nreconstruct the goal from its description, comments, review feedback, linked issues and diff -\nreconstruction never licenses work the diff and conversation do not support.\nThe repo gate still applies: integer minor units on every amount, EN + PL parity, SQL only in\nsrc/server/repos, Zod on every server-function input, generated files only via pnpm\ngenerate-routes / pnpm db:generate, and never pnpm add|remove|update."
+  },
+  {
+    "id": "om-auto-continue-pr-loop",
+    "label": "om-auto-continue-pr-loop - resume a loop-engine PR at its next Step",
+    "text": "<PR number only on this line - e.g. 312>\n\nFlags: --force · --from <phase.step>.\nOnly for a PR started by om-auto-create-pr-loop - it must carry `Tracking plan:` and\n`Tracking run folder:`. If it does not, use om-auto-continue-pr instead.\nResume at the first non-done row of the run folder's PLAN.md Tasks table and keep the discipline:\none lean commit per Step, a checkpoint every ~5 Steps with integration tests and UI screenshots,\nthe full gate at completion. A spec-only design PR stays design-only."
+  },
+  {
+    "id": "om-auto-review-pr",
+    "label": "om-auto-review-pr - review or re-review one PR",
+    "text": "<PR number only on this line - e.g. 312>\n\nFlags: --autofix (fix -> re-review loop; required for a PR this account did not author) · --force.\nBuild the INHERITED finding set from list-review-threads, not list-review-comments, and keep each\nthread id with its first comment id.\nReply in every thread you act on: fixed -> reply and resolve; deferred -> reply naming the\nfollow-up issue and resolve; declined -> reply, leave the thread open, verdict changes-requested.\nThe develop ruleset merges nothing with an open thread. On a non-autofix pass leave threads as you\nfound them and list them by path.\nBlockers on the diff alone: an added @ts-ignore, @ts-expect-error or eslint-disable; an added\n.skip/.only/.todo/.fixme; tests deleted without the code; a hand-edited src/routeTree.gen.ts or\ndrizzle/ file; a dependency change outside a dependencies PR; float arithmetic on an amount."
+  },
+  {
+    "id": "om-auto-fix-pr",
+    "label": "om-auto-fix-pr - drive a PR to merge-ready (never merges)",
+    "text": "<PR number only on this line - e.g. 312>\n\nFlags: --ci-only (CI stabilization alone) · --branch <name> (only with --ci-only) ·\n--max-iterations <n> (default 3) · --no-ui · --force.\nMerge the latest develop first, then loop review-autofix, CI stabilization and UI verification.\nThe loop is not done while a review thread is open - the develop ruleset blocks the merge on one\neven after an approving review. Reply and resolve threads you handled; a declined thread leaves the\nverdict at changes-requested, never merge-queue.\nFile follow-up issues for nits rather than widening the diff. Never merge - hand off to\nom-approve-merge-pr."
+  },
+  {
+    "id": "om-pr-autopilot",
+    "label": "om-pr-autopilot - diagnose a PR and run whatever it needs",
+    "text": "<PR number only on this line - e.g. 312>\n\nFlags: --dry-run (diagnose only, mutate nothing) · --confirm · --allow-merge (off by default -\nthe run stops at merge-ready) · --force · --max-iterations <n> (default 3).\nDiagnose the PR's actual state first - unfinished plan steps, missing review, unresolved threads,\nred CI, base conflicts, missing QA evidence - then dispatch the matching chain verbatim and publish\na status report. Do not add --allow-merge unless a human asked for the merge."
+  },
+  {
+    "id": "om-approve-merge-pr",
+    "label": "om-approve-merge-pr - approve and squash-merge one PR",
+    "text": "<PR number only on this line - e.g. 312>\n\nNo flags; add \"and file a follow-up: <text>\" to open one at the same time.\nRefuse and report when the PR is draft, conflicting, or carries changes-requested, qa-failed,\nblocked or do-not-merge, or when needs-qa lacks qa-approved - only a human sets qa-approved.\nBefore merging, run list-review-threads: any unresolved, non-outdated thread blocks the merge even\nwith an approving review and green CI, because the develop ruleset says so. Report such threads by\npath and author and offer om-auto-fix-pr - never resolve them from here.\nRoute a fixable blocker to om-auto-fix-pr (--ci-only for red CI) rather than forcing the merge."
+  },
+  {
+    "id": "om-auto-qa-pr",
+    "label": "om-auto-qa-pr - verify a PR's UI in a real browser",
+    "text": "<PR number only on this line - e.g. 312>\n\nFlags: --base <branch> · --evidence-only (default) · --self-qa-signoff · --keep-env ·\n--artifacts <dir> · --force. Leave the line above empty to QA the current worktree instead.\nBring the app up with sh .ai/scripts/test-env-up.sh and read baseUrl from .ai/qa/test-env.json;\ncredentials are references, never values.\nEvidence here is the blind A/B pair (ADR 0016): node scripts/visual/capture.mjs for each changed\nroute, base and head, light and dark, at 1440x900 and 360x800, plus the interaction state.\nAttach them with attach-image-evidence and keep the files in .ai/qa/artifacts_*/ - never inside\nthe repository. Evidence only: never apply qa-approved or qa-self-verified here - a human QA\nreviewer does that."
+  },
+  {
+    "id": "om-ux-review-pr",
+    "label": "om-ux-review-pr - design review of what a PR ships",
+    "text": "<PR number or branch on this line - leave empty to review the working tree>\n\nNo flags. Walk the changed screens in a real browser and perform the user's tasks - do not review\nfrom the diff. Rank findings by user impact, and give every one four parts: the evidence, the\npattern, the trade-off and an acceptance criterion. A finding missing any part is not ready to be\nsaid out loud; label opinions as opinions. Judge against .uxproof/ and DESIGN.md, not against\ntaste. Every chart needs its visually-hidden data table and a non-colour encoding (ADR 0007).\nScope guard: for a whole module, flow or product area use om-ux-shape in Review mode instead."
+  },
+  {
+    "id": "om-code-review",
+    "label": "om-code-review - review a diff, branch or PR against the standards",
+    "text": "<PR number, branch, or commit range - leave empty for the current branch vs develop>\n\nNo flags. Run the validation gate, then apply the built-in checklist plus CODE_REVIEW.md,\nBACKWARD_COMPATIBILITY.md and .ai/review-checklist.md, and produce severity-ranked findings with\nan approve or request-changes verdict.\nBlockers checkable on the diff alone: float arithmetic on an amount at any layer, a chart label\nincluded; an added @ts-ignore, @ts-expect-error or eslint-disable; an added .skip/.only/.todo/\n.fixme; tests deleted without the code; a hand-edited src/routeTree.gen.ts or drizzle/ file; a\ndependency change outside a dependencies PR; a repo method without a tenant-isolation test; SQL\noutside src/server/repos or src/server/catalog; a direct write to account_balances outside\nsrc/server/ledger; an i18n key missing from EN or PL. Style smells are minor, never blockers."
+  },
+  {
+    "id": "om-verify-in-repo",
+    "label": "om-verify-in-repo - is this issue real and still unfixed?",
+    "text": "<issue number only on this line - e.g. 1234>\n\nNo flags. Read-only triage gate - change nothing.\nAnswer with the literal NO_ACTION_NEEDED on its own line when the issue is already fixed on\ndevelop, already claimed by someone else, already covered by an open PR, or not actually a bug.\nOtherwise confirm it in 200 words or fewer and hand on to om-root-cause."
+  },
+  {
+    "id": "om-root-cause",
+    "label": "om-root-cause - locate the bug and the minimal change surface",
+    "text": "<issue number only on this line - e.g. 1234>\n\nNo flags. Read-only - do not implement anything.\nStop and say so if om-verify-in-repo has not confirmed this issue first.\nReturn the cause, the files that must change, and the proposed approach, precise enough that the\nnext agent does not have to re-explore the repo. Name the owning module (docs/SPEC.md §8) and flag\nany BACKWARD_COMPATIBILITY.md surface the fix would touch. Next step: om-fix."
+  },
+  {
+    "id": "om-fix",
+    "label": "om-fix - implement the minimal fix plus a regression test",
+    "text": "<issue number only on this line - e.g. 1234>\n\nNo flags. Stop and report if om-root-cause has not produced an analysis for this issue.\nClaim the issue first: assignee, the in-progress label, and a claim comment; release it on exit,\nincluding on error. Implement the minimal change and add a regression test that fails without it.\nDo not commit, push or open a PR - that is om-open-pr's job.\nBlockers: float arithmetic on an amount; a new i18n key missing from EN or PL; SQL outside\nsrc/server/repos; a repo method without a tenant-isolation test; components/ui fetching data or\nimporting from server/; a server-function input not validated with Zod; hand-edited generated\nfiles. Never run pnpm add|remove|update - stop with Status: blocked. Gate: pnpm typecheck &&\npnpm lint && pnpm test."
+  },
+  {
+    "id": "om-open-pr",
+    "label": "om-open-pr - commit, push and open the labelled PR",
+    "text": "<issue number only on this line, or leave empty for a brief- or spec-driven run>\n\nFlags: --title <text> · --plan <path> · --draft · --summary-file <path> · --handoff <next-skill> ·\n{category} = bug|feature|refactor|security|dependencies|documentation.\nTarget develop, never main. Reuse an existing PR for this branch rather than opening a second one.\n`Closes #<n>` when the PR fully implements the issue, `Refs #<n>` when it is partial or spec-only -\nthat line is the contract om-close-fixed-issues reads at housekeeping.\nFill the sections of .github/pull_request_template.md, the Definition of done (docs/SPEC.md §7)\nincluded. Choose needs-qa or skip-qa from the diff surface; risk-high for src/server/auth,\nsrc/server/repos/base.ts, src/server/billing, src/server/ledger, src/server/db/schema.ts or\ndrizzle/. Branch prefixes: fix/issue-<n>-<slug>, feat/issue-<n>-<slug>, spec/<slug>. Never use\n--no-verify."
+  },
+  {
+    "id": "om-followup-issue-from-pr",
+    "label": "om-followup-issue-from-pr - turn a PR comment into tracked work",
+    "text": "<paste the PR or PR-comment URL on this line>\n\nNo flags. Accepts .../pull/<n>#issuecomment-<id>, .../pull/<n>#discussion_r<id>, or a plain\n.../pull/<n>. Parse the repo from the URL - do not assume the current one.\nExtract the actionable ask and file it against the @-mentioned person, or the PR author when\nnobody is named. For a PR that only adds a design document, open the missing `Implement:` tracking\nissue instead. Apply SDLC labels on creation; never add a command label."
+  }
+]

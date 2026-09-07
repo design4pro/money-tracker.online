@@ -1,6 +1,12 @@
-import { amountReading } from '#/components/app/money'
-import { AmountText, ConvertedAmount } from '#/components/app/transactions'
-import { Badge } from '#/components/ui'
+// Module paths rather than the directory barrels: the landing page must load without the
+// application's graph. See the note at the top of `src/routes/index.tsx`.
+import { amountReading } from '#/components/app/money/amount-reading'
+import {
+  AmountText,
+  ConvertedAmount,
+} from '#/components/app/transactions/amount-text'
+import { Badge } from '#/components/ui/badge'
+import { TYPED_LINE } from '#/components/app/transactions/typed-line'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { asCurrencyCode, asMinor, formatMoney, makeMoney } from '#/lib/money'
@@ -47,7 +53,7 @@ import type { MessageKey } from '#/lib/i18n'
  * pixel row the printed ruling already occupies - so the two are one ruling where the paper's
  * rule is visible, and the table keeps its rules where the paper's is faint. A row is therefore
  * always a whole number of rules tall: one for an entry, its category typed after the payee on the
- * same line, and a second only where a converted figure sits under the amount.
+ * same line and a converted figure typed beside the amount on it.
  *
  * ## The narrow page
  *
@@ -59,16 +65,15 @@ import type { MessageKey } from '#/lib/i18n'
  * is not a table's loses its semantics in WebKit, so every part carries its ARIA role explicitly
  * and a screen reader keeps the table at every width.
  *
- * ## Pencil before ink, and one stamp
+ * ## Pencil before ink, and one mark
  *
  * The last entry is planned rather than booked. It is the same row in the secondary ink - pencil -
  * with the word beside its category: the two channels the ledger inside the product gives a
  * planned line. The stamp violet is spent on what is settled and never on what is not, and on
  * this page it is spent once, on the word beside the opening line: February is closed, and the
  * balance it handed over is the one figure here that nothing can move. The mark is a typed word
- * inside a one-pixel rule in the stamp ink ({@link Badge} in its `settled` tone), not a drawing of
- * a rubber stamp - the metaphor lives in rules and type - and a page that closes in pencil is not
- * stamped.
+ * with a run of highlighter behind it ({@link Badge} in its `settled` tone) - the gesture of
+ * checking a line off - and a page that closes in pencil is not marked.
  *
  * **The rows are invented and the page says so.** `PRODUCT.md` forbids fabricating evidence, and a
  * ledger fragment with no label is exactly the kind of thing a visitor could read as somebody's
@@ -182,19 +187,10 @@ const ROWS: ReadonlyArray<PreviewRow> = [
 ]
 
 /**
- * One typed line of the form.
- *
- * The page is ruled at 2.5rem, so every line of type is a 2.5rem box and a description that wraps
- * takes two rules rather than breaking the pitch. In that box the baseline would sit centred, 17px
- * above the rule; a typewriter sets its type on the line. Courier Prime's baseline lies half the
- * box plus 0.22em below the box's top (measured in the browser), so painting the box 1rem minus
- * 0.22em lower puts the baseline 3px above the rule at every size the table uses - and a transform
- * moves paint rather than layout, so a row stays exactly as many rules tall as it has lines.
- *
- * In `cn()` it goes **after** the size class: tailwind-merge drops a `leading-*` that precedes a
- * `text-*` size, since the size utility sets a line-height of its own.
+ * The typed line is shared with the ledger inside the app, so the two are one book; the landing
+ * page re-exports it for the section that explains the euro row.
  */
-export const TYPED_LINE = 'block leading-10 translate-y-[calc(1rem-0.22em)]'
+export { TYPED_LINE }
 
 /** The form's vertical ruling on the wide page: a hairline after every cell but the last. */
 const RULED = 'sm:border-e sm:border-border-subtle sm:last:border-e-0'
@@ -354,14 +350,13 @@ export function LedgerPreview() {
           <td role="cell" className={cn(CELL, AT_DESCRIPTION)}>
             <span className={cn('text-label text-ink-2', TYPED_LINE)}>
               {t('marketing.ledger.opening')}{' '}
-              {/* The one stamp on the page. Beside the line where there is room for it; on the
+              {/* The one mark on the page. Beside the line where there is room for it; on the
                   narrow page it takes the entry's second line, where a category would go, so
                   the row keeps the two-line shape of every other entry rather than wrapping
-                  at whatever width the word happens to run out. */}
+                  at whatever width the word happens to run out. It sits on the baseline like
+                  the word it covers: a highlighter is run over the line, not placed above it. */}
               <span className="sm:ms-1 max-sm:block">
-                {/* Raised four pixels so the frame stands on the printed rule instead of
-                    crossing it: a stamp lands on the line, it is not typed on the baseline. */}
-                <Badge tone="settled" size="sm" className="relative -top-1">
+                <Badge tone="settled" size="sm">
                   {t('marketing.ledger.settled')}
                 </Badge>
               </span>
@@ -427,15 +422,15 @@ export function LedgerPreview() {
                   transferKind={row.transferKind ?? 'none'}
                   className="align-top"
                 />
-                {/* The złoty figure under the euro one on the wide page; beside it where a
-                    second line would push the balance off the entry's second rule. Top-
-                    aligned there so its smaller box shares the line rather than stretching
-                    it by a pixel. */}
+                {/* The złoty figure beside the euro one, on the same rule: a line of its own
+                    would leave the balance cell beside it empty, and a ruled line with no
+                    balance is not a line of a passbook. Top-aligned so its smaller box shares
+                    the line rather than stretching it by a pixel. */}
                 {row.refAmountMinor === undefined ? null : (
                   <ConvertedAmount
                     refAmountMinor={asMinor(row.refAmountMinor)}
                     refCurrencyCode={asCurrencyCode('PLN')}
-                    className="leading-10 max-sm:inline max-sm:ps-2 max-sm:align-top"
+                    className="inline ps-2"
                   />
                 )}
               </span>

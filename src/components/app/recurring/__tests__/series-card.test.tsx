@@ -73,7 +73,7 @@ describe('SeriesCard', () => {
         today={TODAY}
       />,
     )
-    expect(screen.getByText(/Due Apr 30, 2026/)).toBeTruthy()
+    expect(screen.getByText(/Due on Apr 30, 2026/)).toBeTruthy()
   })
 
   it('says so plainly when there is nothing outstanding', async () => {

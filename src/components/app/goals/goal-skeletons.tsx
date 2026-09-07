@@ -40,7 +40,7 @@ export function GoalListSkeleton() {
               <Skeleton shape="block" className="size-9 rounded-md" />
             </div>
             <Skeleton shape="text" className="h-4 w-32" />
-            <Skeleton shape="block" className="h-1.5 w-full rounded-full" />
+            <Skeleton shape="block" className="h-1.5 w-full rounded-sm" />
             <Skeleton shape="text" className="h-3 w-2/3" />
           </li>
         ))}
@@ -59,7 +59,7 @@ export function GoalDetailSkeleton() {
       <Card className="flex flex-col gap-4">
         <Skeleton shape="text" className="h-3 w-28" />
         <Skeleton shape="block" className="h-9 w-56 rounded-md" />
-        <Skeleton shape="block" className="h-2 w-full rounded-full" />
+        <Skeleton shape="block" className="h-2 w-full rounded-sm" />
         <Skeleton shape="text" className="h-3 w-3/4" />
       </Card>
 
@@ -71,7 +71,7 @@ export function GoalDetailSkeleton() {
 
       <Card className="flex flex-col gap-3">
         <Skeleton shape="text" className="h-3 w-48" />
-        <Skeleton shape="block" className="h-[240px] rounded-lg" />
+        <Skeleton shape="block" className="h-60 rounded-lg" />
       </Card>
 
       <Card className="flex flex-col gap-3">

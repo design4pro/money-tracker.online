@@ -86,8 +86,8 @@ missing — is `docs/DEPLOY.md`.
   [open-mercato/skills](https://github.com/open-mercato/skills) (`pnpm install-skills`) and
   orchestrated by Cezar (`docs/agents/cezar.md`). The lifecycle, the label state machine and the
   QA gate are `SDLC.md`; the backlog contract is `docs/agents/issue-tracker.md`.
-- A human starts implementation from the cockpit (issue → "Hand this to the agent" →
-  `om-fix-issue`, the issue number as the task) or locally with `/om-auto-fix-issue <n>`. Every
+- A human starts implementation with the `autofix` label on an issue, from the cockpit (issue →
+  "Hand this to the agent" → `issue-autofix`) or locally with `/om-auto-fix-issue <n>`. Every
   pull request is reviewed by `om-auto-review-pr` and stops at `review` or `merge-queue` for a
   human; `needs-qa` without `qa-approved` never merges.
 

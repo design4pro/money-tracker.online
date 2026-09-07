@@ -38,7 +38,9 @@ export function AppHeader({ shell }: AppHeaderProps) {
             of the rail instead, which leaves this bar to the three controls below and gives the
             screen's own `<h1>` an uncontested first line. */}
         <div className="min-w-0 flex-1 lg:hidden">
-          <WorkspaceSwitcher shell={shell} />
+          {/* No initials here: the account menu at the other end of this bar is an initials
+              disc already, and two of them on one 360px line read as the same control twice. */}
+          <WorkspaceSwitcher shell={shell} showAvatar={false} />
         </div>
 
         {/* Three icon controls, 44px each including their grown hit areas. At 360px they occupy

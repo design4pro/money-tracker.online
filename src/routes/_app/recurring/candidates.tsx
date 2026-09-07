@@ -28,6 +28,7 @@ import type {
 import type { CandidateRow } from '#/server/fns/recurring'
 import type { WeakestSignal } from '#/server/recurring/detect'
 import { useTranslate } from '#/lib/i18n'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/recurring/candidates` - what the detector noticed, offered rather than acted on.
@@ -65,6 +66,8 @@ export const Route = createFileRoute('/_app/recurring/candidates')({
   },
   pendingComponent: CandidateListSkeleton,
   errorComponent: CandidateListError,
+  head: ({ matches }) =>
+    pageHead(matches, (t) => t('recurring.candidates.title')),
   component: CandidateListRoute,
 })
 

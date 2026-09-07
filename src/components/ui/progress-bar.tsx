@@ -62,10 +62,10 @@ export function ProgressBar({
               )}
             </div>
           ) : null}
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+          <div className="h-1.5 w-full overflow-hidden rounded-sm bg-surface-sunken">
             <div
               className={cn(
-                'h-full rounded-full bg-accent',
+                'h-full rounded-sm bg-accent',
                 transitionBase,
                 isIndeterminate && 'w-1/3 animate-indeterminate',
               )}

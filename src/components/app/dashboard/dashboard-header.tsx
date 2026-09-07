@@ -1,12 +1,15 @@
+import { Link } from '@tanstack/react-router'
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Equal,
+  Plus,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
 
 import { Amount } from '#/components/app/accounts'
+import { buttonVariants } from '#/components/ui'
 import {
   formatCalendarDateRange,
   formatPercent,
@@ -19,6 +22,7 @@ import {
   isNegativeMinor,
   isZeroMinor,
   money,
+  negateMinor,
   ratioOfMinor,
 } from '#/lib/money'
 
@@ -61,6 +65,18 @@ import type { PeriodRange } from './period'
  * the one idiom the form refuses. The three figures are now lines of the book - the label at the
  * start of the line, the figure at its end, a rule under each - the way the net-worth panel already
  * sets what is held against what is owed, and the difference keeps its sentence under its figure.
+ * Money in carries its `+` and Money out its `−` like the difference does: every amount is
+ * written with an explicit sign (the Real Minus Rule), never left for the label alone to carry.
+ * `expenseMinor` arrives as a magnitude, so it is negated here the way `DirectionalAmount` negates
+ * an expense row.
+ *
+ * ## The one stamp on the page
+ *
+ * "New transaction" is the page's primary action and its only violet fill. It used to be two hops away
+ * (the Spending tab, then its own `+`), which is one hop too many for the thing the book is for.
+ * It is the router's `Link` painted as a button rather than a `Button` with a handler, so it is a
+ * real `<a>` in the link list and opens in a new tab when asked - the same reasoning as
+ * `widget-link.tsx`.
  */
 export interface DashboardHeaderProps {
   readonly baseCurrencyCode: CurrencyCode
@@ -68,7 +84,7 @@ export interface DashboardHeaderProps {
   readonly incomeMinor: Minor
   readonly expenseMinor: Minor
   readonly netMinor: Minor
-  /** The period selector. Passed in so the header does not need to know about routing. */
+  /** The period selector. Passed in so the header does not need to know about the period. */
   readonly action?: ReactNode
 }
 
@@ -96,7 +112,16 @@ export function DashboardHeader({
             })}
           </p>
         </div>
-        {action}
+        <div className="flex flex-wrap items-end gap-3">
+          {action}
+          <Link
+            to="/transactions/new"
+            className={buttonVariants({ variant: 'primary' })}
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            {t('transactions.create')}
+          </Link>
+        </div>
       </div>
 
       {/*
@@ -116,6 +141,7 @@ export function DashboardHeader({
             amountMinor={incomeMinor}
             currencyCode={baseCurrencyCode}
             size="lg"
+            signed
           />
         </Figure>
         <Figure
@@ -124,9 +150,10 @@ export function DashboardHeader({
         >
           <Amount
             locale={locale}
-            amountMinor={expenseMinor}
+            amountMinor={negateMinor(expenseMinor)}
             currencyCode={baseCurrencyCode}
             size="lg"
+            signed
           />
         </Figure>
         <Figure
