@@ -13,7 +13,10 @@ the rules of `SDLC.md`.
 - Pinned version: `@open-mercato/cezar@0.10.1` (`npx -y @open-mercato/cezar@0.10.1 serve`). The
   project entry in `~/.cezar/config.json` points at the main checkout; the versioned part is
   `.ai/cezar/config.json` (`baseBranch: develop`, `worktreeRetention: 10`, `maxParallel: 2`,
-  `reviewGate: true`, which gates only non-autonomous runs, `skillsRepos: []`). Cezar's own
+  `reviewGate: false`, so a finished run settles straight to `done` rather than parking at
+  `review` for a human to accept the diff; the gate only ever applied to non-autonomous runs,
+  and partial automation is the point, `systemPrompt`, which is prepended to every run's prompt
+  and is where the language contract lives, `skillsRepos: []`). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked.
 - Skills: `pnpm install-skills` installs the collection into `.agents/skills/` and links every
@@ -93,8 +96,10 @@ and the hooks in `.claude/hooks/` tighten:
   the generated files it refuses for everyone.
 
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
-`jq`, and a prefix allowlist would drop label mutations silently. The hooks, the `deny` list in
-`.claude/settings.json`, the PAT scopes, one worktree per run and `maxParallel: 2` are the gate.
+`jq`, and a prefix allowlist would drop label mutations silently. The hooks in `.claude/hooks/`,
+the PAT scopes, one worktree per run and `maxParallel: 2` are the gate. `.claude/settings.json`
+carries no permission rules; it is hooks-only, and the rules a `deny` list used to hold moved into
+`git-guardrails.sh` and `guard-read.sh`, which see the whole command rather than a prefix.
 `.claude/hooks/__tests__/hooks.test.ts` (vitest project `tooling`) holds the hooks' contract.
 
 ## Workflows (`.ai/cezar/workflows/`)

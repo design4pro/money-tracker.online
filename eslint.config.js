@@ -112,6 +112,11 @@ export default [
       'eslint.config.js',
       'prettier.config.js',
       '.claude/**',
+      // A cezar run worktree is a second checkout of this repository nested inside it. Linting it
+      // reports every file twice, against a tsconfig it is not part of, and on a host with a few
+      // of them eslint exhausts the heap before it finishes. `.ai/cezar/.gitignore` already keeps
+      // them out of git.
+      '.ai/cezar/worktrees/**',
       // Agent tooling that GitHub's own surfaces read — skills, agent definitions, hooks. Same
       // reason as `.claude/**`: vendored configuration for tools around the project, written
       // against no tsconfig of ours.
