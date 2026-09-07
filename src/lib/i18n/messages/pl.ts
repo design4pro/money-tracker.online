@@ -851,9 +851,9 @@ const messages = {
   'payees.defaultCategory.summary': 'Podpowiada: {name}',
   'payees.detail.back': 'Wróć do odbiorców',
   'payees.detail.noCategory': 'Nie podpowiada żadnej kategorii',
-  'payees.detail.notFound.title': 'Nie ma tu takiego odbiorcy',
-  'payees.detail.notFound.body':
-    'Mógł zostać usunięty albo scalony z innym, albo adres jest błędny.',
+  'payees.detail.error.title': 'Nie udało się wczytać tego odbiorcy',
+  'payees.detail.error.body':
+    'Żądanie nie wróciło. Nic nie zostało zmienione — spróbuj ponownie.',
   'payees.field.name.help': 'Nazwa, którą chcesz widzieć przy swoich wpisach.',
   'payees.field.defaultCategory': 'Podpowiadana kategoria',
   'payees.field.defaultCategory.help':

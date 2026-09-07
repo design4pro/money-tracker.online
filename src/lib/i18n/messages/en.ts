@@ -827,9 +827,9 @@ const messages = {
   'payees.defaultCategory.summary': 'Suggests {name}',
   'payees.detail.back': 'Back to payees',
   'payees.detail.noCategory': 'Suggests no category',
-  'payees.detail.notFound.title': 'That payee is not here',
-  'payees.detail.notFound.body':
-    'It may have been deleted or merged into another one, or the address may be wrong.',
+  'payees.detail.error.title': 'This payee could not be loaded',
+  'payees.detail.error.body':
+    'The request did not come back. Nothing has been changed — try again.',
   'payees.field.name.help': 'The name you want to see on your entries.',
   'payees.field.defaultCategory': 'Suggested category',
   'payees.field.defaultCategory.help':

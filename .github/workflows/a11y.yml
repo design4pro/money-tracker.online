@@ -57,7 +57,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare the browser-test environment
         uses: ./.github/actions/e2e-env
@@ -80,7 +80,7 @@ jobs:
       # `always()`: the JSON is at its most useful on the run that failed.
       - name: Upload the axe results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a11y-axe-results
           path: a11y-report
@@ -89,7 +89,7 @@ jobs:
 
       - name: Upload the dev server log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a11y-dev-server-log
           path: dev-server.log

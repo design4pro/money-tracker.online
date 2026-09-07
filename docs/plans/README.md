@@ -17,19 +17,18 @@ negotiable per plan.
 The plan set is the **backlog source**; GitHub Issues is the **execution surface**.
 
 ```
-docs/plans/NN-area.md   →   PRD issue (the area)   →   one sub-issue per stage, in stage order
+docs/plans/NN-area.md   →   spec in .ai/specs/ (`om-spec-writing`; its Phasing = the stages)
                                                         ↓
-                                     `status: queued` → `status: ready` per slice
+                                     one issue per stage (`om-prepare-issue`), in stage order
                                                         ↓
-                                     a human adds `run: implement` (or the PRD's `auto-advance`)
+                                     a human hands one issue to `om-fix-issue` from the cockpit
 ```
 
-A stage's twelve headings are shaped to fill a ticket body exactly (`docs/agents/issue-tracker.md` →
-_What a ticket body must contain_). `scripts/agent/publish-tickets.sh` publishes them at the end of a
-`/plan-feature <issue> tickets` run: created `status: queued`, opened to `status: ready` only after
-the native `sub_issues` and `blocked_by` links are verified, and **never** the PRD, which stays
-`status: in-progress` while any child is open. When a plan and an already-worked issue disagree, the
-issue wins and the plan is amended to say so.
+A stage's twelve headings are shaped to fill an issue body (`docs/agents/issue-tracker.md`).
+`om-prepare-issue` writes one issue per stage with the category, priority and risk labels;
+dependencies between stages are stated in the body (`Blocked by #n`), not as native sub-issues,
+and a stage is picked up only when the issues it names are closed. When a plan and an
+already-worked issue disagree, the issue wins and the plan is amended to say so.
 
 ---
 
@@ -227,17 +226,16 @@ rejected before it is scheduled.
 
 ## Label vocabulary
 
-The labels a plan-derived ticket carries, and the ones the automation reads. Full contract:
-`docs/agents/triage-labels.md`.
+The labels a plan-derived issue carries, and the ones the skills read. Full contract: `SDLC.md`;
+meaning of each label: `.github/labels.yml`.
 
-| Label                                                                  | Meaning                                                                               |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `status: queued` → `status: ready`                                     | **The gate.** Per-slice, **never** on a PRD; written by the publish and sweep scripts |
-| `run: implement`                                                       | A human's command to start one ready ticket; the claim removes it                     |
-| `status: needs-human`                                                  | A run stopped. The digest comment says why, and a human decides                       |
-| `status: triage` / `needs-info` / `backlog` / `in-progress` / `review` | The rest of the lifecycle                                                             |
-| `type: bug` / `feature` / `enhancement` / `maintenance`                | Kind; on the PRD, never on its tickets                                                |
-| `prd` / `auto-advance`                                                 | The parent, and the sweeper's licence to advance its children                         |
+| Label                                                             | Meaning                                                                    |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `feature` / `bug` / `refactor` / `security` / `documentation`     | Category, exactly one per issue; a plan stage is a `feature`               |
+| `priority-*` / `risk-*`                                           | One of each; `om-prepare-issue` sets them from the stage's risk section    |
+| `in-progress`                                                     | A run holds the issue (assignee + label + claim comment); nothing restarts |
+| `review` / `changes-requested` / `qa` / `merge-queue` / `blocked` | The pull request's pipeline state, at most one at a time                   |
+| `needs-qa` / `skip-qa` / `qa-approved`                            | The QA gate; only a human sets `qa-approved`                               |
 
 Body marker: `<!-- sentry-issue: SHORT-ID[#n] -->`.
 Commits: Conventional Commits in English, agent runs included. There is no agent-only prefix.

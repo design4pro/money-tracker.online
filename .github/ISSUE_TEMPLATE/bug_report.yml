@@ -1,14 +1,14 @@
 name: Bug report
 description: Behaviour that is wrong against a stated expectation.
 title: 'bug: '
-labels: ['type: bug', 'status: triage']
+labels: ['bug']
 body:
   - type: markdown
     attributes:
       value: >
-        A bug report is worth what its reproduction is worth. The triager reproduces at HEAD
-        before promoting anything, so the steps below are what decides whether this becomes work
-        or a question.
+        A bug report is worth what its reproduction is worth. The fix chain reproduces at HEAD
+        (`om-verify-in-repo`) before changing anything, so the steps below are what decides
+        whether this becomes work or a question.
 
   - type: textarea
     id: what-happens
@@ -68,7 +68,7 @@ body:
     attributes:
       label: Severity
       description: >
-        The triager sets the `priority: *` label from this. Anything that loses data or reports a
+        `om-auto-manage-issues` sets the `priority-*` label from this. Anything that loses data or reports a
         wrong amount is critical regardless of how rare it is.
       options:
         - critical - data loss, a wrong amount, or the product is down

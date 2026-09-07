@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # PreToolUse hook (Read|Glob|Grep), agent runs only (CEZ_TASK_ID or GITHUB_ACTIONS): an agent
 # reads inside its own worktree and never the files that hold secrets or other runs' state.
+# .ai/runs, .ai/analysis, .ai/qa and .ai/tmp stay readable: the om-* skills write their
+# artefacts there; only the test-env credentials file under .ai/qa/ is denied.
 # Contract: exit 2 blocks the tool call and feeds stderr back to the model; exit 0 allows.
 set -euo pipefail
 
@@ -48,7 +50,7 @@ check() { # path
   esac
   case "$rel" in
     .ai/cezar/runs*|.ai/cezar/worktrees*|.ai/cezar/tmp*) deny "$1" "cezar run state" ;;
-    .agent/handoff*) deny "$1" "handoff file" ;;
+    .ai/qa/test-env.env) deny "$1" "test-env credentials" ;;
     .git/*) deny "$1" "git internals" ;;
   esac
 }
@@ -57,7 +59,7 @@ check() { # path
 # A Glob pattern that walks upwards or names a denied file is a read of it.
 case "$pattern" in
   ../*|*/../*|/*) check "$pattern" ;;
-  *.dev.vars*|*.env|*.env.*|*handoff*) deny "$pattern" "pattern names a protected file" ;;
+  *.dev.vars*|*.env|*.env.*|*test-env.env*) deny "$pattern" "pattern names a protected file" ;;
 esac
 
 exit 0

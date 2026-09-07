@@ -18,6 +18,18 @@ coverage/
 .claude/settings.local.json
 .claude/worktrees/
 
-# Per-run scratch of the cezar workflows (scripts/agent/): the port pin, ladder verdicts and
-# digests, the claim and the handoff. Never committed; the run's pull request carries what matters.
-.agent/
+# open-mercato skills: installed per checkout by `pnpm install-skills`, never committed.
+# Repo-local skills live in .ai/skills/ and their .claude/skills/<name> symlinks are tracked.
+.agents/
+skills-lock.json
+.claude/skills/om-*
+
+# Per-run artefacts of the om pipeline. The launchers .ai/scripts/test-env-*.sh stay tracked
+# so a fresh Cezar worktree can boot the QA environment.
+.ai/qa/test-env.json
+.ai/qa/test-env.env
+.ai/qa/test-env.lock/
+.ai/qa/test-env-boot.log
+.ai/qa/test-env-build-cache.json
+.ai/qa/artifacts_*/
+.ai/tmp/
