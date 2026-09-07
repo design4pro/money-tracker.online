@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "description": "Project-scoped Claude Code settings for money-tracker.online. Hooks only: the guardrails that must apply to every checkout live in .claude/hooks. Permission rules are managed per-developer, outside the repository.",
+  "description": "Project-scoped Claude Code settings for money-tracker.online. Hooks only: the guardrails that must apply to every checkout live in .claude/hooks. Permission rules are managed per-developer in the gitignored .claude/settings.local.json.",
   "hooks": {
     "PreToolUse": [
       {

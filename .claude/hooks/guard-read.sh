@@ -3,7 +3,9 @@
 #
 # The secret files - .dev.vars*, .env* and .ai/qa/test-env.env - are refused to every caller.
 # AGENTS.md lists reading them under `## Never`, and since `.claude/settings.json` became
-# hooks-only this hook is the only thing enforcing that rule for an interactive session.
+# hooks-only this hook is what carries that rule for the file-reading tools. It guards those tools
+# only: `cat .dev.vars` is a Bash call and reaches git-guardrails.sh instead, which does not stop
+# it, so this is a guard against the obvious read, not a containment boundary.
 #
 # Everything else is agent runs only (CEZ_TASK_ID or GITHUB_ACTIONS): a run reads inside its own
 # worktree and never another run's state or git internals, while a developer at the keyboard
@@ -17,8 +19,27 @@ set -euo pipefail
 agent_run() { [ -n "${CEZ_TASK_ID:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; }
 
 input=$(cat)
+tool=$(printf '%s' "$input" | jq -r '.tool_name // empty')
 target=$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.path // empty')
 pattern=$(printf '%s' "$input" | jq -r '.tool_input.pattern // empty')
+glob=$(printf '%s' "$input" | jq -r '.tool_input.glob // empty')
+
+# Which input names a path depends on the tool. `Glob` matches its `pattern` against paths, but
+# `Grep` searches file *contents* with it and filters paths with `glob` - so `process.env` is a
+# search for that source expression, not a request to read `.env`.
+case "$tool" in
+  Grep) path_pattern="$glob" ;;
+  Glob) path_pattern="${pattern:-$glob}" ;;
+  *)
+    # No `tool_name` in the payload: `pattern` could be either, so it counts as a path only when
+    # it is shaped like one - a separator or a glob metacharacter. That keeps `**/.dev.vars`
+    # denied without reading a bare content regex as a request for the file it names.
+    case "$pattern" in
+      */* | *\** | *\?* | *\[*) path_pattern="$pattern" ;;
+      *) path_pattern="$glob" ;;
+    esac
+    ;;
+esac
 
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 root=$(cd "$root" && pwd -P)
@@ -78,10 +99,14 @@ check() { # path
 }
 
 [ -n "$target" ] && check "$target"
-# A Glob pattern that walks upwards or names a denied file is a read of it.
-case "$pattern" in
-  ../*|*/../*|/*) check "$pattern" ;;
-  *.dev.vars*|*.env|*.env.*|*test-env.env*) deny "$pattern" "pattern names a protected file" ;;
+# A path pattern that walks upwards or names a denied file is a read of it.
+case "$path_pattern" in
+  '') ;;
+  ../*|*/../*|/*) check "$path_pattern" ;;
+esac
+case "$path_pattern" in
+  '') ;;
+  *.dev.vars*|*.env|*.env.*|*test-env.env*) deny "$path_pattern" "pattern names a protected file" ;;
 esac
 
 exit 0
