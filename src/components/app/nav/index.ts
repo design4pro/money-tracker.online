@@ -20,6 +20,12 @@ export type { Destination } from './destinations'
 export { NavLink } from './nav-link'
 export type { NavLinkProps } from './nav-link'
 
+export { SegmentedFilter } from './segmented-filter'
+export type {
+  SegmentedFilterOption,
+  SegmentedFilterProps,
+} from './segmented-filter'
+
 export { SidebarNav } from './sidebar-nav'
 export type { SidebarNavProps } from './sidebar-nav'
 

@@ -11,31 +11,25 @@ import { useLocale, useTranslate } from '#/lib/i18n'
 import { Amount } from './amount'
 import { owedMinor } from './credit-utilisation'
 
+import type { ReactNode } from 'react'
 import type { AccountOverview } from '#/server/repos/accounts'
 
 /**
  * The two figures the accounts screen exists for, plus the one they add up to.
  *
- * ## It is a description list, not a grid of divs
+ * ## Three typed lines, not a hero over a pair
  *
- * Each figure is a `<dt>`/`<dd>` pair, so a screen reader hears "What you hold, 12 480,00 zł"
- * rather than two unrelated strings that happen to sit near each other. The plan asks for this
- * by name and it is the cheapest accessibility win on the page.
+ * The card used to open with a micro-uppercase "NET WORTH" over a display-sized figure, with
+ * held and owed as two columns on the floor: an eyebrow over a title and a big-number tile, the
+ * two idioms the form refuses. It is now a `dl` of three lines - the label at the start of each
+ * line, the figure at its end, a rule over each - exactly as the dashboard's header sets Money
+ * in, Money out and Difference and its net-worth panel sets these same three. Net worth is the
+ * head line, one type step above the two under it; hierarchy is position and size, not a wash
+ * or a second surface. A screen reader hears "Net worth, 116 235,77 zł" as one pair rather than
+ * two strings that happen to sit near each other.
  *
- * ## One hero, and it is twice the mass of anything beside it
- *
- * Net worth is the display step; held and owed are the body step in the secondary ink. They
- * used to be one step apart, and because *what you hold* is numerically the larger figure it won
- * the first fixation on a card whose entire subject is the number above it. Hierarchy here is
- * size, weight and colour together — three channels, all of which survive a greyscale print.
- *
- * ## No card inside the card
- *
- * Held and owed are two columns divided by a hairline, not two filled tiles at the parent's own
- * radius. A rounded box nested in a rounded box at the same radius reads as a component wrapped
- * in itself; the card keeps its radius and is the only rounded box in the block. Side by side at
- * every width, which is also what keeps the first account row on the accounts page above the
- * fold on a phone.
+ * The heading the section is labelled by is visually hidden: the first line already says it,
+ * and a visible title over a `dt` with the same words is the eyebrow again by another route.
  *
  * ## Nothing is converted in this component
  *
@@ -61,41 +55,56 @@ export function AccountOverviewCard({
     <Card
       as="section"
       aria-labelledby={headingId}
-      // `h-full` + `mt-auto` on the pair below: the grid stretches this card to the height of
-      // the currency card beside it, and without a rule for where the extra height goes it all
-      // collected under the last line as orphaned padding. Now the hero sits at the top and the
-      // hold/owe pair sits on the floor, so the space between them is deliberate.
-      className="flex h-full flex-col gap-5"
+      className="flex flex-col gap-3"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h2
-            id={headingId}
-            className="text-micro tracking-label uppercase text-ink-2"
-          >
-            {t('accounts.netWorth')}
-          </h2>
-          <p className="mt-1">
-            <Amount
-              locale={locale}
-              amountMinor={overview.netWorthMinor}
-              currencyCode={currency}
-              size="2xl"
-              tone="value"
-            />
-          </p>
-          <p className="mt-1 text-caption text-ink-2">
-            {t('accounts.overview.basis', { count: overview.countedAccounts })}
-          </p>
-        </div>
+      <h2 id={headingId} className="sr-only">
+        {t('accounts.netWorth')}
+      </h2>
 
-        {/*
-          The footnote about what is left out used to be a two-line paragraph at the foot of the
-          card, and on a phone those two lines were part of why not one account row survived the
-          first viewport. It is a popover rather than a tooltip on purpose: a tooltip opens on
-          hover and focus, which is nothing at all on the touch devices this reclaims the space
-          for. `target-min` on the button keeps the 44px hit area behind a 32px glyph.
-        */}
+      <dl className="border-b border-border-subtle">
+        <Line label={t('accounts.netWorth')}>
+          <Amount
+            locale={locale}
+            amountMinor={overview.netWorthMinor}
+            currencyCode={currency}
+            size="lg"
+            tone="value"
+          />
+        </Line>
+        <Line label={t('accounts.overview.assets')}>
+          <Amount
+            locale={locale}
+            amountMinor={overview.totalBalanceMinor}
+            currencyCode={currency}
+            size="md"
+          />
+        </Line>
+        <Line label={t('accounts.overview.liabilities')}>
+          {/*
+            `owedMinor` is a magnitude, never negative, so there is no sign for `tone="value"`
+            to tint. The label carries the direction; the figure carries the size.
+          */}
+          <Amount
+            locale={locale}
+            amountMinor={owedMinor(overview.liabilitiesMinor)}
+            currencyCode={currency}
+            size="md"
+          />
+        </Line>
+      </dl>
+
+      {/*
+        The basis sits under the lines it qualifies, and the footnote about what is left out sits
+        beside it as a popover rather than two more lines of copy: on a phone those two lines were
+        part of why not one account row survived the first viewport. A popover rather than a
+        tooltip on purpose - a tooltip opens on hover and focus, which is nothing at all on the
+        touch devices this reclaims the space for. `target-min` on the button keeps the 44px hit
+        area behind a 32px glyph.
+      */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-caption text-ink-2">
+          {t('accounts.overview.basis', { count: overview.countedAccounts })}
+        </p>
         <PopoverTrigger>
           <Button
             variant="ghost"
@@ -114,41 +123,22 @@ export function AccountOverviewCard({
           </Popover>
         </PopoverTrigger>
       </div>
-
-      <dl className="mt-auto grid grid-cols-2">
-        <div className="min-w-0 pe-4 sm:pe-6">
-          <dt className="text-micro tracking-label uppercase text-ink-2">
-            {t('accounts.overview.assets')}
-          </dt>
-          <dd className="mt-1">
-            <Amount
-              locale={locale}
-              amountMinor={overview.totalBalanceMinor}
-              currencyCode={currency}
-              size="md"
-              className="font-medium text-ink-2"
-            />
-          </dd>
-        </div>
-        <div className="min-w-0 border-s border-border-subtle ps-4 sm:ps-6">
-          <dt className="text-micro tracking-label uppercase text-ink-2">
-            {t('accounts.overview.liabilities')}
-          </dt>
-          <dd className="mt-1">
-            {/*
-              `owedMinor` is a magnitude, never negative, so there is no sign for `tone="value"`
-              to tint. The label carries the direction; the figure carries the size.
-            */}
-            <Amount
-              locale={locale}
-              amountMinor={owedMinor(overview.liabilitiesMinor)}
-              currencyCode={currency}
-              size="md"
-              className="font-medium text-ink-2"
-            />
-          </dd>
-        </div>
-      </dl>
     </Card>
+  )
+}
+
+/**
+ * One line of the book: the label at the start, the figure at the end, a rule over it. The card
+ * has no visible title, so the first line has no rule over it: a hairline 20px under the card's
+ * own edge reads as a stray mark rather than as ruling.
+ */
+function Line({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-t border-border-subtle py-3 first:border-t-0 first:pt-0">
+      <dt className="text-micro tracking-label uppercase text-ink-2">
+        {label}
+      </dt>
+      <dd className="min-w-0 text-end">{children}</dd>
+    </div>
   )
 }

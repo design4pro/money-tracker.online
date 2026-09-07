@@ -29,8 +29,8 @@ colors:
   warning: '#614106'
   warning-soft: '#f7ead3'
   on-warning: '#ffffff'
-  info: '#4a2a82'
-  info-soft: '#ece4f7'
+  info: '#4b4941'
+  info-soft: '#ebeae1'
   on-info: '#ffffff'
   focus: '#4a2a82'
   focus-gap: '#ffffff'
@@ -331,8 +331,10 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f5a08f`.
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
   9.26:1 on raised; on `warning-soft` 7.79:1. Dark `#e9c46a`.
-- **Notice** (`info`): a system notice with no verdict. Shares the stamp value exactly, because a
-  notice speaks in the product's own voice and a fifth hue would buy nothing.
+- **Notice** (`info`): a system notice with no verdict - "Hidden", "Planned", "Auto", a scope. It
+  is pencil, not a fifth hue and not the stamp: `info` shares `ink-2`'s value (7.47:1 on sunken,
+  9.02:1 on raised; dark 7.11:1 on raised) and `info-soft` is the printed tint (`surface-sunken`,
+  carrying `info` at 7.47:1; dark 9.15:1). A status never wears violet.
 
 ### Neutral
 
@@ -635,9 +637,11 @@ A slip laid on the paper, for content that needs its own ground. Not the scaffol
 ### Badges
 
 `sm` radius (2px), 20px (sm, micro uppercase) or 24px (md, caption) height, bold. Tones: `neutral`
-(the only ruled one, `border-strong` on `surface`), `accent`, `brand`, `positive`, `negative`,
-`warning`, `info`, and `settled`; every tinted tone pairs a `-soft` ground with its own ink at 7:1
-or better. **`settled`** is the stamp mark: `brand` text inside a one-pixel `brand` rule with no
+(ruled, `border-strong` on `surface`), `accent`, `brand`, `positive`, `negative`, `warning`,
+`info`, and `settled`; every tinted tone pairs a `-soft` ground with its own ink at 7:1 or better.
+**`info`** is the typed status - "Hidden", "Planned", "Auto" - in `ink-2` inside a one-pixel
+`border-panel` rule on whatever ground it lands on, no wash: the same construction as the stamp,
+in pencil and a neutral rule, so it can never be mistaken for one. **`settled`** is the stamp mark: `brand` text inside a one-pixel `brand` rule with no
 wash, on the paper rather than on a tint, typed at the small size (micro, uppercase, 0.06em, 20px
 high). It is the only status that carries `brand` and the only "settled" mark in the product; it
 is never placed on a planned line. On the landing it stands once, beside the passbook's opening

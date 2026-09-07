@@ -51,11 +51,12 @@ import { pageHead } from '#/routes/-lib/page-title'
  *
  * ## A template is a starting point, not a second screen
  *
- * `TemplatePicker` sits above the form rather than behind a route of its own, because picking a
- * template is the first keystroke of an entry and not an errand. It writes nothing: applying one
- * fills the fields and leaves the person on the same form, free to change any of them before
- * saving. With no templates saved it renders nothing at all, so the screen is unchanged for anyone
- * who has never made one.
+ * `TemplatePicker` sits inside the form, one row under the amount, rather than behind a route of
+ * its own or above the field the screen exists for: picking a template is the first keystroke of
+ * an entry and not an errand, and the amount stays where the thumb lands. It writes nothing:
+ * applying one fills the fields and leaves the person on the same form, free to change any of them
+ * before saving. With no templates saved it renders nothing at all, so the screen is unchanged for
+ * anyone who has never made one.
  *
  * ## The gates are outside the form
  *
@@ -304,12 +305,6 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
         </p>
       </header>
 
-      <TemplatePicker
-        templates={templates}
-        onApply={applyDraft}
-        isDisabled={creation.isPending}
-      />
-
       <TransactionForm
         values={values}
         onChange={setValues}
@@ -330,6 +325,13 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
         submitLabel={t('action.save')}
         autoFocusAmount
         resetToken={resetToken}
+        afterAmount={
+          <TemplatePicker
+            templates={templates}
+            onApply={applyDraft}
+            isDisabled={creation.isPending}
+          />
+        }
       />
     </div>
   )

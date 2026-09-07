@@ -144,6 +144,13 @@ export interface LedgerRow {
   readonly isBalanceAdjustment: boolean
   readonly excludeFromStats: boolean
   readonly transferKind: LedgerTransferKind
+  /**
+   * The balance of the row's account once this line is written, in minor units of
+   * {@link currencyCode}. Present only on the per-account passbook, where a running balance is
+   * well-defined; the all-accounts ledger mixes currencies and carries none. Summed by the
+   * repository from stored amounts, never recomputed here.
+   */
+  readonly balanceAfterMinor?: Minor
 }
 
 /** Income, expense and net over the whole filtered set, in the base currency. */

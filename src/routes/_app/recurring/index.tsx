@@ -10,7 +10,8 @@ import {
   RecurringListSkeleton,
   SeriesCard,
 } from '#/components/app/recurring'
-import { Button, Card, Select, SelectItem, toast } from '#/components/ui'
+import { SegmentedFilter } from '#/components/app/nav'
+import { Button, Card, toast } from '#/components/ui'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import { listAccounts } from '#/server/fns/accounts'
@@ -28,7 +29,6 @@ import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 import { SeriesActionsMenu } from './-ui/series-actions-menu'
 import { SeriesFormDialog } from './-ui/series-form-dialog'
 
-import type { Key } from 'react-aria-components'
 import type { RecurringSeries } from '#/server/db/types'
 import type { UpcomingPeriod } from '#/server/repos/recurring'
 import { pageHead } from '#/routes/-lib/page-title'
@@ -170,22 +170,17 @@ function RecurringListRoute() {
         <>
           <UpcomingPanel upcoming={overview.upcoming} />
 
-          <div className="w-full sm:max-w-xs">
-            <Select
-              label={t('recurring.filter.label')}
-              selectedKey={status}
-              onSelectionChange={(key: Key | null) => {
-                if (key !== null) {
-                  void navigate({ search: { status: key as StatusFilter } })
-                }
-              }}
-            >
-              <SelectItem id="active">
-                {t('recurring.filter.active')}
-              </SelectItem>
-              <SelectItem id="all">{t('recurring.filter.all')}</SelectItem>
-            </Select>
-          </div>
+          <SegmentedFilter
+            label={t('recurring.filter.label')}
+            value={status}
+            options={[
+              { id: 'active', label: t('recurring.filter.active') },
+              { id: 'all', label: t('recurring.filter.all') },
+            ]}
+            onChange={(next: StatusFilter) => {
+              void navigate({ search: { status: next } })
+            }}
+          />
 
           {overview.rows.length === 0 ? (
             <Card padding="lg" className="text-center">
@@ -320,6 +315,11 @@ function UpcomingPanel({
 }) {
   const t = useTranslate()
   const locale = useLocale()
+  // "Upcoming" repeated down every row says nothing the section name has not already said; the
+  // status column is printed only when a row is late, which is the case the word distinguishes.
+  const showStatus = upcoming.some(
+    (period) => period.derivedStatus !== 'upcoming',
+  )
 
   return (
     <Card className="flex flex-col gap-3">
@@ -360,12 +360,14 @@ function UpcomingPanel({
                 >
                   {t('recurring.periods.col.expected')}
                 </th>
-                <th
-                  scope="col"
-                  className="px-3 py-2 text-start font-medium text-ink-2"
-                >
-                  {t('recurring.periods.col.status')}
-                </th>
+                {showStatus ? (
+                  <th
+                    scope="col"
+                    className="px-3 py-2 text-start font-medium text-ink-2"
+                  >
+                    {t('recurring.periods.col.status')}
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -398,9 +400,11 @@ function UpcomingPanel({
                       ),
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <PeriodStatusBadge status={period.derivedStatus} />
-                  </td>
+                  {showStatus ? (
+                    <td className="px-3 py-2">
+                      <PeriodStatusBadge status={period.derivedStatus} />
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

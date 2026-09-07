@@ -1,4 +1,4 @@
-import { PAYEE_CATEGORIZATION_MODES } from '#/server/db/schema'
+import { PAYEE_CATEGORIZATION_MODES } from '#/lib/enums'
 
 import type { MessageKey } from '#/lib/i18n'
 import type { PayeeCategorizationMode } from '#/server/db/schema'

@@ -129,7 +129,29 @@ const config = defineConfig({
     devtools(),
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        codeSplittingOptions: {
+          /**
+           * `pendingComponent` is split off each route along with the other three.
+           *
+           * The plugin's own default leaves it in the route's reference part, which is the part
+           * every route contributes to the entry chunk. Seventeen routes declare a skeleton, and
+           * a skeleton imports the surface it stands in for - the shell, the dashboard widgets,
+           * the charts - so with the default the entry carried the whole application, React Aria,
+           * d3 and sonner included, to the marketing page. A skeleton is only ever shown after
+           * `pendingMs`, which is far longer than fetching its chunk takes, and `defaultPreload`
+           * is `intent`, so the chunk is usually there before the click lands anyway.
+           */
+          defaultBehavior: [
+            ['component'],
+            ['pendingComponent'],
+            ['errorComponent'],
+            ['notFoundComponent'],
+          ],
+        },
+      },
+    }),
     viteReact(),
     // Last on purpose: it reads the bundle the other plugins produced, so it has to run after
     // them. Inert without a token — `disable` short-circuits it before it looks for anything.

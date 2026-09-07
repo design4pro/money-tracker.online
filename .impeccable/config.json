@@ -9,6 +9,12 @@
         "value": "#000",
         "createdAt": "2026-09-06T15:11:16.446Z",
         "reason": "Claude: #000 is a mask-image gradient stop in src/routes/index.tsx, where only alpha is read; not a palette colour"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#112233",
+        "createdAt": "2026-09-06T17:06:14.322Z",
+        "reason": "Claude: a category colour fixture in dashboard-data.test.ts, seeded test data rather than a palette value"
       }
     ]
   }

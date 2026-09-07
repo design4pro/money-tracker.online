@@ -1,12 +1,15 @@
+import { Link } from '@tanstack/react-router'
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Equal,
+  Plus,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
 
 import { Amount } from '#/components/app/accounts'
+import { buttonVariants } from '#/components/ui'
 import {
   formatCalendarDateRange,
   formatPercent,
@@ -19,6 +22,7 @@ import {
   isNegativeMinor,
   isZeroMinor,
   money,
+  negateMinor,
   ratioOfMinor,
 } from '#/lib/money'
 
@@ -32,8 +36,8 @@ import type { PeriodRange } from './period'
  *
  * ## A description list, not three divs
  *
- * Each figure is a `<dt>`/`<dd>` pair. Linearised — by a screen reader, by reader mode, by a
- * 320px viewport — the label stays attached to its number instead of becoming two strings that
+ * Each figure is a `<dt>`/`<dd>` pair. Linearised â by a screen reader, by reader mode, by a
+ * 320px viewport â the label stays attached to its number instead of becoming two strings that
  * happen to have been near each other.
  *
  * ## No time-of-day greeting
@@ -43,13 +47,13 @@ import type { PeriodRange } from './period'
  *
  * ## The difference is signed three ways
  *
- * An icon, a word, and the locale's own minus sign — colour arrives fourth and carries no meaning
- * of its own. `docs/ACCESSIBILITY.md` §1: a surplus and a shortfall have to be distinguishable in
+ * An icon, a word, and the locale's own minus sign â colour arrives fourth and carries no meaning
+ * of its own. `docs/ACCESSIBILITY.md` Â§1: a surplus and a shortfall have to be distinguishable in
  * greyscale, in a forced-colours theme, and by a reader with deuteranopia.
  *
  * ## No glyph means two things
  *
- * Money in and money out own the two arrows, and they own them everywhere — the same pair the
+ * Money in and money out own the two arrows, and they own them everywhere â the same pair the
  * transaction rows draw. The difference therefore takes a **trend** pair instead: a surplus that
  * borrowed money-in's arrow taught a reader that the arrow means nothing, which costs the whole
  * icon channel on the row where it is doing the most work. Three states, three glyphs, and none
@@ -61,6 +65,18 @@ import type { PeriodRange } from './period'
  * the one idiom the form refuses. The three figures are now lines of the book - the label at the
  * start of the line, the figure at its end, a rule under each - the way the net-worth panel already
  * sets what is held against what is owed, and the difference keeps its sentence under its figure.
+ * Money in carries its `+` and Money out its `−` like the difference does: every amount is
+ * written with an explicit sign (the Real Minus Rule), never left for the label alone to carry.
+ * `expenseMinor` arrives as a magnitude, so it is negated here the way `DirectionalAmount` negates
+ * an expense row.
+ *
+ * ## The one stamp on the page
+ *
+ * "New transaction" is the page's primary action and its only violet fill. It used to be two hops away
+ * (the Spending tab, then its own `+`), which is one hop too many for the thing the book is for.
+ * It is the router's `Link` painted as a button rather than a `Button` with a handler, so it is a
+ * real `<a>` in the link list and opens in a new tab when asked - the same reasoning as
+ * `widget-link.tsx`.
  */
 export interface DashboardHeaderProps {
   readonly baseCurrencyCode: CurrencyCode
@@ -68,7 +84,7 @@ export interface DashboardHeaderProps {
   readonly incomeMinor: Minor
   readonly expenseMinor: Minor
   readonly netMinor: Minor
-  /** The period selector. Passed in so the header does not need to know about routing. */
+  /** The period selector. Passed in so the header does not need to know about the period. */
   readonly action?: ReactNode
 }
 
@@ -96,13 +112,22 @@ export function DashboardHeader({
             })}
           </p>
         </div>
-        {action}
+        <div className="flex flex-wrap items-end gap-3">
+          {action}
+          <Link
+            to="/transactions/new"
+            className={buttonVariants({ variant: 'primary' })}
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            {t('transactions.create')}
+          </Link>
+        </div>
       </div>
 
       {/*
         A real heading rather than an `aria-label` on the `<dl>`: a description list has no
         implicit ARIA role, so a label on it is an attribute assistive technology is free to
-        ignore — and a heading is also a navigation stop, which is how most screen-reader users
+        ignore â and a heading is also a navigation stop, which is how most screen-reader users
         move around a page. It is visually hidden because the figures below already say it.
       */}
       <h2 className="sr-only">{t('dashboard.summary.label')}</h2>
@@ -116,6 +141,7 @@ export function DashboardHeader({
             amountMinor={incomeMinor}
             currencyCode={baseCurrencyCode}
             size="lg"
+            signed
           />
         </Figure>
         <Figure
@@ -124,9 +150,10 @@ export function DashboardHeader({
         >
           <Amount
             locale={locale}
-            amountMinor={expenseMinor}
+            amountMinor={negateMinor(expenseMinor)}
             currencyCode={baseCurrencyCode}
             size="lg"
+            signed
           />
         </Figure>
         <Figure
@@ -163,17 +190,17 @@ export function DashboardHeader({
 }
 
 /**
- * The line beside the difference — what the figure above it *means*, not what it says again.
+ * The line beside the difference â what the figure above it *means*, not what it says again.
  *
- * It used to read "You kept zł 6 387,38" under a tile already showing `+zł 6 387,38`: a second
+ * It used to read "You kept zÅ 6 387,38" under a tile already showing `+zÅ 6 387,38`: a second
  * rendering of one number, which teaches a reader that the second line is never worth reading, and
- * the only three-line tile in a row of three. The share is the reading the figure does not carry —
- * six thousand kept out of ten thousand in is a different month from six thousand out of sixty —
+ * the only three-line tile in a row of three. The share is the reading the figure does not carry â
+ * six thousand kept out of ten thousand in is a different month from six thousand out of sixty â
  * and it fits on one line, so the row keeps its rhythm.
  *
  * With nothing coming in there is no share to take, and the sentence falls back to the word for
  * the direction. The magnitude there is formatted from `absMinor`, never from a subtraction: the
- * direction is already carried by the message, and a second minus sign inside "You spent −120,00 zł
+ * direction is already carried by the message, and a second minus sign inside "You spent â120,00 zÅ
  * more than came in" is how a sentence stops meaning what it says.
  */
 function netSentence(

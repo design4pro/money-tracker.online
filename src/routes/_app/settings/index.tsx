@@ -3,7 +3,6 @@ import { ChevronRight, CreditCard, Shapes, Store, Users } from 'lucide-react'
 
 import { writeLocaleCookie } from '#/components/app/shell'
 import {
-  Badge,
   Card,
   CardBody,
   CardHeader,
@@ -246,9 +245,9 @@ function SettingsCard({
         title={title}
         description={
           <>
-            <Badge tone="info" size="sm">
+            <span className="block text-micro tracking-label uppercase text-ink-2">
               {t(SCOPE_LABEL[scope])}
-            </Badge>
+            </span>
             <span className="mt-2 block">{description}</span>
           </>
         }

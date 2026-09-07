@@ -49,12 +49,18 @@ function makeRouter(children: ReactNode) {
     path: '/transactions',
     component: Nothing,
   })
+  const newTransactionRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/transactions/new',
+    component: Nothing,
+  })
 
   return createRouter({
     routeTree: rootRoute.addChildren([
       indexRoute,
       accountsRoute,
       transactionsRoute,
+      newTransactionRoute,
     ]),
     history: createMemoryHistory({ initialEntries: ['/'] }),
   })

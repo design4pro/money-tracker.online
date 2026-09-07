@@ -739,3 +739,120 @@ describe('totals', () => {
     expect(second).toEqual(first)
   })
 })
+
+/* -------------------------------------------------------------------------- */
+
+describe('the balance after each row', () => {
+  const byDate: TransactionSort = { field: 'bookedOn', direction: 'asc' }
+  const onAccountOne: TransactionFilters = { accountIds: ['acc-1'] }
+
+  /** Every row on the account with its balance, paged small enough to cross several boundaries. */
+  async function ledgerOf(sort: TransactionSort) {
+    const rows: Array<{ id: string; balance: number }> = []
+    let cursor: string | null = null
+    do {
+      const page = await pageTransactions({
+        scope,
+        policies: EVERYTHING,
+        filters: onAccountOne,
+        historyFloor: null,
+        sort,
+        cursor,
+        limit: 5,
+        includeBalanceAfter: true,
+      })
+      for (const row of page.rows) {
+        rows.push({ id: row.id, balance: page.balances?.[row.id] ?? NaN })
+      }
+      cursor = page.nextCursor
+    } while (cursor !== null)
+    return rows
+  }
+
+  /** The figure a person would get with a pencil: opening balance, then each line in order. */
+  function runningFrom(
+    opening: number,
+    lines: ReadonlyArray<{ direction: string; amountMinor: number }>,
+  ): Array<number> {
+    let balance = opening
+    return lines.map((line) => {
+      balance +=
+        line.direction === 'income' ? line.amountMinor : -line.amountMinor
+      return balance
+    })
+  }
+
+  it('is absent unless the page asks for it', async () => {
+    const page = await pageTransactions({
+      scope,
+      policies: EVERYTHING,
+      filters: NO_FILTERS,
+      historyFloor: null,
+      sort: byDate,
+      cursor: null,
+    })
+    expect(page.balances).toBeNull()
+  })
+
+  it('is the opening balance plus every movement up to the row, whichever way the page runs', async () => {
+    await scope.db
+      .update(accounts)
+      .set({ initialBalanceMinor: 50_000 })
+      .where(eq(accounts.id, 'acc-1'))
+
+    const oldestFirst = await ledgerOf(byDate)
+    const stored = await scope.db
+      .select({
+        id: transactions.id,
+        direction: transactions.direction,
+        amountMinor: transactions.amountMinor,
+      })
+      .from(transactions)
+      .where(eq(transactions.accountId, 'acc-1'))
+    const inLedgerOrder = oldestFirst.map((row) =>
+      stored.find((line) => line.id === row.id)!,
+    )
+
+    expect(oldestFirst.map((row) => row.balance)).toEqual(
+      runningFrom(50_000, inLedgerOrder),
+    )
+
+    // The figure belongs to the row, not to the page: reading newest first changes nothing.
+    const newestFirst = await ledgerOf({ field: 'bookedOn', direction: 'desc' })
+    expect(new Map(newestFirst.map((row) => [row.id, row.balance]))).toEqual(
+      new Map(oldestFirst.map((row) => [row.id, row.balance])),
+    )
+  })
+
+  it('projects a planned row in pencil without letting it move a booked line', async () => {
+    const before = await ledgerOf(byDate)
+    const now = new Date('2026-03-20T09:00:00.000Z')
+    await scope.db.insert(transactions).values({
+      id: 'txn-planned',
+      organizationId: 'org-a',
+      accountId: 'acc-1',
+      direction: 'expense',
+      amountMinor: 999,
+      currencyCode: 'PLN',
+      refAmountMinor: 999,
+      refCurrencyCode: 'PLN',
+      rateE10: 10_000_000_000,
+      // Dated inside the booked history, unconfirmed: the case a naive running sum gets wrong.
+      bookedOn: '2026-03-15',
+      bookedAt: now,
+      isPlanned: true,
+      note: 'not yet',
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const after = await ledgerOf(byDate)
+    const planned = after.find((row) => row.id === 'txn-planned')!
+    const bookedBeforeIt = after
+      .slice(0, after.indexOf(planned))
+      .filter((row) => row.id !== 'txn-planned')
+
+    expect(after.filter((row) => row.id !== 'txn-planned')).toEqual(before)
+    expect(planned.balance).toBe(bookedBeforeIt.at(-1)!.balance - 999)
+  })
+})

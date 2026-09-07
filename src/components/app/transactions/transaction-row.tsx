@@ -21,48 +21,52 @@ import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, money } from '#/lib/money'
 
-import { AmountText, ConvertedAmount } from './amount-text'
-import { COLUMN_INDEX, ROW_HEIGHT_PX } from './grid-model'
+import { AmountText, BalanceAmount, ConvertedAmount } from './amount-text'
+import { columnIndexFor, rowHeightFor } from './grid-model'
+import { TYPED_LINE } from './typed-line'
 
 import type { KeyboardEvent, MouseEvent } from 'react'
+import type { LedgerColumn } from './grid-model'
 import type { LedgerRow } from './types'
 
 /**
- * One line of the ledger.
+ * One line of the passbook.
  *
  * ## Shape
  *
- * `DESIGN.md`'s signature component, rendered as a real `<tr>` inside a `role="grid"` table: the
- * date, the payee or note, the category and the account, and the amount end-aligned in one of the
- * reserved hues with the base-currency equivalent beneath it when the two currencies differ.
+ * `DESIGN.md`'s typed line, rendered as a real `<tr>` inside a `role="grid"` table. From `lg` up
+ * an entry is one rule of the form: the date, the payee or note with the category (and the
+ * account, where the book has more than one) on tracks beside it, the amount end-aligned in one
+ * of the reserved hues, and in the passbook of one account the balance after the line behind the
+ * spine. A foreign-currency entry takes a second rule for the converted figure under the amount.
  *
- * Below `lg` the category and the account are a second line under the title. From `lg` up they are
- * two proportional tracks of a CSS grid inside the same cell, so they line up down the page under
- * their own headings — see {@link DESCRIPTION_TRACKS}.
+ * Below `lg` the category and the account drop under the title, so every entry is two rules.
+ * Below `sm` the `<tr>` becomes a grid (see {@link ROW}): the title over the date and the category
+ * on the left, the amount over the balance on the right, the checkbox and the overflow trigger as
+ * side tracks spanning both rules. Every cell keeps its ARIA role, so the table is a table at every
+ * width, and every cell keeps a box of its own, so the roving tab stop always has somewhere visible
+ * to land.
+ *
+ * ## On the pitch
+ *
+ * The page is ruled at 2.5rem. A cell has no vertical padding, its rule is an inset shadow on its
+ * last pixel row, and every line of type in it is a {@link TYPED_LINE}: a 2.5rem box painted so the
+ * baseline sits three pixels above the rule. The translate is on a span *inside* the link, never on
+ * the link itself, because a transform moves hit-testing too and a link painted 13px lower would
+ * catch taps meant for the line under it.
  *
  * ## Nothing may leave its column
  *
- * The table is `table-fixed`, which fixes the *track* widths but does nothing about content that is
- * wider than its track: an unbreakable ten-character date in a 44px cell simply paints over the
- * title beside it, with no gutter and no clipping. Every text node in this row is therefore either
- * `truncate`d or short by construction, and the date column is sized for the string it actually
- * holds at each breakpoint rather than for the shortest one.
- *
- * ## One centreline
- *
- * Every cell — the date, the title, the amount, the checkbox and the overflow trigger — is
- * `vertical-align: middle` in a 56px band. Type and targets therefore share one centreline, which
- * is the thing a ledger is scanned along: an amount and the button that acts on it are no longer
- * ten pixels apart vertically. From `lg` up all the type in the row is a single 20px line, so a
- * common centre is also a common baseline. See {@link CELL_TEXT} for what this replaced and why.
+ * The table is `table-fixed`, which fixes the track widths but does nothing about content wider
+ * than its track. Every text node in this row is therefore either `truncate`d or short by
+ * construction.
  *
  * ## Why every prop is a scalar
  *
  * The list virtualises ten thousand rows and re-renders on every scroll frame, so this component is
- * `memo`ised — and a memo is defeated by exactly one thing: an object prop rebuilt on each render
+ * `memo`ised - and a memo is defeated by exactly one thing: an object prop rebuilt on each render
  * of the parent. Names arrive as strings rather than as a `labels` object and callbacks arrive as
- * one stable `actions` bundle the parent holds in a ref-stable `useMemo`. The prop list is long on
- * purpose; the alternative is a list that repaints every row when one row's selection changes.
+ * one stable `actions` bundle the parent holds in a ref-stable `useMemo`.
  *
  * ## Row actions are never hover-only
  *
@@ -93,6 +97,14 @@ export interface TransactionRowProps {
   /** The column holding the grid's single tab stop, or `null` when it is elsewhere. */
   readonly activeColumn: number | null
   readonly isMenuOpen: boolean
+  /** The book's columns; a reference-stable constant from `columnsFor`. */
+  readonly columns: ReadonlyArray<LedgerColumn>
+  /** Whether the list is grouped by day, so the row prints only the day of the month. */
+  readonly isGrouped: boolean
+  /** Whether the account is worth naming: false when every row in the book is the same one. */
+  readonly showAccount: boolean
+  /** Whether the row is set on a wide page - from `lg` - and so one rule tall. */
+  readonly isWide: boolean
   readonly accountName: string
   readonly categoryName: string | null
   readonly categoryColor: string | null
@@ -107,63 +119,64 @@ export interface TransactionRowProps {
 }
 
 /**
- * The description cell's internal tracks, shared with its column heading so the two agree.
- *
- * Above `lg` a 1440px ledger has some 850px between the description and the amount, and spending it
- * on nothing while the category is squeezed into a 12px subtitle is the widest column in the table
- * doing the least work. These three tracks are a *drawing*, not a change to the grid: the DOM is
- * still one `gridcell`, so `aria-colcount`, the roving tab stop and the server-rendered markup are
- * untouched by it.
- *
- * It goes on a wrapper **inside** the cell, never on the `<td>` or `<th>` itself. `display: grid`
- * on a table cell stops it being a table cell: the browser wraps it in an anonymous one, the real
- * box no longer stretches to the row's height, and its background stops short — which paints a bare
- * strip of canvas straight across the middle of the column headings.
- *
- * ## Why three fractions and not one fraction plus two fixed tracks
- *
- * They were `minmax(0,1fr)` then two 180px tracks. Fixed tracks do not share: at 1440px every pixel
- * of surplus went to the description — some 600px to hold the word "Uber" — while the category, the
- * column actually carrying meaning, truncated at 180px. At 1024px the arithmetic went the other way
- * and the two fixed tracks left the description barely any width at all. Fractions with a `minmax(0,…)`
- * floor make the split proportional at every width instead: the description keeps half again what
- * either of the others gets, and surplus is divided rather than dumped. At 1440px that is roughly
- * 325 / 215 / 215 where it was 600 / 180 / 180.
+ * The description cell's internal tracks from `lg` up, shared with its column heading so the two
+ * agree. Three where the account is named, two where it is not. They are a *drawing*, not a change
+ * to the grid: the DOM is still one `gridcell`, so `aria-colcount` and the roving tab stop are
+ * untouched. They go on a wrapper **inside** the cell, never on the `<td>` itself: `display: grid`
+ * on a table cell stops it being one.
  */
-export const DESCRIPTION_TRACKS =
-  'block lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-baseline lg:gap-x-4'
+export function descriptionTracks(showAccount: boolean): string {
+  return showAccount
+    ? 'block lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-4'
+    : 'block lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-x-4'
+}
 
 /**
- * `scroll-mt-9` is WCAG 2.2 §2.4.11 for this grid specifically.
- *
- * `<html>` reserves `scroll-pt-16` for the app header, which is all the header needs — but the
- * ledger stacks its own 36px column headings beneath it. Arrowing down the grid calls `focus()` on
- * a cell, and the browser scrolls it only clear of the scrollport's own padding, so without these
- * extra 36px the focused cell — ring and all — comes to rest underneath the headings.
+ * The row below `sm`: a grid of two rules, a 2.5rem track for the checkbox, the entry, its
+ * figures sized to themselves, and a 2.75rem track for the overflow trigger. The row draws the
+ * rule under both lines there, since its cells draw none.
  */
-const CELL_BASE =
-  'scroll-mt-9 px-2 outline-focus data-[active]:relative focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2'
+const ROW =
+  'max-sm:grid max-sm:grid-cols-[2.5rem_minmax(0,1fr)_auto_2.75rem] max-sm:grid-rows-[2.5rem_2.5rem] max-sm:shadow-[inset_0_-1px_0_0_var(--color-border-subtle)]'
+
+/** Where each cell lands in that grid. */
+const AT_SELECT = 'max-sm:col-start-1 max-sm:row-start-1 max-sm:row-span-2'
+const AT_TITLE = 'max-sm:col-start-2 max-sm:row-start-1'
+const AT_META = 'max-sm:col-start-2 max-sm:row-start-2'
+const AT_AMOUNT = 'max-sm:col-start-3 max-sm:row-start-1'
+const AT_BALANCE = 'max-sm:col-start-3 max-sm:row-start-2'
+const AT_ACTIONS = 'max-sm:col-start-4 max-sm:row-start-1 max-sm:row-span-2'
 
 /**
- * A text cell, centred in the row's band.
+ * `scroll-mt-10` is WCAG 2.2 §2.4.11 for this grid specifically: `<html>` reserves scroll padding
+ * for the app header, and the ledger pins its own 2.5rem column headings beneath it. Arrowing down
+ * the grid calls `focus()` on a cell, and without these extra 40px the focused cell comes to rest
+ * underneath the headings.
  *
- * It used to be `align-baseline pt-3` against a 72px row, which put the type in the top 40% of the
- * band with 30px of nothing under it — and left an amount and its own overflow button, which is a
- * centred target, on two different centrelines about 10px apart. Every cell in the row is now
- * centred on the one line, so the amount, its kebab, its checkbox and its date agree.
- *
- * The shared-baseline promise the row was built on is kept where it is visible: from `lg` up the
- * description's three tracks are single lines of the same 20px leading as the date and the amount,
- * so centring them in a common band puts them on a common baseline. Below `lg` the description is
- * two lines and the date centres against the pair rather than hanging off the title's baseline,
- * which is the better of the two readings once the band is only 56px tall.
+ * A cell has no vertical padding - the row is exactly as tall as its rules - and from `sm` up
+ * draws its own rule as an inset shadow on its last pixel row, which adds no height of its own.
  */
-const CELL_TEXT = 'align-middle'
+export const CELL_BASE =
+  'scroll-mt-10 px-2 py-0 align-top outline-focus data-[active]:relative focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2 sm:px-3 sm:shadow-[inset_0_-1px_0_0_var(--color-border-subtle)]'
 
-/** A cell holding a target rather than type. */
-const CELL_TARGET = 'align-middle'
+/** The vertical rule in front of a cell. Every cell but the first has one. */
+export const CELL_RULE = 'sm:border-s sm:border-border-subtle'
 
-/** U+2014. Stands in for a date or a category a row does not have, so no cell is ever blank. */
+/** The spine: the one heavier vertical rule, in front of the balance column. It is neutral. */
+export const CELL_SPINE = 'sm:border-s-2 sm:border-border-panel'
+
+/** A cell holding a target rather than type: the target centred on the first rule. */
+const TARGET_LINE = 'flex h-10 items-center justify-center max-sm:h-full'
+
+/** The meta line: the secondary facts of an entry, typed in pencil on one truncating line. */
+const META_LINE = cn(
+  'text-caption text-ink-2',
+  TYPED_LINE,
+  // After the typed line, whose `block` this replaces; the line-height it set stays.
+  'flex min-w-0 items-center gap-1.5 overflow-hidden',
+)
+
+/** U+2014. Stands in for a category a row does not have, so no track is ever blank. */
 const EM_DASH = '—'
 
 /** `YYYY-MM-DD`, which is the only shape `bookedOn` is ever written in. */
@@ -180,7 +193,7 @@ function isPlainLeftClick(event: MouseEvent): boolean {
   )
 }
 
-/** The category's own colour, as a dot beside its name — never instead of it. */
+/** The category's own colour, as a dot beside its name - never instead of it. */
 function CategoryMark({ color }: { color: string | null }) {
   return (
     <span
@@ -193,27 +206,83 @@ function CategoryMark({ color }: { color: string | null }) {
   )
 }
 
-/** What is unusual about a row, in words. */
-function RowFlags({
-  isPlanned,
-  isBalanceAdjustment,
-  excludeFromStats,
-}: Pick<LedgerRow, 'isPlanned' | 'isBalanceAdjustment' | 'excludeFromStats'>) {
+function Dot() {
+  return <span aria-hidden="true">·</span>
+}
+
+interface MetaProps {
+  readonly row: LedgerRow
+  readonly categoryName: string | null
+  readonly categoryColor: string | null
+  readonly accountName: string
+  readonly showAccount: boolean
+}
+
+/**
+ * The category, typed in pencil with the word `Planned` before it where the line is not booked
+ * yet: a line that has to lose its end loses the category's tail and never the status.
+ */
+function CategoryFacts({
+  row,
+  categoryName,
+  categoryColor,
+}: Pick<MetaProps, 'row' | 'categoryName' | 'categoryColor'>) {
   const t = useTranslate()
   return (
     <>
-      {isPlanned ? (
-        <Badge tone="info" size="sm">
-          {t('transactions.planned')}
-        </Badge>
+      {row.isPlanned ? (
+        <>
+          <span className="shrink-0">{t('transactions.planned')}</span>
+          <Dot />
+        </>
       ) : null}
-      {isBalanceAdjustment ? (
-        <Badge tone="warning" size="sm">
+      {categoryName === null ? (
+        <span aria-hidden="true">{EM_DASH}</span>
+      ) : (
+        <>
+          <CategoryMark color={categoryColor} />
+          <span className="truncate">{categoryName}</span>
+        </>
+      )}
+    </>
+  )
+}
+
+/**
+ * The account, where the book names it, and what is unusual about the row, in words.
+ *
+ * `afterDot` is the shared-line case, where the account follows the category: it takes what is
+ * left of the line and gives way first, dot included, since it is the same on most lines and the
+ * category is not.
+ */
+function AccountFacts({
+  row,
+  accountName,
+  showAccount,
+  afterDot = false,
+}: Pick<MetaProps, 'row' | 'accountName' | 'showAccount'> & {
+  readonly afterDot?: boolean
+}) {
+  const t = useTranslate()
+  return (
+    <>
+      {showAccount ? (
+        <span className={cn('truncate', afterDot && 'min-w-0 flex-1')}>
+          {afterDot ? (
+            <>
+              <Dot />{' '}
+            </>
+          ) : null}
+          {accountName}
+        </span>
+      ) : null}
+      {row.isBalanceAdjustment ? (
+        <Badge tone="warning" size="sm" className="relative -top-0.5">
           {t('transactions.balanceAdjustment')}
         </Badge>
       ) : null}
-      {excludeFromStats ? (
-        <Badge tone="neutral" size="sm">
+      {row.excludeFromStats ? (
+        <Badge tone="neutral" size="sm" className="relative -top-0.5">
           {t('transactions.excludedFromTotals')}
         </Badge>
       ) : null}
@@ -228,6 +297,10 @@ function TransactionRowImpl({
   isSelected,
   activeColumn,
   isMenuOpen,
+  columns,
+  isGrouped,
+  showAccount,
+  isWide,
   accountName,
   categoryName,
   categoryColor,
@@ -238,6 +311,8 @@ function TransactionRowImpl({
 }: TransactionRowProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const column = columnIndexFor(columns)
+  const hasBalance = column.balance !== -1
 
   // A row with no usable booking date is not a state the schema allows, and the cell still gets a
   // mark rather than a hole: a column that goes blank on one row out of twelve reads as a rendering
@@ -246,12 +321,15 @@ function TransactionRowImpl({
   const dateLong = hasDate
     ? formatCalendarDate(locale, row.bookedOn, 'long')
     : t('common.unknown')
-  const dateShort = hasDate
-    ? formatCalendarDate(locale, row.bookedOn, 'short')
+  const dateMedium = hasDate
+    ? formatCalendarDate(locale, row.bookedOn, 'medium')
     : EM_DASH
-  const dateDay = hasDate
-    ? formatCalendarDate(locale, row.bookedOn, 'day')
-    : EM_DASH
+  // Under a day heading the month and the year are already named, so the row prints the day of
+  // the month alone; under any other sort there is no heading to carry them and it prints the date.
+  const dateInColumn =
+    hasDate && isGrouped
+      ? formatCalendarDate(locale, row.bookedOn, 'day')
+      : dateMedium
 
   const title = payeeName ?? row.note ?? t('common.unknown')
   const spokenAmount = formatMoney(
@@ -261,6 +339,7 @@ function TransactionRowImpl({
       display: 'name',
     },
   )
+  const facts = { row, categoryName, categoryColor, accountName, showAccount }
 
   const cellProps = (columnIndex: number) => ({
     role: 'gridcell' as const,
@@ -277,9 +356,10 @@ function TransactionRowImpl({
       role="row"
       aria-rowindex={ariaRowIndex}
       aria-selected={isSelected}
-      style={{ height: ROW_HEIGHT_PX }}
+      style={{ height: rowHeightFor(row, isWide) }}
       className={cn(
-        'border-t border-t-border-subtle bg-surface text-ink transition-[background-color] duration-fast',
+        ROW,
+        'bg-surface text-ink transition-[background-color] duration-fast',
         'hover:bg-hover',
         isSelected &&
           'bg-brand-soft shadow-[inset_0_0_0_1px_var(--color-brand)] hover:bg-brand-soft',
@@ -287,52 +367,66 @@ function TransactionRowImpl({
     >
       {/* ---- Selection ---------------------------------------------------- */}
       <td
-        {...cellProps(COLUMN_INDEX.select)}
-        className={cn(CELL_BASE, CELL_TARGET, 'text-center')}
+        {...cellProps(column.select)}
+        className={cn(CELL_BASE, AT_SELECT, 'text-center')}
       >
-        <Checkbox
-          excludeFromTabOrder
-          // `target-min` rather than the primitive's `target-min-h`: a checkbox with no visible
-          // label is only as wide as its 18px box, and the select column's content box is 24px.
-          // The height was already 44; this is the axis that was not.
-          className="target-min"
-          isSelected={isSelected}
-          onChange={() => actions.onToggleSelect(row.id)}
-          aria-label={t('transactions.row.select', {
-            amount: spokenAmount,
-            date: dateLong,
-          })}
-        />
+        <span className={TARGET_LINE}>
+          <Checkbox
+            excludeFromTabOrder
+            // `target-min` rather than the primitive's `target-min-h`: a checkbox with no visible
+            // label is only as wide as its 18px box, and the select column's content box is 24px.
+            className="target-min"
+            isSelected={isSelected}
+            onChange={() => actions.onToggleSelect(row.id)}
+            aria-label={t('transactions.row.select', {
+              amount: spokenAmount,
+              date: dateLong,
+            })}
+          />
+        </span>
       </td>
 
       {/* ---- Date --------------------------------------------------------- */}
       <td
-        {...cellProps(COLUMN_INDEX.date)}
-        className={cn(CELL_BASE, CELL_TEXT, 'text-start text-ink-2')}
+        {...cellProps(column.date)}
+        className={cn(CELL_BASE, CELL_RULE, AT_META, 'text-start text-ink-2')}
       >
-        {/*
-          One date, drawn two ways. Below `sm` there is no column wide enough for `31.12.2025`
-          without it spilling over the title, and none is needed: the day heading above the group
-          has just named the month and the year, so the day of the month alone is unambiguous.
-        */}
+        {/* From `sm` up the column holds the date. The date is spoken in full on every row: a
+            listener has no day heading above them to carry the context forward. */}
         <span
           aria-hidden="true"
-          className="block truncate text-caption leading-5 tabular"
+          className={cn(
+            'truncate text-caption tabular max-sm:hidden',
+            TYPED_LINE,
+          )}
         >
-          <span className="sm:hidden">{dateDay}</span>
-          <span className="hidden sm:inline">{dateShort}</span>
+          {dateInColumn}
         </span>
-        {/* The date is spoken in full on every row: a listener has no day heading above them to
-            carry the context forward. */}
         <span className="sr-only">{dateLong}</span>
+        {/* Below `sm` the column is gone and this cell is the entry's second line: the category
+            and the account, with the date typed in front of them only where no day heading names
+            it. `hidden` is `display: none`, so only one of the two readings of this cell ever
+            reaches the accessibility tree. */}
+        <span className={cn(META_LINE, 'sm:hidden')}>
+          {isGrouped ? null : (
+            <>
+              <span aria-hidden="true" className="shrink-0 tabular">
+                {dateMedium}
+              </span>
+              <Dot />
+            </>
+          )}
+          <CategoryFacts {...facts} />
+          <AccountFacts {...facts} afterDot />
+        </span>
       </td>
 
       {/* ---- Description, category and account ----------------------------- */}
       <td
-        {...cellProps(COLUMN_INDEX.description)}
-        className={cn(CELL_BASE, CELL_TEXT, 'min-w-0')}
+        {...cellProps(column.description)}
+        className={cn(CELL_BASE, CELL_RULE, AT_TITLE, 'min-w-0')}
       >
-        <div className={cn('min-w-0', DESCRIPTION_TRACKS)}>
+        <div className={cn('min-w-0', descriptionTracks(showAccount))}>
           <a
             href={actions.hrefFor(row.id)}
             tabIndex={-1}
@@ -343,139 +437,158 @@ function TransactionRowImpl({
               event.preventDefault()
               actions.onOpen(row.id)
             }}
-            // The row's one tap path. `py-3 -my-3` makes the link's own box 44px tall around its
-            // 20px line without moving a pixel of layout: the negative margins give back exactly
-            // what the padding took, above `lg` through the block's collapsing margins and from
-            // `lg` up as a grid item whose baseline is unchanged. Below `lg` that box reaches 12px
-            // into the meta line under it, and `relative` keeps the link above that static text, so
-            // the whole box is the link and not only its top 32px. `target-min` would not do: its
-            // pseudo-element is a centred 44×44 square, which on a 300px-wide title is a hit area
-            // in the middle of the word and nothing at either end.
-            className="relative -my-3 block truncate py-3 text-label leading-5 font-medium text-ink no-underline hover:underline"
+            // The row's one tap path: a 44px box around the 40px line, the extra 4px given back by
+            // the negative margins so nothing moves. `relative` keeps it above the static text of
+            // the line under it. The typed line is the span inside, so the box stays on its rule.
+            className="relative -my-0.5 block min-w-0 overflow-hidden py-0.5 no-underline hover:underline"
           >
-            {title}
+            <span
+              className={cn(
+                'truncate text-label font-medium',
+                row.isPlanned ? 'text-ink-2' : 'text-ink',
+                TYPED_LINE,
+              )}
+            >
+              {title}
+            </span>
           </a>
 
-          {/* Below `lg`: one meta line under the title. Exactly one of these two subtrees is ever
-            displayed, so neither the reader nor a screen reader sees the pair. */}
-          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-caption text-ink-2 lg:hidden">
-            {categoryName === null ? null : (
-              <>
-                <CategoryMark color={categoryColor} />
-                <span className="truncate">{categoryName}</span>
-                <span aria-hidden="true">·</span>
-              </>
-            )}
-            <span className="truncate">{accountName}</span>
-            <RowFlags
-              isPlanned={row.isPlanned}
-              isBalanceAdjustment={row.isBalanceAdjustment}
-              excludeFromStats={row.excludeFromStats}
-            />
+          {/* Between `sm` and `lg`: one meta line under the title. Exactly one of the three
+              readings of the meta facts is ever displayed, so no reader sees them twice. */}
+          <span className={cn(META_LINE, 'max-sm:hidden lg:hidden')}>
+            <CategoryFacts {...facts} />
+            <AccountFacts {...facts} afterDot />
           </span>
 
-          {/* From `lg` up: two tracks of their own, under their own headings. */}
-          <span className="hidden min-w-0 items-center gap-1.5 text-caption leading-5 text-ink-2 lg:flex">
-            {categoryName === null ? (
-              <span aria-hidden="true">{EM_DASH}</span>
-            ) : (
-              <>
-                <CategoryMark color={categoryColor} />
-                <span className="truncate">{categoryName}</span>
-              </>
-            )}
+          {/* From `lg` up: tracks of their own, under their own headings. */}
+          <span className={cn(META_LINE, 'hidden lg:flex')}>
+            <CategoryFacts {...facts} />
+            {showAccount ? null : <AccountFacts {...facts} />}
           </span>
-          <span className="hidden min-w-0 items-center gap-1.5 text-caption leading-5 text-ink-2 lg:flex">
-            <span className="truncate">{accountName}</span>
-            <RowFlags
-              isPlanned={row.isPlanned}
-              isBalanceAdjustment={row.isBalanceAdjustment}
-              excludeFromStats={row.excludeFromStats}
-            />
-          </span>
+          {showAccount ? (
+            <span className={cn(META_LINE, 'hidden lg:flex')}>
+              <AccountFacts {...facts} />
+            </span>
+          ) : null}
         </div>
       </td>
 
       {/* ---- Amount -------------------------------------------------------- */}
       <td
-        {...cellProps(COLUMN_INDEX.amount)}
-        className={cn(CELL_BASE, CELL_TEXT, 'text-end')}
-      >
-        <AmountText
-          amountMinor={row.amountMinor}
-          currencyCode={row.currencyCode}
-          direction={row.direction}
-          isPlanned={row.isPlanned}
-          transferKind={row.transferKind}
-          className="text-label leading-5"
-        />
-        {row.currencyCode === row.refCurrencyCode ? null : (
-          <ConvertedAmount
-            refAmountMinor={row.refAmountMinor}
-            refCurrencyCode={row.refCurrencyCode}
-          />
+        {...cellProps(column.amount)}
+        className={cn(
+          CELL_BASE,
+          CELL_RULE,
+          AT_AMOUNT,
+          'text-end',
+          // With no balance under it the cell keeps both phone lines, so a converted figure
+          // takes the second rather than widening the column at the title's expense.
+          hasBalance ? null : 'max-sm:row-span-2',
         )}
+      >
+        <span className={cn('text-label', TYPED_LINE)}>
+          {/* The amount is an inline-flex box; top-aligned it shares the line's own baseline
+              rather than lending the transfer glyph's bottom edge as one. */}
+          <AmountText
+            amountMinor={row.amountMinor}
+            currencyCode={row.currencyCode}
+            direction={row.direction}
+            isPlanned={row.isPlanned}
+            transferKind={row.transferKind}
+            className="align-top"
+          />
+          {/* The base-currency figure on the rule under the amount where the row has one to
+              spare. On a phone passbook that rule belongs to the balance and the figure is left to
+              the entry's own page: beside the amount it took the title's room instead. */}
+          {row.currencyCode === row.refCurrencyCode ? null : (
+            <ConvertedAmount
+              refAmountMinor={row.refAmountMinor}
+              refCurrencyCode={row.refCurrencyCode}
+              className={cn('leading-10', hasBalance && 'max-sm:hidden')}
+            />
+          )}
+        </span>
       </td>
+
+      {/* ---- Balance after, behind the spine ------------------------------ */}
+      {hasBalance ? (
+        <td
+          {...cellProps(column.balance)}
+          className={cn(CELL_BASE, CELL_SPINE, AT_BALANCE, 'text-end')}
+        >
+          {row.balanceAfterMinor === undefined ? null : (
+            <span className={cn('text-label', TYPED_LINE)}>
+              <BalanceAmount
+                amountMinor={row.balanceAfterMinor}
+                currencyCode={row.currencyCode}
+                isPlanned={row.isPlanned}
+              />
+            </span>
+          )}
+        </td>
+      ) : null}
 
       {/* ---- Actions ------------------------------------------------------- */}
       <td
-        {...cellProps(COLUMN_INDEX.actions)}
-        className={cn(CELL_BASE, CELL_TARGET, 'text-center')}
+        {...cellProps(column.actions)}
+        className={cn(CELL_BASE, CELL_RULE, AT_ACTIONS, 'text-center')}
       >
-        <MenuTrigger
-          isOpen={isMenuOpen}
-          onOpenChange={(open) => actions.onMenuOpenChange(row.id, open)}
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            shape="icon"
-            excludeFromTabOrder
-            label={t('transactions.row.actions', { name: title })}
-            icon={<MoreHorizontal />}
-          />
-          {/*
-            React Aria renders a `MenuTrigger`'s overlay only through a `Popover`; `Menu`'s own
-            docblock says so. Without one the menu is not "closed", it is simply always in the
-            document — nineteen open menus and seventy-six menu items on a full ledger, each a
-            tab stop the grid promises it does not have.
-          */}
-          <Popover placement="bottom end">
-            <Menu
-              onAction={(key) => {
-                switch (key) {
-                  case 'open':
-                    actions.onOpen(row.id)
-                    return
-                  case 'edit':
-                    actions.onEdit(row.id)
-                    return
-                  case 'duplicate':
-                    actions.onDuplicate(row.id)
-                    return
-                  case 'delete':
-                    actions.onDelete(row.id)
-                    return
-                  default:
-                    return
-                }
-              }}
-            >
-              <MenuItem id="open" icon={<SquareArrowOutUpRight />}>
-                {t('transactions.row.open')}
-              </MenuItem>
-              <MenuItem id="edit" icon={<Pencil />}>
-                {t('action.edit')}
-              </MenuItem>
-              <MenuItem id="duplicate" icon={<Copy />}>
-                {t('action.duplicate')}
-              </MenuItem>
-              <MenuItem id="delete" isDestructive icon={<Trash2 />}>
-                {t('action.delete')}
-              </MenuItem>
-            </Menu>
-          </Popover>
-        </MenuTrigger>
+        <span className={TARGET_LINE}>
+          <MenuTrigger
+            isOpen={isMenuOpen}
+            onOpenChange={(open) => actions.onMenuOpenChange(row.id, open)}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              shape="icon"
+              excludeFromTabOrder
+              label={t('transactions.row.actions', { name: title })}
+              icon={<MoreHorizontal />}
+            />
+            {/*
+              React Aria renders a `MenuTrigger`'s overlay only through a `Popover`; `Menu`'s own
+              docblock says so. Without one the menu is not "closed", it is simply always in the
+              document - nineteen open menus and seventy-six menu items on a full ledger, each a
+              tab stop the grid promises it does not have.
+            */}
+            <Popover placement="bottom end">
+              <Menu
+                onAction={(key) => {
+                  switch (key) {
+                    case 'open':
+                      actions.onOpen(row.id)
+                      return
+                    case 'edit':
+                      actions.onEdit(row.id)
+                      return
+                    case 'duplicate':
+                      actions.onDuplicate(row.id)
+                      return
+                    case 'delete':
+                      actions.onDelete(row.id)
+                      return
+                    default:
+                      return
+                  }
+                }}
+              >
+                <MenuItem id="open" icon={<SquareArrowOutUpRight />}>
+                  {t('transactions.row.open')}
+                </MenuItem>
+                <MenuItem id="edit" icon={<Pencil />}>
+                  {t('action.edit')}
+                </MenuItem>
+                <MenuItem id="duplicate" icon={<Copy />}>
+                  {t('action.duplicate')}
+                </MenuItem>
+                <MenuItem id="delete" isDestructive icon={<Trash2 />}>
+                  {t('action.delete')}
+                </MenuItem>
+              </Menu>
+            </Popover>
+          </MenuTrigger>
+        </span>
       </td>
     </tr>
   )

@@ -36,7 +36,7 @@ export function GoalEmptyState({
     >
       <span
         aria-hidden="true"
-        className="grid size-14 place-items-center rounded-full bg-brand-soft text-brand"
+        className="grid size-14 place-items-center rounded-full bg-surface-sunken text-ink-2"
       >
         <Target className="size-6" />
       </span>

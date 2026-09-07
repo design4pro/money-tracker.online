@@ -12,7 +12,8 @@ import {
   ErrorPanel,
   totalsByCurrency,
 } from '#/components/app/accounts'
-import { Button, Card, Select, SelectItem, toast } from '#/components/ui'
+import { SegmentedFilter } from '#/components/app/nav'
+import { Button, Card, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import {
   archiveAccount,
@@ -27,7 +28,6 @@ import { AccountFormDialog } from './-ui/account-form-dialog'
 import { AdjustBalanceDialog } from './-ui/adjust-balance-dialog'
 import { ConfirmDialog } from './-ui/confirm-dialog'
 
-import type { Key } from 'react-aria-components'
 import type { AccountCategory } from '#/server/db/schema'
 import type { Account } from '#/server/db/types'
 import type { AccountGroupWithMembers } from '#/server/repos/accounts'
@@ -186,7 +186,7 @@ function AccountsListRoute() {
         />
       ) : (
         <>
-          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <div className="grid items-start gap-4 lg:grid-cols-[2fr_1fr]">
             <AccountOverviewCard
               overview={overview}
               headingId="accounts-overview"
@@ -199,41 +199,36 @@ function AccountsListRoute() {
             ) : null}
           </div>
 
-          {/* Full width to the page gutters on a phone: a 320px control under a full-bleed
-              card left a ragged right edge against every row below it. */}
-          <div className="w-full sm:max-w-xs">
-            <Select
-              label={t('accounts.filter.label')}
-              selectedKey={status}
-              onSelectionChange={(key: Key | null) => {
-                if (key !== null) {
-                  void navigate({ search: { status: key as StatusFilter } })
-                }
-              }}
-            >
-              <SelectItem id="active">{t('accounts.filter.active')}</SelectItem>
-              <SelectItem id="archived">
-                {t('accounts.filter.archived')}
-              </SelectItem>
-              <SelectItem id="all">{t('accounts.filter.all')}</SelectItem>
-            </Select>
-          </div>
+          <SegmentedFilter
+            label={t('accounts.filter.label')}
+            value={status}
+            options={[
+              { id: 'active', label: t('accounts.filter.active') },
+              { id: 'archived', label: t('accounts.filter.archived') },
+              { id: 'all', label: t('accounts.filter.all') },
+            ]}
+            onChange={(next: StatusFilter) => {
+              void navigate({ search: { status: next } })
+            }}
+          />
 
           {accounts.length === 0 ? (
             <FilteredEmpty status={status} />
           ) : (
-            /* 24px between groups, and nothing between the rows inside one. The caps heading
-               owns its block because of the space above it, not because each row beneath it
-               floats on its own sheet. */
+            /* 24px between groups, and nothing between the rows inside one. The group's name
+               is written by hand on a rule above its rows - a heading over a body with a
+               hairline above it - not typed in caps, and not floating. The first group sits on
+               the filter's rule rather than drawing a second one 16px under it. */
             <div className="flex flex-col gap-6">
               {sections.map((section) => (
                 <section
                   key={section.id}
                   aria-labelledby={`group-${section.id}`}
+                  className="border-t border-border-subtle pt-2 first:border-t-0 first:pt-0"
                 >
                   <h2
                     id={`group-${section.id}`}
-                    className="mb-2 text-micro tracking-label uppercase text-ink-2"
+                    className="mb-2 text-subtitle font-bold text-ink"
                   >
                     {section.name}
                   </h2>

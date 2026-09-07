@@ -17,6 +17,7 @@ import {
   SelectItem,
   TextAreaField,
 } from '#/components/ui'
+import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { currencyName } from '#/lib/money'
 
@@ -24,7 +25,7 @@ import { AmountField } from './amount-field'
 import { PAYMENT_METHOD_KEY } from './filter-chips'
 import { LEDGER_PAYMENT_METHODS } from './types'
 
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { DateValue } from 'react-aria-components'
 import type { Translate } from '#/lib/i18n'
 import type { CurrencyCode, Minor } from '#/lib/money'
@@ -163,6 +164,11 @@ export interface TransactionFormProps {
   readonly autoFocusAmount?: boolean
   /** Bumped by the caller after a repeat save, to pull focus back to the amount. */
   readonly resetToken?: number
+  /**
+   * Rendered directly under the amount - the template row on the entry route. A slot rather than
+   * a prop of its own, because the form neither fetches templates nor knows what one is.
+   */
+  readonly afterAmount?: ReactNode
 }
 
 export function TransactionForm({
@@ -177,6 +183,7 @@ export function TransactionForm({
   submitLabel,
   autoFocusAmount = false,
   resetToken = 0,
+  afterAmount,
 }: TransactionFormProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -269,7 +276,13 @@ export function TransactionForm({
           event.preventDefault()
           submit(false)
         }}
-        className="flex flex-col gap-6"
+        className={cn(
+          'flex flex-col gap-6',
+          // Below `lg` the actions are a sticky footer over the bottom bar, and `<html>` only
+          // budgets scroll padding for the bar. The extra clearance lives on the controls
+          // themselves, since focus scrolls the focused element and nothing else.
+          'max-lg:[&_:is(input,textarea,button,[tabindex])]:scroll-mb-28',
+        )}
       >
         {serverError === undefined ? null : (
           <div
@@ -336,6 +349,8 @@ export function TransactionForm({
               }
             />
           </div>
+
+          {afterAmount}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <DatePicker
@@ -471,29 +486,62 @@ export function TransactionForm({
           </Checkbox>
         </FormSection>
 
-        <FormActions>
-          <Button variant="ghost" isDisabled={isSubmitting} onPress={onCancel}>
-            {t('action.cancel')}
-          </Button>
-          {allowRepeat ? (
-            <Button
-              variant="secondary"
-              isPending={isSubmitting}
-              onPress={() => submit(true)}
-            >
-              {t('transactions.form.saveAndNew')}
-            </Button>
-          ) : null}
-          <Button type="submit" variant="primary" isPending={isSubmitting}>
-            {submitLabel}
-          </Button>
-        </FormActions>
-
+        {/*
+          The hint stays out of the pinned footer: two lines of caption pinned to every scroll
+          position would cost the phone a third of its form. It sits in flow above the actions
+          below `lg` and drops back under the row from `lg`, where the row is in flow too.
+        */}
         {allowRepeat ? (
-          <p className="-mt-3 text-end text-caption text-ink-2">
+          <p className="text-caption text-ink-2 lg:order-last lg:-mt-3 lg:text-end">
             {t('transactions.form.saveAndNewHint')}
           </p>
         ) : null}
+
+        {/*
+          On a phone the actions are a footer pinned above the bottom bar, so Save is under the
+          thumb however long the form has grown, and it is the one full-width button: the two
+          quieter actions share the row beneath it, so a thumb aimed at Save cannot land on
+          "add another". The offset is the bar's own height - 64px of tabs, its one-pixel top rule
+          and the safe-area inset it pads for - and the footer is sticky rather than fixed, so at
+          the end of the form it settles into flow and never covers the last field. From `lg` the
+          bar is gone and the row sits in flow as it always has.
+        */}
+        <div
+          className={cn(
+            'sticky bottom-[calc(4rem+1px+var(--safe-bottom))] border-t border-border-subtle bg-canvas py-3',
+            'max-sm:-mx-4 max-sm:px-4',
+            'lg:static lg:border-0 lg:bg-transparent lg:py-0',
+          )}
+        >
+          <FormActions className="pt-0 lg:pt-2">
+            <Button
+              variant="ghost"
+              isDisabled={isSubmitting}
+              onPress={onCancel}
+              className="max-lg:flex-1"
+            >
+              {t('action.cancel')}
+            </Button>
+            {allowRepeat ? (
+              <Button
+                variant="secondary"
+                isPending={isSubmitting}
+                onPress={() => submit(true)}
+                className="max-lg:flex-[3]"
+              >
+                {t('transactions.form.saveAndNew')}
+              </Button>
+            ) : null}
+            <Button
+              type="submit"
+              variant="primary"
+              isPending={isSubmitting}
+              className="max-lg:order-first max-lg:w-full"
+            >
+              {submitLabel}
+            </Button>
+          </FormActions>
+        </div>
       </Form>
     </div>
   )

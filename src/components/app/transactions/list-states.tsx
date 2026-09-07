@@ -3,8 +3,6 @@ import { FilterX, Plus, ReceiptText, TriangleAlert } from 'lucide-react'
 import { Button, EmptyState, Skeleton } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
-import { ROW_HEIGHT_PX } from './grid-model'
-
 /**
  * The three things the list shows when it is not showing transactions.
  *
@@ -17,7 +15,8 @@ import { ROW_HEIGHT_PX } from './grid-model'
 const SKELETON_ROWS = 12
 
 /**
- * Twelve rows at the real row height.
+ * Twelve rows at the real row height: two rules of the form, one from `lg` where an entry is a
+ * single typed line.
  *
  * The height is the point: a skeleton shorter than its content lets the page grow under the
  * reader's pointer the moment data arrives, which on a list they were already scrolling is how a
@@ -34,8 +33,7 @@ export function TransactionListSkeleton() {
       {Array.from({ length: SKELETON_ROWS }, (_, index) => (
         <div
           key={index}
-          style={{ height: ROW_HEIGHT_PX }}
-          className="flex items-center gap-3 border-b border-border-subtle px-3 last:border-b-0"
+          className="flex h-20 items-center gap-3 border-b border-border-subtle px-3 last:border-b-0 lg:h-10"
         >
           <Skeleton className="size-4 shrink-0 rounded-sm" />
           <Skeleton className="h-3 w-8 shrink-0" />

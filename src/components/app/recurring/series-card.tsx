@@ -104,7 +104,7 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
           </p>
         </div>
 
-        <div className="relative z-10 flex shrink-0 items-center gap-2">
+        <div className="relative flex shrink-0 items-center gap-2">
           {isPaused ? (
             <Badge tone="neutral">{t('recurring.series.paused')}</Badge>
           ) : null}

@@ -42,9 +42,17 @@ export function AccountListSkeleton() {
             </div>
             <Skeleton shape="text" className="h-3 w-32" />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Skeleton shape="block" className="h-[70px] rounded-lg" />
-            <Skeleton shape="block" className="h-[70px] rounded-lg" />
+          {/* The two totals under the balance: a micro term over a body figure, split by a rule,
+              exactly as `OverviewCard` lays them out. */}
+          <div className="grid grid-cols-2">
+            <div className="pe-4 sm:pe-6">
+              <Skeleton shape="text" className="h-3 w-16" />
+              <Skeleton shape="block" className="mt-2 h-5 w-28 rounded-md" />
+            </div>
+            <div className="border-s border-border-subtle ps-4 sm:ps-6">
+              <Skeleton shape="text" className="h-3 w-20" />
+              <Skeleton shape="block" className="mt-2 h-5 w-28 rounded-md" />
+            </div>
           </div>
           <Skeleton shape="text" className="h-3 w-3/4" />
         </Card>
@@ -63,7 +71,6 @@ export function AccountListSkeleton() {
             key={row}
             className="flex min-h-16 items-center gap-3 border-t border-border-subtle px-4 py-3 first:border-t-0"
           >
-            <Skeleton shape="block" className="size-10 shrink-0 rounded-lg" />
             <div className="flex-1">
               <Skeleton shape="text" className="h-4 w-40" />
               <Skeleton shape="text" className="mt-1 h-3 w-24" />

@@ -11,9 +11,15 @@
 export { AmountField, toInputValue, toMinor } from './amount-field'
 export type { AmountFieldProps } from './amount-field'
 
-export { AmountText, ConvertedAmount, NetAmount } from './amount-text'
+export {
+  AmountText,
+  BalanceAmount,
+  ConvertedAmount,
+  NetAmount,
+} from './amount-text'
 export type {
   AmountTextProps,
+  BalanceAmountProps,
   ConvertedAmountProps,
   NetAmountProps,
 } from './amount-text'
@@ -38,15 +44,20 @@ export {
 export type { FilterChip } from './filter-chips'
 
 export {
-  COLUMN_COUNT,
-  COLUMN_INDEX,
   HEADER_ROW,
-  ROW_HEIGHT_PX,
+  columnIndexFor,
+  columnsFor,
   groupByDay,
   nextPosition,
+  rowHeightFor,
   samePosition,
 } from './grid-model'
-export type { CellPosition, DayGrouping, NavigationKey } from './grid-model'
+export type {
+  CellPosition,
+  DayGrouping,
+  LedgerColumn,
+  NavigationKey,
+} from './grid-model'
 
 export {
   TransactionListError,

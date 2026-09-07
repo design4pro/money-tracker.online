@@ -1,6 +1,6 @@
 import { cn } from '#/lib/cn'
 
-import type { ComponentType, ReactNode } from 'react'
+import type { CSSProperties, ComponentType, ReactNode } from 'react'
 
 /**
  * A `role="meter"` over an amount: a headline, a verdict, a track, and a caption.
@@ -141,21 +141,26 @@ export function AmountMeter({
         aria-valuemax={100}
         aria-valuetext={`${verdict} · ${valueText}`}
         className={cn(
-          'relative w-full overflow-hidden rounded-full bg-border-subtle',
+          'relative w-full overflow-hidden rounded-sm bg-border-subtle',
           size === 'lg' ? 'h-2' : 'h-1.5',
         )}
       >
+        {/*
+          The fill is the full track slid back by what is left, not a box whose width changes:
+          a transform is the one property a meter may animate (DESIGN.md, Motion), and it leaves
+          the hatch at its drawn pitch at every percentage. `rtl:` mirrors the slide.
+        */}
         <div
           className={cn(
-            'relative h-full rounded-full transition-[width] duration-base ease-out-quint motion-reduce:transition-none',
+            'relative h-full w-full translate-x-(--meter-fill) rounded-sm transition-transform duration-base ease-out-quint motion-reduce:transition-none rtl:-translate-x-(--meter-fill)',
             fillTone,
           )}
-          style={{ width: `${percentage}%` }}
+          style={{ '--meter-fill': `${percentage - 100}%` } as CSSProperties}
         >
           {isHatched ? (
             <span
               aria-hidden="true"
-              className="absolute inset-0 rounded-full"
+              className="absolute inset-0 rounded-sm"
               style={{
                 backgroundImage:
                   'repeating-linear-gradient(135deg, var(--color-surface) 0 2px, transparent 2px 6px)',

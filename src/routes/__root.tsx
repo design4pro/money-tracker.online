@@ -1,8 +1,19 @@
+/**
+ * The document shell, and the one route every visitor downloads.
+ *
+ * This module is in the browser's entry chunk, so its static import graph is the floor under
+ * every page - the marketing page included, which renders no design-system primitive at all.
+ * Nothing here may import `#/components/ui`, `react-aria-components`, `sonner` or the charts:
+ * the not-found screen, the only thing the root needs from the design system, is loaded lazily
+ * below, and React Aria's locale provider is mounted by the two layouts that render primitives
+ * (`src/components/app/shell/aria-i18n.tsx`). `pnpm build` followed by a look at what `/` loads
+ * is the check.
+ */
 import {
   HeadContent,
-  Link,
   Scripts,
   createRootRouteWithContext,
+  lazyRouteComponent,
 } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 
@@ -13,7 +24,6 @@ import {
   loadCatalogue,
   useTranslate,
 } from '#/lib/i18n'
-import { EmptyState, buttonVariants } from '#/components/ui'
 import { themeBootstrapScript } from '#/lib/theme'
 import {
   LOCALE_COOKIE,
@@ -46,12 +56,18 @@ const FALLBACK_TITLE = 'Money Tracker — know where your money goes'
 const FALLBACK_DESCRIPTION =
   'A household budget: accounts, spending, category limits, recurring bills and several currencies at once. You type it in or load a file yourself, and we never connect to your bank.'
 
-/** The brand mark, inlined so the tab icon costs no request and never 404s. */
+/**
+ * The brand mark, inlined so the tab icon costs no request and never 404s.
+ *
+ * The same geometry as `BrandMark`, frozen to the light theme's `accent` / `on-accent` pair
+ * because a data URI in `<head>` resolves before any stylesheet exists. Change the two hexes
+ * together with those tokens.
+ */
 const FAVICON_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">' +
-  '<rect width="28" height="28" rx="9" fill="#10312a"/>' +
-  '<path d="M7 19.5V9.2l4.4 5.6L15.8 9.2v10.3" fill="none" stroke="#f4f7f5" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>' +
-  '<path d="M19.4 8.6v10.9M17 11.4h4.8M17 14.6h4.8" fill="none" stroke="#f4f7f5" stroke-width="1.7" stroke-linecap="round"/>' +
+  '<rect width="28" height="28" rx="2" fill="#4a2a82"/>' +
+  '<path d="M7 19.5V9.2l4.4 5.6L15.8 9.2v10.3" fill="none" stroke="#ffffff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>' +
+  '<path d="M19.4 8.6v10.9M17 11.4h4.8M17 14.6h4.8" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round"/>' +
   '</svg>'
 
 const FAVICON_HREF = `data:image/svg+xml,${encodeURIComponent(FAVICON_SVG)}`
@@ -276,48 +292,18 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     }
   },
   shellComponent: RootDocument,
-  notFoundComponent: NotFound,
+  /**
+   * What an unknown address renders - `NotFound` in `src/components/app/shell/not-found.tsx`,
+   * which is where the reasoning for it lives. It sits on the root so a mistyped marketing or
+   * auth URL is covered too, and it is loaded on demand because it is the only thing the root
+   * needs from the design system: a 404 is rare, and a static import would carry the button
+   * primitive into every visitor's first download.
+   */
+  notFoundComponent: lazyRouteComponent(
+    () => import('#/components/app/shell/not-found'),
+    'NotFound',
+  ),
 })
-
-/**
- * What an unknown address renders.
- *
- * Without this the router falls back to a bare `<p>Not Found</p>` outside every stylesheet and
- * every translation — which is what six of the nine rail destinations reached, because
- * `components/app/nav/destinations.ts` deliberately links to routes later plans still own and
- * "404s until then" was the stated behaviour. 404ing is fine; 404ing into an unstyled English
- * fragment, in a product whose entire shell is translated, is not.
- *
- * It sits on the **root** route rather than on `_app`, so it also covers a mistyped marketing or
- * auth URL. It deliberately does not render the app rail: a reader who is not signed in must not
- * be shown a workspace navigation, and the one link out is the one that works from either state.
- *
- * The keys already existed — `empty.notFound.*` in both catalogues — and were never wired to
- * anything. No new string, and therefore no new parity risk.
- */
-function NotFound() {
-  const t = useTranslate()
-  return (
-    <main id={MAIN_CONTENT_ID} className="mx-auto w-full max-w-2xl px-4 py-24">
-      <EmptyState
-        headingLevel={2}
-        title={t('empty.notFound.title')}
-        description={t('empty.notFound.body')}
-        action={
-          // A real link painted as a button, the pattern `(auth)/reset-password.tsx` already uses:
-          // this navigates, so it must be an `<a>` — a `<Button>` here would give it no href, no
-          // middle-click and no place in a screen reader's link list.
-          <Link
-            to="/dashboard"
-            className={buttonVariants({ variant: 'primary', size: 'lg' })}
-          >
-            {t('empty.notFound.action')}
-          </Link>
-        }
-      />
-    </main>
-  )
-}
 
 function RootDocument({ children }: { children: ReactNode }) {
   // The shell renders outside `matchContext`, so the route-relative `useLoaderData()` has no
@@ -352,8 +338,9 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         {/* The catalogue is already resolved, so `t()` is synchronous and the first render is in
-            the reader's language. React Aria's own I18nProvider is mounted inside this one, which
-            is what gives every date and number primitive the same locale and direction. */}
+            the reader's language. React Aria's own I18nProvider is *not* mounted here: the
+            layouts that render primitives mount `AriaI18nProvider` under this one, so the
+            marketing page never downloads React Aria for a provider it has nothing to hand it to. */}
         <I18nProvider locale={locale} messages={messages}>
           <SkipLink />
           {children}

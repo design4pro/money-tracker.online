@@ -180,10 +180,7 @@ function PayeesRoute() {
         />
       )}
 
-      <IgnoredNames
-        names={ignored}
-        onChanged={refresh}
-      />
+      <IgnoredNames names={ignored} onChanged={refresh} />
 
       {pending.kind === 'form' ? (
         <PayeeFormDialog
@@ -313,7 +310,11 @@ function IgnoredNames({
             maxLength={200}
             className="flex-1"
           />
-          <Button type="submit" variant="secondary" isDisabled={draft.trim() === ''}>
+          <Button
+            type="submit"
+            variant="secondary"
+            isDisabled={draft.trim() === ''}
+          >
             {t('action.add')}
           </Button>
         </Form>
@@ -333,7 +334,7 @@ function IgnoredNames({
             {names.map((row) => (
               <li
                 key={row.id}
-                className="flex items-center gap-1 rounded-full border border-border-strong bg-surface ps-3 text-caption text-ink"
+                className="flex items-center gap-1 rounded-sm border border-border-strong bg-surface ps-3 text-caption text-ink"
               >
                 <span className="truncate">{row.normalizedName}</span>
                 <Button

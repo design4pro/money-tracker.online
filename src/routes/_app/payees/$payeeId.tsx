@@ -210,7 +210,7 @@ function PayeeDetailRoute() {
               {aliases.map((alias) => (
                 <li
                   key={alias.id}
-                  className="flex items-center gap-1 rounded-full border border-border-strong bg-surface ps-3 text-caption text-ink"
+                  className="flex items-center gap-1 rounded-sm border border-border-strong bg-surface ps-3 text-caption text-ink"
                 >
                   <span className="truncate">{alias.normalizedName}</span>
                   <Button

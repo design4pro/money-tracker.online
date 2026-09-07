@@ -12,13 +12,17 @@ export const badgeVariants = cva(
       tone: {
         neutral: 'border-border-strong bg-surface text-ink',
         accent: 'border-transparent bg-accent text-on-accent',
-        /** Product identity. Renders identically to `info` — see the note below. */
+        /** Product identity: the product speaking about itself. Follows a rebrand. */
         brand: 'border-transparent bg-brand-soft text-brand',
         positive: 'border-transparent bg-positive-soft text-positive',
         negative: 'border-transparent bg-negative-soft text-negative',
         warning: 'border-transparent bg-warning-soft text-warning',
-        /** Neutral status. Renders identically to `brand` — see the note below. */
-        info: 'border-transparent bg-info-soft text-info',
+        /**
+         * A neutral status with no verdict - "Hidden", "Planned", "Auto". Typed in pencil inside
+         * a one-pixel `border-panel` rule on whatever ground it lands on: a ruled label, not a
+         * stamp and not a wash. Only `settled` carries the stamp ink.
+         */
+        info: 'border-border-panel text-info',
         /**
          * The stamp: a typed word framed by a one-pixel rule in the stamp ink, on the paper itself
          * rather than on a wash. It is the mark the product puts on what is settled, and the one
@@ -54,28 +58,13 @@ export interface BadgeProps
  * A badge is not a button. If it can be clicked it is a `Button` with
  * `shape="pill"`, so it gets a focus ring and a 44px hit area.
  *
- * ### `brand` and `info` are one colour, and that is on purpose
+ * ### `info` is pencil, `settled` is the stamp
  *
- * `--color-info` is declared as `--color-brand`'s exact value at all three of
- * the theme sites in `tokens.css`, so `tone="brand"` and `tone="info"` are
- * pixel-identical today and no reader can tell them apart. They are kept as two
- * names because they answer two different questions and only one of them is
- * allowed to move: `brand` means *the product is speaking about itself* and
- * would follow a rebrand, `info` means *a neutral status with no valence* and
- * would not. Collapsing them into one token would make a rebrand repaint every
- * "Auto", "Hidden" and "Split" badge in the product, which is the wrong result.
- *
- * So pick by meaning, never by appearance — the appearance cannot tell you
- * anything. **When in doubt the answer is `info`**: a badge is nearly always a
- * status, and `brand` is for the rare badge that is part of the product's own
- * voice.
- *
- * Note for whoever reads this next: the codebase does not yet obey that rule.
- * Thirteen call sites pass one of the two, and all thirteen are statuses — the
- * three `brand` ones (an active filter count, an open rollover period, an active
- * series) should be `info`. They are left alone here because moving them is a
- * change to three unrelated files that no pixel would record; it belongs in
- * whichever change next touches them.
+ * Violet is spent on what commands and on what is settled, so a status never
+ * wears it: `info` is `ink-2` inside a neutral rule, and `settled` is the one
+ * tone that carries `brand`. Pick by meaning: `brand` is for the rare badge
+ * that is part of the product's own voice and would follow a rebrand; a status
+ * with no valence is `info`. **When in doubt the answer is `info`.**
  */
 export function Badge({
   className,

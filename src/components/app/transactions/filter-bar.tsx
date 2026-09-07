@@ -207,7 +207,6 @@ function SearchablePicker({
                 <Button
                   variant="subtle"
                   size="sm"
-                  shape="pill"
                   iconAfter={<X />}
                   aria-label={removeLabel(name)}
                   onPress={() =>
@@ -336,7 +335,7 @@ export function FilterBar({
       <div className="flex flex-wrap items-end gap-2">
         <SearchField
           aria-label={t('transactions.search.placeholder')}
-          placeholder={t('transactions.search.placeholder')}
+          placeholder={t('transactions.search.placeholder.short')}
           clearLabel={t('action.clear')}
           value={filters.text ?? ''}
           onChange={(value) =>
@@ -381,7 +380,7 @@ export function FilterBar({
           <Button variant="secondary" icon={<ListFilter />}>
             {t('transactions.filter.title')}
             {activeCount === 0 ? null : (
-              <Badge tone="brand" size="sm" className="ms-1">
+              <Badge tone="neutral" size="sm" className="ms-1">
                 {activeCount}
               </Badge>
             )}
@@ -658,7 +657,6 @@ export function FilterBar({
               <Button
                 variant="subtle"
                 size="sm"
-                shape="pill"
                 iconAfter={<X />}
                 aria-label={t('transactions.filter.remove', {
                   name: chip.label,

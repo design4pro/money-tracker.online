@@ -53,7 +53,7 @@ describe('RecentTransactionsWidget', () => {
     expect(plain(rows[1].textContent)).toContain('+zł 8,200.00')
   })
 
-  it('shows the amount in the currency the transaction was entered in', async () => {
+  it('shows the amount as entered, with the stored base-currency figure under it', async () => {
     await renderLinked(
       <RecentTransactionsWidget
         baseCurrencyCode={PLN}
@@ -68,11 +68,23 @@ describe('RecentTransactionsWidget', () => {
       />,
     )
 
-    // €50.00 is what the person typed. The 214,50 zł equivalent is what the totals are built
-    // from, and it is stated where a total is — not here, where it would not be recognised.
-    expect(plain(screen.getAllByRole('listitem')[0].textContent)).toContain(
-      '−€50.00',
+    // €50.00 is what the person typed, so it is the row's figure. The 214.50 zł beneath it is
+    // the stored equivalent the totals are built from, never a fresh conversion - and it is
+    // spoken as such, so a listener hears which of the two figures is the book's.
+    const row = plain(screen.getAllByRole('listitem')[0].textContent)
+    expect(row).toContain('−€50.00')
+    expect(row).toContain('zł 214.50')
+    expect(row).toContain('Amount in')
+  })
+
+  it('draws no base-currency caption under a row already in the base currency', async () => {
+    await renderLinked(
+      <RecentTransactionsWidget baseCurrencyCode={PLN} transactions={ROWS} />,
     )
+
+    // One figure per row: repeating 214.50 zł under 214.50 zł is noise.
+    const row = plain(screen.getAllByRole('listitem')[0].textContent)
+    expect(row).not.toContain('Amount in')
   })
 
   it('formats the booked date as a calendar date, with no timezone applied', async () => {

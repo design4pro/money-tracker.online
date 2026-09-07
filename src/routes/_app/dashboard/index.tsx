@@ -5,8 +5,8 @@ import { ErrorPanel } from '#/components/app/accounts'
 import {
   AccountsWidget,
   CashFlowWidget,
-  DASHBOARD_PERIODS,
   DashboardHeader,
+  FirstEntryPrompt,
   FirstRunPanel,
   NetWorthWidget,
   PeriodSelector,
@@ -15,6 +15,10 @@ import {
   WidgetFrame,
   WidgetGrid,
 } from '#/components/app/dashboard'
+// `validateSearch` runs before any component loads, so this one import stays in the route's
+// reference part and with it in every visitor's entry chunk. Taken from the module rather than the
+// barrel so the widgets, the charts and d3 do not follow it there. See `src/routes/__root.tsx`.
+import { DASHBOARD_PERIODS } from '#/components/app/dashboard/period'
 import { Skeleton } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
@@ -48,6 +52,10 @@ import { pageHead } from '#/routes/-lib/page-title'
  * `hasData` is false only while the workspace has no accounts at all, and then the grid is
  * **replaced** by the first-run panel rather than decorated with it. Five boxes each saying
  * "nothing yet" reads as broken; it is also the very first impression this product makes.
+ *
+ * The step after that - accounts opened, nothing written against them - gets one ruled line
+ * asking for the first entry. `recent` is the ledger with no date filter, so it is empty exactly
+ * when the workspace has no booked transaction at all, whatever period is selected.
  */
 
 const searchSchema = z.object({
@@ -85,15 +93,15 @@ function DashboardRoute() {
       />
 
       {data.hasData ? null : <FirstRunPanel />}
+      {data.hasData && data.recent.length === 0 ? <FirstEntryPrompt /> : null}
 
       <WidgetGrid label={t('dashboard.panels.label')}>
         {/*
-          Stretched, not `height="content"`. The net-worth panel is one grid column beside a
-          two-column chart, and letting it end where its text ends left ~150px of page ground
-          under it — an unfilled grid cell rather than deliberate space. The panel now takes the
-          row's height and composes it (`NetWorthWidget`: hero at the top, the pair on the floor).
+          `height="content"`: three typed lines and a caption end where their last rule ends.
+          Stretching them to the chart beside them left the middle of the panel empty, and an
+          empty middle is not composed space.
         */}
-        <WidgetFrame title={t('dashboard.widget.netWorth')}>
+        <WidgetFrame title={t('dashboard.widget.netWorth')} height="content">
           <NetWorthWidget
             baseCurrencyCode={data.baseCurrencyCode}
             totalBalanceMinor={data.netWorth.totalBalanceMinor}

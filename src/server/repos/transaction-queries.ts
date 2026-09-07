@@ -38,6 +38,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 
 import { ZERO_MINOR, asMinor, subtractMinor } from '#/lib/money'
@@ -530,14 +531,86 @@ export interface PageTransactionsArgs extends TransactionQueryArgs {
   readonly sort: TransactionSort
   readonly cursor: string | null
   readonly limit?: number
+  /** Also compute {@link TransactionPage.balances}. Off by default: it is one subquery per row. */
+  readonly includeBalanceAfter?: boolean
 }
 
 export interface TransactionPage {
   readonly rows: ReadonlyArray<Transaction>
+  /**
+   * The balance of each row's **own account** once that row is written, by row id, in minor units
+   * of the account's currency. `null` unless the page was asked for it - see
+   * {@link balanceAfterExpression} for what the figure is and is not.
+   */
+  readonly balances: Readonly<Record<string, Minor>> | null
   /** Pass back as `cursor` for the next page; `null` when the list is exhausted. */
   readonly nextCursor: string | null
   /** Non-null when the plan's history ceiling moved the requested `from` forward. */
   readonly clampedFrom: string | null
+}
+
+/**
+ * The inner half of the running-balance self-join. The alias carries the same `organization_id`
+ * column as the table, so it goes through {@link tenantFilter} like every other predicate here.
+ */
+const earlier = alias(transactions, 'earlier')
+
+/**
+ * The passbook's balance-after column, as SQL: `initial_balance_minor` of the row's account plus
+ * every movement on that account up to and including the row, in the ordering the date sort pages
+ * by (`booked_on`, `booked_at`, `id`). Integer minor units of the account's own currency from end
+ * to end - one account has one currency, so nothing is converted and no scale is mixed
+ * (`docs/MONEY.md` §1). It is a sum of stored amounts, never a stored balance re-read, so a row's
+ * figure agrees with the rows above it by construction.
+ *
+ * Planned rows are the one subtlety. A planned line is an expectation, not a movement
+ * (`account-balances.ts` says the same), so a **booked** row's balance counts booked rows only and a
+ * past-dated planned row that was never confirmed cannot shift the lines after it. A **planned**
+ * row's figure is a projection - the booked balance to that point plus every planned line up to and
+ * including itself - which is what the page draws in pencil: what the balance will be, not what it
+ * is.
+ */
+function balanceAfterExpression(scope: TenantScope): SQL<number> {
+  const opening = scope.db
+    .select({ value: accounts.initialBalanceMinor })
+    .from(accounts)
+    .where(
+      tenantFilter(scope, accounts, eq(accounts.id, transactions.accountId)),
+    )
+
+  const upToHere = or(
+    lt(earlier.bookedOn, transactions.bookedOn),
+    and(
+      eq(earlier.bookedOn, transactions.bookedOn),
+      or(
+        lt(earlier.bookedAt, transactions.bookedAt),
+        and(
+          eq(earlier.bookedAt, transactions.bookedAt),
+          lte(earlier.id, transactions.id),
+        ),
+      ),
+    ),
+  )
+  const counted = or(
+    eq(earlier.isPlanned, false),
+    eq(transactions.isPlanned, true),
+  )
+  const movements = scope.db
+    .select({
+      value: sql<number>`coalesce(sum(case when ${earlier.direction} = 'income' then ${earlier.amountMinor} else -${earlier.amountMinor} end), 0)`,
+    })
+    .from(earlier)
+    .where(
+      tenantFilter(
+        scope,
+        earlier,
+        eq(earlier.accountId, transactions.accountId),
+        counted,
+        upToHere,
+      ),
+    )
+
+  return sql<number>`(${opening}) + (${movements})`
 }
 
 function whereFor(
@@ -577,6 +650,10 @@ export async function pageTransactions(
     .select({
       ...getTableColumns(transactions),
       sortName: sortName ?? sql<string | null>`null`,
+      balanceAfter:
+        args.includeBalanceAfter === true
+          ? balanceAfterExpression(scope)
+          : sql<number | null>`null`,
     })
     .from(transactions)
     .where(
@@ -591,17 +668,27 @@ export async function pageTransactions(
 
   const hasMore = selected.length > limit
   const kept = hasMore ? selected.slice(0, limit) : selected
-  const rows = kept.map(({ sortName: _sortName, ...columns }) =>
-    toTransaction(columns),
+  const rows = kept.map(
+    ({ sortName: _sortName, balanceAfter: _balanceAfter, ...columns }) =>
+      toTransaction(columns),
   )
+  // `asMinor` rather than a cast: a sum that has left the safe-integer range must throw here
+  // rather than become a rounded float in the spine of the passbook.
+  const balances =
+    args.includeBalanceAfter === true
+      ? Object.fromEntries(
+          kept.map((row) => [row.id, asMinor(Number(row.balanceAfter))]),
+        )
+      : null
   const last = kept.at(-1)
 
   if (!hasMore || last === undefined) {
-    return { rows, nextCursor: null, clampedFrom }
+    return { rows, balances, nextCursor: null, clampedFrom }
   }
 
   return {
     rows,
+    balances,
     nextCursor: encodeCursor({
       v: 1,
       f: sort.field,

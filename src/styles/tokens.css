@@ -118,9 +118,11 @@
   --color-warning-soft: #f7ead3; /* carries --color-warning at 7.79:1 */
   --color-on-warning: #ffffff; /* 9.26:1 on warning */
 
-  --color-info: #4a2a82; /* = brand. 8.94:1 on sunken */
-  --color-info-soft: #ece4f7; /* carries --color-info at 8.75:1 */
-  --color-on-info: #ffffff; /* 10.80:1 on info */
+  /* A notice has no verdict, so it is typed in pencil, not stamped: `info` is
+     `ink-2`'s value and its ground is the printed tint, not the stamp wash. */
+  --color-info: #4b4941; /* = ink-2. 7.47:1 on sunken, 9.02:1 on raised */
+  --color-info-soft: #ebeae1; /* = sunken. carries --color-info at 7.47:1 */
+  --color-on-info: #ffffff; /* 9.02:1 on info */
 
   /* Interaction washes, drawn in ink at low alpha so they read the same on
      every ground. */
@@ -207,9 +209,9 @@
     --color-warning-soft: #332a12; /* carries --color-warning at 8.49:1 */
     --color-on-warning: #16171a; /* 10.73:1 on warning */
 
-    --color-info: #c5aef2; /* = brand. 7.43:1 on raised */
-    --color-info-soft: #2b2438; /* carries --color-info at 7.58:1 */
-    --color-on-info: #16171a; /* 9.14:1 on info */
+    --color-info: #b9b5aa; /* = ink-2. 7.11:1 on raised, 8.75:1 on canvas */
+    --color-info-soft: #111214; /* = sunken. carries --color-info at 9.15:1 */
+    --color-on-info: #16171a; /* 8.75:1 on info */
 
     --color-hover: rgb(235 232 223 / 0.07);
     --color-press: rgb(235 232 223 / 0.12);
@@ -289,9 +291,9 @@
   --color-warning-soft: #332a12; /* 8.49:1 */
   --color-on-warning: #16171a; /* 10.73:1 */
 
-  --color-info: #c5aef2; /* = brand. 7.43:1 on raised */
-  --color-info-soft: #2b2438; /* carries --color-info at 7.58:1 */
-  --color-on-info: #16171a; /* 9.14:1 */
+  --color-info: #b9b5aa; /* = ink-2. 7.11:1 on raised */
+  --color-info-soft: #111214; /* = sunken. carries --color-info at 9.15:1 */
+  --color-on-info: #16171a; /* 8.75:1 */
 
   --color-hover: rgb(235 232 223 / 0.07);
   --color-press: rgb(235 232 223 / 0.12);
