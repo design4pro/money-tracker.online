@@ -31,10 +31,19 @@ the rules of `SDLC.md`.
   `validation.commands` in `.ai/agentic.config.json`, not pre-commit: the first `om-fix-issue`
   run (PR #64) paid for lint-staged, typecheck and the full test run on every commit, and the
   test run flaked under the load of a second worktree.
-- Host identity: a dedicated `HOME` whose `gh` holds a fine-grained PAT (Contents, Issues and Pull
-  requests read/write; **no Workflows, no Administration**: a run cannot push under
-  `.github/workflows/` or delete a label), over HTTPS. Commits carry `user.name
-money-tracker-agent` from that HOME's global git config.
+- Host identity: the cockpit acts as `design4pro-agent` (bot@design4.pro), a member of the
+  `design4pro` organisation with Write on this repository and on `planned.travel`, nothing else.
+  Its `gh` login lives in its own config directory, next to the developer's: `mkdir -p
+~/.config/gh-agent && GH_CONFIG_DIR=~/.config/gh-agent gh auth login --with-token`, pasting a
+  fine-grained PAT owned by that account (resource owner `design4pro`, only the two repositories,
+  Contents, Issues and Pull requests read/write; **no Workflows, no Administration**: a run cannot
+  push under `.github/workflows/` or delete a label; the organisation approves the token once,
+  under Settings → Personal access tokens). The plist sets `GH_CONFIG_DIR` and cezar forwards it,
+  so `gh` inside a run and `git push` over HTTPS (the global credential helper is `gh auth
+git-credential`, which reads the same variable) both act as the bot, while `~/.config/gh` and
+  the developer's terminal stay the developer's. Commits carry `user.name design4pro-agent` and
+  `user.email bot@design4.pro` from the host clone's local git config, which every worktree
+  shares.
 - Ports: the test environment (`.ai/scripts/test-env-up.sh`, the `om-prepare-test-env` contract)
   takes the first free port from **3011-3020**. 3010 is excluded on purpose: `vite.config.ts`
   binds it with `strictPort`, so it belongs to the developer's own dev server.
@@ -132,11 +141,15 @@ file no longer names). Two definitions:
   issue anyone on GitHub can open must not start a run by itself; an outside report is handled
   from the cockpit by a human.
 - `pr-opened` (`pull_request.opened`) → `om-review-pr`, again with `authors`. Dependabot's PRs
-  carry nothing to review by hand. Agent PRs are reviewed inside their own chain, but the host's
-  `gh` is the maintainer's account, so `authors` cannot tell them apart and the poller re-checks
-  labels on every poll: the first `om-fix-issue` run got a second review the moment its
-  `in-progress` lock lifted. `merge-queue` and `changes-requested` are therefore excluded too,
-  as the marks of a PR the chain has already reviewed.
+  carry nothing to review by hand. Agent PRs are authored by `design4pro-agent` and reviewed
+  inside their own chain, so `authors` keeps them out. `merge-queue` and `changes-requested` stay
+  excluded as the marks of a PR the chain has already reviewed: the poller re-checks labels on
+  every poll, and while the cockpit still ran under the maintainer's `gh` the first
+  `om-fix-issue` run got a second review the moment its `in-progress` lock lifted. The review
+  checks out the PR's head, hooks included: a branch cut before the om cutover (`f2a258e`)
+  carries the old `git-guardrails.sh`, which blocks every GitHub write in agent mode, and the run
+  ends in a question nobody answers (PR #67, 2026-09-07). Merge `develop` into such a branch
+  before opening the PR.
 
 Every filter excludes `in-progress`; `lookbackDays: 3` and `maxRecords` bound a mistaken burst to
 a handful of runs. The poller needs `CEZ_AUTOMATIONS=1` in the service env (a 409 from the API

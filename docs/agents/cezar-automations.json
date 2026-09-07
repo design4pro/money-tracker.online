@@ -21,7 +21,7 @@
   },
   {
     "name": "pr-opened",
-    "description": "A maintainer opens a pull request; om-auto-review-pr reviews it and moves the pipeline label, never merges (ADR 0017). Dependabot's PRs carry nothing to review by hand, so `authors` keeps them out. Agent PRs are reviewed inside their own chain, but the host's gh identity is the maintainer's, so `authors` cannot tell them apart: the poller re-checks labels on every poll, and `merge-queue` / `changes-requested` mark a PR the chain has already reviewed once its `in-progress` lock lifts. `in-progress` and `ci-monitoring` are a run still working; `do-not-merge` is a human hold.",
+    "description": "A maintainer opens a pull request; om-auto-review-pr reviews it and moves the pipeline label, never merges (ADR 0017). Dependabot's PRs carry nothing to review by hand, so `authors` keeps them out. Agent PRs are authored by `design4pro-agent` (the cockpit's `gh` identity) and reviewed inside their own chain, so `authors` keeps them out; `merge-queue` / `changes-requested` stay excluded as the marks of a PR the chain has already reviewed, since the poller re-checks labels on every poll. `in-progress` and `ci-monitoring` are a run still working; `do-not-merge` is a human hold.",
     "events": ["pull_request.opened"],
     "intervalSeconds": 60,
     "filters": {
