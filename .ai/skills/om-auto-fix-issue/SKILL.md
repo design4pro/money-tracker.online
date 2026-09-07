@@ -6,7 +6,7 @@ description: Repo-local extension of om-auto-fix-issue - how an issue reference 
 # om-auto-fix-issue (money-tracker.online)
 
 This file extends the shared `om-auto-fix-issue` skill installed at
-`.agents/skills/om-auto-fix-issue/SKILL.md`. Follow its full workflow with the rules below layered
+`.claude/skills/om-auto-fix-issue/SKILL.md`. Follow its full workflow with the rules below layered
 on top.
 
 ## An issue reference, not a brief

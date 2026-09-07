@@ -29,7 +29,7 @@ Work on this repository is done through the `om-*` skills and Cezar automations,
 nothing else. The bespoke layer is removed in full.
 
 1. **Skills are installed, not written.** `pnpm install-skills` installs the collection into
-   `.agents/skills/` (gitignored, lockfile gitignored) and links it into `.claude/skills/`. No skill
+   `.claude/skills/om-*`, and `skills-lock.json` records what landed. No skill
    of the collection is forked. Repository specifics live in `AGENTS.md`, the config, and
    extensions under `.ai/skills/om-<name>/SKILL.md`, which add rules and never relax the installed
    skill's safety rules. The three skills that are ours (`verifying-changes`, `i18n-messages`,
@@ -85,8 +85,16 @@ switch): whether an `issue.labeled` automation should start implementation witho
 cockpit, and whether the `pull_request.opened` automation should skip the `develop → main` promotion
 PR.
 
-**Skill versions float.** `install-skills` updates to the collection's head on every run; after an
-upgrade, `om-apply-upgrade-notes` reconciles the descriptors.
+**Skill versions are pinned, not floating.** `install-skills` still resolves the collection's head,
+but what it produced is committed, so a run never resolves anything: `.claude/skills/om-*` and
+`skills-lock.json` are files in the checkout and `.ai/cezar/config.json` names the SHA. Upgrading is
+a pull request whose diff is the collection's, read with `om-apply-upgrade-notes`, and the pin moves
+in the same commit. (Amended 2026-09-07: the first draft vendored nothing — the collection went to a
+gitignored `.agents/skills/` with symlinks into `.claude/skills/`, its lockfile gitignored too, and
+every worktree re-installed it in the workflow's setup step. That made a run's skill versions
+whatever upstream HEAD was that minute, unreviewable and unreproducible, and it put the collection
+outside `guard-generated.sh`, which refuses edits under `.claude/`. Vendoring is what
+`planned.travel` does, and the two repositories now share one mechanism and one SHA.)
 
 **Husky.** `package.json` runs `husky` on `prepare`, and every `pnpm install` in a worktree rewrites
 `core.hooksPath` in the git config the worktrees share. The setup step of every Cezar workflow

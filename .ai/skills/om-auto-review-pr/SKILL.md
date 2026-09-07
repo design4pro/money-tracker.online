@@ -6,7 +6,7 @@ description: Repo-local extension of om-auto-review-pr - QA routing for user-fac
 # om-auto-review-pr (money-tracker.online)
 
 This file extends the shared `om-auto-review-pr` skill installed at
-`.agents/skills/om-auto-review-pr/SKILL.md`. Follow its full workflow (claim, worktree, review
+`.claude/skills/om-auto-review-pr/SKILL.md`. Follow its full workflow (claim, worktree, review
 engine, verdict, labels, bounded CI follow-up) with the rules below layered on top.
 
 ## QA routing

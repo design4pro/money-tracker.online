@@ -7,8 +7,8 @@ name: pr-review
 description: om-auto-review-pr --autofix on one PR - code review, pipeline labels, autofix loop on agent PRs.
 steps:
   - id: setup
-    name: Install dependencies and the om skills
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm install-skills
+    name: Install dependencies and generate the route tree
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: review
     name: om-auto-review-pr
     prompt: '/om-auto-review-pr {{task}} --autofix'

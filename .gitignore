@@ -18,11 +18,9 @@ coverage/
 .claude/settings.local.json
 .claude/worktrees/
 
-# open-mercato skills: installed per checkout by `pnpm install-skills`, never committed.
-# Repo-local skills live in .ai/skills/ and their .claude/skills/<name> symlinks are tracked.
-.agents/
-skills-lock.json
-.claude/skills/om-*
+# The open-mercato skill collection is vendored: `.claude/skills/om-*` and skills-lock.json are
+# committed, byte-identical to the SHA pinned in .ai/cezar/config.json. `pnpm install-skills`
+# refreshes them and the pin moves in the same commit (docs/agents/cezar.md).
 
 # Per-run artefacts of the om pipeline. The launchers .ai/scripts/test-env-*.sh stay tracked
 # so a fresh Cezar worktree can boot the QA environment.

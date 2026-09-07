@@ -6,7 +6,7 @@ description: Repo-local extension of om-prepare-issue - the tenant, money and vi
 # om-prepare-issue (money-tracker.online)
 
 This file extends the shared `om-prepare-issue` skill installed at
-`.agents/skills/om-prepare-issue/SKILL.md`. Follow its full workflow (dedupe, covering spec,
+`.claude/skills/om-prepare-issue/SKILL.md`. Follow its full workflow (dedupe, covering spec,
 analysis, body, labels, report) with the rules below layered on top.
 
 ## Before creating

@@ -39,7 +39,7 @@
     "id": "om-create-skill",
     "skills": ["om-create-skill"],
     "label": "om-create-skill - author a new om skill or split an oversized one",
-    "text": "<what the skill should do, or the name of an existing skill to split>\n\nFlags: --mode author|split (auto-detected otherwise) · --dry-run.\nMatch house conventions: the layering philosophy, the lint invariants, the tracker abstraction and\nthe cross-skill contract. Stay behind the lint + completeness gate. Repo-specific rules belong in\n.ai/skills/om-<name>/SKILL.md as an extension, never as a fork of the installed skill - the\ncollection here is installed by pnpm install-skills into .agents/skills/ and is gitignored."
+    "text": "<what the skill should do, or the name of an existing skill to split>\n\nFlags: --mode author|split (auto-detected otherwise) · --dry-run.\nMatch house conventions: the layering philosophy, the lint invariants, the tracker abstraction and\nthe cross-skill contract. Stay behind the lint + completeness gate. Repo-specific rules belong in\n.ai/skills/om-<name>/SKILL.md as an extension, never as a fork of the installed skill - the\ncollection here is vendored in .claude/skills/om-* at a pinned SHA and is write-protected in\nagent runs."
   },
   {
     "id": "om-ux-shape",
@@ -111,7 +111,7 @@
     "id": "om-apply-upgrade-notes",
     "skills": ["om-apply-upgrade-notes"],
     "label": "om-apply-upgrade-notes - migrate after a skills-collection upgrade",
-    "text": "Flags: --dry-run · --tracker <name> · --browser <name> · --yes (apply purely additive changes).\nRead the collection's UPGRADE_NOTES.md and re-sync the installed tracker and browser descriptors\nwhile preserving local edits. Report every custom-provider gap rather than papering over it.\nTouch only .ai/ artifacts. The collection itself is not vendored here: pnpm install-skills\nrefreshes .agents/skills/ (gitignored), so the migration commit carries the .ai/ diff alone."
+    "text": "Flags: --dry-run · --tracker <name> · --browser <name> · --yes (apply purely additive changes).\nRead the collection's UPGRADE_NOTES.md and re-sync the installed tracker and browser descriptors\nwhile preserving local edits. Report every custom-provider gap rather than papering over it.\nTouch only .ai/ artifacts. The pin in .ai/cezar/config.json (skillsRepos[0].ref) and\nskills-lock.json must move in the same commit as the vendored .claude/skills/om-* files."
   },
   {
     "id": "om-auto-fix-issue",

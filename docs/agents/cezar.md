@@ -13,16 +13,33 @@ the rules of `SDLC.md`.
 - Pinned version: `@open-mercato/cezar@0.10.1` (`npx -y @open-mercato/cezar@0.10.1 serve`). The
   project entry in `~/.cezar/config.json` points at the main checkout; the versioned part is
   `.ai/cezar/config.json` (`baseBranch: develop`, `worktreeRetention: 10`, `maxParallel: 2`,
-  `reviewGate: true`, which gates only non-autonomous runs, `skillsRepos: []`). Cezar's own
-  `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
-  `config.json` and `workflows/` are tracked.
-- Skills: `pnpm install-skills` installs the collection into `.agents/skills/` and links every
-  `om-*` skill into `.claude/skills/`; both are gitignored, so every worktree installs its own copy
-  in the workflow's setup step. Repo specifics live in `.ai/skills/om-<name>/SKILL.md` as
-  extensions of the installed skill. After an upgrade, read the diff with `/om-apply-upgrade-notes`.
-- Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, and never `GH_TOKEN`,
-  `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar builds the agent's env from an allowlist
-  (`PATH`, `HOME`, toolchain prefixes such as `NODE_*`/`PNPM_*`, `GH_TOKEN`, `ANTHROPIC_*`,
+  `reviewGate: true`, which gates only non-autonomous runs, `skillsRepos[0].ref` pinned to the same
+  SHA as `skills-lock.json`). Cezar's own `.ai/cezar/.gitignore` keeps run state, worktrees and its
+  automations store out of git; `config.json` and `workflows/` are tracked.
+- Host patches: `bash .ai/scripts/cezar-host-patch.sh` patches the cached copy of 0.10.1 the
+  service runs, puts `CEZ_SKILLS_AUTO_UPDATE=0` in the service plist and restarts it. Rerun it
+  after the npx cache is cleared; drop each patch once the pinned version carries the fix. The
+  cockpit is one per host and shared with `planned.travel`, whose copy of the script is
+  byte-identical — running either is enough.
+  - `issue.labeled` polls fail as soon as one recently updated issue has a comment or a
+    cross-reference (open-mercato/cezar#914, fix in upstream PR #916, unreleased), so
+    `issue-regroom`, `issue-autofix` and `issue-spec` never fire.
+  - On every cockpit start the skills coordinator runs `npx skills check <om-*> -p` in each project
+    root, and that command re-adds the skills from upstream HEAD: the vendored
+    `.claude/skills/om-*` directories become symlinks into an untracked `.agents/skills/`, which
+    shows as hundreds of deleted files in `git status`. `skillsAutoUpdate: false` (kept in
+    `~/.cezar/config.json`) gates only the update; the patch makes `CEZ_SKILLS_AUTO_UPDATE=0` skip
+    the check too. Recovery: remove the symlinks, `git checkout -- .claude/skills`, delete `.agents/`.
+- Skills: `.claude/skills/om-*` are vendored files, byte-identical to the pinned upstream SHA, and
+  `skills-lock.json` records it. A worktree therefore has the collection the moment it is cut, and
+  the workflow's setup step installs dependencies only. `pnpm install-skills` re-installs and
+  updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and the pin in
+  `.ai/cezar/config.json` moves in the same commit. Repo specifics live in
+  `.ai/skills/om-<name>/SKILL.md` as extensions of the installed skill, never as a fork.
+- Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, `CEZ_SKILLS_AUTO_UPDATE=0`,
+  `GH_CONFIG_DIR` (below), and never `GH_TOKEN`, `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar
+  builds the agent's env from an allowlist (`PATH`, `HOME`, toolchain prefixes such as
+  `NODE_*`/`PNPM_*`, `GH_TOKEN`, `GH_CONFIG_DIR`, `ANTHROPIC_*`,
   `CLAUDE_*`, `CEZ_*`), so a token in the service env is a token in every run, and any other
   variable set there (`HUSKY=0` for one) never reaches the agent. Husky is therefore handled in
   the repo: `HUSKY=0` inline in every workflow's setup step keeps `pnpm install` from running
@@ -100,11 +117,11 @@ Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell
 ## Workflows (`.ai/cezar/workflows/`)
 
 Every workflow is a setup step (`HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm
-install-skills`) and one agent step whose prompt is the skill as a slash command (`/om-… {{task}}`;
+generate-routes`) and one agent step whose prompt is the skill as a slash command (`/om-… {{task}}`;
 never `skill:`, which would load the thin `.ai/skills/` override alone). `allowedTools` is the
 full set for skills that write code and drops `Edit`/`Write` for the ones that must not. The tree
-is the same eight workflows as `planned.travel`, under the same names; only the setup step differs,
-because the skill collection here is installed per checkout rather than vendored.
+is the same eight workflows as `planned.travel`, under the same names; the setup step differs only
+where that repository provisions D1 and a basemap it needs and this one does not.
 
 | Workflow         | Agent step                                                               | Model                | Started by                                                                 |
 | ---------------- | ------------------------------------------------------------------------ | -------------------- | -------------------------------------------------------------------------- |
@@ -177,9 +194,8 @@ per-developer state (`skillUsage`, `lastTask`, `appearance`). Edit the tracked J
 script — never the ui-state file by hand.
 
 Cezar's normalizer truncates and drops silently, so the script checks the caps first: at most 50
-templates, `label` 80 characters, `text` 2000, ids unique and matching an installed skill. Because
-the collection is installed rather than vendored here, `pnpm install-skills` has to have run in the
-checkout or that last check has nothing to compare against.
+templates, `label` 80 characters, `text` 2000, ids unique and matching an installed skill — which
+`.claude/skills/om-*` carries in the checkout, so that last check needs no install step.
 
 A template whose `skills` array names the skill selected in the composer is applied automatically,
 but only while the composer is still pristine. That is why only the 19 skills taking a free-text
@@ -256,8 +272,8 @@ claiming issues the new ones handle.
    `issue-autofix`, `issue-spec` and `pr-autopilot` are created enabled. The script also lists any
    definition the cockpit still holds that the file no longer names — the retired `issue-opened`
    and `pr-opened` are deleted in the cockpit (Automations), by hand.
-7. `pnpm install-skills`, then `scripts/cezar/prompt-templates.sh --dry-run` and without the flag:
-   37 templates replace cezar's five built-ins.
+7. `scripts/cezar/prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
+   cezar's five built-ins.
 8. Install the housekeeping plist (above) and run `bash scripts/cezar/housekeeping.sh` once by hand.
 9. Verify end to end: open a test issue with the Bug form (as a maintainer) → within two minutes an
    `issue-groom` run adds priority and risk and posts the Definition of Ready and implementation

@@ -6,7 +6,7 @@ description: Repo-local extension of om-auto-create-pr - per-phase test, copy an
 # om-auto-create-pr (money-tracker.online)
 
 This file extends the shared `om-auto-create-pr` skill installed at
-`.agents/skills/om-auto-create-pr/SKILL.md`. Follow its full workflow (claim, plan, worktree,
+`.claude/skills/om-auto-create-pr/SKILL.md`. Follow its full workflow (claim, plan, worktree,
 phase-by-phase commits, gate, PR, review loop, summary) with the rules below layered on top.
 
 ## Per phase

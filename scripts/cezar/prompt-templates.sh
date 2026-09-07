@@ -13,9 +13,8 @@
 # array names the selected skill is applied automatically while the composer is pristine; skills
 # taking an issue or PR number carry no `skills` on purpose (docs/agents/cezar.md).
 #
-# The skill collection is not vendored here: `.claude/skills/om-*` are symlinks that
-# `pnpm install-skills` writes into the gitignored `.agents/skills/`. Run it first, or the
-# installed-skill check below has nothing to compare against.
+# The skill collection is vendored, so `.claude/skills/om-*` is in the checkout and the
+# installed-skill check below needs no install step.
 set -euo pipefail
 
 API="${CEZ_API:-http://localhost:4321}/api/v1/p/${CEZ_PROJECT:-money-tracker-online}/ui-state"
@@ -41,9 +40,9 @@ jq -e '
 ' "$FILE" >/dev/null || die "$FILE violates cezar's caps (<=50 templates, label <=80, text <=2000, unique ids)"
 
 # Every id, and every skill a template binds to, must be an installed skill.
-[ -d "$ROOT/.claude/skills" ] || die "no .claude/skills - run pnpm install-skills first"
+[ -d "$ROOT/.claude/skills" ] || die "no .claude/skills in $ROOT"
 installed=$(cd "$ROOT/.claude/skills" && printf '%s\n' om-*/ | sed 's:/$::' | sort)
-[ "$installed" = "om-*" ] && die "no om-* skills linked - run pnpm install-skills first"
+[ "$installed" = "om-*" ] && die "no om-* skills in .claude/skills - the vendored collection is missing"
 strays=$(comm -13 <(printf '%s\n' "$installed") \
                   <(jq -r '.[].id, (.[].skills // [])[]' "$FILE" | sort -u))
 [ -z "$strays" ] || die "not installed skills: $(tr '\n' ' ' <<<"$strays")"

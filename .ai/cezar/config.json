@@ -4,5 +4,10 @@
   "baseBranch": "develop",
   "worktreeRetention": 10,
   "maxParallel": 2,
-  "skillsRepos": []
+  "skillsRepos": [
+    {
+      "repo": "open-mercato/skills",
+      "ref": "91f11c63721b5f7e17a859940b3e9c55ece698ee"
+    }
+  ]
 }
