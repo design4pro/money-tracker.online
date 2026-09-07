@@ -33,6 +33,7 @@ import { z } from 'zod'
 import { requireOrg } from '#/server/auth/guards'
 import { serverToday } from '#/server/clock'
 import { calendarOf, periodContaining } from '#/server/budgets/period'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import {
   rolloverLedger,
   summariseBudget,
@@ -121,7 +122,9 @@ export const loadBudgetDetail = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<BudgetDetail> => {
     const scope = await requireOrg()
     const today = serverToday()
-    const budget = await getBudgetRow(scope, data.budgetId)
+    const budget = await getBudgetRow(scope, data.budgetId).catch(
+      rethrowAsNotFound,
+    )
     const [periods, allCategoryRefs, conversion] = await Promise.all([
       listPeriodsRow(scope, budget.id),
       listBudgetCategoryRefs(scope),

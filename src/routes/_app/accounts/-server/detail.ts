@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { getAccount, listAccountGroups } from '#/server/repos/accounts'
 import { baseCurrencyOf } from '#/server/repos/workspace-currencies'
 import { countTransactions } from '#/server/repos/transaction-queries'
@@ -71,7 +72,11 @@ export const loadAccountDetail = createServerFn({ method: 'GET' })
 
     // The account first and alone: an id from another workspace has to fail before anything
     // else is read, so a probe cannot learn from the shape of a partially populated response.
-    const account = await getAccount(scope, data.accountId)
+    // A `NOT_FOUND` from that read is a 404 rather than a 500 — the row is gone, and "try again"
+    // would be advice that never works.
+    const account = await getAccount(scope, data.accountId).catch(
+      rethrowAsNotFound,
+    )
 
     const [groups, transactionCount, baseCurrencyCode] = await Promise.all([
       listAccountGroups(scope),
