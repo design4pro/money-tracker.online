@@ -1,52 +1,42 @@
 [
   {
-    "name": "triage-opened",
-    "description": "A new issue from an issue form, an audit or the Sentry sweep carries `status: triage`; the triage workflow reproduces it at HEAD and routes it (ADR 0014). The claim stands down when the `<!-- agent-triage -->` marker is already there.",
+    "name": "issue-opened",
+    "description": "A maintainer opens an issue; om-auto-manage-issues adds the SDLC labels, checks the Definition of Ready and comments its analysis (ADR 0017). `authors` is the gate: the run holds Bash with no allowlist and the issue body is its input, so an issue from anyone else is handled from the cockpit by a human. Issues a run holds or a human put on hold never match.",
     "events": ["issue.opened"],
     "intervalSeconds": 60,
     "filters": {
-      "anyLabels": ["status: triage"]
+      "authors": ["rafalwolak"],
+      "excludeLabels": ["in-progress", "blocked", "do-not-close"],
+      "lookbackDays": 3,
+      "maxRecords": 10
     },
     "task": {
-      "prompt": "{{github.number}} {{github.url}}",
-      "workflow": "triage",
+      "prompt": "{{github.number}}",
+      "workflow": "om-manage-issue",
       "autonomous": true,
       "worktree": true,
-      "variants": 1
+      "variants": 1,
+      "generateFollowups": false
     }
   },
   {
-    "name": "triage-relabel",
-    "description": "A human adds `run: triage` to (re)triage an issue; bypasses the already-triaged marker. Issues a run holds or that wait for a human never match.",
-    "events": ["issue.labeled"],
+    "name": "pr-opened",
+    "description": "A maintainer opens a pull request; om-auto-review-pr reviews it and moves the pipeline label, never merges (ADR 0017). Agent PRs are reviewed inside their own chain and dependabot's carry nothing to review by hand, so `authors` keeps both out. `in-progress` and `ci-monitoring` are a run still working; `do-not-merge` is a human hold.",
+    "events": ["pull_request.opened"],
     "intervalSeconds": 60,
     "filters": {
-      "changedLabels": ["run: triage"],
-      "excludeLabels": ["status: in-progress", "status: review"]
+      "authors": ["rafalwolak"],
+      "excludeLabels": ["in-progress", "ci-monitoring", "do-not-merge"],
+      "lookbackDays": 3,
+      "maxRecords": 5
     },
     "task": {
-      "prompt": "{{github.number}} {{github.url}}",
-      "workflow": "triage",
+      "prompt": "{{github.number}}",
+      "workflow": "om-review-pr",
       "autonomous": true,
       "worktree": true,
-      "variants": 1
-    }
-  },
-  {
-    "name": "implement",
-    "description": "A human adds `run: implement` to a ready ticket; the implement-ticket workflow claims it (ADR 0014). Tickets already held, in review, or PRDs never match.",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 60,
-    "filters": {
-      "changedLabels": ["run: implement"],
-      "excludeLabels": ["status: in-progress", "status: review", "prd"]
-    },
-    "task": {
-      "prompt": "{{github.number}} {{github.url}}",
-      "workflow": "implement-ticket",
-      "autonomous": true,
-      "worktree": true,
-      "variants": 1
+      "variants": 1,
+      "generateFollowups": false
     }
   }
 ]

@@ -1,16 +1,15 @@
 name: QA report
 description: The result of exercising a shipped change by hand.
 title: 'qa: '
-labels: ['type: bug', 'status: triage']
+labels: ['bug']
 body:
   - type: markdown
     attributes:
       value: >
         Manual QA closes the loop the automated gates cannot: the gates prove the code does what
         the tests say, not that the screen is usable. A report that did not hold up enters as any
-        other bug does, at `status: triage`, and a triage run reproduces it before anything is
-        promoted (docs/adr/0014-label-protocol.md). A report that held up is a record, and closing
-        it is the whole follow-up.
+        other bug does, labelled `bug`, and the fix chain reproduces it before anything is changed
+        (SDLC.md). A report that held up is a record, and closing it is the whole follow-up.
 
   - type: input
     id: subject
@@ -28,7 +27,7 @@ body:
       options:
         - Held up - no follow-up needed
         - Held up with notes - follow-up filed separately
-        - Did not hold up - triage reproduces it from the detail below
+        - Did not hold up - the fix chain reproduces it from the detail below
     validations:
       required: true
 

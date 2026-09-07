@@ -1,9 +1,8 @@
 # Dependency updates, grouped so a week is one or two pull requests rather than fifteen.
 #
-# `type: maintenance` says what the change is, and it is the only label here. A `status:` is a
-# label on an issue, never on a pull request (docs/adr/0014-label-protocol.md), and none of the
-# two pull-request labels applies to a bot's bump: `agent-pr` and `agent-docs` both mean a run
-# opened it.
+# `dependencies` says what the change is, and it is the only label here: one category from the
+# SDLC taxonomy (docs/adr/0017-om-skills-replace-the-bespoke-agent-layer.md). The pipeline labels
+# (`review`, `merge-queue`, ...) are written by the review chain, never by a bot's bump.
 #
 # Two pins are load-bearing and are NOT ignored here, because a bump to either has to be followed
 # by a matching edit and it is better that the pull request exists and goes red:
@@ -27,7 +26,7 @@ updates:
     open-pull-requests-limit: 5
     versioning-strategy: increase
     labels:
-      - 'type: maintenance'
+      - dependencies
     commit-message:
       prefix: 'chore(deps)'
       prefix-development: 'chore(deps-dev)'
@@ -79,7 +78,7 @@ updates:
       timezone: Europe/Warsaw
     open-pull-requests-limit: 3
     labels:
-      - 'type: maintenance'
+      - dependencies
     commit-message:
       prefix: 'chore(ci)'
       include: scope

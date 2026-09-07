@@ -1,0 +1,15 @@
+# A pull request opened by a maintainer (automation `pr-opened`) or a PR number typed in the
+# cockpit. om-auto-review-pr reviews it with om-code-review and the repo checklist, requests
+# changes on blockers and majors, and moves the pipeline label (`review` → `changes-requested`
+# or `merge-queue`). It never merges. Edit and Write stay off: a review does not change code.
+name: om-review-pr
+description: Review one pull request with om-auto-review-pr (autonomous, never merges).
+steps:
+  - id: setup
+    name: Install dependencies and the om skills
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm install-skills
+  - id: review
+    name: om-auto-review-pr
+    prompt: '/om-auto-review-pr {{task}}'
+    model: sonnet
+    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]

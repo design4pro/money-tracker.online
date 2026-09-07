@@ -1,5 +1,5 @@
-# Blank issues stay on. The triage loop reads and rewrites issues, and a form that forces a
-# shape on a two-line note would only get worked around.
+# Blank issues stay on. `om-auto-manage-issues` reads and enriches issues, and a form that forces
+# a shape on a two-line note would only get worked around.
 blank_issues_enabled: true
 
 contact_links:
@@ -8,8 +8,8 @@ contact_links:
     about: >
       Do not open a public issue for a vulnerability. The disclosure address and PGP key are on
       the security page.
-  - name: Label vocabulary
-    url: https://github.com/design4pro/money-tracker.online/blob/develop/.github/labels.yml
+  - name: Lifecycle and labels
+    url: https://github.com/design4pro/money-tracker.online/blob/develop/SDLC.md
     about: >
-      What each label means and which ones a run acts on. Exactly one `status:` per open issue;
-      `run:` labels are commands, not states.
+      How an issue becomes a merged pull request, and what each label means. One category per
+      issue; the pipeline labels are written by the agents and read by the merge gate.

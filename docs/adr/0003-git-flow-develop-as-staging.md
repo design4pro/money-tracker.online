@@ -99,3 +99,11 @@ the promotion pull request the same checks as any other. The fallback is not a b
 and a11y.yml also run on push to `develop`, so the promoted commit has already been through the full
 gate - but it is the degraded one, and provisioning the secret belongs in the repository setup
 runbook.
+
+## Amendment 2026-09-06 (branch prefixes of the om skills)
+
+**The agent's branches changed name with ADR 0017.** The `om-*` skills cut `fix/issue-<n>-<slug>`
+for a fix, `feat/<slug>` for a feature and `spec/<slug>` for a design-only pull request that lands
+a document under `.ai/specs/`; `claude/*` for hand-started sessions and `cez/<id8>` (Cezar's
+worktree branches, never pushed) stay. All of them open a pull request to `develop`, and nothing
+here changes what promotes to `main`.

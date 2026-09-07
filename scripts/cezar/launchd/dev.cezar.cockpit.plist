@@ -10,13 +10,16 @@
      git, gh and pnpm (cezar spawns all five inside a run), __REPO_ROOT__ with the boot repo and
      __HOME__ with the home directory. Install per docs/agents/cezar.md.
 
-     Deliberately NOT `bash -lc`, unlike the sweeper: a login shell sources ~/.profile, and cezar
-     copies its own environment into every agent run, so a key exported there would become a key
-     in every run. The explicit PATH below is the whole environment the cockpit gets, plus the
-     two CEZ_ variables the workflows need.
+     Deliberately NOT `bash -lc`: a login shell sources ~/.profile, and cezar copies its own
+     environment into every agent run, so a key exported there would become a key in every run.
+     The explicit PATH below is the whole environment the cockpit gets, plus the three variables
+     the workflows need. HUSKY=0 keeps `pnpm install` in a worktree from running `prepare`
+     (husky), which would rewrite core.hooksPath in the host clone's shared config, and makes
+     husky skip its hooks inside a run; the validation gate is validation.commands in
+     .ai/agentic.config.json, not pre-commit.
 
      `npx` resolves from a content-hashed cache that npm may collect; for a KeepAlive service
-     prefer `npm i -g @open-mercato/cezar@0.10.0` and point __NPX__ at the stable `cezar` binary
+     prefer `npm i -g @open-mercato/cezar@0.10.1` and point __NPX__ at the stable `cezar` binary
      with the three npx arguments below removed. -->
 <plist version="1.0">
 <dict>
@@ -26,7 +29,7 @@
   <array>
     <string>__NPX__</string>
     <string>--yes</string>
-    <string>@open-mercato/cezar@0.10.0</string>
+    <string>@open-mercato/cezar@0.10.1</string>
     <string>serve</string>
     <string>--no-open</string>
     <string>--port</string>
@@ -41,6 +44,8 @@
     <key>CEZ_AUTOMATIONS</key>
     <string>1</string>
     <key>CEZ_AUTONOMOUS_DEFAULT</key>
+    <string>0</string>
+    <key>HUSKY</key>
     <string>0</string>
   </dict>
   <key>WorkingDirectory</key>
