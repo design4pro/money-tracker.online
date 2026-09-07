@@ -3,7 +3,8 @@
 # whole chain (verify, root cause, fix, PR, review, QA for UI changes) to a reviewed PR on
 # develop (ADR 0017). No bashAllowlist by design: the tracker descriptor is shell functions and
 # jq; the hooks in .claude/hooks/ and the PAT scopes are the gate. HUSKY=0 skips the `prepare`
-# hook install, so the run never rewrites core.hooksPath on the host clone.
+# hook install, so the run never rewrites core.hooksPath on the host clone; .husky/pre-commit
+# skips itself under CEZ_TASK_ID, so commits in the run are gated by validation.commands only.
 name: om-fix-issue
 description: Fix or implement one issue end to end with om-auto-fix-issue (autonomous).
 steps:

@@ -20,16 +20,30 @@ the rules of `SDLC.md`.
   `om-*` skill into `.claude/skills/`; both are gitignored, so every worktree installs its own copy
   in the workflow's setup step. Repo specifics live in `.ai/skills/om-<name>/SKILL.md` as
   extensions of the installed skill. After an upgrade, read the diff with `/om-apply-upgrade-notes`.
-- Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, `HUSKY=0`, and never
-  `GH_TOKEN`, `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar copies its own env into the agent's,
-  so a token in the service env is a token in every run. `HUSKY=0` keeps a worktree's
-  `pnpm install` from running `prepare`, which would rewrite `core.hooksPath` in the host clone's
-  shared config, and makes husky skip its hooks inside a run: the gate a run passes is
-  `validation.commands` in `.ai/agentic.config.json`, not pre-commit.
-- Host identity: a dedicated `HOME` whose `gh` holds a fine-grained PAT (Contents, Issues and Pull
-  requests read/write; **no Workflows, no Administration**: a run cannot push under
-  `.github/workflows/` or delete a label), over HTTPS. Commits carry `user.name
-money-tracker-agent` from that HOME's global git config.
+- Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, and never `GH_TOKEN`,
+  `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar builds the agent's env from an allowlist
+  (`PATH`, `HOME`, toolchain prefixes such as `NODE_*`/`PNPM_*`, `GH_TOKEN`, `ANTHROPIC_*`,
+  `CLAUDE_*`, `CEZ_*`), so a token in the service env is a token in every run, and any other
+  variable set there (`HUSKY=0` for one) never reaches the agent. Husky is therefore handled in
+  the repo: `HUSKY=0` inline in every workflow's setup step keeps `pnpm install` from running
+  `prepare`, which would rewrite `core.hooksPath` in the host clone's shared config, and
+  `.husky/pre-commit` exits at once when `CEZ_TASK_ID` is set. The gate a run passes is
+  `validation.commands` in `.ai/agentic.config.json`, not pre-commit: the first `om-fix-issue`
+  run (PR #64) paid for lint-staged, typecheck and the full test run on every commit, and the
+  test run flaked under the load of a second worktree.
+- Host identity: the cockpit acts as `design4pro-agent` (bot@design4.pro), a member of the
+  `design4pro` organisation with Write on this repository and on `planned.travel`, nothing else.
+  Its `gh` login lives in its own config directory, next to the developer's: `mkdir -p
+~/.config/gh-agent && GH_CONFIG_DIR=~/.config/gh-agent gh auth login --with-token`, pasting a
+  fine-grained PAT owned by that account (resource owner `design4pro`, only the two repositories,
+  Contents, Issues and Pull requests read/write; **no Workflows, no Administration**: a run cannot
+  push under `.github/workflows/` or delete a label; the organisation approves the token once,
+  under Settings → Personal access tokens). The plist sets `GH_CONFIG_DIR` and cezar forwards it,
+  so `gh` inside a run and `git push` over HTTPS (the global credential helper is `gh auth
+git-credential`, which reads the same variable) both act as the bot, while `~/.config/gh` and
+  the developer's terminal stay the developer's. Commits carry `user.name design4pro-agent` and
+  `user.email bot@design4.pro` from the host clone's local git config, which every worktree
+  shares.
 - Ports: the test environment (`.ai/scripts/test-env-up.sh`, the `om-prepare-test-env` contract)
   takes the first free port from **3011-3020**. 3010 is excluded on purpose: `vite.config.ts`
   binds it with `strictPort`, so it belongs to the developer's own dev server.
@@ -60,8 +74,9 @@ edit to the plist. Once it is installed, stop running bare `cezar` in a repo. Lo
 
 ## Agent mode
 
-A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTIONS` is set. The
-hooks in `.claude/hooks/` then tighten:
+A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTIONS` is set.
+`.husky/pre-commit` skips itself under `CEZ_TASK_ID` (`validation.commands` is the run's gate),
+and the hooks in `.claude/hooks/` tighten:
 
 - `git-guardrails.sh` also blocks `pnpm add|remove|update` (the stack is pinned, `docs/SPEC.md`
   §3), `printenv` and `env` dumps. For everyone it blocks force-pushes to `develop`/`main`,
@@ -125,8 +140,16 @@ file no longer names). Two definitions:
   maintainers. The agent step holds Bash with no allowlist and the issue body is its input, so an
   issue anyone on GitHub can open must not start a run by itself; an outside report is handled
   from the cockpit by a human.
-- `pr-opened` (`pull_request.opened`) → `om-review-pr`, again with `authors`. Agent PRs are
-  reviewed inside their own chain and Dependabot's carry nothing to review by hand.
+- `pr-opened` (`pull_request.opened`) → `om-review-pr`, again with `authors`. Dependabot's PRs
+  carry nothing to review by hand. Agent PRs are authored by `design4pro-agent` and reviewed
+  inside their own chain, so `authors` keeps them out. `merge-queue` and `changes-requested` stay
+  excluded as the marks of a PR the chain has already reviewed: the poller re-checks labels on
+  every poll, and while the cockpit still ran under the maintainer's `gh` the first
+  `om-fix-issue` run got a second review the moment its `in-progress` lock lifted. The review
+  checks out the PR's head, hooks included: a branch cut before the om cutover (`f2a258e`)
+  carries the old `git-guardrails.sh`, which blocks every GitHub write in agent mode, and the run
+  ends in a question nobody answers (PR #67, 2026-09-07). Merge `develop` into such a branch
+  before opening the PR.
 
 Every filter excludes `in-progress`; `lookbackDays: 3` and `maxRecords` bound a mistaken burst to
 a handful of runs. The poller needs `CEZ_AUTOMATIONS=1` in the service env (a 409 from the API
@@ -163,11 +186,12 @@ claiming issues the new ones handle.
 
    Then `/om-auto-manage-issues` over the open issues adds the missing priority and risk.
 
-4. Re-render the cockpit plist from the template (it pins 0.10.1 and adds `HUSKY=0`),
+4. Re-render the cockpit plist from the template (it pins 0.10.1),
    `launchctl bootout gui/$(id -u)/dev.cezar.cockpit`, `bootstrap` it again, and check
    `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4321/api/v1/p/money-tracker-online/runs`
    answers 200. On the host clone, `git config core.hooksPath` should be unset or `.husky/_`;
-   either is fine with `HUSKY=0`.
+   either is fine, since the hook skips itself inside a run. An installed copy that still
+   carries `HUSKY=0` can stay: cezar drops it before the agent starts.
 5. `scripts/cezar/automations.sh --dry-run`, then without the flag: `issue-opened` and `pr-opened`
    are created enabled.
 6. Verify end to end: open a test issue with the Bug form → within a minute an `om-manage-issue`
