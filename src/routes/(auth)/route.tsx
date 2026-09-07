@@ -9,6 +9,7 @@ import {
 // Deep imports rather than the shell barrel: that barrel also exports the rail, the workspace
 // switcher and the user menu, and pulling them in here would put the whole authenticated product
 // into the bundle of the one screen a visitor loads before they have an account.
+import { AriaI18nProvider } from '#/components/app/shell/aria-i18n'
 import { BrandMark } from '#/components/app/shell/brand-mark'
 import { LocaleSwitcher } from '#/components/app/shell/locale-switcher'
 import { RouteError } from '#/components/app/shell/route-error'
@@ -182,103 +183,106 @@ function AuthFrame({ children }: { children: ReactNode }) {
   const year = new Date().getUTCFullYear()
 
   return (
-    <div className="min-h-dvh bg-canvas text-ink lg:grid lg:min-h-dvh lg:grid-cols-[58fr_42fr] lg:grid-rows-[4rem_1fr_auto_1fr_auto]">
-      {/* `lg:contents` dissolves this wrapper into the page grid so the header, the form and the
+    // React Aria's locale is repeated here rather than in the document shell - see `aria-i18n.tsx`.
+    <AriaI18nProvider>
+      <div className="min-h-dvh bg-canvas text-ink lg:grid lg:min-h-dvh lg:grid-cols-[58fr_42fr] lg:grid-rows-[4rem_1fr_auto_1fr_auto]">
+        {/* `lg:contents` dissolves this wrapper into the page grid so the header, the form and the
           footer become items of it. Below 1024px it is a plain flex column again. */}
-      <div className="flex min-h-dvh flex-col lg:contents">
-        <header className="h-16 shrink-0 px-5 sm:px-8 lg:col-start-1 lg:row-start-1 lg:px-12">
-          <div
-            className={cn(
-              SPINE,
-              'flex h-full items-center justify-between gap-3',
-            )}
-          >
-            {/*
+        <div className="flex min-h-dvh flex-col lg:contents">
+          <header className="h-16 shrink-0 px-5 sm:px-8 lg:col-start-1 lg:row-start-1 lg:px-12">
+            <div
+              className={cn(
+                SPINE,
+                'flex h-full items-center justify-between gap-3',
+              )}
+            >
+              {/*
               A plain anchor, not a router link. It leaves this bundle for the marketing shell, and
               a document load is both what that costs anyway and what keeps the two halves of the
               app from sharing a JavaScript graph.
             */}
-            <a
-              href="/"
-              className="target-min-h focus-ring inline-flex items-center gap-2.5 rounded-md text-subtitle font-semibold text-ink no-underline"
-            >
-              <BrandMark />
-              {t('app.name')}
-            </a>
+              <a
+                href="/"
+                className="target-min-h focus-ring inline-flex items-center gap-2.5 rounded-md text-subtitle font-semibold text-ink no-underline"
+              >
+                <BrandMark />
+                {t('app.name')}
+              </a>
 
-            <div className="flex shrink-0 items-center gap-0.5">
-              <ThemeMenu />
-              <LocaleSwitcher />
+              <div className="flex shrink-0 items-center gap-0.5">
+                <ThemeMenu />
+                <LocaleSwitcher />
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main
-          id={MAIN_CONTENT_ID}
-          tabIndex={-1}
-          className="flex flex-1 items-center px-5 py-10 outline-none sm:px-8 lg:col-start-1 lg:row-start-3 lg:items-start lg:px-12 lg:py-0"
-        >
-          <div className={SPINE}>
-            {children}
+          <main
+            id={MAIN_CONTENT_ID}
+            tabIndex={-1}
+            className="flex flex-1 items-center px-5 py-10 outline-none sm:px-8 lg:col-start-1 lg:row-start-3 lg:items-start lg:px-12 lg:py-0"
+          >
+            <div className={SPINE}>
+              {children}
 
-            {/*
+              {/*
               The rail cannot follow the layout down to one column, so its three points do. Only the
               display heading is dropped: the copy is the one part of this screen that says what the
               product actually is, and a phone is where that is needed most.
             */}
-            <div className="mt-8 border-t border-border-subtle pt-8 lg:hidden">
-              <AsidePoints />
+              <div className="mt-8 border-t border-border-subtle pt-8 lg:hidden">
+                <AsidePoints />
+              </div>
             </div>
-          </div>
-        </main>
+          </main>
 
-        <footer className="shrink-0 px-5 pb-8 sm:px-8 lg:col-start-1 lg:row-start-5 lg:px-12">
-          <p className={cn(SPINE, 'text-caption text-ink-2')}>
-            © {year} {t('app.name')}. {t('marketing.footer.legal')}
-          </p>
-        </footer>
-      </div>
+          <footer className="shrink-0 px-5 pb-8 sm:px-8 lg:col-start-1 lg:row-start-5 lg:px-12">
+            <p className={cn(SPINE, 'text-caption text-ink-2')}>
+              © {year} {t('app.name')}. {t('marketing.footer.legal')}
+            </p>
+          </footer>
+        </div>
 
-      {/*
+        {/*
         The panel plane. Decorative and empty on purpose: it spans every row of the second column so
         the split runs the full height, while the `<aside>` below sits in the shared content row.
         Its edge is `border-panel` — a hairline that holds 1.5:1 against both grounds it divides in
         both themes, which `border-subtle` does not manage against the dark panel.
       */}
-      <div
-        aria-hidden="true"
-        className="hidden border-s border-border-panel bg-surface-panel lg:col-start-2 lg:row-start-1 lg:row-end-6 lg:block"
-      />
+        <div
+          aria-hidden="true"
+          className="hidden border-s border-border-panel bg-surface-panel lg:col-start-2 lg:row-start-1 lg:row-end-6 lg:block"
+        />
 
-      {/*
+        {/*
         Supplementary. It repeats nothing the form needs, so hiding it below 1024px removes no
         information — which is what makes `hidden` legitimate here rather than a WCAG 1.3.2 problem.
       */}
-      <aside className="hidden lg:col-start-2 lg:row-start-3 lg:block lg:ps-16 lg:pe-12 xl:ps-24">
-        {/* Left-aligned to the rail's own gutter rather than optically centred, so the rail sits on
+        <aside className="hidden lg:col-start-2 lg:row-start-3 lg:block lg:ps-16 lg:pe-12 xl:ps-24">
+          {/* Left-aligned to the rail's own gutter rather than optically centred, so the rail sits on
             a grid instead of floating: the gutter is on the panel, so the measure is the measure and
             not the measure minus its own padding. */}
-        <div
-          className={cn(
-            RAIL_MEASURE,
-            ASIDE_BASELINE_NUDGE,
-            'flex flex-col gap-7',
-          )}
-        >
-          <h2 className="text-balance text-title text-ink">
-            {t('auth.aside.title')}
-          </h2>
-          <p className="text-pretty text-body text-ink-2">
-            {t('auth.aside.body')}
-          </p>
+          <div
+            className={cn(
+              RAIL_MEASURE,
+              ASIDE_BASELINE_NUDGE,
+              'flex flex-col gap-7',
+            )}
+          >
+            <h2 className="text-balance text-title text-ink">
+              {t('auth.aside.title')}
+            </h2>
+            <p className="text-pretty text-body text-ink-2">
+              {t('auth.aside.body')}
+            </p>
 
-          <div className="mt-1 border-t border-border-subtle pt-7">
-            {/* The number gutter hangs outside the measure — see `RAIL_MEASURE`. */}
-            <AsidePoints className="-ms-10" />
+            <div className="mt-1 border-t border-border-subtle pt-7">
+              {/* The number gutter hangs outside the measure — see `RAIL_MEASURE`. */}
+              <AsidePoints className="-ms-10" />
+            </div>
           </div>
-        </div>
-      </aside>
-    </div>
+        </aside>
+      </div>
+    </AriaI18nProvider>
   )
 }
 

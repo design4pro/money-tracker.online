@@ -1,5 +1,4 @@
 import { createContext, useContext, useMemo } from 'react'
-import { I18nProvider as ReactAriaI18nProvider } from 'react-aria-components'
 
 import { createStoredTranslator, createTranslator } from './catalogue'
 import { conventionsOf, directionOf } from './locales'
@@ -17,17 +16,12 @@ import type { Catalogue, Translate, TranslateStored } from './types'
  * language, with no flash and no second pass to correct it. Handing this
  * component a promise would reintroduce the flash it exists to prevent.
  *
- * **It also mounts React Aria's `I18nProvider`, and that is the load-bearing
- * half.** Every React Aria Components primitive that touches a number or a date
- * — `NumberField`, `DatePicker`, `Calendar`, `DateRangePicker`, the table's
- * sort announcements, every `aria-label` a collection builds — reads its locale
- * from that context and defaults to the *browser's* locale when it is absent.
- * Without this wrapper a reader whose workspace is Polish but whose browser is
- * English gets an amount field that groups with commas, a date picker that
- * opens weeks on Sunday, and a set of screen-reader announcements in the wrong
- * language, none of which the message catalogue can reach. It also supplies the
- * text direction React Aria uses for keyboard navigation, which is why this
- * product does not need Radix's `DirectionProvider`.
+ * **It does not mount React Aria's `I18nProvider`.** That half is
+ * `AriaI18nProvider` in `src/components/app/shell/aria-i18n.tsx`, mounted by
+ * the two layouts that render React Aria primitives. This provider sits in the
+ * document shell, which the marketing page renders too, and an import of
+ * `react-aria-components` here would put the library into the chunk every
+ * visitor downloads before a page that uses none of it can hydrate.
  */
 
 export interface I18nContextValue {
@@ -72,11 +66,7 @@ export function I18nProvider({
     [locale, messages],
   )
 
-  return (
-    <I18nContext.Provider value={value}>
-      <ReactAriaI18nProvider locale={locale}>{children}</ReactAriaI18nProvider>
-    </I18nContext.Provider>
-  )
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
 /**

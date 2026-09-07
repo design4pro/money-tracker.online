@@ -11,9 +11,10 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createRouter as createTanStackRouter } from '@tanstack/react-router'
-
-import { RouteError } from '#/components/app/shell/route-error'
+import {
+  createRouter as createTanStackRouter,
+  lazyRouteComponent,
+} from '@tanstack/react-router'
 
 import { routeTree } from './routeTree.gen'
 
@@ -63,11 +64,13 @@ export function getRouter() {
      * That default is wrong here twice over: the copy is untranslated in a product whose whole
      * shell is not, and a stack in the reader's browser is a stack in an attacker's. `RouteError`
      * says neither - catalogue copy, and `reset` as the way out.
+     *
+     * Loaded on demand, because this module is in every visitor's entry chunk and `RouteError`
+     * is built on the design system - see `default-error.tsx`.
      */
-    defaultErrorComponent: ({ reset }) => (
-      <div className="mx-auto w-full max-w-3xl px-4 py-16">
-        <RouteError onRetry={reset} />
-      </div>
+    defaultErrorComponent: lazyRouteComponent(
+      () => import('#/components/app/shell/default-error'),
+      'DefaultRouteError',
     ),
     Wrap: ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

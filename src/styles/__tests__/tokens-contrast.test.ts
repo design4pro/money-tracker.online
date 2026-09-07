@@ -98,6 +98,7 @@ const FILL_PAIRS: Array<[string, string]> = [
 /** Tinted panel → the token it is required to carry as readable text. */
 const SOFT_PAIRS: Array<[string, string]> = [
   ['color-brand-soft', 'color-brand'],
+  ['color-highlighter', 'color-ink'],
   ['color-positive-soft', 'color-positive'],
   ['color-negative-soft', 'color-negative'],
   ['color-warning-soft', 'color-warning'],

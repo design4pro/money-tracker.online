@@ -29,6 +29,7 @@ import type { Minor } from '#/lib/money'
 import type { Transaction } from '#/server/db/types'
 import type { TransactionDraft } from '#/server/repos/transaction-templates'
 import type { TransactionPolicies } from '#/server/repos/transactions'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/transactions/new` — the entry form.
@@ -50,11 +51,12 @@ import type { TransactionPolicies } from '#/server/repos/transactions'
  *
  * ## A template is a starting point, not a second screen
  *
- * `TemplatePicker` sits above the form rather than behind a route of its own, because picking a
- * template is the first keystroke of an entry and not an errand. It writes nothing: applying one
- * fills the fields and leaves the person on the same form, free to change any of them before
- * saving. With no templates saved it renders nothing at all, so the screen is unchanged for anyone
- * who has never made one.
+ * `TemplatePicker` sits inside the form, one row under the amount, rather than behind a route of
+ * its own or above the field the screen exists for: picking a template is the first keystroke of
+ * an entry and not an errand, and the amount stays where the thumb lands. It writes nothing:
+ * applying one fills the fields and leaves the person on the same form, free to change any of them
+ * before saving. With no templates saved it renders nothing at all, so the screen is unchanged for
+ * anyone who has never made one.
  *
  * ## The gates are outside the form
  *
@@ -78,6 +80,8 @@ const newSearchSchema = z.object({
 
 export const Route = createFileRoute('/_app/transactions/new')({
   validateSearch: newSearchSchema,
+  head: ({ matches }) =>
+    pageHead(matches, (t) => t('transactions.form.newTitle')),
   component: NewTransactionRoute,
 })
 
@@ -301,12 +305,6 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
         </p>
       </header>
 
-      <TemplatePicker
-        templates={templates}
-        onApply={applyDraft}
-        isDisabled={creation.isPending}
-      />
-
       <TransactionForm
         values={values}
         onChange={setValues}
@@ -327,6 +325,13 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
         submitLabel={t('action.save')}
         autoFocusAmount
         resetToken={resetToken}
+        afterAmount={
+          <TemplatePicker
+            templates={templates}
+            onApply={applyDraft}
+            isDisabled={creation.isPending}
+          />
+        }
       />
     </div>
   )

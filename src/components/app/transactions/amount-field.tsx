@@ -1,5 +1,9 @@
+import { useId } from 'react'
+
 import { NumberField } from '#/components/ui'
+import { useLocale } from '#/lib/i18n'
 import {
+  currencyName,
   minorFromBigInt,
   minorUnitDigits,
   scaleDecimalString,
@@ -32,8 +36,16 @@ import type { CurrencyCode, Minor } from '#/lib/money'
  * `'en-US'` is hard-coded in the serialiser and is not a display locale: it is a canonical decimal
  * writer whose output (`.` for the point, no grouping) is exactly what `scaleDecimalString`'s
  * grammar accepts. What the *reader* sees is formatted by React Aria in their own locale, from
- * `formatOptions` below — `1 234,56 zł` in Polish, `zł1,234.56` in English — and parsed back with
- * the matching rules, which is the whole reason not to use `<input type="number">`.
+ * `formatOptions` below — `1 234,56` in Polish, `1,234.56` in English — and parsed back with the
+ * matching rules, which is the whole reason not to use `<input type="number">`.
+ *
+ * ## The currency is written once, at the end of the box
+ *
+ * The code stands as a trailing adornment inside the field - typed, tabular, in the second ink -
+ * so an empty box already says what it is asking for, and the figure is formatted as a plain
+ * decimal rather than carrying a symbol of its own: `12,50 | PLN`, never `12,50 zł PLN`. The
+ * adornment is decoration to assistive tech; what a screen reader hears is the currency's full
+ * name, wired through `aria-describedby` beside the field's own description and error.
  *
  * ## Digits come from the currency, never from a constant
  *
@@ -110,34 +122,40 @@ export function AmountField({
   className,
 }: AmountFieldProps) {
   const digits = minorUnitDigits(currencyCode)
+  const locale = useLocale()
+  const currencyId = useId()
 
   return (
-    <NumberField
-      // Remounting on a currency change is deliberate: React Aria caches the parsed text against
-      // the format it was typed under, and a field that switches from yen to dinar mid-edit would
-      // otherwise keep showing the old scale.
-      key={currencyCode}
-      label={label}
-      description={description}
-      errorMessage={errorMessage}
-      isRequired={isRequired}
-      isDisabled={isDisabled}
-      isInvalid={errorMessage !== undefined}
-      autoFocus={autoFocus}
-      hideStepper
-      size="lg"
-      className={className}
-      value={toInputValue(value, currencyCode)}
-      onChange={(next) => onChange(toMinor(next, currencyCode))}
-      // The sign lives in `direction`; a negative amount is not representable here.
-      minValue={0}
-      formatOptions={{
-        style: 'currency',
-        currency: currencyCode,
-        currencyDisplay: 'narrowSymbol',
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-      }}
-    />
+    <>
+      <NumberField
+        // Remounting on a currency change is deliberate: React Aria caches the parsed text against
+        // the format it was typed under, and a field that switches from yen to dinar mid-edit would
+        // otherwise keep showing the old scale.
+        key={currencyCode}
+        label={label}
+        description={description}
+        errorMessage={errorMessage}
+        isRequired={isRequired}
+        isDisabled={isDisabled}
+        isInvalid={errorMessage !== undefined}
+        autoFocus={autoFocus}
+        hideStepper
+        size="lg"
+        className={className}
+        value={toInputValue(value, currencyCode)}
+        onChange={(next) => onChange(toMinor(next, currencyCode))}
+        // The sign lives in `direction`; a negative amount is not representable here.
+        minValue={0}
+        formatOptions={{
+          minimumFractionDigits: digits,
+          maximumFractionDigits: digits,
+        }}
+        suffix={<span className="tabular">{currencyCode}</span>}
+        aria-describedby={currencyId}
+      />
+      <span id={currencyId} className="sr-only">
+        {currencyName(currencyCode, locale)}
+      </span>
+    </>
   )
 }

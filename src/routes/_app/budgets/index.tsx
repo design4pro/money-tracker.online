@@ -9,7 +9,8 @@ import {
   BudgetEmptyState,
   BudgetListSkeleton,
 } from '#/components/app/budgets'
-import { Button, Card, Select, SelectItem, toast } from '#/components/ui'
+import { SegmentedFilter } from '#/components/app/nav'
+import { Button, Card, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { listCategories } from '#/server/fns/categories'
 import { archiveBudget, loadBudgets, restoreBudget } from '#/server/fns/budgets'
@@ -19,9 +20,9 @@ import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 import { BudgetActionsMenu } from './-ui/budget-actions-menu'
 import { BudgetFormDialog } from './-ui/budget-form-dialog'
 
-import type { Key } from 'react-aria-components'
 import type { BudgetKind } from '#/server/db/schema'
 import type { BudgetSummary } from '#/server/budgets/summary'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/budgets` — the list, and the one question it answers.
@@ -64,6 +65,7 @@ export const Route = createFileRoute('/_app/budgets/')({
   },
   pendingComponent: BudgetListSkeleton,
   errorComponent: BudgetsListError,
+  head: ({ matches }) => pageHead(matches, (t) => t('budgets.title')),
   component: BudgetsListRoute,
 })
 
@@ -147,23 +149,18 @@ function BudgetsListRoute() {
         />
       ) : (
         <>
-          <div className="w-full sm:max-w-xs">
-            <Select
-              label={t('budgets.filter.label')}
-              selectedKey={status}
-              onSelectionChange={(key: Key | null) => {
-                if (key !== null) {
-                  void navigate({ search: { status: key as StatusFilter } })
-                }
-              }}
-            >
-              <SelectItem id="active">{t('budgets.filter.active')}</SelectItem>
-              <SelectItem id="archived">
-                {t('budgets.filter.archived')}
-              </SelectItem>
-              <SelectItem id="all">{t('budgets.filter.all')}</SelectItem>
-            </Select>
-          </div>
+          <SegmentedFilter
+            label={t('budgets.filter.label')}
+            value={status}
+            options={[
+              { id: 'active', label: t('budgets.filter.active') },
+              { id: 'archived', label: t('budgets.filter.archived') },
+              { id: 'all', label: t('budgets.filter.all') },
+            ]}
+            onChange={(next: StatusFilter) => {
+              void navigate({ search: { status: next } })
+            }}
+          />
 
           {shown.length === 0 ? (
             <Card padding="lg" className="text-center">
@@ -254,7 +251,7 @@ function BudgetsListRoute() {
             if (!open) close()
           }}
           title={t('budgets.actions.restore')}
-          body={t('budgets.confirm.archive.body')}
+          body={t('budgets.confirm.restore.body')}
           confirmLabel={t('budgets.actions.restore')}
           errorTitle={t('budgets.toast.failed')}
           errorBody={t('empty.error.body')}

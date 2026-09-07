@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router'
 
 import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
-import { AccountAvatar } from './account-avatar'
 import { AccountStateBadges } from './account-badges'
 import { Amount } from './amount'
 import { accountCategoryFacts, isAccountCategory } from './categories'
@@ -101,16 +100,10 @@ export function AccountCard({
         rather than rendered twice behind a `hidden`/`sm:block` pair, so there is one element in
         the accessibility tree and one place to change it.
       */}
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
-        <AccountAvatar
-          name={account.name}
-          locale={locale}
-          initials={account.logoInitials}
-          color={account.logoColor}
-          className="col-start-1 row-start-1 row-span-2 self-center"
-        />
-
-        <div className="col-start-2 row-start-1 min-w-0">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+        {/* No initials square before the name: the name identifies the row, and a coloured
+            monogram beside every line was a second identity system the form never asked for. */}
+        <div className="col-start-1 row-start-1 min-w-0">
           <h3 className="text-subtitle font-semibold text-ink">
             <Link
               to="/accounts/$accountId"
@@ -128,7 +121,7 @@ export function AccountCard({
           </h3>
         </div>
 
-        <div className="col-start-2 row-start-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {isAccountCategory(account.category) ? (
             <span className="text-label text-ink-2">
               {t(accountCategoryFacts(account.category).labelKey)}
@@ -144,7 +137,7 @@ export function AccountCard({
           Line three on a phone, the right-hand column from 640px up. `justify-self-end` rather
           than a second copy of the node behind a breakpoint.
         */}
-        <div className="col-start-2 col-span-2 row-start-3 mt-1 justify-self-end text-end sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:row-span-2 sm:mt-0 sm:self-center">
+        <div className="col-start-1 col-span-2 row-start-3 mt-1 justify-self-end text-end sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:row-span-2 sm:mt-0 sm:self-center">
           <Amount
             locale={locale}
             amountMinor={account.currentBalanceMinor}
@@ -176,7 +169,7 @@ export function AccountCard({
         </div>
 
         {actions ? (
-          <div className="relative col-start-3 row-start-1 row-span-2 self-center sm:col-start-4">
+          <div className="relative col-start-2 row-start-1 row-span-2 self-center sm:col-start-3">
             {actions}
           </div>
         ) : null}

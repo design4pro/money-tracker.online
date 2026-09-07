@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 import { ErrorPanel } from '#/components/app/accounts'
-import { Badge, Button, Card, toast } from '#/components/ui'
+import { Button, toast } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import { applyTemplate } from '#/server/fns/transaction-groups'
@@ -12,7 +12,7 @@ import type {
 } from '#/server/repos/transaction-templates'
 
 /**
- * The template picker: saved shapes for the entry form, and the one thing pressing them does not
+ * The template row: saved shapes for the entry form, and the one thing pressing them does not
  * do.
  *
  * ## Choosing a template fills a form. It never books a transaction.
@@ -24,12 +24,15 @@ import type {
  * is filled in, nothing is saved yet*, in the same words for everybody, rather than leaving the
  * reader to work out whether a row now exists.
  *
- * ## What each button says
+ * ## One row of chips under the amount, not a card above it
  *
- * A template with an amount prints it with its currency; one without says *"you type the
- * amount"* — which is half the point of a template and reads as a promise rather than as a
- * missing value. Both are text on the button, so a screen reader's element list is a list of
- * different templates rather than seven buttons called "Use".
+ * The row is a shortcut, so it takes one line: a caption at the start and one chip per template,
+ * scrolling sideways on a phone rather than pushing the amount field down the page, and wrapping
+ * where there is room. A chip is
+ * the template's name and, when the template fixes one, its amount in the second ink; a template
+ * that leaves the amount to the person says nothing about it, because an empty amount box under
+ * a chip already says that. Both are text on the button, so a screen reader's element list is a
+ * list of different templates rather than seven buttons called "Use".
  *
  * ## It holds no data of its own
  *
@@ -58,6 +61,7 @@ export function TemplatePicker({
 }: TemplatePickerProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const labelId = useId()
 
   const [pending, setPending] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -79,10 +83,10 @@ export function TemplatePicker({
     }
   }
 
-  /** The amount on the button, or the promise that stands in for it. */
-  function amountOf(template: TransactionTemplateSummary): string {
+  /** The amount on the chip, or nothing when the template leaves it to the person. */
+  function amountOf(template: TransactionTemplateSummary): string | null {
     if (template.amountMinor === null || template.currencyCode === null) {
-      return t('templates.picker.noAmount')
+      return null
     }
     return formatMoney(
       locale,
@@ -91,21 +95,45 @@ export function TemplatePicker({
   }
 
   return (
-    <Card
-      as="section"
-      aria-labelledby="template-picker-heading"
-      className="flex flex-col gap-3"
+    <section
+      aria-label={t('templates.picker.title')}
+      className="flex flex-col gap-2"
     >
-      <div className="flex flex-col gap-1">
-        <h2
-          id="template-picker-heading"
-          className="text-body font-semibold text-ink"
+      <div className="flex items-start gap-3">
+        {/* The caption is centred on the first 40px chip row, not on the block, so it stays put
+            when the row wraps. */}
+        <span
+          id={labelId}
+          className="flex h-10 shrink-0 items-center text-caption text-ink-2"
         >
-          {t('templates.picker.title')}
-        </h2>
-        <p className="text-caption text-ink-2">
-          {t('templates.picker.description')}
-        </p>
+          {t('templates.picker.label')}
+        </span>
+        {/* One sideways-scrolling line on a phone, a wrapping row from `sm`. `focus-safe`
+            reserves room for a chip's focus ring inside the scroller; the negative margin gives
+            that room back so the first chip lines up with the field above. */}
+        <ul
+          aria-labelledby={labelId}
+          className="-m-1 flex min-w-0 flex-1 gap-2 overflow-x-auto focus-safe sm:flex-wrap"
+        >
+          {templates.map((template) => {
+            const amount = amountOf(template)
+            return (
+              <li key={template.id} className="shrink-0">
+                <Button
+                  variant="secondary"
+                  isPending={pending === template.id}
+                  isDisabled={isDisabled}
+                  onPress={() => void apply(template)}
+                >
+                  {template.name}
+                  {amount === null ? null : (
+                    <span className="tabular text-ink-2">{amount}</span>
+                  )}
+                </Button>
+              </li>
+            )
+          })}
+        </ul>
       </div>
 
       {failure === null ? null : (
@@ -115,30 +143,6 @@ export function TemplatePicker({
           detail={failure}
         />
       )}
-
-      <ul
-        aria-label={t('templates.picker.label')}
-        className="flex flex-wrap gap-2"
-      >
-        {templates.map((template) => (
-          <li key={template.id}>
-            <Button
-              variant="secondary"
-              size="sm"
-              isPending={pending === template.id}
-              isDisabled={isDisabled}
-              onPress={() => void apply(template)}
-            >
-              <span className="flex items-center gap-2">
-                <span>{template.name}</span>
-                <Badge tone="neutral" size="sm">
-                  {amountOf(template)}
-                </Badge>
-              </span>
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </Card>
+    </section>
   )
 }

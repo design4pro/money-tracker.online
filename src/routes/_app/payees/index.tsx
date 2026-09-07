@@ -34,6 +34,7 @@ import { PayeeFormDialog } from './-ui/payee-form-dialog'
 
 import type { PayeeListItem } from '#/components/app/payees'
 import type { PayeeRow } from '#/server/db/schema'
+import { pageHead } from '#/routes/-lib/page-title'
 
 /**
  * `/payees` — the list, the merge, and the strings the importer must ignore.
@@ -71,6 +72,7 @@ export const Route = createFileRoute('/_app/payees/')({
   },
   pendingComponent: PayeeListSkeleton,
   errorComponent: PayeesError,
+  head: ({ matches }) => pageHead(matches, (t) => t('payees.title')),
   component: PayeesRoute,
 })
 
@@ -178,10 +180,7 @@ function PayeesRoute() {
         />
       )}
 
-      <IgnoredNames
-        names={ignored}
-        onChanged={refresh}
-      />
+      <IgnoredNames names={ignored} onChanged={refresh} />
 
       {pending.kind === 'form' ? (
         <PayeeFormDialog
@@ -311,7 +310,11 @@ function IgnoredNames({
             maxLength={200}
             className="flex-1"
           />
-          <Button type="submit" variant="secondary" isDisabled={draft.trim() === ''}>
+          <Button
+            type="submit"
+            variant="secondary"
+            isDisabled={draft.trim() === ''}
+          >
             {t('action.add')}
           </Button>
         </Form>
@@ -331,7 +334,7 @@ function IgnoredNames({
             {names.map((row) => (
               <li
                 key={row.id}
-                className="flex items-center gap-1 rounded-full border border-border-strong bg-surface ps-3 text-caption text-ink"
+                className="flex items-center gap-1 rounded-sm border border-border-strong bg-surface ps-3 text-caption text-ink"
               >
                 <span className="truncate">{row.normalizedName}</span>
                 <Button

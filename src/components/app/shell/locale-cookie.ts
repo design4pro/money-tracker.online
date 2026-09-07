@@ -49,3 +49,17 @@ export function writeLocaleCookie(locale: Locale): void {
   const secure = window.location.protocol === 'https:' ? '; Secure' : ''
   document.cookie = `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${ONE_YEAR_SECONDS}; SameSite=Lax${secure}`
 }
+
+/**
+ * Applies a choice: writes it, then asks the server for the document again.
+ *
+ * A full load rather than a client-side swap, because the catalogue is resolved by the root
+ * loader on the server before the first byte. Swapping in the browser would leave `<html lang>`
+ * stating the previous language - which is what a screen reader picks its voice from - and
+ * would need every catalogue in the bundle to do it. Shared by the app's language menu and the
+ * landing page's switch, so both switch the same way.
+ */
+export function switchLocale(locale: Locale): void {
+  writeLocaleCookie(locale)
+  window.location.reload()
+}

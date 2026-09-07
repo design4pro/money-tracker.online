@@ -109,7 +109,7 @@ export function GoalProjection({
       aria-label={t('goals.projection.heading')}
       className={cn('flex flex-col gap-3', className)}
     >
-      <h2 className="text-caption font-semibold tracking-wide text-ink-2 uppercase">
+      <h2 className="text-subtitle font-semibold text-ink">
         {t('goals.projection.heading')}
       </h2>
 

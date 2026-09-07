@@ -127,7 +127,7 @@ test.describe('tenant isolation', () => {
 
     await gotoApp(b, `/transactions/${transactionId}`)
     await expect(
-      b.getByRole('heading', { name: 'That entry is not here' }),
+      b.getByRole('heading', { name: 'That transaction is not here' }),
     ).toBeVisible()
     await expect(b.locator('body')).not.toContainText(note)
     await expect(b.locator('body')).not.toContainText('99.99')

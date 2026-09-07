@@ -106,14 +106,15 @@ describe('an account row', () => {
 
     const kind = screen.getByText('Credit card').parentElement
     const classes = kind?.getAttribute('class') ?? ''
-    // Column 2 at every width — the name's column — rather than a third column at ~45% of the
-    // measure, which aligned with nothing and cut the row into three fragments.
-    expect(classes).toContain('col-start-2')
+    // The name's column at every width - the first, now that no initials square sits before
+    // the name - rather than a third column at ~45% of the measure, which aligned with nothing
+    // and cut the row into three fragments.
+    expect(classes).toContain('col-start-1')
     expect(classes).toContain('row-start-2')
     expect(classes).not.toContain('sm:col-start-3')
 
     const name = container.querySelector('h3')
-    expect(name?.parentElement?.getAttribute('class')).toContain('col-start-2')
+    expect(name?.parentElement?.getAttribute('class')).toContain('col-start-1')
   })
 
   it('runs the utilisation track to the full width of the row', async () => {

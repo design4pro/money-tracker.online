@@ -1,4 +1,6 @@
-import { BudgetMeter } from '#/components/app/budgets'
+// The module path rather than the budgets barrel, which reaches the charts and d3. See the note
+// at the top of `src/routes/index.tsx`.
+import { BudgetMeter } from '#/components/app/budgets/budget-meter'
 import { useTranslate } from '#/lib/i18n'
 import { asMinor } from '#/lib/money'
 

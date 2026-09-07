@@ -21,7 +21,11 @@ export { cashFlowCopy, chartCopy, spendingCopy } from './chart-copy'
 export { DashboardHeader } from './dashboard-header'
 export type { DashboardHeaderProps } from './dashboard-header'
 
-export { FIRST_RUN_STEPS, FirstRunPanel } from './first-run-panel'
+export {
+  FIRST_RUN_STEPS,
+  FirstEntryPrompt,
+  FirstRunPanel,
+} from './first-run-panel'
 export type { FirstRunStep } from './first-run-panel'
 
 export { monthLabel } from './month-label'

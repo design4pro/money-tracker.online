@@ -10,7 +10,7 @@ import {
   Switch,
   TextField,
 } from '#/components/ui'
-import { PAYMENT_METHODS } from '#/server/db/schema'
+import { PAYMENT_METHODS } from '#/lib/enums'
 import {
   MAX_ACTION_NOTE_LENGTH,
   RULE_ACTION_KINDS,

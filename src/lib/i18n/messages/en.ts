@@ -59,7 +59,7 @@ const messages = {
   'nav.primary': 'Main navigation',
   'nav.dashboard': 'Dashboard',
   'nav.accounts': 'Accounts',
-  'nav.transactions': 'Spending',
+  'nav.transactions': 'Transactions',
   'nav.budgets': 'Budgets',
   'nav.categories': 'Categories',
   'nav.tags': 'Tags',
@@ -323,6 +323,7 @@ const messages = {
     other: '{count} entries on this account',
   },
   'accounts.detail.note.empty': 'No note on this account yet.',
+  'accounts.detail.ledger.empty': 'No transactions on this account yet.',
   'accounts.detail.error.title': 'This account did not load',
   'accounts.detail.danger': 'Archiving and deleting',
   'accounts.credit.title': 'Credit used',
@@ -394,8 +395,8 @@ const messages = {
   'accounts.adjust.error.title': 'The correction was not recorded',
 
   /* -- Transactions ------------------------------------------------------- */
-  'transactions.title': 'Spending',
-  'transactions.create': 'New expense',
+  'transactions.title': 'Transactions',
+  'transactions.create': 'New transaction',
   'transactions.createIncome': 'Record income',
   'transactions.createExpense': 'Record an expense',
   'transactions.createTransfer': 'Record a transfer',
@@ -437,11 +438,12 @@ const messages = {
   'transactions.attachment.add': 'Attach a receipt',
   'transactions.attachment.remove': 'Remove attachment',
   'transactions.search.placeholder': 'Search notes, payees and amounts',
+  'transactions.search.placeholder.short': 'Search',
   'transactions.filter.title': 'Filters',
   'transactions.filter.reset': 'Reset filters',
   'transactions.count': {
-    one: '{count} entry',
-    other: '{count} entries',
+    one: '{count} transaction',
+    other: '{count} transactions',
   },
   'transactions.selected': {
     one: '{count} selected',
@@ -466,6 +468,8 @@ const messages = {
   'transactions.column.description': 'Description',
   'transactions.column.actions': 'Actions',
   'transactions.day.net': 'Day total',
+  'transactions.day.carried': 'Carried forward',
+  'transactions.column.balance': 'Balance after',
   'transactions.loading': 'Loading your spending…',
   'transactions.loadMore': 'Load more',
   'transactions.loadingMore': 'Loading more…',
@@ -537,10 +541,10 @@ const messages = {
   'transactions.chip.withoutReceipt': 'Without a receipt',
 
   /* -- Transactions: the entry form --------------------------------------- */
-  'transactions.form.newTitle': 'New expense',
+  'transactions.form.newTitle': 'New transaction',
   'transactions.form.newSubtitle':
     'The amount comes first. Everything below it is optional except the account and the date.',
-  'transactions.form.editTitle': 'Edit expense',
+  'transactions.form.editTitle': 'Edit transaction',
   'transactions.form.details': 'Details',
   'transactions.form.moreDetails': 'More',
   'transactions.form.saveAndNew': 'Save and add another',
@@ -572,7 +576,7 @@ const messages = {
 
   /* -- Transactions: the detail screen ------------------------------------ */
   'transactions.detail.title': 'Expense',
-  'transactions.detail.back': 'Back to your spending',
+  'transactions.detail.back': 'Back to transactions',
   'transactions.detail.summary': 'Summary',
   'transactions.detail.recordedAt': 'Recorded {datetime}',
   'transactions.detail.rate': 'Converted at {rate}, the rate for {date}.',
@@ -581,7 +585,7 @@ const messages = {
   'transactions.detail.noTags': 'No tags on this entry.',
   'transactions.detail.noAttachments': 'No receipt attached.',
   'transactions.detail.noRefunds': 'No refund linked.',
-  'transactions.detail.notFound.title': 'That entry is not here',
+  'transactions.detail.notFound.title': 'That transaction is not here',
   'transactions.detail.notFound.body':
     'It may have been deleted, or the address may be wrong.',
   /* -- Transactions: the split editor -------------------------------------- */
@@ -672,10 +676,7 @@ const messages = {
 
   /* -- Transactions: templates (11-S2) ------------------------------------- */
   'templates.picker.title': 'Start from a template',
-  'templates.picker.description':
-    'A template fills this form in. Nothing is saved until you save it, and the exchange rate is the one for the date you pick.',
   'templates.picker.label': 'Templates',
-  'templates.picker.noAmount': 'You type the amount',
   'templates.picker.error.title': 'The template could not be applied',
   'templates.applied':
     'The form is filled in from {name}. Nothing is saved yet.',
@@ -896,7 +897,7 @@ const messages = {
   'dashboard.widget.netWorth': 'Net worth',
   'dashboard.widget.cashFlow': 'Cash flow',
   'dashboard.widget.spendingByCategory': 'Spending by category',
-  'dashboard.widget.recentTransactions': 'Latest entries',
+  'dashboard.widget.recentTransactions': 'Latest transactions',
   'dashboard.widget.upcomingBills': 'Coming up',
   'dashboard.widget.budgetProgress': 'Budgets',
   'dashboard.widget.savingsGoals': 'Savings goals',
@@ -959,6 +960,9 @@ const messages = {
   'dashboard.firstRun.step.review.title': 'Come back here',
   'dashboard.firstRun.step.review.body':
     'The panels below fill in as soon as there is something to show.',
+  'dashboard.firstEntry.lead':
+    'Your accounts are in. Nothing is written against them yet.',
+  'dashboard.firstEntry.action': 'Record your first transaction',
 
   /* -- Budgets (shared with the dashboard) -------------------------------- */
   'budgets.title': 'Budgets',
@@ -1128,6 +1132,8 @@ const messages = {
   'budgets.confirm.archive.body':
     'It leaves the list and keeps every period it closed. You can restore it at any time.',
   'budgets.confirm.archive.action': 'Archive budget',
+  'budgets.confirm.restore.body':
+    'It returns to the list and picks up where it left off. Its closed periods stay as they were.',
   'budgets.confirm.delete.title': 'Delete this budget?',
   'budgets.confirm.delete.body':
     'This cannot be undone. A budget that has closed a period cannot be deleted — archive it instead.',
@@ -1207,7 +1213,7 @@ const messages = {
   'empty.notFound.title': 'Not here',
   'empty.notFound.body':
     'This page does not exist, or it is no longer shared with you.',
-  'empty.notFound.action': 'Back to the dashboard',
+  'empty.notFound.home': 'Front page',
   'empty.forbidden.title': 'No access',
   'empty.forbidden.body': 'Ask a household owner to give you access to this.',
   'empty.offline.title': 'You are offline',
@@ -1643,7 +1649,7 @@ const messages = {
 
   /* -- What is due, in words ---------------------------------------------- */
   'recurring.due.today': 'Due today',
-  'recurring.due.on': 'Due {date}',
+  'recurring.due.on': 'Due on {date}',
   'recurring.due.in': {
     one: 'Due tomorrow',
     other: 'Due in {count} days',
@@ -1851,13 +1857,13 @@ const messages = {
   'recurring.links.unlinked': 'Unlinked',
 
   /* -- Candidates ------------------------------------------------------------ */
-  'recurring.candidates.title': 'Series we noticed',
+  'recurring.candidates.title': 'Recurring patterns in your transactions',
   'recurring.candidates.subtitle':
-    'Patterns in what you already recorded. Each one is a suggestion, not something we did.',
-  'recurring.candidates.loading': 'Looking through your spending…',
+    'Payments that repeat in what you recorded: the same payee, a similar amount, a steady interval. Each one is a suggestion - set it up as a series, or mark it as not one.',
+  'recurring.candidates.loading': 'Looking through your transactions…',
   'recurring.candidates.detect': 'Look again',
   'recurring.candidates.detecting': 'Looking…',
-  'recurring.candidates.link': 'Series we noticed',
+  'recurring.candidates.link': 'Find recurring patterns',
   'recurring.candidates.pending': {
     one: '{count} suggestion',
     other: '{count} suggestions',

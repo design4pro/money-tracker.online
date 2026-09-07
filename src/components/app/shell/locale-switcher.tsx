@@ -2,7 +2,7 @@ import { Languages } from 'lucide-react'
 
 import { Button, Menu, MenuItem, MenuTrigger, Popover } from '#/components/ui'
 import { SUPPORTED_LOCALES, useLocale, useTranslate } from '#/lib/i18n'
-import { writeLocaleCookie } from './locale-cookie'
+import { switchLocale } from './locale-cookie'
 
 import type { Locale } from '#/lib/i18n'
 
@@ -47,8 +47,7 @@ export function LocaleSwitcher() {
           onSelectionChange={(keys) => {
             const next = keys === 'all' ? undefined : [...keys][0]
             if (typeof next !== 'string' || next === locale) return
-            writeLocaleCookie(next as Locale)
-            window.location.reload()
+            switchLocale(next as Locale)
           }}
         >
           {SUPPORTED_LOCALES.map((descriptor) => (

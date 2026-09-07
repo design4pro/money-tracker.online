@@ -15,7 +15,7 @@ import {
   TextField,
 } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
-import { CATEGORY_KINDS } from '#/server/db/schema'
+import { CATEGORY_KINDS } from '#/lib/enums'
 import { createCategory, updateCategory } from '#/server/fns/categories'
 
 import type { Key } from 'react-aria-components'

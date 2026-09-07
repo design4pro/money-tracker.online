@@ -199,6 +199,25 @@ export function FieldGroup({ className, ...props }: FieldGroupProps) {
 }
 
 /**
+ * A button that is the end cap of a field: the calendar trigger, the search field's clear.
+ *
+ * It is the field's full inner height and 36px wide, so its own box is nearly the target and the
+ * `target-min` pseudo-element only has 4px to add on each side. That matters on a phone: the
+ * pseudo-element is centred, so a 24px button inside a 40px field grows 10px *into the input*, and
+ * a thumb placing the caret at the end of a query clears the query instead. The group that holds
+ * it drops its end padding (`pe-0`) so the cap sits flush against the field's edge.
+ */
+export const fieldEndButton = cn(
+  'grid w-9 shrink-0 place-items-center self-stretch text-ink-2 cursor-pointer target-min',
+  transitionBase,
+  'data-[hovered]:bg-hover data-[hovered]:text-ink',
+  'data-[pressed]:bg-press',
+  'data-[disabled]:opacity-45 data-[disabled]:pointer-events-none',
+  'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
+  '[&_svg]:size-4',
+)
+
+/**
  * The vertical rhythm shared by every field row. `group/field` is what lets the
  * `Label` above dim itself when the container is disabled without the caller
  * threading a prop through.

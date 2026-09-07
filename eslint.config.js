@@ -36,6 +36,15 @@ export default [
               message:
                 'SQL lives in server/repos via the tenant base repository. Call a server function instead.',
             },
+            {
+              // The schema module carries every table and drizzle-orm with it; a value import
+              // from client code put both into the chunk every visitor downloads. The tuples
+              // live in src/lib/enums and the types are free to import from either.
+              group: ['#/server/db/schema', '**/server/db/schema'],
+              allowTypeImports: true,
+              message:
+                'The enumerated tuples live in #/lib/enums. A value import of the schema ships every table and drizzle-orm to the browser.',
+            },
           ],
         },
       ],
@@ -103,6 +112,11 @@ export default [
       'eslint.config.js',
       'prettier.config.js',
       '.claude/**',
+      // A cezar run worktree is a second checkout of this repository nested inside it. Linting it
+      // reports every file twice, against a tsconfig it is not part of, and on a host with a few
+      // of them eslint exhausts the heap before it finishes. `.ai/cezar/.gitignore` already keeps
+      // them out of git.
+      '.ai/cezar/worktrees/**',
       // Agent tooling that GitHub's own surfaces read — skills, agent definitions, hooks. Same
       // reason as `.claude/**`: vendored configuration for tools around the project, written
       // against no tsconfig of ours.
