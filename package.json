@@ -31,6 +31,7 @@
     "db:migrate:local": "wrangler d1 migrations apply money-tracker-db --local",
     "db:migrate:staging": "wrangler d1 migrations apply money-tracker-db-staging --remote --env staging",
     "db:migrate:prod": "wrangler d1 migrations apply money-tracker-db --remote",
+    "install-skills": "./scripts/install-skills.sh",
     "prepare": "husky"
   },
   "lint-staged": {

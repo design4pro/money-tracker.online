@@ -14,20 +14,22 @@ quoted, the command that produced it is named. §7.7 governs anything you write 
 A `git worktree` carries none of the per-checkout fixtures, and each one fails in a way that looks
 like something else:
 
-| Missing              | What you see                                                 | Fix                       |
-| -------------------- | ------------------------------------------------------------ | ------------------------- |
-| `node_modules`       | `Command "prettier" not found`, `tsc: not found`             | `pnpm install --frozen-lockfile --prefer-offline` |
-| the local D1         | every route 500s on the first query                          | `pnpm db:migrate:local`   |
-| `.dev.vars`          | Better Auth throws on anything touching a session            | `bash scripts/agent/setup-e2e.sh` |
-| the demo workspace   | specs pass against empty screens, which asserts nothing      | `node scripts/seed/seed.mjs --url http://127.0.0.1:3010` |
+| Missing            | What you see                                            | Fix                                                      |
+| ------------------ | ------------------------------------------------------- | -------------------------------------------------------- |
+| `node_modules`     | `Command "prettier" not found`, `tsc: not found`        | `pnpm install --frozen-lockfile --prefer-offline`        |
+| the local D1       | every route 500s on the first query                     | `pnpm db:migrate:local`                                  |
+| `.dev.vars`        | Better Auth throws on anything touching a session       | `sh .ai/scripts/test-env-up.sh`                          |
+| the demo workspace | specs pass against empty screens, which asserts nothing | `node scripts/seed/seed.mjs --url http://127.0.0.1:3010` |
 
-`scripts/agent/setup-e2e.sh` does all four plus the route tree and a dev server, mirroring
-`.github/actions/e2e-env/action.yml` step for step. `--if-needed` makes it a no-op when a server is
-already answering, so running it when it was not needed is nearly free.
+`.ai/scripts/test-env-up.sh` does all four plus the route tree and a dev server on the first free
+port in 3011-3020, and writes `.ai/qa/test-env.json` with the base URL. It is the entrypoint
+`om-prepare-test-env` generated and the one `om-auto-qa-pr` boots through; a second run attaches to
+a healthy server instead of restarting it, so running it when it was not needed is nearly free.
+`sh .ai/scripts/test-env-down.sh` stops exactly what it started.
 
 **It refuses to clobber a `.dev.vars` a person wrote.** The file it writes starts with a marker
-comment; a file without that marker is a real checkout's real secrets and the script exits rather
-than overwrite it. On your own checkout use `pnpm dev` in one shell and `pnpm e2e` in another.
+comment; a file without that marker is a real checkout's real secrets and the script keeps it. On
+your own checkout use `pnpm dev` in one shell and `pnpm e2e` in another.
 
 ## The ladder
 
@@ -42,16 +44,14 @@ than overwrite it. On your own checkout use `pnpm dev` in one shell and `pnpm e2
    `pnpm db:generate && git diff --exit-code -- drizzle/`. CI re-asserts both.
 4. **UI touched**: `pnpm e2e` locally, **and look at the screens**. Nothing compares a pixel
    (ADR 0016): the suite asserts that a screen answers, hydrates, says nothing in the console and
-   can be acted on. What catches a screen that changed *shape* is the blind pair,
+   can be acted on. What catches a screen that changed _shape_ is the blind pair,
    `node scripts/visual/capture.mjs`, and it only catches it if somebody runs it and reads it. For
    a refactor with no intended visual change - a token retune, a shared layout edit, a Tailwind
    bump - that pair is the only thing between the change and `develop`.
-5. **In a cezar worktree** the whole ladder has one entrypoint (`scripts/agent/cez-ladder.sh` wraps
-   it): `TARGET_BRANCH=<branch> bash scripts/agent/validate.sh --json-out <path>`. It always runs
-   the route-tree and migration gates, typecheck, lint and vitest, and adds Playwright when the
-   diff touches UI paths (`--force-e2e` / `--skip-e2e` override). It prepares the environment
-   itself and takes its own port from the 3011-3020 pool, so parallel runs never photograph each
-   other's application.
+5. **In an agent worktree** the gate is `validation.commands` in `.ai/agentic.config.json`: both
+   drift gates, typecheck, lint, vitest and build, in that order, run by the om skills before a PR
+   opens and again by `om-auto-review-pr`. The browser suite is not in it: CI runs it on every pull
+   request, and `om-auto-qa-pr` drives the app through `.ai/scripts/test-env-up.sh` for evidence.
 6. **CI** runs lint, typecheck, unit tests, build, both drift gates, the browser suite and the axe
    scan on every pull request. Since ADR 0016 there is no label to remember.
 
@@ -69,7 +69,7 @@ These are hard-won and each one has cost somebody an afternoon.
   `1 failed`. Only the body separates `Received: hidden` - a computed style, which a starved
   processor computes no differently - from an empty value an interaction should have set. Grepping
   for that costs a second and decides whether to re-run or to fix. Starvation turns a passing test
-  red and never a failing test green, so every *pass* under load is worth what it would be on a
+  red and never a failing test green, so every _pass_ under load is worth what it would be on a
   quiet machine, and only failures need repeating.
 - **Re-run the failed files alone, straight away.** Two files that timed out inside a 134-second
   full suite passed together in 999 ms while the one-minute load stood at 120. A pass is the
@@ -104,7 +104,7 @@ These are hard-won and each one has cost somebody an afternoon.
 - **Console red is the application talking.** The net is `e2e/support/console.ts`, an `auto: true`
   fixture, so every spec importing `test` from `./support/console` is watched. Fixing a console
   failure means fixing the application: `TOLERATED_CONSOLE_WARNINGS` may only ever hold something
-  the *engine* says on the dev-server path that a build cannot produce, and appending to it removes
+  the _engine_ says on the dev-server path that a build cannot produce, and appending to it removes
   coverage from the clause `docs/SPEC.md` §2.10 states.
 - **`playwright.config.ts` refuses ports outside 3010-3020** when not in CI. That guard exists
   because runs have photographed the wrong checkout. Don't fight it.
@@ -114,7 +114,7 @@ These are hard-won and each one has cost somebody an afternoon.
 Driving the app by hand is how a change gets checked before it has a spec. These are the seams that
 make a probe lie.
 
-- **Theme needs both halves.** `useTheme()` (`e2e/support/app.ts`) writes the stored mode *and*
+- **Theme needs both halves.** `useTheme()` (`e2e/support/app.ts`) writes the stored mode _and_
   calls `page.emulateMedia({ colorScheme })`. `data-theme` comes from the bootstrap script reading
   `localStorage` before first paint; `prefers-color-scheme` decides what the browser paints behind
   the document and what the `system` branch of the token layer resolves to. Setting one of them

@@ -1,15 +1,108 @@
-Start at `CLAUDE.md` — it holds the project rules, commands and agent-skill configuration.
-The block below is generated TanStack guidance (owned by `@tanstack/intent`; do not edit it by
-hand): run the matching command before editing TanStack-adjacent files.
+# money-tracker.online
 
-Four prohibitions are repeated here on purpose, because some tools read only this file. They are
-deliberately duplicated, and if they ever disagree with `CLAUDE.md`, **`CLAUDE.md` wins**:
+Multi-tenant SaaS personal finance manager on Cloudflare Workers (TanStack Start + React 19,
+D1/Drizzle, KV, R2, Queues, one Durable Object). shadcn-shaped UI on **React Aria Components**, not
+Radix. Package manager: pnpm. The stack is pinned (`docs/SPEC.md` §3). There are no bank connectors
+and adding one is out of scope permanently (`docs/adr/0008-no-bank-connectors.md`).
 
-1. Money is integer minor units, everywhere, at every layer. No float ever touches an amount.
-2. All SQL goes through the tenant-scoped repository in `src/server/repos`. Never write raw SQL
-   in a route, a server function or a component.
-3. `src/routeTree.gen.ts` and everything under `drizzle/` are generated. Regenerate; never edit.
-4. No bank connectors, no scraping of a bank, no third-party aggregator. Permanently out of scope.
+This file is the router. It stays under 32 KiB; detail lives in the documents the table points at.
 
-<!-- intent-skills:start -->
-<!-- intent-skills:end -->
+## Always
+
+- Money stays in integer minor units at every layer. The scale is `currencies.digits`, never a
+  hard-coded 2. `ref_amount_minor` is historical and never recomputed (`docs/MONEY.md`).
+- All SQL lives in `src/server/repos` and goes through the tenant-scoped base repository;
+  `src/server/catalog` is the single exception (`docs/SPEC.md` §6.1).
+- Validate every server-function input with Zod, and parse it a second time in the repository.
+  Validation is shape, never permission.
+- A new repository function ships with a case in `src/server/repos/__tests__/tenant-isolation.test.ts`;
+  a new money-touching write path with a case in `src/server/repos/__tests__/money-invariants.test.ts`.
+- User-facing copy lives in the EN + PL catalogue and a new key lands in both locales in the same
+  change (skill `i18n-messages`).
+- Named exports only, route modules excepted. `components/ui` never fetches and never imports from
+  `server/`.
+- Regenerate, never edit: `src/routeTree.gen.ts` (`pnpm generate-routes`) and `drizzle/`
+  (`pnpm db:generate`). Migrations are additive.
+- Anything slow is enqueued on `TASKS`; balances are rebuilt through the `LEDGER` Durable Object.
+- Conventional Commits in English, scope = module or plan area. Branches `fix/issue-<n>-<slug>`,
+  `feat/issue-<n>-<slug>`, `spec/<slug>`. PRs target `develop` and carry `Closes #<n>`.
+- Every number you write down came from a command whose output you read (`docs/SPEC.md` §7.7).
+- Verify before claiming: skill `verifying-changes` is the ladder; `docs/SPEC.md` §7 is done.
+
+## Ask First
+
+- Adding, removing or upgrading a dependency (`docs/SPEC.md` §3 freeze).
+- A schema migration, or any change to auth, sessions, tenant scoping, billing or the ledger.
+- Anything that widens the accessibility claim (`docs/ACCESSIBILITY.md`).
+- Deleting a test, or narrowing what a test asserts.
+- A change to a surface listed in `BACKWARD_COMPATIBILITY.md`.
+
+## Never
+
+- Float arithmetic on an amount, at any layer, including a chart label or a tooltip.
+- SQL outside `src/server/repos`; a direct write to `account_balances` outside `src/server/ledger`.
+- A bank connector, an aggregator or credential capture for a financial institution (ADR 0008).
+- Copying a string, a name, a number or a layout from the reference product: the clean-room rule
+  in `docs/agents/reference.md`.
+- `--no-verify`; a force-push to `develop` or `main`; a hand edit to a generated file.
+- Adding `@ts-ignore`, `@ts-expect-error` or `eslint-disable`; `.skip`, `.only`, `.todo` or
+  `.fixme` on a test; deleting a test file to make a gate green.
+- Hardcoded user-facing copy; an `if (n === 1)` plural; `Intl.DisplayNames` in `src/lib/i18n`.
+- Reading `.dev.vars`, `.env.local` or `.ai/qa/test-env.env`.
+- A blanket "WCAG AAA" claim anywhere: copy, comment, commit message or plan.
+- A PNG or a report left inside the repository; frames go to `.ai/qa/artifacts_*/` or a scratchpad.
+
+## Validation Commands
+
+The gate every PR passes, in this order (`validation.commands` in `.ai/agentic.config.json`):
+
+- `pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts`
+- `pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm test`
+- `pnpm build`
+
+`pnpm e2e` is not in the gate because it needs a running environment: CI runs it on every pull
+request, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
+repo) is not a gate either; keep what you touch prettier-clean.
+
+## Task Router
+
+| When the task involves…                        | Read first                                                                               | Key rules                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| A word you are not sure of                     | `CONTEXT.md`                                                                             | A glossary and nothing else; the `_Avoid_` clause is the load-bearing part                      |
+| An amount, a rate, a currency or a date bucket | `docs/MONEY.md` in full                                                                  | Cite section numbers; never restate the arithmetic                                              |
+| A query, a repository, a migration             | `docs/SPEC.md` §5.2, §6.1; ADR 0002; `src/server/repos/scope.ts`                         | `TenantScope` first parameter; additive migrations; tenant-isolation case                       |
+| Balances, transfers, the ledger                | `docs/MONEY.md` §4; ADR 0010; `src/server/ledger/`                                       | Rebuilt wholesale through `LEDGER`, never accumulated                                           |
+| A server function or an API route              | `docs/SPEC.md` §5.1, §6.1; `src/server/fns/`                                             | Zod twice; permission server-side; slow work on `TASKS`                                         |
+| Auth, sessions, invitations, roles             | ADR 0011; `docs/SPEC.md` §5.3; `src/server/auth/`                                        | Two role dictionaries; `beforeLoad` is UX                                                       |
+| Billing, plans, quotas                         | ADR 0012; `docs/SPEC.md` §5.4; `docs/plans/22-billing.md`; `src/lib/plans.ts`            | One catalogue, one resolver (SPEC §8); webhook work runs on the queue                           |
+| A component or a screen                        | `DESIGN.md`; `docs/SPEC.md` §2, §4; `src/components/ui/`                                 | React Aria primitives; states; keyboard path; text table beside every chart                     |
+| User-facing copy                               | skill `i18n-messages`; `docs/I18N.md`                                                    | EN + PL in the same change; plural machinery; keys in stored rows                               |
+| Accessibility                                  | `docs/ACCESSIBILITY.md`; `docs/SPEC.md` §10                                              | AA is the gate; five named AAA criteria; never a wider claim                                    |
+| A chart                                        | ADR 0007; `DESIGN.md` → Charts                                                           | Hand-rolled; visually-hidden data table; non-colour encoding                                    |
+| CSV, OFX, QIF import                           | `src/server/import/`; `docs/plans/`                                                      | Widen before narrowing; presets are stored rows                                                 |
+| Tests                                          | skill `tdd`; skill `verifying-changes`; `vitest.config.ts`; `e2e/support/`               | Failing test first; workerd project for Worker code (ADR 0015); console red fails a browser run |
+| Verifying a change, a confusing failure        | skill `verifying-changes`                                                                | Re-run failed files alone; a timeout is a claim about the machine until the text says otherwise |
+| Visual verification                            | ADR 0016; `scripts/visual/capture.mjs`                                                   | Light + dark, 360 + 1280, the interaction state; frames outside the repository                  |
+| Background work, cron, email                   | `src/server/queue/`, `src/server/cron/`, `src/server/email/`; `wrangler.jsonc`           | Idempotent handlers; one `kind` per job; keys not sentences in envelopes                        |
+| Bindings, secrets, deploys                     | `wrangler.jsonc`; `docs/DEPLOY.md`; `docs/SECURITY.md`; `.dev.vars.example`              | Append-only DO migrations; never a secret in a log or a PR                                      |
+| A new feature or area                          | `docs/plans/README.md` and the area's plan; `docs/agents/out-of-scope.md`                | Plans are the backlog source; a rejected request is not re-litigated                            |
+| A product decision                             | `docs/adr/`                                                                              | One ADR per decision; amend rather than rewrite                                                 |
+| Comparing against the reference product        | `docs/agents/reference.md`                                                               | Rendered pixels only; nothing else crosses                                                      |
+| Working while someone else edits the checkout  | `docs/agents/shared-checkout.md`                                                         | 3010 is the developer's port; agents take 3011-3020                                             |
+| The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md` | Labels are the state machine; `needs-qa` needs a human's `qa-approved`                          |
+| The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                               | One cockpit per host; no secrets in the service env                                             |
+
+## Process and skills
+
+- The pipeline is the `om-*` skill collection, installed per checkout with `pnpm install-skills`
+  (into `.agents/skills/`, linked into `.claude/skills/`) and configured by
+  `.ai/agentic.config.json`. Tracker operations are defined in `.ai/trackers/github.md`, browser
+  operations in `.ai/browsers/playwright.md`.
+- Repo-specific rules for a skill live in `.ai/skills/om-<name>/SKILL.md` and extend the installed
+  skill; they never relax its safety rules.
+- Repo-local skills: `verifying-changes`, `i18n-messages`, `tdd` (`.ai/skills/`).
+- `SDLC.md` is the ticket flow, `CODE_REVIEW.md` the review rules, `BACKWARD_COMPATIBILITY.md` the
+  protected surfaces, `.ai/review-checklist.md` the per-PR list.
