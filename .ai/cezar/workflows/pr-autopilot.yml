@@ -1,0 +1,17 @@
+# A human opened a pull request (the pr-autopilot automation filters on authors). om-pr-autopilot
+# diagnoses it and runs the right chain: continue, fix, review, QA. `--allow-merge` is absent on
+# purpose: nothing autonomous merges here; a human runs om-approve-merge-pr from the cockpit
+# (ADR 0017). A review or autopilot run checks out the PR's head, hooks included: a branch cut
+# before the om cutover (`f2a258e`) carries the old `git-guardrails.sh`, which blocks every
+# GitHub write in agent mode, so merge `develop` into such a branch before opening the PR.
+name: pr-autopilot
+description: om-pr-autopilot on one PR - diagnose, then continue / fix / review / QA; never merges.
+steps:
+  - id: setup
+    name: Install dependencies and generate the route tree
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+  - id: autopilot
+    name: om-pr-autopilot
+    prompt: '/om-pr-autopilot {{task}}'
+    model: opus
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]

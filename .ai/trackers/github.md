@@ -534,3 +534,14 @@ gh label create risk-low          --color 0e8a16 --description "Isolated, low bl
 gh label create risk-medium       --color fbca04 --description "Ordinary change with tests"
 gh label create risk-high         --color b60205 --description "Wide blast radius, review deeply"
 ```
+
+The three command labels a human sets to start a Cezar automation
+(`docs/agents/cezar-automations.json`). Only a collaborator can set a label, which is what gates
+the `issue.labeled` triggers; the skill that reacts removes its own label as its first mutation, so
+a label still present means nobody picked the issue up. No skill ever adds one:
+
+```bash
+gh label create groom   --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
+gh label create autofix --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
+gh label create spec    --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
+```

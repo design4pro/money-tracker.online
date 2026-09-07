@@ -6,7 +6,7 @@ description: Repo-local extension of om-spec-writing - what a spec here cites, t
 # om-spec-writing (money-tracker.online)
 
 This file extends the shared `om-spec-writing` skill installed at
-`.agents/skills/om-spec-writing/SKILL.md`. Follow its full workflow (skeleton, Open Questions gate,
+`.claude/skills/om-spec-writing/SKILL.md`. Follow its full workflow (skeleton, Open Questions gate,
 research, design, phasing, review) with the rules below layered on top.
 
 ## What a spec cites

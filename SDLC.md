@@ -151,9 +151,11 @@ This document and `.ai/agentic.config.json` describe the same process: change th
 ## This repository
 
 - **Who starts a run.** A person, in the Cezar cockpit: an issue → "Hand this to the agent" →
-  workflow `om-fix-issue`, with the issue number as the task. Automations start
-  `om-manage-issue` on `issue.opened` and `om-review-pr` on `pull_request.opened`
-  (`docs/agents/cezar.md`). No label means "start".
+  workflow `issue-autofix`, with the issue number as the task; or the `autofix` label on the issue,
+  which the automation of the same name reacts to. Automations also start `issue-groom` on
+  `issue.opened` and on the `groom` label, `spec` on the `spec` label of a `feature`, and
+  `pr-autopilot` on `pull_request.opened` (`docs/agents/cezar.md`). `groom`, `autofix` and `spec`
+  are the only labels that start work, and no skill adds one.
 - **QA routing.** A PR that reaches `src/routes/**`, `src/components/**`, `src/styles/**` or
   `src/lib/i18n/messages/*` carries `needs-qa`; docs, CI, tests, `scripts/**`, `.ai/**` and
   dependency bumps carry `skip-qa`. The QA reviewer takes the blind pair with

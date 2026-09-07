@@ -6,7 +6,7 @@ description: Repo-local extension of om-auto-qa-pr - the viewports, themes, hydr
 # om-auto-qa-pr (money-tracker.online)
 
 This file extends the shared `om-auto-qa-pr` skill installed at
-`.agents/skills/om-auto-qa-pr/SKILL.md`. Follow its full workflow (review-first gate, environment
+`.claude/skills/om-auto-qa-pr/SKILL.md`. Follow its full workflow (review-first gate, environment
 via `om-prepare-test-env`, scenario, evidence, labels) with the rules below layered on top.
 
 ## Capture matrix

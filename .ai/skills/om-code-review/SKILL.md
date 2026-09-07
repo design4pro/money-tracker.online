@@ -6,7 +6,7 @@ description: Repo-local extension of om-code-review for money-tracker.online - t
 # om-code-review (money-tracker.online)
 
 This file extends the shared `om-code-review` skill installed at
-`.agents/skills/om-code-review/SKILL.md`. Follow the shared skill's full workflow (validation gate,
+`.claude/skills/om-code-review/SKILL.md`. Follow the shared skill's full workflow (validation gate,
 breaking-change gate, checklist, output format, verdict) with the repo-specific rules below layered
 on top.
 

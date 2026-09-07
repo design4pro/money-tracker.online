@@ -190,7 +190,7 @@ describe('guard-generated.sh', () => {
     '.claude/settings.json',
     '.husky/pre-commit',
     '.ai/cezar/config.json',
-    '.ai/cezar/workflows/om-fix-issue.yml',
+    '.ai/cezar/workflows/issue-autofix.yml',
     '.ai/agentic.config.json',
     '.ai/trackers/github.md',
     '.ai/browsers/playwright.md',

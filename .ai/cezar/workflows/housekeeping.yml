@@ -1,0 +1,26 @@
+# Three read-mostly passes over the open queue (ADR 0017), started by launchd three times a day
+# on the cezar host (scripts/cezar/launchd/, scripts/cezar/housekeeping.sh). om-review-prs
+# reviews what waits for review, om-merge-buddy reports what could merge (it never merges),
+# om-close-fixed-issues closes issues whose `Closes #n` PR merged into develop - GitHub does not,
+# because develop is not the default branch. The task text is ignored by all three.
+name: housekeeping
+description: Review the queue, report what can merge, close issues whose PR merged into develop.
+steps:
+  - id: setup
+    name: Install dependencies and generate the route tree
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+  - id: review-prs
+    name: om-review-prs
+    prompt: '/om-review-prs'
+    model: opus
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+  - id: merge-buddy
+    name: om-merge-buddy (read-only)
+    prompt: '/om-merge-buddy'
+    model: sonnet
+    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
+  - id: close-fixed
+    name: om-close-fixed-issues
+    prompt: '/om-close-fixed-issues --limit 50'
+    model: sonnet
+    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
