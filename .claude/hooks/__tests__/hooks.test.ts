@@ -216,6 +216,28 @@ describe('git-guardrails.sh', () => {
     )
   })
 
+  // A newline separates two commands exactly as `;` does, and the head-word test reads only the
+  // first line - so a prose head word on line one used to disable the stripping for an executor
+  // on line two, and its quoted payload was deleted before a tier-one rule saw it. Every case
+  // here is a tier-one rule, the tier that holds in every session, reached through that gap.
+  it('reads a newline as the command separator it is', () => {
+    expect(
+      bash('echo hi\nbash -c "git push --force origin develop"').status,
+    ).toBe(2)
+    expect(bash('cat notes.txt\nsh -c "wrangler deploy"', AGENT).status).toBe(2)
+    expect(bash('printf hi\neval "wrangler secret put X"').status).toBe(2)
+    // The same shape one line up, already covered, stated here so the pair reads as one rule.
+    expect(
+      bash('echo hi && bash -c "git push --force origin develop"').status,
+    ).toBe(2)
+    // The heredoc bodies are removed before this test, so the two multi-line shapes that must
+    // stay allowed - a commit message and a document - keep their exemption.
+    expect(
+      bash("git commit -F - <<'EOF'\nchore: document pnpm deploy\nEOF", AGENT)
+        .status,
+    ).toBe(0)
+  })
+
   // ...and the over-broad half of the same substring match: an unrelated flag, or a word in a
   // message, disabled the stripping and made the whole message match as a command.
   it('does not read an unrelated flag as a shell invocation', () => {
