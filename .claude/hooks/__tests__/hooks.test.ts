@@ -319,6 +319,80 @@ describe('guard-generated.sh', () => {
   })
 })
 
+// The one exception to the block above, and the reason it exists: the review job comments on a
+// pull request whose whole diff is guarded paths, and until now a run could not act on a single
+// one of those threads. The `develop` ruleset merges nothing with an unresolved thread, so a
+// correction the run agreed with turned into a permanent stall (planned.travel PR #320).
+describe('guard-generated.sh, on a branch that already changes a guarded file', () => {
+  // A real repository, because the rule is a question about `git diff` and nothing else can
+  // answer it. `origin/develop` is a local ref: the hook never reaches the network.
+  const root = mkdtempSync(join(tmpdir(), 'guard-diff-'))
+  const git = (...args: string[]) =>
+    spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' })
+  const write = (rel: string, body: string) => {
+    mkdirSync(join(root, rel, '..'), { recursive: true })
+    writeFileSync(join(root, rel), body)
+  }
+
+  git('init', '--initial-branch=develop')
+  git('config', 'user.email', 'test@example.com')
+  git('config', 'user.name', 'test')
+  write('.ai/agentic.config.json', JSON.stringify({ baseBranch: 'develop' }))
+  write('.ai/trackers/github.md', 'before\n')
+  write('.ai/cezar/config.json', '{}\n')
+  git('add', '-A')
+  git('commit', '-m', 'base')
+  git('update-ref', 'refs/remotes/origin/develop', 'develop')
+  git('checkout', '-b', 'fix/tracker')
+  write('.ai/trackers/github.md', 'after\n')
+  git('commit', '-am', 'change the tracker descriptor')
+
+  const edit = (rel: string, env: Record<string, string>) =>
+    hook(
+      'guard-generated.sh',
+      { file_path: `${root}/${rel}` },
+      { ...env, CLAUDE_PROJECT_DIR: root },
+      root,
+    )
+
+  it('lets a cezar run amend a guarded file the branch already changes', () => {
+    expect(edit('.ai/trackers/github.md', AGENT).status).toBe(0)
+  })
+
+  it('still refuses a guarded file the branch does not touch', () => {
+    // The case the rule exists for: introducing a change to the run's own configuration, rather
+    // than correcting one a human already proposed and a reviewer already flagged.
+    const r = edit('.ai/cezar/config.json', AGENT)
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('configures the agent')
+  })
+
+  it('refuses both under GitHub Actions, whatever the branch changes', () => {
+    // There the diff is the attacker's, so "the branch already changes it" is the attacker's
+    // claim about the attacker's own file.
+    expect(edit('.ai/trackers/github.md', ACTIONS).status).toBe(2)
+    expect(edit('.ai/cezar/config.json', ACTIONS).status).toBe(2)
+  })
+
+  it('fails closed when the base ref is missing', () => {
+    // No `origin/develop` means no answer, and an unanswerable question is not a permission.
+    const orphan = mkdtempSync(join(tmpdir(), 'guard-diff-orphan-'))
+    mkdirSync(join(orphan, '.ai'), { recursive: true })
+    writeFileSync(
+      join(orphan, '.ai/agentic.config.json'),
+      JSON.stringify({ baseBranch: 'develop' }),
+    )
+    expect(
+      hook(
+        'guard-generated.sh',
+        { file_path: `${orphan}/.ai/trackers/github.md` },
+        { ...AGENT, CLAUDE_PROJECT_DIR: orphan },
+        orphan,
+      ).status,
+    ).toBe(2)
+  })
+})
+
 describe('guard-read.sh', () => {
   const root = mkdtempSync(join(tmpdir(), 'guard-read-'))
   mkdirSync(join(root, 'src'), { recursive: true })
