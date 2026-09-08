@@ -5,6 +5,7 @@
   "browser": { "provider": "playwright" },
   "validation": {
     "commands": [
+      "node .ai/scripts/agent-kit-check.mjs",
       "pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts",
       "pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/",
       "pnpm typecheck",
