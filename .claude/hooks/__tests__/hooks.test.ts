@@ -24,7 +24,10 @@ function hook(
   const r = spawnSync('bash', [join(HOOKS, name)], {
     // `tool_name` is omitted unless a case names it, so the hooks stay exercised on the shape
     // they see when a harness does not send it: `pattern` is then read as a path, the safe read.
-    input: JSON.stringify({ ...(toolName ? { tool_name: toolName } : {}), tool_input: toolInput }),
+    input: JSON.stringify({
+      ...(toolName ? { tool_name: toolName } : {}),
+      tool_input: toolInput,
+    }),
     encoding: 'utf8',
     env: {
       PATH: PATH ?? '',
@@ -113,7 +116,9 @@ describe('git-guardrails.sh', () => {
       expect(bash('pnpm exec wrangler secret list', env).status).toBe(2)
       expect(bash('wrangler d1 delete money-tracker-db', env).status).toBe(2)
       expect(bash('wrangler r2 bucket delete uploads', env).status).toBe(2)
-      expect(bash('wrangler kv namespace delete --namespace-id=1', env).status).toBe(2)
+      expect(
+        bash('wrangler kv namespace delete --namespace-id=1', env).status,
+      ).toBe(2)
       expect(bash('wrangler delete money-tracker', env).status).toBe(2)
     }
   })
@@ -142,32 +147,106 @@ describe('git-guardrails.sh', () => {
   it.each(SHIPPING)('blocks %s in an agent run', (command) => {
     expect(bash(command, AGENT).status).toBe(2)
   })
-  it.each(SHIPPING)('leaves %s to the prompt outside an agent run', (command) => {
-    expect(bash(command).status).toBe(0)
-  })
+  it.each(SHIPPING)(
+    'leaves %s to the prompt outside an agent run',
+    (command) => {
+      expect(bash(command).status).toBe(0)
+    },
+  )
 
   it('leaves the local database alone in both modes', () => {
     for (const env of [{}, AGENT]) {
       expect(bash('pnpm db:migrate:local', env).status).toBe(0)
-      expect(bash('wrangler d1 migrations apply money-tracker-db --local', env).status).toBe(0)
-      expect(bash('wrangler d1 migrations list money-tracker-db', env).status).toBe(0)
+      expect(
+        bash('wrangler d1 migrations apply money-tracker-db --local', env)
+          .status,
+      ).toBe(0)
+      expect(
+        bash('wrangler d1 migrations list money-tracker-db', env).status,
+      ).toBe(0)
     }
   })
 
   // A rule matches the command, not prose about it: `docs/DEPLOY.md` documents `wrangler secret
   // put`, so grepping, rewriting or writing a commit message about that file has to stay possible.
+  //
+  // Which commands get that reading is a closed list, and the list is of commands that *cannot*
+  // execute a string they are handed - not of the ones that can. See the two tests below for the
+  // four bypasses the other direction produced.
   it('reads a quoted mention as text, not as an invocation', () => {
     expect(bash('grep -rn "wrangler secret" docs/').status).toBe(0)
-    expect(bash('git commit -m "docs: say why wrangler secret put is denied"').status).toBe(0)
-    expect(bash(`sed -i '' 's/wrangler secret/x/' docs/DEPLOY.md`).status).toBe(0)
-    expect(bash('git commit -m "chore: fix the pnpm deploy script"', AGENT).status).toBe(0)
-    expect(bash("git commit -F - <<'EOF'\nchore: document pnpm deploy\nEOF", AGENT).status).toBe(0)
+    expect(
+      bash('git commit -m "docs: say why wrangler secret put is denied"')
+        .status,
+    ).toBe(0)
+    expect(
+      bash('git commit -m "chore: fix the pnpm deploy script"', AGENT).status,
+    ).toBe(0)
+    expect(
+      bash("git commit -F - <<'EOF'\nchore: document pnpm deploy\nEOF", AGENT)
+        .status,
+    ).toBe(0)
+    // A heredoc written to a file is text for the same reason a commit message is - `cat` runs
+    // nothing. This is the case that keeps DEPLOY.md writable by the agent that documents it.
+    expect(
+      bash("cat > docs/DEPLOY.md <<'EOF'\nnever run wrangler secret put\nEOF")
+        .status,
+    ).toBe(0)
   })
 
-  it('still reads a string a shell will execute as the command', () => {
+  // The exemption used to be a denylist of ways to run a string - ` -c `, `eval `, `xargs`,
+  // matched as raw substrings anywhere in the command. Every one of these got past it; all four
+  // were reported against this hook on planned.travel#322, where the same normalisation landed.
+  it('reads every string a shell will execute as the command, listed or not', () => {
     expect(bash('bash -c "wrangler deploy"', AGENT).status).toBe(2)
     expect(bash(`sh -c 'wrangler secret put X'`).status).toBe(2)
     expect(bash(`eval "wrangler d1 delete money-tracker-db"`).status).toBe(2)
+    // Combined short options carry no ` -c ` substring, so the old check read them as prose.
+    expect(bash('bash -lc "wrangler deploy"', AGENT).status).toBe(2)
+    expect(bash(`sh -ec "wrangler secret put X"`).status).toBe(2)
+    expect(bash(`node -e 'run("wrangler deploy")'`, AGENT).status).toBe(2)
+    // A heredoc redirected into a shell is executed too, and the old shape deleted its body
+    // outright - so a tier-one rule, the tier that holds in every session, allowed this.
+    expect(bash("bash <<'EOF'\ngit reset --hard HEAD~5\nEOF").status).toBe(2)
+    expect(bash("sh <<'EOF'\nwrangler secret put X\nEOF", AGENT).status).toBe(2)
+    // `sed` and `awk` can execute a string as well - GNU `s///e` and `system()` - so neither is
+    // on the prose list, even though a substitution pattern reads exactly like prose.
+    expect(bash(`sed -i '' 's/wrangler secret/x/' docs/DEPLOY.md`).status).toBe(
+      2,
+    )
+  })
+
+  // ...and the over-broad half of the same substring match: an unrelated flag, or a word in a
+  // message, disabled the stripping and made the whole message match as a command.
+  it('does not read an unrelated flag as a shell invocation', () => {
+    expect(bash('grep -c "wrangler secret" docs/DEPLOY.md').status).toBe(0)
+    expect(
+      bash('git commit -m "docs: -c flag and wrangler secret put"').status,
+    ).toBe(0)
+  })
+
+  // Quoting is not commenting: the shell drops the quote and keeps the word, so a quoted verb is
+  // still the verb. Deleting quoted *content* meant the verb vanished with it, and the tier this
+  // file's header calls "everyone, every session, no exceptions" let all three of these through.
+  it('sees through a quoted verb in every session', () => {
+    expect(bash('wrangler "secret" put BETTER_AUTH_SECRET').status).toBe(2)
+    expect(bash('git "reset" --hard HEAD~5').status).toBe(2)
+    expect(bash('git push "--force" origin main').status).toBe(2)
+  })
+
+  // Under GitHub Actions nothing is discarded at all, not even a commit message: the input is an
+  // attacker-authored diff. A backslash quotes exactly one character and the shell drops it the
+  // same way a quote mark is dropped, so deleting only the two quote marks left this invoking
+  // `gh pr review` unmatched - the bypass this tier was written to close, one character along.
+  it('discards nothing under GitHub Actions', () => {
+    expect(bash('gh pr "review" 12 --approve', ACTIONS).status).toBe(2)
+    expect(bash('gh pr \\review 12 --approve', ACTIONS).status).toBe(2)
+    expect(bash('gh \\pr review 12 --approve', ACTIONS).status).toBe(2)
+    expect(bash('wrangler "secret" put X', ACTIONS).status).toBe(2)
+    // ...and the trade is deliberate: the same string is read as prose for a cezar run.
+    expect(
+      bash('git commit -m "chore: mention wrangler secret put"', AGENT).status,
+    ).toBe(0)
   })
 
   it('treats GITHUB_ACTIONS as agent mode too', () => {
@@ -229,7 +308,10 @@ describe('git-guardrails.sh', () => {
       expect(bash('gh "pr" review 12 --approve', ACTIONS).status).toBe(2)
       expect(bash('wrangler "secret" put X', ACTIONS).status).toBe(2)
       // ...and the trade is deliberate: the same text is still prose for a cezar run.
-      expect(bash('git commit -m "chore: mention wrangler secret put"', AGENT).status).toBe(0)
+      expect(
+        bash('git commit -m "chore: mention wrangler secret put"', AGENT)
+          .status,
+      ).toBe(0)
     })
 
     // The review's one job is to post its summary on the pull request. Only the workflow sets
@@ -400,7 +482,10 @@ describe('guard-read.sh', () => {
   mkdirSync(join(root, '.ai', 'qa'), { recursive: true })
   writeFileSync(join(root, '.dev.vars'), 'SECRET=1')
   writeFileSync(join(root, '.dev.vars.example'), 'SECRET=')
-  writeFileSync(join(root, '.ai', 'qa', 'test-env.env'), 'TEST_OWNER_PASSWORD=x')
+  writeFileSync(
+    join(root, '.ai', 'qa', 'test-env.env'),
+    'TEST_OWNER_PASSWORD=x',
+  )
   writeFileSync(join(root, '.ai', 'qa', 'test-env.json'), '{}')
   writeFileSync(join(root, 'src', 'a.ts'), '')
   const read = (
@@ -416,7 +501,9 @@ describe('guard-read.sh', () => {
       expect(read({ file_path: '.dev.vars' }, env).status).toBe(2)
       expect(read({ file_path: '.env.local' }, env).status).toBe(2)
       expect(read({ file_path: '.ai/qa/test-env.env' }, env).status).toBe(2)
-      expect(read({ file_path: join(root, '.dev.vars.example') }, env).status).toBe(0)
+      expect(
+        read({ file_path: join(root, '.dev.vars.example') }, env).status,
+      ).toBe(0)
       expect(read({ file_path: join(root, 'src/a.ts') }, env).status).toBe(0)
     }
   })
@@ -432,17 +519,23 @@ describe('guard-read.sh', () => {
 
   // Grep's `pattern` searches file *contents* and is a regex; `process.env` is not a request to
   // read `.env`. Its `glob` input is the path filter, and that is what gets checked.
-  it.each(['process.env', 'import.meta.env', 'import.meta.env.VITE_APP_URL', 'c.env.DB'])(
-    'allows the Grep content regex %s in every session',
-    (pattern) => {
-      expect(read({ pattern }, {}, 'Grep').status).toBe(0)
-      expect(read({ pattern }, AGENT, 'Grep').status).toBe(0)
-    },
-  )
+  it.each([
+    'process.env',
+    'import.meta.env',
+    'import.meta.env.VITE_APP_URL',
+    'c.env.DB',
+  ])('allows the Grep content regex %s in every session', (pattern) => {
+    expect(read({ pattern }, {}, 'Grep').status).toBe(0)
+    expect(read({ pattern }, AGENT, 'Grep').status).toBe(0)
+  })
 
   it('checks the Grep glob filter, which is a path', () => {
-    expect(read({ pattern: 'SECRET', glob: '**/.dev.vars' }, {}, 'Grep').status).toBe(2)
-    expect(read({ pattern: 'SECRET', glob: '**/*.ts' }, {}, 'Grep').status).toBe(0)
+    expect(
+      read({ pattern: 'SECRET', glob: '**/.dev.vars' }, {}, 'Grep').status,
+    ).toBe(2)
+    expect(
+      read({ pattern: 'SECRET', glob: '**/*.ts' }, {}, 'Grep').status,
+    ).toBe(0)
   })
 
   it('allows reads inside the worktree, including files that do not exist yet', () => {
@@ -472,9 +565,15 @@ describe('guard-read.sh', () => {
 
   it('denies Glob patterns that escape or name a secret', () => {
     expect(read({ pattern: '../**/*.ts' }, AGENT, 'Glob').status).toBe(2)
-    expect(read({ path: root, pattern: '**/.dev.vars' }, AGENT, 'Glob').status).toBe(2)
-    expect(read({ path: root, pattern: '*.env.local' }, AGENT, 'Glob').status).toBe(2)
-    expect(read({ path: root, pattern: '**/test-env.env' }, AGENT, 'Glob').status).toBe(2)
+    expect(
+      read({ path: root, pattern: '**/.dev.vars' }, AGENT, 'Glob').status,
+    ).toBe(2)
+    expect(
+      read({ path: root, pattern: '*.env.local' }, AGENT, 'Glob').status,
+    ).toBe(2)
+    expect(
+      read({ path: root, pattern: '**/test-env.env' }, AGENT, 'Glob').status,
+    ).toBe(2)
   })
 
   // A harness that sends no `tool_name` leaves `pattern` ambiguous, so its shape decides: a
@@ -496,11 +595,15 @@ describe('.husky/pre-commit', () => {
   // Cezar forwards CEZ_* into the agent's env and drops HUSKY, so the hook itself is what keeps
   // lint-staged, typecheck and the full test run out of a run's commits (ADR 0017, Husky).
   it('exits at once, without running anything, inside a cezar run', () => {
-    const r = spawnSync('/bin/sh', ['-e', resolve(HOOKS, '../../.husky/pre-commit')], {
-      encoding: 'utf8',
-      env: { PATH: '/nonexistent', ...AGENT }, // no pnpm, no npx: a fall-through would fail
-      timeout: 5_000,
-    })
+    const r = spawnSync(
+      '/bin/sh',
+      ['-e', resolve(HOOKS, '../../.husky/pre-commit')],
+      {
+        encoding: 'utf8',
+        env: { PATH: '/nonexistent', ...AGENT }, // no pnpm, no npx: a fall-through would fail
+        timeout: 5_000,
+      },
+    )
     expect(r.status).toBe(0)
     expect(r.stdout + r.stderr).toBe('')
   })
