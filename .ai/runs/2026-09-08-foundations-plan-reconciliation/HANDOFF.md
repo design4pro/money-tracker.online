@@ -1,31 +1,34 @@
 # Handoff — 2026-09-08-foundations-plan-reconciliation
 
-**Last updated:** 2026-09-08T15:41Z
+**Last updated:** 2026-09-08T18:05Z
 **Branch:** `feat/issue-77-foundations-plan-reconciliation`
-**PR:** https://github.com/design4pro/money-tracker.online/pull/98 (draft)
-**Current phase/step:** Phase 3 Step 3.3 (Phases 1 and 2 closed, gate green)
-**Last commit:** `f5dffdc` — test(plans): guard docs/plans/00-foundations.md against path drift
+**PR:** https://github.com/design4pro/money-tracker.online/pull/111 (draft) — Phases 2 and 3
+**Also:** https://github.com/design4pro/money-tracker.online/pull/98 (merged) — Phase 1
+**Current phase/step:** all 11 Steps done; review loop on #111
+**Last commit:** `b235bbc` — test(plans): assert each audit assertion directly, and label the register column
 
 ## What just happened
 
-- Phase 2 reconciled the document in four commits (`5b32bb0`, `ccea7cc`, `da24fbb`, `c6d30ca`) and
-  Phase 3's guard landed as `f5dffdc`. All four audit assertions PASS; rows read 23 `done`,
-  2 `partial`, 9 `missing`, all 34 accounted for and none deleted.
+- All three phases landed. Phase 2 reconciled the document (`5b32bb0`, `ccea7cc`, `da24fbb`,
+  `c6d30ca`), Phase 3 added the guard (`f5dffdc`), the gate (`dff0055`) and the follow-up references
+  (`3be63cb`). All four audit assertions PASS; rows read 23 `done`, 2 `partial`, 9 `missing`, all 34
+  accounted for and none deleted.
 - The guard was watched failing before being believed: a broken path at `00-foundations.md:500` took
   assertion 1 red naming the stage, the line and the path. Reverted, diff empty.
-- Step 3.2's six-command gate is green end to end — see `final-gate-checks.md`, including why
-  command 5 needs `TMPDIR=/tmp` in this worktree.
+- **PR #98 was merged mid-run**, at Phase 1 (`67ad5c3`). Phases 2 and 3 therefore ship on their own
+  PR, #111, after merging `origin/develop` back in (`4783dd9`).
+- Four follow-ups filed and referenced back from the plan: #105, #106, #107, #108.
+- The review pass on #111 found two minor issues in this run's own work and fixed them in `b235bbc`:
+  an assertion lookup in the guard test that could have passed green having asserted nothing, and an
+  unnamed third column in the stage register table.
 
 ## Next concrete action
 
-- Step 3.3: file the four follow-up issues from the specification's _Risks & Impact Review_ — the
-  unused `@tanstack/react-table`, the two `amount-field.tsx` components, the missing
-  `docs/plans/OPEN-FINDINGS.md`, and the 28 unmeasured plan documents — then reference their numbers
-  back from the plan at the Blockers entries that currently read "Tracked as a follow-up issue."
+- Submit the review on #111, take it out of draft, release the claim lock, and report.
 
 ## Blockers / open questions
 
-- None.
+- None outstanding. One machine-level caveat is recorded under Environment caveats below.
 
 ## Environment caveats
 
@@ -47,6 +50,13 @@
   Verified directly: `git -C "$TMPDIR/probe" rev-parse --show-toplevel` prints the repository root.
   The test is correct and the guard is correct; only the temp location is wrong. Nothing about this
   branch is involved, and no test or hook is changed for it.
+- **A 5000 ms timeout in `src/routes/_app/dashboard/-server/__tests__/dashboard-data.test.ts` is a
+  claim about the machine, not about the code.** It appeared twice in a row while this host sat at
+  load average 197 with a dozen other node processes on it, and the same full suite passed
+  2393 / 2393 on identical content twenty minutes earlier in 29s. Run alone the file passes in
+  2.61s, the failure text is `Test timed out in 5000ms` with no assertion, and this branch changes
+  no file under `src/`. `skill: verifying-changes` says to read a timeout that way until the text
+  says otherwise; the text never said otherwise.
 
 ## Worktree
 
