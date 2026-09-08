@@ -21,8 +21,8 @@
 | ----- | ---- | -------------------------------------------------------- | ------ | ------ | ------- |
 | 1     | 1.1  | The plan parser                                          | inline | done   | 89034aa |
 | 1     | 1.2  | The audit report                                         | inline | done   | d775692 |
-| 1     | 1.3  | The class map                                            | inline | done   | PENDING |
-| 1     | 1.4  | Record the specification corrections as an amendment     | inline | todo   | —       |
+| 1     | 1.3  | The class map                                            | inline | done   | bcf2bb9 |
+| 1     | 1.4  | Record the specification corrections as an amendment     | inline | done   | PENDING |
 | 2     | 2.1  | Correct the Class A paths                                | inline | todo   | —       |
 | 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | todo   | —       |
 | 2     | 2.3  | Re-measure every reference row                           | inline | todo   | —       |
