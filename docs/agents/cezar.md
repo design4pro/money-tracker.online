@@ -117,6 +117,13 @@ and the hooks in `.claude/hooks/` tighten:
   `pnpm-workspace.yaml`, `docs/agents/reference.md` and `docs/agents/out-of-scope.md`, on top of
   the generated files it refuses for everyone.
 
+  One exception, and only in a cezar run: a guarded file **this branch already changes**. A
+  reviewer asking for a correction to a change a human proposed is not a run rewriting its own
+  rules, and refusing it is how a review thread stays open forever - the `develop` ruleset merges
+  nothing with one. Introducing a change to a guarded file the branch does not already carry is
+  still refused, and under `GITHUB_ACTIONS` the block is absolute, because there the diff is the
+  attacker's and "the branch already changes it" is the attacker's own claim.
+
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
 `jq`, and a prefix allowlist would drop label mutations silently. The hooks in `.claude/hooks/`,
 the PAT scopes, one worktree per run and `maxParallel: 2` are the gate. `.claude/settings.json`
