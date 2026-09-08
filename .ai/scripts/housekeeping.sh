@@ -34,4 +34,11 @@ case "$rc" in
 esac
 
 cd "$ROOT"
+# The cockpit is pinned by a global install, so the headless fallback uses the stable binary too.
+# It matters more here than anywhere else: this line runs precisely when the cockpit is already
+# unreachable, which is the worst moment to discover that npm collected the npx cache. The npx
+# form stays for a host that has not cut over.
+if command -v cezar >/dev/null 2>&1; then
+  exec cezar run "housekeeping" --workflow housekeeping
+fi
 exec npx --yes @open-mercato/cezar@0.10.1 run "housekeeping" --workflow housekeeping

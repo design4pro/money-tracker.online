@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-# Host workarounds for the pinned @open-mercato/cezar@0.10.1, applied to the copy in the npx cache
-# that the cockpit service runs (a `.orig` is kept beside each patched file). Idempotent; rerun
-# after the npx cache is cleared. Drop each patch when the pinned version carries the fix.
+# Host workarounds for the pinned @open-mercato/cezar@0.10.1, applied to the copy the cockpit
+# service runs (a `.orig` is kept beside each patched file). Idempotent; rerun after an upgrade.
+# Drop each patch when the pinned version carries the fix.
+#
+# The global install is preferred over the npx cache, and that preference is the point rather than
+# a detail: `npx` resolves from a content-hashed cache npm may collect at any time, and a collected
+# cache takes these patches with it. Nothing reports that. Patch 4 is the one `pr-review-threads`
+# needs, so its loss shows up as pull requests sitting with unresolved threads and no error
+# anywhere. `npm i -g @open-mercato/cezar@0.10.1` removes the hazard; the npx path stays below as
+# a fallback for a host that has not cut over.
 #
 # 1. open-mercato/cezar#914 (fix in upstream PR #916, unreleased): the automations poller validates
 #    every /timeline row against a labeled|unlabeled schema, so one comment or cross-reference on
@@ -31,11 +38,23 @@ set -euo pipefail
 
 VERSION="${CEZ_VERSION:-0.10.1}"
 PLIST="$HOME/Library/LaunchAgents/dev.cezar.cockpit.plist"
-# `|| true`: under pipefail a missing install makes grep exit non-zero and `set -e` would abort
-# here, before the message below.
-DIST=$(grep -lx "  \"version\": \"$VERSION\"," "$HOME"/.npm/_npx/*/node_modules/@open-mercato/cezar/package.json 2>/dev/null \
-  | head -1 | xargs -I{} dirname {} | sed 's|$|/dist|' || true)
-[ -n "$DIST" ] && [ -d "$DIST" ] || { echo "cezar $VERSION not found in the npx cache; start the cockpit once first" >&2; exit 1; }
+
+# Candidates, most stable first. The version is checked rather than assumed: the npx cache holds
+# several releases side by side, and patching the wrong one leaves the cockpit unpatched with every
+# patch reporting success.
+DIST=""
+for candidate in "$(npm root -g 2>/dev/null)/@open-mercato/cezar" \
+                 "$HOME"/.npm/_npx/*/node_modules/@open-mercato/cezar; do
+  [ -f "$candidate/package.json" ] || continue
+  grep -qx "  \"version\": \"$VERSION\"," "$candidate/package.json" || continue
+  DIST="$candidate/dist"
+  break
+done
+[ -n "$DIST" ] && [ -d "$DIST" ] || {
+  echo "cezar $VERSION not found. Install it: npm i -g @open-mercato/cezar@$VERSION" >&2
+  exit 1
+}
+echo "patching $DIST"
 
 # patch FILE MARKER FROM TO [COUNT]: replace exactly COUNT (default 1) occurrences unless MARKER is present.
 patch() {

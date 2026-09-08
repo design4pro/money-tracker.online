@@ -10,7 +10,10 @@ the rules of `SDLC.md`.
 
 ## Install and configure
 
-- Pinned version: `@open-mercato/cezar@0.10.1` (`npx -y @open-mercato/cezar@0.10.1 serve`). The
+- Pinned version: `@open-mercato/cezar@0.10.1`, installed globally
+  (`npm i -g @open-mercato/cezar@0.10.1`) and started by the cockpit plist as `cezar serve`. The
+  service deliberately does not go through `npx`: npx resolves from a content-hashed cache npm may
+  collect at any time, and the collection takes the host patches below with it, silently. The
   project entry in `~/.cezar/config.json` points at the main checkout; the versioned part is
   `.ai/cezar/config.json` (`baseBranch: develop`, `worktreeRetention: 10`, `maxParallel: 2`,
   `reviewGate: false`, so a finished run settles straight to `done` rather than parking at
@@ -21,9 +24,10 @@ the rules of `SDLC.md`.
   vendored `om-*` tree. The collection's SHA lives in `skills-lock.json` alone)). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked.
-- Host patches: `bash .ai/scripts/cezar-host-patch.sh` patches the cached copy of 0.10.1 the
-  service runs, puts `CEZ_SKILLS_AUTO_UPDATE=0` in the service plist and restarts it. Rerun it
-  after the npx cache is cleared; drop each patch once the pinned version carries the fix. The
+- Host patches: `bash .ai/scripts/cezar-host-patch.sh` patches the copy of 0.10.1 the service
+  runs - the global install first, the npx cache as a fallback for a host that has not cut over -
+  puts `CEZ_SKILLS_AUTO_UPDATE=0` in the service plist and restarts it. Rerun it after any
+  reinstall or upgrade of cezar; drop each patch once the pinned version carries the fix. The
   cockpit is one per host and shared with `planned.travel`, whose copy of the script is identical
   apart from one paragraph of its header — running either is enough.
   - `issue.labeled` polls fail as soon as one recently updated issue has a comment or a
@@ -83,20 +87,15 @@ write the same `.ai/cezar/` state). The `<id>` is `money-tracker-online`: cezar 
 checkout's directory basename. Every script here defaults to it and takes `CEZ_PROJECT` as the
 override; `GET /api/v1/projects` is the authority when a host disagrees.
 
-Install it as a launchd job (template in `.ai/scripts/launchd/`, once per host):
+The cockpit is host-wide state, so its plist is not this repository's to own: the template and the
+cutover runbook live in `design4pro/agent-kit` (`host/launchd/dev.cezar.cockpit.plist`, README
+section "The host layer"). This repository keeps only its own housekeeping plist, below. The copy
+that used to sit here was invisible to `planned.travel`, which had none at all, and that split is
+exactly what the kit exists to end.
 
-```bash
-sed -e "s|__NPX__|$(command -v npx)|g" -e "s|__REPO_ROOT__|$PWD|g" -e "s|__HOME__|$HOME|g" \
-  -e "s|__PATH__|$(dirname "$(command -v node)"):$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin|g" \
-  .ai/scripts/launchd/dev.cezar.cockpit.plist > ~/Library/LaunchAgents/dev.cezar.cockpit.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.cezar.cockpit.plist
-```
-
-The `PATH` must carry everything a run spawns (`node`, `claude`, `git`, `gh`, `pnpm`), because
-the job deliberately does not go through a login shell. `KeepAlive` means `bootout` is how you
-stop it; `kickstart -k gui/$(id -u)/dev.cezar.cockpit` is the restart after a version bump or an
-edit to the plist. Once it is installed, stop running bare `cezar` in a repo. Log:
-`~/Library/Logs/cezar-cockpit.log`.
+`KeepAlive` means `bootout` is how you stop the service; `kickstart -k
+gui/$(id -u)/dev.cezar.cockpit` is the restart after a version bump or an edit to the plist. Once
+it is installed, stop running bare `cezar` in a repo. Log: `~/Library/Logs/cezar-cockpit.log`.
 
 ## Agent mode
 
