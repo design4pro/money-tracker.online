@@ -36,6 +36,15 @@
   `$TMPDIR`, and this worktree's cezar temp path is long enough to exceed the socket-path limit
   (`EINVAL: listen`). Nothing in the repository depends on it — the guard runs under vitest, which
   does not use that socket — and no workaround is committed.
+- `pnpm test` needs `TMPDIR=/tmp` **in this worktree only**, for a second and unrelated reason.
+  `.claude/hooks/__tests__/hooks.test.ts` builds an "orphan" directory with `mkdtemp` and asserts
+  `guard-generated.sh` fails closed there because `origin/develop` cannot be resolved. In a cezar
+  worktree `$TMPDIR` is `…/money-tracker.online/.ai/cezar/tmp/<run-id>` — inside the main checkout —
+  so `git -C <orphan> rev-parse origin/develop` walks up to the repository and answers
+  `6ac3c38`. The guard then has an answer, exits 0, and the test reads `expected +0 to be 2`.
+  Verified directly: `git -C "$TMPDIR/probe" rev-parse --show-toplevel` prints the repository root.
+  The test is correct and the guard is correct; only the temp location is wrong. Nothing about this
+  branch is involved, and no test or hook is changed for it.
 
 ## Worktree
 

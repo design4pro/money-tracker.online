@@ -46,3 +46,21 @@
 
 - No browser evidence this run: the specification's _Visual change expected_ is **None**, the diff
   touches no route, component, token or style file, and `--no-ui` was passed on the invocation.
+
+## 2026-09-08T15:38:00Z — finding: a red `hooks.test.ts` was the temp directory, not this branch
+
+- `guard-generated.sh, fails closed when the base ref is missing` failed with `expected +0 to be 2`.
+  The test builds an orphan directory with `mkdtemp` and expects the guard to fail closed because
+  `origin/develop` cannot be resolved there. In a cezar worktree `$TMPDIR` points inside the main
+  checkout, so `git -C <orphan> rev-parse origin/develop` walks up and answers — the guard has an
+  answer and exits 0. `git -C "$TMPDIR/probe" rev-parse --show-toplevel` prints the repository root,
+  which is the whole diagnosis. `TMPDIR=/tmp pnpm test` is green.
+- Neither the test nor the hook is touched. Recorded in `HANDOFF.md` under Environment caveats.
+
+## 2026-09-08T15:38:00Z — the guard was watched failing
+
+- Broke `docs/plans/00-foundations.md:500` from `src/server/db/schema.ts` to
+  `src/server/db/schema-renamed.ts` and re-ran the guard. Assertion 1 went red naming the stage, the
+  line and the path: `00-S5 (line 500)`, the renamed path, "edit declares a file, found absent, and
+  no stage declares it new". That is what the plan asked to see before calling it a guard.
+- Reverted. `git diff` on the document is empty and the suite is green again: 175 passed.
