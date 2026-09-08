@@ -16,8 +16,9 @@ the rules of `SDLC.md`.
   `reviewGate: false`, so a finished run settles straight to `done` rather than parking at
   `review` for a human to accept the diff; the gate only ever applied to non-autonomous runs,
   and partial automation is the point, `systemPrompt`, which is prepended to every run's prompt
-  and is where the language contract lives, `skillsRepos[0].ref` pinned to the same
-  SHA as `skills-lock.json`)). Cezar's own
+  and is where the language contract lives, and `skillsRepos`, which is deliberately empty:
+  listing a repository there hands `.claude/skills/` to the cockpit, which then replaces the
+  vendored `om-*` tree. The collection's SHA lives in `skills-lock.json` alone)). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked.
 - Host patches: `bash .ai/scripts/cezar-host-patch.sh` patches the cached copy of 0.10.1 the
@@ -41,8 +42,8 @@ the rules of `SDLC.md`.
 - Skills: `.claude/skills/om-*` are vendored files, byte-identical to the pinned upstream SHA, and
   `skills-lock.json` records it. A worktree therefore has the collection the moment it is cut, and
   the workflow's setup step installs dependencies only. `pnpm install-skills` re-installs and
-  updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and the pin in
-  `.ai/cezar/config.json` moves in the same commit. Repo specifics live in
+  updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and `skills-lock.json`
+  moves in the same commit. Repo specifics live in
   `.ai/skills/om-<name>/SKILL.md` as extensions of the installed skill, never as a fork.
 - Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, `CEZ_SKILLS_AUTO_UPDATE=0`,
   `GH_CONFIG_DIR` (below), and never `GH_TOKEN`, `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar
