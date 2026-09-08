@@ -22,14 +22,14 @@
 | 1     | 1.1  | The plan parser                                          | inline | done   | 89034aa |
 | 1     | 1.2  | The audit report                                         | inline | done   | d775692 |
 | 1     | 1.3  | The class map                                            | inline | done   | bcf2bb9 |
-| 1     | 1.4  | Record the specification corrections as an amendment     | inline | done   | PENDING |
-| 2     | 2.1  | Correct the Class A paths                                | inline | todo   | —       |
-| 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | todo   | —       |
-| 2     | 2.3  | Re-measure every reference row                           | inline | todo   | —       |
-| 2     | 2.4  | Stage register and Blockers                              | inline | todo   | —       |
-| 3     | 3.1  | The guard test                                           | inline | todo   | —       |
-| 3     | 3.2  | The full gate                                            | inline | todo   | —       |
-| 3     | 3.3  | File the four follow-ups                                 | inline | todo   | —       |
+| 1     | 1.4  | Record the specification corrections as an amendment     | inline | done   | 3bfddb2 |
+| 2     | 2.1  | Correct the Class A paths                                | inline | done   | 5b32bb0 |
+| 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | done   | ccea7cc |
+| 2     | 2.3  | Re-measure every reference row                           | inline | done   | da24fbb |
+| 2     | 2.4  | Stage register and Blockers                              | inline | done   | c6d30ca |
+| 3     | 3.1  | The guard test                                           | inline | done   | f5dffdc |
+| 3     | 3.2  | The full gate                                            | inline | done   | dff0055 |
+| 3     | 3.3  | File the four follow-ups                                 | inline | done   | 3be63cb |
 
 ## Goal
 

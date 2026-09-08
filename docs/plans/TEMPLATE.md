@@ -55,6 +55,17 @@ stage. If a row is only partly addressed, say which behaviour is deferred and to
 
 Every file the stage creates or edits, as `` `path` — new `` or `` `path` — edit `` bullets. No
 globs that could widen under a later refactor, except a `__tests__` directory the stage owns wholly.
+One further glob is sanctioned by name and by nobody else: `src/components/ui/**`, which `00-S6`
+owns as a shared path (`README.md` → _The eight shared paths_). The drift guard resolves it to its
+base directory and asserts that the directory exists; it never expands it, because expanding a
+shared path would fail every time a primitive is legitimately added.
+
+**A generated filename never appears under this heading.** `src/routeTree.gen.ts` is already
+excluded by name (`README.md`); a `drizzle/*.sql` migration is excluded for the same reason and
+this sentence says so, because the exclusion was previously only implied. Say what the migration
+creates and what it backfills under _Data and migration_ instead. A stage that names one is
+asserting control over a string its generator owns, and the requirement is unenforceable however
+carefully it is written.
 
 This list is the fan-out contract: an auditor diffs the stage's actual changes against it, and a
 path outside it is a failure **even if the code is correct**.
@@ -73,8 +84,10 @@ Tables and columns the stage needs, and for each whether it already exists in
 - The schema edit itself belongs to `00-foundations.md`. This section states the **requirement**:
   table, column, type, nullability, default, the `CHECK` constraint for any enum, and the leading
   `organization_id` position in every new composite index.
-- Name the migration `pnpm db:generate` will produce and say what it backfills, or state that it
-  backfills nothing.
+- State that `pnpm db:generate` produces exactly one new file under `drizzle/`, name the tables and
+  columns it creates, and say what it backfills or that it backfills nothing. Do **not** name the
+  file: Drizzle chooses that name, so a stage asserting it is asserting something it does not
+  control. The filename never appears under _Owned paths_ either — see that heading.
 - Money is `integer` minor units plus a `text(3)` ISO-4217 code; rates are `rate_e10` integers;
   calendar dates are `YYYY-MM-DD` text, times `HH:MM` text, instants epoch milliseconds; ids come
   from `newId()`. Do not invent a second convention.
