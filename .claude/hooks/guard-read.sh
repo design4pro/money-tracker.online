@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # PreToolUse hook (Read|Glob|Grep). Two tiers.
 #
-# The secret files - .dev.vars*, .env* and .ai/qa/test-env.env - are refused to every caller.
-# AGENTS.md lists reading them under `## Never`, and since `.claude/settings.json` became
-# hooks-only this hook is what carries that rule for the file-reading tools. It guards those tools
-# only: `cat .dev.vars` is a Bash call and reaches git-guardrails.sh instead, which does not stop
-# it, so this is a guard against the obvious read, not a containment boundary.
+# Tier one - the secret files, refused to every caller: .dev.vars*, .env* and
+# .ai/qa/test-env.env. Since `.claude/settings.json` became hooks-only this hook is what carries
+# that rule for the file-reading tools. It guards those tools only: `cat .dev.vars` is a Bash call and
+# reaches git-guardrails.sh instead, which does not stop it - so this is a guard against the
+# obvious read, not a containment boundary.
 #
-# Everything else is agent runs only (CEZ_TASK_ID or GITHUB_ACTIONS): a run reads inside its own
-# worktree and never another run's state or git internals, while a developer at the keyboard
-# legitimately reads outside the checkout. .ai/runs, .ai/analysis, .ai/qa and .ai/tmp stay
-# readable either way: the om-* skills write their artefacts there; only the test-env credentials
-# file under .ai/qa/ is denied.
+# Tier two - agent runs only (CEZ_TASK_ID or GITHUB_ACTIONS): a run reads inside its own worktree
+# and never another run's state or git internals, while a developer at the keyboard legitimately
+# reads outside the checkout. .ai/runs, .ai/analysis, .ai/qa and .ai/tmp stay readable either way -
+# the om-* skills write their artefacts there; only the test-env credentials file under .ai/qa/ is
+# denied.
 #
 # Contract: exit 2 blocks the tool call and feeds stderr back to the model; exit 0 allows.
 set -euo pipefail
@@ -74,13 +74,13 @@ check() { # path
   # sitting in some other checkout.
   rel="${abs#"$root"/}"
 
-  # Tier one: the secret files, refused in every session.
+  # Tier one: refused in every session.
   case "$rel" in
     .dev.vars*|*/.dev.vars*|.env|.env.*|*/.env|*/.env.*)
       case "$rel" in *.example) ;; *) deny "$1" "environment file" ;; esac ;;
   esac
   case "$rel" in
-    .ai/qa/test-env.env|*/.ai/qa/test-env.env) deny "$1" "test-env credentials" ;;
+    .ai/qa/test-env.env|*/.ai/qa/test-env.env) deny "$1" "test-env credential file" ;;
   esac
 
   # Tier two: confinement, for agent runs only.

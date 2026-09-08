@@ -5,7 +5,7 @@
 # that the file no longer names are listed, never touched: retiring one is the operator's call
 # (docs/agents/cezar.md).
 #
-#   scripts/cezar/automations.sh [--dry-run]
+#   .ai/scripts/cez-automations.sh [--dry-run]
 #
 # Needs the service started with CEZ_AUTOMATIONS=1; a 409 from the API says it was not.
 set -euo pipefail
