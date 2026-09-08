@@ -12,21 +12,24 @@
 > Authoritative status table. `Status` is one of `todo` or `done`. On landing a Step, flip `Status`
 > to `done` and fill the `Commit` column with the short SHA. The first row whose `Status` is not
 > `done` is the resume point for `om-auto-continue-pr-loop`. Step ids and `Exec` cells are immutable
-> once the plan is committed — per-Step commits touch only `Status` and `Commit`.
+> once the plan is committed — per-Step commits touch only `Status` and `Commit`. A Step flips its
+> own `Status` inside its own commit and carries `PENDING` in `Commit`; the SHA is backfilled by
+> the next commit, because a commit cannot contain its own hash. `Status` is what the resume
+> contract parses, so a `PENDING` cell never costs a resume its place.
 
-| Phase | Step | Title                                                    | Exec   | Status | Commit |
-| ----- | ---- | -------------------------------------------------------- | ------ | ------ | ------ |
-| 1     | 1.1  | The plan parser                                          | inline | todo   | —      |
-| 1     | 1.2  | The audit report                                         | inline | todo   | —      |
-| 1     | 1.3  | The class map                                            | inline | todo   | —      |
-| 1     | 1.4  | Record the specification corrections as an amendment     | inline | todo   | —      |
-| 2     | 2.1  | Correct the Class A paths                                | inline | todo   | —      |
-| 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | todo   | —      |
-| 2     | 2.3  | Re-measure every reference row                           | inline | todo   | —      |
-| 2     | 2.4  | Stage register and Blockers                              | inline | todo   | —      |
-| 3     | 3.1  | The guard test                                           | inline | todo   | —      |
-| 3     | 3.2  | The full gate                                            | inline | todo   | —      |
-| 3     | 3.3  | File the four follow-ups                                 | inline | todo   | —      |
+| Phase | Step | Title                                                    | Exec   | Status | Commit  |
+| ----- | ---- | -------------------------------------------------------- | ------ | ------ | ------- |
+| 1     | 1.1  | The plan parser                                          | inline | done   | PENDING |
+| 1     | 1.2  | The audit report                                         | inline | todo   | —       |
+| 1     | 1.3  | The class map                                            | inline | todo   | —       |
+| 1     | 1.4  | Record the specification corrections as an amendment     | inline | todo   | —       |
+| 2     | 2.1  | Correct the Class A paths                                | inline | todo   | —       |
+| 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | todo   | —       |
+| 2     | 2.3  | Re-measure every reference row                           | inline | todo   | —       |
+| 2     | 2.4  | Stage register and Blockers                              | inline | todo   | —       |
+| 3     | 3.1  | The guard test                                           | inline | todo   | —       |
+| 3     | 3.2  | The full gate                                            | inline | todo   | —       |
+| 3     | 3.3  | File the four follow-ups                                 | inline | todo   | —       |
 
 ## Goal
 
