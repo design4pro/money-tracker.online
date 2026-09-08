@@ -44,6 +44,20 @@ Seventeen stages, and every one of them exists because a named feature stage req
 requisitions are listed inside each stage below. A stage in this register with no requisition is
 deleted, not filled.
 
+**Which of them closed.** The register above says who holds a concern; this one says whether they are finished. A stage is
+**closed** when every reference row it owns reads `→ done`, and **open** when any row does not. Both
+columns are re-derivable — `pnpm exec tsx scripts/plans/audit.ts docs/plans/00-foundations.md` reads
+the same rows — so neither is a claim anybody has to take on trust.
+
+| State      | Stages                                                                        |                                                                                               |
+| ---------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Closed — 8 | `00-S2` `00-S3` `00-S4` `00-S5` `00-S6` `00-S7` `00-S13` `00-S15`             | Every row measured `→ done` against a path that resolves.                                     |
+| Open — 9   | `00-S1` `00-S8` `00-S9` `00-S10` `00-S11` `00-S12` `00-S14` `00-S16` `00-S17` | At least one row still `partial` or `missing`; the row says which and to whom it is deferred. |
+
+Nine of seventeen still open is the finding, not an embarrassment. Before this reconciliation every
+one of the thirty-four rows read `→ done` and none had been re-measured after the work landed, so
+the document could not distinguish a stage that finished from one that never started. It can now.
+
 ---
 
 ## Stage 00-S1 — Schema conventions, the SaaS tables and the global catalogue
@@ -802,7 +816,13 @@ All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
-None.
+- **`@tanstack/react-table`, declared and imported by nothing.** It is in `package.json`, and zero
+  files under `src/` import it. This stage is the only justification for it anywhere in the
+  repository, and the `data-table.tsx` that justified it never landed — the virtualised list that
+  did land uses `@tanstack/react-virtual` alone. Disposition: **defer**. `docs/SPEC.md` §3.1 makes
+  the dependency freeze absolute and `AGENTS.md` puts adding or removing a package under
+  **Ask First**, so a plan reconciliation is not where that call is spent. A human decides: remove
+  the package, or schedule the stage that would use it. Tracked as a follow-up issue.
 
 ---
 
@@ -965,7 +985,15 @@ All seven §7 items and all ten §2 clauses, including the chart clause.
 
 ### Blockers
 
-None.
+- **Two amount fields, and no measurement of whether they agree.**
+  `src/components/app/transactions/amount-field.tsx` serialises through a canonical decimal string
+  and `src/components/app/accounts/amount-field.tsx` refuses React Aria's `NumberField` because it
+  hands back a major-unit float. Each docblock treats the other's approach as the defect. Both
+  delegate to `src/lib/money/`, so this is a `docs/SPEC.md` §8 duplication and **not** a second
+  parser, but whether `parseMoney` and `scaleDecimalString` agree on a half-way tie is
+  **unmeasured**. Disposition: **defer**. Consolidating the component is a money-path change and
+  belongs on its own PR with a committed differential test, not on a documentation reconciliation.
+  Tracked as a follow-up issue.
 
 ---
 
