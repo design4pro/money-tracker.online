@@ -80,3 +80,15 @@
 - Plan decision D6 reserved `FND-35` on `00-S1` to give assertion 2 coverage there. Measurement made
   it unnecessary: `FND-02` and `FND-18` both resolved to `partial`, which is an open row. Inventing
   an id to satisfy a guard would have been the guard writing the plan, so D6 was dropped.
+
+## 2026-09-08T15:44:00Z — the four follow-ups are filed
+
+- #105 `dependencies` — decide the fate of the unused `@tanstack/react-table`.
+- #106 `refactor` — measure, then consolidate the two `amount-field.tsx` components. The issue puts
+  the differential test over `parseMoney` and `scaleDecimalString` before any consolidation, because
+  whether they agree on a half-way tie is the unmeasured part.
+- #107 `documentation` — `docs/plans/OPEN-FINDINGS.md` is promised by `README.md` and does not exist.
+- #108 `documentation` — audit and reconcile the 28 unmeasured plan documents.
+- All four are referenced back from `docs/plans/00-foundations.md`: #105 and #106 at the Blockers
+  entries they came from, #107 and #108 in the stage register, because they belong to the plan set
+  rather than to any stage in this document.

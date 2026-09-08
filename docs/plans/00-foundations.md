@@ -58,6 +58,11 @@ Nine of seventeen still open is the finding, not an embarrassment. Before this r
 one of the thirty-four rows read `→ done` and none had been re-measured after the work landed, so
 the document could not distinguish a stage that finished from one that never started. It can now.
 
+Two findings from the same reconciliation belong to the plan set rather than to any stage here, and
+are tracked as their own issues: `docs/plans/OPEN-FINDINGS.md` is named by `README.md` and does not
+exist (#107), and the other twenty-eight plan documents have not been measured at all (#108). This
+document is the only member of the guard's opt-in list until they are.
+
 ---
 
 ## Stage 00-S1 — Schema conventions, the SaaS tables and the global catalogue
@@ -822,7 +827,7 @@ All seven §7 items and all ten §2 clauses.
   did land uses `@tanstack/react-virtual` alone. Disposition: **defer**. `docs/SPEC.md` §3.1 makes
   the dependency freeze absolute and `AGENTS.md` puts adding or removing a package under
   **Ask First**, so a plan reconciliation is not where that call is spent. A human decides: remove
-  the package, or schedule the stage that would use it. Tracked as a follow-up issue.
+  the package, or schedule the stage that would use it. Tracked as #105.
 
 ---
 
@@ -993,7 +998,7 @@ All seven §7 items and all ten §2 clauses, including the chart clause.
   parser, but whether `parseMoney` and `scaleDecimalString` agree on a half-way tie is
   **unmeasured**. Disposition: **defer**. Consolidating the component is a money-path change and
   belongs on its own PR with a committed differential test, not on a documentation reconciliation.
-  Tracked as a follow-up issue.
+  Tracked as #106, which requires the differential test before any consolidation.
 
 ---
 
