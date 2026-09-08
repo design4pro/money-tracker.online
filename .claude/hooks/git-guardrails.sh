@@ -29,42 +29,58 @@ command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
 [ -z "$command" ] && exit 0
 
-# A rule matches the command, not prose about it. Quoted text and the body of a quoted-delimiter
-# heredoc are data - `grep -rn "wrangler secret" docs/` searches DEPLOY.md, and a commit message
-# about a deploy script deploys nothing - so both are stripped before matching. A string handed
-# to a shell with `-c`, or to `eval`/`xargs`, is executed, so those keep the whole command.
+# A rule matches the command, not prose about it - and deciding which is which is the whole
+# problem. The first shape of this got it backwards: it listed the ways a string gets *executed*
+# and read everything else as text. A denylist of ways to run a string is a list that is always
+# missing one, and it was missing four - `bash -lc`, `sh -ec`, `node -e` and a heredoc redirected
+# into a shell all had their payload deleted before a rule saw it. It was over-broad in the same
+# stroke, on raw substrings: `grep -c` was refused, and so was a commit message that merely
+# contained the token - including the one writing this fix.
 #
-# Two different normalisations, because the two audiences are different.
+# So the list is inverted. Quoted spans and heredoc bodies are discarded only for a closed set of
+# commands whose quoted arguments are text *by definition*, and only when nothing else hides
+# behind them. Everything else - every executor, listed or not - keeps every word. An unknown
+# command now fails closed, which is the direction this file's mistakes should point.
 #
-# Under GitHub Actions the command originates from an attacker-authored diff, so nothing may be
-# discarded: quote characters are deleted and every word is kept, which is what makes
-# `gh pr "review" 12 --approve` still match the rule for `gh pr review`. Note that the raw string
-# does not match it - the quotes sit exactly where the verb is expected - so this is the tier
-# doing more work than passing the command through, not less.
-#
-# Everywhere else the caller is trusted and the cost is inverted: a false positive stops honest
-# work, and quoted text really is prose. There the quoted *content* goes, so
-# `grep -rn "wrangler secret" docs/` searches a file rather than being refused.
+# Backslash is a quoting character too, and both audiences need it gone: the shell drops it and
+# keeps the character, so `gh pr \review 12 --approve` invokes `gh pr review` while a `tr` that
+# deletes only the two quote marks left it matching nothing.
+unquote() { printf '%s' "$1" | tr -d '"\047\\'; }
+
+# Nothing on this list can execute a string it is handed: a message, a pattern, a heredoc written
+# to a file. `sed` (GNU `s///e`) and `awk` (`system()`) can, so they are deliberately absent even
+# though their arguments read as prose - the criterion is what the command *can* do, not what it
+# usually does.
+prose_command='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(git[[:space:]]+(commit|tag|stash|notes)|gh[[:space:]]+(pr|issue|release)[[:space:]]+[a-z-]+|grep|egrep|fgrep|rg|echo|printf|cat|tee)([[:space:]]|$)'
+
+# Under GitHub Actions nothing is discarded at all, not even for those commands: there the string
+# comes from an attacker-authored diff, so a commit message is untrusted input like the rest of
+# it. Only the quoting characters go, which is what makes `gh pr "review" 12 --approve` still
+# match the rule for `gh pr review` - the raw string does not, because the quotes sit exactly
+# where the verb is expected.
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
-  scan=$(printf '%s' "$command" | tr -d "\"'")
+  scan=$(unquote "$command")
 else
-  scan="$command"
-  case "$command" in
-    *' -c '*| *'eval '* | *xargs*) ;;
-    *)
-      scan=$(printf '%s' "$command" | awk '
-        skip { if ($0 == tag) skip = 0; next }
-        {
-          if (match($0, /<<-?["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
-            tag = substr($0, RSTART, RLENGTH)
-            gsub(/^<<-?["\047]|["\047]$/, "", tag)
-            skip = 1
-          }
-          print
+  scan=$(unquote "$command")
+  # Here-strings, not pipes: `grep -q` closes early, and under `pipefail` that turns a match into
+  # a non-zero pipeline - the one failure shape that would silently re-open the stripping.
+  if grep -Eq "$prose_command" <<< "${command%%$'\n'*}"; then
+    text=$(printf '%s' "$command" | awk '
+      skip { if ($0 == tag) skip = 0; next }
+      {
+        if (match($0, /<<-?["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
+          tag = substr($0, RSTART, RLENGTH)
+          gsub(/^<<-?["\047]|["\047]$/, "", tag)
+          skip = 1
         }
-      ' | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
-      ;;
-  esac
+        print
+      }
+    ' | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+    # A control operator means a second command hides behind the first, and the head word says
+    # nothing about it: a `grep` chained by `&&` into a shell invocation would have had the
+    # payload stripped as if it were the grep's own pattern. Only a lone simple command is text.
+    grep -Eq '[|;&`]|\$\(' <<< "$text" || scan="$text"
+  fi
 fi
 
 block() {
