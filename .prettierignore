@@ -6,7 +6,17 @@ src/routeTree.gen.ts
 # Generated SQL: drizzle-kit owns the formatting and its journal is byte-compared.
 drizzle
 # Claude Code orchestration scripts and run state.
-.claude
+# ...except the hook tests, which are ordinary TypeScript in this repo's tsconfig.
+# Ignored one level at a time because a path inside an excluded directory cannot be
+# re-included; see the matching comment in eslint.config.js.
+.claude/*
+!.claude/hooks
+.claude/hooks/*
+!.claude/hooks/__tests__
+# om-* pipeline descriptors, installed verbatim from the om-setup-agent-pipeline
+# skill's references; kept byte-identical so upgrades diff cleanly.
+.ai/trackers
+.ai/browsers
 # The same skills and agents, mirrored where GitHub's tooling looks for them,
 # plus the design skill's own run state. Vendored: formatting them rewrites
 # files this repository does not own and makes the next update conflict.
