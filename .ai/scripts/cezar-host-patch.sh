@@ -60,12 +60,17 @@ patch "$DIST/automations/github-poller.js" 'cezar#914' \
         const rows = JSON.parse(raw).filter((entry) => entry?.event === 'labeled' || entry?.event === 'unlabeled');
         return z.array(timelineEventSchema).parse(rows);"
 
-patch "$DIST/automations/github-poller.js" 'host patch: includePullRequests (search scope)' \
+# The two markers below are fragments of the replacement code, not of its comment: both sites patch
+# the same file and the natural comment marker ("host patch: includePullRequests") is a prefix of
+# the other's, so a marker taken from a comment would either be absent after patching or match the
+# wrong site. Keep each marker a string the patched file holds exactly once and the stock file not
+# at all - `grep -c` on both is the check.
+patch "$DIST/automations/github-poller.js" "includePullRequests ? 'mixed' : 'issues'" \
   "            sources.push({ family: 'issues', activity: 'updated', opened: false, labels: true });" \
   "            // host patch: includePullRequests widens the label source to PRs ('mixed' emits no is: qualifier).
             sources.push({ family: definition.filters.includePullRequests ? 'mixed' : 'issues', activity: 'updated', opened: false, labels: true });"
 
-patch "$DIST/automations/github-poller.js" 'host patch: includePullRequests (hit filter)' \
+patch "$DIST/automations/github-poller.js" 'definition.filters.includePullRequests || !item.pull_request' \
   "                if (source.labels && !item.pull_request) {" \
   "                if (source.labels && (definition.filters.includePullRequests || !item.pull_request)) { // host patch: includePullRequests"
 
