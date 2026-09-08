@@ -44,12 +44,13 @@ Seventeen stages, and every one of them exists because a named feature stage req
 requisitions are listed inside each stage below. A stage in this register with no requisition is
 deleted, not filled.
 
-**Which of them closed.** The register above says who holds a concern; this one says whether they are finished. A stage is
-**closed** when every reference row it owns reads `→ done`, and **open** when any row does not. Both
-columns are re-derivable — `pnpm exec tsx scripts/plans/audit.ts docs/plans/00-foundations.md` reads
-the same rows — so neither is a claim anybody has to take on trust.
+**Which of them closed.** The register above says who holds a concern; this one says whether they
+are finished. A stage is **closed** when every reference row it owns reads `→ done`, and **open**
+when any row does not. Both columns are re-derivable —
+`pnpm exec tsx scripts/plans/audit.ts docs/plans/00-foundations.md` reads the same rows — so neither
+is a claim anybody has to take on trust.
 
-| State      | Stages                                                                        |                                                                                               |
+| State      | Stages                                                                        | What the state means                                                                          |
 | ---------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Closed — 8 | `00-S2` `00-S3` `00-S4` `00-S5` `00-S6` `00-S7` `00-S13` `00-S15`             | Every row measured `→ done` against a path that resolves.                                     |
 | Open — 9   | `00-S1` `00-S8` `00-S9` `00-S10` `00-S11` `00-S12` `00-S14` `00-S16` `00-S17` | At least one row still `partial` or `missing`; the row says which and to whom it is deferred. |

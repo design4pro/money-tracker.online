@@ -29,7 +29,7 @@
 | 2     | 2.4  | Stage register and Blockers                              | inline | done   | c6d30ca |
 | 3     | 3.1  | The guard test                                           | inline | done   | f5dffdc |
 | 3     | 3.2  | The full gate                                            | inline | done   | dff0055 |
-| 3     | 3.3  | File the four follow-ups                                 | inline | done   | PENDING |
+| 3     | 3.3  | File the four follow-ups                                 | inline | done   | 3be63cb |
 
 ## Goal
 

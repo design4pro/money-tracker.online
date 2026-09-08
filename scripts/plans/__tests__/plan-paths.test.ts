@@ -53,14 +53,12 @@ const generatedEntries = (markdown: string): Array<string> =>
 describe.each(GUARDED_PLANS)('%s', (planPath) => {
   const audit = auditPlan(planPath)
 
-  it.each(audit.assertions.map((assertion) => [assertion.id, assertion.title]))(
-    'assertion %i: %s',
-    (id) => {
-      const assertion = audit.assertions.find((entry) => entry.id === id)
-
-      expect(lines(assertion?.violations ?? [])).toEqual([])
-    },
-  )
+  // The assertions are passed through directly rather than looked up by id inside the case: a
+  // lookup that missed would hand `toEqual([])` an empty array and the case would pass green
+  // having asserted nothing at all.
+  it.each(audit.assertions)('assertion $id: $title', (assertion) => {
+    expect(lines(assertion.violations)).toEqual([])
+  })
 
   it('never lists a generated file under `Owned paths`', () => {
     expect(generatedEntries(readFileSync(planPath, 'utf8'))).toEqual([])
