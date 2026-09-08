@@ -12,7 +12,7 @@ the rules below layered on top.
 ## Implementation rules
 
 - Write the failing test first, at the seam the analyzer named (skill `tdd`,
-  `.ai/skills/tdd/SKILL.md`). A repository change gets its tenant-isolation case; an amount-touching
+  `.claude/skills/tdd/SKILL.md`). A repository change gets its tenant-isolation case; an amount-touching
   change gets its money-invariant case.
 - Copy goes through the catalogue (skill `i18n-messages`): the key lands in `en.ts` and `pl.ts` in
   the same change, and a count goes through the plural machinery.

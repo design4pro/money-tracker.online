@@ -123,3 +123,33 @@ the deletion of `scripts/agent/`, `scripts/ci/`, the old skills and the Action, 
 label migration is the operator's step at B's merge: `type: bug` → `bug`,
 `type: enhancement`/`type: feature` → `feature`, `type: maintenance` → `refactor`, every `status:`
 removed; priority and risk are filled in by `om-auto-manage-issues`.
+
+## Amendment, 2026-09-08: the three repo-local skills live under `.claude/skills/`, and `skillsRepos` is empty
+
+Point 1 of the decision put the three skills that are ours (`verifying-changes`, `i18n-messages`,
+`tdd`) under `.ai/skills/` "beside" the `om-*` overrides. The port implemented that with tracked
+symlinks at `.claude/skills/<name>` pointing back into `.ai/skills/<name>`, so the harness could
+discover them by name while the files lived next to the overrides. Both halves of that are now
+reversed: the three skills are real directories under `.claude/skills/`, and `.ai/skills/` holds
+`om-*` overrides and nothing else.
+
+Two reasons, and it is worth being precise about which one carried the weight, because the first
+draft of the change asserted a stronger one that does not hold. The symlinks were **not** broken in
+a Cezar worktree: `git worktree add` reproduces them, the relative target `../../.ai/skills/<name>`
+resolves because `.ai/skills/` is checked out in the same worktree, and the skills were discoverable
+by name in practice. What was actually wrong is smaller and still sufficient. A tracked symlink is
+avoidable fragility - it does not survive a checkout with `core.symlinks=false`, and it makes one
+skill reachable by two paths at once. Every document named the `.ai/skills/` one (`AGENTS.md`,
+`docs/agents/ATTRIBUTION.md`, `.ai/skills/om-fix/SKILL.md`) while the harness loaded the
+`.claude/skills/` one, so the second path was carried by nothing but the symlink. And the split cost
+the directory its one meaning: `.ai/skills/` now says "repo-local override of an installed skill"
+and nothing else, which is what `planned.travel` already does.
+
+The same change empties `skillsRepos` in `.ai/cezar/config.json`. Listing a repository there hands
+`.claude/skills/` to the cockpit's skills coordinator, which re-adds the collection from upstream
+HEAD and replaces the vendored `om-*` directories with symlinks into an untracked `.agents/skills/`
+
+- several hundred deleted files in `git status`, described under "Skills" in `docs/agents/cezar.md`.
+  `CEZ_SKILLS_AUTO_UPDATE=0` already suppressed it, but only on a host where the patch has been
+  applied; an empty `skillsRepos` needs nothing applied anywhere. The collection's SHA is therefore
+  recorded in `skills-lock.json` alone, and nothing should re-add the pin.

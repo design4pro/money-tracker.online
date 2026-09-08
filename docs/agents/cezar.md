@@ -16,8 +16,9 @@ the rules of `SDLC.md`.
   `reviewGate: false`, so a finished run settles straight to `done` rather than parking at
   `review` for a human to accept the diff; the gate only ever applied to non-autonomous runs,
   and partial automation is the point, `systemPrompt`, which is prepended to every run's prompt
-  and is where the language contract lives, `skillsRepos[0].ref` pinned to the same
-  SHA as `skills-lock.json`)). Cezar's own
+  and is where the language contract lives, and `skillsRepos`, which is deliberately empty:
+  listing a repository there hands `.claude/skills/` to the cockpit, which then replaces the
+  vendored `om-*` tree. The collection's SHA lives in `skills-lock.json` alone)). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked.
 - Host patches: `bash .ai/scripts/cezar-host-patch.sh` patches the cached copy of 0.10.1 the
@@ -41,8 +42,8 @@ the rules of `SDLC.md`.
 - Skills: `.claude/skills/om-*` are vendored files, byte-identical to the pinned upstream SHA, and
   `skills-lock.json` records it. A worktree therefore has the collection the moment it is cut, and
   the workflow's setup step installs dependencies only. `pnpm install-skills` re-installs and
-  updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and the pin in
-  `.ai/cezar/config.json` moves in the same commit. Repo specifics live in
+  updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and `skills-lock.json`
+  moves in the same commit. Repo specifics live in
   `.ai/skills/om-<name>/SKILL.md` as extensions of the installed skill, never as a fork.
 - Service environment: `CEZ_AUTOMATIONS=1`, `CEZ_AUTONOMOUS_DEFAULT=0`, `CEZ_SKILLS_AUTO_UPDATE=0`,
   `GH_CONFIG_DIR` (below), and never `GH_TOKEN`, `CLOUDFLARE_*` or `CEZ_ENV_PASSTHROUGH`. Cezar
@@ -82,12 +83,12 @@ write the same `.ai/cezar/` state). The `<id>` is `money-tracker-online`: cezar 
 checkout's directory basename. Every script here defaults to it and takes `CEZ_PROJECT` as the
 override; `GET /api/v1/projects` is the authority when a host disagrees.
 
-Install it as a launchd job (template in `scripts/cezar/launchd/`, once per host):
+Install it as a launchd job (template in `.ai/scripts/launchd/`, once per host):
 
 ```bash
 sed -e "s|__NPX__|$(command -v npx)|g" -e "s|__REPO_ROOT__|$PWD|g" -e "s|__HOME__|$HOME|g" \
   -e "s|__PATH__|$(dirname "$(command -v node)"):$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin|g" \
-  scripts/cezar/launchd/dev.cezar.cockpit.plist > ~/Library/LaunchAgents/dev.cezar.cockpit.plist
+  .ai/scripts/launchd/dev.cezar.cockpit.plist > ~/Library/LaunchAgents/dev.cezar.cockpit.plist
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.cezar.cockpit.plist
 ```
 
@@ -113,9 +114,16 @@ and the hooks in `.claude/hooks/` tighten:
   `.ai/tmp` stay readable: the skills write their artefacts there.
 - `guard-generated.sh` also refuses edits under `.github/`, `.claude/`, `.husky/`, `.ai/cezar/`,
   `.ai/agentic.config.json`, `.ai/trackers/`, `.ai/browsers/`, `.ai/skills/`, `.ai/scripts/` (a
-  run must not rewrite its own validation gate), `scripts/cezar/`, `.npmrc`,
+  run must not rewrite its own validation gate), `.npmrc`,
   `pnpm-workspace.yaml`, `docs/agents/reference.md` and `docs/agents/out-of-scope.md`, on top of
   the generated files it refuses for everyone.
+
+  One exception, and only in a cezar run: a guarded file **this branch already changes**. A
+  reviewer asking for a correction to a change a human proposed is not a run rewriting its own
+  rules, and refusing it is how a review thread stays open forever - the `develop` ruleset merges
+  nothing with one. Introducing a change to a guarded file the branch does not already carry is
+  still refused, and under `GITHUB_ACTIONS` the block is absolute, because there the diff is the
+  attacker's and "the branch already changes it" is the attacker's own claim.
 
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
 `jq`, and a prefix allowlist would drop label mutations silently. The hooks in `.claude/hooks/`,
@@ -142,7 +150,7 @@ where that repository provisions D1 and a basemap it needs and this one does not
 | `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation `pr-autopilot` (`pull_request.opened` by a human maintainer)    |
 | `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                  |
 | `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation `pr-review-threads` (label `review-threads` on a PR)            |
-| `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `scripts/cezar/housekeeping.sh`, or a human                    |
+| `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `.ai/scripts/housekeeping.sh`, or a human                      |
 | `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                       |
 
 The task text an automation sends is the issue or PR number alone (`{{github.number}}`); a second
@@ -166,7 +174,7 @@ human sets `qa-approved`: the blind pair is `node scripts/visual/capture.mjs` (A
 
 ## Automations (`docs/agents/cezar-automations.json`)
 
-Registered with the running cockpit by `scripts/cezar/automations.sh` (`--dry-run` first;
+Registered with the running cockpit by `.ai/scripts/cez-automations.sh` (`--dry-run` first;
 idempotent: update in place or create enabled; it lists definitions the cockpit holds that the
 file no longer names). Six definitions: `issue-groom` on `issue.opened` with `authors` naming the
 human maintainers; `issue-regroom`, `issue-autofix`, `issue-spec` on `issue.labeled` with
@@ -203,7 +211,7 @@ a branch before opening the PR.
 
 ## Prompt templates (`docs/agents/cezar-prompt-templates.json`)
 
-Installed into the cockpit by `scripts/cezar/prompt-templates.sh` (`--dry-run` lists what it would
+Installed into the cockpit by `.ai/scripts/cez-prompt-templates.sh` (`--dry-run` lists what it would
 write). One template per `om-*` skill, 37 of them: the task text with its argument placeholder, the
 flags, and the preconditions the skill's `SKILL.md` and its `.ai/skills/` override state, phrased as
 directives because the text is sent as the task. They replace cezar's five generic built-ins. The
@@ -227,19 +235,19 @@ alone.
 
 ## Housekeeping
 
-Cezar has no scheduler. `scripts/cezar/housekeeping.sh` POSTs one `housekeeping` run to the cockpit
+Cezar has no scheduler. `.ai/scripts/housekeeping.sh` POSTs one `housekeeping` run to the cockpit
 (`/api/v1/p/money-tracker-online/runs`) and falls back to a headless `cezar run` when the cockpit is
 down; launchd calls it at 07:00, 12:00 and 17:00 on weekdays. Install (template in
-`scripts/cezar/launchd/`):
+`.ai/scripts/launchd/`):
 
 ```bash
 sed -e "s|__REPO_ROOT__|$PWD|g" -e "s|__PATH__|$(dirname "$(command -v node)"):$(dirname "$(command -v gh)"):/usr/bin:/bin|g" \
-  scripts/cezar/launchd/dev.money-tracker.housekeeping.plist > ~/Library/LaunchAgents/dev.money-tracker.housekeeping.plist
+  .ai/scripts/launchd/dev.money-tracker.housekeeping.plist > ~/Library/LaunchAgents/dev.money-tracker.housekeeping.plist
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.money-tracker.housekeeping.plist
 ```
 
 Remove with `launchctl bootout gui/$(id -u)/dev.money-tracker.housekeeping`. Log:
-`.ai/cezar/tmp/housekeeping.log`. Run it by hand any time: `bash scripts/cezar/housekeeping.sh`.
+`.ai/cezar/tmp/housekeeping.log`. Run it by hand any time: `bash .ai/scripts/housekeeping.sh`.
 
 ## Host cutover (operator, once, when PR B merges)
 
@@ -289,13 +297,13 @@ claiming issues the new ones handle.
    gh label list --limit 100 | wc -l   # 31
    ```
 
-6. `scripts/cezar/automations.sh --dry-run`, then without the flag: `issue-groom`, `issue-regroom`,
+6. `.ai/scripts/cez-automations.sh --dry-run`, then without the flag: `issue-groom`, `issue-regroom`,
    `issue-autofix`, `issue-spec`, `pr-autopilot` and `pr-review-threads` are created enabled. The
    script also lists any definition the cockpit still holds that the file no longer names — the
    retired `issue-opened` and `pr-opened` are deleted in the cockpit (Automations), by hand.
-7. `scripts/cezar/prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
+7. `.ai/scripts/cez-prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
    cezar's five built-ins.
-8. Install the housekeeping plist (above) and run `bash scripts/cezar/housekeeping.sh` once by hand.
+8. Install the housekeeping plist (above) and run `bash .ai/scripts/housekeeping.sh` once by hand.
 9. Verify end to end: open a test issue with the Bug form (as a maintainer) → within two minutes an
    `issue-groom` run adds priority and risk and posts the Definition of Ready and implementation
    notes → add `autofix` → the run removes the label, claims with `in-progress`, opens a PR on
