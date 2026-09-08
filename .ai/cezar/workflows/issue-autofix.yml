@@ -2,14 +2,11 @@
 # chain (verify, root cause, fix, PR, review, QA for UI fixes) to a reviewed PR on develop
 # (ADR 0017). The repo-local override (.ai/skills/om-auto-fix-issue/) removes `autofix` as its
 # first mutation, so a label still present is a run nobody took. No bashAllowlist by design:
-# the tracker descriptor is shell functions and jq; the hooks in .claude/hooks/ and the PAT
-# scopes are the gate. HUSKY=0 skips the `prepare` hook install, so the run never rewrites
-# core.hooksPath on the host clone; .husky/pre-commit skips itself under CEZ_TASK_ID, so commits
-# in the run are gated by validation.commands only.
+# the tracker descriptor needs shell functions and jq; hooks in .claude/hooks/ are the gate.
 name: issue-autofix
-description: Human added `autofix`; om-auto-fix-issue drives the issue to a reviewed PR on develop.
+description: Human added `autofix`; om-auto-fix-issue drives the issue to a reviewed draft-then-ready PR on develop.
 steps:
-  - id: setup
+  - id: bootstrap
     name: Install dependencies and generate the route tree
     command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: fix
