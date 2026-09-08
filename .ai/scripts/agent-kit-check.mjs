@@ -12,6 +12,13 @@
 // the point, not a limitation to work around. "Behind the kit" is answered by a developer running
 // the kit's sync on the host and opening an ordinary pull request.
 //
+// With `--base <ref>` it answers one more, and this one it can: is this branch behind the base's
+// pipeline layer? That needs no network either - the answer is in the base commit's own lock, and
+// `kitVersion` is the only orderable thing a consumer repository has. It matters because a
+// `pr-autopilot` or `pr-fix` run checks out the PR head and therefore runs whatever agent layer
+// that branch carries. A branch cut before a pipeline change runs the old hooks, the old
+// workflows and the old guards, and nothing else notices.
+//
 // It lives under .ai/scripts/ rather than scripts/ because guard-generated.sh already refuses
 // edits under .ai/scripts/ whenever CEZ_TASK_ID or GITHUB_ACTIONS is set. A cezar run therefore
 // cannot rewrite the checker that judges it, which a top-level scripts/ path would have allowed.
@@ -20,14 +27,23 @@
 //   0  clean
 //   1  a managed file was hand-edited, or a hook lost its executable bit
 //   2  a managed file is missing, or the lock is absent or malformed
+//   3  --base only: this branch's pipeline layer is older than the base branch's
 
 import { readFileSync, existsSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const LOCK_PATH = join(ROOT, ".ai/agent-kit.lock.json");
+
+const baseFlag = process.argv.indexOf("--base");
+const BASE = baseFlag === -1 ? null : process.argv[baseFlag + 1];
+if (baseFlag !== -1 && !BASE) {
+  console.error("agent-kit: --base needs a git ref, e.g. --base origin/develop");
+  process.exit(2);
+}
 
 // The remedy is a host action, and saying so is most of this script's value: a cezar run that hits
 // this cannot fix it - guard-generated.sh blocks the very paths involved - so the message has to
@@ -40,9 +56,22 @@ const REMEDY = [
   "Do not hand-edit them here. An agent run cannot fix this and should stop.",
 ].join("\n");
 
-function die(code, lines) {
+// Staleness has a different fix, and offering the sync here would be wrong twice over: it would
+// send a developer to rewrite files that are already correct, and a cezar run cannot run the sync
+// at all.
+const MERGE_REMEDY = [
+  "",
+  "Merge the base branch before an agent run touches this one:",
+  "  git merge origin/<base>    and push.",
+  "A pr-autopilot or pr-fix run checks out this head, so until then it would run",
+  "the older hooks, workflows and guards this branch still carries.",
+].join("\n");
+
+// A malformed --base argument is a workflow bug, not a hand edit, so those calls pass no remedy
+// rather than pointing a developer at a sync that would not help.
+function die(code, lines, remedy = REMEDY) {
   for (const l of lines) console.error(l);
-  console.error(REMEDY);
+  if (remedy) console.error(remedy);
   process.exit(code);
 }
 
@@ -120,4 +149,82 @@ const n =
   Object.keys(lock.rendered).length + Object.keys(lock.watched || {}).length;
 console.log(
   `agent-kit: ${n} managed files match the lock (kit version ${lock.kitVersion}).`,
+);
+
+if (!BASE) process.exit(0);
+
+// Read the base commit's lock out of git rather than the worktree: the point is what the base
+// branch carries, not what is checked out.
+let baseLockText;
+try {
+  baseLockText = execFileSync(
+    "git",
+    ["-C", ROOT, "show", `${BASE}:.ai/agent-kit.lock.json`],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  );
+} catch {
+  // Two very different situations, and only one of them is a problem. The base having no lock is
+  // ordinary history - it was true of both repositories until C1 - so there is nothing to be
+  // behind, and the gate passes loudly rather than silently. A ref that cannot be resolved at all
+  // is a misconfigured workflow, and passing there is how a gate quietly stops gating.
+  try {
+    const ref = `${BASE}^{commit}`;
+    execFileSync("git", ["-C", ROOT, "rev-parse", "--verify", ref], {
+      stdio: "ignore",
+    });
+  } catch {
+    die(
+      2,
+      [
+        `agent-kit: --base ${BASE} does not resolve to a commit.`,
+        "  In CI this usually means the base branch was never fetched:",
+        '  git fetch --depth=1 origin "$BASE"  before running this.',
+      ],
+      "",
+    );
+  }
+  console.log(
+    `agent-kit: ${BASE} carries no lock, so there is no pipeline layer to be behind.`,
+  );
+  process.exit(0);
+}
+
+let baseVersion;
+try {
+  baseVersion = JSON.parse(baseLockText).kitVersion;
+} catch (e) {
+  die(
+    2,
+    [`agent-kit: the lock at ${BASE} is not valid JSON - ${e.message}`],
+    "",
+  );
+}
+
+if (typeof baseVersion !== "number" || typeof lock.kitVersion !== "number") {
+  die(
+    2,
+    [
+      "agent-kit: kitVersion is not a number on one side, so the two cannot be ordered.",
+      `  this branch: ${JSON.stringify(lock.kitVersion)}`,
+      `  ${BASE}: ${JSON.stringify(baseVersion)}`,
+    ],
+    "",
+  );
+}
+
+// Ahead is fine and is what a sync pull request looks like. Only behind is a problem.
+if (lock.kitVersion < baseVersion) {
+  die(
+    3,
+    [
+      `agent-kit: this branch's pipeline layer is older than ${BASE}'s.`,
+      `  this branch: kit version ${lock.kitVersion}`,
+      `  ${BASE}: kit version ${baseVersion}`,
+    ],
+    MERGE_REMEDY,
+  );
+}
+
+console.log(
+  `agent-kit: not behind ${BASE} (kit version ${lock.kitVersion} against ${baseVersion}).`,
 );

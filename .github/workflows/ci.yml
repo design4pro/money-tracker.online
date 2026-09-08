@@ -66,6 +66,27 @@ jobs:
       - name: Check out
         uses: actions/checkout@v7
 
+      # The agent layer this branch carries is what a cezar run executes: pr-autopilot
+      # and pr-fix check out the PR *head*, so a branch cut before a pipeline change
+      # runs the old hooks, the old workflows and the old guards, and nothing else
+      # notices. First, before the toolchain, because it needs only the runner's node
+      # and a branch in that state should go red in seconds rather than after a build.
+      - name: Check the agent layer
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASE" ]; then
+            # A push or a manual run has no base to be behind; hashes only.
+            node .ai/scripts/agent-kit-check.mjs
+            exit 0
+          fi
+          # An explicit refspec: the checkout is shallow and its configured one covers
+          # only the ref it fetched, so `origin/$BASE` does not exist yet. Depth 1 is
+          # enough - all this reads is the base tip's copy of the lock.
+          git fetch --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          node .ai/scripts/agent-kit-check.mjs --base "origin/$BASE"
+
       - name: Set up the toolchain
         uses: ./.github/actions/setup
 
