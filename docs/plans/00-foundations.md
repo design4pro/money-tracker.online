@@ -44,6 +44,26 @@ Seventeen stages, and every one of them exists because a named feature stage req
 requisitions are listed inside each stage below. A stage in this register with no requisition is
 deleted, not filled.
 
+**Which of them closed.** The register above says who holds a concern; this one says whether they
+are finished. A stage is **closed** when every reference row it owns reads `→ done`, and **open**
+when any row does not. Both columns are re-derivable —
+`pnpm exec tsx scripts/plans/audit.ts docs/plans/00-foundations.md` reads the same rows — so neither
+is a claim anybody has to take on trust.
+
+| State      | Stages                                                                        | What the state means                                                                          |
+| ---------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Closed — 8 | `00-S2` `00-S3` `00-S4` `00-S5` `00-S6` `00-S7` `00-S13` `00-S15`             | Every row measured `→ done` against a path that resolves.                                     |
+| Open — 9   | `00-S1` `00-S8` `00-S9` `00-S10` `00-S11` `00-S12` `00-S14` `00-S16` `00-S17` | At least one row still `partial` or `missing`; the row says which and to whom it is deferred. |
+
+Nine of seventeen still open is the finding, not an embarrassment. Before this reconciliation every
+one of the thirty-four rows read `→ done` and none had been re-measured after the work landed, so
+the document could not distinguish a stage that finished from one that never started. It can now.
+
+Two findings from the same reconciliation belong to the plan set rather than to any stage here, and
+are tracked as their own issues: `docs/plans/OPEN-FINDINGS.md` is named by `README.md` and does not
+exist (#107), and the other twenty-eight plan documents have not been measured at all (#108). This
+document is the only member of the guard's opt-in list until they are.
+
 ---
 
 ## Stage 00-S1 — Schema conventions, the SaaS tables and the global catalogue
@@ -55,9 +75,16 @@ tables, the workspace-settings tables and the three global catalogue tables.
 
 ### Reference rows
 
-`FND-01 missing → done` — the schema module exists with its conventions docblock and `enumCheck`.
-`FND-02 missing → done` — Better Auth tables and the workspace/user settings tables.
-`FND-03 missing → done` — the global catalogue tables (`currencies`, `exchange_rates`, `brand_logos`).
+`FND-01 missing → done` — `src/server/db/schema.ts` exists, carrying the conventions docblock and
+`enumCheck()` as a module-private function.
+`FND-02 missing → partial` — the Better Auth tables shipped in `src/server/db/auth-schema.ts`, and
+the workspace and user settings tables did **not**: `organization_settings`, `user_preferences`,
+`audit_log` and `platform_audit_log` are absent from the schema, which names them and says they
+belong to the tenancy and console plans. Deferred to `04-S1` and `24-S1`, which own those areas;
+this row stays open until they land, and it is also what keeps this stage's absent
+`conventions.test.ts` a declared gap rather than an unexplained one.
+`FND-03 missing → done` — the global catalogue tables `currencies`, `exchange_rates` and
+`brand_logos` are in `src/server/db/schema.ts`.
 
 Requisitioned by `04-S1` (auth needs the Better Auth tables) and `03-S1` (money needs the
 catalogue). No finance-domain table lands here; those are `00-S5` and later.
@@ -66,11 +93,14 @@ catalogue). No finance-domain table lands here; those are `00-S5` and later.
 
 - `src/server/db/schema.ts` — new
 - `src/server/db/auth-schema.ts` — new
-- `src/server/db/enum-check.ts` — new
 - `src/server/db/ids.ts` — new
 - `src/server/db/types.ts` — new
 - `src/server/db/__tests__/conventions.test.ts` — new
-- `drizzle/0000_init.sql` — new (generated)
+
+`enumCheck()` has no file of its own. It is a module-private, unexported function inside
+`schema.ts`, which is acceptable because it has exactly one caller — the schema module itself —
+and exporting it would invite a second generator of the same `CHECK` clauses. The requirement is
+unchanged; the host module is `schema.ts` and is owned above.
 
 ### Data and migration
 
@@ -101,8 +131,10 @@ DEFAULT false`, `default_transaction_account_id text NULL`.
 - **`brand_logos`**: `domain text PK`, `initials`, `color`, `fetched_at`.
 - **`subscriptions`** (Polar mirror, one row per organization) with the columns named in
   `docs/SPEC.md` §5.4, unique on `organization_id` and on `provider_subscription_id`.
-- Migration `pnpm db:generate` produces: `drizzle/0000_init.sql`. It backfills nothing — the
-  database is empty.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the Better Auth tables, the workspace and user
+  settings tables, the two audit logs, the three global catalogue tables and `subscriptions`, and
+  it backfills nothing — the database is empty.
 
 ### Server (repo, server function, Zod)
 
@@ -169,9 +201,10 @@ crons, and the entry module that exports them.
 
 ### Reference rows
 
-`FND-04 missing → done` — `wrangler.jsonc` for production and staging with the live resource ids.
-`FND-05 missing → done` — `src/server/worker.ts` exporting `fetch`, `queue`, `scheduled` and the DO
-classes.
+`FND-04 missing → done` — `wrangler.jsonc` carries the production configuration and a `staging`
+environment with the live resource ids.
+`FND-05 missing → done` — `src/server/worker.ts` exports `fetch`, `queue` and `scheduled` on the
+default export and re-exports the `AccountLedger` Durable Object class.
 
 Requisitioned by `04-S1` (`SESSIONS`), `03-S2` (`TASKS` + the nightly cron), `09-S2` (`LEDGER`),
 `05-S3` (`observability`) and `19-S1` (`FILES`).
@@ -180,9 +213,17 @@ Requisitioned by `04-S1` (`SESSIONS`), `03-S2` (`TASKS` + the nightly cron), `09
 
 - `wrangler.jsonc` — new
 - `src/server/worker.ts` — new
-- `src/server/queue/consumer.ts` — new
-- `src/server/cron/scheduled.ts` — new
+- `src/server/queue/messages.ts` — new
 - `worker-configuration.d.ts` — edit (generated by `wrangler types`)
+
+Neither the queue consumer nor the cron handler is a file. Both are inlined in
+`src/server/worker.ts` as the `queue` and `scheduled` exports, which is what the isolate's entry
+contract asks for: a Worker exports handlers, and a module that only re-exported them would be a
+name with no behaviour. What is a file is the envelope parse — `src/server/queue/messages.ts`,
+owned above — because that one is called from both the producer and the consumer side. The
+per-`kind` handlers under `src/server/queue/handlers/` and the cron sweeps —
+`src/server/cron/budget-periods.ts`, `src/server/cron/budget-thresholds.ts` and
+`src/server/cron/recurring.ts` — belong to the feature plan that adds each one, not here.
 
 ### Data and migration
 
@@ -264,14 +305,16 @@ z-index of `DESIGN.md`, in both themes.
 
 ### Reference rows
 
-`FND-06 missing → done` — the token contract exists and `DESIGN.md`'s front matter is its source.
+`FND-06 missing → done` — `src/styles/tokens.css` carries the token contract with `DESIGN.md`'s
+front matter as its source, and `src/styles/__tests__/tokens-contrast.test.ts` holds the contrast
+floor over it.
 
 Requisitioned by `01-S1`, which cannot build a primitive against tokens that do not exist.
 
 ### Owned paths
 
 - `src/styles/tokens.css` — new
-- `src/styles/__tests__/contrast.test.ts` — new
+- `src/styles/__tests__/tokens-contrast.test.ts` — new
 
 ### Data and migration
 
@@ -338,8 +381,10 @@ both free of any binding import.
 
 ### Reference rows
 
-`FND-07 missing → done` — `src/lib/money.ts`.
-`FND-08 missing → done` — `src/lib/plans.ts`.
+`FND-07 missing → done` — `src/lib/money.ts` is the entry point; the primitives themselves are the
+modules under `src/lib/money/`, and `src/lib/__tests__/money-core.test.ts` is one of the four suites
+over them.
+`FND-08 missing → done` — `src/lib/plans.ts`, asserted by `src/lib/__tests__/plans.test.ts`.
 
 Requisitioned by `03-S1` (formatting and parsing), `22-S1` (`resolveLimits` reads the catalogue) and
 every plan that renders an amount.
@@ -348,8 +393,15 @@ every plan that renders an amount.
 
 - `src/lib/money.ts` — new
 - `src/lib/plans.ts` — new
-- `src/lib/__tests__/money.test.ts` — new
+- `src/lib/__tests__/money-core.test.ts` — new
+- `src/lib/__tests__/money-convert.test.ts` — new
+- `src/lib/__tests__/money-allocate.test.ts` — new
+- `src/lib/__tests__/money-format.test.ts` — new
 - `src/lib/__tests__/plans.test.ts` — new
+
+The money suite is four files, not one, split along the module boundaries it covers — the core
+integer arithmetic, conversion, allocation and formatting. One file per concern keeps a failure
+readable; a single `money.test.ts` was a plan-time guess at a shape the code did not take.
 
 ### Data and migration
 
@@ -435,12 +487,16 @@ layer — the tables waves 2 and 3 are built on.
 
 ### Reference rows
 
-`FND-09 missing → done` — `organization_currencies`, `organization_exchange_rates`.
-`FND-10 missing → done` — `accounts`, `account_groups`, `account_group_members`, `account_balances`.
-`FND-11 missing → done` — `transactions`, `transaction_splits`, `transaction_tags`,
+`FND-09 missing → done` — `organization_currencies` and `organization_exchange_rates`, in
+`src/server/db/schema.ts`.
+`FND-10 missing → done` — `accounts`, `account_groups`, `account_group_members` and
+`account_balances`, in `src/server/db/schema.ts`.
+`FND-11 missing → done` — in `src/server/db/schema.ts`: `transactions`, `transaction_splits`,
+`transaction_tags`,
 `transaction_groups`, `transaction_group_items`, `refunds`, `transaction_templates`,
 `transaction_template_tags`, `attachments`.
-`FND-12 missing → done` — `categories`, `tags`, `tag_reminders`, `payees`, `payee_aliases`,
+`FND-12 missing → done` — in `src/server/db/schema.ts`: `categories`, `tags`, `tag_reminders`,
+`payees`, `payee_aliases`,
 `payee_ignored_names`, `payee_tags`.
 
 Requisitioned by `06-S1`, `07-S1`, `08-S1`, `09-S1`, `10-S1`, `11-S1`.
@@ -449,7 +505,6 @@ Requisitioned by `06-S1`, `07-S1`, `08-S1`, `09-S1`, `10-S1`, `11-S1`.
 
 - `src/server/db/schema.ts` — edit
 - `src/server/db/__tests__/conventions.test.ts` — edit
-- `drizzle/0001_finance_core.sql` — new (generated)
 
 ### Data and migration
 
@@ -470,7 +525,9 @@ it is written. The properties that must not be lost:
   with two lines in one category is representable.
 - `account_balances` PK `(organization_id, account_id, date)` with `native_minor`, `ref_minor` and
   `rate_e10`.
-- Migration: `drizzle/0001_finance_core.sql`. Backfills nothing — no rows exist.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the per-workspace currency and rate tables, the
+  account tables and `account_balances`, and backfills nothing — no rows exist.
 
 ### Server (repo, server function, Zod)
 
@@ -526,7 +583,12 @@ into the shared `src/components/ui/**` under foundations' single-writer rule.
 
 ### Reference rows
 
-`FND-13 missing → done` — the ~45-component primitive set exists with one implementation each.
+`FND-13 missing → done` — the primitive set exists in `src/components/ui`, exported from
+`src/components/ui/index.ts`, with one implementation of each pattern **inside that directory**.
+Measured rather than estimated: **38** files match `src/components/ui/*.tsx`, not the ~45 this row
+guessed at before the set was built. The one duplicated interaction pattern in the product — the
+two amount fields — lives outside this directory and is recorded on `00-S10`, whose money field was
+meant to prevent it.
 
 Requisitioned by `01-S1`, whose stage body is the **specification** this stage builds. `01-S1` owns
 the inventory, the state matrix and the evidence; `00-S6` owns the files.
@@ -605,18 +667,19 @@ None.
 
 ### Reference rows
 
-`FND-14 missing → done` — `budgets`, `budget_categories`, `budget_transactions`, `budget_periods`.
-`FND-15 missing → done` — `recurring_series`, `recurring_periods`, `recurring_links`,
-`recurring_candidates`.
-`FND-16 missing → done` — `rules`.
-`FND-17 missing → done` — `savings_goals`, `savings_goal_contributions`.
+`FND-14 missing → done` — `budgets`, `budget_categories`, `budget_transactions` and
+`budget_periods`, in `src/server/db/schema.ts`.
+`FND-15 missing → done` — `recurring_series`, `recurring_periods`, `recurring_links` and
+`recurring_candidates`, in `src/server/db/schema.ts`.
+`FND-16 missing → done` — `rules`, in `src/server/db/schema.ts`.
+`FND-17 missing → done` — `savings_goals` and `savings_goal_contributions`, in
+`src/server/db/schema.ts`.
 
 Requisitioned by `12-S1`, `13-S1`, `14-S1`, `15-S1`.
 
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0002_budgets_recurring_rules_goals.sql` — new (generated)
 
 ### Data and migration
 
@@ -631,7 +694,9 @@ period_end)`, `limit_minor`, `carried_in_minor`, `spent_minor`, `closed_at`. A r
 - `rules.paused_reason` is JSON `{kind:'missing_reference', ref_type, ref_id, label, at}`.
 - The tables are named `recurring_*` and never `subscriptions` — that name belongs to billing, and a
   comment at the table says so.
-- Migration `drizzle/0002_budgets_recurring_rules_goals.sql`, backfilling nothing.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the budget, recurring, rule and savings-goal
+  tables, backfilling nothing.
 
 ### Server (repo, server function, Zod)
 
@@ -685,18 +750,31 @@ which is `12-S2`'s.
 
 ### Reference rows
 
-`FND-18 missing → done` — the virtualised table shell, the filter-bar primitives, the bulk-select
-affordance and the keyboard reorder menu.
+`FND-18 missing → partial` — the capabilities shipped, none of them as a `src/components/ui`
+primitive: the virtualised shell is `src/components/app/transactions/transaction-list.tsx`, the
+filter bar `src/components/app/transactions/filter-bar.tsx`, and the keyboard reorder path
+`GridListMoveButton` inside `src/components/ui/grid-list.tsx`. Open on one measured count, not on a
+judgment about placement: that move path has **no test anywhere in the tree**, so
+`src/components/ui/__tests__/grid-list.test.tsx` is still owed by this stage. Placement is settled
+under the plan set's precedence rule and is not re-litigated here.
 
 Requisitioned by `07-S2` (the transaction list) and `08-S2` (the category tree).
 
 ### Owned paths
 
-- `src/components/ui/data-table.tsx` — new
-- `src/components/ui/filter-bar.tsx` — new
-- `src/components/ui/reorder-menu.tsx` — new
-- `src/components/ui/__tests__/reorder-menu.test.tsx` — new
+- `src/components/ui/grid-list.tsx` — edit
+- `src/components/ui/__tests__/grid-list.test.tsx` — new
 - `src/components/ui/index.ts` — edit
+
+Three of this stage's four primitives shipped outside `src/components/ui`, so they are outside
+this plan's remit and are named here only so the move is on the record. The data table split in
+two: `src/components/charts/data-table.tsx` is the chart text equivalent (ADR 0007, owned by
+`16-charts.md`) and `src/components/app/transactions/transaction-list.tsx` is the virtualised list
+(owned by `07-transactions-core.md`). The filter bar shipped as
+`src/components/app/transactions/filter-bar.tsx`, also `07`'s. The reorder menu did not ship as a
+menu at all: the keyboard move path is `GridListMoveButton` inside the existing `grid-list.tsx`
+primitive, which is where the rows it reorders already lived — that entry stays here, as an edit,
+because it is the one piece of this stage still inside the shared directory.
 
 ### Data and migration
 
@@ -744,7 +822,13 @@ All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
-None.
+- **`@tanstack/react-table`, declared and imported by nothing.** It is in `package.json`, and zero
+  files under `src/` import it. This stage is the only justification for it anywhere in the
+  repository, and the `data-table.tsx` that justified it never landed — the virtualised list that
+  did land uses `@tanstack/react-virtual` alone. Disposition: **defer**. `docs/SPEC.md` §3.1 makes
+  the dependency freeze absolute and `AGENTS.md` puts adding or removing a package under
+  **Ask First**, so a plan reconciliation is not where that call is spent. A human decides: remove
+  the package, or schedule the stage that would use it. Tracked as #105.
 
 ---
 
@@ -756,16 +840,18 @@ None.
 
 ### Reference rows
 
-`FND-19 missing → done` — `import_batches`, `import_mapping_presets`, `import_row_errors`.
-`FND-20 missing → done` — `export_jobs`.
-`FND-21 missing → done` — `notifications`, `notification_preferences`.
+`FND-19 missing → done` — `import_batches`, `import_mapping_presets` and `import_row_errors`, in
+`src/server/db/schema.ts`.
+`FND-20 missing → done` — `export_jobs`, in `src/server/db/schema.ts`.
+`FND-21 missing → missing` — `notifications` and `notification_preferences` are **absent** from the
+schema, which names them and assigns them to the notification plan. Deferred to `21-S1`; the row
+stays open.
 
 Requisitioned by `19-S1`, `20-S1`, `21-S1`.
 
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0003_import_export_notifications.sql` — new (generated)
 
 ### Data and migration
 
@@ -778,7 +864,9 @@ Requisitioned by `19-S1`, `20-S1`, `21-S1`.
 - `notification_preferences` unique on `(organization_id, user_id, event_type, channel)` with
   `is_enabled` defaulting to true — the product is **opt-out**, and the default belongs in the
   column so a missing row means enabled.
-- Migration `drizzle/0003_import_export_notifications.sql`, backfilling nothing.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the import, export and notification tables,
+  backfilling nothing.
 
 ### Server (repo, server function, Zod)
 
@@ -829,19 +917,32 @@ None.
 
 ### Reference rows
 
-`FND-22 missing → done` — the chart frame primitive (axes, legend, the visually-hidden table slot,
-the focus ring on a datum) that `16-charts.md` builds its four chart types on.
-`FND-23 missing → done` — `MoneyField`, the currency-aware amount input.
+`FND-22 missing → done` — the chart frame shipped as `src/components/charts/chart-frame.tsx`, with
+the axes, legend, visually-hidden table slot and datum focus ring the four chart types build on.
+`FND-23 missing → missing` — `MoneyField` was **never built**, and the responsibility it was minted
+to hold landed in two places instead: `src/components/app/transactions/amount-field.tsx` and
+`src/components/app/accounts/amount-field.tsx`, whose docblocks argue opposite premises about how an
+amount should be entered. That is a `docs/SPEC.md` §8 duplication of one interaction pattern. It is
+**not** a second money parser: both delegate to `src/lib/money/`, so `docs/MONEY.md` §7's one-parser
+rule is held. Whether the two agree numerically is unmeasured and is tracked separately — see this
+stage's Blockers. The row stays open.
 
 Requisitioned by `16-S1` and `07-S3`.
 
 ### Owned paths
 
-- `src/components/ui/chart-frame.tsx` — new
 - `src/components/ui/money-field.tsx` — new
-- `src/components/ui/__tests__/chart-frame.test.tsx` — new
 - `src/components/ui/__tests__/money-field.test.tsx` — new
 - `src/components/ui/index.ts` — edit
+
+The chart frame shipped as `src/components/charts/chart-frame.tsx`, outside this plan's remit and
+owned by `16-charts.md` under ADR 0007. It has no test file of its own: it is exercised only
+through the chart tests that render it — `src/components/charts/__tests__/bar-chart.test.tsx`,
+`src/components/charts/__tests__/line-chart.test.tsx` and
+`src/components/charts/__tests__/donut-chart.test.tsx`. That is a weaker guarantee than a dedicated
+test and is recorded here rather than counted as equivalent.
+
+The money field is a different case and stays open — see this stage's reference rows.
 
 ### Data and migration
 
@@ -890,7 +991,15 @@ All seven §7 items and all ten §2 clauses, including the chart clause.
 
 ### Blockers
 
-None.
+- **Two amount fields, and no measurement of whether they agree.**
+  `src/components/app/transactions/amount-field.tsx` serialises through a canonical decimal string
+  and `src/components/app/accounts/amount-field.tsx` refuses React Aria's `NumberField` because it
+  hands back a major-unit float. Each docblock treats the other's approach as the defect. Both
+  delegate to `src/lib/money/`, so this is a `docs/SPEC.md` §8 duplication and **not** a second
+  parser, but whether `parseMoney` and `scaleDecimalString` agree on a half-way tie is
+  **unmeasured**. Disposition: **defer**. Consolidating the component is a money-path change and
+  belongs on its own PR with a committed differential test, not on a documentation reconciliation.
+  Tracked as #106, which requires the differential test before any consolidation.
 
 ---
 
@@ -902,15 +1011,19 @@ None.
 
 ### Reference rows
 
-`FND-24 missing → done` — `dashboard_layouts` (per user per organization, JSON widget grid).
-`FND-25 missing → done` — the covering indexes plans 17 and 18 need for their aggregations.
+`FND-24 missing → missing` — `dashboard_layouts` is **absent** from the schema, which names it and
+assigns it to the dashboard plan. Deferred to `18-S1`; the row stays open.
+`FND-25 missing → done` — the covering indexes are in `src/server/db/schema.ts`:
+`transactions_organization_id_booked_on_direction_idx`,
+`transactions_organization_id_category_id_booked_on_idx`,
+`transactions_organization_id_account_id_booked_on_idx` and
+`account_balances_organization_id_date_idx`.
 
 Requisitioned by `18-S1` and `17-S1`.
 
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0004_analytics_and_layout.sql` — new (generated)
 
 ### Data and migration
 
@@ -919,7 +1032,9 @@ Requisitioned by `18-S1` and `17-S1`.
 - Indexes, each with `organization_id` leading: `transactions (organization_id, booked_on,
 direction)`, `transactions (organization_id, category_id, booked_on)`, `transactions
 (organization_id, account_id, booked_on)`, `account_balances (organization_id, date)`.
-- Migration `drizzle/0004_analytics_and_layout.sql`. It backfills nothing but it **does** rebuild
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates `dashboard_layouts` and the covering indexes
+  plans 17 and 18 need. It backfills nothing but it **does** rebuild
   indexes on a table that by now holds rows, so the migration note records the expected duration
   against the seeded workspace and `docs/DEPLOY.md` §5's non-additive register is checked: adding an
   index is additive, and the previous Worker's SQL keeps working, so this stays in the additive path.
@@ -973,16 +1088,20 @@ None.
 
 ### Reference rows
 
-`FND-26 missing → done` — the queue consumer dispatches the import, export and backup envelope
-kinds; the R2 key layout is fixed.
+`FND-26 missing → missing` — the dispatch exists in `src/server/worker.ts` and the envelope union
+in `src/server/queue/messages.ts`, but that union carries exactly **one** kind, `billing.event`.
+The import, export and backup kinds this row is about have no envelope and no handler, and the R2
+key layout is unfixed. Deferred to `19-S1` and `20-S1`, which own them; the row stays open.
 
 Requisitioned by `19-S1` and `20-S1`.
 
 ### Owned paths
 
 - `src/server/worker.ts` — edit
-- `src/server/queue/consumer.ts` — edit
 - `wrangler.jsonc` — edit
+
+The dispatch this stage widens is inlined in `src/server/worker.ts`, owned above; there is no
+`consumer.ts` to edit. See `00-S2`.
 
 ### Data and migration
 
@@ -1050,16 +1169,21 @@ None.
 
 ### Reference rows
 
-`FND-27 missing → done` — the grid cell and widget frame primitives, with the keyboard move path.
+`FND-27 missing → done` — both shipped as dashboard components rather than primitives: the cell is
+part of `src/components/app/dashboard/widget-grid.tsx` and the frame is
+`src/components/app/dashboard/widget-frame.tsx`. The keyboard move path is asserted in
+`src/components/app/dashboard/__tests__/widget-grid.test.tsx`.
 
 Requisitioned by `18-S1`.
 
 ### Owned paths
 
-- `src/components/ui/grid-cell.tsx` — new
-- `src/components/ui/widget-frame.tsx` — new
-- `src/components/ui/__tests__/grid-cell.test.tsx` — new
-- `src/components/ui/index.ts` — edit
+None inside this plan's remit, which is the finding rather than an omission. Both primitives
+shipped as dashboard components: the cell is part of `src/components/app/dashboard/widget-grid.tsx`
+rather than a standalone file, and the frame is
+`src/components/app/dashboard/widget-frame.tsx`. `18-dashboard.md` owns both, and the keyboard move
+path is asserted in `src/components/app/dashboard/__tests__/widget-grid.test.tsx`. Nothing was
+added to `src/components/ui/index.ts`, so this stage no longer edits it either.
 
 ### Data and migration
 
@@ -1119,15 +1243,15 @@ None.
 
 `FND-28 missing → done` — the `subscriptions` columns Polar's plan-change flow needs
 (`pending_plan`, `pending_interval`, `pending_effective_at`, `quota_overrides`, `seat_limit`,
-`storage_limit_bytes`) confirmed present and indexed.
-`FND-29 missing → done` — `impersonation_sessions` for the console.
+`storage_limit_bytes`) are present and indexed in `src/server/db/schema.ts`.
+`FND-29 missing → missing` — `impersonation_sessions` is **absent** from the schema, which names it
+and assigns it to the console plan. Deferred to `24-S2`; the row stays open.
 
 Requisitioned by `22-S2` and `24-S2`.
 
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0005_billing_and_console.sql` — new (generated)
 
 ### Data and migration
 
@@ -1135,7 +1259,9 @@ Requisitioned by `22-S2` and `24-S2`.
 index on `provider_customer_id`. `impersonation_sessions` records actor, subject, reason, started and
 ended instants, and is written from the console's audited path only.
 
-Migration `drizzle/0005_billing_and_console.sql`, additive, backfilling nothing.
+Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+generator's and is not asserted here. It adds the Polar plan-change columns to `subscriptions` and
+creates `impersonation_sessions` — additive, backfilling nothing.
 
 ### Server (repo, server function, Zod)
 
@@ -1190,8 +1316,8 @@ published one.
 
 ### Reference rows
 
-`FND-30 proposed → done` — `src/lib/plans.ts` carries decided numbers and the _proposed_ comment is
-removed.
+`FND-30 proposed → done` — `src/lib/plans.ts` carries decided numbers and no _proposed_ comment
+remains in it.
 
 Requisitioned by `22-S1` and `25-S2` (the pricing page renders the same catalogue).
 
@@ -1258,7 +1384,9 @@ decision has one landing place instead of leaking into four.
 
 ### Reference rows
 
-`FND-31 missing → done` — the install-prompt and offline-state primitives.
+`FND-31 missing → missing` — neither `src/components/ui/install-prompt.tsx` nor
+`src/components/ui/offline-banner.tsx` was ever built, anywhere. A real open gap, kept as one: this
+stage's owned paths stay declared and the row stays open.
 
 Requisitioned by `27-S1`.
 
@@ -1326,18 +1454,18 @@ None.
 
 ### Reference rows
 
-`FND-32 missing → done` — `loans`: the borrowing, its terms and its status.
-`FND-33 missing → done` — `loan_instalments`: the materialised schedule, with the settlement link
-and the evidence `CHECK`.
-`FND-34 missing → done` — `loan_extra_repayments`: the link table for a repayment outside the
-schedule.
+`FND-32 missing → missing` — `loans` is **absent** from `src/server/db/schema.ts`. Deferred to
+`28-S1`; the row stays open.
+`FND-33 missing → missing` — `loan_instalments`, with its settlement link and evidence `CHECK`, is
+**absent**. Deferred to `28-S1`; the row stays open.
+`FND-34 missing → missing` — `loan_extra_repayments` is **absent**. Deferred to `28-S1`; the row
+stays open.
 
 Requisitioned by `28-S1`.
 
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0006_loans.sql` — new (generated)
 
 ### Data and migration
 
@@ -1360,7 +1488,9 @@ narrowing of `RECURRING_FREQUENCIES` to the four that divide a year exactly. It 
 subset of that array rather than a new literal list, so a frequency added to the recurring
 vocabulary cannot silently fail to appear here.
 
-Migration `drizzle/0006_loans.sql`, additive, backfilling nothing. Three new tables and no change to
+Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+generator's and is not asserted here. It creates `loans`, `loan_instalments` and
+`loan_extra_repayments` — additive, backfilling nothing. Three new tables and no change to
 an existing one, so `docs/DEPLOY.md` §5's non-additive register is unchanged and the previous
 Worker's SQL keeps working against the new schema.
 

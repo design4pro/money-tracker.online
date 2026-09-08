@@ -122,6 +122,12 @@ export type ClassReport = {
    * see, because a path corrected to the wrong existing file passes that one.
    */
   readonly unresolvedLandings: ReadonlyArray<string>
+  /**
+   * `landedAt` paths the plan document never mentions - as a bullet or in prose. The other half
+   * of Step 2.1: a correction that silently drops a moved subject leaves the plan smaller and no
+   * more honest, so every recorded landing site has to be written down somewhere in the document.
+   */
+  readonly unmentionedLandings: ReadonlyArray<string>
 }
 
 const allEntries = (
@@ -164,7 +170,8 @@ const satisfied = (path: string): boolean => found(path) === declared(path)
  * for every documented way of invoking this - `pnpm exec` and vitest both run there.
  */
 export const auditPlan = (planPath: string): AuditReport => {
-  const plan = parsePlan(readFileSync(planPath, 'utf8'))
+  const markdown = readFileSync(planPath, 'utf8')
+  const plan = parsePlan(markdown)
   const entries = allEntries(plan)
 
   const distinct = new Set(entries.map(({ entry }) => entry.path))
@@ -313,6 +320,11 @@ export const auditPlan = (planPath: string): AuditReport => {
       ]
         .filter((path) => !existsSync(path))
         .sort(),
+      unmentionedLandings: [
+        ...new Set(DRIFT_ENTRIES.flatMap((row) => row.landedAt)),
+      ]
+        .filter((path) => !markdown.includes(path))
+        .sort(),
     },
   }
 }
@@ -353,6 +365,9 @@ const report = (audit: AuditReport): string => {
     audit.classes.unresolvedLandings.length === 0
       ? '  every recorded landing site resolves on disk'
       : `  landing sites that do NOT resolve: ${audit.classes.unresolvedLandings.join(', ')}`,
+    audit.classes.unmentionedLandings.length === 0
+      ? '  every recorded landing site is named in the plan'
+      : `  landing sites the plan never names: ${audit.classes.unmentionedLandings.join(', ')}`,
     '',
     'Assertions',
   ]
