@@ -3,7 +3,7 @@
 # editing .ai/cezar/ui-state.json by hand). One template per om-* skill: the task text, the flags
 # and the preconditions, so the cockpit composer carries what SKILL.md knows.
 #
-#   scripts/cezar/prompt-templates.sh [--dry-run]
+#   .ai/scripts/cez-prompt-templates.sh [--dry-run]
 #
 # The PUT merges shallowly at the top level, so only `promptTemplates` is replaced and every other
 # preference in ui-state.json survives. Idempotent: the array is written wholesale.

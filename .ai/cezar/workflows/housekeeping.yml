@@ -1,5 +1,5 @@
 # Three read-mostly passes over the open queue (ADR 0017), started by launchd three times a day
-# on the cezar host (scripts/cezar/launchd/, scripts/cezar/housekeeping.sh). om-review-prs
+# on the cezar host (.ai/scripts/launchd/, .ai/scripts/housekeeping.sh). om-review-prs
 # reviews what waits for review, om-merge-buddy reports what could merge (it never merges),
 # om-close-fixed-issues closes issues whose `Closes #n` PR merged into develop - GitHub does not,
 # because develop is not the default branch. The task text is ignored by all three.

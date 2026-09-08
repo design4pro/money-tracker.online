@@ -279,7 +279,7 @@ describe('guard-generated.sh', () => {
     '.ai/browsers/playwright.md',
     '.ai/skills/om-code-review/SKILL.md',
     '.ai/scripts/test-env-up.sh',
-    'scripts/cezar/automations.sh',
+    '.ai/scripts/cez-automations.sh',
     '.npmrc',
     'pnpm-workspace.yaml',
     'docs/agents/reference.md',
