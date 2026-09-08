@@ -408,6 +408,17 @@ describe('guard-generated.sh', () => {
     'docs/agents/out-of-scope.md',
     '.ai/scripts/test-env-up.sh',
     '.ai/scripts/__tests__/cezar-config.test.ts',
+    // The lock is the root of trust for agent-kit-check.mjs, which proves only that each file's
+    // hash equals the hash the lock states. A run able to edit both edits a rendered file and
+    // restates its hash in the same breath, and the gate still exits 0.
+    '.ai/agent-kit.lock.json',
+    // Kit-rendered, and review-threads-label.mjs is the single thing that arms pr-review-threads.
+    'scripts/ci/review-threads-label.mjs',
+    'scripts/ci/__tests__/review-threads-label.test.mjs',
+    // What the cockpit installs as this repository's automations and prompts. Only the first is
+    // kit-rendered; both are configuration a run is handed and must not rewrite.
+    'docs/agents/cezar-automations.json',
+    'docs/agents/cezar-prompt-templates.json',
     '.npmrc',
     'pnpm-workspace.yaml',
   ])('agent mode blocks %s', (rel) => {
@@ -424,6 +435,12 @@ describe('guard-generated.sh', () => {
     for (const rel of [
       'src/x.ts',
       'scripts/seed/seed.mjs',
+      // scripts/ci/ is guarded; the rest of scripts/ is not, and must stay that way.
+      'scripts/visual/capture.mjs',
+      // skills-lock.json stays editable so om-apply-upgrade-notes can still move it. Protecting
+      // the lock is what makes the `watched` entry for it meaningful: a run may write this file,
+      // and can no longer rewrite the hash that reports it.
+      'skills-lock.json',
       'docs/agents/cezar.md',
       'src/.npmrc-ish.ts',
       '.ai/runs/2026-09-06-rings/PLAN.md',
