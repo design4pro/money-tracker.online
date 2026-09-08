@@ -7,6 +7,10 @@ src/routeTree.gen.ts
 drizzle
 # Claude Code orchestration scripts and run state.
 .claude
+# om-* pipeline descriptors, installed verbatim from the om-setup-agent-pipeline
+# skill's references; kept byte-identical so upgrades diff cleanly.
+.ai/trackers
+.ai/browsers
 # The same skills and agents, mirrored where GitHub's tooling looks for them,
 # plus the design skill's own run state. Vendored: formatting them rewrites
 # files this repository does not own and makes the next update conflict.

@@ -42,7 +42,7 @@ Upstream references: cli/cli#11983 (`gh pr edit` aborts without any project flag
 - PRs open as **drafts** when a skill says so; a human (or **mark-pr-ready**) promotes them.
 - Claim/lock signals on an issue or PR are: assignee set to the automation user, the `in-progress` label, and a `🤖`-prefixed claim comment. All three are set on claim; the label is guarded (below). The `ci-monitoring` label is **not** a claim signal — it marks work that is finished and reported while its CI-result follow-up is still owed, and never makes another skill back off.
 - Long, multi-line comment bodies are posted with `--body-file` (or a heredoc via process substitution) so formatting is preserved.
-- CI status truth comes from **get-pr-checks**; the set of _required_ checks comes from **get-required-checks** (branch protection). When branch protection is not readable (404), treat every reported check as required.
+- CI status truth comes from **get-pr-checks**; the set of *required* checks comes from **get-required-checks** (branch protection). When branch protection is not readable (404), treat every reported check as required.
 
 ## Label guards
 
@@ -89,9 +89,18 @@ remove_issue_label() { remove_label "$1" "$2"; }
 
 # Pipeline labels are mutually exclusive: setting one removes the others first.
 # Note the argument order, unchanged: $1 = PR number, $2 = label.
+#
+# $PIPELINE_LABELS is a space-separated string, and `for label in $PIPELINE_LABELS`
+# iterates it once as a single word under zsh, which does not word-split an unquoted
+# parameter expansion (setting IFS does not change that; only the non-default
+# SH_WORD_SPLIT option does). The competing labels are then never removed and the
+# mutual exclusion silently does not hold. Splitting on newlines through `read` behaves
+# identically in sh, bash and zsh; the trailing newline from `printf` matters, because
+# `read` returns non-zero on an unterminated last line and drops it.
 set_pipeline_label() {
   if [ "$LABELS_ENABLED" != "true" ]; then return 0; fi
-  for label in $PIPELINE_LABELS; do
+  printf '%s\n' "$PIPELINE_LABELS" | tr ' ' '\n' | while IFS= read -r label; do
+    [ -z "$label" ] && continue
     [ "$label" = "$2" ] && continue
     remove_label "$label" "$1"
   done
@@ -108,9 +117,7 @@ Read the labels back (`gh pr view {prNumber} --json labels`) whenever the label 
 ### Identity and repository
 
 #### auth-check
-
 Verify the CLI is authenticated and new enough. → exit status (non-zero when unauthenticated), plus a warning on stdout when the client predates the Projects (classic) fix.
-
 ```bash
 gh auth status || exit 1
 
@@ -123,30 +130,23 @@ if [ "$(printf '%s\n%s\n' "$MIN_GH_VERSION" "$GH_VERSION" | sort -V | head -n1)"
   echo "WARNING: gh $GH_VERSION predates $MIN_GH_VERSION — 'gh pr edit'/'gh issue edit' fail on the Projects (classic) deprecation. Upgrade: https://github.com/cli/cli/blob/trunk/docs/install_linux.md#recommended-official"
 fi
 ```
-
 `sort -V` exists on GNU and BSD/macOS `sort`; where it does not, compare `gh --version` against 2.82.1 by inspection and report the same warning.
 
 #### current-user
-
 → the automation user's login.
-
 ```bash
 CURRENT_USER=$(gh api user --jq '.login')
 ```
 
 #### repo-info
-
 → `owner/name` handle and default branch of the current repository.
-
 ```bash
 gh repo view --json nameWithOwner,defaultBranchRef
 REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
 ```
 
 #### default-branch
-
 → the repository's default branch name (used when the config's `baseBranch` is `"auto"`).
-
 ```bash
 BASE_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)
 [ -z "$BASE_BRANCH" ] && BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
@@ -156,87 +156,66 @@ BASE_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
 ### Issues
 
 #### get-issue
-
 `{issueId}`, field list → issue data. Request only the fields the calling skill names.
-
 ```bash
 gh issue view {issueId} --repo {owner}/{repo} --json number,title,body,state,author,url,labels,assignees,comments
 ```
 
 #### search-issues
-
 Query (text, `in:title,body`, state) → matching issues.
-
 ```bash
 gh issue list --repo {owner}/{repo} --state open --search "<query> in:title,body" --json number,title,url
 ```
 
 #### create-issue
-
 Title, body, assignee, labels → created issue URL.
-
 ```bash
 gh issue create --repo {owner}/{repo} --title "<title>" --assignee <login> --label <labels> --body "<body>"
 ```
 
 #### close-issue
-
 `{issueId}`, reason, closing comment.
-
 ```bash
 gh issue close {issueId} --repo {owner}/{repo} --reason completed --comment "<comment>"
 ```
 
 #### comment-issue
-
 `{issueId}`, body (use a heredoc/body-file for multi-line bodies).
-
 ```bash
 gh issue comment {issueId} --repo {owner}/{repo} --body "<body>"
 ```
 
 #### update-issue
-
 `{issueId}`, new title and/or body. Edits the issue's own fields; does not touch labels or assignees (those have their own operations). Pass only what changed; read the body from a file so multi-line content survives.
-
 ```bash
 gh api -X PATCH repos/{owner}/{repo}/issues/{issueId} -f title="<title>"
 gh api -X PATCH repos/{owner}/{repo}/issues/{issueId} -F body=@<file>
 ```
-
 `gh issue edit {issueId} --title "<title>" --body-file <file>` does the same on `gh` >= 2.82.1 and is fine interactively; older clients fail before writing anything (see Prerequisites), so script the REST form.
 
 #### assign-issue / unassign-issue
-
 ```bash
 gh api -X POST   repos/{owner}/{repo}/issues/{issueId}/assignees -f "assignees[]=<login>"
 gh api -X DELETE repos/{owner}/{repo}/issues/{issueId}/assignees -f "assignees[]=<login>"
 ```
 
 #### label-issue / unlabel-issue
-
 Always through the guards: `apply_issue_label "<label>" {issueId}` / `remove_issue_label "<label>" {issueId}`.
 
 #### get-issue-comment
-
 Comment id → body, author, URL.
-
 ```bash
 gh api repos/{owner}/{repo}/issues/comments/{commentId} --jq '{body,user:.user.login,url:.html_url}'
 ```
 
 #### list-issue-comments
-
 `{issueId or prNumber}` → conversation comments (PR conversation comments are issue comments on GitHub).
-
 ```bash
 gh api repos/{owner}/{repo}/issues/{number}/comments --jq '.[] | {id,user:.user.login,body}'
 ```
 
 #### update-comment
-
 `{commentId}`, new body → rewrite an existing conversation comment in place (works for issue and PR conversation comments alike). This is how marker-idempotent comments (label rationale, verification, claim take-overs) are updated on re-runs: find your `🤖 …` marker via **list-issue-comments**, then update that comment instead of posting a new one. Use a body file so multi-line bodies survive.
-
 ```bash
 gh api -X PATCH repos/{owner}/{repo}/issues/comments/{commentId} -F body=@<path>
 ```
@@ -244,17 +223,13 @@ gh api -X PATCH repos/{owner}/{repo}/issues/comments/{commentId} -F body=@<path>
 ### Pull requests
 
 #### get-pr
-
 `{prNumber}`, field list → PR data. Request only the fields the calling skill names; the full field set skills use:
-
 ```bash
 gh pr view {prNumber} --json number,title,url,body,state,author,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,maintainerCanModify,mergeable,mergeStateStatus,reviewDecision,labels,latestReviews,reviews,commits,files,assignees,comments,mergedAt,mergeCommit,closingIssuesReferences,createdAt,closedAt,additions,changedFiles
 ```
 
 #### list-prs
-
 State/search filters, field list, limit → PRs.
-
 ```bash
 gh pr list --state open --json number,title,url,author,labels,reviewDecision,mergeable,mergeStateStatus,headRefName,baseRefName,updatedAt,isDraft,assignees --limit 100
 gh pr list --state merged --search "merged:>=${SINCE_DATE}" --json number,title,url,body,author,createdAt,mergedAt,mergeCommit,baseRefName,headRefName,closingIssuesReferences,labels --limit {limit}
@@ -262,17 +237,13 @@ gh pr list --state closed --search "closed:>=${SINCE_DATE} is:unmerged" --json n
 ```
 
 #### search-prs
-
 Free-text query (for example an issue reference) and state → matching PRs.
-
 ```bash
 gh search prs --repo {owner}/{repo} "#{issueId}" --state open --json number,title,url,state
 ```
 
 #### create-pr
-
 Base branch, draft flag, title, body → PR.
-
 ```bash
 gh pr create --repo {owner}/{repo} --base "$BASE_BRANCH" --draft --title "<title>" --body "<body>"
 PR_URL=$(gh pr view --json url --jq .url)
@@ -280,26 +251,20 @@ PR_NUMBER=$(gh pr view --json number --jq .number)
 ```
 
 #### update-pr
-
 `{prNumber}`, new title and/or new body → the PR's own title/body rewritten in place (not a comment), e.g. describing what a PR actually ships once its scope changed. Pass whichever of title / body changed; omit the other. Read the body from a file so multi-line content survives.
-
 ```bash
 gh api -X PATCH repos/{owner}/{repo}/pulls/{prNumber} -f title="<title>"
 gh api -X PATCH repos/{owner}/{repo}/pulls/{prNumber} -F body=@<path>
 ```
-
 `gh pr edit {prNumber} --title … --body-file …` does the same on `gh` >= 2.82.1. On older clients it exits non-zero with the Projects (classic) error and writes nothing (see Prerequisites) — which reads like a no-op, so script the REST form above.
 
 #### comment-pr
-
 `{prNumber}`, body. For long structured comments:
-
 ```bash
 gh pr comment {prNumber} --body-file <path-or-process-substitution>
 ```
 
 #### attach-image-evidence
-
 `{prNumber}`, a markdown comment body (without the images), a `{slug}` (e.g. `pr-{prNumber}`), and a list of local PNG paths → post one comment with the images embedded **inline**, and return the comment URL.
 
 GitHub does not accept image bytes through the comment API, so make the images referenceable first. For a **public** repo, upload them to a dedicated **slash-free** evidence branch (never the change's own branch) via the Contents API and reference `raw.githubusercontent.com` URLs — those render inline in comments:
@@ -339,110 +304,83 @@ gh pr view {prNumber} --json url --jq .url
 Fallbacks: for a **private** repo the raw URLs need auth and will not render — post the comment with the image links plus the local artifact paths and note that inline rendering is unavailable (a private-visibility limit), rather than failing. When even the evidence branch cannot be pushed (no write access), degrade to listing the artifact paths in the comment. Never store evidence on the change's own branch, and never force-push.
 
 #### assign-pr / unassign-pr
-
 Assignees live on the shared `/issues/` endpoint for PRs too — `{prNumber}` is the path segment.
-
 ```bash
 gh api -X POST   repos/{owner}/{repo}/issues/{prNumber}/assignees -f "assignees[]=<login>"
 gh api -X DELETE repos/{owner}/{repo}/issues/{prNumber}/assignees -f "assignees[]=<login>"
 ```
 
 #### label-pr / unlabel-pr
-
 Always through the guards: `apply_label "<label>" {prNumber}` / `set_pipeline_label {prNumber} "<label>"` for the mutually exclusive pipeline group; direct removal: `remove_label "<label>" {prNumber}`.
 
 #### get-pr-diff
-
 `{prNumber}` → full diff, or the changed-file list with `--name-only`.
-
 ```bash
 gh pr diff {prNumber}
 gh pr diff {prNumber} --name-only
 ```
 
 #### get-pr-files
-
 `{prNumber}` → changed files with per-file status (added/modified/removed), paginated.
-
 ```bash
 gh api "repos/{owner}/{repo}/pulls/{prNumber}/files" --paginate --jq '.[] | {path: .filename, status: .status}'
 ```
 
 #### checkout-pr
-
 `{prNumber}` → the PR's head available locally (needed for cross-repository fork PRs where the head branch cannot be fetched from `origin`).
-
 ```bash
 gh pr checkout {prNumber} --recurse-submodules=no
 ```
 
 #### review-pr
-
 `{prNumber}`, verdict (approve / request changes), body.
-
 ```bash
 gh pr review {prNumber} --approve --body "<body>"
 gh pr review {prNumber} --request-changes --body "<body>"
 ```
-
 GitHub rejects self-approval (reviewing your own PR); surface that instead of working around it.
 
 #### merge-pr
-
 `{prNumber}`; squash is the default merge strategy. `--auto` merges when checks pass; `--delete-branch` only when asked.
-
 ```bash
 gh pr merge {prNumber} --squash
 ```
 
 #### mark-pr-ready
-
 Promote a draft PR.
-
 ```bash
 gh pr ready {prNumber}
 ```
 
 #### get-pr-checks
-
 `{prNumber}` → CI check runs with name, state, and link.
-
 ```bash
 gh pr checks {prNumber} --json name,state,link
 ```
 
 #### get-required-checks
-
 Base branch → the set of required status checks. A 404 means branch protection is not readable — treat all reported checks as required.
-
 ```bash
 gh api repos/{owner}/{repo}/branches/{baseRefName}/protection/required_status_checks --jq '.contexts[]' 2>/dev/null
 ```
 
 #### get-pr-comment / get-review-comment
-
 Conversation comment id (`issuecomment-<id>` links) vs inline review comment id (`discussion_r<id>` links) → body, author, URL.
-
 ```bash
 gh api repos/{owner}/{repo}/issues/comments/{commentId} --jq '{body,user:.user.login,url:.html_url}'
 gh api repos/{owner}/{repo}/pulls/comments/{commentId} --jq '{body,user:.user.login,url:.html_url}'
 ```
 
 #### list-review-comments
-
 `{prNumber}` → every inline review comment on the diff (the conversation comments come from **list-issue-comments**; these are the ones anchored to a file and line).
-
 ```bash
 gh api --paginate repos/{owner}/{repo}/pulls/{prNumber}/comments \
   --jq '.[] | {id,user:.user.login,path,line:(.line // .original_line),body,url:.html_url,reply_to:.in_reply_to_id}'
 ```
-
 REST does not expose a thread's resolved state; **list-review-threads** does (GraphQL), so take the open set from there and use this operation for the comment bodies alone. Without it, treat every returned comment as potentially open and judge it against the current diff. `reply_to` is non-null on replies, which is what lets you reconstruct a thread. Consumers treat an unavailable operation as "inline feedback out of reach", not as a failure: they fall back to review bodies plus conversation comments and state the gap in their report.
 
 #### list-review-threads
-
-`{prNumber}` → every inline review thread with its resolution and outdated state (the two things **list-review-comments** cannot see), the file it anchors to and its comments oldest first. `id` is the GraphQL thread id that **resolve-review-thread** takes; each comment's `id` is the REST id that **reply-review-comment** takes. Consumers count a thread as open only when it is unresolved _and_ not outdated.
-
+`{prNumber}` → every inline review thread with its resolution and outdated state (the two things **list-review-comments** cannot see), the file it anchors to and its comments oldest first. `id` is the GraphQL thread id that **resolve-review-thread** takes; each comment's `id` is the REST id that **reply-review-comment** takes. Consumers count a thread as open only when it is unresolved *and* not outdated.
 ```bash
 gh api graphql --paginate -F owner={owner} -F name={repo} -F number={prNumber} -f query='
   query($owner:String!,$name:String!,$number:Int!,$endCursor:String){
@@ -456,17 +394,13 @@ gh api graphql --paginate -F owner={owner} -F name={repo} -F number={prNumber} -
 ```
 
 #### reply-review-comment
-
 `{prNumber}`, the REST id of the thread's first comment, body → a reply inside that thread (the reply stays attached to the file and line; a conversation comment would not).
-
 ```bash
 gh api -X POST repos/{owner}/{repo}/pulls/{prNumber}/comments/{commentId}/replies -f body="<body>"
 ```
 
 #### resolve-review-thread
-
 Thread id from **list-review-threads** → the thread is marked resolved. Resolution is a claim that the ask was handled: a consumer resolves a thread only after it has answered in it (**reply-review-comment**) with what was done, and never one whose ask it neither fixed nor declined with a reason. Any collaborator with write access may resolve, the thread's author included; the mutation is idempotent on an already-resolved thread.
-
 ```bash
 gh api graphql -F threadId={threadId} -f query='
   mutation($threadId:ID!){ resolveReviewThread(input:{threadId:$threadId}){ thread{ id isResolved } } }' \
@@ -475,44 +409,34 @@ gh api graphql -F threadId={threadId} -f query='
 
 ### CI runs
 
-CI status for a _PR_ comes from **get-pr-checks** / **get-required-checks** above. The operations here address CI runs directly — needed when working from a bare branch, or when a failure diagnosis needs the actual logs.
+CI status for a *PR* comes from **get-pr-checks** / **get-required-checks** above. The operations here address CI runs directly — needed when working from a bare branch, or when a failure diagnosis needs the actual logs.
 
 #### list-runs
-
 Branch (or head SHA) → recent workflow runs with id, workflow name, status, and conclusion.
-
 ```bash
 gh run list --branch {branch} --limit 20 --json databaseId,workflowName,name,status,conclusion,headSha,url,createdAt
 ```
 
 #### get-run
-
 Run id → status, conclusion, and per-job breakdown.
-
 ```bash
 gh run view {runId} --json status,conclusion,workflowName,headSha,url,jobs
 ```
 
 #### get-run-failed-logs
-
 Run id → the log output of failed steps only. This is the primary diagnosis input for CI failures.
-
 ```bash
 gh run view {runId} --log-failed
 ```
 
 #### rerun-failed
-
 Run id → re-execute only the failed jobs of that run. Use to disambiguate flaky failures before changing any code.
-
 ```bash
 gh run rerun {runId} --failed
 ```
 
 #### watch-run
-
 Run id → block until the run completes, exiting non-zero on failure. Prefer this over sleep-polling; fall back to periodic **get-run** when watching is unavailable.
-
 ```bash
 gh run watch {runId} --exit-status
 ```
@@ -520,25 +444,19 @@ gh run watch {runId} --exit-status
 ### Labels
 
 #### list-labels
-
 → all label names defined in the repo. Paginated, so repositories with large taxonomies are not truncated the way a fixed `gh label list --limit` is.
-
 ```bash
 gh api --paginate repos/{owner}/{repo}/labels --jq '.[].name'
 ```
 
 #### create-label
-
 Name, color, description. Never delete, rename, or recolor existing labels.
-
 ```bash
 gh label create <name> --color <hex> --description "<description>"
 ```
 
 #### ensure-label-taxonomy
-
 Create every label from the config's taxonomy that does not exist yet (used by `om-setup-agent-pipeline`; skip ones that already exist per **list-labels**):
-
 ```bash
 gh label create review            --color 0366d6 --description "Ready for code review"
 gh label create changes-requested --color b60205 --description "Reviewer requested changes"
