@@ -14,10 +14,19 @@
 #    short-circuit the check as well, and the service plist gets that variable.
 # 3. GH_CONFIG_DIR: the cockpit acts as design4pro-agent (docs/agents/cezar.md, Host identity); the
 #    plist carries the path to that account's gh config directory and cezar forwards it to every run.
+# 4. Label events on pull requests: the poller scopes its label source to `is:issue` and then skips
+#    any search hit carrying `pull_request`, so `issue.labeled` can never fire on a PR and the only
+#    PR trigger cezar has is `pull_request.opened` - the wrong moment for anything a review job
+#    posts minutes later. The patch makes both gates honour a `filters.includePullRequests` flag,
+#    which survives validation because `automationFiltersSchema` is `.passthrough()`. Opt-in per
+#    automation: without the flag the behaviour is byte-for-byte what it was, so `issue-regroom`,
+#    `issue-autofix` and `issue-spec` cannot start firing on PRs that happen to carry their label.
+#    Used by `pr-review-threads` (docs/agents/cezar-automations.json).
 #
 # The cockpit is one per host and shared with planned.travel, whose .ai/scripts/cezar-host-patch.sh
-# is byte-identical. Both are idempotent and check their own markers, so running either one is
-# enough; this copy exists so a host that only carries this checkout is still self-sufficient.
+# is identical apart from this paragraph. Both are idempotent and check their own markers, so
+# running either one is enough; this copy exists so a host that only carries this checkout is
+# still self-sufficient.
 set -euo pipefail
 
 VERSION="${CEZ_VERSION:-0.10.1}"
@@ -50,6 +59,15 @@ patch "$DIST/automations/github-poller.js" 'cezar#914' \
   "        // host patch, open-mercato/cezar#914: validate only the label rows of the timeline.
         const rows = JSON.parse(raw).filter((entry) => entry?.event === 'labeled' || entry?.event === 'unlabeled');
         return z.array(timelineEventSchema).parse(rows);"
+
+patch "$DIST/automations/github-poller.js" 'host patch: includePullRequests (search scope)' \
+  "            sources.push({ family: 'issues', activity: 'updated', opened: false, labels: true });" \
+  "            // host patch: includePullRequests widens the label source to PRs ('mixed' emits no is: qualifier).
+            sources.push({ family: definition.filters.includePullRequests ? 'mixed' : 'issues', activity: 'updated', opened: false, labels: true });"
+
+patch "$DIST/automations/github-poller.js" 'host patch: includePullRequests (hit filter)' \
+  "                if (source.labels && !item.pull_request) {" \
+  "                if (source.labels && (definition.filters.includePullRequests || !item.pull_request)) { // host patch: includePullRequests"
 
 patch "$DIST/skills-update.js" 'host patch: CEZ_SKILLS_AUTO_UPDATE' \
   "        if (process.env.CEZ_DRY_RUN === '1') {" \
