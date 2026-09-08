@@ -52,7 +52,13 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 import { citations, isOpen, parsePlan, resolveOwnedPath } from './parse-plan.ts'
+import {
+  DRIFT_CLASSES,
+  DRIFT_ENTRIES,
+  EXPECTED_CLASS_COUNTS,
+} from './drift-classes.ts'
 import type { OwnedPathEntry, PlanFile, Stage } from './parse-plan.ts'
+import type { DriftClass } from './drift-classes.ts'
 
 /** The twelve `###` headings `docs/plans/TEMPLATE.md` requires of every stage, in order. */
 export const REQUIRED_HEADINGS = [
@@ -100,6 +106,22 @@ export type AuditReport = {
   /** The absent paths, deduplicated and sorted - one absent path, one line. */
   readonly missingPaths: ReadonlyArray<string>
   readonly assertions: ReadonlyArray<Assertion>
+  readonly classes: ClassReport
+}
+
+export type ClassReport = {
+  /** Entries per class, counted from `drift-classes.ts`. */
+  readonly counts: Readonly<Record<DriftClass, number>>
+  /** Class-map rows the plan no longer declares - the Phase 2 progress measure. */
+  readonly corrected: ReadonlyArray<string>
+  /** Class-map rows still declared by the plan exactly as recorded. */
+  readonly outstanding: ReadonlyArray<string>
+  /**
+   * `landedAt` paths that do not resolve. Step 2.1's machine check: a Class A subject repointed
+   * at something that is not there is the failure mode a "zero Class A entries" check could not
+   * see, because a path corrected to the wrong existing file passes that one.
+   */
+  readonly unresolvedLandings: ReadonlyArray<string>
 }
 
 const allEntries = (
@@ -227,6 +249,16 @@ export const auditPlan = (planPath: string): AuditReport => {
     }
   }
 
+  const stillDeclared = new Set(
+    entries.map(({ stage, entry }) => `${stage.id} ${entry.path}`),
+  )
+  const classCounts = Object.fromEntries(
+    DRIFT_CLASSES.map((driftClass) => [
+      driftClass,
+      DRIFT_ENTRIES.filter((row) => row.driftClass === driftClass).length,
+    ]),
+  ) as Record<DriftClass, number>
+
   return {
     planPath,
     counts: {
@@ -268,6 +300,20 @@ export const auditPlan = (planPath: string): AuditReport => {
         violations: citationViolations,
       },
     ],
+    classes: {
+      counts: classCounts,
+      corrected: DRIFT_ENTRIES.filter(
+        (row) => !stillDeclared.has(`${row.stage} ${row.path}`),
+      ).map((row) => `${row.stage} ${row.path}`),
+      outstanding: DRIFT_ENTRIES.filter((row) =>
+        stillDeclared.has(`${row.stage} ${row.path}`),
+      ).map((row) => `${row.stage} ${row.path}`),
+      unresolvedLandings: [
+        ...new Set(DRIFT_ENTRIES.flatMap((row) => row.landedAt)),
+      ]
+        .filter((path) => !existsSync(path))
+        .sort(),
+    },
   }
 }
 
@@ -294,6 +340,19 @@ const report = (audit: AuditReport): string => {
     ...audit.missingPaths.map(
       (path) => `  ${path} — declared ${declared(path)}, found ${found(path)}`,
     ),
+    '',
+    'Drift classes (from `drift-classes.ts`, as of `f0ce37a`)',
+    ...DRIFT_CLASSES.map(
+      (driftClass) =>
+        `  ${driftClass}  ${String(audit.classes.counts[driftClass]).padStart(2)} entries` +
+        (audit.classes.counts[driftClass] === EXPECTED_CLASS_COUNTS[driftClass]
+          ? ''
+          : ` — MISMATCH, expected ${EXPECTED_CLASS_COUNTS[driftClass]}`),
+    ),
+    `  total ${Object.values(audit.classes.counts).reduce((a, b) => a + b, 0)} entries, of which ${audit.classes.corrected.length} no longer declared by the plan and ${audit.classes.outstanding.length} still declared`,
+    audit.classes.unresolvedLandings.length === 0
+      ? '  every recorded landing site resolves on disk'
+      : `  landing sites that do NOT resolve: ${audit.classes.unresolvedLandings.join(', ')}`,
     '',
     'Assertions',
   ]
