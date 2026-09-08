@@ -64,3 +64,19 @@
   line and the path: `00-S5 (line 500)`, the renamed path, "edit declares a file, found absent, and
   no stage declares it new". That is what the plan asked to see before calling it a guard.
 - Reverted. `git diff` on the document is empty and the suite is green again: 175 passed.
+
+## 2026-09-08T15:41:00Z — checkpoint 2: Phase 2 closed, and the six-command gate is green
+
+- Steps 2.1–2.4 landed as `5b32bb0`, `ccea7cc`, `da24fbb`, `c6d30ca`; the guard as `f5dffdc`.
+- All four audit assertions PASS, from 2 / 27 / 0 / 30 violations at checkpoint 1.
+- 34 reference rows before and after — 23 `done`, 2 `partial`, 9 `missing`. No row was deleted.
+- Seven declared paths are still absent and every one belongs to a stage with an open reference row.
+  That is the backlog the plan is for, not drift.
+- All six `validation.commands` pass, both codegen checks with a clean diff. See
+  `checkpoint-2-checks.md` and `final-gate-checks.md`.
+
+## 2026-09-08T15:41:00Z — decision: no new reference-row id was minted
+
+- Plan decision D6 reserved `FND-35` on `00-S1` to give assertion 2 coverage there. Measurement made
+  it unnecessary: `FND-02` and `FND-18` both resolved to `partial`, which is an open row. Inventing
+  an id to satisfy a guard would have been the guard writing the plan, so D6 was dropped.

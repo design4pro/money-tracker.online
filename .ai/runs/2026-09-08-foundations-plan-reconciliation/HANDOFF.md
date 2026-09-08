@@ -1,25 +1,27 @@
 # Handoff — 2026-09-08-foundations-plan-reconciliation
 
-**Last updated:** 2026-09-08T15:23Z
+**Last updated:** 2026-09-08T15:41Z
 **Branch:** `feat/issue-77-foundations-plan-reconciliation`
 **PR:** https://github.com/design4pro/money-tracker.online/pull/98 (draft)
-**Current phase/step:** Phase 2 Step 2.1 (Phase 1 closed at checkpoint 1)
-**Last commit:** `3bfddb2` — docs(specs): record the foundations reconciliation amendments
+**Current phase/step:** Phase 3 Step 3.3 (Phases 1 and 2 closed, gate green)
+**Last commit:** `f5dffdc` — test(plans): guard docs/plans/00-foundations.md against path drift
 
 ## What just happened
 
-- Phase 1 shipped in four commits: the parser (`89034aa`), the audit (`d775692`), the class map
-  (`bcf2bb9`) and the specification amendment (`3bfddb2`).
-- The audit reproduces every number the specification pinned — 56 / 40 / 29 / 27, and 30 under the
-  naive rule — so Phase 2 starts from the specification's table rather than re-opening it.
-- Two Class E landing sites the specification assumed turned out not to exist. Recorded, not
-  smoothed over; the `reorder-menu.test.tsx` entry stays open in Phase 2.
+- Phase 2 reconciled the document in four commits (`5b32bb0`, `ccea7cc`, `da24fbb`, `c6d30ca`) and
+  Phase 3's guard landed as `f5dffdc`. All four audit assertions PASS; rows read 23 `done`,
+  2 `partial`, 9 `missing`, all 34 accounted for and none deleted.
+- The guard was watched failing before being believed: a broken path at `00-foundations.md:500` took
+  assertion 1 red naming the stage, the line and the path. Reverted, diff empty.
+- Step 3.2's six-command gate is green end to end — see `final-gate-checks.md`, including why
+  command 5 needs `TMPDIR=/tmp` in this worktree.
 
 ## Next concrete action
 
-- Step 2.1: repoint the 12 Class A entries in `docs/plans/00-foundations.md` at the paths
-  `scripts/plans/drift-classes.ts` records, with a sentence at each of the three inlined subjects
-  (`enumCheck`, the queue dispatch, the cron switch) saying it is inlined and into what.
+- Step 3.3: file the four follow-up issues from the specification's _Risks & Impact Review_ — the
+  unused `@tanstack/react-table`, the two `amount-field.tsx` components, the missing
+  `docs/plans/OPEN-FINDINGS.md`, and the 28 unmeasured plan documents — then reference their numbers
+  back from the plan at the Blockers entries that currently read "Tracked as a follow-up issue."
 
 ## Blockers / open questions
 

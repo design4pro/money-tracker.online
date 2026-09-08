@@ -27,8 +27,8 @@
 | 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | done   | ccea7cc |
 | 2     | 2.3  | Re-measure every reference row                           | inline | done   | da24fbb |
 | 2     | 2.4  | Stage register and Blockers                              | inline | done   | c6d30ca |
-| 3     | 3.1  | The guard test                                           | inline | done   | PENDING |
-| 3     | 3.2  | The full gate                                            | inline | todo   | —       |
+| 3     | 3.1  | The guard test                                           | inline | done   | f5dffdc |
+| 3     | 3.2  | The full gate                                            | inline | done   | PENDING |
 | 3     | 3.3  | File the four follow-ups                                 | inline | todo   | —       |
 
 ## Goal
