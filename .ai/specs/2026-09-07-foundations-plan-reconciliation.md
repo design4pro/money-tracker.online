@@ -404,3 +404,79 @@ either does not, something outside this scope was touched.
 citing this spec and carrying category, priority and risk labels.
 _Verify:_ four issue numbers, referenced back from the reconciled plan at the row or Blockers entry they
 belong to.
+
+## 📝 Amendments
+
+Append-only. Each entry records a correction made **after** this document was approved on #75, with
+who raised it and how it was resolved. The body above is left as it was written, per the
+`docs/adr/` convention of amending rather than rewriting: a reader who wants to know what the
+document said at approval can still read it.
+
+### 2026-09-08 — the specification review's five corrections, resolved during implementation
+
+Raised by the specification review on #76 and carried as a checklist on issue #77. All five were
+approved as minor gaps, none blocking; they are resolved here and in
+`.ai/runs/2026-09-08-foundations-plan-reconciliation/PLAN.md` → _Decisions taken in this run_.
+
+1. **The audit is `scripts/plans/audit.ts`, not `audit.mts`.** `tsconfig.json` declares
+   `"include": ["**/*.ts", "**/*.tsx", …]`, and that glob does not match a `.mts` file, so the audit
+   as specified would have sat outside `pnpm typecheck`. `pnpm exec tsx` runs a `.ts` file just as
+   happily, and this document's actual argument — that a `.mjs` audit could not import the `.ts`
+   parser — is untouched. Every reference to `audit.mts` above should be read as `audit.ts`.
+
+2. **The reference-row status grammar is written down**, in `scripts/plans/parse-plan.ts`'s
+   docblock rather than here, so that the one place that parses it is the one place that defines
+   it. In short: a row opens with a backticked `` `FND-NN <from> → <to>` `` token whose statuses are
+   drawn from `missing | proposed | partial | done | deferred`; a row is **open** when `<to>` is
+   anything other than `done`; and a _citation_ is a backticked token in the row body that is
+   path-shaped — it contains a `/`, or ends in a source extension — which is what excludes the
+   table names (`accounts`), identifiers (`enumCheck`) and package names (`@tanstack/react-table`)
+   that rows legitimately carry. Assertion 2's coverage is per stage: an absent `— new` entry is
+   covered when the stage that owns it still has an open row, never by a row two stages away.
+
+3. **Step 2.3's verification is no longer circular.** Guard assertion 4 ships in the **Phase 1
+   audit**, not only in the Phase 3 test — the cheap half of the choice the review offered, since
+   the audit already holds the parsed rows. Step 2.3 therefore has a machine check to run at the
+   moment it needs one.
+
+4. **The `BACKWARD_COMPATIBILITY.md` claim is narrowed.** _Risks & Impact Review_ says that document
+   "lists no plan document and no `scripts/` module". The first clause holds; the second does not —
+   `BACKWARD_COMPATIBILITY.md:25` protects `scripts/seed/seed.mjs` and `scripts/seed/verify.mjs`
+   under _Seed and fixtures_. The verdict survives unchanged, because this work lives in
+   `scripts/plans/` and never touches `scripts/seed/`, but the sentence as written would have left
+   an implementer believing nothing under `scripts/` is protected.
+
+5. **`scripts/plans/drift-classes.ts` is permanent.** It is a frozen historical record of a fixed
+   moment, carrying its as-of SHA in its docblock, and Phase 3 does not remove it. Step 2.1's
+   verification reads it, so it must outlive Phase 2 in any case; and after Phase 2 the reconciled
+   plan no longer contains the drifted paths, so nothing else in the repository would record what
+   the drift was. The freeze is the point: it is dated data, never re-measured, and the guard — not
+   this file — is what keeps the live document honest.
+
+Two smaller notes from the same review:
+
+- **The counts are as-of, not eternal.** Every figure in _The measurement_ (56 / 40 / 29 / 27, and
+  30 under the naive rule) was taken at `1a1715a` and re-derived unchanged at `f0ce37a` before
+  implementation began. They describe the pre-reconciliation document and Phase 2 deliberately
+  changes them; nothing asserts them as a committed invariant, and the guard asserts properties
+  rather than counts precisely so that it does not go red for being right.
+- **Which Phase 1 files are expected to still exist a year from now:**
+  `scripts/plans/parse-plan.ts` and the Phase 3 guard, because they are read on every `pnpm test`.
+  `scripts/plans/audit.ts` is a re-derivation tool run on demand, and `drift-classes.ts` is frozen
+  data — both permanent, neither expected to change.
+
+### 2026-09-08 — two landing sites the classification assumed, corrected by measurement
+
+_The five drift classes_ → **Class E** describes four `__tests__` entries as tests that follow their
+subject. Measured against `f0ce37a`, two of them did not follow anything:
+
+- There is no `chart-frame.test.tsx` anywhere in the tree. `ChartFrame` is exercised only through
+  `src/components/charts/__tests__/{bar,line,donut}-chart.test.tsx`, which render it — a weaker
+  guarantee than a dedicated test.
+- `GridListMoveButton` has **no test file at all**, so the keyboard move path that
+  `src/components/ui/__tests__/reorder-menu.test.tsx` existed to cover is unasserted.
+
+Both are recorded in `scripts/plans/drift-classes.ts` with the measurement rather than the
+assumption, and the second keeps its entry open in the reconciled plan. This is exactly the failure
+mode _Risks_ names as the real one — a gap reclassified as shipped — caught by the classification
+step rather than by the guard, which is where it is cheapest to catch.
