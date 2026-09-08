@@ -4,7 +4,7 @@
 name: spec
 description: Human added `spec`; om-auto-write-spec turns the feature issue into a spec file on a design-only PR.
 steps:
-  - id: setup
+  - id: bootstrap
     name: Install dependencies and generate the route tree
     command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: spec

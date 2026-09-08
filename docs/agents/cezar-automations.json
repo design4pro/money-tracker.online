@@ -1,7 +1,7 @@
 [
   {
     "name": "issue-groom",
-    "description": "A maintainer opens an issue; om-auto-manage-issues adds SDLC labels, a Definition of Ready check and implementation notes (ADR 0017). `authors` is the gate: the run holds Bash with no allowlist and the issue body is its input, so an issue from anyone else is groomed only when a maintainer adds `groom`. Issues a run holds or a human put on hold never match.",
+    "description": "A maintainer opens an issue; om-auto-manage-issues adds SDLC labels, a Definition of Ready check and implementation notes (ADR 0017). `authors` is the gate: the run holds Bash with no allowlist, so an issue from anyone else is groomed only when a maintainer adds `groom`. Issues a run holds or a human put on hold never match.",
     "events": ["issue.opened"],
     "intervalSeconds": 120,
     "filters": {
@@ -21,7 +21,7 @@
   },
   {
     "name": "issue-regroom",
-    "description": "A label only a collaborator can set: `groom` re-runs om-auto-manage-issues on one issue (an external report a maintainer vouches for, an edit, a reply). The repo-local override removes the label as its first mutation, so a label still present is a run nobody took.",
+    "description": "A label only a collaborator can set: `groom` re-runs om-auto-manage-issues on one issue (an external report a maintainer vouches for, an edit, a reply). The override removes the label first.",
     "events": ["issue.labeled"],
     "intervalSeconds": 120,
     "filters": {
@@ -82,7 +82,7 @@
   },
   {
     "name": "pr-autopilot",
-    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; the pipeline labels exclude the race with om-open-pr, since the poller re-checks labels on every poll.",
+    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr.",
     "events": ["pull_request.opened"],
     "intervalSeconds": 300,
     "filters": {
@@ -112,7 +112,7 @@
   },
   {
     "name": "pr-review-threads",
-    "description": "The review job left unresolved threads on a PR and .github/workflows/claude-code-review.yml applied `review-threads` (scripts/ci/review-threads-label.mjs, once per head SHA); om-auto-fix-pr drives the PR to merge-ready and resolves them (ADR 0017). Without this the PR waits for a human to run the same skill by hand. `includePullRequests` is read by the host patch in .ai/scripts/cezar-host-patch.sh - stock cezar 0.10.1 drops every label event on a PR, so this automation does not fire without it. The gate is the label: only a collaborator or an Actions token can set one. The run removes it as its first mutation, so a label still present is a run nobody took.",
+    "description": "The `claude-review` job left unresolved review threads on a PR and applied `review-threads`; om-auto-fix-pr drives the PR to merge-ready and resolves them (ADR 0017). Without this the PR waits for a human to run the same skill by hand. `includePullRequests` is read by the host patch in .ai/scripts/cezar-host-patch.sh - stock cezar 0.10.1 drops every label event on a PR, so this automation does not fire without it. The gate is the label: only a collaborator or the Actions bot can set one, and the review job applies it once per head SHA. The run removes it as its first mutation, so a label still present is a run nobody took.",
     "events": ["issue.labeled"],
     "intervalSeconds": 120,
     "filters": {

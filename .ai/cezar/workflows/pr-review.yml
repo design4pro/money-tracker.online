@@ -1,12 +1,10 @@
 # Started from the cockpit on one PR number. om-auto-review-pr runs om-code-review (CODE_REVIEW.md,
-# BACKWARD_COMPATIBILITY.md, .ai/review-checklist.md), submits approve or request-changes, sets
-# pipeline labels, and with --autofix loops fix / validate / re-review on the agent's own PRs
-# (ADR 0017). Edit and Write are on for that loop; without --autofix the skill leaves the tree
-# alone.
+# BACKWARD_COMPATIBILITY.md), submits approve or request-changes, sets pipeline labels, and with
+# --autofix loops fix / validate / re-review on the agent's own PRs (ADR 0017).
 name: pr-review
 description: om-auto-review-pr --autofix on one PR - code review, pipeline labels, autofix loop on agent PRs.
 steps:
-  - id: setup
+  - id: bootstrap
     name: Install dependencies and generate the route tree
     command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: review

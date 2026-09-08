@@ -1,12 +1,12 @@
-# Three read-mostly passes over the open queue (ADR 0017), started by launchd three times a day
-# on the cezar host (.ai/scripts/launchd/, .ai/scripts/housekeeping.sh). om-review-prs
-# reviews what waits for review, om-merge-buddy reports what could merge (it never merges),
-# om-close-fixed-issues closes issues whose `Closes #n` PR merged into develop - GitHub does not,
-# because develop is not the default branch. The task text is ignored by all three.
+# The sweeper's successor (ADR 0017): three read-mostly passes over the open queue, started by
+# launchd three times a day on the cezar host (.ai/scripts/launchd/, .ai/scripts/housekeeping.sh).
+# om-review-prs reviews what waits for review, om-merge-buddy reports what could merge (it never
+# merges), om-close-fixed-issues closes issues whose `Closes #n` PR merged into develop - GitHub
+# does not, because develop is not the default branch. The task text is ignored by all three.
 name: housekeeping
 description: Review the queue, report what can merge, close issues whose PR merged into develop.
 steps:
-  - id: setup
+  - id: bootstrap
     name: Install dependencies and generate the route tree
     command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: review-prs
