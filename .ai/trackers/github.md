@@ -490,8 +490,12 @@ gh label create risk-high         --color b60205 --description "Wide blast radiu
 The four command labels a human sets to start a Cezar automation
 (`docs/agents/cezar-automations.json`). Only a collaborator can set a label, which is what gates
 the `issue.labeled` triggers; the skill that reacts removes its own label as its first mutation, so
-a label still present means nobody picked the item up. No skill ever adds one. The first three go
-on an issue, `review-threads` on a pull request:
+a label still present means nobody picked the item up. No skill ever adds one.
+
+`spec` is the exception to that last diagnosis. `issue-spec` filters on `allLabels: ["feature"]`,
+alone among the four, so on an issue that is not labelled `feature` the label sits there because no
+run was ever going to start - not because one stalled, which is where the sentence above would
+otherwise send you looking. The first three go on an issue, `review-threads` on a pull request:
 
 ```bash
 gh label create groom          --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
