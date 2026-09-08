@@ -35,6 +35,19 @@ esac
 # browser descriptors, the skill overrides and the validation entrypoints under .ai/scripts/ (a
 # run must not rewrite its own gate). docs/agents/reference.md and out-of-scope.md are the
 # clean-room rule and the product boundary, governance a run reads and never edits.
+#
+# .ai/agent-kit.lock.json is here because it is the root of trust for that gate and not merely
+# another generated file. agent-kit-check.mjs proves nothing except that each file's hash equals
+# the hash the lock states, so a run able to edit both edits the file and restates its hash in the
+# same breath and the check still exits 0 - the one failure that leaves the gate looking green.
+# Protecting the lock is what makes every hash in it mean something, the `watched` skills-lock.json
+# entry included; that file stays editable so om-apply-upgrade-notes can still move it, and the
+# lock is now what reports it when something else does.
+#
+# scripts/ci/ and the two docs/agents/cezar-*.json are the same argument one step out:
+# review-threads-label.mjs is the single thing that arms pr-review-threads, and the two JSON files
+# are what the cockpit installs as this repository's automations and prompts - a run rewriting the
+# prompt it is about to be handed is the same act as a run rewriting .ai/cezar/.
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 rel="${file_path#"$root"/}"
 
@@ -49,7 +62,7 @@ in_branch_diff() {
   grep -Fxq "$1" <<< "$changed"
 }
 
-if printf '%s' "$rel" | grep -Eq '^(\.github/|\.claude/|\.husky/|\.ai/cezar/|\.ai/agentic\.config\.json$|\.ai/trackers/|\.ai/browsers/|\.ai/skills/|\.ai/scripts/|\.npmrc$|pnpm-workspace\.yaml$|docs/agents/reference\.md$|docs/agents/out-of-scope\.md$)'; then
+if printf '%s' "$rel" | grep -Eq '^(\.github/|\.claude/|\.husky/|\.ai/cezar/|\.ai/agentic\.config\.json$|\.ai/trackers/|\.ai/browsers/|\.ai/skills/|\.ai/scripts/|\.ai/agent-kit\.lock\.json$|scripts/ci/|docs/agents/cezar-(automations|prompt-templates)\.json$|\.npmrc$|pnpm-workspace\.yaml$|docs/agents/reference\.md$|docs/agents/out-of-scope\.md$)'; then
   # One exception, and only for a cezar run: a file the branch already changes. A reviewer asking
   # for a correction to a change a human proposed is not a run rewriting its own rules, and
   # refusing it is how a review thread stays open forever - the `develop` ruleset merges nothing

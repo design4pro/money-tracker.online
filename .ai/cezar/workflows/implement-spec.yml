@@ -5,7 +5,7 @@
 name: implement-spec
 description: Build a merged spec on one implementation PR to develop; review loop and UI verification included.
 steps:
-  - id: setup
+  - id: bootstrap
     name: Install dependencies and generate the route tree
     command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: implement
