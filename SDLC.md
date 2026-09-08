@@ -154,8 +154,9 @@ This document and `.ai/agentic.config.json` describe the same process: change th
   workflow `issue-autofix`, with the issue number as the task; or the `autofix` label on the issue,
   which the automation of the same name reacts to. Automations also start `issue-groom` on
   `issue.opened` and on the `groom` label, `spec` on the `spec` label of a `feature`, and
-  `pr-autopilot` on `pull_request.opened` (`docs/agents/cezar.md`). `groom`, `autofix` and `spec`
-  are the only labels that start work, and no skill adds one.
+  `pr-autopilot` on `pull_request.opened`, and `pr-fix` on the `review-threads` label of a PR whose
+  review left unresolved threads (`docs/agents/cezar.md`). `groom`, `autofix`, `spec` and
+  `review-threads` are the only labels that start work, and no skill adds one.
 - **QA routing.** A PR that reaches `src/routes/**`, `src/components/**`, `src/styles/**` or
   `src/lib/i18n/messages/*` carries `needs-qa`; docs, CI, tests, `scripts/**`, `.ai/**` and
   dependency bumps carry `skip-qa`. The QA reviewer takes the blind pair with

@@ -23,8 +23,8 @@ the rules of `SDLC.md`.
 - Host patches: `bash .ai/scripts/cezar-host-patch.sh` patches the cached copy of 0.10.1 the
   service runs, puts `CEZ_SKILLS_AUTO_UPDATE=0` in the service plist and restarts it. Rerun it
   after the npx cache is cleared; drop each patch once the pinned version carries the fix. The
-  cockpit is one per host and shared with `planned.travel`, whose copy of the script is
-  byte-identical — running either is enough.
+  cockpit is one per host and shared with `planned.travel`, whose copy of the script is identical
+  apart from one paragraph of its header — running either is enough.
   - `issue.labeled` polls fail as soon as one recently updated issue has a comment or a
     cross-reference (open-mercato/cezar#914, fix in upstream PR #916, unreleased), so
     `issue-regroom`, `issue-autofix` and `issue-spec` never fire.
@@ -34,6 +34,10 @@ the rules of `SDLC.md`.
     shows as hundreds of deleted files in `git status`. `skillsAutoUpdate: false` (kept in
     `~/.cezar/config.json`) gates only the update; the patch makes `CEZ_SKILLS_AUTO_UPDATE=0` skip
     the check too. Recovery: remove the symlinks, `git checkout -- .claude/skills`, delete `.agents/`.
+  - A label event on a pull request never reaches an automation: the poller asks for `is:issue` and
+    then drops any hit carrying `pull_request`, so `pull_request.opened` is the only PR trigger
+    stock cezar has. The patch teaches both gates a `filters.includePullRequests` flag, opt-in per
+    automation, which `pr-review-threads` sets and nothing else does.
 - Skills: `.claude/skills/om-*` are vendored files, byte-identical to the pinned upstream SHA, and
   `skills-lock.json` records it. A worktree therefore has the collection the moment it is cut, and
   the workflow's setup step installs dependencies only. `pnpm install-skills` re-installs and
@@ -126,7 +130,7 @@ Every workflow is a setup step (`HUSKY=0 pnpm install --frozen-lockfile --prefer
 generate-routes`) and one agent step whose prompt is the skill as a slash command (`/om-… {{task}}`;
 never `skill:`, which would load the thin `.ai/skills/` override alone). `allowedTools` is the
 full set for skills that write code and drops `Edit`/`Write` for the ones that must not. The tree
-is the same eight workflows as `planned.travel`, under the same names; the setup step differs only
+is the same nine workflows as `planned.travel`, under the same names; the setup step differs only
 where that repository provisions D1 and a basemap it needs and this one does not.
 
 | Workflow         | Agent step                                                               | Model                | Started by                                                                 |
@@ -137,6 +141,7 @@ where that repository provisions D1 and a basemap it needs and this one does not
 | `implement-spec` | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged                        |
 | `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation `pr-autopilot` (`pull_request.opened` by a human maintainer)    |
 | `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                  |
+| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation `pr-review-threads` (label `review-threads` on a PR)            |
 | `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `scripts/cezar/housekeeping.sh`, or a human                    |
 | `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                       |
 
@@ -148,9 +153,9 @@ same: a number, a spec path, or for `brainstorm` the idea.
 
 **Starting a run.** GitHub tab → issue → "Hand this to the agent" → workflow → the task box.
 Implementation also has a label trigger: `autofix` on an issue starts `issue-autofix` without the
-cockpit. The three command labels (`groom`, `autofix`, `spec`) are the only things that start
-code-writing work, and no skill adds them (the `.ai/skills/` overrides say so), so no run can start
-another.
+cockpit. The four command labels (`groom`, `autofix`, `spec` on an issue, `review-threads` on a
+PR) are the only things that start code-writing work, and no skill adds them (the `.ai/skills/`
+overrides say so), so no run can start another.
 
 **Merge and after.** `om-merge-buddy` reports what is mergeable; a human runs
 `/om-approve-merge-pr <n>` (squash to `develop`), then `/om-close-fixed-issues` closes what the
@@ -163,10 +168,11 @@ human sets `qa-approved`: the blind pair is `node scripts/visual/capture.mjs` (A
 
 Registered with the running cockpit by `scripts/cezar/automations.sh` (`--dry-run` first;
 idempotent: update in place or create enabled; it lists definitions the cockpit holds that the
-file no longer names). Five definitions: `issue-groom` on `issue.opened` with `authors` naming the
+file no longer names). Six definitions: `issue-groom` on `issue.opened` with `authors` naming the
 human maintainers; `issue-regroom`, `issue-autofix`, `issue-spec` on `issue.labeled` with
 `changedLabels` `groom` / `autofix` / `spec`; `pr-autopilot` on `pull_request.opened`, again with
-`authors`.
+`authors`; `pr-review-threads` on `issue.labeled` with `changedLabels` `review-threads` and
+`includePullRequests`, the only one that fires on a PR.
 
 Every trigger is gated on who can produce it: the open events by author, the label events because
 only a collaborator can set a label. This matters because the agent step holds Bash with no
@@ -174,6 +180,14 @@ allowlist and the issue body is its prompt: an issue anyone on GitHub can open m
 by itself, so an external report is groomed when a maintainer adds `groom`. The skill that reacts
 removes its own command label as its first tracker mutation, so a label still present means nobody
 picked the issue up.
+
+`pr-review-threads` is the one automation whose trigger stock cezar cannot deliver: the poller
+drops every label event on a pull request, so it needs patch 4 in `.ai/scripts/cezar-host-patch.sh`
+and the `includePullRequests` flag in its own filters. Unlike `planned.travel`, this repository has
+no review job that applies `review-threads` on its own and its `develop` ruleset does not carry
+`required_review_thread_resolution`, so the label is a human's call on a PR whose review left live
+threads, and an open thread blocks nothing but `om-auto-fix-pr`'s own exit criterion
+(`.ai/skills/om-auto-fix-pr/SKILL.md`).
 
 Agent PRs (authored by `design4pro-agent`, already reviewed inside their own chain) and Dependabot
 never enter the autopilot, and the pipeline labels stay excluded because the poller re-checks labels
@@ -264,20 +278,21 @@ claiming issues the new ones handle.
    answers 200. On the host clone, `git config core.hooksPath` should be unset or `.husky/_`;
    either is fine, since the hook skips itself inside a run. An installed copy that still
    carries `HUSKY=0` can stay: cezar drops it before the agent starts.
-5. The three command labels the `issue.labeled` automations react to
+5. The four command labels the `issue.labeled` automations react to
    (`ensure-label-taxonomy` in `.ai/trackers/github.md` carries them):
 
    ```bash
-   gh label create groom   --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
-   gh label create autofix --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
-   gh label create spec    --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
-   gh label list --limit 100 | wc -l   # 30
+   gh label create groom          --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
+   gh label create autofix        --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
+   gh label create spec           --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
+   gh label create review-threads --color 5319e7 --description "Human trigger: a review left unresolved threads; starts om-auto-fix-pr (Cezar automation)"
+   gh label list --limit 100 | wc -l   # 31
    ```
 
 6. `scripts/cezar/automations.sh --dry-run`, then without the flag: `issue-groom`, `issue-regroom`,
-   `issue-autofix`, `issue-spec` and `pr-autopilot` are created enabled. The script also lists any
-   definition the cockpit still holds that the file no longer names — the retired `issue-opened`
-   and `pr-opened` are deleted in the cockpit (Automations), by hand.
+   `issue-autofix`, `issue-spec`, `pr-autopilot` and `pr-review-threads` are created enabled. The
+   script also lists any definition the cockpit still holds that the file no longer names — the
+   retired `issue-opened` and `pr-opened` are deleted in the cockpit (Automations), by hand.
 7. `scripts/cezar/prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
    cezar's five built-ins.
 8. Install the housekeeping plist (above) and run `bash scripts/cezar/housekeeping.sh` once by hand.

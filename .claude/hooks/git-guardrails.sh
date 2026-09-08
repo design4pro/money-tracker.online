@@ -10,8 +10,10 @@
 # The Cloudflare rules are split by what a mistake costs. A deploy is undone by deploying again,
 # so a developer at the keyboard keeps the ordinary approval prompt for it; a written secret is
 # already in the transcript and a deleted database is gone, so those are refused in every
-# session. These lived in `.claude/settings.json` as `permissions.deny` until that file became
-# hooks-only; the hook is what carries them now.
+# session. These lived in `.claude/settings.json` as `permissions.deny` until the deny rules moved
+# out of it; the hook is what carries them now, and nothing that refuses a command belongs back in
+# that file - its allow list is only for the tracker operations the om-* pipeline cannot run
+# without.
 #
 # Everything in the first block destroys work that is not recoverable from the reflog by someone
 # who does not already know to look. `develop` and `main` are the shared branches - staging and
