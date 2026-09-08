@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 const HOOKS = resolve(__dirname, '..')
 const AGENT = { CEZ_TASK_ID: '0123456789ab-test' }
+const ACTIONS = { GITHUB_ACTIONS: 'true' }
 
 function hook(
   name: string,
@@ -170,7 +171,89 @@ describe('git-guardrails.sh', () => {
   })
 
   it('treats GITHUB_ACTIONS as agent mode too', () => {
-    expect(bash('printenv', { GITHUB_ACTIONS: 'true' }).status).toBe(2)
+    expect(bash('printenv', ACTIONS).status).toBe(2)
+    expect(bash('pnpm add zod', ACTIONS).status).toBe(2)
+  })
+
+  // GitHub Actions only, and the reason the whole tier exists: a review job runs with
+  // `--permission-mode bypassPermissions` and a pull-requests:write token over a diff whose
+  // author is not trusted, which leaves this hook as the only thing between a crafted pull
+  // request and `gh pr review --approve`. A cezar run is different - it runs on the operator's
+  // host, on work the operator queued, and mutates GitHub through the tracker descriptor by
+  // design - so every case here pairs the block with its AGENT counter-case.
+  //
+  // These land before this repository has such a workflow, deliberately. The rules have to be in
+  // place before the job that needs them, not after.
+  describe('GitHub Actions keeps every gh mutation blocked', () => {
+    it.each([
+      ['gh issue edit 1 --add-label x', 'gh issue|pr mutation'],
+      ['gh pr create --draft', 'gh issue|pr mutation'],
+      ['gh pr review 12 --approve', 'gh issue|pr mutation'],
+      ['gh pr merge 12 --squash', 'gh issue|pr mutation'],
+      ['gh pr ready 12', 'gh issue|pr mutation'],
+      ['gh pr checkout 12', 'gh issue|pr mutation'],
+      ['gh issue comment 1 -b hi', 'gh issue|pr mutation'],
+      ['gh pr comment 12 -b hi', 'gh issue|pr mutation'],
+      ['gh label delete x', 'gh mutation surface'],
+      ['gh release create v1.0.0', 'gh mutation surface'],
+      ['gh secret set TOKEN', 'gh mutation surface'],
+      ['gh workflow run deploy.yml', 'gh mutation surface'],
+      ['gh api --method POST repos/x/y/issues/1/comments', 'gh api non-GET'],
+      ['gh api -X PATCH repos/x/y/issues/1', 'gh api non-GET'],
+      ['gh api repos/x/y/issues/1/comments -f body=hi', 'gh api non-GET'],
+      ['gh api repos/x/y/issues -F title=@f', 'gh api non-GET'],
+      ['gh api --input body.json repos/x/y/issues', 'gh api non-GET'],
+    ])('blocks %s', (command, pattern) => {
+      const r = bash(command, ACTIONS)
+      expect(r.status).toBe(2)
+      expect(r.stderr).toContain(pattern)
+    })
+
+    it.each([
+      'gh issue view 12 --json body',
+      'gh pr list',
+      'gh pr diff 12',
+      'gh api repos/x/y/issues/1',
+      'gh api --method GET repos/x/y/issues/1 --paginate',
+      'git add -A',
+      'pnpm exec vitest run',
+    ])('allows the read %s', (command) => {
+      expect(bash(command, ACTIONS).status).toBe(0)
+    })
+
+    // Quoting must not hide a verb. The raw string does not match the rule - the quotes sit
+    // exactly where the verb is expected - so under Actions the quote characters are deleted and
+    // every word kept, which is the opposite of the prose-stripping used for a trusted caller.
+    it('does not let quoting hide a mutation', () => {
+      expect(bash('gh pr "review" 12 --approve', ACTIONS).status).toBe(2)
+      expect(bash('gh "pr" review 12 --approve', ACTIONS).status).toBe(2)
+      expect(bash('wrangler "secret" put X', ACTIONS).status).toBe(2)
+      // ...and the trade is deliberate: the same text is still prose for a cezar run.
+      expect(bash('git commit -m "chore: mention wrangler secret put"', AGENT).status).toBe(0)
+    })
+
+    // The review's one job is to post its summary on the pull request. Only the workflow sets
+    // the variable, and a pull request cannot set it for itself.
+    describe('the code review exception for gh pr comment', () => {
+      const REVIEW = { ...ACTIONS, CLAUDE_REVIEW_PR_COMMENT: '1' }
+
+      it('opens gh pr comment only when the review sets the variable', () => {
+        expect(bash('gh pr comment 12 -b hi', ACTIONS).status).toBe(2)
+        expect(bash('gh pr comment 12 -b hi', REVIEW).status).toBe(0)
+      })
+
+      it.each([
+        'gh issue comment 12 -b hi',
+        'gh pr create --draft',
+        'gh pr edit 12 --add-label x',
+        'gh pr review 12 --approve',
+        'gh pr merge 12',
+        'gh api --method POST repos/x/y/issues/1/comments',
+        'gh label delete x',
+      ])('leaves %s blocked', (command) => {
+        expect(bash(command, REVIEW).status).toBe(2)
+      })
+    })
   })
 })
 
@@ -305,7 +388,7 @@ describe('guard-read.sh', () => {
     ['.env.local', 'environment file'],
     ['.ai/cezar/runs/x.json', 'cezar run state'],
     ['.ai/cezar/runs.json', 'cezar run state'],
-    ['.ai/qa/test-env.env', 'test-env credentials'],
+    ['.ai/qa/test-env.env', 'test-env credential file'],
     ['.git/config', 'git internals'],
   ])('denies %s', (file_path, reason) => {
     const r = read({ file_path })
