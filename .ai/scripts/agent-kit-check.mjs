@@ -45,21 +45,45 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const LOCK_PATH = join(ROOT, ".ai/agent-kit.lock.json");
 
-// A value starting with `-` is a swallowed flag, not a ref: `--base --head x` would otherwise set
-// BASE to "--head" and report it as an unresolvable ref, which names the wrong mistake.
+// Both `--base <ref>` and `--base=<ref>`, and nothing else. An argument this script does not
+// understand is not ignored: `--base=origin/develop` under an indexOf-only parser left BASE null,
+// skipped the staleness half entirely and exited 0 - the same silent non-gating the script exists
+// to prevent, one level up. A typo must be as red as a real failure.
+const ARGV = process.argv.slice(2);
+const consumed = new Set();
+
 function refArg(flag, example) {
-  const i = process.argv.indexOf(flag);
-  if (i === -1) return null;
-  const value = process.argv[i + 1];
-  if (!value || value.startsWith("-")) {
+  const bad = () => {
     console.error(`agent-kit: ${flag} needs a git ref, e.g. ${flag} ${example}`);
     process.exit(2);
+  };
+  const eqAt = ARGV.findIndex((a) => a.startsWith(`${flag}=`));
+  if (eqAt !== -1) {
+    consumed.add(eqAt);
+    const value = ARGV[eqAt].slice(flag.length + 1);
+    if (!value) bad();
+    return value;
   }
+  const at = ARGV.indexOf(flag);
+  if (at === -1) return null;
+  consumed.add(at);
+  // A value starting with `-` is a swallowed flag, not a ref: `--base --head x` would otherwise
+  // set BASE to "--head" and report it as an unresolvable ref, naming the wrong mistake.
+  const value = ARGV[at + 1];
+  if (!value || value.startsWith("-")) bad();
+  consumed.add(at + 1);
   return value;
 }
 
 const BASE = refArg("--base", "origin/develop");
 const HEAD = refArg("--head", "origin/pr-head");
+
+const stray = ARGV.filter((_, i) => !consumed.has(i));
+if (stray.length) {
+  console.error(`agent-kit: unrecognised argument(s): ${stray.join(" ")}`);
+  console.error("agent-kit: usage: agent-kit-check.mjs [--base <ref> [--head <ref>]]");
+  process.exit(2);
+}
 if (HEAD && !BASE) {
   console.error("agent-kit: --head says which tree to judge; it needs --base to judge it against.");
   process.exit(2);
