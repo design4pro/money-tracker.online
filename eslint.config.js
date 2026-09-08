@@ -111,7 +111,17 @@ export default [
     ignores: [
       'eslint.config.js',
       'prettier.config.js',
-      '.claude/**',
+      // Ignored one level at a time, and not with `'.claude/**'` plus a negation: these are
+      // gitignore semantics, so a path inside an excluded *directory* can never be re-included -
+      // the directory is pruned before the negation is read. The shorter form silently ignores
+      // the hook tests below.
+      '.claude/*',
+      '!.claude/hooks',
+      '.claude/hooks/*',
+      // The hook tests are the carve-out. The rationale for the rest of this tree is that it is
+      // not written against the project's tsconfig - which stopped being true of them when that
+      // `include` was added, and without this they sit outside `pnpm lint` and Prettier.
+      '!.claude/hooks/__tests__',
       // A cezar run worktree is a second checkout of this repository nested inside it. Linting it
       // reports every file twice, against a tsconfig it is not part of, and on a host with a few
       // of them eslint exhausts the heap before it finishes. `.ai/cezar/.gitignore` already keeps
