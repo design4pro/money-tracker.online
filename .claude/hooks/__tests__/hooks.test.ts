@@ -36,7 +36,7 @@ function hook(
       HOME: HOME ?? '',
       ...(cwd ? { CLAUDE_PROJECT_DIR: cwd } : {}),
       ...env,
-    } as unknown as NodeJS.ProcessEnv, // a hook gets a clean env (CI sets GITHUB_ACTIONS); the repo augments ProcessEnv with app variables
+    }, // a hook gets a clean env; CI is what sets GITHUB_ACTIONS on a real run
     cwd,
   })
   return { status: r.status, stderr: r.stderr }
@@ -102,12 +102,14 @@ describe('git-guardrails.sh', () => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash('wrangler secret put BETTER_AUTH_SECRET', env).status).toBe(2)
       expect(bash('pnpm exec wrangler secret list', env).status).toBe(2)
-      expect(bash('wrangler d1 delete money-tracker-online-db', env).status).toBe(2)
-      expect(bash('wrangler r2 bucket delete tiles', env).status).toBe(2)
+      expect(bash('wrangler d1 delete money-tracker-db', env).status).toBe(2)
+      expect(
+        bash('wrangler r2 bucket delete money-tracker-files', env).status,
+      ).toBe(2)
       expect(
         bash('wrangler kv namespace delete --namespace-id=1', env).status,
       ).toBe(2)
-      expect(bash('wrangler delete money-tracker-online', env).status).toBe(2)
+      expect(bash('wrangler delete money-tracker', env).status).toBe(2)
     }
   })
 
@@ -125,8 +127,8 @@ describe('git-guardrails.sh', () => {
     'wrangler versions deploy',
     'wrangler triggers deploy',
     'wrangler rollback',
-    'wrangler d1 execute money-tracker-online-db --remote --command "DROP TABLE trips"',
-    'wrangler d1 migrations apply money-tracker-online-db --remote',
+    'wrangler d1 execute money-tracker-db --remote --command "DROP TABLE transactions"',
+    'wrangler d1 migrations apply money-tracker-db --remote',
     'pnpm deploy',
     'pnpm run deploy',
     'pnpm -s run deploy',
@@ -150,11 +152,11 @@ describe('git-guardrails.sh', () => {
     for (const env of [{}, AGENT]) {
       expect(bash('pnpm db:migrate:local', env).status).toBe(0)
       expect(
-        bash('wrangler d1 migrations apply money-tracker-online-db --local', env)
+        bash('wrangler d1 migrations apply money-tracker-db --local', env)
           .status,
       ).toBe(0)
       expect(
-        bash('wrangler d1 migrations list money-tracker-online-db', env).status,
+        bash('wrangler d1 migrations list money-tracker-db', env).status,
       ).toBe(0)
     }
   })
@@ -192,7 +194,7 @@ describe('git-guardrails.sh', () => {
   it('reads every string a shell will execute as the command, listed or not', () => {
     expect(bash('bash -c "wrangler deploy"', AGENT).status).toBe(2)
     expect(bash(`sh -c 'wrangler secret put X'`).status).toBe(2)
-    expect(bash(`eval "wrangler d1 delete money-tracker-online-db"`).status).toBe(2)
+    expect(bash(`eval "wrangler d1 delete money-tracker-db"`).status).toBe(2)
     // Combined short options carry no ` -c ` substring, so the old check read them as prose.
     expect(bash('bash -lc "wrangler deploy"', AGENT).status).toBe(2)
     expect(bash(`sh -ec "wrangler secret put X"`).status).toBe(2)
@@ -281,13 +283,16 @@ describe('git-guardrails.sh', () => {
     expect(r.stderr).toContain(pattern)
   })
 
-  it.each([
+  // Everything a run legitimately does, asserted in agent mode and in a developer's session
+  // alike. The developer tier is the permissive one, so a command refused there is a rule that
+  // has escaped its tier - which is why both tables run over the same list.
+  const ALLOWED = [
     'git add src/x.ts',
     'git add -A',
     'git add .',
     'git commit -m "fix: x\n\nCloses #12"',
-    'git commit -m "fix(map): rings (refs #12)"',
-    'git push -u origin fix/issue-12-rings',
+    'git commit -m "fix(transactions): rounding (refs #12)"',
+    'git push -u origin fix/issue-12-rounding',
     'gh issue view 12 --json body',
     'gh pr create --base develop --title x --body-file b.md',
     'gh pr comment 12 -b hi',
@@ -301,13 +306,19 @@ describe('git-guardrails.sh', () => {
     'pnpm install --frozen-lockfile',
     'pnpm install-skills',
     'pnpm exec playwright test',
-    'pnpm exec vite dev --port 3030 --strictPort --host 127.0.0.1',
+    'pnpm exec vite dev --port 3011 --strictPort --host 127.0.0.1',
     'npx -y skills@latest --version',
     'bash .ai/scripts/test-env-up.sh',
     'env -i PATH=/bin true',
     'pnpm run build',
-  ])('agent mode allows %s', (command) => {
+    'pnpm exec vitest run',
+    'npx prettier --check .',
+  ]
+  it.each(ALLOWED)('agent mode allows %s', (command) => {
     expect(bash(command, AGENT).status).toBe(0)
+  })
+  it.each(ALLOWED)('a developer session allows %s', (command) => {
+    expect(bash(command).status).toBe(0)
   })
 
   it('treats GITHUB_ACTIONS as agent mode too', () => {
@@ -322,10 +333,15 @@ describe('git-guardrails.sh', () => {
       ['gh issue edit 1 --add-label x', 'gh issue|pr mutation'],
       ['gh pr create --draft', 'gh issue|pr mutation'],
       ['gh pr review 12 --approve', 'gh issue|pr mutation'],
-      ['gh pr merge 12', 'gh issue|pr mutation'],
+      ['gh pr merge 12 --squash', 'gh issue|pr mutation'],
+      ['gh pr ready 12', 'gh issue|pr mutation'],
+      ['gh pr checkout 12', 'gh issue|pr mutation'],
       ['gh issue comment 1 -b hi', 'gh issue|pr mutation'],
       ['gh pr comment 12 -b hi', 'gh issue|pr mutation'],
       ['gh label delete x', 'gh mutation surface'],
+      ['gh release create v1.0.0', 'gh mutation surface'],
+      ['gh secret set TOKEN', 'gh mutation surface'],
+      ['gh workflow run deploy.yml', 'gh mutation surface'],
       ['gh api --method POST repos/x/y/issues/1/comments', 'gh api non-GET'],
       ['gh api -X PATCH repos/x/y/issues/1', 'gh api non-GET'],
       ['gh api repos/x/y/issues/1/comments -f body=hi', 'gh api non-GET'],
@@ -340,6 +356,7 @@ describe('git-guardrails.sh', () => {
     it.each([
       'gh issue view 12 --json body',
       'gh pr list',
+      'gh pr diff 12',
       'gh api repos/x/y/issues/1',
       'gh api --method GET repos/x/y/issues/1 --paginate',
       'git add -A',
@@ -443,8 +460,8 @@ describe('guard-generated.sh', () => {
       'skills-lock.json',
       'docs/agents/cezar.md',
       'src/.npmrc-ish.ts',
-      '.ai/runs/2026-09-06-rings/PLAN.md',
-      '.ai/specs/2026-09-06-rings.md',
+      '.ai/runs/2026-09-06-rounding/PLAN.md',
+      '.ai/specs/2026-09-06-rounding.md',
       '.ai/analysis/12.md',
       '.ai/qa/test-env.json',
       '.ai/agentic.config.json.bak',
@@ -547,7 +564,10 @@ describe('guard-read.sh', () => {
   writeFileSync(join(root, '.dev.vars'), 'SECRET=1')
   writeFileSync(join(root, '.dev.vars.example'), 'SECRET=')
   writeFileSync(join(root, 'src', 'a.ts'), '')
-  writeFileSync(join(root, '.ai', 'qa', 'test-env.env'), 'TEST_DEMO_PASSWORD=x')
+  writeFileSync(
+    join(root, '.ai', 'qa', 'test-env.env'),
+    'TEST_OWNER_PASSWORD=x',
+  )
   writeFileSync(join(root, '.ai', 'qa', 'test-env.json'), '{}')
   writeFileSync(join(root, '.ai', 'runs', 'x', 'HANDOFF.md'), '')
   const read = (
@@ -646,10 +666,38 @@ describe('guard-read.sh', () => {
     expect(r.stderr).toContain(reason)
   })
 
+  // Explicitly labelled, because `Glob)` and the unlabelled fallback are different arms: the
+  // first reads any pattern as a path, the second only a path-shaped one. The test above covers
+  // the fallback; without the tool name here the labelled arm has no test at all.
   it('denies Glob patterns that escape or name a secret', () => {
-    expect(read({ pattern: '../**/*.ts' }).status).toBe(2)
-    expect(read({ path: root, pattern: '**/.dev.vars' }).status).toBe(2)
-    expect(read({ path: root, pattern: '*.env.local' }).status).toBe(2)
-    expect(read({ path: root, pattern: '.ai/qa/test-env.env' }).status).toBe(2)
+    expect(read({ pattern: '../**/*.ts' }, AGENT, 'Glob').status).toBe(2)
+    expect(
+      read({ path: root, pattern: '**/.dev.vars' }, AGENT, 'Glob').status,
+    ).toBe(2)
+    expect(
+      read({ path: root, pattern: '*.env.local' }, AGENT, 'Glob').status,
+    ).toBe(2)
+    expect(
+      read({ path: root, pattern: '.ai/qa/test-env.env' }, AGENT, 'Glob')
+        .status,
+    ).toBe(2)
+  })
+})
+
+describe('.husky/pre-commit', () => {
+  // Cezar forwards CEZ_* into the agent's env and drops HUSKY, so the hook itself is what keeps
+  // lint-staged, typecheck and the full test run out of a run's commits (ADR 0017, Husky).
+  it('exits at once, without running anything, inside a cezar run', () => {
+    const r = spawnSync(
+      '/bin/sh',
+      ['-e', resolve(HOOKS, '../../.husky/pre-commit')],
+      {
+        encoding: 'utf8',
+        env: { PATH: '/nonexistent', ...AGENT }, // no pnpm, no npx: a fall-through would fail
+        timeout: 5_000,
+      },
+    )
+    expect(r.status).toBe(0)
+    expect(r.stdout + r.stderr).toBe('')
   })
 })
