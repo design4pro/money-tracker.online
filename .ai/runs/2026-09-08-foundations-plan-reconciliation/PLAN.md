@@ -23,8 +23,8 @@
 | 1     | 1.2  | The audit report                                         | inline | done   | d775692 |
 | 1     | 1.3  | The class map                                            | inline | done   | bcf2bb9 |
 | 1     | 1.4  | Record the specification corrections as an amendment     | inline | done   | 3bfddb2 |
-| 2     | 2.1  | Correct the Class A paths                                | inline | done   | PENDING |
-| 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | todo   | —       |
+| 2     | 2.1  | Correct the Class A paths                                | inline | done   | 5b32bb0 |
+| 2     | 2.2  | Restate the migration requirement, and amend TEMPLATE.md | inline | done   | PENDING |
 | 2     | 2.3  | Re-measure every reference row                           | inline | todo   | —       |
 | 2     | 2.4  | Stage register and Blockers                              | inline | todo   | —       |
 | 3     | 3.1  | The guard test                                           | inline | todo   | —       |

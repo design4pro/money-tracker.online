@@ -69,7 +69,6 @@ catalogue). No finance-domain table lands here; those are `00-S5` and later.
 - `src/server/db/ids.ts` — new
 - `src/server/db/types.ts` — new
 - `src/server/db/__tests__/conventions.test.ts` — new
-- `drizzle/0000_init.sql` — new (generated)
 
 `enumCheck()` has no file of its own. It is a module-private, unexported function inside
 `schema.ts`, which is acceptable because it has exactly one caller — the schema module itself —
@@ -105,8 +104,10 @@ DEFAULT false`, `default_transaction_account_id text NULL`.
 - **`brand_logos`**: `domain text PK`, `initials`, `color`, `fetched_at`.
 - **`subscriptions`** (Polar mirror, one row per organization) with the columns named in
   `docs/SPEC.md` §5.4, unique on `organization_id` and on `provider_subscription_id`.
-- Migration `pnpm db:generate` produces: `drizzle/0000_init.sql`. It backfills nothing — the
-  database is empty.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the Better Auth tables, the workspace and user
+  settings tables, the two audit logs, the three global catalogue tables and `subscriptions`, and
+  it backfills nothing — the database is empty.
 
 ### Server (repo, server function, Zod)
 
@@ -468,7 +469,6 @@ Requisitioned by `06-S1`, `07-S1`, `08-S1`, `09-S1`, `10-S1`, `11-S1`.
 
 - `src/server/db/schema.ts` — edit
 - `src/server/db/__tests__/conventions.test.ts` — edit
-- `drizzle/0001_finance_core.sql` — new (generated)
 
 ### Data and migration
 
@@ -489,7 +489,9 @@ it is written. The properties that must not be lost:
   with two lines in one category is representable.
 - `account_balances` PK `(organization_id, account_id, date)` with `native_minor`, `ref_minor` and
   `rate_e10`.
-- Migration: `drizzle/0001_finance_core.sql`. Backfills nothing — no rows exist.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the per-workspace currency and rate tables, the
+  account tables and `account_balances`, and backfills nothing — no rows exist.
 
 ### Server (repo, server function, Zod)
 
@@ -635,7 +637,6 @@ Requisitioned by `12-S1`, `13-S1`, `14-S1`, `15-S1`.
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0002_budgets_recurring_rules_goals.sql` — new (generated)
 
 ### Data and migration
 
@@ -650,7 +651,9 @@ period_end)`, `limit_minor`, `carried_in_minor`, `spent_minor`, `closed_at`. A r
 - `rules.paused_reason` is JSON `{kind:'missing_reference', ref_type, ref_id, label, at}`.
 - The tables are named `recurring_*` and never `subscriptions` — that name belongs to billing, and a
   comment at the table says so.
-- Migration `drizzle/0002_budgets_recurring_rules_goals.sql`, backfilling nothing.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the budget, recurring, rule and savings-goal
+  tables, backfilling nothing.
 
 ### Server (repo, server function, Zod)
 
@@ -792,7 +795,6 @@ Requisitioned by `19-S1`, `20-S1`, `21-S1`.
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0003_import_export_notifications.sql` — new (generated)
 
 ### Data and migration
 
@@ -805,7 +807,9 @@ Requisitioned by `19-S1`, `20-S1`, `21-S1`.
 - `notification_preferences` unique on `(organization_id, user_id, event_type, channel)` with
   `is_enabled` defaulting to true — the product is **opt-out**, and the default belongs in the
   column so a missing row means enabled.
-- Migration `drizzle/0003_import_export_notifications.sql`, backfilling nothing.
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates the import, export and notification tables,
+  backfilling nothing.
 
 ### Server (repo, server function, Zod)
 
@@ -944,7 +948,6 @@ Requisitioned by `18-S1` and `17-S1`.
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0004_analytics_and_layout.sql` — new (generated)
 
 ### Data and migration
 
@@ -953,7 +956,9 @@ Requisitioned by `18-S1` and `17-S1`.
 - Indexes, each with `organization_id` leading: `transactions (organization_id, booked_on,
 direction)`, `transactions (organization_id, category_id, booked_on)`, `transactions
 (organization_id, account_id, booked_on)`, `account_balances (organization_id, date)`.
-- Migration `drizzle/0004_analytics_and_layout.sql`. It backfills nothing but it **does** rebuild
+- Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+  generator's and is not asserted here. It creates `dashboard_layouts` and the covering indexes
+  plans 17 and 18 need. It backfills nothing but it **does** rebuild
   indexes on a table that by now holds rows, so the migration note records the expected duration
   against the seeded workspace and `docs/DEPLOY.md` §5's non-additive register is checked: adding an
   index is additive, and the previous Worker's SQL keeps working, so this stays in the additive path.
@@ -1165,7 +1170,6 @@ Requisitioned by `22-S2` and `24-S2`.
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0005_billing_and_console.sql` — new (generated)
 
 ### Data and migration
 
@@ -1173,7 +1177,9 @@ Requisitioned by `22-S2` and `24-S2`.
 index on `provider_customer_id`. `impersonation_sessions` records actor, subject, reason, started and
 ended instants, and is written from the console's audited path only.
 
-Migration `drizzle/0005_billing_and_console.sql`, additive, backfilling nothing.
+Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+generator's and is not asserted here. It adds the Polar plan-change columns to `subscriptions` and
+creates `impersonation_sessions` — additive, backfilling nothing.
 
 ### Server (repo, server function, Zod)
 
@@ -1375,7 +1381,6 @@ Requisitioned by `28-S1`.
 ### Owned paths
 
 - `src/server/db/schema.ts` — edit
-- `drizzle/0006_loans.sql` — new (generated)
 
 ### Data and migration
 
@@ -1398,7 +1403,9 @@ narrowing of `RECURRING_FREQUENCIES` to the four that divide a year exactly. It 
 subset of that array rather than a new literal list, so a frequency added to the recurring
 vocabulary cannot silently fail to appear here.
 
-Migration `drizzle/0006_loans.sql`, additive, backfilling nothing. Three new tables and no change to
+Migration: `pnpm db:generate` produces exactly one new file under `drizzle/`; its name is the
+generator's and is not asserted here. It creates `loans`, `loan_instalments` and
+`loan_extra_repayments` — additive, backfilling nothing. Three new tables and no change to
 an existing one, so `docs/DEPLOY.md` §5's non-additive register is unchanged and the previous
 Worker's SQL keeps working against the new schema.
 
