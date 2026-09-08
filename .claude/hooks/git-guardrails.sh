@@ -76,6 +76,9 @@ else
         print
       }
     ' | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+    # A control operator means a second command hides behind the first, and the head word says
+    # nothing about it: a `grep` chained by `&&` into a shell invocation would have had the
+    # payload stripped as if it were the grep's own pattern. Only a lone simple command is text.
     #
     # A newline is one of those operators. It separates commands exactly as `;` does, and leaving
     # it out of the set was the whole bug: the head-word test above reads only the first line, so

@@ -153,3 +153,43 @@ HEAD and replaces the vendored `om-*` directories with symlinks into an untracke
   `CEZ_SKILLS_AUTO_UPDATE=0` already suppressed it, but only on a host where the patch has been
   applied; an empty `skillsRepos` needs nothing applied anywhere. The collection's SHA is therefore
   recorded in `skills-lock.json` alone, and nothing should re-add the pin.
+
+## Amendment, 2026-09-08: decision 6 is superseded - the review Action returns as the arming signal
+
+Decision 6 said "Review is `om-auto-review-pr`, started by a Cezar automation on
+`pull_request.opened`. The `claude-code-review` Action is removed," and `f2a258e` removed it. That
+reasoning was sound for what it addressed and is not being disowned: an Action running a second
+implementation of a process the skill collection already ships is duplication, and duplication with
+nothing comparing the two halves drifts. `.github/workflows/claude-code-review.yml` comes back
+anyway, because the decision solved the review problem and created a different one nobody had
+looked for yet.
+
+`pr-review-threads` is the automation that turns a PR with unresolved threads into an
+`om-auto-fix-pr` run. Its trigger is the `review-threads` label. Nothing in this repository applied
+that label: it was documented as a human's call, and the measurable result is that `pr-fix` has
+**never run**, not once, in the cockpit's entire recorded history. The second-chance path for a
+thread the first run left open did not exist; it only looked like it did.
+
+The label cannot be armed from inside the skill layer. `scripts/ci/review-threads-label.mjs` arms
+only on threads whose author is one of `claude`, `claude[bot]` or `github-actions[bot]`, and that
+restriction is deliberate rather than incidental: a human's review thread is a conversation, and
+starting an autofix run on one is how a disagreement gets bulldozed. `om-auto-review-pr` posts as
+`design4pro-agent`, so its threads are - correctly - invisible to the arming decision, and a run
+cannot arm a second run against itself in any case. Cezar 0.10.1 has no automation event for a
+review, and its poller drops label events on pull requests outright (patch 4 in
+`.ai/scripts/cezar-host-patch.sh` exists for that reason). So the producer of the signal has to sit
+outside both, and a GitHub Action is the only place left.
+
+What this costs, stated plainly, is the thing decision 6 was avoiding: two review passes on a pull
+request, one from `om-auto-review-pr` inside the cezar run and one from the Action. That is the
+price, it is paid on every PR, and it buys the only automated route from "the review left something
+unresolved" to "something clears it". The drift objection is narrower than it was in the original
+context: the Action runs the upstream `code-review` plugin rather than a bespoke reimplementation,
+and it is now one of the files the agent-kit convergence keeps identical between this repository and
+`planned.travel`, where the same chain runs.
+
+Two things follow that are not yet done. This repository's `develop` ruleset does not carry
+`required_review_thread_resolution`, so an unresolved thread still blocks nothing at the merge gate
+here - the chain runs, but the hard stop behind it is a repository setting nobody has turned on.
+And `sentry-triage.yml`, the third Action `planned.travel` runs, is still absent: it needs
+`scripts/sentry-triage/**`, which this repository does not have.
