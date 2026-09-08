@@ -92,3 +92,22 @@
 - All four are referenced back from `docs/plans/00-foundations.md`: #105 and #106 at the Blockers
   entries they came from, #107 and #108 in the stage register, because they belong to the plan set
   rather than to any stage in this document.
+
+## 2026-09-08T16:10:00Z — run closed: both PRs merged, all 11 Steps done
+
+- The implementation shipped across two PRs, because #98 was merged at Phase 1 while the run was
+  still in flight. #98 carries Phase 1; #111 carries Phases 2 and 3 and was merged at `b235bbc`.
+- The review pass on #111 found two minor issues in this run's own work and fixed them before the
+  merge: an assertion lookup in the guard test that could have passed green having asserted nothing,
+  and an unnamed third column in the stage register table.
+- Verdict posted as a comment rather than an approval: GitHub does not allow approving one's own PR.
+  A human reviewer is still owed on the merged result.
+- Final gate at `b235bbc`: all six commands green, `pnpm test` 159 files / 2393 tests.
+
+## 2026-09-08T16:10:00Z — finding: a 5000 ms timeout that was the host, not the branch
+
+- Two full-suite runs failed on `src/routes/_app/dashboard/-server/__tests__/dashboard-data.test.ts`
+  with `Test timed out in 5000ms` — no assertion, just the deadline — at load average 197.
+- The file passes alone in 2.61s, the same content passed 2393 / 2393 twenty minutes earlier, and
+  the green run above was taken at load average 18. This branch changes no file under `src/`.
+- Recorded rather than retried into silence, because the next agent on this host will see it again.
