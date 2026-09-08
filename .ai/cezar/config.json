@@ -4,11 +4,6 @@
   "baseBranch": "develop",
   "worktreeRetention": 10,
   "maxParallel": 2,
-  "skillsRepos": [
-    {
-      "repo": "open-mercato/skills",
-      "ref": "91f11c63721b5f7e17a859940b3e9c55ece698ee"
-    }
-  ],
+  "skillsRepos": [],
   "systemPrompt": "Talk to the developer in Polish: every message of this session, progress notes, every question (CEZ:ASK - the question, the option labels and their descriptions) and the final report. Everything that leaves the session stays in English: code and code comments, commit messages, branch names and pull request titles, file names and file contents (docs, ADRs, CONTEXT.md, skills, drafts under .agent/), and everything that reaches GitHub (issue bodies, comments, the grilling log). Identifiers, technical terms and quoted output stay as they are. In Polish prose write \"-\", never the long dash."
 }
