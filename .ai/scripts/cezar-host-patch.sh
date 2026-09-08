@@ -23,10 +23,10 @@
 #    `issue-autofix` and `issue-spec` cannot start firing on PRs that happen to carry their label.
 #    Used by `pr-review-threads` (docs/agents/cezar-automations.json).
 #
-# The cockpit is one per host and shared with planned.travel, whose .ai/scripts/cezar-host-patch.sh
-# is identical apart from this paragraph. Both are idempotent and check their own markers, so
-# running either one is enough; this copy exists so a host that only carries this checkout is
-# still self-sufficient.
+# The cockpit is one per host and shared with planned.travel. That repository's copy of
+# .ai/scripts/cezar-host-patch.sh is identical apart from this paragraph; both are idempotent and
+# check their own markers, so running either one is enough. This copy exists so a host that only
+# carries this checkout is still self-sufficient.
 set -euo pipefail
 
 VERSION="${CEZ_VERSION:-0.10.1}"
