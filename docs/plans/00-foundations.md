@@ -55,9 +55,16 @@ tables, the workspace-settings tables and the three global catalogue tables.
 
 ### Reference rows
 
-`FND-01 missing → done` — the schema module exists with its conventions docblock and `enumCheck`.
-`FND-02 missing → done` — Better Auth tables and the workspace/user settings tables.
-`FND-03 missing → done` — the global catalogue tables (`currencies`, `exchange_rates`, `brand_logos`).
+`FND-01 missing → done` — `src/server/db/schema.ts` exists, carrying the conventions docblock and
+`enumCheck()` as a module-private function.
+`FND-02 missing → partial` — the Better Auth tables shipped in `src/server/db/auth-schema.ts`, and
+the workspace and user settings tables did **not**: `organization_settings`, `user_preferences`,
+`audit_log` and `platform_audit_log` are absent from the schema, which names them and says they
+belong to the tenancy and console plans. Deferred to `04-S1` and `24-S1`, which own those areas;
+this row stays open until they land, and it is also what keeps this stage's absent
+`conventions.test.ts` a declared gap rather than an unexplained one.
+`FND-03 missing → done` — the global catalogue tables `currencies`, `exchange_rates` and
+`brand_logos` are in `src/server/db/schema.ts`.
 
 Requisitioned by `04-S1` (auth needs the Better Auth tables) and `03-S1` (money needs the
 catalogue). No finance-domain table lands here; those are `00-S5` and later.
@@ -174,9 +181,10 @@ crons, and the entry module that exports them.
 
 ### Reference rows
 
-`FND-04 missing → done` — `wrangler.jsonc` for production and staging with the live resource ids.
-`FND-05 missing → done` — `src/server/worker.ts` exporting `fetch`, `queue`, `scheduled` and the DO
-classes.
+`FND-04 missing → done` — `wrangler.jsonc` carries the production configuration and a `staging`
+environment with the live resource ids.
+`FND-05 missing → done` — `src/server/worker.ts` exports `fetch`, `queue` and `scheduled` on the
+default export and re-exports the `AccountLedger` Durable Object class.
 
 Requisitioned by `04-S1` (`SESSIONS`), `03-S2` (`TASKS` + the nightly cron), `09-S2` (`LEDGER`),
 `05-S3` (`observability`) and `19-S1` (`FILES`).
@@ -277,7 +285,9 @@ z-index of `DESIGN.md`, in both themes.
 
 ### Reference rows
 
-`FND-06 missing → done` — the token contract exists and `DESIGN.md`'s front matter is its source.
+`FND-06 missing → done` — `src/styles/tokens.css` carries the token contract with `DESIGN.md`'s
+front matter as its source, and `src/styles/__tests__/tokens-contrast.test.ts` holds the contrast
+floor over it.
 
 Requisitioned by `01-S1`, which cannot build a primitive against tokens that do not exist.
 
@@ -351,8 +361,10 @@ both free of any binding import.
 
 ### Reference rows
 
-`FND-07 missing → done` — `src/lib/money.ts`.
-`FND-08 missing → done` — `src/lib/plans.ts`.
+`FND-07 missing → done` — `src/lib/money.ts` is the entry point; the primitives themselves are the
+modules under `src/lib/money/`, and `src/lib/__tests__/money-core.test.ts` is one of the four suites
+over them.
+`FND-08 missing → done` — `src/lib/plans.ts`, asserted by `src/lib/__tests__/plans.test.ts`.
 
 Requisitioned by `03-S1` (formatting and parsing), `22-S1` (`resolveLimits` reads the catalogue) and
 every plan that renders an amount.
@@ -455,12 +467,16 @@ layer — the tables waves 2 and 3 are built on.
 
 ### Reference rows
 
-`FND-09 missing → done` — `organization_currencies`, `organization_exchange_rates`.
-`FND-10 missing → done` — `accounts`, `account_groups`, `account_group_members`, `account_balances`.
-`FND-11 missing → done` — `transactions`, `transaction_splits`, `transaction_tags`,
+`FND-09 missing → done` — `organization_currencies` and `organization_exchange_rates`, in
+`src/server/db/schema.ts`.
+`FND-10 missing → done` — `accounts`, `account_groups`, `account_group_members` and
+`account_balances`, in `src/server/db/schema.ts`.
+`FND-11 missing → done` — in `src/server/db/schema.ts`: `transactions`, `transaction_splits`,
+`transaction_tags`,
 `transaction_groups`, `transaction_group_items`, `refunds`, `transaction_templates`,
 `transaction_template_tags`, `attachments`.
-`FND-12 missing → done` — `categories`, `tags`, `tag_reminders`, `payees`, `payee_aliases`,
+`FND-12 missing → done` — in `src/server/db/schema.ts`: `categories`, `tags`, `tag_reminders`,
+`payees`, `payee_aliases`,
 `payee_ignored_names`, `payee_tags`.
 
 Requisitioned by `06-S1`, `07-S1`, `08-S1`, `09-S1`, `10-S1`, `11-S1`.
@@ -547,7 +563,12 @@ into the shared `src/components/ui/**` under foundations' single-writer rule.
 
 ### Reference rows
 
-`FND-13 missing → done` — the ~45-component primitive set exists with one implementation each.
+`FND-13 missing → done` — the primitive set exists in `src/components/ui`, exported from
+`src/components/ui/index.ts`, with one implementation of each pattern **inside that directory**.
+Measured rather than estimated: **38** files match `src/components/ui/*.tsx`, not the ~45 this row
+guessed at before the set was built. The one duplicated interaction pattern in the product — the
+two amount fields — lives outside this directory and is recorded on `00-S10`, whose money field was
+meant to prevent it.
 
 Requisitioned by `01-S1`, whose stage body is the **specification** this stage builds. `01-S1` owns
 the inventory, the state matrix and the evidence; `00-S6` owns the files.
@@ -626,11 +647,13 @@ None.
 
 ### Reference rows
 
-`FND-14 missing → done` — `budgets`, `budget_categories`, `budget_transactions`, `budget_periods`.
-`FND-15 missing → done` — `recurring_series`, `recurring_periods`, `recurring_links`,
-`recurring_candidates`.
-`FND-16 missing → done` — `rules`.
-`FND-17 missing → done` — `savings_goals`, `savings_goal_contributions`.
+`FND-14 missing → done` — `budgets`, `budget_categories`, `budget_transactions` and
+`budget_periods`, in `src/server/db/schema.ts`.
+`FND-15 missing → done` — `recurring_series`, `recurring_periods`, `recurring_links` and
+`recurring_candidates`, in `src/server/db/schema.ts`.
+`FND-16 missing → done` — `rules`, in `src/server/db/schema.ts`.
+`FND-17 missing → done` — `savings_goals` and `savings_goal_contributions`, in
+`src/server/db/schema.ts`.
 
 Requisitioned by `12-S1`, `13-S1`, `14-S1`, `15-S1`.
 
@@ -707,8 +730,13 @@ which is `12-S2`'s.
 
 ### Reference rows
 
-`FND-18 missing → done` — the virtualised table shell, the filter-bar primitives, the bulk-select
-affordance and the keyboard reorder menu.
+`FND-18 missing → partial` — the capabilities shipped, none of them as a `src/components/ui`
+primitive: the virtualised shell is `src/components/app/transactions/transaction-list.tsx`, the
+filter bar `src/components/app/transactions/filter-bar.tsx`, and the keyboard reorder path
+`GridListMoveButton` inside `src/components/ui/grid-list.tsx`. Open on one measured count, not on a
+judgment about placement: that move path has **no test anywhere in the tree**, so
+`src/components/ui/__tests__/grid-list.test.tsx` is still owed by this stage. Placement is settled
+under the plan set's precedence rule and is not re-litigated here.
 
 Requisitioned by `07-S2` (the transaction list) and `08-S2` (the category tree).
 
@@ -786,9 +814,12 @@ None.
 
 ### Reference rows
 
-`FND-19 missing → done` — `import_batches`, `import_mapping_presets`, `import_row_errors`.
-`FND-20 missing → done` — `export_jobs`.
-`FND-21 missing → done` — `notifications`, `notification_preferences`.
+`FND-19 missing → done` — `import_batches`, `import_mapping_presets` and `import_row_errors`, in
+`src/server/db/schema.ts`.
+`FND-20 missing → done` — `export_jobs`, in `src/server/db/schema.ts`.
+`FND-21 missing → missing` — `notifications` and `notification_preferences` are **absent** from the
+schema, which names them and assigns them to the notification plan. Deferred to `21-S1`; the row
+stays open.
 
 Requisitioned by `19-S1`, `20-S1`, `21-S1`.
 
@@ -860,9 +891,15 @@ None.
 
 ### Reference rows
 
-`FND-22 missing → done` — the chart frame primitive (axes, legend, the visually-hidden table slot,
-the focus ring on a datum) that `16-charts.md` builds its four chart types on.
-`FND-23 missing → done` — `MoneyField`, the currency-aware amount input.
+`FND-22 missing → done` — the chart frame shipped as `src/components/charts/chart-frame.tsx`, with
+the axes, legend, visually-hidden table slot and datum focus ring the four chart types build on.
+`FND-23 missing → missing` — `MoneyField` was **never built**, and the responsibility it was minted
+to hold landed in two places instead: `src/components/app/transactions/amount-field.tsx` and
+`src/components/app/accounts/amount-field.tsx`, whose docblocks argue opposite premises about how an
+amount should be entered. That is a `docs/SPEC.md` §8 duplication of one interaction pattern. It is
+**not** a second money parser: both delegate to `src/lib/money/`, so `docs/MONEY.md` §7's one-parser
+rule is held. Whether the two agree numerically is unmeasured and is tracked separately — see this
+stage's Blockers. The row stays open.
 
 Requisitioned by `16-S1` and `07-S3`.
 
@@ -940,8 +977,13 @@ None.
 
 ### Reference rows
 
-`FND-24 missing → done` — `dashboard_layouts` (per user per organization, JSON widget grid).
-`FND-25 missing → done` — the covering indexes plans 17 and 18 need for their aggregations.
+`FND-24 missing → missing` — `dashboard_layouts` is **absent** from the schema, which names it and
+assigns it to the dashboard plan. Deferred to `18-S1`; the row stays open.
+`FND-25 missing → done` — the covering indexes are in `src/server/db/schema.ts`:
+`transactions_organization_id_booked_on_direction_idx`,
+`transactions_organization_id_category_id_booked_on_idx`,
+`transactions_organization_id_account_id_booked_on_idx` and
+`account_balances_organization_id_date_idx`.
 
 Requisitioned by `18-S1` and `17-S1`.
 
@@ -1012,8 +1054,10 @@ None.
 
 ### Reference rows
 
-`FND-26 missing → done` — the queue consumer dispatches the import, export and backup envelope
-kinds; the R2 key layout is fixed.
+`FND-26 missing → missing` — the dispatch exists in `src/server/worker.ts` and the envelope union
+in `src/server/queue/messages.ts`, but that union carries exactly **one** kind, `billing.event`.
+The import, export and backup kinds this row is about have no envelope and no handler, and the R2
+key layout is unfixed. Deferred to `19-S1` and `20-S1`, which own them; the row stays open.
 
 Requisitioned by `19-S1` and `20-S1`.
 
@@ -1091,7 +1135,10 @@ None.
 
 ### Reference rows
 
-`FND-27 missing → done` — the grid cell and widget frame primitives, with the keyboard move path.
+`FND-27 missing → done` — both shipped as dashboard components rather than primitives: the cell is
+part of `src/components/app/dashboard/widget-grid.tsx` and the frame is
+`src/components/app/dashboard/widget-frame.tsx`. The keyboard move path is asserted in
+`src/components/app/dashboard/__tests__/widget-grid.test.tsx`.
 
 Requisitioned by `18-S1`.
 
@@ -1162,8 +1209,9 @@ None.
 
 `FND-28 missing → done` — the `subscriptions` columns Polar's plan-change flow needs
 (`pending_plan`, `pending_interval`, `pending_effective_at`, `quota_overrides`, `seat_limit`,
-`storage_limit_bytes`) confirmed present and indexed.
-`FND-29 missing → done` — `impersonation_sessions` for the console.
+`storage_limit_bytes`) are present and indexed in `src/server/db/schema.ts`.
+`FND-29 missing → missing` — `impersonation_sessions` is **absent** from the schema, which names it
+and assigns it to the console plan. Deferred to `24-S2`; the row stays open.
 
 Requisitioned by `22-S2` and `24-S2`.
 
@@ -1234,8 +1282,8 @@ published one.
 
 ### Reference rows
 
-`FND-30 proposed → done` — `src/lib/plans.ts` carries decided numbers and the _proposed_ comment is
-removed.
+`FND-30 proposed → done` — `src/lib/plans.ts` carries decided numbers and no _proposed_ comment
+remains in it.
 
 Requisitioned by `22-S1` and `25-S2` (the pricing page renders the same catalogue).
 
@@ -1302,7 +1350,9 @@ decision has one landing place instead of leaking into four.
 
 ### Reference rows
 
-`FND-31 missing → done` — the install-prompt and offline-state primitives.
+`FND-31 missing → missing` — neither `src/components/ui/install-prompt.tsx` nor
+`src/components/ui/offline-banner.tsx` was ever built, anywhere. A real open gap, kept as one: this
+stage's owned paths stay declared and the row stays open.
 
 Requisitioned by `27-S1`.
 
@@ -1370,11 +1420,12 @@ None.
 
 ### Reference rows
 
-`FND-32 missing → done` — `loans`: the borrowing, its terms and its status.
-`FND-33 missing → done` — `loan_instalments`: the materialised schedule, with the settlement link
-and the evidence `CHECK`.
-`FND-34 missing → done` — `loan_extra_repayments`: the link table for a repayment outside the
-schedule.
+`FND-32 missing → missing` — `loans` is **absent** from `src/server/db/schema.ts`. Deferred to
+`28-S1`; the row stays open.
+`FND-33 missing → missing` — `loan_instalments`, with its settlement link and evidence `CHECK`, is
+**absent**. Deferred to `28-S1`; the row stays open.
+`FND-34 missing → missing` — `loan_extra_repayments` is **absent**. Deferred to `28-S1`; the row
+stays open.
 
 Requisitioned by `28-S1`.
 
