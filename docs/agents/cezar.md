@@ -183,19 +183,14 @@ human maintainers; `issue-regroom`, `issue-autofix`, `issue-spec` on `issue.labe
 `includePullRequests`, the only one that fires on a PR.
 
 Every trigger is gated on who can produce it: the open events by author, the label events because
-only a collaborator can set a label. This matters because the agent step holds Bash with no
+only a collaborator or an Actions token can set a label. This matters because the agent step holds Bash with no
 allowlist and the issue body is its prompt: an issue anyone on GitHub can open must not start a run
 by itself, so an external report is groomed when a maintainer adds `groom`. The skill that reacts
 removes its own command label as its first tracker mutation, so a label still present means nobody
 picked the issue up.
 
-`pr-review-threads` is the one automation whose trigger stock cezar cannot deliver: the poller
-drops every label event on a pull request, so it needs patch 4 in `.ai/scripts/cezar-host-patch.sh`
-and the `includePullRequests` flag in its own filters. Unlike `planned.travel`, this repository has
-no review job that applies `review-threads` on its own and its `develop` ruleset does not carry
-`required_review_thread_resolution`, so the label is a human's call on a PR whose review left live
-threads, and an open thread blocks nothing but `om-auto-fix-pr`'s own exit criterion
-(`.ai/skills/om-auto-fix-pr/SKILL.md`).
+`pr-review-threads` is the one automation whose trigger stock cezar cannot deliver, and the one
+that reaches a pull request; it has a section of its own below.
 
 Agent PRs (authored by `design4pro-agent`, already reviewed inside their own chain) and Dependabot
 never enter the autopilot, and the pipeline labels stay excluded because the poller re-checks labels
@@ -208,6 +203,63 @@ A review or autopilot run checks out the PR's head, hooks included: a branch cut
 cutover (`f2a258e`) carries the old `git-guardrails.sh`, which blocks every GitHub write in agent
 mode, and the run ends in a question nobody answers (PR #67, 2026-09-07). Merge `develop` into such
 a branch before opening the PR.
+
+## Review threads that block a merge (`pr-review-threads`)
+
+Nothing resolves the threads the `claude-review` job opens, and until this automation a maintainer
+cleared them by running `om-auto-fix-pr` by hand on every PR the review job had commented on.
+
+It cannot be a webhook. Cezar 0.10.1 knows four automation events - `issue.opened`,
+`issue.labeled`, `issue.unlabeled`, `pull_request.opened` - and none of them is a review; worse, the
+poller scopes its label source to `is:issue` and then drops any hit carrying `pull_request`, so even
+a label on a PR is invisible to it. `pull_request.opened` is the only PR trigger there is, and it
+fires minutes before the review job posts anything. So the chain is:
+
+1. `.github/workflows/claude-code-review.yml` ends with `scripts/ci/review-threads-label.mjs`,
+   which applies `review-threads` when the PR has live threads opened by the review bot.
+2. Patch 4 in `.ai/scripts/cezar-host-patch.sh` teaches the poller to honour
+   `filters.includePullRequests` on both gates. It is opt-in per automation - the cockpit's filter
+   schema passes unknown keys through untouched - which is what keeps `issue-regroom`,
+   `issue-autofix` and `issue-spec` from starting to fire on PRs that happen to carry their label.
+   **Without the patch this automation never fires and says nothing**; re-run the script after the
+   npx cache is cleared.
+3. `pr-review-threads` runs the `pr-fix` workflow, and `om-auto-fix-pr` replies in every thread and
+   resolves the ones it settles. A finding it agrees with but cannot act on - a guarded file it is
+   still refused, a change that belongs upstream - is **not** a decline: it replies with the exact
+   edit as a diff block, leaves `changes-requested`, and resolves the thread anyway
+   (`.ai/skills/om-auto-review-pr/SKILL.md`). Only a disagreement leaves a thread open.
+
+The loop is closed at the head, not at the thread. The run removes `review-threads` as its first
+mutation (`.ai/skills/om-auto-fix-pr/SKILL.md`), and the labelling script keeps one marker comment
+naming the head it last armed, so the same head is never armed twice. That matters because a thread
+the run **declines** stays open on purpose - a disagreement is a human's to settle - and without the
+marker the `reopened` and `ready_for_review` triggers would restart the same run to reach the same
+conclusion forever. `in-progress`, `blocked` and `do-not-merge` stand the script down, and the
+automation excludes them again.
+
+**The `in-progress` stand-down is why this chain has to ask twice.** `pr-autopilot` fires on
+`pull_request.opened` and takes `in-progress` within a minute; the review job needs five to eight,
+so step 1 is never once asked at a moment when the claim is absent. In `planned.travel`, where this
+chain ran first, that was three arming attempts out of three refused with `not arming - the PR
+carries in-progress`, and zero `pr-fix` runs in the cockpit's whole recorded history - the same zero
+this repository has. The stand-down is right (a run that owns the PR should not have a second one
+started beside it); what was missing is a second ask. So the workflow also listens for
+`pull_request.unlabeled`, and a separate job re-runs the same script when the label removed is
+`in-progress`. Same decision, same head-keyed marker - so a run that declines every thread and
+pushes nothing cannot re-arm itself when it drops its own claim - only asked at the first moment the
+answer can be anything but "held".
+
+The gate is the same as for `groom` and `autofix`: only a collaborator or the Actions bot can set a
+label, so an outsider cannot start a run that holds an unrestricted Bash. A human's review thread is
+deliberately not a trigger - the script arms only on the review bot's threads, because a
+disagreement with a person is settled by talking. Rehearse the decision against any live PR with
+`GH_REPO=... PR_NUMBER=... HEAD_SHA=... node scripts/ci/review-threads-label.mjs --dry-run`.
+
+**What this repository still does not have.** Its `develop` ruleset does not carry
+`required_review_thread_resolution`, so an unresolved thread blocks nothing at the merge gate here -
+only `om-auto-fix-pr`'s own exit criterion (`.ai/skills/om-auto-fix-pr/SKILL.md`) holds it. The
+autofix chain above is live either way; what is missing is the hard stop behind it, and turning it
+on is a repository-settings change, not a change to any file in this tree.
 
 ## Prompt templates (`docs/agents/cezar-prompt-templates.json`)
 
@@ -293,7 +345,7 @@ claiming issues the new ones handle.
    gh label create groom          --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
    gh label create autofix        --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
    gh label create spec           --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
-   gh label create review-threads --color 5319e7 --description "Human trigger: a review left unresolved threads; starts om-auto-fix-pr (Cezar automation)"
+   gh label create review-threads --color 5319e7 --description "Automated trigger: the review job left unresolved threads; starts om-auto-fix-pr (Cezar automation)"
    gh label list --limit 100 | wc -l   # 31
    ```
 

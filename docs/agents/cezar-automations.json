@@ -112,7 +112,7 @@
   },
   {
     "name": "pr-review-threads",
-    "description": "A review left unresolved threads on a PR and a collaborator applied `review-threads`; om-auto-fix-pr drives the PR to merge-ready and resolves them (ADR 0017). Without this the PR waits for a human to run the same skill by hand. `includePullRequests` is read by the host patch in .ai/scripts/cezar-host-patch.sh - stock cezar 0.10.1 drops every label event on a PR, so this automation does not fire without it. The gate is the label: only a collaborator can set one. The run removes it as its first mutation, so a label still present is a run nobody took.",
+    "description": "The review job left unresolved threads on a PR and .github/workflows/claude-code-review.yml applied `review-threads` (scripts/ci/review-threads-label.mjs, once per head SHA); om-auto-fix-pr drives the PR to merge-ready and resolves them (ADR 0017). Without this the PR waits for a human to run the same skill by hand. `includePullRequests` is read by the host patch in .ai/scripts/cezar-host-patch.sh - stock cezar 0.10.1 drops every label event on a PR, so this automation does not fire without it. The gate is the label: only a collaborator or an Actions token can set one. The run removes it as its first mutation, so a label still present is a run nobody took.",
     "events": ["issue.labeled"],
     "intervalSeconds": 120,
     "filters": {

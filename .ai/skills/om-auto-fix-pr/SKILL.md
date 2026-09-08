@@ -12,10 +12,10 @@ This file extends the shared `om-auto-fix-pr` skill installed at
 
 When the PR carries `review-threads`, remove it as the run's **first** tracker mutation, before the
 claim - the same contract `autofix` has on an issue, so a label still present is a run nobody took.
-A collaborator applies it to a PR whose review left live threads, and the `pr-review-threads`
-automation turns it into this run; leaving it on would let the next poll start a second run beside
-this one. Removing it is also what re-arms the trigger: a reviewer applies it again when the next
-head still has open threads. Never add `review-threads` to any PR.
+The `claude-review` job applies it when it leaves live threads
+(`scripts/ci/review-threads-label.mjs`), and the `pr-review-threads` automation turns it into this
+run; leaving it on would let the next poll start a second run beside this one. Removing it is also
+what re-arms the trigger: the job re-applies it on the next head that still has open threads. Never add `review-threads` to any PR.
 
 ## An open thread ends the loop, it does not pass it
 
