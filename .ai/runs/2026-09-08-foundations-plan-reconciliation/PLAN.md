@@ -19,8 +19,8 @@
 
 | Phase | Step | Title                                                    | Exec   | Status | Commit  |
 | ----- | ---- | -------------------------------------------------------- | ------ | ------ | ------- |
-| 1     | 1.1  | The plan parser                                          | inline | done   | PENDING |
-| 1     | 1.2  | The audit report                                         | inline | todo   | —       |
+| 1     | 1.1  | The plan parser                                          | inline | done   | 89034aa |
+| 1     | 1.2  | The audit report                                         | inline | done   | PENDING |
 | 1     | 1.3  | The class map                                            | inline | todo   | —       |
 | 1     | 1.4  | Record the specification corrections as an amendment     | inline | todo   | —       |
 | 2     | 2.1  | Correct the Class A paths                                | inline | todo   | —       |
