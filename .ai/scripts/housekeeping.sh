@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Start one `housekeeping` run (.ai/cezar/workflows/housekeeping.yml) on the cezar cockpit of
-# this host. launchd calls it three times a day (scripts/cezar/launchd/); a human may call it any
+# this host. launchd calls it three times a day (.ai/scripts/launchd/); a human may call it any
 # time. Cezar has no scheduler of its own, so this POST is the schedule (ADR 0017).
 #
-#   scripts/cezar/housekeeping.sh
+#   .ai/scripts/housekeeping.sh
 #
 # Env: CEZ_API (default http://localhost:4321), CEZ_PROJECT (default money-tracker-online).
 # Exactly one run per call: a reachable cockpit is the authority, whatever it answers (a 2xx is
