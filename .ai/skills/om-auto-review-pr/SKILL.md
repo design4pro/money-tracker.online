@@ -28,9 +28,31 @@ node scripts/visual/capture.mjs --url http://127.0.0.1:3010/<route> --out <scrat
 Frames belong outside the repository. Evidence from `om-auto-qa-pr` complements the pair; it never
 replaces it, and only a person applies `qa-approved`.
 
+## Review threads are answered, then resolved
+
+The threads other reviewers leave (a human, an earlier agent pass) are resolved by nobody unless
+this skill does it, and a thread nobody answers is feedback that disappears at the squash. Two
+additions to step 2 and step 11:
+
+- Step 2, collecting `INHERITED` findings: take the open set from **list-review-threads**
+  (unresolved and not outdated), not from **list-review-comments** alone; keep each thread's `id`
+  and its first comment's `id` with the finding.
+- Step 11, accounting: a finding **fixed** in this run ends with **reply-review-comment** (what
+  changed, in which commit) followed by **resolve-review-thread**. A finding **filed as a
+  follow-up** ends with a reply naming the follow-up issue, then resolve. A finding **declined**
+  ends with a reply giving the reason and the thread stays open, the verdict stays
+  `changes-requested`, and the report names it: a human, not the pipeline, closes a disagreement.
+  Never resolve a thread without replying in it first, and never resolve one this run did not act
+  on.
+- On a pass without autofix (another author's PR, no `--autofix`) the threads are left as found;
+  the report lists them by path so the autopilot's next chain can pick them up.
+
 ## Rules
 
 - Never apply `qa-approved` or `qa-self-verified`.
+- Never add `review-threads`. It is the human trigger for the `pr-review-threads` automation, and a
+  skill that applies it after leaving threads open would start a run on its own work. Name the open
+  threads in the report instead and let a person decide.
 - Pending CI is not a reason to wait: the browser suite runs on every PR and finishes in minutes.
   Report it as pending and let the bounded follow-up correct the label.
 - The `develop → main` promotion PR is reviewed like any other; when its diff is only merge

@@ -437,7 +437,41 @@ gh api --paginate repos/{owner}/{repo}/pulls/{prNumber}/comments \
   --jq '.[] | {id,user:.user.login,path,line:(.line // .original_line),body,url:.html_url,reply_to:.in_reply_to_id}'
 ```
 
-REST does not expose a thread's resolved state (that lives in GraphQL's review threads), so treat every returned comment as potentially open and judge it against the current diff. `reply_to` is non-null on replies, which is what lets you reconstruct a thread. Consumers treat an unavailable operation as "inline feedback out of reach", not as a failure: they fall back to review bodies plus conversation comments and state the gap in their report.
+REST does not expose a thread's resolved state; **list-review-threads** does (GraphQL), so take the open set from there and use this operation for the comment bodies alone. Without it, treat every returned comment as potentially open and judge it against the current diff. `reply_to` is non-null on replies, which is what lets you reconstruct a thread. Consumers treat an unavailable operation as "inline feedback out of reach", not as a failure: they fall back to review bodies plus conversation comments and state the gap in their report.
+
+#### list-review-threads
+
+`{prNumber}` → every inline review thread with its resolution and outdated state (the two things **list-review-comments** cannot see), the file it anchors to and its comments oldest first. `id` is the GraphQL thread id that **resolve-review-thread** takes; each comment's `id` is the REST id that **reply-review-comment** takes. Consumers count a thread as open only when it is unresolved _and_ not outdated.
+
+```bash
+gh api graphql --paginate -F owner={owner} -F name={repo} -F number={prNumber} -f query='
+  query($owner:String!,$name:String!,$number:Int!,$endCursor:String){
+    repository(owner:$owner,name:$name){ pullRequest(number:$number){
+      reviewThreads(first:100,after:$endCursor){
+        pageInfo{hasNextPage endCursor}
+        nodes{ id isResolved isOutdated path line
+          comments(first:50){ nodes{ databaseId author{login} body url } } } } } } }' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+        | {id,isResolved,isOutdated,path,line,comments:[.comments.nodes[]|{id:.databaseId,user:.author.login,body,url}]}'
+```
+
+#### reply-review-comment
+
+`{prNumber}`, the REST id of the thread's first comment, body → a reply inside that thread (the reply stays attached to the file and line; a conversation comment would not).
+
+```bash
+gh api -X POST repos/{owner}/{repo}/pulls/{prNumber}/comments/{commentId}/replies -f body="<body>"
+```
+
+#### resolve-review-thread
+
+Thread id from **list-review-threads** → the thread is marked resolved. Resolution is a claim that the ask was handled: a consumer resolves a thread only after it has answered in it (**reply-review-comment**) with what was done, and never one whose ask it neither fixed nor declined with a reason. Any collaborator with write access may resolve, the thread's author included; the mutation is idempotent on an already-resolved thread.
+
+```bash
+gh api graphql -F threadId={threadId} -f query='
+  mutation($threadId:ID!){ resolveReviewThread(input:{threadId:$threadId}){ thread{ id isResolved } } }' \
+  --jq '.data.resolveReviewThread.thread'
+```
 
 ### CI runs
 
@@ -535,13 +569,15 @@ gh label create risk-medium       --color fbca04 --description "Ordinary change 
 gh label create risk-high         --color b60205 --description "Wide blast radius, review deeply"
 ```
 
-The three command labels a human sets to start a Cezar automation
+The four command labels a human sets to start a Cezar automation
 (`docs/agents/cezar-automations.json`). Only a collaborator can set a label, which is what gates
 the `issue.labeled` triggers; the skill that reacts removes its own label as its first mutation, so
-a label still present means nobody picked the issue up. No skill ever adds one:
+a label still present means nobody picked the item up. No skill ever adds one. The first three go
+on an issue, `review-threads` on a pull request:
 
 ```bash
-gh label create groom   --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
-gh label create autofix --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
-gh label create spec    --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
+gh label create groom          --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
+gh label create autofix        --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
+gh label create spec           --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
+gh label create review-threads --color 5319e7 --description "Human trigger: a review left unresolved threads; starts om-auto-fix-pr (Cezar automation)"
 ```
