@@ -1,5 +1,5 @@
 {
-  "kitVersion": 6,
+  "kitVersion": 7,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -43,7 +43,7 @@
       "mode": "100644"
     },
     ".ai/scripts/agent-kit-check.mjs": {
-      "sha256": "9cf9575a46e77851f338d9e66ba3037c91fd65ee1be7e1d1122dcf4383fb0e5a",
+      "sha256": "d932d372b774ed4fb816ce6a1a0f08d15ee1f5bf9e7c4ae1384672f95a9f32be",
       "mode": "100755"
     },
     ".ai/scripts/cez-automations.sh": {

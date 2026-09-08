@@ -74,6 +74,7 @@ jobs:
       - name: Check the agent layer
         env:
           BASE: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           if [ -z "$BASE" ]; then
@@ -81,11 +82,16 @@ jobs:
             node .ai/scripts/agent-kit-check.mjs
             exit 0
           fi
-          # An explicit refspec: the checkout is shallow and its configured one covers
-          # only the ref it fetched, so `origin/$BASE` does not exist yet. Depth 1 is
-          # enough - all this reads is the base tip's copy of the lock.
-          git fetch --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-          node .ai/scripts/agent-kit-check.mjs --base "origin/$BASE"
+          # Explicit refspecs: the checkout is shallow and its configured one covers
+          # only the ref it fetched. Depth 1 is enough on both sides - all this reads
+          # is each tip's copy of the lock. The head is fetched separately because
+          # this job holds refs/pull/N/merge, and a merge already carries the base's
+          # lock whenever the head never touched it; judging the worktree would pass
+          # every stale branch, which is the shape this gate exists to catch.
+          git fetch --depth=1 origin \
+            "+refs/heads/$BASE:refs/remotes/origin/$BASE" \
+            "+$HEAD_SHA:refs/remotes/origin/pr-head"
+          node .ai/scripts/agent-kit-check.mjs --base "origin/$BASE" --head origin/pr-head
 
       - name: Set up the toolchain
         uses: ./.github/actions/setup

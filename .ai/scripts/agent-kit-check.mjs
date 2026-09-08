@@ -19,6 +19,13 @@
 // that branch carries. A branch cut before a pipeline change runs the old hooks, the old
 // workflows and the old guards, and nothing else notices.
 //
+// `--head <ref>` names the tree that comparison is about, and CI must pass it. On a pull_request
+// event actions/checkout hands the job refs/pull/N/merge, and a three-way merge takes the base's
+// side of the lock whenever the head never touched it - which is exactly what a stale branch looks
+// like. Judging the worktree there compares the base against itself and passes every stale branch:
+// the gate would exist and never fire. The hash half stays on the worktree, where it belongs - a
+// hand edit should be caught in the state that would land.
+//
 // It lives under .ai/scripts/ rather than scripts/ because guard-generated.sh already refuses
 // edits under .ai/scripts/ whenever CEZ_TASK_ID or GITHUB_ACTIONS is set. A cezar run therefore
 // cannot rewrite the checker that judges it, which a top-level scripts/ path would have allowed.
@@ -38,10 +45,23 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const LOCK_PATH = join(ROOT, ".ai/agent-kit.lock.json");
 
-const baseFlag = process.argv.indexOf("--base");
-const BASE = baseFlag === -1 ? null : process.argv[baseFlag + 1];
-if (baseFlag !== -1 && !BASE) {
-  console.error("agent-kit: --base needs a git ref, e.g. --base origin/develop");
+// A value starting with `-` is a swallowed flag, not a ref: `--base --head x` would otherwise set
+// BASE to "--head" and report it as an unresolvable ref, which names the wrong mistake.
+function refArg(flag, example) {
+  const i = process.argv.indexOf(flag);
+  if (i === -1) return null;
+  const value = process.argv[i + 1];
+  if (!value || value.startsWith("-")) {
+    console.error(`agent-kit: ${flag} needs a git ref, e.g. ${flag} ${example}`);
+    process.exit(2);
+  }
+  return value;
+}
+
+const BASE = refArg("--base", "origin/develop");
+const HEAD = refArg("--head", "origin/pr-head");
+if (HEAD && !BASE) {
+  console.error("agent-kit: --head says which tree to judge; it needs --base to judge it against.");
   process.exit(2);
 }
 
@@ -153,59 +173,76 @@ console.log(
 
 if (!BASE) process.exit(0);
 
-// Read the base commit's lock out of git rather than the worktree: the point is what the base
-// branch carries, not what is checked out.
-let baseLockText;
-try {
-  baseLockText = execFileSync(
-    "git",
-    ["-C", ROOT, "show", `${BASE}:.ai/agent-kit.lock.json`],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
-} catch {
-  // Two very different situations, and only one of them is a problem. The base having no lock is
-  // ordinary history - it was true of both repositories until C1 - so there is nothing to be
-  // behind, and the gate passes loudly rather than silently. A ref that cannot be resolved at all
-  // is a misconfigured workflow, and passing there is how a gate quietly stops gating.
+// Both sides are read out of git rather than the worktree: what matters is what each commit
+// carries. Returns null when the ref resolves but carries no lock - a real and different answer
+// from "that ref does not exist", and the two must not collapse into one.
+function kitVersionAt(ref) {
+  let text;
   try {
-    const ref = `${BASE}^{commit}`;
-    execFileSync("git", ["-C", ROOT, "rev-parse", "--verify", ref], {
-      stdio: "ignore",
-    });
-  } catch {
-    die(
-      2,
-      [
-        `agent-kit: --base ${BASE} does not resolve to a commit.`,
-        "  In CI this usually means the base branch was never fetched:",
-        '  git fetch --depth=1 origin "$BASE"  before running this.',
-      ],
-      "",
+    text = execFileSync(
+      "git",
+      ["-C", ROOT, "show", `${ref}:.ai/agent-kit.lock.json`],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
+  } catch {
+    // A ref that cannot be resolved at all is a misconfigured workflow, and passing there is how a
+    // gate quietly stops gating.
+    try {
+      execFileSync("git", ["-C", ROOT, "rev-parse", "--verify", `${ref}^{commit}`], {
+        stdio: "ignore",
+      });
+    } catch {
+      die(
+        2,
+        [
+          `agent-kit: ${ref} does not resolve to a commit.`,
+          "  In CI this usually means the ref was never fetched:",
+          '  git fetch --depth=1 origin "$BASE"  before running this.',
+        ],
+        "",
+      );
+    }
+    return null;
   }
+  try {
+    return JSON.parse(text).kitVersion;
+  } catch (e) {
+    die(2, [`agent-kit: the lock at ${ref} is not valid JSON - ${e.message}`], "");
+  }
+}
+
+const baseVersion = kitVersionAt(BASE);
+if (baseVersion === null) {
+  // Ordinary history - it was true of both repositories until the kit landed - so there is nothing
+  // to be behind, and the gate passes loudly rather than in silence.
   console.log(
     `agent-kit: ${BASE} carries no lock, so there is no pipeline layer to be behind.`,
   );
   process.exit(0);
 }
 
-let baseVersion;
-try {
-  baseVersion = JSON.parse(baseLockText).kitVersion;
-} catch (e) {
+const WHERE = HEAD ? `${HEAD}` : "this worktree";
+const branchVersion = HEAD ? kitVersionAt(HEAD) : lock.kitVersion;
+
+// The base is managed and this head is not: a branch cut before the repository adopted the kit at
+// all. That is as behind as a branch gets, and the same merge fixes it.
+if (branchVersion === null) {
   die(
-    2,
-    [`agent-kit: the lock at ${BASE} is not valid JSON - ${e.message}`],
-    "",
+    3,
+    [
+      `agent-kit: ${WHERE} carries no lock, and ${BASE} is at kit version ${baseVersion}.`,
+      "  This branch predates the agent-kit adoption.",
+    ],
+    MERGE_REMEDY,
   );
 }
 
-if (typeof baseVersion !== "number" || typeof lock.kitVersion !== "number") {
+if (typeof baseVersion !== "number" || typeof branchVersion !== "number") {
   die(
     2,
     [
       "agent-kit: kitVersion is not a number on one side, so the two cannot be ordered.",
-      `  this branch: ${JSON.stringify(lock.kitVersion)}`,
+      `  ${WHERE}: ${JSON.stringify(branchVersion)}`,
       `  ${BASE}: ${JSON.stringify(baseVersion)}`,
     ],
     "",
@@ -213,12 +250,12 @@ if (typeof baseVersion !== "number" || typeof lock.kitVersion !== "number") {
 }
 
 // Ahead is fine and is what a sync pull request looks like. Only behind is a problem.
-if (lock.kitVersion < baseVersion) {
+if (branchVersion < baseVersion) {
   die(
     3,
     [
       `agent-kit: this branch's pipeline layer is older than ${BASE}'s.`,
-      `  this branch: kit version ${lock.kitVersion}`,
+      `  ${WHERE}: kit version ${branchVersion}`,
       `  ${BASE}: kit version ${baseVersion}`,
     ],
     MERGE_REMEDY,
@@ -226,5 +263,5 @@ if (lock.kitVersion < baseVersion) {
 }
 
 console.log(
-  `agent-kit: not behind ${BASE} (kit version ${lock.kitVersion} against ${baseVersion}).`,
+  `agent-kit: not behind ${BASE} (${WHERE} at kit version ${branchVersion} against ${baseVersion}).`,
 );
