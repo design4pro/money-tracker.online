@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 const HOOKS = resolve(__dirname, '..')
 const AGENT = { CEZ_TASK_ID: '0123456789ab-test' }
+const ACTIONS = { GITHUB_ACTIONS: 'true' }
 
 function hook(
   name: string,
@@ -170,7 +171,89 @@ describe('git-guardrails.sh', () => {
   })
 
   it('treats GITHUB_ACTIONS as agent mode too', () => {
-    expect(bash('printenv', { GITHUB_ACTIONS: 'true' }).status).toBe(2)
+    expect(bash('printenv', ACTIONS).status).toBe(2)
+    expect(bash('pnpm add zod', ACTIONS).status).toBe(2)
+  })
+
+  // GitHub Actions only, and the reason the whole tier exists: a review job runs with
+  // `--permission-mode bypassPermissions` and a pull-requests:write token over a diff whose
+  // author is not trusted, which leaves this hook as the only thing between a crafted pull
+  // request and `gh pr review --approve`. A cezar run is different - it runs on the operator's
+  // host, on work the operator queued, and mutates GitHub through the tracker descriptor by
+  // design - so every case here pairs the block with its AGENT counter-case.
+  //
+  // These land before this repository has such a workflow, deliberately. The rules have to be in
+  // place before the job that needs them, not after.
+  describe('GitHub Actions keeps every gh mutation blocked', () => {
+    it.each([
+      ['gh issue edit 1 --add-label x', 'gh issue|pr mutation'],
+      ['gh pr create --draft', 'gh issue|pr mutation'],
+      ['gh pr review 12 --approve', 'gh issue|pr mutation'],
+      ['gh pr merge 12 --squash', 'gh issue|pr mutation'],
+      ['gh pr ready 12', 'gh issue|pr mutation'],
+      ['gh pr checkout 12', 'gh issue|pr mutation'],
+      ['gh issue comment 1 -b hi', 'gh issue|pr mutation'],
+      ['gh pr comment 12 -b hi', 'gh issue|pr mutation'],
+      ['gh label delete x', 'gh mutation surface'],
+      ['gh release create v1.0.0', 'gh mutation surface'],
+      ['gh secret set TOKEN', 'gh mutation surface'],
+      ['gh workflow run deploy.yml', 'gh mutation surface'],
+      ['gh api --method POST repos/x/y/issues/1/comments', 'gh api non-GET'],
+      ['gh api -X PATCH repos/x/y/issues/1', 'gh api non-GET'],
+      ['gh api repos/x/y/issues/1/comments -f body=hi', 'gh api non-GET'],
+      ['gh api repos/x/y/issues -F title=@f', 'gh api non-GET'],
+      ['gh api --input body.json repos/x/y/issues', 'gh api non-GET'],
+    ])('blocks %s', (command, pattern) => {
+      const r = bash(command, ACTIONS)
+      expect(r.status).toBe(2)
+      expect(r.stderr).toContain(pattern)
+    })
+
+    it.each([
+      'gh issue view 12 --json body',
+      'gh pr list',
+      'gh pr diff 12',
+      'gh api repos/x/y/issues/1',
+      'gh api --method GET repos/x/y/issues/1 --paginate',
+      'git add -A',
+      'pnpm exec vitest run',
+    ])('allows the read %s', (command) => {
+      expect(bash(command, ACTIONS).status).toBe(0)
+    })
+
+    // Quoting must not hide a verb. The raw string does not match the rule - the quotes sit
+    // exactly where the verb is expected - so under Actions the quote characters are deleted and
+    // every word kept, which is the opposite of the prose-stripping used for a trusted caller.
+    it('does not let quoting hide a mutation', () => {
+      expect(bash('gh pr "review" 12 --approve', ACTIONS).status).toBe(2)
+      expect(bash('gh "pr" review 12 --approve', ACTIONS).status).toBe(2)
+      expect(bash('wrangler "secret" put X', ACTIONS).status).toBe(2)
+      // ...and the trade is deliberate: the same text is still prose for a cezar run.
+      expect(bash('git commit -m "chore: mention wrangler secret put"', AGENT).status).toBe(0)
+    })
+
+    // The review's one job is to post its summary on the pull request. Only the workflow sets
+    // the variable, and a pull request cannot set it for itself.
+    describe('the code review exception for gh pr comment', () => {
+      const REVIEW = { ...ACTIONS, CLAUDE_REVIEW_PR_COMMENT: '1' }
+
+      it('opens gh pr comment only when the review sets the variable', () => {
+        expect(bash('gh pr comment 12 -b hi', ACTIONS).status).toBe(2)
+        expect(bash('gh pr comment 12 -b hi', REVIEW).status).toBe(0)
+      })
+
+      it.each([
+        'gh issue comment 12 -b hi',
+        'gh pr create --draft',
+        'gh pr edit 12 --add-label x',
+        'gh pr review 12 --approve',
+        'gh pr merge 12',
+        'gh api --method POST repos/x/y/issues/1/comments',
+        'gh label delete x',
+      ])('leaves %s blocked', (command) => {
+        expect(bash(command, REVIEW).status).toBe(2)
+      })
+    })
   })
 })
 
@@ -196,7 +279,7 @@ describe('guard-generated.sh', () => {
     '.ai/browsers/playwright.md',
     '.ai/skills/om-code-review/SKILL.md',
     '.ai/scripts/test-env-up.sh',
-    'scripts/cezar/automations.sh',
+    '.ai/scripts/cez-automations.sh',
     '.npmrc',
     'pnpm-workspace.yaml',
     'docs/agents/reference.md',
@@ -233,6 +316,80 @@ describe('guard-generated.sh', () => {
       hook('guard-generated.sh', { file_path: `${root}/.claude/settings.json` })
         .status,
     ).toBe(0)
+  })
+})
+
+// The one exception to the block above, and the reason it exists: the review job comments on a
+// pull request whose whole diff is guarded paths, and until now a run could not act on a single
+// one of those threads. The `develop` ruleset merges nothing with an unresolved thread, so a
+// correction the run agreed with turned into a permanent stall (planned.travel PR #320).
+describe('guard-generated.sh, on a branch that already changes a guarded file', () => {
+  // A real repository, because the rule is a question about `git diff` and nothing else can
+  // answer it. `origin/develop` is a local ref: the hook never reaches the network.
+  const root = mkdtempSync(join(tmpdir(), 'guard-diff-'))
+  const git = (...args: string[]) =>
+    spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' })
+  const write = (rel: string, body: string) => {
+    mkdirSync(join(root, rel, '..'), { recursive: true })
+    writeFileSync(join(root, rel), body)
+  }
+
+  git('init', '--initial-branch=develop')
+  git('config', 'user.email', 'test@example.com')
+  git('config', 'user.name', 'test')
+  write('.ai/agentic.config.json', JSON.stringify({ baseBranch: 'develop' }))
+  write('.ai/trackers/github.md', 'before\n')
+  write('.ai/cezar/config.json', '{}\n')
+  git('add', '-A')
+  git('commit', '-m', 'base')
+  git('update-ref', 'refs/remotes/origin/develop', 'develop')
+  git('checkout', '-b', 'fix/tracker')
+  write('.ai/trackers/github.md', 'after\n')
+  git('commit', '-am', 'change the tracker descriptor')
+
+  const edit = (rel: string, env: Record<string, string>) =>
+    hook(
+      'guard-generated.sh',
+      { file_path: `${root}/${rel}` },
+      { ...env, CLAUDE_PROJECT_DIR: root },
+      root,
+    )
+
+  it('lets a cezar run amend a guarded file the branch already changes', () => {
+    expect(edit('.ai/trackers/github.md', AGENT).status).toBe(0)
+  })
+
+  it('still refuses a guarded file the branch does not touch', () => {
+    // The case the rule exists for: introducing a change to the run's own configuration, rather
+    // than correcting one a human already proposed and a reviewer already flagged.
+    const r = edit('.ai/cezar/config.json', AGENT)
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('configures the agent')
+  })
+
+  it('refuses both under GitHub Actions, whatever the branch changes', () => {
+    // There the diff is the attacker's, so "the branch already changes it" is the attacker's
+    // claim about the attacker's own file.
+    expect(edit('.ai/trackers/github.md', ACTIONS).status).toBe(2)
+    expect(edit('.ai/cezar/config.json', ACTIONS).status).toBe(2)
+  })
+
+  it('fails closed when the base ref is missing', () => {
+    // No `origin/develop` means no answer, and an unanswerable question is not a permission.
+    const orphan = mkdtempSync(join(tmpdir(), 'guard-diff-orphan-'))
+    mkdirSync(join(orphan, '.ai'), { recursive: true })
+    writeFileSync(
+      join(orphan, '.ai/agentic.config.json'),
+      JSON.stringify({ baseBranch: 'develop' }),
+    )
+    expect(
+      hook(
+        'guard-generated.sh',
+        { file_path: `${orphan}/.ai/trackers/github.md` },
+        { ...AGENT, CLAUDE_PROJECT_DIR: orphan },
+        orphan,
+      ).status,
+    ).toBe(2)
   })
 })
 
@@ -305,7 +462,7 @@ describe('guard-read.sh', () => {
     ['.env.local', 'environment file'],
     ['.ai/cezar/runs/x.json', 'cezar run state'],
     ['.ai/cezar/runs.json', 'cezar run state'],
-    ['.ai/qa/test-env.env', 'test-env credentials'],
+    ['.ai/qa/test-env.env', 'test-env credential file'],
     ['.git/config', 'git internals'],
   ])('denies %s', (file_path, reason) => {
     const r = read({ file_path })

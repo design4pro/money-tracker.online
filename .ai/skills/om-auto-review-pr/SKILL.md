@@ -31,7 +31,7 @@ replaces it, and only a person applies `qa-approved`.
 ## Review threads are answered, then resolved
 
 The threads other reviewers leave (a human, an earlier agent pass) are resolved by nobody unless
-this skill does it, and a thread nobody answers is feedback that disappears at the squash. Two
+this skill does it, and a thread nobody answers is feedback that disappears at the squash. Three
 additions to step 2 and step 11:
 
 - Step 2, collecting `INHERITED` findings: take the open set from **list-review-threads**
@@ -44,6 +44,17 @@ additions to step 2 and step 11:
   `changes-requested`, and the report names it: a human, not the pipeline, closes a disagreement.
   Never resolve a thread without replying in it first, and never resolve one this run did not act
   on.
+- Step 11, the fourth outcome: **agreed but out of the run's reach.** Declining is for a
+  disagreement, and only a disagreement. A finding you agree with but cannot act on - a hook
+  refuses the file, the change belongs upstream, the fix needs a credential a run does not hold -
+  ends with a reply that carries **the exact edit as a diff block**, the verdict
+  `changes-requested` on the PR, and the thread **resolved**. Resolving is what makes the state
+  terminal: an open thread blocks the merge and nothing but a human clicking will ever clear it,
+  so a run that agrees and walks away has converted a one-line correction into a permanent stall.
+  `changes-requested` is what says a human still owes something; the resolved thread carries what
+  they owe. Before you use this outcome on a guarded path, try the edit: `guard-generated.sh` lets
+  a run amend a guarded file **this branch already changes**, which is most review findings on a
+  pipeline PR. The outcome is for what is still refused after that.
 - On a pass without autofix (another author's PR, no `--autofix`) the threads are left as found;
   the report lists them by path so the autopilot's next chain can pick them up.
 

@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
-# PreToolUse hook (Bash): blocks destructive git commands, `--no-verify` and the two Cloudflare
-# operations nothing recovers from - writing a secret and deleting a D1/R2/KV store - for
-# everyone; and in agent runs (CEZ_TASK_ID or GITHUB_ACTIONS set) the things an om-* run never
-# needs: dumping the environment (the worktree holds live secrets in .dev.vars), changing the
-# pinned stack (docs/SPEC.md §3), and shipping - deploys and remote migrations. GitHub mutations,
+# PreToolUse hook (Bash). Three tiers, by who is at the other end of the command.
+#
+# Tier one - everyone, in every session: destructive git, `--no-verify`, and the two Cloudflare
+# operations nothing recovers from - writing a secret and deleting a D1/R2/KV store or the Worker
+# itself. Everything here destroys work that is not recoverable from the reflog by someone who
+# does not already know to look. `develop` and `main` are the shared branches - staging and
+# production respectively - so a force-push to either rewrites what somebody else has pulled.
+#
+# Tier two - agent runs (CEZ_TASK_ID or GITHUB_ACTIONS): the things an om-* run never needs.
+# Dumping the environment (the worktree holds live secrets in .dev.vars), changing the pinned
+# stack (docs/SPEC.md §3), and shipping - deploys and remote migrations. GitHub mutations,
 # `git add -A`, closing keywords and `pnpm exec` are the om-* skills' ordinary tools (tracker
-# descriptor .ai/trackers/github.md, SDLC.md) and stay open (ADR 0017).
+# descriptor .ai/trackers/github.md, SDLC.md) and stay open under Cezar.
+#
+# Tier three - GitHub Actions only: the whole `gh` mutation surface. See the section itself.
 #
 # The Cloudflare rules are split by what a mistake costs. A deploy is undone by deploying again,
 # so a developer at the keyboard keeps the ordinary approval prompt for it; a written secret is
-# already in the transcript and a deleted database is gone, so those are refused in every
-# session. These lived in `.claude/settings.json` as `permissions.deny` until the deny rules moved
-# out of it; the hook is what carries them now, and nothing that refuses a command belongs back in
-# that file - its allow list is only for the tracker operations the om-* pipeline cannot run
-# without.
-#
-# Everything in the first block destroys work that is not recoverable from the reflog by someone
-# who does not already know to look. `develop` and `main` are the shared branches - staging and
-# production respectively - so a force-push to either is a rewrite of what somebody else has
-# already pulled.
+# already in the transcript and a deleted database is gone, so those are refused in every session.
+# Nothing that refuses a command belongs in `.claude/settings.json` - its allow list is only for
+# the tracker operations the om-* pipeline cannot run without.
 #
 # Contract: exit 2 blocks the tool call and feeds stderr back to the model; exit 0 allows.
 set -euo pipefail
@@ -32,23 +33,39 @@ command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 # heredoc are data - `grep -rn "wrangler secret" docs/` searches DEPLOY.md, and a commit message
 # about a deploy script deploys nothing - so both are stripped before matching. A string handed
 # to a shell with `-c`, or to `eval`/`xargs`, is executed, so those keep the whole command.
-scan="$command"
-case "$command" in
-  *' -c '*| *'eval '* | *xargs*) ;;
-  *)
-    scan=$(printf '%s' "$command" | awk '
-      skip { if ($0 == tag) skip = 0; next }
-      {
-        if (match($0, /<<-?["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
-          tag = substr($0, RSTART, RLENGTH)
-          gsub(/^<<-?["\047]|["\047]$/, "", tag)
-          skip = 1
+#
+# Two different normalisations, because the two audiences are different.
+#
+# Under GitHub Actions the command originates from an attacker-authored diff, so nothing may be
+# discarded: quote characters are deleted and every word is kept, which is what makes
+# `gh pr "review" 12 --approve` still match the rule for `gh pr review`. Note that the raw string
+# does not match it - the quotes sit exactly where the verb is expected - so this is the tier
+# doing more work than passing the command through, not less.
+#
+# Everywhere else the caller is trusted and the cost is inverted: a false positive stops honest
+# work, and quoted text really is prose. There the quoted *content* goes, so
+# `grep -rn "wrangler secret" docs/` searches a file rather than being refused.
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+  scan=$(printf '%s' "$command" | tr -d "\"'")
+else
+  scan="$command"
+  case "$command" in
+    *' -c '*| *'eval '* | *xargs*) ;;
+    *)
+      scan=$(printf '%s' "$command" | awk '
+        skip { if ($0 == tag) skip = 0; next }
+        {
+          if (match($0, /<<-?["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
+            tag = substr($0, RSTART, RLENGTH)
+            gsub(/^<<-?["\047]|["\047]$/, "", tag)
+            skip = 1
+          }
+          print
         }
-        print
-      }
-    ' | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
-    ;;
-esac
+      ' | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+      ;;
+  esac
+fi
 
 block() {
   echo "BLOCKED: '$command' matches dangerous pattern '$1'. The user has prevented you from doing this." >&2
@@ -65,13 +82,13 @@ echo "$scan" | grep -Eq 'git\s+clean\s+-[a-zA-Z]*f' && block 'git clean -f'
 echo "$scan" | grep -Eq 'git\s+branch\s+-D\b' && block 'git branch -D'
 echo "$scan" | grep -Eq 'git\s+(checkout|restore)\s+\.' && block 'git checkout/restore .'
 # The pre-commit hook is the fast gate (lint-staged, typecheck, tests); skipping it is how a red
-# tree reaches a pull request. AGENTS.md promises this under `## Never`.
+# tree reaches a pull request.
 echo "$scan" | grep -Eq 'git\s+.*--no-verify' && block 'git --no-verify'
 echo "$scan" | grep -Eq 'git\s+commit\b.*\s-n(\s|$)' && block 'git --no-verify'
 
 # A secret named on a command line is already in the transcript, and a deleted D1 database, R2
 # bucket, KV namespace or Worker does not come back - deleting the Worker takes its routes, its
-# Durable Object binding and the live deployment with it. Neither has a legitimate caller here,
+# Durable Object bindings and the live deployment with it. Neither has a legitimate caller here,
 # in any session.
 echo "$scan" | grep -Eq 'wrangler\s+secret\b' && block 'wrangler secret'
 echo "$scan" | grep -Eq 'wrangler\s+((d1|r2\s+bucket|kv\s+namespace)\s+)?delete\b' && block 'wrangler delete'
@@ -98,9 +115,39 @@ echo "$scan" | grep -Eq 'wrangler\s+(deploy|rollback|versions\s+(deploy|upload)|
   && agent_block 'wrangler deploy' 'Deploying is a human decision; end the run as blocked and say what is ready to ship.'
 echo "$scan" | grep -Eq 'wrangler\s+d1\s+(migrations\s+apply|execute)\b.*--remote' \
   && agent_block 'remote d1 access' 'The staging and production databases are a human decision; end the run as blocked.'
-# `pnpm -s run deploy` and `pnpm --filter web deploy` are the same deploy, so flags and a filter
-# argument are skipped over rather than treated as the end of the command.
-echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])pnpm\s+((-{1,2}[^[:space:]]+|[a-z]+)\s+)*(deploy:staging|db:migrate:prod|db:migrate:staging|deploy)(\s|$)' \
+# The package scripts that reach staging or production, named as this repository spells them -
+# `db:migrate:staging` and `db:migrate:prod`, not the `db:migrate:remote` of a sibling repo. A
+# list copied from elsewhere would match nothing here and look protective while being inert.
+# Longest alternative first, and flags and a filter argument are skipped over, so
+# `pnpm -s run deploy` and `pnpm --filter web deploy` are the same deploy.
+echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])pnpm\s+((-{1,2}[^[:space:]]+|[a-z]+)\s+)*(deploy:staging|db:migrate:staging|db:migrate:prod|deploy)(\s|$)' \
   && agent_block 'pnpm deploy|remote migration' 'Deploys and remote migrations are a human decision; end the run as blocked.'
+
+# GitHub Actions only. .github/workflows/claude-code-review.yml runs on every pull_request
+# with `--permission-mode bypassPermissions` and a pull-requests:write token, so the diff it
+# reads is untrusted input and this hook is the only thing between a crafted PR and
+# `gh pr review --approve`. A Cezar run (CEZ_TASK_ID) is different: it runs on the
+# operator's host, on work the operator queued, and mutates GitHub through the tracker
+# descriptor by design, so these blocks do not apply there.
+[ -n "${GITHUB_ACTIONS:-}" ] || exit 0
+
+actions_block() {
+  echo "BLOCKED (GitHub Actions): '$command' matches '$1'. The review job posts one comment and nothing else." >&2
+  exit 2
+}
+
+echo "$scan" | grep -Eq 'gh\s+(issue|pr)\s+(create|edit|close|reopen|delete|transfer|pin|unpin|lock|unlock|merge|review|ready|checkout)\b' && actions_block 'gh issue|pr mutation'
+# `comment` is the one verb with an exception. The code review posts its summary with
+# `gh pr comment`, and that job is the one agent run whose whole purpose is to write to a pull
+# request. Only .github/workflows/claude-code-review.yml sets the variable, and a pull request
+# cannot set it for itself: editing that workflow makes the action's OIDC exchange refuse to run
+# the review at all. `gh issue comment` stays blocked either way.
+comment_targets='issue|pr'
+[ "${CLAUDE_REVIEW_PR_COMMENT:-}" = 1 ] && comment_targets='issue'
+echo "$scan" | grep -Eq "gh\s+($comment_targets)\s+comment\b" && actions_block 'gh issue|pr mutation'
+echo "$scan" | grep -Eq 'gh\s+(label|release|repo|secret|variable|workflow|run)\s' && actions_block 'gh mutation surface'
+if echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])gh\s+api\b'; then
+  echo "$scan" | grep -Eq '(--method|-X)[[:space:]=]*(POST|PATCH|PUT|DELETE)|(^|\s)(-f|-F|--field|--raw-field|--input)(\s|=)' && actions_block 'gh api non-GET'
+fi
 
 exit 0
