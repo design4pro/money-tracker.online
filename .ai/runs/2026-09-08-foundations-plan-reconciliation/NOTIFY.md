@@ -23,3 +23,26 @@
   assertion 4 in the Phase 1 audit so Step 2.3's verification is no longer circular; D3 makes
   `drift-classes.ts` a permanent, as-of-dated historical record; D5 lands the two prose corrections
   as an append-only `Amendments` section on the specification. Full rationale in `PLAN.md`.
+
+## 2026-09-08T15:23:00Z — checkpoint 1: Phase 1 (Audit) closed
+
+- Steps 1.1–1.4 landed as `89034aa`, `d775692`, `bcf2bb9`, `3bfddb2`.
+- Targeted validation green: `pnpm typecheck` clean, `pnpm lint` 0 errors (2 pre-existing warnings
+  in a generated file), `pnpm vitest run --project tooling` 169 passed, prettier clean.
+- The audit reproduces the specification's numbers exactly, which is the specification's own gate
+  on starting Phase 2.
+- Assertion baseline before the rewrite: 2 / 27 / 0 / 30 violations across assertions 1–4.
+
+## 2026-09-08T15:23:00Z — finding: two Class E landing sites the specification assumed do not exist
+
+- No `chart-frame.test.tsx` exists anywhere; `ChartFrame` is covered only through the three chart
+  tests that render it. `GridListMoveButton` has no test file at all.
+- Recorded in `scripts/plans/drift-classes.ts` and the specification's amendments. The
+  `reorder-menu.test.tsx` entry stays open in Phase 2 rather than being repointed at a file that is
+  not there. This is the "gap reclassified as shipped" failure the specification calls the real
+  risk, caught at classification time rather than by the guard.
+
+## 2026-09-08T15:23:00Z — skipped UI pass, with reason
+
+- No browser evidence this run: the specification's _Visual change expected_ is **None**, the diff
+  touches no route, component, token or style file, and `--no-ui` was passed on the invocation.
