@@ -217,10 +217,10 @@ describe('the two themes are separately designed', () => {
    * both are the bug it was written for (#19):
    *
    *   · `border-subtle` is checked at all. It is the rule under every card edge
-   *     and every row divider in the product — 144 usages — and it was the one
-   *     structural token with no floor and no measured ratio beside it, which
-   *     is how its dark value came to sit at 1.39:1 on `surface` with nothing
-   *     failing;
+   *     and every row divider in the product — 144 occurrences across 80 files
+   *     under `src/` — and it was the one structural token with no floor and no
+   *     measured ratio beside it, which is how its dark value came to sit at
+   *     1.39:1 on `surface` with nothing failing;
    *   · every ground, not just the two a panel divides. `surface-raised` is the
    *     lightest ground in dark, so it is the binding one for a rule, and it is
    *     the ground a menu, a popover and a dialog draw their dividers on.
