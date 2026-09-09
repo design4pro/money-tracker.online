@@ -34,6 +34,8 @@ import {
 import { openTestDb } from '#/server/repos/__tests__/db-harness'
 import { createScope } from '#/server/repos/scope'
 
+import { dashboardFor } from '../dashboard-data'
+
 import type { DashboardPeriod } from '#/components/app/dashboard'
 import type { TenantScope } from '#/server/repos/scope'
 
@@ -146,8 +148,17 @@ beforeEach(async () => {
   })
 })
 
+/**
+ * The import is static, and that is load-bearing rather than stylistic.
+ *
+ * `dashboard-data` pulls the i18n catalogue, the dashboard view models, four repositories and
+ * `@tanstack/react-start/server` behind it. Vite transforms that graph on first import, and
+ * imported from inside a case the whole cost — measured at over seven seconds on this machine —
+ * is charged to that case's 5000 ms `testTimeout`, while the composition it is actually
+ * measuring runs in about ten. Hoisting the import to module scope moves the transform into
+ * collection, which no timeout bounds, and leaves each case timing only its own work.
+ */
 async function load(period: DashboardPeriod = 'thisMonth') {
-  const { dashboardFor } = await import('../dashboard-data')
   return dashboardFor(scope, period)
 }
 
