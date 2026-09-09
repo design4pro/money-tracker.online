@@ -1,0 +1,504 @@
+<!doctype html>
+<!--
+  Illustrative static mockup for .ai/specs/2026-09-09-modal-scroll-and-unsaved-guard.md
+  No app code, no build step, no external requests. Placeholder data only.
+
+  Each "screen" box is a simulated short viewport (900 x 470). The overlay and
+  panel rules inside it are transcribed from src/components/ui/dialog.tsx so the
+  LEFT column reproduces today's behaviour and the RIGHT column the proposal.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>
+      Centred dialog on a short desktop viewport - current vs proposed
+    </title>
+    <style>
+      :root {
+        --canvas: #f5f4ee;
+        --surface-raised: #ffffff;
+        --ink: #262420;
+        --ink-2: #4b4941;
+        --border-subtle: #c3d1c4;
+        --accent: #4a2a82;
+        --on-accent: #ffffff;
+      }
+      .dark {
+        --canvas: #16171a;
+        --surface-raised: #262930;
+        --ink: #ebe8df;
+        --ink-2: #b9b5aa;
+        --border-subtle: #42454c;
+        --accent: #c5aef2;
+        --on-accent: #16171a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #dedbd2;
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        color: #262420;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      .lede {
+        margin: 0 0 20px;
+        color: #4b4941;
+        max-width: 70ch;
+      }
+      .row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .case {
+        flex: 1 1 420px;
+        min-width: 420px;
+      }
+      .case > h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 6px;
+      }
+      .case > p {
+        margin: 0 0 8px;
+        font-size: 12px;
+        color: #4b4941;
+        min-height: 34px;
+      }
+      .bad > h2 {
+        color: #8a2b1f;
+      }
+      .good > h2 {
+        color: #1f5c3a;
+      }
+
+      /* --- the simulated viewport ------------------------------------- */
+      .screen {
+        position: relative;
+        height: 470px;
+        overflow: hidden; /* this box IS the viewport */
+        background: var(--canvas);
+        border: 2px solid #a8b5a9;
+        border-radius: 6px;
+      }
+      .screen::after {
+        content: attr(data-label);
+        position: absolute;
+        inset-inline-end: 6px;
+        top: 6px;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        background: var(--canvas);
+        padding: 2px 6px;
+        border-radius: 3px;
+        z-index: 5;
+      }
+
+      /* --- overlay + panel, transcribed from dialog.tsx ---------------- */
+      .overlay {
+        position: absolute;
+        inset: 0;
+        background: rgb(38 36 32 / 0.48);
+        display: flex;
+        padding: 16px; /* `flex p-4` */
+        align-items: center;
+        justify-content: center;
+      }
+      .overlay.current {
+        overflow-y: auto;
+      } /* `overflow-y-auto` on the scrim */
+
+      .panel {
+        position: relative;
+        width: 100%;
+        max-width: 512px; /* size="md" -> max-w-lg */
+        background: var(--surface-raised);
+        color: var(--ink);
+        border-radius: 4px;
+        box-shadow:
+          0 2px 8px -2px rgb(38 36 32 / 0.14),
+          0 32px 72px -16px rgb(38 36 32 / 0.3);
+      }
+      /* current: no height bound at all -> the panel grows past the viewport */
+      .panel.proposed {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100% - 32px); /* the one added rule */
+      }
+
+      .dhead,
+      .dfoot {
+        padding: 16px 20px;
+      }
+      .dhead {
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .dfoot {
+        border-top: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .panel.proposed .dhead,
+      .panel.proposed .dfoot {
+        flex: none;
+      }
+      .dtitle {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0;
+      }
+      .ddesc {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      .dbody {
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .panel.proposed .dbody {
+        min-height: 0;
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .field label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--ink-2);
+        margin-bottom: 4px;
+      }
+      .field .control {
+        height: 34px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 2px;
+        background: var(--canvas);
+        color: var(--ink);
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
+        font-size: 13px;
+      }
+      .btn {
+        border: 1px solid var(--border-subtle);
+        background: transparent;
+        color: var(--ink);
+        border-radius: 2px;
+        padding: 7px 14px;
+        font-size: 13px;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--on-accent);
+        border-color: var(--accent);
+      }
+      .x {
+        position: absolute;
+        inset-inline-end: 14px;
+        top: 14px;
+        color: var(--ink-2);
+        font-size: 16px;
+      }
+
+      .cut {
+        position: absolute;
+        inset-inline: 0;
+        top: 0;
+        height: 3px;
+        background: repeating-linear-gradient(
+          90deg,
+          #b3241a 0 8px,
+          transparent 8px 16px
+        );
+        z-index: 4;
+      }
+      .cut-note {
+        position: absolute;
+        top: 8px;
+        inset-inline-start: 8px;
+        z-index: 4;
+        background: #b3241a;
+        color: #fff;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Centred dialog, short desktop viewport (900 x 470)</h1>
+    <p class="lede">
+      Placeholder content: an eight-field form, the shape of the account and
+      budget dialogs. Left is the behaviour on <code>develop</code>; right is
+      the behaviour this spec proposes. Both boxes are the same simulated
+      viewport, and neither is scrolled.
+    </p>
+
+    <div class="row">
+      <div class="case bad">
+        <h2>Current</h2>
+        <p>
+          The panel has no height bound, so it grows past the viewport. The
+          scrim scrolls instead, and because the scrim centres its child, the
+          part above the top edge cannot be reached at all: the title, the lead
+          line and the close control are gone.
+        </p>
+        <div class="screen" data-label="current">
+          <div class="cut"></div>
+          <div class="cut-note">header clipped, unreachable</div>
+          <div class="overlay current">
+            <div class="panel">
+              <div class="dhead">
+                <span class="x">&times;</span>
+                <p class="dtitle">Edit account</p>
+                <p class="ddesc">
+                  Rename it, move it to another category, or park it out of the
+                  statistics.
+                </p>
+              </div>
+              <div class="dbody">
+                <div class="field">
+                  <label>Name</label>
+                  <div class="control">Everyday current account</div>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <div class="control">General</div>
+                </div>
+                <div class="field">
+                  <label>Currency</label>
+                  <div class="control">PLN &mdash; Polish zloty</div>
+                </div>
+                <div class="field">
+                  <label>Opening balance</label>
+                  <div class="control">1 240,00</div>
+                </div>
+                <div class="field">
+                  <label>Credit limit</label>
+                  <div class="control">&mdash;</div>
+                </div>
+                <div class="field">
+                  <label>Opened on</label>
+                  <div class="control">2026-01-04</div>
+                </div>
+                <div class="field">
+                  <label>Note</label>
+                  <div class="control">Salary lands here</div>
+                </div>
+                <div class="field">
+                  <label>Exclude from statistics</label>
+                  <div class="control">No</div>
+                </div>
+              </div>
+              <div class="dfoot">
+                <button class="btn">Cancel</button>
+                <button class="btn primary">Save changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="case good">
+        <h2>Proposed</h2>
+        <p>
+          The panel is bounded to the viewport and becomes a flex column. The
+          header and the footer are pinned, the body is the scroll port, and the
+          submit control is on screen from the first frame &mdash; whatever the
+          form's length.
+        </p>
+        <div class="screen" data-label="proposed">
+          <div class="overlay">
+            <div class="panel proposed">
+              <div class="dhead">
+                <span class="x">&times;</span>
+                <p class="dtitle">Edit account</p>
+                <p class="ddesc">
+                  Rename it, move it to another category, or park it out of the
+                  statistics.
+                </p>
+              </div>
+              <div class="dbody">
+                <div class="field">
+                  <label>Name</label>
+                  <div class="control">Everyday current account</div>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <div class="control">General</div>
+                </div>
+                <div class="field">
+                  <label>Currency</label>
+                  <div class="control">PLN &mdash; Polish zloty</div>
+                </div>
+                <div class="field">
+                  <label>Opening balance</label>
+                  <div class="control">1 240,00</div>
+                </div>
+                <div class="field">
+                  <label>Credit limit</label>
+                  <div class="control">&mdash;</div>
+                </div>
+                <div class="field">
+                  <label>Opened on</label>
+                  <div class="control">2026-01-04</div>
+                </div>
+                <div class="field">
+                  <label>Note</label>
+                  <div class="control">Salary lands here</div>
+                </div>
+                <div class="field">
+                  <label>Exclude from statistics</label>
+                  <div class="control">No</div>
+                </div>
+              </div>
+              <div class="dfoot">
+                <button class="btn">Cancel</button>
+                <button class="btn primary">Save changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row dark">
+      <div class="case bad">
+        <h2>Current &mdash; dark</h2>
+        <p>The same fault in the dark theme.</p>
+        <div class="screen" data-label="current / dark">
+          <div class="cut"></div>
+          <div class="cut-note">header clipped, unreachable</div>
+          <div class="overlay current">
+            <div class="panel">
+              <div class="dhead">
+                <span class="x">&times;</span>
+                <p class="dtitle">Edit account</p>
+                <p class="ddesc">
+                  Rename it, move it to another category, or park it out of the
+                  statistics.
+                </p>
+              </div>
+              <div class="dbody">
+                <div class="field">
+                  <label>Name</label>
+                  <div class="control">Everyday current account</div>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <div class="control">General</div>
+                </div>
+                <div class="field">
+                  <label>Currency</label>
+                  <div class="control">PLN &mdash; Polish zloty</div>
+                </div>
+                <div class="field">
+                  <label>Opening balance</label>
+                  <div class="control">1 240,00</div>
+                </div>
+                <div class="field">
+                  <label>Credit limit</label>
+                  <div class="control">&mdash;</div>
+                </div>
+                <div class="field">
+                  <label>Opened on</label>
+                  <div class="control">2026-01-04</div>
+                </div>
+                <div class="field">
+                  <label>Note</label>
+                  <div class="control">Salary lands here</div>
+                </div>
+                <div class="field">
+                  <label>Exclude from statistics</label>
+                  <div class="control">No</div>
+                </div>
+              </div>
+              <div class="dfoot">
+                <button class="btn">Cancel</button>
+                <button class="btn primary">Save changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="case good">
+        <h2>Proposed &mdash; dark</h2>
+        <p>The same rule, the same result.</p>
+        <div class="screen" data-label="proposed / dark">
+          <div class="overlay">
+            <div class="panel proposed">
+              <div class="dhead">
+                <span class="x">&times;</span>
+                <p class="dtitle">Edit account</p>
+                <p class="ddesc">
+                  Rename it, move it to another category, or park it out of the
+                  statistics.
+                </p>
+              </div>
+              <div class="dbody">
+                <div class="field">
+                  <label>Name</label>
+                  <div class="control">Everyday current account</div>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <div class="control">General</div>
+                </div>
+                <div class="field">
+                  <label>Currency</label>
+                  <div class="control">PLN &mdash; Polish zloty</div>
+                </div>
+                <div class="field">
+                  <label>Opening balance</label>
+                  <div class="control">1 240,00</div>
+                </div>
+                <div class="field">
+                  <label>Credit limit</label>
+                  <div class="control">&mdash;</div>
+                </div>
+                <div class="field">
+                  <label>Opened on</label>
+                  <div class="control">2026-01-04</div>
+                </div>
+                <div class="field">
+                  <label>Note</label>
+                  <div class="control">Salary lands here</div>
+                </div>
+                <div class="field">
+                  <label>Exclude from statistics</label>
+                  <div class="control">No</div>
+                </div>
+              </div>
+              <div class="dfoot">
+                <button class="btn">Cancel</button>
+                <button class="btn primary">Save changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

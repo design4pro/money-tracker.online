@@ -15,6 +15,72 @@
         "value": "#112233",
         "createdAt": "2026-09-06T17:06:14.322Z",
         "reason": "Claude: a category colour fixture in dashboard-data.test.ts, seeded test data rather than a palette value"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
+        ],
+        "createdAt": "2026-09-09T21:10:19.971Z",
+        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
+        ],
+        "createdAt": "2026-09-09T21:10:20.154Z",
+        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "*",
+        "files": [
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
+        ],
+        "createdAt": "2026-09-09T21:10:20.257Z",
+        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
+      },
+      {
+        "rule": "design-system-spacing",
+        "value": "*",
+        "files": [
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
+        ],
+        "createdAt": "2026-09-09T21:10:20.425Z",
+        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
+      },
+      {
+        "rule": "design-system-shadow",
+        "value": "*",
+        "files": [
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
+        ],
+        "createdAt": "2026-09-09T21:10:20.547Z",
+        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
+      },
+      {
+        "rule": "design-system-motion",
+        "value": "*",
+        "files": [
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
+          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
+        ],
+        "createdAt": "2026-09-09T21:10:20.651Z",
+        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
       }
     ]
   }
