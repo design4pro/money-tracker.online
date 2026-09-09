@@ -356,8 +356,8 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
 - **Pencil** (`ink-2`): 7.47:1 on sunken, 9.02:1 on raised. Metadata, column headings, and every
   planned line. It is not a 4.5:1 grey; hierarchy comes from face, weight and position, never from
   fading text.
-- **Printed Rule** (`border-subtle`): the ruling of the form. Decorative and deliberately faint at
-  1.44:1 on canvas, so a page full of it reads as paper rather than as a grid.
+- **Printed Rule** (`border-subtle`): the green ruling of the form. Decorative and deliberately
+  faint at 1.44:1 on canvas, so a page full of it reads as paper rather than as a grid.
 - **Column Rule** (`border-panel`): the heavier rule - the spine before the balance column, the
   rule under a column heading, the frame of the current rail row, the section rule between two
   paper grounds. 1.94:1 on canvas, 1.77:1 on panel.
