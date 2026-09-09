@@ -241,3 +241,28 @@ Gate at `71b61bb`: 163 files / 2465 tests passed, build ok, no drift, lint 0 err
 chromium **101/101** across five spec files, webkit **52/56** with all four failures `pl`-only,
 none on `/recurring`, all tracing to the pre-existing #163. Eight frames in
 `.ai/qa/artifacts_issue-18/review-fix-2/`, read at 1440, 1152 and 360.
+
+## 2026-09-10T02:55:00Z — run closed
+
+Third review pass: **no blocker, no major.** Two minors (the `STATUS_COLUMN` copy of `badgeVariants`
+will not notice a future `Badge` change; the breakpoint restated in prose the constant already owns)
+and two nits, all recorded on the PR. Verdict **approve**.
+
+**GitHub refused to record it.** `addPullRequestReview` returns _"Can not approve your own pull
+request"_ — this PR is authored by the same account that ran the review. Per `.ai/trackers/github.md`
+the rejection is surfaced, not worked around: the report is posted as a PR comment carrying an
+explicit header that it has none of the weight of a human approval.
+
+**Decision recorded:** the pipeline label stays **`review`** instead of moving to `merge-queue`.
+`merge-queue` reads as "a reviewer signed this off" and none has. The label rationale comment says so
+in its own row.
+
+Gate re-run at the reviewed head `958bdc1`: agent-kit ok, no route or drizzle drift, typecheck ok,
+lint 0 errors / 2 pre-existing warnings, **163 files / 2465 tests passed**, build ok.
+
+CI remains unreadable from here — `gh pr checks 156` and both the check-runs and branch-protection
+APIs return `403 Resource not accessible by personal access token`. Disclosed in the review body, the
+summary comment and the PR body. Required checks still gate the merge.
+
+Lock released, `needs-qa` retained, test environment down. Open follow-ups: **#161**, **#166**, and
+three deferred review suggestions each needing a human's yes under `AGENTS.md` → Ask First.
