@@ -348,6 +348,20 @@ gh pr ready {prNumber}
 ```bash
 gh pr checks {prNumber} --json name,state,link
 ```
+Unreadable to a fine-grained PAT: the rollup expands to `CheckRun` nodes, fine-grained tokens have
+no `Checks` permission to grant, and `gh` exits non-zero with `Resource not accessible by personal
+access token`. Fall back to the Actions API, which asks only for `Actions: Read`:
+```bash
+sha=$(gh pr view {prNumber} --json headRefOid --jq .headRefOid)
+for run in $(gh api "repos/{owner}/{repo}/actions/runs?head_sha=$sha" --jq '.workflow_runs[].id'); do
+  gh api "repos/{owner}/{repo}/actions/runs/$run/jobs" \
+    --jq '.jobs[] | {name, state: .status, conclusion, link: .html_url}'
+done
+```
+The fallback sees GitHub Actions jobs only — check runs published by other GitHub Apps
+(GitGuardian, Sentry, and the like) are invisible to it. Report what it returns as the Actions
+jobs it is, and say that the App-published checks were out of reach, the same way
+**list-review-comments** states its own gap.
 
 #### get-required-checks
 Base branch → the set of required status checks. A 404 means branch protection is not readable — treat all reported checks as required.
