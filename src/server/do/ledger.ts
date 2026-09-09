@@ -202,8 +202,9 @@ export class AccountLedger implements DurableObject {
    * Ask for a rebuild of `accountId`.
    *
    * Returns `'coalesced'` when a pass was already running — the dirty bit is set and the running
-   * pass will serve this request too. Otherwise it runs one pass, then keeps running while the
-   * dirty bit is set, so a burst of requests collapses into at most one extra pass.
+   * pass serves this request too, or, if that pass throws, leaves the bit set for the next one.
+   * Otherwise it runs one pass, then keeps running while the dirty bit is set, so a burst of
+   * requests collapses into at most one extra pass.
    */
   async requestRebuild(
     accountId: string,
@@ -220,8 +221,10 @@ export class AccountLedger implements DurableObject {
     this.dirty = false
 
     // Everything from here is inside the `try`, including the first read: a lock taken outside the
-    // block that releases it is the shape of the bug this class just had.
-    let current: LedgerRecord = EMPTY
+    // block that releases it is the shape of the bug this class just had. `current` stays `null`
+    // until that read lands, which is how the `catch` tells "the read failed" from "the rebuild
+    // failed after a good read" — the two need different bookkeeping.
+    let current: LedgerRecord | null = null
     let outcome: RebuildOutcome = 'skipped'
     try {
       current = await this.stored()
@@ -246,17 +249,28 @@ export class AccountLedger implements DurableObject {
         accountId,
         error: error instanceof Error ? error.message : String(error),
       })
-      await this.write({
-        lastRunAt: this.now(),
-        lastOutcome: 'failed',
-        runs: current.runs + 1,
-      })
+      // Only when the record was actually read. The bookkeeping write is a whole-record `put`, so
+      // deriving it from the `EMPTY` default would rewrite an account's real history — `runs: 40`
+      // becomes `runs: 1` — because the read that would have told us the truth is the thing that
+      // just failed. A failed read leaves the previous record untouched, which is the honest state.
+      if (current !== null) {
+        await this.write({
+          lastRunAt: this.now(),
+          lastOutcome: 'failed',
+          runs: current.runs + 1,
+        })
+      }
       throw error
     } finally {
-      // Released whether the pass returned or threw, and synchronously: nothing runs between the
-      // `break` above and here, so a dirty bit set at the last moment cannot be dropped.
+      // The lock is released whether the pass returned or threw, and synchronously: nothing runs
+      // between the `break` above and here, so a dirty bit set at the last moment cannot be
+      // dropped. The dirty bit is *not* cleared here. On the success path the loop already cleared
+      // it (`takeDirty()` returning false is what broke the loop), so there is nothing to clear;
+      // on the throw path it belongs to a caller that was told `'coalesced'` and is still owed a
+      // pass. Clearing it would discard that request silently. Left set, `GET /state` reports the
+      // outstanding work and the next `requestRebuild` — which always rebuilds the whole history —
+      // serves it; the nightly cron is the backstop when no next request comes (ADR 0010).
       this.running = false
-      this.dirty = false
     }
   }
 

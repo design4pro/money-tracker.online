@@ -188,6 +188,89 @@ describe('AccountLedger.requestRebuild', () => {
     await expect(ledger.requestRebuild('acc')).rejects.toThrow(
       'storage operation cancelled',
     )
+    // `runs: 1`, not 2: a pass whose read failed writes no bookkeeping at all, so the next one
+    // starts from the record that was already there - here, none.
+    expect(await ledger.requestRebuild('acc')).toEqual({
+      outcome: 'rebuilt',
+      runs: 1,
+    })
+  })
+
+  it('leaves the persisted record alone when the storage read is what failed', async () => {
+    const storage = fakeStorage()
+    // An account with real history behind it. The failure below must not become its new record.
+    await storage.put({
+      ledger: { lastRunAt: 111, lastOutcome: 'rebuilt', runs: 40 },
+    })
+    let reads = 0
+    const failingRead: AccountLedgerStorage = {
+      ...storage,
+      get: <T>(key: string) => {
+        reads += 1
+        return reads === 1
+          ? Promise.reject(new Error('storage operation cancelled'))
+          : storage.get<T>(key)
+      },
+    }
+    const ledger = new AccountLedger(
+      { storage: failingRead },
+      {},
+      {
+        logger: quiet,
+        now: () => 5_000,
+        rebuild: () => Promise.resolve<RebuildOutcome>('rebuilt'),
+      },
+    )
+
+    await expect(ledger.requestRebuild('acc')).rejects.toThrow(
+      'storage operation cancelled',
+    )
+    // Untouched. The failure bookkeeping is a whole-record `put`, so writing one derived from the
+    // empty default would reset `runs` to 1 and drop `lastRunAt` - forty passes of history erased
+    // by a transient read error, on the one path that has no idea what the record said.
+    expect(storage.persisted()).toEqual({
+      lastRunAt: 111,
+      lastOutcome: 'rebuilt',
+      runs: 40,
+    })
+  })
+
+  it('keeps a coalesced request pending when the pass it joined throws', async () => {
+    const storage = fakeStorage()
+    const first = gate()
+    let attempt = 0
+    const ledger = new AccountLedger(
+      { storage },
+      {},
+      {
+        logger: quiet,
+        now: () => 6_000,
+        rebuild: async () => {
+          attempt += 1
+          if (attempt === 1) {
+            await first.held
+            throw new Error('d1 refused the delete')
+          }
+          return 'rebuilt' satisfies RebuildOutcome
+        },
+      },
+    )
+
+    // Parked on the gate, holding the lock.
+    const running = ledger.requestRebuild('acc')
+    // Answered `coalesced`, which is a promise that some pass will serve it.
+    expect(await ledger.requestRebuild('acc')).toEqual({
+      outcome: 'coalesced',
+      runs: 0,
+    })
+
+    first.release()
+    await expect(running).rejects.toThrow('d1 refused the delete')
+
+    // The failed pass released the lock but not the request it had accepted: clearing the dirty
+    // bit here would drop that caller's rebuild after it was told 200, and only the nightly cron
+    // would ever notice.
+    expect(await ledger.read()).toMatchObject({ running: false, dirty: true })
     expect(await ledger.requestRebuild('acc')).toEqual({
       outcome: 'rebuilt',
       runs: 2,
