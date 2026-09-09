@@ -403,3 +403,47 @@ for (const locale of LOCALES) {
     await expectCappedAtDesktopOnly(page, panel)
   })
 }
+
+/* -------------------------------------------------------------------------- */
+/* Phase 5 — `/dashboard` panels end where their content ends                   */
+/* -------------------------------------------------------------------------- */
+
+for (const locale of LOCALES) {
+  test(`the dashboard panels are not stretched to the tallest in their row — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/dashboard')
+
+    const panels = page
+      .getByRole('list', { name: /.+/ })
+      .first()
+      .locator('> li')
+    expect(await panels.count()).toBeGreaterThanOrEqual(5)
+
+    // The three panels of the second row at `xl`: a spending chart, an accounts list and a recent
+    // list, each holding a different amount. Stretched, all three measured the tallest.
+    const boxes = await Promise.all([
+      boxOf(panels.nth(2)),
+      boxOf(panels.nth(3)),
+      boxOf(panels.nth(4)),
+    ])
+    const row = boxes.filter((box) => Math.abs(box.y - boxes[0].y) < 1)
+    // Sanity: they are on one row, or this test is measuring something else.
+    expect(row.length).toBe(3)
+
+    const heights = new Set(row.map((box) => Math.round(box.height)))
+    expect(heights.size).toBeGreaterThan(1)
+
+    // Below `lg` the grid is one column, so `items-start` has nothing to do and the panels stack in
+    // DOM order exactly as before.
+    await page.setViewportSize({ width: 360, height: 800 })
+    const stackedFirst = await boxOf(panels.nth(0))
+    const stackedSecond = await boxOf(panels.nth(1))
+    expect(stackedSecond.x).toBeCloseTo(stackedFirst.x, 0)
+    expect(stackedSecond.y).toBeGreaterThan(
+      stackedFirst.y + stackedFirst.height - 1,
+    )
+  })
+}

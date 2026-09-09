@@ -97,11 +97,12 @@ function DashboardRoute() {
 
       <WidgetGrid label={t('dashboard.panels.label')}>
         {/*
-          `height="content"`: three typed lines and a caption end where their last rule ends.
-          Stretching them to the chart beside them left the middle of the panel empty, and an
-          empty middle is not composed space.
+          Three typed lines and a caption end where their last rule ends. Stretching them to the
+          chart beside them left the middle of the panel empty, and an empty middle is not composed
+          space. That is now the grid's default rather than this panel's exception, so the
+          `height="content"` this frame used to carry is gone: see `widget-grid.tsx`.
         */}
-        <WidgetFrame title={t('dashboard.widget.netWorth')} height="content">
+        <WidgetFrame title={t('dashboard.widget.netWorth')}>
           <NetWorthWidget
             baseCurrencyCode={data.baseCurrencyCode}
             totalBalanceMinor={data.netWorth.totalBalanceMinor}

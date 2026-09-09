@@ -26,14 +26,15 @@ export interface WidgetFrameProps {
   /** How many columns the panel takes on a wide screen. One on a narrow one, always. */
   readonly span?: 1 | 2
   /**
-   * `'content'` lets the panel end where its content ends instead of being stretched to the
-   * height of the tallest panel in its row.
+   * `'fill'` stretches the panel to the height of the tallest panel in its row; `'content'`, the
+   * default, lets it end where its content ends.
    *
-   * A grid row stretches by default, which is right for a panel whose content grows to fill it —
-   * a list, a chart — and wrong for one that does not. A summary card holding four lines beside a
-   * 300px chart is drawn as a card with 160px of empty floor, and empty floor at the bottom of a
-   * card is not whitespace that structures anything: it reads as a panel that failed to load the
-   * rest of itself. `'fill'` stays the default because it is right for every other panel here.
+   * The default used to be the other way round, inherited from the grid's own stretch, and it drew
+   * a summary card holding four lines beside a 300px chart as a card with 160px of empty floor.
+   * Empty floor at the bottom of a card is not whitespace that structures anything: it reads as a
+   * panel that failed to load the rest of itself (issue #18). So stretching is now something a
+   * panel asks for — `self-stretch` is explicit rather than ambient, which is also what keeps this
+   * prop meaningful now that {@link WidgetGrid} carries `items-start`.
    */
   readonly height?: 'fill' | 'content'
   readonly children: ReactNode
@@ -43,7 +44,7 @@ export interface WidgetFrameProps {
 export function WidgetFrame({
   title,
   span = 1,
-  height = 'fill',
+  height = 'content',
   children,
   className,
 }: WidgetFrameProps) {
@@ -54,7 +55,7 @@ export function WidgetFrame({
       className={cn(
         'min-w-0',
         span === 2 && 'lg:col-span-2',
-        height === 'content' && 'self-start',
+        height === 'fill' && 'self-stretch',
       )}
     >
       <Card
