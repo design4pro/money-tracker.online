@@ -12,26 +12,26 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 
 > Authoritative status table. `Status` is one of `todo` or `done`. On landing a Step, flip `Status` to `done` and fill the `Commit` column with the short SHA. The first row whose `Status` is not `done` is the resume point for `om-auto-continue-pr-loop`. Step ids and `Exec` cells are immutable once the plan is committed — per-Step commits touch only `Status` and `Commit`.
 
-| Phase | Step | Title                                                                    | Exec   | Status | Commit |
-| ----- | ---- | ------------------------------------------------------------------------ | ------ | ------ | ------ |
-| 1     | 1.1  | Add `--list-max: 56rem` to `tokens.css`                                  | inline | done   | 4e348ca|
-| 1     | 1.2  | Expose `--container-list` in `app.css`                                   | inline | done   | 8851a04|
-| 1     | 1.3  | Amend `DESIGN.md` → Layout with the three width bands                    | inline | done   | c5a2d86|
-| 1     | 1.4  | Cap the eight `_app` page subtitles with `max-w-prose`                   | inline | done   | a4f6c2b|
-| 2     | 2.1  | Cap the category tree at `max-w-list`                                    | inline | todo   | —      |
-| 2     | 2.2  | Cap the groups table container at `max-w-list`                           | inline | todo   | —      |
-| 3     | 3.1  | Split `/recurring` into two panes and move `Due soon` after the list     | inline | todo   | —      |
-| 3     | 3.2  | Keep the rail's column when nothing is due                               | inline | todo   | —      |
-| 3     | 3.3  | Follow the split through `recurring-skeletons.tsx`                       | inline | todo   | —      |
-| 4     | 4.1  | Lay the budget list out as a two-column grid from `lg`                   | inline | todo   | —      |
-| 4     | 4.2  | Render a single budget at `max-w-list`                                   | inline | todo   | —      |
-| 4     | 4.3  | Follow the pairing through `budget-skeletons.tsx` and the filtered empty | inline | todo   | —      |
-| 5     | 5.1  | Stop the dashboard widget grid equalising row heights                    | inline | todo   | —      |
-| 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | todo   | —      |
-| 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | todo   | —      |
-| 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | todo   | —      |
-| 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | todo   | —      |
-| 6     | 6.3  | Cap the `/transactions` search field from `md` up                        | inline | todo   | —      |
+| Phase | Step | Title                                                                    | Exec   | Status | Commit  |
+| ----- | ---- | ------------------------------------------------------------------------ | ------ | ------ | ------- |
+| 1     | 1.1  | Add `--list-max: 56rem` to `tokens.css`                                  | inline | done   | 4e348ca |
+| 1     | 1.2  | Expose `--container-list` in `app.css`                                   | inline | done   | 8851a04 |
+| 1     | 1.3  | Amend `DESIGN.md` → Layout with the three width bands                    | inline | done   | c5a2d86 |
+| 1     | 1.4  | Cap the eight `_app` page subtitles with `max-w-prose`                   | inline | done   | a4f6c2b |
+| 2     | 2.1  | Cap the category tree at `max-w-list`                                    | inline | done   | pending |
+| 2     | 2.2  | Cap the groups table container at `max-w-list`                           | inline | todo   | —       |
+| 3     | 3.1  | Split `/recurring` into two panes and move `Due soon` after the list     | inline | todo   | —       |
+| 3     | 3.2  | Keep the rail's column when nothing is due                               | inline | todo   | —       |
+| 3     | 3.3  | Follow the split through `recurring-skeletons.tsx`                       | inline | todo   | —       |
+| 4     | 4.1  | Lay the budget list out as a two-column grid from `lg`                   | inline | todo   | —       |
+| 4     | 4.2  | Render a single budget at `max-w-list`                                   | inline | todo   | —       |
+| 4     | 4.3  | Follow the pairing through `budget-skeletons.tsx` and the filtered empty | inline | todo   | —       |
+| 5     | 5.1  | Stop the dashboard widget grid equalising row heights                    | inline | todo   | —       |
+| 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | todo   | —       |
+| 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | todo   | —       |
+| 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | todo   | —       |
+| 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | todo   | —       |
+| 6     | 6.3  | Cap the `/transactions` search field from `md` up                        | inline | todo   | —       |
 
 ## Goal
 

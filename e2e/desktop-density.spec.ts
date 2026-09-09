@@ -3,6 +3,7 @@ import { expect, test } from './support/console'
 import { gotoApp, useLocale } from './support/app'
 import { storageStateFor } from './support/session'
 
+import type { Locator } from '@playwright/test'
 import type { AppLocale } from './support/app'
 
 /**
@@ -133,4 +134,72 @@ for (const locale of LOCALES) {
       }
     })
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase 2 — the two capped blocks                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The list band, 896px, plus 16px of tolerance.
+ *
+ * The tolerance absorbs a scrollbar and sub-pixel rounding, not a second opinion about the band: a
+ * block that took the whole well would measure ~1156px here, so nothing near the boundary is
+ * ambiguous.
+ */
+const LIST_BAND_MAX = 912
+
+/** The rendered width, refusing to measure something that is not on the page. */
+async function widthOf(locator: Locator): Promise<number> {
+  const box = await locator.boundingBox()
+  if (box === null) throw new Error('element is not rendered')
+  return box.width
+}
+
+/**
+ * Nothing in the capped block lost text to the cap.
+ *
+ * Only the elements carrying `truncate` can: everything else in a row is a fixed-size glyph or a
+ * `shrink-0` badge. A category named at the length the seed data uses has to survive 896px, or the
+ * band is too narrow rather than the layout too wide.
+ */
+async function clippedTextIn(block: Locator): Promise<ReadonlyArray<string>> {
+  return block.evaluate((root) =>
+    [...root.querySelectorAll('.truncate')]
+      .filter((element) => element.scrollWidth > element.clientWidth + 1)
+      .map((element) => element.textContent),
+  )
+}
+
+for (const locale of LOCALES) {
+  test(`the category tree takes the list band and not the whole well — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/categories')
+
+    // The page `<header>` is the reference width, not the viewport: it is the one block on this
+    // screen meant to span the content column - title on one side, primary action on the other - so
+    // its width is the width the tree would have taken had nothing capped it. Comparing against it
+    // rather than against 1440 keeps this true whatever the rail, the gutters and a scrollbar cost
+    // on the machine running it.
+    const tree = page.getByRole('grid').first()
+    const band = page.locator('main header').first()
+    await expect(tree).toBeVisible()
+
+    const wideTree = await widthOf(tree)
+    const wideBand = await widthOf(band)
+
+    // Capped, and the cap is doing something: the column it sits in is wider than it is.
+    expect(wideTree).toBeLessThanOrEqual(LIST_BAND_MAX)
+    expect(wideTree).toBeLessThan(wideBand - 1)
+    expect(await clippedTextIn(tree)).toEqual([])
+
+    // A phone never reaches the band, so the cap must be invisible there. The tree still fills the
+    // column, exactly as it did before this change.
+    await page.setViewportSize({ width: 360, height: 800 })
+    await expect(tree).toBeVisible()
+    expect(await widthOf(tree)).toBeCloseTo(await widthOf(band), 0)
+  })
 }
