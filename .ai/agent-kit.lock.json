@@ -55,7 +55,7 @@
       "mode": "100755"
     },
     ".ai/scripts/cezar-host-patch.sh": {
-      "sha256": "9f8655f623c4127e211266a3f2877e4e801641467ee4d30096a80766630d8243",
+      "sha256": "5afa72cf0f499852bab4ad107d6d77acc11966fadadaedb282dccae48f76ca46",
       "mode": "100755"
     },
     ".ai/scripts/housekeeping.sh": {
