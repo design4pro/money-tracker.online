@@ -488,3 +488,87 @@ for (const locale of LOCALES) {
     expect(ends.end).toBeLessThanOrEqual(BAND_END_SLACK)
   })
 }
+
+/* -------------------------------------------------------------------------- */
+/* Phase 6 — the two toolbars earn their width                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Why the narrowing state is reached by URL rather than by archiving something.
+ *
+ * The counterweight is drawn only while the filter hides rows, and the seeded workspace has
+ * nothing archived — so the state has to come from somewhere. Archiving an account through the UI
+ * would reach it, and would also mutate a workspace the rest of this suite reads concurrently.
+ * `?status=archived` reaches the same branch without writing anything: nothing matches, so every
+ * one of the workspace's accounts is hidden, which is the widest the gap between shown and total
+ * can be.
+ */
+const NARROWED = '/accounts?status=archived'
+
+/**
+ * One caption line plus the gap above it, at 360px.
+ *
+ * `text-caption` sets a 20px line box and the band's `gap-y-2` is 8px, so a count that wraps onto
+ * its own row costs 28px. 40 leaves room for a second wrapped line in a longer locale without
+ * admitting a node that took a block of its own.
+ */
+const CAPTION_LINE_BUDGET = 40
+
+for (const locale of LOCALES) {
+  test(`the /accounts filter band carries a counterweight only while it narrows — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, NARROWED)
+
+    // The band is the row the segmented control sits on: the control at its start, the count at
+    // its end. `main div` would match the page column, so the control's own parent is the anchor.
+    const band = page.getByRole('radiogroup').first().locator('xpath=..')
+    const bandBox = await boxOf(band)
+    expect(bandBox.width).toBeGreaterThan(900)
+
+    const count = band.locator('p')
+    await expect(count).toBeVisible()
+    const countBox = await boxOf(count)
+    expect(
+      bandBox.x + bandBox.width - (countBox.x + countBox.width),
+    ).toBeLessThanOrEqual(BAND_END_SLACK)
+
+    // `all` hides nothing, so "12 of 12" would be a sentence that says nothing and takes a line to
+    // say it. It is not drawn at all.
+    await gotoApp(page, '/accounts?status=all')
+    const wideBand = page.getByRole('radiogroup').first().locator('xpath=..')
+    await expect(wideBand).toBeVisible()
+    await expect(wideBand.locator('p')).toHaveCount(0)
+  })
+
+  test(`the /accounts counterweight costs a phone one line and no more — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await page.setViewportSize({ width: 360, height: 800 })
+
+    // This is one of the two phases that changes a narrow viewport, and the node it adds lands
+    // directly above the list. `accounts/index.tsx` records what happened last time a row grew
+    // here, so what this phase owes the phone is a bound on how much it grew by — measured as the
+    // difference between the band with the count and the same band without it, in the same run.
+    await gotoApp(page, '/accounts?status=all')
+    const quiet = await boxOf(
+      page.getByRole('radiogroup').first().locator('xpath=..'),
+    )
+
+    await gotoApp(page, NARROWED)
+    const band = page.getByRole('radiogroup').first().locator('xpath=..')
+    await expect(band.locator('p')).toBeVisible()
+    const loaded = await boxOf(band)
+
+    // One wrapped caption line and the 8px that separates it from the control above — never a
+    // block of its own, and never a second copy of the control's own height.
+    expect(loaded.height - quiet.height).toBeLessThanOrEqual(
+      CAPTION_LINE_BUDGET,
+    )
+    expect(loaded.height).toBeGreaterThan(quiet.height)
+  })
+}

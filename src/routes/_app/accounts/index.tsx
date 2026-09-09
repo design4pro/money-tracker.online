@@ -14,7 +14,7 @@ import {
 } from '#/components/app/accounts'
 import { SegmentedFilter } from '#/components/app/nav'
 import { Button, Card, toast } from '#/components/ui'
-import { useTranslate } from '#/lib/i18n'
+import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import {
   archiveAccount,
   listAccountGroups,
@@ -113,6 +113,7 @@ type Pending =
 
 function AccountsListRoute() {
   const t = useTranslate()
+  const locale = useLocale()
   const { list, groups } = Route.useLoaderData()
   const { status } = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -201,18 +202,42 @@ function AccountsListRoute() {
             ) : null}
           </div>
 
-          <SegmentedFilter
-            label={t('accounts.filter.label')}
-            value={status}
-            options={[
-              { id: 'active', label: t('accounts.filter.active') },
-              { id: 'archived', label: t('accounts.filter.archived') },
-              { id: 'all', label: t('accounts.filter.all') },
-            ]}
-            onChange={(next: StatusFilter) => {
-              void navigate({ search: { status: next } })
-            }}
-          />
+          {/*
+            The filter's band earns its width rather than ending in ~900px of nothing: the
+            segmented control keeps the start, the count takes the end. It is a counterweight, not
+            a new figure - it counts rows already rendered on this screen against a total the
+            loader already returns, so nothing is fetched and nothing is computed twice.
+
+            It appears only while the filter is actually narrowing the list. "Showing 12 of 12
+            accounts" tells a reader nothing and takes a line to do it, and on a phone that line
+            is an account row pushed below the fold - which is the mistake the `<header>` above
+            already records having made once.
+          */}
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+            <SegmentedFilter
+              label={t('accounts.filter.label')}
+              value={status}
+              options={[
+                { id: 'active', label: t('accounts.filter.active') },
+                { id: 'archived', label: t('accounts.filter.archived') },
+                { id: 'all', label: t('accounts.filter.all') },
+              ]}
+              onChange={(next: StatusFilter) => {
+                void navigate({ search: { status: next } })
+              }}
+            />
+            {accounts.length < overview.totalAccounts ? (
+              <p className="text-caption text-ink-2">
+                {t('accounts.filter.count', {
+                  // The plural agrees with the total, so the total drives the branch; `shown` and
+                  // `total` arrive pre-formatted because `interpolate` stringifies with `String()`.
+                  count: overview.totalAccounts,
+                  shown: formatNumber(locale, accounts.length),
+                  total: formatNumber(locale, overview.totalAccounts),
+                })}
+              </p>
+            ) : null}
+          </div>
 
           {accounts.length === 0 ? (
             <FilteredEmpty status={status} />
