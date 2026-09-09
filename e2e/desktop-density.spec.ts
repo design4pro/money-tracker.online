@@ -543,6 +543,39 @@ for (const locale of LOCALES) {
     await expect(wideBand.locator('p')).toHaveCount(0)
   })
 
+  test(`the /accounts filter rule still reaches the end of the band — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/accounts')
+
+    const control = page.getByRole('radiogroup').first()
+    const band = control.locator('xpath=..')
+    await expect(band).toBeVisible()
+
+    // Putting a counterweight at the band's end made the segmented control a flex item, and a
+    // flex item is as wide as its content — which took the control's own `border-b` with it,
+    // from the band's full width down to the width of three words. The hairline is load-bearing:
+    // the first account group below sets `first:border-t-0` precisely because it sits on this
+    // rule rather than drawing a second one under it. So the rule belongs to the band now, and
+    // the control must not draw a shorter copy of it.
+    const bandRule = await band.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).borderBottomWidth),
+    )
+    const controlRule = await control.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).borderBottomWidth),
+    )
+    expect(bandRule).toBeGreaterThan(0)
+    expect(controlRule).toBe(0)
+
+    // And it reaches where the list below it reaches, which is the promise the group depends on.
+    const bandBox = await boxOf(band)
+    const listBox = await boxOf(page.locator('main ul.rounded-xl').first())
+    expect(bandBox.x).toBeCloseTo(listBox.x, 0)
+    expect(bandBox.width).toBeCloseTo(listBox.width, 0)
+  })
+
   test(`the /accounts counterweight costs a phone one line and no more — ${locale}`, async ({
     page,
     context,

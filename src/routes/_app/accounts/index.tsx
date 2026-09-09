@@ -212,9 +212,15 @@ function AccountsListRoute() {
             accounts" tells a reader nothing and takes a line to do it, and on a phone that line
             is an account row pushed below the fold - which is the mistake the `<header>` above
             already records having made once.
+
+            The hairline belongs to this row rather than to the control. `SegmentedFilter` draws
+            its own `border-b`, and as a flex item it is only as wide as its three words - so the
+            rule that the first group below sits on (`first:border-t-0`, and the comment there)
+            would end at x~690 in a 1156px band instead of spanning it.
           */}
-          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border-subtle">
             <SegmentedFilter
+              className="border-b-0"
               label={t('accounts.filter.label')}
               value={status}
               options={[
