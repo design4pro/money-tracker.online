@@ -226,7 +226,9 @@ export class AccountLedger implements DurableObject {
     // Everything from here is inside the `try`, including the first read: a lock taken outside the
     // block that releases it is the shape of the bug this class just had. `current` stays `null`
     // until that read lands, which is how the `catch` tells "the read failed" from "the rebuild
-    // failed after a good read" — the two need different bookkeeping.
+    // failed after a good read" — the two need different bookkeeping. From then on it holds what
+    // storage holds, never a value on its way there: the `catch` counts from it, so a `runs`
+    // bumped before a write that threw would have the failure bookkeeping count that pass twice.
     let current: LedgerRecord | null = null
     let outcome: RebuildOutcome = 'skipped'
     try {
@@ -235,12 +237,13 @@ export class AccountLedger implements DurableObject {
       // dirty bit, and one more whole-history rebuild answers all of it.
       for (;;) {
         outcome = await this.rebuild(accountId)
-        current = {
+        const next: LedgerRecord = {
           lastRunAt: this.now(),
           lastOutcome: outcome,
           runs: current.runs + 1,
         }
-        await this.write(current)
+        await this.write(next)
+        current = next
         // Read after the write, so a request that arrived during either await is still counted.
         if (!this.takeDirty()) break
       }

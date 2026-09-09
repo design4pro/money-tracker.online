@@ -235,6 +235,45 @@ describe('AccountLedger.requestRebuild', () => {
     })
   })
 
+  it('counts a pass once when its bookkeeping write is what failed', async () => {
+    const storage = fakeStorage()
+    await storage.put({
+      ledger: { lastRunAt: 111, lastOutcome: 'rebuilt', runs: 5 },
+    })
+    let writes = 0
+    const failingWrite: AccountLedgerStorage = {
+      ...storage,
+      put: <T>(next: Record<string, T>) => {
+        writes += 1
+        return writes === 1
+          ? Promise.reject(new Error('storage write refused'))
+          : storage.put(next)
+      },
+    }
+    const ledger = new AccountLedger(
+      { storage: failingWrite },
+      {},
+      {
+        logger: quiet,
+        now: () => 7_000,
+        rebuild: () => Promise.resolve<RebuildOutcome>('rebuilt'),
+      },
+    )
+
+    await expect(ledger.requestRebuild('acc')).rejects.toThrow(
+      'storage write refused',
+    )
+    // `runs: 6`, not 7. One pass ran, so the counter advances by one - the increment the failed
+    // write never persisted must not be counted a second time by the failure bookkeeping. The
+    // outcome is `failed` because the pass failed: the rebuild half of it landed, but the record
+    // that says so did not, and the caller was given the error rather than a success.
+    expect(storage.persisted()).toEqual({
+      lastRunAt: 7_000,
+      lastOutcome: 'failed',
+      runs: 6,
+    })
+  })
+
   it('keeps a coalesced request pending when the pass it joined throws', async () => {
     const storage = fakeStorage()
     const first = gate()
