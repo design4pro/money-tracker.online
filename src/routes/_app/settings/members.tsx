@@ -183,7 +183,10 @@ function MembersRoute() {
                 </Column>
                 <Column minWidth={120}>{t('members.column.role')}</Column>
                 <Column minWidth={120}>{t('members.column.joined')}</Column>
-                <Column align="end" minWidth={68}>
+                {/* 92, not the menu's 44px target plus padding: this heading is `Działania` in
+                    Polish, which measures 65px, and a floor that clips the word it is holding
+                    space for is the same defect one column further along. */}
+                <Column align="end" minWidth={92}>
                   {t('members.column.actions')}
                 </Column>
               </TableHeader>

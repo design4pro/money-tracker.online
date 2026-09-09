@@ -53,6 +53,10 @@ const PL = {
   recurringFindPatterns: 'Znajdź wzorce w transakcjach',
   groupsHeading: 'Grupy wydatków',
   groupsTable: 'Grupy wydatków',
+  membersHeading: 'Osoby',
+  membersTable: 'W tym domu',
+  importHeading: 'Import',
+  importTable: 'Importy, od najnowszego',
 } as const
 
 /**
@@ -171,44 +175,77 @@ test.describe('a 360px screen still shows its own subject', () => {
     ).toBeGreaterThan(240)
   })
 
-  test('the groups table scrolls rather than clipping its headings', async ({
-    page,
-  }) => {
-    await useLocale(page.context(), 'pl')
-    await gotoApp(page, '/transactions/groups')
-    await expect(
-      page.getByRole('heading', { name: PL.groupsHeading, level: 1 }),
-    ).toBeVisible()
+  /**
+   * Every table that states column floors, not only the one the issue named.
+   *
+   * A floor is a promise about one column, so the way it fails is per column and per locale: the
+   * groups table's action heading is `Akcje` and fits in the menu's own width, the members table's
+   * is `Działania` and does not. Checking only the screen the report was written about would have
+   * shipped the second one clipped.
+   */
+  for (const surface of [
+    {
+      route: '/transactions/groups',
+      heading: PL.groupsHeading,
+      table: PL.groupsTable,
+      // The seed owns whether this workspace has groups, and the designed empty state is a
+      // shipped state too — `transaction-groups.visual.spec.ts` makes the same allowance.
+      skippableWhenEmpty: true,
+    },
+    {
+      route: '/settings/members',
+      heading: PL.membersHeading,
+      table: PL.membersTable,
+      skippableWhenEmpty: false,
+    },
+    {
+      route: '/import',
+      heading: PL.importHeading,
+      table: PL.importTable,
+      skippableWhenEmpty: true,
+    },
+  ]) {
+    test(`${surface.route} scrolls rather than clipping its headings`, async ({
+      page,
+    }) => {
+      await useLocale(page.context(), 'pl')
+      await gotoApp(page, surface.route)
+      await expect(
+        page.getByRole('heading', { name: surface.heading, level: 1 }),
+      ).toBeVisible()
 
-    const table = page.getByRole('grid', { name: PL.groupsTable })
-    // The seed owns whether this workspace has groups, and the designed empty state is a shipped
-    // state too — `transaction-groups.visual.spec.ts` makes the same allowance for the same reason.
-    if ((await table.count()) === 0) {
-      test.skip(true, 'the demo workspace has no groups to table')
-      return
-    }
+      const table = page.getByRole('grid', { name: surface.table })
+      if ((await table.count()) === 0) {
+        test.skip(
+          surface.skippableWhenEmpty,
+          `the demo workspace has nothing to table on ${surface.route}`,
+        )
+        return
+      }
 
-    const headers = table.getByRole('columnheader')
-    const headerCount = await headers.count()
-    for (let index = 0; index < headerCount; index += 1) {
+      const headers = table.getByRole('columnheader')
+      const headerCount = await headers.count()
+      for (let index = 0; index < headerCount; index += 1) {
+        const label = headers.nth(index).locator('span').first()
+        expect(
+          await isClipped(label),
+          `"${(await label.textContent()) ?? ''}" was clipped instead of the table scrolling`,
+        ).toBe(false)
+      }
+
+      // A table that refuses to shrink below its columns' floors is wider than the phone, and the
+      // container it sits in is what scrolls. Both halves matter: overflow with no scroll port is
+      // only a differently shaped clip.
+      const scrolls = await table.evaluate((element) => {
+        const container = element.parentElement
+        if (container === null) return null
+        return container.scrollWidth > container.clientWidth
+      })
+      expect(scrolls, 'the grid sits in a container').not.toBeNull()
       expect(
-        await isClipped(headers.nth(index).locator('span').first()),
-        `column heading ${index} was clipped instead of the table scrolling`,
-      ).toBe(false)
-    }
-
-    // A table that refuses to shrink below its columns' floors is wider than the phone, and the
-    // container it sits in is what scrolls. Both halves matter: overflow with no scroll port is
-    // only a differently shaped clip.
-    const scrolls = await table.evaluate((element) => {
-      const container = element.parentElement
-      if (container === null) return null
-      return container.scrollWidth > container.clientWidth
+        scrolls,
+        `the ${surface.route} table was squeezed into 360px instead of scrolling`,
+      ).toBe(true)
     })
-    expect(scrolls, 'the groups grid sits in a container').not.toBeNull()
-    expect(
-      scrolls,
-      'the groups table was squeezed into 360px instead of scrolling',
-    ).toBe(true)
-  })
+  }
 })
