@@ -2,6 +2,11 @@ import { expect } from '@playwright/test'
 
 import { THEME_STORAGE_KEY } from '#/lib/theme'
 
+import {
+  TRANSACTION_DETAIL_URL,
+  TRANSACTION_ROW_SELECTOR,
+} from './transactions'
+
 import type { BrowserContext, Locator, Page } from '@playwright/test'
 
 /**
@@ -333,6 +338,78 @@ export async function createTransactionThroughUi(
     throw new Error(`could not read a transaction id out of ${String(href)}`)
   }
   return transactionId
+}
+
+/* -------------------------------------------------------------------------- */
+/* Getting to a panel on the transaction detail screen                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How long a screen is given to fetch what it will draw, once it is hydrated.
+ *
+ * A *budget*, in the same sense as {@link waitForHydration}'s, and for the same reason: nothing
+ * that fails to arrive is accepted, it is only given longer to say so. It applies to the two waits
+ * for data in {@link openTransactionDetailPanel} and to nothing else — the suite-wide
+ * `expect.timeout` of five seconds in `playwright.config.ts` is untouched, so every assertion
+ * about what the product *drew* still fails as fast as it ever did.
+ *
+ * The number is measured rather than picked. Run the way CI runs these — `mobile-safari`,
+ * `workers: 1`, against `pnpm dev` — the whole of the slowest refund test takes 10.7 s, navigation,
+ * hydration, the panel, a dialog and two axe scans included; the wait below is a small part of
+ * that. Ten seconds is an order of magnitude more than it needs and still leaves two thirds of the
+ * 30 s `timeout` for the test's own work, so a screen that genuinely never loads fails here, on
+ * this sentence, rather than on a test timeout that has none.
+ */
+const DATA_TIMEOUT = 10_000
+
+/**
+ * Opens the first transaction in the ledger and returns one of its panels, by accessible name.
+ *
+ * The row is reached by following the list's own link rather than by a seeded id: the demo
+ * workspace's contents are the seed's business, and a spec that hard-codes an id fails for a reason
+ * that has nothing to do with the panel it is about. Which link that is, and why it has to be said
+ * so precisely, is `support/transactions.ts` — it is #82.
+ *
+ * One helper rather than one per spec because the refund, split and receipts specs each wrote the
+ * same navigate-click-assert themselves, which meant the bug in it was present three times, had to
+ * be found three times, and could rot back into two of them unnoticed.
+ *
+ * Both waits for data carry {@link DATA_TIMEOUT} rather than the default five seconds, and neither
+ * is a tolerance: the ledger and the detail screen are both fetched after hydration, on a runner
+ * `playwright.config.ts` already records as slow enough to starve hydration itself. What they buy
+ * is that the failure, when there is one, is the right one — a row that never arrives and a panel
+ * that is not there fail on their own sentence rather than on whichever assertion the clock reached
+ * first.
+ *
+ * @param panelName The panel's accessible name in the locale the page is in. It is a message value
+ *   from `src/lib/i18n/messages/*.ts`, so callers pass it per locale rather than hard-coding one.
+ */
+export async function openTransactionDetailPanel(
+  page: Page,
+  panelName: string,
+): Promise<Locator> {
+  await gotoApp(page, '/transactions')
+
+  const firstRow = page.locator(TRANSACTION_ROW_SELECTOR).first()
+  await expect(
+    firstRow,
+    'The ledger listed no transaction to open. The demo workspace should always have one.',
+  ).toBeVisible({ timeout: DATA_TIMEOUT })
+  await firstRow.click()
+  await expect(
+    page,
+    'Following the ledger\'s first row did not open one transaction. Landing on "/transactions/new" here means the create stamp in the bottom bar was clicked instead - see `support/transactions.ts`.',
+  ).toHaveURL(TRANSACTION_DETAIL_URL)
+
+  const panel = page.getByRole('region', { name: panelName })
+  await expect(
+    panel,
+    // Not a diagnosis of *why*, and it cannot be: the accessible name is locale-dependent, so a
+    // missing region and a renamed one look the same from here. What it can now say is that this
+    // is the transaction's own screen, which is the part that used to be untrue.
+    `No region named "${panelName}" on the transaction detail screen (the name is locale-dependent).`,
+  ).toBeVisible({ timeout: DATA_TIMEOUT })
+  return panel
 }
 
 /**
