@@ -28,7 +28,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 4     | 4.3  | Follow the pairing through `budget-skeletons.tsx` and the filtered empty | inline | done   | a1f010f |
 | 5     | 5.1  | Stop the dashboard widget grid equalising row heights                    | inline | done   | pending |
 | 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | done   | pending |
-| 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | todo   | —       |
+| 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | done   | pending |
 | 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | todo   | —       |
 | 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | todo   | —       |
 | 6     | 6.3  | Cap the `/transactions` search field from `md` up                        | inline | todo   | —       |
@@ -268,4 +268,8 @@ None. No `--skill-url` was passed.
 
 ## Follow-ups
 
-- Net worth widget mid-card void — filed in Step 5.3, issue number recorded here on landing.
+- Net worth widget mid-card void — **#161**, filed in Step 5.3. Vertical density inside a
+  hand-rolled chart (ADR 0007), so it shares neither this spec's decision rule nor its token; issue
+  #18's own measurement (~140px of dead space mid-card) is quoted in the body. The other two
+  `/dashboard` measurements from that same line are closed on this PR: the header strip by
+  `e1ca9d7`'s assertion on work `cf483b7`/`11e8848` already did, the bottom-row voids by `3ec1aa0`.
