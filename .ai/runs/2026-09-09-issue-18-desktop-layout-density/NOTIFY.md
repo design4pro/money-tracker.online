@@ -183,3 +183,32 @@
 - **Design-system / style pass:** `token-classes.test.ts` green, `DESIGN.md` and the code agree,
   no new component or variant, `prettier --check` clean on every touched file. One thing considered
   and not done, recorded with its reasoning: a `role="status"` live region on the `/accounts` count.
+
+## 2026-09-10T00:55:00Z — checkpoint 6: the review pass, three findings, three fixes
+
+`om-auto-review-pr 156 --autofix` returned **request changes** with three majors. Each was
+re-derived from a measurement rather than accepted, and all three held:
+
+- **`/accounts`** — the Step 6.2 counterweight wrapper made `SegmentedFilter` a flex item, so its
+  `border-b` ran 438px inside a 1156px band. The rule the first account group sits on
+  (`first:border-t-0`) was not there from x≈690 outward. Moved to the wrapper — `ee3ffb4`.
+- **`/recurring` outline** — the Step 3.1 reorder left `h1 → h3,h3,h3 → h2`. axe missed it because
+  `heading-order` is `best-practice` and `accessibility.spec.ts:52` excludes that tag. Series
+  heading promoted to `h2` — `cef03d8`.
+- **`Due soon` rail** — the `20rem` track left the table 278px for 290px (`en`) / 298px (`pl`) of
+  columns, 406px with the status column, so the rail scrolled sideways at 1440. Track widened to
+  `28rem`; the pane split moved `lg` → `xl` because at 1024px a 28rem aside leaves the series list
+  268px, which is the defect this spec exists to remove — `d7490fc`.
+
+**Decision recorded:** the `lg` → `xl` move is a deliberate deviation from the spec's "two panes on
+one row from `lg`", taken on the spec's own rule (earn the width where there is width to earn) and
+disclosed in `panes.ts`, the commit, the checkpoint and the PR body. A reviewer who disagrees has
+the numbers to overrule it.
+
+All six new browser cases proven red against the unfixed `src/`. Gate re-run at `d7490fc`: 2465
+tests passed, build ok, no drift. Serial browser runs: chromium 94/94 across four spec files,
+webkit 52/56 with all four failures `pl`-only and traced to the pre-existing #163. Twelve frames in
+`.ai/qa/artifacts_issue-18/review-fix/`, read.
+
+The single failing test in `final-gate-checks.md` §1 is settled as a flake: the same commit re-runs
+2465/2465 green, and the only delta from the previous green head is run-folder markdown.
