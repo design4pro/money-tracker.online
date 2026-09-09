@@ -70,10 +70,10 @@ the rules of `SDLC.md`.
   push under `.github/workflows/` or delete a label; the organisation approves the token once,
   under Settings → Personal access tokens). The full permission list, and what a run does for the
   operations the missing ones would serve, is "Token scopes the pipeline needs" below. The plist
-  sets `GH_CONFIG_DIR` and cezar forwards it,
-  so `gh` inside a run and `git push` over HTTPS (the global credential helper is `gh auth
-git-credential`, which reads the same variable) both act as the bot, while `~/.config/gh` and
-  the developer's terminal stay the developer's. Commits carry `user.name design4pro-agent` and
+  sets `GH_CONFIG_DIR` and cezar forwards it, so `gh` inside a run and `git push` over HTTPS (the
+  global credential helper is `gh auth git-credential`, which reads the same variable) both act as
+  the bot, while `~/.config/gh` and the developer's terminal stay the developer's. Commits carry
+  `user.name design4pro-agent` and
   `user.email bot@design4.pro` from the host clone's local git config, which every worktree
   shares.
 - Ports: the test environment (`.ai/scripts/test-env-up.sh`, the `om-prepare-test-env` contract)
@@ -84,32 +84,46 @@ git-credential`, which reads the same variable) both act as the bot, while `~/.c
 
 The permissions the bot's fine-grained PAT carries decide which tracker operations in
 `.ai/trackers/github.md` are real and which silently degrade, so the next scope change is checked
-against this list rather than against a run's behaviour. Verified against the live API on
-2026-09-09 as `design4pro-agent`; re-verify with the probe below after any change.
+against this list rather than against a run's behaviour. Which permission an operation needs is
+fixed by GitHub's API and is the durable half of this section; which ones the token actually holds
+is a snapshot, dated in the last column and re-checked with the probe below.
 
-| Repository permission | Operations it serves                                                              | Granted |
-| --------------------- | --------------------------------------------------------------------------------- | ------- |
-| Metadata: read        | **repo-info**, **default-branch**, the ruleset read below (implicit on every PAT) | yes     |
-| Contents: read/write  | `git push`, **get-pr-diff**                                                       | yes     |
-| Issues: read/write    | **get-issue**, **comment-issue**, the label and assignee guards                   | yes     |
-| Pull requests: r/w    | **open-pr**, **get-pr**, the review and review-thread operations                  | yes     |
-| Actions: read         | **list-runs**, **get-run**, **get-run-failed-logs**, **watch-run**                | yes     |
-| Checks: read          | **get-pr-checks** (`gh pr checks`, `commits/{sha}/check-runs`)                    | **no**  |
-| Commit statuses: read | **get-pr-checks**' status half (`commits/{sha}/status`)                           | **no**  |
-| Actions: write        | **rerun-failed**                                                                  | **no**  |
-| Administration: read  | **get-required-checks** (`branches/*/protection/*`)                               | **no**  |
-| Workflows             | pushing under `.github/workflows/`                                                | **no**  |
+| Repository permission     | Operations it serves                                                              | Held 2026-09-09 |
+| ------------------------- | --------------------------------------------------------------------------------- | --------------- |
+| Metadata: read            | **repo-info**, **default-branch**, the ruleset read below (implicit on every PAT) | yes             |
+| Contents: read/write      | `git push`                                                                        | yes             |
+| Issues: read/write        | **get-issue**, **comment-issue**, the label and assignee guards                   | yes             |
+| Pull requests: read/write | **create-pr**, **get-pr**, **get-pr-diff**, the review and review-thread ops      | yes             |
+| Actions: read             | **list-runs**, **get-run**, **get-run-failed-logs**, **watch-run**                | yes             |
+| Commit statuses: read     | **get-pr-checks**' status half (`commits/{sha}/status`)                           | yes             |
+| Checks: read              | **get-pr-checks** (`gh pr checks`, `commits/{sha}/check-runs`)                    | **no**          |
+| Actions: write            | **rerun-failed**                                                                  | **no**          |
+| Administration: read      | **get-required-checks** (`branches/*/protection/*`)                               | **no**          |
+| Workflows                 | pushing under `.github/workflows/`                                                | **no**          |
 
-The last two rows are refused on purpose (#133, and the Host identity bullet above): a run does not
-edit the workflows that judge it, and does not read or write branch protection. The three before
-them are simply not granted yet, and until they are, this is what a run must do instead — a
-degraded path, stated so it is not mistaken for the real gate:
+The last two rows are refused on purpose, by the Host identity bullet above. Workflows, so a run
+cannot edit the workflows that judge it. Administration, because a run has no business in the branch
+protection settings — and it would buy nothing here anyway, for the reason under "Required checks"
+below. The two above them are simply not granted yet (#133 asks for them), and until they are, this
+is what a run does instead — a degraded path, stated so it is not mistaken for the real gate. Stated
+here, not enforced: the skills read `.ai/trackers/github.md`, and teaching them this belongs to
+`design4pro/agent-kit`, which renders that file.
 
-- **CI status.** Without Checks and Commit statuses, **get-pr-checks** answers `403 Resource not
-accessible by personal access token` — the GraphQL wording names `statusCheckRollup`. Every check
-  on this repository is produced by a workflow in `.github/workflows/`, so **list-runs** for the
-  head branch is the whole picture and is readable today. A run reports CI from workflow runs and
-  says in its report that the check-run view was unavailable.
+Treat the last column as a reading, not a setting. While #133 was being written, `commits/{sha}/status`
+answered 403 at 07:40Z and 200 at 07:57Z for the same SHA and the same `gh` config, which is how the
+"Commit statuses" row came to say yes. Nothing in the repository would have noticed either value
+changing; the probe is what turns the column back into a fact.
+
+- **CI status.** Checks: read is the one that bites. Without it **get-pr-checks** answers
+  `403 Resource not accessible by personal access token`; the GraphQL wording names
+  `statusCheckRollup`, and once Commit statuses landed it narrowed to the per-context nodes
+  underneath it — the rollup resolves, the check runs inside it do not. Commit statuses being
+  readable buys nothing on its own here, because nothing posts a commit status to this repository:
+  every check comes from a workflow in `.github/workflows/`, so `commits/HEAD/status` reports zero
+  statuses and **list-runs** for the head branch is the whole picture. A run reports CI from workflow
+  runs and says in its report that the check-run view was unavailable. Note what that costs: a check
+  posted by an installed GitHub App rather than by a workflow would be invisible to a run, and this
+  paragraph would stop being true without any signal that it had.
 - **Required checks.** **get-required-checks** answers 403 here, and would answer 404 even with
   Administration: read, because it reads _classic branch protection_ and this repository's gate is a
   repository **ruleset**. The readable truth needs Metadata alone:
@@ -119,23 +133,41 @@ accessible by personal access token` — the GraphQL wording names `statusCheckR
   `required_approving_review_count: 0`. The descriptor's documented fallback — "treat every
   reported check as required" — is therefore stricter than the gate, not a stand-in for it. That is
   the safe direction, and a run may keep it; what it must not do is call it the required set.
+  It follows that what holds a merge here is the pipeline — the labels, the review verdict and the
+  QA gate in `SDLC.md`, and the merge tooling's own refusal to merge on red — and not the ruleset,
+  which enforces only that `develop` and `main` are reached through a pull request and are neither
+  deleted nor force-pushed. Prose elsewhere that credits required checks or branch protection with
+  holding the merge predates this reading and is tracked separately. None of this generalises: the
+  same read against `design4pro/planned.travel` returns a `required_status_checks` rule on its
+  `develop`. Two repositories share this token and disagree about their gate, which is the argument
+  for reading the ruleset per repository rather than assuming either answer.
 - **Re-running a job.** Without Actions: write, **rerun-failed** is refused (`run … cannot be
 rerun`). Re-running a job is a human action in this repository: a run that suspects infrastructure
   rather than a real failure says so on the pull request, names the run id, and stops — it does not
   retry the call and does not change code to chase a failure it could not disambiguate.
 
-Probe, from the bot's `gh` config, one repository at a time:
+Probe, from the bot's `gh` config, once per repository — `planned.travel` carries the same token and
+the same expectations, so run it there too. `HEAD` in a REST path is the default branch's tip, which
+is what makes the first two lines stable to paste; the third prints the ruleset instead of a verdict,
+because reading it is the point.
 
 ```bash
-GH_CONFIG_DIR=~/.config/gh-agent gh api repos/design4pro/money-tracker.online/commits/HEAD/check-runs >/dev/null && echo "checks: read ok"
-GH_CONFIG_DIR=~/.config/gh-agent gh api repos/design4pro/money-tracker.online/commits/HEAD/status  >/dev/null && echo "statuses: read ok"
-GH_CONFIG_DIR=~/.config/gh-agent gh api repos/design4pro/money-tracker.online/rules/branches/develop --jq '.[].type'
+R=design4pro/money-tracker.online   # then repeat with design4pro/planned.travel
+GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/commits/HEAD/check-runs" >/dev/null 2>&1 \
+  && echo "checks: read ok" || echo "checks: read MISSING"
+GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/commits/HEAD/status" >/dev/null 2>&1 \
+  && echo "commit statuses: read ok" || echo "commit statuses: read MISSING"
+GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/rules/branches/develop" --jq '.[].type'
 ```
 
-Granting the three is one edit under Settings → Personal access tokens on the `design4pro-agent`
-account, re-approved once by the organisation; the descriptor half of the change (teaching
-**get-required-checks** the rulesets endpoint) lives in `design4pro/agent-kit`, which renders
-`.ai/trackers/github.md`.
+Both repositories are private, so an unauthenticated 200 cannot mask a missing permission. Were one
+made public, the first two endpoints would answer without authorization and the probe would report
+a scope it does not have.
+
+Granting Checks: read and Actions: write is one edit under Settings → Personal access tokens on the
+`design4pro-agent` account, re-approved once by the organisation. The descriptor half of the change
+lives in `design4pro/agent-kit`, which renders `.ai/trackers/github.md`; the piece worth carrying
+there is teaching **get-required-checks** the rulesets endpoint, which needs no new scope at all.
 
 ### The cockpit process
 
