@@ -18,11 +18,11 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 1     | 1.2  | Expose `--container-list` in `app.css`                                   | inline | done   | 8851a04 |
 | 1     | 1.3  | Amend `DESIGN.md` → Layout with the three width bands                    | inline | done   | c5a2d86 |
 | 1     | 1.4  | Cap the eight `_app` page subtitles with `max-w-prose`                   | inline | done   | a4f6c2b |
-| 2     | 2.1  | Cap the category tree at `max-w-list`                                    | inline | done   | pending |
-| 2     | 2.2  | Cap the groups table container at `max-w-list`                           | inline | done   | pending |
-| 3     | 3.1  | Split `/recurring` into two panes and move `Due soon` after the list     | inline | done   | pending |
-| 3     | 3.2  | Keep the rail's column when nothing is due                               | inline | done   | pending |
-| 3     | 3.3  | Follow the split through `recurring-skeletons.tsx`                       | inline | done   | pending |
+| 2     | 2.1  | Cap the category tree at `max-w-list`                                    | inline | done   | f4295f1 |
+| 2     | 2.2  | Cap the groups table container at `max-w-list`                           | inline | done   | 6fbe35f |
+| 3     | 3.1  | Split `/recurring` into two panes and move `Due soon` after the list     | inline | done   | 0c3d947 |
+| 3     | 3.2  | Keep the rail's column when nothing is due                               | inline | done   | 79c61fd |
+| 3     | 3.3  | Follow the split through `recurring-skeletons.tsx`                       | inline | done   | 76d758d |
 | 4     | 4.1  | Lay the budget list out as a two-column grid from `lg`                   | inline | todo   | —       |
 | 4     | 4.2  | Render a single budget at `max-w-list`                                   | inline | todo   | —       |
 | 4     | 4.3  | Follow the pairing through `budget-skeletons.tsx` and the filtered empty | inline | todo   | —       |

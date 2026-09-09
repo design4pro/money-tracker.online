@@ -35,3 +35,30 @@
 - **Observed, not acted on:** `/transactions/rules` rows carry the same void issue #18 describes,
   but that route is not one of the spec's seven surfaces. Recorded, not widened into this PR.
 - Environment: `.ai/scripts/test-env-up.sh` → `http://127.0.0.1:3016`.
+
+## 2026-09-09T20:25:00Z — checkpoint 2 (Steps 2.1 … 3.3)
+
+- Phases 2 and 3 closed. `typecheck`, `lint`, `build`, `prettier` green; 64/64 across
+  `desktop-density`, `narrow-viewport` and `accessibility` on chromium in both locales; every new
+  browser case proven red without its change.
+- The token guard Phase 1 could not exercise now bites: deleting `--container-list` fails
+  `token-classes.test.ts` with `max-w-list` in `dead`. Restored, never committed.
+- **Decision:** the `/recurring` pane geometry lives in one exported constant,
+  `RECURRING_PANES` (`src/components/app/recurring/panes.ts`), imported by the screen and by its
+  skeleton. The spec asks the two to match to within 1px; a shared constant makes that true by
+  construction instead of by assertion.
+- **Decision:** "the rail keeps its column when nothing is due" is asserted by removing the rail's
+  content in the page and re-measuring the track, not by seeding a workspace. No fixture holds
+  series with nothing outstanding and writing recurring rows into D1 to make one would be a great
+  deal of fixture for a claim about a grid track.
+- **Decision:** `/transactions/groups` keeps its error panel uncapped. The spec names the skeleton
+  and the empty state for that step and not the error panel, unlike the `/categories` step. Followed
+  literally rather than widened.
+- **Deliberate visible change, called out rather than left in a frame:** on a phone `Due soon` now
+  sits **below** the series list. The 360 before/after pair is at the top of the PR body.
+- **Observed, not acted on:** capping `/categories` narrows but does not close the gap inside a row
+  between the badge and the overflow menu. That is the row's own composition and issue #18's Out of
+  scope forbids adding a fact to fill it.
+- **Problem, unchanged:** `pnpm test` reports two load-flaky 5s timeouts in
+  `dashboard-data.test.ts`. Green alone (3/3 in 2.55s), unreachable from this branch's diff, and
+  already flaky at checkpoint 1 before any of this existed. CI is the arbiter.
