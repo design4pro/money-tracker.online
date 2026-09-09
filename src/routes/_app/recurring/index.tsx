@@ -185,7 +185,7 @@ function RecurringListRoute() {
         />
       ) : (
         /*
-          Two panes from `lg` up - the tracks and why they are what they are live on
+          Two panes from `xl` up - the tracks and why they are what they are live on
           {@link RECURRING_PANES}, which the loading picture uses too.
 
           The DOM order moved with them, deliberately: `Due soon` now comes *after* the series

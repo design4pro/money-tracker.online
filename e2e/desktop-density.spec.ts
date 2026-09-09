@@ -238,8 +238,8 @@ for (const locale of LOCALES) {
 /* Phase 3 — `/recurring` earns its width with two panes                       */
 /* -------------------------------------------------------------------------- */
 
-/** The `Due soon` rail's grid track, 20rem, as `/recurring` states it from `lg` up. */
-const RAIL_TRACK = 320
+/** The `Due soon` rail's grid track, 28rem, as `/recurring` states it from `xl` up. */
+const RAIL_TRACK = 448
 
 /**
  * The rendered box, refusing to measure something that is not on the page.
@@ -254,7 +254,7 @@ async function boxOf(locator: Locator) {
 }
 
 for (const locale of LOCALES) {
-  test(`/recurring puts the series list and the rail on one row, and stacks them in DOM order below lg — ${locale}`, async ({
+  test(`/recurring puts the series list and the rail on one row, and stacks them in DOM order below xl — ${locale}`, async ({
     page,
     context,
   }) => {
@@ -296,9 +296,11 @@ for (const locale of LOCALES) {
     expect(wideRail.x).toBeGreaterThan(wideSeries.x + wideSeries.width - 1)
     expect(wideSeries.width).toBeLessThanOrEqual(LIST_BAND_MAX)
 
-    // 1023 and 360: stacked, and stacked the way the DOM reads - `Due soon` below the list. This
-    // is the phase's deliberate reorder, so it is asserted rather than left to a frame.
-    for (const width of [1023, 360]) {
+    // 1279, 1023 and 360: stacked, and stacked the way the DOM reads - `Due soon` below the list.
+    // This is the phase's deliberate reorder, so it is asserted rather than left to a frame. 1279
+    // is the pane split's own edge: the rail needs 28rem to hold its table, and the page column
+    // below `xl` is not wide enough to give it that and still leave the series list a list.
+    for (const width of [1279, 1023, 360]) {
       await page.setViewportSize({ width, height: 900 })
       const stackedSeries = await boxOf(series)
       const stackedRail = await boxOf(rail)
@@ -319,7 +321,7 @@ for (const locale of LOCALES) {
     const rail = page.locator('main div.grid').first().locator('> *').nth(1)
     await expect(rail).toBeVisible()
 
-    // The rail's track is `20rem`, stated by the grid template rather than negotiated with what
+    // The rail's track is `28rem`, stated by the grid template rather than negotiated with what
     // the rail happens to hold. That is the whole of "keep the column when nothing is due": an
     // `auto` or `max-content` track would collapse toward the empty sentence and take the layout
     // with it, and this number is what would change if somebody wrote one.
@@ -359,6 +361,56 @@ for (const locale of LOCALES) {
     for (let index = 1; index < levels.length; index += 1) {
       expect(levels[index] - (levels[index - 1] ?? 0)).toBeLessThanOrEqual(1)
     }
+  })
+
+  test(`the /recurring rail holds its own table rather than scrolling it — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/recurring')
+
+    const rail = page.locator('main div.grid').first().locator('> *').nth(1)
+    const scroller = rail.locator('div[role="region"]')
+    await expect(scroller).toBeVisible()
+
+    // A `20rem` track left the `Due soon` table 278px to render 290px (`en`) / 298px (`pl`) of
+    // columns, so the rail arrived at 1440px already scrolling sideways — a horizontal scrollbar
+    // on a desktop aside, on a table whose whole job is to be read at a glance.
+    const natural = await scroller.evaluate((element) => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }))
+    expect(natural.scrollWidth).toBeLessThanOrEqual(natural.clientWidth)
+
+    // And the case that matters most, which the seeded workspace does not contain: the status
+    // column the panel prints as soon as one period is late. Injected rather than seeded, for the
+    // reason the empty-rail test above gives — writing recurring rows into a workspace the rest
+    // of this suite reads concurrently is a lot of fixture for a claim about a grid track.
+    const late = await scroller.evaluate((element) => {
+      const table = element.querySelector('table')
+      if (table === null) return null
+      const header = document.createElement('th')
+      header.scope = 'col'
+      header.className = 'px-3 py-2 text-start font-medium text-ink-2'
+      header.textContent = 'Overdue'
+      table.querySelector('thead tr')?.appendChild(header)
+      for (const row of table.querySelectorAll('tbody tr')) {
+        const cell = document.createElement('td')
+        cell.className = 'px-3 py-2'
+        const badge = document.createElement('span')
+        badge.className = 'rounded-full px-2 py-0.5 text-caption'
+        badge.textContent = 'Overdue'
+        cell.appendChild(badge)
+        row.appendChild(cell)
+      }
+      return {
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+      }
+    })
+    if (late === null) throw new Error('the rail is not rendering a table')
+    expect(late.scrollWidth).toBeLessThanOrEqual(late.clientWidth)
   })
 }
 
