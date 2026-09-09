@@ -165,7 +165,19 @@ export function CategoryTree({
             />
             <CategorySwatch color={row.color} />
             <span className="truncate text-label text-ink">{row.name}</span>
-            <Badge tone="neutral" size="sm">
+            {/*
+              The kind yields to the name on a phone. A `Badge` is `shrink-0` and a text span is
+              not, so on a 328px row the seven fixed-width elements keep their size and the one
+              element carrying the row's subject absorbs the whole deficit - which is how a child
+              category comes to render as `C.`. `MONEY OUT` is also the same word on most of the
+              column, so it is the cheapest thing on the row to stop painting. It is still
+              *spoken*: the visually-hidden copy below `sm` keeps the fact in the accessibility
+              tree at every width, and only one of the two is ever in the tree at once.
+            */}
+            <span className="sr-only sm:hidden">
+              {t(KIND_LABELS[row.kind])}
+            </span>
+            <Badge tone="neutral" size="sm" className="max-sm:hidden">
               {t(KIND_LABELS[row.kind])}
             </Badge>
             {row.isSystem ? (

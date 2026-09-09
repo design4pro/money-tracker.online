@@ -236,8 +236,10 @@ function RulesListRoute() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        {/* The heading states its own measure, so the actions decide the wrap rather than
+            the subtitle's ideal line - see `recurring/index.tsx`. */}
+        <div className="min-w-0 grow basis-72">
           <h1 className="text-title font-bold text-ink">{t('rules.title')}</h1>
           <p className="mt-1 text-body text-ink-2">{t('rules.subtitle')}</p>
         </div>
@@ -329,7 +331,14 @@ function RulesListRoute() {
                 />
               }
             >
-              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              {/*
+                The match count and the switch take a second line before they take the name's
+                width. Both are `shrink-0` and the name is not, so on a phone the row spent its
+                whole deficit on the one thing that identifies the rule and printed `Paliwo n…`
+                beside a `Matches:` label that reads the same on every row. `basis-48` is the
+                measure the name asks for; where it does not fit beside them, they wrap.
+              */}
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
                 <Button
                   slot="drag"
                   variant="ghost"
@@ -338,7 +347,13 @@ function RulesListRoute() {
                   label={t('rules.drag.label', { name: rule.name })}
                   icon={<GripVertical aria-hidden="true" />}
                 />
-                <div className="min-w-0 flex-1">
+                {/*
+                  `grow basis-48` rather than `flex-1 basis-48`: `flex-1` is the shorthand, so
+                  which of the two wins the basis is decided by their order in the generated
+                  stylesheet rather than by anything stated here. The route headers say the same
+                  thing the same way.
+                */}
+                <div className="min-w-0 grow basis-48">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-label text-ink">
                       {rule.name}
