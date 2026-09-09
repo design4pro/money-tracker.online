@@ -1,4 +1,9 @@
-import { absMoney, formatMoney, isNegativeMinor, isPositiveMinor } from '#/lib/money'
+import {
+  absMoney,
+  formatMoney,
+  isNegativeMinor,
+  isPositiveMinor,
+} from '#/lib/money'
 
 import type { Locale, Translate } from '#/lib/i18n'
 import type { Money } from '#/lib/money'
