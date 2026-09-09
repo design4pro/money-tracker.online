@@ -233,3 +233,76 @@ for (const locale of LOCALES) {
     await expectCappedAtDesktopOnly(page, container)
   })
 }
+
+/* -------------------------------------------------------------------------- */
+/* Phase 3 — `/recurring` earns its width with two panes                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The rendered box, refusing to measure something that is not on the page.
+ *
+ * `boundingBox` rather than a computed style, because what is being asserted here is where two
+ * blocks sit relative to each other, which is the thing a reader sees.
+ */
+async function boxOf(locator: Locator) {
+  const box = await locator.boundingBox()
+  if (box === null) throw new Error('element is not rendered')
+  return box
+}
+
+for (const locale of LOCALES) {
+  test(`/recurring puts the series list and the rail on one row, and stacks them in DOM order below lg — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/recurring')
+
+    // The one grid on this screen, and its two panes. `.first()` is the outer grid: the series
+    // cards inside it come later in document order.
+    const grid = page.locator('main div.grid').first()
+    const panes = grid.locator('> *')
+    await expect(panes).toHaveCount(2)
+
+    const series = panes.nth(0)
+    const rail = panes.nth(1)
+
+    // Neither pane is placed by hand. `order`, `grid-row` and `grid-column` would each let the
+    // visual order drift from the DOM order the screen reader follows, which is what WCAG 1.3.2
+    // forbids and what this layout deliberately does not use.
+    for (const pane of [series, rail]) {
+      const placement = await pane.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return {
+          order: style.order,
+          gridRow: style.gridRow,
+          gridColumn: style.gridColumn,
+        }
+      })
+      // Matched rather than compared: engines disagree on whether the resolved shorthand reads
+      // `auto` or `auto / auto`, and the fact being asserted is that neither end was set.
+      expect(placement.order).toBe('0')
+      expect(placement.gridRow).toMatch(/^auto\b/)
+      expect(placement.gridColumn).toMatch(/^auto\b/)
+    }
+
+    // 1440: one row. Same top edge, the rail to the end side, and the series pane inside the band.
+    const wideSeries = await boxOf(series)
+    const wideRail = await boxOf(rail)
+    expect(wideSeries.y).toBeCloseTo(wideRail.y, 0)
+    expect(wideRail.x).toBeGreaterThan(wideSeries.x + wideSeries.width - 1)
+    expect(wideSeries.width).toBeLessThanOrEqual(LIST_BAND_MAX)
+
+    // 1023 and 360: stacked, and stacked the way the DOM reads - `Due soon` below the list. This
+    // is the phase's deliberate reorder, so it is asserted rather than left to a frame.
+    for (const width of [1023, 360]) {
+      await page.setViewportSize({ width, height: 900 })
+      const stackedSeries = await boxOf(series)
+      const stackedRail = await boxOf(rail)
+      expect(stackedRail.x).toBeCloseTo(stackedSeries.x, 0)
+      expect(stackedRail.y).toBeGreaterThan(
+        stackedSeries.y + stackedSeries.height - 1,
+      )
+    }
+  })
+}

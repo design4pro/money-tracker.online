@@ -183,67 +183,82 @@ function RecurringListRoute() {
           onDetect={() => void navigate({ to: '/recurring/candidates' })}
         />
       ) : (
-        <>
-          <UpcomingPanel upcoming={overview.upcoming} />
+        /*
+          Two panes from `lg` up. `Due soon` is a rail - a short, fixed list somebody glances at -
+          and 20rem is the width it needs; the series list keeps `minmax(0,1fr)` so a long name
+          shrinks its own pane instead of pushing the rail off the row. `items-start` so the rail
+          ends at its last row rather than being stretched to the height of a list that may hold
+          twenty series.
 
-          <SegmentedFilter
-            label={t('recurring.filter.label')}
-            value={status}
-            options={[
-              { id: 'active', label: t('recurring.filter.active') },
-              { id: 'all', label: t('recurring.filter.all') },
-            ]}
-            onChange={(next: StatusFilter) => {
-              void navigate({ search: { status: next } })
-            }}
-          />
+          The DOM order changes with it, in the same commit and deliberately: `Due soon` now comes
+          *after* the series list, so below `lg` it reads below the list rather than above it. The
+          reason somebody opens `/recurring` is the series they keep; the rail is the aside. Doing
+          it in the DOM rather than with `order` keeps the reading order and the visual order the
+          same thing at every width, which is WCAG 1.3.2.
+        */
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="flex min-w-0 flex-col gap-6">
+            <SegmentedFilter
+              label={t('recurring.filter.label')}
+              value={status}
+              options={[
+                { id: 'active', label: t('recurring.filter.active') },
+                { id: 'all', label: t('recurring.filter.all') },
+              ]}
+              onChange={(next: StatusFilter) => {
+                void navigate({ search: { status: next } })
+              }}
+            />
 
-          {overview.rows.length === 0 ? (
-            <Card padding="lg" className="text-center">
-              <h2 className="text-subtitle font-semibold text-ink">
-                {t('recurring.empty.filtered.title')}
-              </h2>
-              <p className="mt-1 text-body text-ink-2">
-                {t('recurring.empty.filtered.body')}
-              </p>
-            </Card>
-          ) : (
-            /* One card, hairlines between the rows. No `overflow-hidden`: a focus ring in this
+            {overview.rows.length === 0 ? (
+              <Card padding="lg" className="text-center">
+                <h2 className="text-subtitle font-semibold text-ink">
+                  {t('recurring.empty.filtered.title')}
+                </h2>
+                <p className="mt-1 text-body text-ink-2">
+                  {t('recurring.empty.filtered.body')}
+                </p>
+              </Card>
+            ) : (
+              /* One card, hairlines between the rows. No `overflow-hidden`: a focus ring in this
                product is an `outline` and nothing may clip one - the rows round their own first
                and last corners instead. */
-            <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
-              {overview.rows.map((row) => (
-                <SeriesCard
-                  key={row.series.id}
-                  row={row}
-                  today={overview.today}
-                  actions={
-                    <SeriesActionsMenu
-                      series={row.series}
-                      onEdit={() =>
-                        setPending({ kind: 'form', series: row.series })
-                      }
-                      onPause={() =>
-                        setPending({ kind: 'pause', series: row.series })
-                      }
-                      onResume={() => {
-                        void resumeSeries({
-                          data: { seriesId: row.series.id },
-                        }).then(() => {
-                          toast.success(t('recurring.toast.resumed'))
-                          refresh()
-                        })
-                      }}
-                      onComplete={() =>
-                        setPending({ kind: 'complete', series: row.series })
-                      }
-                    />
-                  }
-                />
-              ))}
-            </ul>
-          )}
-        </>
+              <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
+                {overview.rows.map((row) => (
+                  <SeriesCard
+                    key={row.series.id}
+                    row={row}
+                    today={overview.today}
+                    actions={
+                      <SeriesActionsMenu
+                        series={row.series}
+                        onEdit={() =>
+                          setPending({ kind: 'form', series: row.series })
+                        }
+                        onPause={() =>
+                          setPending({ kind: 'pause', series: row.series })
+                        }
+                        onResume={() => {
+                          void resumeSeries({
+                            data: { seriesId: row.series.id },
+                          }).then(() => {
+                            toast.success(t('recurring.toast.resumed'))
+                            refresh()
+                          })
+                        }}
+                        onComplete={() =>
+                          setPending({ kind: 'complete', series: row.series })
+                        }
+                      />
+                    }
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <UpcomingPanel upcoming={overview.upcoming} />
+        </div>
       )}
 
       {pending.kind === 'form' ? (

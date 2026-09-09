@@ -20,7 +20,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 1     | 1.4  | Cap the eight `_app` page subtitles with `max-w-prose`                   | inline | done   | a4f6c2b |
 | 2     | 2.1  | Cap the category tree at `max-w-list`                                    | inline | done   | pending |
 | 2     | 2.2  | Cap the groups table container at `max-w-list`                           | inline | done   | pending |
-| 3     | 3.1  | Split `/recurring` into two panes and move `Due soon` after the list     | inline | todo   | —       |
+| 3     | 3.1  | Split `/recurring` into two panes and move `Due soon` after the list     | inline | done   | pending |
 | 3     | 3.2  | Keep the rail's column when nothing is due                               | inline | todo   | —       |
 | 3     | 3.3  | Follow the split through `recurring-skeletons.tsx`                       | inline | todo   | —       |
 | 4     | 4.1  | Lay the budget list out as a two-column grid from `lg`                   | inline | todo   | —       |
