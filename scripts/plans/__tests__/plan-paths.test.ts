@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { auditPlan } from '../audit.ts'
+import { auditPlan, mentionsPath } from '../audit.ts'
 import { parsePlan } from '../parse-plan.ts'
 import type { Violation } from '../audit.ts'
 
@@ -62,6 +62,56 @@ describe.each(GUARDED_PLANS)('%s', (planPath) => {
 
   it('never lists a generated file under `Owned paths`', () => {
     expect(generatedEntries(readFileSync(planPath, 'utf8'))).toEqual([])
+  })
+
+  // The two landing-site classes were computed and printed by the CLI and asserted by nothing, so
+  // a correction that repointed a moved subject at the wrong file, or dropped it from the prose
+  // altogether, left this suite green. Both docblocks in `audit.ts` state their intent as a
+  // guarantee, which is what an assertion rather than a report line is for.
+  //
+  // `drift-classes.ts` records the drift of `docs/plans/00-foundations.md`, so its landing sites
+  // are that document's. A second document joining `GUARDED_PLANS` will need the mention case
+  // keyed to the document the class map describes rather than run against every entry on the list.
+  //
+  // Both were watched failing on a hand-broken copy of the document and of the class map:
+  // `.ai/runs/2026-09-09-landing-checks-assert/watched-failing.md`.
+  it('resolves every recorded landing site on disk', () => {
+    expect(audit.classes.unresolvedLandings).toEqual([])
+  })
+
+  it('names every recorded landing site somewhere in the document', () => {
+    expect(audit.classes.unmentionedLandings).toEqual([])
+  })
+})
+
+/**
+ * The mention rule watched failing, on a fixture rather than on the real document.
+ *
+ * `markdown.includes(path)` was a substring test, not a "names this path" test, and the document
+ * happens to carry no pair where the two disagree - so only a fixture can show the difference.
+ *
+ * @see .ai/runs/2026-09-09-landing-checks-assert/watched-failing.md - these two cases, red against
+ * the substring rule they replaced
+ */
+describe('the landing-site mention rule', () => {
+  const document = [
+    '- `src/lib/money.tsx` — new',
+    'per-`kind` handlers under `src/server/queue/handlers/` and the cron sweeps',
+  ].join('\n')
+
+  it('does not count a path a longer filename merely contains', () => {
+    expect(mentionsPath(document, 'src/lib/money.ts')).toBe(false)
+    expect(mentionsPath(document, 'src/lib/money.tsx')).toBe(true)
+  })
+
+  it('does not count a path a longer prefix turns into another file', () => {
+    expect(
+      mentionsPath('`packages/app/src/lib/money.tsx`', 'src/lib/money.tsx'),
+    ).toBe(false)
+  })
+
+  it('counts a directory the document names with a trailing slash', () => {
+    expect(mentionsPath(document, 'src/server/queue/handlers')).toBe(true)
   })
 })
 
