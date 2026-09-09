@@ -3,10 +3,10 @@
 **Last updated:** 2026-09-10T02:55:00Z
 **Branch:** `feat/issue-18-desktop-layout-density`
 **PR:** https://github.com/design4pro/money-tracker.online/pull/156 (ready for review, claimed)
-**Current phase/step:** every Tasks row is `done`, including the four `X.Y-review-fix` Steps from
-the two review passes — the run is at its closing sequence
-**Last commit:** `71b61bb` — fix(recurring): re-derive the rail track against the real badge, cap
-the stacked panes
+**Current phase/step:** **run closed.** All 22 Tasks rows are `done`, the four `X.Y-review-fix`
+Steps from the two review passes included.
+**Last code commit:** `71b61bb` — fix(recurring): re-derive the rail track against the real badge,
+cap the stacked panes
 
 ## What just happened
 
@@ -31,23 +31,34 @@ the stacked panes
 - The spec carries an amendment recording what Phase 3 actually shipped (`30rem`, `xl`, the
   `max-w-list` cap) and Phase 6's assertion-only outcome.
 
+The closing sequence ran in full: run folder and spec amendment pushed; the third review pass
+returned **approve** with no blocker and no major; its report, the comprehensive summary and the
+consolidated label rationale are on the PR; the `in-progress` lock is released; the test environment
+is down.
+
 ## Next concrete action
 
-The **closing sequence**:
+Nothing for an agent. What is left belongs to a human:
 
-1. Commit and push the run-folder update + spec amendment.
-2. Post the `om-code-review` report **verbatim, in English**, as the PR review body via `review-pr`,
-   carrying the CI-pending disclosure paragraph.
-3. Label transitions on #156, then the comprehensive summary comment.
-4. Release the `in-progress` lock, write the closing HANDOFF/NOTIFY entries.
-5. `.ai/scripts/test-env-down.sh`.
+1. **Give the PR a real code review.** GitHub refused to record the automation's approval
+   (`addPullRequestReview`: _"Can not approve your own pull request"_ — the PR is authored by the
+   reviewing account), so the report is a comment with an explicit header saying it carries none of
+   an approval's weight. The pipeline label is deliberately left at **`review`** rather than moved
+   to `merge-queue` for the same reason; whoever reviews should move it.
+2. **Confirm the required checks in the GitHub UI before merging** (see Blockers).
+3. **Manual QA**, then `qa-approved`. `needs-qa` is on and this run never sets it.
+4. Optionally say yes or no to the three deferred review suggestions — the `WidgetFrame` `height`
+   prop, `desktop-density.spec.ts:754`'s exact-float `toBe`, and the `/recurring` skeleton's missing
+   filter row. Each would delete or narrow a test assertion, which `AGENTS.md` → Ask First puts with
+   a human; each is a one-line change once decided.
 
 ## Blockers / open questions
 
-- **CI checks are unreadable from here, and the review body must say so.** `gh pr checks 156` and
-  both the check-runs and branch-protection APIs return
+- **CI checks are unreadable from here, and every artifact says so.** `gh pr checks 156` and both
+  the check-runs and branch-protection APIs return
   `403 Resource not accessible by personal access token`. `mergeStateStatus` read `CLEAN` at
-  `16f294d`. Required checks still gate the merge; nothing here relaxes that.
+  `16f294d`. The local gate is this run's own evidence and does **not** stand in for branch
+  protection — required checks still gate the merge, and nothing here relaxes that.
 
 ## Environment caveats
 
