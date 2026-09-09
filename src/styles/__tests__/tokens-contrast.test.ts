@@ -118,6 +118,7 @@ describe.each([
       ...SERIES_KEYS,
       'color-border-strong',
       'color-border-panel',
+      'color-border-subtle',
       'color-focus',
       ...FILL_PAIRS.flat(),
       ...SOFT_PAIRS.flat(),
@@ -207,24 +208,101 @@ describe('the two themes are separately designed', () => {
 
   /*
    * …and by a rule as well, in both themes, so tone is never the only channel
-   * carrying the layout's main structural idea. 1.5:1 is a design floor rather
-   * than a WCAG one: this edge divides two grounds, not two controls, so 1.4.11
-   * does not bind it — but below this the boundary is implied rather than
-   * stated, which is the defect the token was added to close.
+   * carrying the layout's main structural idea. These are design floors rather
+   * than WCAG ones: these edges divide two grounds, not two controls, so 1.4.11
+   * does not bind them — but below the floor the boundary is implied rather
+   * than stated, which is the defect the tokens exist to close.
+   *
+   * Two things this asserts that the earlier, panel-only version did not, and
+   * both are the bug it was written for (#19):
+   *
+   *   · `border-subtle` is checked at all. It is the rule under every card edge
+   *     and every row divider in the product — 144 occurrences across 80 files
+   *     under `src/` — and it was the one structural token with no floor and no
+   *     measured ratio beside it, which is how its dark value came to sit at
+   *     1.39:1 on `surface` with nothing failing;
+   *   · every ground, not just the two a panel divides. `surface-raised` is the
+   *     lightest ground in dark, so it is the binding one for a rule, and it is
+   *     the ground a menu, a popover and a dialog draw their dividers on.
+   *
+   * The floors differ by theme on purpose. Re-valuing light's number into dark
+   * is the exact failure this closes: in light a card is separated by tone AND
+   * a rule, while dark's whole canvas → raised tone span is 1.231:1 (pinned —
+   * see the test below), so in dark the rule is doing the work alone and has to
+   * be measured on dark's own terms.
    */
-  it('draws the panel edge as a visible rule against both grounds it divides', () => {
+  const RULE_FLOORS = {
+    'color-border-subtle': { light: 1.3, dark: 1.5 },
+    'color-border-panel': { light: 1.75, dark: 2.2 },
+  } as const
+
+  it.each(Object.keys(RULE_FLOORS) as Array<keyof typeof RULE_FLOORS>)(
+    '%s clears its per-theme floor against every ground it can land on',
+    (key) => {
+      for (const [themeName, tokens] of [
+        ['light', light],
+        ['dark', dark],
+      ] as const) {
+        const floor = RULE_FLOORS[key][themeName]
+        for (const ground of GROUND_KEYS) {
+          const ratio = contrast(tokens[key], tokens[ground])
+          expect(
+            ratio,
+            `${themeName}: --${key} on --${ground} is ${ratio.toFixed(3)}:1, floor ${floor}`,
+          ).toBeGreaterThanOrEqual(floor)
+        }
+      }
+    },
+  )
+
+  /*
+   * Two rules with the same weight are one rule. The product spends `subtle` on
+   * a row divider and `panel` on the heavier rule that frames a plane, and a
+   * reader can only use that distinction if the two are separable from each
+   * other — not merely each separable from the ground.
+   */
+  it('keeps the two rules separable from each other in both themes', () => {
     for (const [themeName, tokens] of [
       ['light', light],
       ['dark', dark],
     ] as const) {
-      for (const ground of ['color-canvas', 'color-surface-panel'] as const) {
-        const ratio = contrast(tokens['color-border-panel'], tokens[ground])
-        expect(
-          ratio,
-          `${themeName}: --color-border-panel on --${ground} is ${ratio.toFixed(2)}:1`,
-        ).toBeGreaterThanOrEqual(1.5)
-      }
+      const ratio = contrast(
+        tokens['color-border-panel'],
+        tokens['color-border-subtle'],
+      )
+      expect(
+        ratio,
+        `${themeName}: panel vs subtle is ${ratio.toFixed(3)}:1`,
+      ).toBeGreaterThanOrEqual(1.3)
     }
+  })
+
+  /*
+   * The honest limit, recorded rather than argued — the same shape as the series
+   * ramp's note below.
+   *
+   * Dark's five grounds are crammed into one narrow band because the top of it
+   * is nailed down: `surface-raised` is the lightest ground dark text lands on,
+   * and `ink-2` clears the 7:1 AAA floor on it by a hair. Lift `raised` to buy
+   * a wider tone ladder and `ink-2`, `info` and `negative` all have to be
+   * lightened behind it, which spends the ink/ink-2 hierarchy on a step the
+   * rule can carry for free.
+   *
+   * So dark is rule-led by construction, not by neglect. If either number here
+   * moves materially, that trade-off has changed and the per-theme rule floors
+   * above should be re-derived rather than inherited.
+   */
+  it('records why dark separates by rule rather than by tone', () => {
+    const span = contrast(dark['color-surface-raised'], dark['color-canvas'])
+    const pin = contrast(dark['color-ink-2'], dark['color-surface-raised'])
+
+    expect(span, `dark canvas→raised span is ${span.toFixed(3)}`).toBeLessThan(
+      1.3,
+    )
+    expect(
+      pin,
+      `dark ink-2 on raised is ${pin.toFixed(3)}:1 — raised cannot lift without it`,
+    ).toBeLessThan(7.3)
   })
 
   it('shares no ground value between light and dark', () => {

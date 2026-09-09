@@ -61,6 +61,26 @@
    Non-text contrast (WCAG 1.4.11) has its own floor of 3:1 and applies to
    `border-strong`, the focus indicator, and the category series fills.
 
+   ---------------------------------------------------------------------------
+   SURFACE SEPARATION - a design floor, per theme
+   ---------------------------------------------------------------------------
+   1.4.11 does not bind a rule that divides two grounds, so the two decorative
+   rules carry a floor of their own, stated per theme and checked by
+   `tokens-contrast.test.ts` against EVERY ground each one can land on:
+
+     `border-subtle`   light >= 1.30:1   dark >= 1.50:1
+     `border-panel`    light >= 1.75:1   dark >= 2.20:1
+
+   The floors are not equal across themes, and that asymmetry is the whole
+   point. Light separates a card from the page with tone AND a rule; dark
+   cannot, because `surface-raised` is pinned by the 7:1 text floor (`ink-2`
+   sits at 7.11:1 on it), which caps the entire canvas -> raised tone span at
+   1.231:1 - three planes inside a step light spends on one. So in dark the
+   RULE carries the separation, and it has to be measured on dark's own terms
+   rather than re-valued from light's. A token that is a comfortable step in
+   light can be a rendering seam in dark, and mirroring light's number is
+   exactly how that goes unnoticed.
+
    A token added without a measured ratio beside it is not finished.
    ========================================================================== */
 
@@ -88,7 +108,7 @@
      deliberately faint (1.44:1 on canvas) so a page full of it reads as paper
      rather than as a grid. `strong` is a control boundary and clears 3:1 on
      every ground. `panel` separates two grounds that are both paper. */
-  --color-border-subtle: #c3d1c4;
+  --color-border-subtle: #c3d1c4; /* 1.44:1 on canvas, 1.31:1 on sunken */
   --color-border-panel: #a8b5a9; /* 1.94:1 on canvas, 1.77:1 on panel */
   --color-border-strong: #6f7d71; /* 4.33:1 on raised, 3.59:1 on sunken */
 
@@ -185,8 +205,14 @@
     --color-ink-2: #b9b5aa; /* 7.11:1 on raised, 8.75:1 on canvas */
     --color-on-accent: #16171a; /* 9.14:1 on accent, 11.33:1 on accent-hover */
 
-    --color-border-subtle: #2f3a33;
-    --color-border-panel: #4a5249; /* 2.21:1 on canvas, 1.90:1 on panel */
+    /* At night the form's printed green ruling is not what a rule is made of:
+       the grounds here are slate, and a green line on slate reads as a tint
+       somebody forgot to convert rather than as the ruling of a page - which
+       is exactly how the `info` badge, whose whole chrome is a `border-panel`
+       rule, came to glow. So both rules are slate too, and both are set from
+       dark's own floors rather than re-valued from the light pair. */
+    --color-border-subtle: #42454c; /* 1.87:1 on canvas, 1.52:1 on raised */
+    --color-border-panel: #5a5d64; /* 2.72:1 on canvas, 2.33:1 on panel */
     --color-border-strong: #7f8a80; /* 4.06:1 on raised, 4.99:1 on canvas */
 
     --color-accent: #c5aef2; /* canvas ink on it: 9.14:1 */
@@ -268,8 +294,8 @@
   --color-ink-2: #b9b5aa; /* 7.11:1 on raised, 8.75:1 on canvas */
   --color-on-accent: #16171a; /* 9.14:1 on accent */
 
-  --color-border-subtle: #2f3a33;
-  --color-border-panel: #4a5249; /* 2.21:1 on canvas, 1.90:1 on panel */
+  --color-border-subtle: #42454c; /* 1.87:1 on canvas, 1.52:1 on raised */
+  --color-border-panel: #5a5d64; /* 2.72:1 on canvas, 2.33:1 on panel */
   --color-border-strong: #7f8a80; /* 4.06:1 on raised */
 
   --color-accent: #c5aef2;
