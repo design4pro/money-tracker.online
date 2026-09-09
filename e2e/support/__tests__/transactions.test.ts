@@ -20,15 +20,23 @@ describe('TRANSACTION_DETAIL_URL', () => {
     for (const url of [
       'http://127.0.0.1:3012/transactions/tx_01H8XYZ',
       'http://localhost:3010/transactions/9f2c4e1a-0000-4000-8000-000000000000',
+      // An id is not the word "new" just because it opens with those three letters.
+      'http://localhost:3010/transactions/newton',
     ]) {
       expect(TRANSACTION_DETAIL_URL.test(url), url).toBe(true)
     }
   })
 
   it('refuses the entry form, which is the wrong turn #82 took', () => {
-    expect(
-      TRANSACTION_DETAIL_URL.test('http://localhost:3010/transactions/new'),
-    ).toBe(false)
+    for (const url of [
+      'http://localhost:3010/transactions/new',
+      // The entry form's other address: `transactions-screen.tsx` opens it this way to duplicate
+      // a row, so a guard that only knew the bare path would let this one straight through.
+      'http://localhost:3010/transactions/new?from=tx_01H8XYZ',
+      'http://localhost:3010/transactions/new#amount',
+    ]) {
+      expect(TRANSACTION_DETAIL_URL.test(url), url).toBe(false)
+    }
   })
 
   it('refuses the ledger it was navigated away from', () => {

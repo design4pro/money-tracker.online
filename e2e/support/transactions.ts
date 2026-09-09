@@ -35,5 +35,10 @@ export const TRANSACTION_ROW_SELECTOR =
  * The lookahead is the guard the selector above already makes unnecessary, kept because the two
  * fail differently: the selector stops the wrong link being clicked, this stops a wrong turn
  * arriving anywhere else being mistaken for a missing panel.
+ *
+ * It ends at a segment boundary rather than at the end of the string because the entry form has a
+ * second address: `transactions-screen.tsx` opens it as `/transactions/new?from=<id>` to duplicate
+ * a row. A bare `(?!new$)` reads as if it excluded the entry form and lets that one straight
+ * through, which is the same silence this pattern exists to break.
  */
-export const TRANSACTION_DETAIL_URL = /\/transactions\/(?!new$)[^/]+$/
+export const TRANSACTION_DETAIL_URL = /\/transactions\/(?!new(?:[?#]|$))[^/]+$/
