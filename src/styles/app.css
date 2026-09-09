@@ -159,8 +159,12 @@
 
   /* Tailwind reads `max-w-*` from the container namespace, so the app content
      well is reachable as `max-w-content` rather than as a repeated `max-w-7xl`
-     that three files each had to agree on. */
+     that three files each had to agree on. The list band follows the same
+     chain for the same reason: a screen that is one column of rows says
+     `max-w-list` instead of picking one of the seven unnamed `max-w-*` answers
+     that were in `src/routes/_app` before this token had a name. */
   --container-content: var(--content-max);
+  --container-list: var(--list-max);
 
   --shadow-card: var(--shadow-card);
   --shadow-elevated: var(--shadow-elevated);
