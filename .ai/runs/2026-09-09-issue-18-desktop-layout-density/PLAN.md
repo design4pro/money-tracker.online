@@ -14,10 +14,10 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 
 | Phase | Step | Title                                                                    | Exec   | Status | Commit |
 | ----- | ---- | ------------------------------------------------------------------------ | ------ | ------ | ------ |
-| 1     | 1.1  | Add `--list-max: 56rem` to `tokens.css`                                  | inline | done   | b4a8975|
-| 1     | 1.2  | Expose `--container-list` in `app.css`                                   | inline | done   | pending|
-| 1     | 1.3  | Amend `DESIGN.md` → Layout with the three width bands                    | inline | done   | pending|
-| 1     | 1.4  | Cap the eight `_app` page subtitles with `max-w-prose`                   | inline | done   | pending|
+| 1     | 1.1  | Add `--list-max: 56rem` to `tokens.css`                                  | inline | done   | 4e348ca|
+| 1     | 1.2  | Expose `--container-list` in `app.css`                                   | inline | done   | 8851a04|
+| 1     | 1.3  | Amend `DESIGN.md` → Layout with the three width bands                    | inline | done   | c5a2d86|
+| 1     | 1.4  | Cap the eight `_app` page subtitles with `max-w-prose`                   | inline | done   | a4f6c2b|
 | 2     | 2.1  | Cap the category tree at `max-w-list`                                    | inline | todo   | —      |
 | 2     | 2.2  | Cap the groups table container at `max-w-list`                           | inline | todo   | —      |
 | 3     | 3.1  | Split `/recurring` into two panes and move `Due soon` after the list     | inline | todo   | —      |
