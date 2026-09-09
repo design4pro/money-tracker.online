@@ -68,10 +68,12 @@ a decision a human makes here, in an ADR, with the reason attached.
 - `src/server/do/account-ledger.ts` owns the wired class. `worker.ts` re-exports it and no longer
   builds a Drizzle handle of its own; `src/server/db/from-env.ts` does, for both the object and
   the cron, which are the two callers that run outside a request.
-- The first thing the project found is recorded in the test rather than fixed here: a burst of
-  requests to one live instance does not coalesce, because `serialise()` chains them and each
-  pass clears `running` before the next starts. The coalescing branch is reachable only from a
-  record a previous instance left behind. Whether that is the intended design is a separate
-  question, on the backlog.
+- The first thing the project found is fixed rather than recorded: a burst of requests to one live
+  instance did not coalesce, because `serialise()` chained them and each pass cleared `running`
+  before the next started, which left the coalescing branch reachable only from a record a
+  previous instance had abandoned - and therefore from a pass that would never run, wedging the
+  account permanently. The lock moved into memory (issue #22), where a Durable Object's turn
+  semantics already make it safe, and this project is where the eviction that used to cause the
+  wedge is now asserted.
 - The queue consumer is not covered. It has no handler yet, so there is nothing to assert; it
   joins this project when it has one.

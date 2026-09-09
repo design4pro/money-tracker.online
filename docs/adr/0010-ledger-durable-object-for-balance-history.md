@@ -82,5 +82,13 @@ account's chart is stale until the nightly sweep at 03:00 heals it. That sweep i
 the mechanism**; a person who edits a transaction and refreshes must see a correct chart immediately,
 which is why the wrapper is at the outermost boundary and is lint-enforced.
 
+**The lock and the dirty bit are in-memory, and a pass interrupted by eviction falls into that same
+net.** A Durable Object is single-threaded, so the flag is tested and set inside one turn and needs
+no storage to be a lock; persisting it only made an evicted instance able to leave a claim behind
+that nothing would ever clear, which wedged the account permanently rather than for one pass
+(issue #22, amended 2026-09-09). What storage holds is the record of the last pass, which is what
+`GET /state` reports. The cost of the smaller lock is that an evicted pass is lost rather than
+resumed; the next write to that account re-enqueues one, and the nightly sweep catches the rest.
+
 In exchange, the interleaved-rebuild hole is unreachable rather than rare, and a bulk import costs
 one rebuild per account instead of one per row.

@@ -10,15 +10,26 @@
  * turns rather than two racers.
  *
  * **The object holds a lock and a dirty bit, never ledger data.** Balances live in D1. What is
- * stored here is the small amount of state that has to survive the object being evicted between
- * requests: whether a rebuild is in flight, whether another was asked for while it ran, and when
- * the last one finished.
+ * stored here is only the record of the last pass — when it finished, how it ended, how many
+ * have run — which is what `GET /state` reports and what an operator reads.
  *
  * **Coalescing is the second reason it exists.** Ten transactions imported into one account
  * should cause one rebuild, not ten. A request arriving while a rebuild is running sets the
- * dirty bit and returns immediately; the running pass re-runs once when it finishes and clears
- * it. A rebuild is idempotent and always rebuilds the whole history, so one extra pass is always
- * enough and a skipped duplicate never loses work.
+ * dirty bit and returns `'coalesced'` immediately; the running pass re-runs once when it finishes
+ * and clears it. A rebuild is idempotent and always rebuilds the whole history, so one extra pass
+ * is always enough and a skipped duplicate never loses work.
+ *
+ * **The lock and the dirty bit live in memory, and that is the load-bearing part.** A Durable
+ * Object is single-threaded, so `running` is read and set within one turn and no second request
+ * can observe it half-taken; that is all the mutual exclusion this needs. Persisting it would buy
+ * nothing and cost availability: the only way a stored `running: true` is ever read by a *later*
+ * instance is that the instance which wrote it went away mid-pass — evicted, torn down, restarted
+ * — so the pass it names is already lost, and coalescing onto it means coalescing onto something
+ * that will never run. That is how an account's history used to stop updating permanently
+ * (issue #22). A fresh instance starts with the lock free, which is the truth: nothing is running
+ * in it. The cost is that a pass interrupted by eviction is lost rather than resumed, and the
+ * nightly rebuild cron is what heals that — the same safety net a write path that forgot to open
+ * a ledger batch falls into (ADR 0010).
  *
  * ---------------------------------------------------------------------------
  * WHAT IS AND IS NOT WIRED UP TODAY
@@ -73,10 +84,6 @@ export interface AccountLedgerOptions {
 
 /** The persisted shape. Small on purpose: this object is a lock, not a store. */
 interface LedgerRecord {
-  /** Set while a rebuild is running. Cleared in a `finally`, including on a throw. */
-  running: boolean
-  /** A rebuild was requested while one was running and has not been served yet. */
-  dirty: boolean
   /** Epoch ms of the last completed pass, successful or not. */
   lastRunAt: number | null
   lastOutcome: RebuildOutcome | 'failed' | null
@@ -84,11 +91,20 @@ interface LedgerRecord {
   runs: number
 }
 
+/**
+ * What `GET /state` reports: the persisted record plus the live lock.
+ *
+ * `running` and `dirty` are read off the instance rather than out of storage, so they describe
+ * this instance and cannot be a claim left behind by one that no longer exists.
+ */
+export interface LedgerState extends LedgerRecord {
+  running: boolean
+  dirty: boolean
+}
+
 const RECORD_KEY = 'ledger'
 
 const EMPTY: LedgerRecord = {
-  running: false,
-  dirty: false,
   lastRunAt: null,
   lastOutcome: null,
   runs: 0,
@@ -118,8 +134,13 @@ export class AccountLedger implements DurableObject {
   private readonly logger: Logger
   private readonly now: () => number
   private readonly rebuild: RebuildPort
-  /** Serialises mutations so two in-flight requests cannot interleave a read-modify-write. */
-  private tail: Promise<unknown> = Promise.resolve()
+  /**
+   * The lock. Taken and released within one turn, which is what makes it a lock at all here, and
+   * deliberately not persisted — see the note on memory in the file docblock.
+   */
+  private running = false
+  /** A rebuild was requested while one was running and has not been served yet. */
+  private dirty = false
 
   constructor(
     state: AccountLedgerState,
@@ -165,10 +186,16 @@ export class AccountLedger implements DurableObject {
     return json({ error: 'not found' }, 404)
   }
 
-  /** The persisted record, or the empty one for an object that has never run. */
-  async read(): Promise<LedgerRecord> {
-    const stored = await this.state.storage.get<LedgerRecord>(RECORD_KEY)
-    return stored ?? EMPTY
+  /** Everything this object knows: the persisted record, plus the lock as it stands right now. */
+  async read(): Promise<LedgerState> {
+    const { lastRunAt, lastOutcome, runs } = await this.stored()
+    return {
+      running: this.running,
+      dirty: this.dirty,
+      lastRunAt,
+      lastOutcome,
+      runs,
+    }
   }
 
   /**
@@ -181,65 +208,81 @@ export class AccountLedger implements DurableObject {
   async requestRebuild(
     accountId: string,
   ): Promise<{ outcome: RebuildOutcome | 'coalesced'; runs: number }> {
-    return this.serialise(async () => {
-      const record = await this.read()
+    // Taking the lock is these two statements, with no `await` between the test and the set. One
+    // turn cannot be interrupted, so a second request either sees the lock free and takes it, or
+    // sees it held and coalesces. There is no third answer to observe.
+    if (this.running) {
+      this.dirty = true
+      this.logger.debug('ledger rebuild coalesced', { accountId })
+      return { outcome: 'coalesced' as const, runs: (await this.stored()).runs }
+    }
+    this.running = true
+    this.dirty = false
 
-      if (record.running) {
-        await this.write({ ...record, dirty: true })
-        this.logger.debug('ledger rebuild coalesced', { accountId })
-        return { outcome: 'coalesced' as const, runs: record.runs }
-      }
-
-      let current: LedgerRecord = { ...record, running: true, dirty: false }
-      await this.write(current)
-
-      let outcome: RebuildOutcome = 'skipped'
-      try {
-        // The loop is the coalescing window: anything that arrived while the pass ran set the
-        // dirty bit, and one more whole-history rebuild answers all of it.
-        for (;;) {
-          outcome = await this.rebuild(accountId)
-          current = {
-            ...current,
-            lastRunAt: this.now(),
-            lastOutcome: outcome,
-            runs: current.runs + 1,
-          }
-          const latest = await this.read()
-          if (!latest.dirty) break
-          current = { ...current, dirty: false }
-          await this.write({ ...current, running: true })
-        }
-        return { outcome, runs: current.runs }
-      } catch (error) {
+    let current = await this.stored()
+    let outcome: RebuildOutcome = 'skipped'
+    try {
+      // The loop is the coalescing window: anything that arrived while the pass ran set the
+      // dirty bit, and one more whole-history rebuild answers all of it.
+      for (;;) {
+        outcome = await this.rebuild(accountId)
         current = {
-          ...current,
           lastRunAt: this.now(),
-          lastOutcome: 'failed',
+          lastOutcome: outcome,
           runs: current.runs + 1,
         }
-        this.logger.error('ledger rebuild failed', {
-          accountId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        throw error
-      } finally {
-        // The lock is released whether the pass returned or threw. A `running` bit left set by a
-        // throw would wedge this account's history until the object was evicted.
-        await this.write({ ...current, running: false, dirty: false })
+        await this.write(current)
+        // Read after the write, so a request that arrived during either await is still counted.
+        if (!this.takeDirty()) break
       }
-    })
+      return { outcome, runs: current.runs }
+    } catch (error) {
+      current = {
+        lastRunAt: this.now(),
+        lastOutcome: 'failed',
+        runs: current.runs + 1,
+      }
+      await this.write(current)
+      this.logger.error('ledger rebuild failed', {
+        accountId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    } finally {
+      // Released whether the pass returned or threw, and synchronously: nothing runs between the
+      // `break` above and here, so a dirty bit set at the last moment cannot be dropped.
+      this.running = false
+      this.dirty = false
+    }
+  }
+
+  /**
+   * Reads the dirty bit and clears it in one step: whoever observes it is the pass that will
+   * serve it, so leaving it set would cost a redundant rebuild.
+   *
+   * A method rather than two statements at the call site because the bit is set from *another*
+   * turn, which the compiler's control flow cannot see: after `this.dirty = false` it narrows the
+   * field to `false` and the check reads as a constant. The narrowing is wrong about this class,
+   * and a call is how the code says so without silencing anything.
+   */
+  private takeDirty(): boolean {
+    const requested = this.dirty
+    this.dirty = false
+    return requested
+  }
+
+  /**
+   * The persisted half, or the empty one for an object that has never run.
+   *
+   * A record written before the lock moved into memory also carries `running` and `dirty`. They
+   * are read by nothing and the first write drops them, so no migration is owed.
+   */
+  private async stored(): Promise<LedgerRecord> {
+    const record = await this.state.storage.get<LedgerRecord>(RECORD_KEY)
+    return record ?? EMPTY
   }
 
   private async write(record: LedgerRecord): Promise<void> {
     await this.state.storage.put({ [RECORD_KEY]: record })
-  }
-
-  /** One turn at a time, so a read-modify-write cannot interleave with another request's. */
-  private serialise<T>(work: () => Promise<T>): Promise<T> {
-    const next = this.tail.then(work, work)
-    // Swallowed only for the chain: the caller still receives `next` and its rejection.
-    this.tail = next.catch(() => undefined)
-    return next
   }
 }
