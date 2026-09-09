@@ -24,7 +24,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 3     | 3.2  | Keep the rail's column when nothing is due                               | inline | done   | 79c61fd |
 | 3     | 3.3  | Follow the split through `recurring-skeletons.tsx`                       | inline | done   | 76d758d |
 | 4     | 4.1  | Lay the budget list out as a two-column grid from `lg`                   | inline | done   | pending |
-| 4     | 4.2  | Render a single budget at `max-w-list`                                   | inline | todo   | —       |
+| 4     | 4.2  | Render a single budget at `max-w-list`                                   | inline | done   | pending |
 | 4     | 4.3  | Follow the pairing through `budget-skeletons.tsx` and the filtered empty | inline | todo   | —       |
 | 5     | 5.1  | Stop the dashboard widget grid equalising row heights                    | inline | todo   | —       |
 | 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | todo   | —       |

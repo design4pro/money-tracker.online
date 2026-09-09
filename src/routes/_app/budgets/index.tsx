@@ -8,6 +8,7 @@ import {
   BudgetCard,
   BudgetEmptyState,
   BudgetListSkeleton,
+  budgetListClass,
 } from '#/components/app/budgets'
 import { SegmentedFilter } from '#/components/app/nav'
 import { Button, Card, toast } from '#/components/ui'
@@ -176,12 +177,9 @@ function BudgetsListRoute() {
               </p>
             </Card>
           ) : (
-            /* Two columns from `lg`, which halves the row to ~570px and closes the ~1000px of
-               empty rule a full-width budget row drew at 1440. A budget card is a name, a meter
-               and three facts — it does not use 1156px, and it does not need to, because there is
-               a second budget to put beside it. `items-start` so a card with an alert note does
-               not stretch the card next to it to match. */
-            <ul className="grid items-start gap-4 lg:grid-cols-2">
+            /* Two columns from `lg` when there are two budgets to put on a row, the list band when
+               there is only one. Both cases and why they differ: {@link budgetListClass}. */
+            <ul className={budgetListClass(shown.length)}>
               {shown.map((budget) => (
                 <BudgetCard
                   key={budget.id}

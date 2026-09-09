@@ -20,6 +20,8 @@ export type { BudgetEmptyStateProps } from './budget-empty-state'
 export { BudgetMeter } from './budget-meter'
 export type { BudgetMeterProps } from './budget-meter'
 
+export { budgetListClass } from './list-layout'
+
 export { BudgetDetailSkeleton, BudgetListSkeleton } from './budget-skeletons'
 
 export { NoPeriodNote } from './no-period-note'
