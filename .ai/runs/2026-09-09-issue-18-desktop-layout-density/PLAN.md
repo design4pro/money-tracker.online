@@ -31,7 +31,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | done   | 9d3b368 |
 | 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | done   | pending |
 | 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | done   | pending |
-| 6     | 6.3  | Cap the `/transactions` search field from `md` up                        | inline | todo   | —       |
+| 6     | 6.3  | Pin the `/transactions` toolbar as one cluster (assertion-only)          | inline | done   | pending |
 
 ## Goal
 
@@ -241,12 +241,24 @@ The header band is out of scope, deliberately — see Non-goals.
   none when it is not; at 360×800 the first account row is still above the fold in both locales;
   the filter's 44×44 targets are unchanged.
 
-**6.3 Cap the `/transactions` search field from `md` up**
+**6.3 Cap the `/transactions` search field from `md` up** — resolved as **assertion-only**
 
-- `src/components/app/transactions/filter-bar.tsx:344` — replace `flex-1` from `md` up with a
-  bounded width, so the three icon controls close up beside it into one start cluster.
-- _Verify:_ at 1440×900 the gap between the field's end edge and the first icon control is under
-  16px; below `md` the field still fills its row; every control keeps 44×44.
+- The step as planned was to replace `flex-1` from `md` up in
+  `src/components/app/transactions/filter-bar.tsx:344` with a bounded width, so the icon controls
+  would close up beside the field into one start cluster.
+- **Measured first, and the defect is not there.** At 1440×900 the field is already 274px (`en`) /
+  282px (`pl`) inside a 1156px bar, and every control after it sits at the bar's own 8px gutter —
+  the toolbar has since grown a date filter, a sort select and a sort-direction button, and it is
+  packed edge to edge. `md:max-w-md` is 448px, so the cap would not bind at any viewport and the
+  diff would change no rendered pixel. Issue #18's "wide empty band holding three icons at its
+  edge" was measured on 2026-09-03 against a bar that no longer exists.
+- **So the step ships its assertion and not its edit**, on this plan's own precedent for the
+  dashboard header band ("A phase that 'fixed' it would be a diff with no defect behind it"). That
+  is worth more than the edit would have been: the property the spec cares about held only by
+  accident of how many controls the bar happens to carry, and is now something a browser checks.
+- _Verify:_ at 1440×900 the field is under half the bar and the next control sits within 16px of
+  its end edge; at 360×800 the field is still the widest control on its row and the row is full —
+  both locales. No change to `filter-bar.tsx`, so every control keeps the target size it had.
 
 ## Risks
 

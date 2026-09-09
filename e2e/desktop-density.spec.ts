@@ -572,3 +572,79 @@ for (const locale of LOCALES) {
     expect(loaded.height).toBeGreaterThan(quiet.height)
   })
 }
+
+/**
+ * How far a control may sit from the edge it is measured against.
+ *
+ * The bar's own gutter is `gap-2`, 8px. 16 is that with a pixel of slack, and it is nowhere near
+ * the ~600px canyon the spec was written to rule out.
+ */
+const TOOLBAR_GUTTER_MAX = 16
+
+/**
+ * Why this test caps nothing.
+ *
+ * The spec's third Phase 6 item asks for a bounded width on the search field from `md` up, so the
+ * icon controls close up beside it "into one start cluster". Measured before writing the change,
+ * the field is already 274px (`en`) / 282px (`pl`) inside a 1156px bar at 1440×900, and every
+ * control after it sits at the bar's own 8px gutter — the toolbar has since grown a date filter,
+ * a sort select and a sort-direction button, and it is packed edge to edge. A `md:max-w-md` cap is
+ * 448px, so it would not bind at any viewport and the diff would change no rendered pixel.
+ *
+ * This is the same call the spec itself makes about the dashboard header band: "A phase that
+ * 'fixed' it would be a diff with no defect behind it." So the Step ships its assertion and not
+ * its edit — which is worth more than the edit would have been, because the property the spec
+ * cares about (one cluster, not a field and a canyon) was true only by accident of how many
+ * controls the bar happens to hold, and is now something a browser checks in both locales.
+ */
+for (const locale of LOCALES) {
+  test(`the /transactions toolbar reads as one cluster rather than a field and a canyon — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/transactions')
+
+    // `SearchField` renders root > `FieldGroup` > input, so the input's grandparent is the field
+    // and its great-grandparent is the bar every control on the row shares.
+    const search = page.getByRole('searchbox').first()
+    await expect(search).toBeVisible()
+    const field = search.locator('xpath=../..')
+    const bar = search.locator('xpath=../../..')
+
+    const fieldBox = await boxOf(field)
+    const barBox = await boxOf(bar)
+
+    // The bar is wide; the field is not.
+    expect(barBox.width).toBeGreaterThan(900)
+    expect(fieldBox.width).toBeLessThan(barBox.width / 2)
+
+    // And the next control sits beside it, at the bar's own gutter, rather than at the far end.
+    const next = bar.locator('> *').nth(1)
+    const nextBox = await boxOf(next)
+    expect(nextBox.x - (fieldBox.x + fieldBox.width)).toBeLessThanOrEqual(
+      TOOLBAR_GUTTER_MAX,
+    )
+
+    // On a phone the same row still belongs to the field: it is the widest thing on it, and the
+    // row is full rather than trailing off. Pinning both is what would catch a later cap that
+    // reached below `md` and left the search box stranded at half a screen.
+    await page.setViewportSize({ width: 360, height: 800 })
+    await expect(search).toBeVisible()
+    const narrowField = await boxOf(field)
+    const narrowBar = await boxOf(bar)
+    const rendered = await bar.locator('> *').evaluateAll((elements) =>
+      elements
+        .map((element) => element.getBoundingClientRect())
+        .filter((box) => box.width > 0 && box.height > 0)
+        .map((box) => ({ width: box.width, right: box.right })),
+    )
+
+    expect(Math.max(...rendered.map((box) => box.width))).toBe(
+      narrowField.width,
+    )
+    expect(
+      narrowBar.x + narrowBar.width - Math.max(...rendered.map((r) => r.right)),
+    ).toBeLessThanOrEqual(TOOLBAR_GUTTER_MAX)
+  })
+}
