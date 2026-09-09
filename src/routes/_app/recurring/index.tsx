@@ -155,7 +155,9 @@ function RecurringListRoute() {
           <h1 className="text-title font-bold text-ink">
             {t('recurring.title')}
           </h1>
-          <p className="mt-1 text-body text-ink-2">{t('recurring.subtitle')}</p>
+          <p className="mt-1 max-w-prose text-body text-ink-2">
+            {t('recurring.subtitle')}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button

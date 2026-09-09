@@ -149,7 +149,7 @@ function CategoriesRoute() {
           <h1 className="text-title font-bold text-ink">
             {t('categories.title')}
           </h1>
-          <p className="mt-1 text-body text-ink-2">
+          <p className="mt-1 max-w-prose text-body text-ink-2">
             {t('categories.subtitle')}
           </p>
         </div>

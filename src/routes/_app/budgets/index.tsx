@@ -128,7 +128,9 @@ function BudgetsListRoute() {
           <h1 className="text-title font-bold text-ink">
             {t('budgets.title')}
           </h1>
-          <p className="mt-1 text-body text-ink-2">{t('budgets.subtitle')}</p>
+          <p className="mt-1 max-w-prose text-body text-ink-2">
+            {t('budgets.subtitle')}
+          </p>
         </div>
         <Button
           variant="primary"

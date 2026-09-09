@@ -163,7 +163,9 @@ function AccountsListRoute() {
           <h1 className="text-title font-bold text-ink">
             {t('accounts.title')}
           </h1>
-          <p className="mt-1 text-body text-ink-2">{t('accounts.subtitle')}</p>
+          <p className="mt-1 max-w-prose text-body text-ink-2">
+            {t('accounts.subtitle')}
+          </p>
         </div>
         <Button
           variant="primary"
