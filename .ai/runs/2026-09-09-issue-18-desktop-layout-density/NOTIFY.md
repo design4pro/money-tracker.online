@@ -212,3 +212,32 @@ webkit 52/56 with all four failures `pl`-only and traced to the pre-existing #16
 
 The single failing test in `final-gate-checks.md` §1 is settled as a flake: the same commit re-runs
 2465/2465 green, and the only delta from the previous green head is run-folder markdown.
+
+## 2026-09-10T02:20:00Z — checkpoint 7: the re-review caught checkpoint 6's own measurement
+
+`om-auto-review-pr 156 --autofix`, second pass over the diff at `701dd9c`: **request changes**, two
+majors and one minor. Both majors were about the fix checkpoint 6 had just shipped.
+
+- **The rail track was derived against a stand-in, not the component.** The e2e stand-in for the
+  status column had no `whitespace-nowrap` and carried the English word in both locales, so it
+  measured 406px where the real `Badge` reading `Po terminie` needs **419px**. The `28rem` track
+  shipped 13px short in `pl`, and the assertion written to catch exactly that stayed green. Track
+  re-derived against the real `badgeVariants` string: **`30rem`**, 438px of content in both
+  locales. Red proof at `28rem`: `Expected: <= 406 / Received: 419`, `pl` only — `71b61bb`.
+- **Moving the split to `xl` left 1024–1279 uncapped.** A stacked pane with nothing holding it takes
+  the whole 995px well, which is finding 1 of the issue on the surface the issue names. Fixed with
+  `max-w-list xl:max-w-none` on the shared `RECURRING_PANES` constant, so the skeleton follows
+  without a second edit. Red proof: `Expected: <= 912 / Received: 995`, both locales — `71b61bb`.
+- **Minor:** three stale `lg` references (`recurring/index.tsx:193`, `recurring-skeletons.test.tsx:11`,
+  the PR body) and a dead SHA in `PLAN.md` (`359e60e`, the pre-amend hash of `d7490fc`).
+
+**Decisions recorded:** three review suggestions were deferred rather than applied, because each
+would delete or narrow an assertion and AGENTS.md → Ask First puts that with a human — the
+`WidgetFrame` `height` prop, `desktop-density.spec.ts:754`'s exact-float `toBe`, and the
+`/recurring` skeleton's missing filter row (pre-existing). Two pre-existing heading skips found
+while fixing the outline were filed as **#166** instead of folded in.
+
+Gate at `71b61bb`: 163 files / 2465 tests passed, build ok, no drift, lint 0 errors. Browser:
+chromium **101/101** across five spec files, webkit **52/56** with all four failures `pl`-only,
+none on `/recurring`, all tracing to the pre-existing #163. Eight frames in
+`.ai/qa/artifacts_issue-18/review-fix-2/`, read at 1440, 1152 and 360.

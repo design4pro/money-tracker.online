@@ -35,7 +35,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 6     | 6.4-review-fix | Keep the `/accounts` filter rule on the band, not the control            | inline | done   | ee3ffb4 |
 | 3     | 3.4-review-fix | Promote the series heading so the outline stops skipping                 | inline | done   | cef03d8 |
 | 3     | 3.5-review-fix | Widen the `Due soon` rail to hold its table, split at `xl`               | inline | done   | d7490fc |
-| 3     | 3.6-review-fix | Re-derive the rail track against the real badge; cap the stacked panes   | inline | todo   |         |
+| 3     | 3.6-review-fix | Re-derive the rail track against the real badge; cap the stacked panes   | inline | done   | 71b61bb |
 
 ## Goal
 

@@ -522,3 +522,37 @@ New message keys: `accounts.filter.count` (EN + PL). Screens whose rendered outp
    _Verify:_ at 1440×900 the gap between the field's end edge and the first icon control is under
    16px; below `md` the field still fills its row; every control keeps 44×44.
 4. Capture and read frames for both routes at 1440 and 360, light and dark, both locales.
+
+---
+
+## Amendment — what Phase 3 actually shipped (2026-09-10, PR #156)
+
+Two of this document's numbers did not survive contact with the rendered page. They are corrected
+here rather than left for a reader to discover from the diff, because the spec is what somebody
+opens first.
+
+**The `/recurring` rail is `30rem`, not `20rem`, and the panes start at `xl`, not `lg`.**
+
+`Due soon` is a table. Measured at 1440x900, it needs 290px (`en`) / 298px (`pl`) for its three
+ordinary columns and **419px** once a late period adds the status column — `PeriodStatusBadge` is
+`whitespace-nowrap font-semibold` inside a border and reads `Po terminie`. A `20rem` track with
+`Card padding="md"` leaves 278px, so the rail shipped scrolling sideways on a 1440px desktop before
+any row was late. `30rem` leaves 438px, which holds the widest state in both locales.
+
+A rail that wide cannot start at `lg`: the page column is 740px at 1024px of viewport, so the panes
+there would be 230px for the series list against 480px for the aside — this document's own finding
+1, reintroduced on the pane that matters. At 1280 the panes are 492/480 and at 1440 they are
+652/480.
+
+Below `xl` the panes stack, and a stacked pane left alone takes the whole 995px well, which is the
+same fault again. So the container carries `max-w-list` below the breakpoint and drops it above,
+where both tracks are already narrower than the band.
+
+The decision rule this document sets out is unchanged — earn the width where there is width to
+earn — and this is that rule applied to measurements the document did not have. Everything else in
+Phase 3, including the DOM reorder and its WCAG 1.3.2 reasoning, shipped as written.
+
+**Phase 6 step 3 shipped as an assertion and no edit.** Measured before it was written, the
+`/transactions` search field is already 274px (`en`) / 282px (`pl`) inside a 1156px bar and every
+control after it sits at the bar's own 8px gutter, so the `md:max-w-md` cap would not have bound at
+any viewport. The reasoning is the one this document already applies to the dashboard header band.
