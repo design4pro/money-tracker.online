@@ -111,3 +111,41 @@
   inside a hand-rolled chart (ADR 0007); shares neither this spec's decision rule nor its token.
 - **Problem, resolved:** the `pnpm test` caveat carried since checkpoint 1 is closed by this run's
   clean full suite.
+
+## 2026-09-09T23:40:00Z — checkpoint 5: Phase 6 closed, and with it the plan
+
+- **Steps 6.1 … 6.3 landed** — `8a04d8b` (`accounts.filter.count` in both catalogues, all four
+  Polish CLDR categories), `278c444` (the `/accounts` filter band carries the count at its end),
+  `0198f19` (the `/transactions` toolbar gains a browser case and no edit). Every Tasks row is now
+  `done`.
+- **Checkpoint 5 verification:** `agent-kit-check` (32 files, kit 16), `generate-routes` with no
+  drift, `typecheck`, `lint` (0 errors, 2 pre-existing warnings), `build` (1.96s), `prettier` on
+  every touched file — all green. 197/197 on the i18n + styles unit files. Browser: **77/77**
+  across `desktop-density` (38), `accessibility`, `core-flow` and `narrow-viewport`, chromium,
+  both locales.
+- **Red-then-green on all four new browser cases.** Forcing the counterweight's render condition to
+  `false` fails all four `/accounts` cases with `element(s) not found` while the two older subtitle
+  cases on the same route stay green. The toolbar case, which ships without a change behind it, was
+  made to fail on purpose: `md:w-[640px] md:flex-none` on the search field fails it in both locales
+  with `Expected: < 578 / Received: 640`.
+- **Decision, and the largest one of the run: Step 6.3 ships its assertion and not its edit.** The
+  step asked for a bounded width on the `/transactions` search field from `md` up. Measured first,
+  the field is already 274.3px (`en`) / 282.1px (`pl`) inside a 1156px bar at 1440×900 and the next
+  control sits at the bar's own 8px gutter; the toolbar has since grown a date filter, a sort select
+  and a sort button and runs edge to edge. `md:max-w-md` is 448px, so the cap would not bind at any
+  viewport and the diff would change no rendered pixel. Issue #18's "wide empty band holding three
+  icons at its edge" was measured on 2026-09-03 against a bar that no longer exists — the same call
+  the plan already makes about the dashboard header band, in its own words: "A phase that 'fixed' it
+  would be a diff with no defect behind it."
+- **Decision:** the plan's 360×800 criterion for Step 6.2 changed shape. It asked for the first
+  account row to be above the fold; measured, it is not — y≈860 in an 800px viewport — and it was
+  not before this Step either, because two overview cards sit above the list in the demo workspace.
+  The case therefore bounds what the Step _added_: 89px → 115px, a 26px delta, identical in `en` and
+  `pl`, against a 40px budget. The pre-existing fold position is recorded as observed, not acted on.
+- **Frames:** twelve PNGs in `.ai/qa/artifacts_issue-18/phase-6/` — `/accounts` narrowed and quiet,
+  `/transactions`, at 1440 and 360 in both themes. `en` only, as in every phase: `capture.mjs` has
+  no locale flag and the locale is a cookie; the Polish rendering is covered by the `pl` half of
+  every browser case.
+- **Next:** the final gate — full `validation.commands`, the full integration suite via
+  `om-integration-tests`, the design-system/style pass, then the PR body, labels,
+  `om-auto-review-pr 156 --autofix`, the summary comment and `mark-pr-ready`.

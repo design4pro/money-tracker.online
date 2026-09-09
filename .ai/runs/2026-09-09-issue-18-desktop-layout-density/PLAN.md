@@ -29,9 +29,9 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 5     | 5.1  | Stop the dashboard widget grid equalising row heights                    | inline | done   | 3ec1aa0 |
 | 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | done   | e1ca9d7 |
 | 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | done   | 9d3b368 |
-| 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | done   | pending |
-| 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | done   | pending |
-| 6     | 6.3  | Pin the `/transactions` toolbar as one cluster (assertion-only)          | inline | done   | pending |
+| 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | done   | 8a04d8b |
+| 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | done   | 278c444 |
+| 6     | 6.3  | Pin the `/transactions` toolbar as one cluster (assertion-only)          | inline | done   | 0198f19 |
 
 ## Goal
 
@@ -238,8 +238,16 @@ The header band is out of scope, deliberately — see Non-goals.
 - The `SegmentedFilter` keeps the start of its band; the end carries the count, rendered **only**
   when the filter is actually narrowing the list (`Showing 12 of 12 accounts` is noise).
 - _Verify:_ at 1440×900 the band carries a node within 32px of its end when a filter is active and
-  none when it is not; at 360×800 the first account row is still above the fold in both locales;
-  the filter's 44×44 targets are unchanged.
+  none when it is not; at 360×800 the count costs the band one caption line and no more; the
+  filter's 44×44 targets are unchanged.
+- **The 360 criterion changed shape, and why.** As written it asked for the first account row to be
+  above the fold. Measured, it is not — y≈860 in an 800px viewport — and it was not before this
+  Step either: the same assertion against the pre-change file gives identical numbers, because two
+  overview cards sit above the list in the demo workspace. An assertion this Step cannot make true
+  is not a criterion for this Step. What it can own is how much it added, so the case asserts the
+  delta between the band carrying the count and the same band without it: **89px → 115px, 26px, in
+  both locales**, against a 40px budget. The pre-existing fold position is recorded in
+  `checkpoint-5-checks.md` as observed and not acted on.
 
 **6.3 Cap the `/transactions` search field from `md` up** — resolved as **assertion-only**
 
