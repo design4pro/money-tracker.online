@@ -149,3 +149,37 @@
 - **Next:** the final gate — full `validation.commands`, the full integration suite via
   `om-integration-tests`, the design-system/style pass, then the PR body, labels,
   `om-auto-review-pr 156 --autofix`, the summary comment and `mark-pr-ready`.
+
+## 2026-09-10T00:30:00Z — final gate
+
+- **Full `validation.commands` green, in order:** `agent-kit-check` (32 files, kit 16),
+  `generate-routes` and `db:generate` with no drift, `typecheck`, `lint` (0 errors, 2 warnings that
+  are on `develop`), **`pnpm test` 2465/2465 in 163 files**, `build`.
+- **Full integration suite: 456 passed, 71 failed, 24 skipped, 17.0m** — and the 71 took the rest of
+  this entry to account for, because a number that size is not a thing to wave through.
+- **Blocker investigated and cleared, 1 of 2: the timeouts are contention.** `fullyParallel: true`
+  with no local `workers` cap puts three browser projects on one Vite dev server and one D1 file.
+  Re-run serially (`--workers=1`): `webkit` over `desktop-density` + `budgets.visual` +
+  `budget-detail.visual` → **44 passed, 8 failed**; `mobile-safari` over `desktop-density` → **34
+  passed, 4 failed**. Every timeout gone. Every Phase 6 case passes on `webkit` once it is not
+  competing for the server — the parallel failures were `Test timeout` and `page.goto: Timeout`,
+  never an assertion and never a measurement.
+- **Blocker investigated and cleared, 2 of 2: the hydration mismatch is older than this branch.**
+  What survives the serial re-run is eight `pl` cases with one cause, which React prints in full:
+  `budget-card.tsx:100` renders `1–31 sie 2026` on the server and `01–31.08.2026` in WebKit;
+  `dashboard-header.tsx:109` does the same with `Zakres:` in front of it. Both are
+  `formatCalendarDateRange(…, 'medium')` and **neither is touched here** — the only change to
+  `budget-card.tsx` on this branch is the `<li>` class list and a comment, and
+  `dashboard-header.tsx` is not in the diff at all. Proven rather than argued: with `src/` checked
+  out from `origin/develop` and nothing else changed, the same command gives the same four failures
+  with the same diff. **Filed as #163** (`bug`, `priority-medium`, `risk-low`).
+- **Decision: `desktop-density.spec.ts` was left running on the `mobile-safari` project.** The file
+  forces a 1440×900 viewport onto `devices['iPhone 15']`, which is a surface that does not exist,
+  and the repository has an idiom for excluding it (`test.skip(({ isMobile }) => isMobile, …)`, used
+  in eight places). Measured serially, the file does not actually fail there beyond #163's four `pl`
+  cases — so there is no defect to fix, only an opinion about where a suite belongs, and
+  `AGENTS.md` → Ask First covers narrowing what a test asserts. Recorded in `final-gate-checks.md`
+  for a reviewer to decide rather than narrowed unilaterally.
+- **Design-system / style pass:** `token-classes.test.ts` green, `DESIGN.md` and the code agree,
+  no new component or variant, `prettier --check` clean on every touched file. One thing considered
+  and not done, recorded with its reasoning: a `role="status"` live region on the `/accounts` count.
