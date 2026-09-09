@@ -189,7 +189,7 @@ function RecurringListRoute() {
           {@link RECURRING_PANES}, which the loading picture uses too.
 
           The DOM order moved with them, deliberately: `Due soon` now comes *after* the series
-          list, so below `lg` it reads below the list rather than above it. The reason somebody
+          list, so below `xl` it reads below the list rather than above it. The reason somebody
           opens `/recurring` is the series they keep; the rail is the aside. Doing it in the DOM
           rather than with `order` keeps the reading order and the visual order the same thing at
           every width, which is WCAG 1.3.2.

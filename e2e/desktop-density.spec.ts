@@ -238,8 +238,42 @@ for (const locale of LOCALES) {
 /* Phase 3 — `/recurring` earns its width with two panes                       */
 /* -------------------------------------------------------------------------- */
 
-/** The `Due soon` rail's grid track, 28rem, as `/recurring` states it from `xl` up. */
-const RAIL_TRACK = 448
+/** The `Due soon` rail's grid track, 30rem, as `/recurring` states it from `xl` up. */
+const RAIL_TRACK = 480
+
+/**
+ * The status column `Due soon` prints as soon as a period is late, reproduced rather than seeded.
+ *
+ * The seeded workspace has no overdue period and writing one into a D1 file the rest of this suite
+ * reads concurrently is a lot of fixture for a claim about a grid track. So the column is injected
+ * — but injected as what the product actually renders, which is the part a first attempt at this
+ * test got wrong: it built a `rounded-full px-2 py-0.5` stand-in carrying the English word in both
+ * locales, and a stand-in with no `whitespace-nowrap` can be broken by the browser and can never
+ * overflow. It measured 406px where the real thing needs 419px, and stayed green while `pl`
+ * scrolled.
+ *
+ * `badgeVariants` is quoted rather than imported for the `import.meta.glob` reason `support/app.ts`
+ * sets out — the source of truth is `src/components/ui/badge.tsx:9,37` with `tone="negative"`
+ * (`recurring/period-status.tsx:26`), and the words are `recurring.status.overdue` and
+ * `recurring.periods.col.status` from the two catalogues.
+ */
+const STATUS_COLUMN: Record<
+  AppLocale,
+  { header: string; badge: string; badgeClass: string }
+> = {
+  en: {
+    header: 'Status',
+    badge: 'Overdue',
+    badgeClass:
+      'inline-flex shrink-0 items-center gap-1 rounded-sm border font-semibold whitespace-nowrap h-6 px-2 text-caption border-transparent bg-negative-soft text-negative',
+  },
+  pl: {
+    header: 'Stan',
+    badge: 'Po terminie',
+    badgeClass:
+      'inline-flex shrink-0 items-center gap-1 rounded-sm border font-semibold whitespace-nowrap h-6 px-2 text-caption border-transparent bg-negative-soft text-negative',
+  },
+}
 
 /**
  * The rendered box, refusing to measure something that is not on the page.
@@ -298,7 +332,7 @@ for (const locale of LOCALES) {
 
     // 1279, 1023 and 360: stacked, and stacked the way the DOM reads - `Due soon` below the list.
     // This is the phase's deliberate reorder, so it is asserted rather than left to a frame. 1279
-    // is the pane split's own edge: the rail needs 28rem to hold its table, and the page column
+    // is the pane split's own edge: the rail needs 30rem to hold its table, and the page column
     // below `xl` is not wide enough to give it that and still leave the series list a list.
     for (const width of [1279, 1023, 360]) {
       await page.setViewportSize({ width, height: 900 })
@@ -308,6 +342,14 @@ for (const locale of LOCALES) {
       expect(stackedRail.y).toBeGreaterThan(
         stackedSeries.y + stackedSeries.height - 1,
       )
+
+      // Stacked is not a licence to span. Moving the split up handed 1024-1279 back to the
+      // single-column shape, and a single column left alone takes the whole well - which is the
+      // finding this file exists to catch, on the surface the issue names. Both panes stay inside
+      // the list band there, and the cap is dropped again at `xl` where the tracks are already
+      // narrower than it.
+      expect(stackedSeries.width).toBeLessThanOrEqual(LIST_BAND_MAX)
+      expect(stackedRail.width).toBeLessThanOrEqual(LIST_BAND_MAX)
     }
   })
 
@@ -387,20 +429,20 @@ for (const locale of LOCALES) {
     // column the panel prints as soon as one period is late. Injected rather than seeded, for the
     // reason the empty-rail test above gives — writing recurring rows into a workspace the rest
     // of this suite reads concurrently is a lot of fixture for a claim about a grid track.
-    const late = await scroller.evaluate((element) => {
+    const late = await scroller.evaluate((element, status) => {
       const table = element.querySelector('table')
       if (table === null) return null
       const header = document.createElement('th')
       header.scope = 'col'
       header.className = 'px-3 py-2 text-start font-medium text-ink-2'
-      header.textContent = 'Overdue'
+      header.textContent = status.header
       table.querySelector('thead tr')?.appendChild(header)
       for (const row of table.querySelectorAll('tbody tr')) {
         const cell = document.createElement('td')
         cell.className = 'px-3 py-2'
         const badge = document.createElement('span')
-        badge.className = 'rounded-full px-2 py-0.5 text-caption'
-        badge.textContent = 'Overdue'
+        badge.className = status.badgeClass
+        badge.textContent = status.badge
         cell.appendChild(badge)
         row.appendChild(cell)
       }
@@ -408,7 +450,7 @@ for (const locale of LOCALES) {
         scrollWidth: element.scrollWidth,
         clientWidth: element.clientWidth,
       }
-    })
+    }, STATUS_COLUMN[locale])
     if (late === null) throw new Error('the rail is not rendering a table')
     expect(late.scrollWidth).toBeLessThanOrEqual(late.clientWidth)
   })
@@ -476,8 +518,9 @@ for (const locale of LOCALES) {
     // children, so the parent element is the block whose width is in question.
     const panel = page.getByRole('heading', { level: 2 }).locator('xpath=..')
 
-    // A filter that finds nothing must not also change how wide the page is - the panel takes the
-    // band the list it replaces would have taken.
+    // A filter that finds nothing must not answer with one sentence ruled across the whole well.
+    // The panel is running text, so it stops at the band - not because it matches the width of the
+    // list it replaces, which for two budgets or more is uncapped.
     await expectCappedAtDesktopOnly(page, panel)
   })
 }

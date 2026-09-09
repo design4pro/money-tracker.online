@@ -168,8 +168,11 @@ function BudgetsListRoute() {
           />
 
           {shown.length === 0 ? (
-            /* The band the list it replaces would have taken, so switching the filter to something
-               with nothing in it does not also change the width of the page. */
+            /* A heading and a sentence, so it stops at the list band like every other block of
+               running text on these screens - not because it matches the list it replaces. It does
+               not: `budgetListClass` caps at the band only for a single budget, and the paired
+               grid above takes the whole well. What is being avoided here is a filter that finds
+               nothing and answers with one sentence ruled across 1156px. */
             <Card padding="lg" className="max-w-list text-center">
               <h2 className="text-subtitle font-semibold text-ink">
                 {t('budgets.empty.archived.title')}

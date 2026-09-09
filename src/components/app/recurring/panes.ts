@@ -8,22 +8,34 @@
  * files is a jump waiting for somebody to change one of them.
  *
  * `minmax(0,1fr)` for the series list so a long series name shrinks its own pane rather than
- * pushing the rail off the row; a fixed `28rem` for the rail so an empty `Due soon` cannot collapse
+ * pushing the rail off the row; a fixed `30rem` for the rail so an empty `Due soon` cannot collapse
  * the column; `items-start` so the rail ends at its own last row instead of being stretched to the
  * height of a list that may hold twenty series.
  *
- * ## Why `28rem`, and why `xl` rather than `lg`
+ * ## Why `30rem`, and why the number was measured twice
  *
- * Both numbers are measurements rather than taste. `Due soon` is a table, and a table has a width
- * below which it stops being one: measured at 1440x900 it needs 290px (`en`) / 298px (`pl`) for its
- * three ordinary columns and 406px once a late period adds the status column. A `20rem` track left
- * it 278px to do that in, so the rail arrived on a desktop already scrolling sideways. `28rem`
- * leaves 406px, which is the smallest track that holds the widest state.
+ * `Due soon` is a table, and a table has a width below which it stops being one. Measured at
+ * 1440x900 it needs 290px (`en`) / 298px (`pl`) for its three ordinary columns, and **419px** once
+ * a late period adds the status column: `PeriodStatusBadge` renders `Badge`, which is
+ * `whitespace-nowrap font-semibold` inside a border and reads `Po terminie` in Polish. A `20rem`
+ * track left it 278px to do that in, so the rail arrived on a desktop already scrolling sideways.
  *
- * A rail that wide cannot start at `lg`. The page column is 740px at 1024px of viewport, so a
- * 28rem aside there would leave the series list 268px - the phone-list-in-a-desktop-band this
- * whole spec exists to remove, reintroduced on the pane that matters. Below `xl` the rail stacks
- * under the list instead and takes the full column, where its table has more room than it can use.
+ * The first attempt at this number was `28rem`, derived against a hand-built stand-in for that
+ * badge which had no `whitespace-nowrap` and carried the English word - so it measured 406px and
+ * came out 13px short in the one locale that needed the room. `30rem` leaves 438px, measured
+ * against markup that matches what `Badge` actually renders, in both locales.
+ *
+ * ## Why `xl` rather than `lg`, and why the stacked case is capped
+ *
+ * A rail this wide cannot start at `lg`. The page column is 740px at 1024px of viewport, so a
+ * 30rem aside there would leave the series list 230px - the phone-list-in-a-desktop-band this
+ * whole spec exists to remove, reintroduced on the pane that matters. At 1280 the panes are
+ * 492/480, at 1440 they are 652/480.
+ *
+ * Below `xl` the panes stack, and a stacked pane left alone would take the whole well - which is
+ * finding 1 of the issue, on the surface the issue names. So the container carries the list band
+ * below the breakpoint and drops it above, where both tracks are already narrower than the band
+ * and the cap would only shrink a row it is meant to leave alone.
  */
 export const RECURRING_PANES =
-  'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_28rem]'
+  'grid max-w-list items-start gap-6 xl:max-w-none xl:grid-cols-[minmax(0,1fr)_30rem]'

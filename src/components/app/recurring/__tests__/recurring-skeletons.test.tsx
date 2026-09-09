@@ -8,7 +8,7 @@ import { renderRecurring } from './harness'
 /**
  * The `/recurring` loading picture stands in for a two-pane screen.
  *
- * `/recurring` is one column below `lg` and two columns above it. A loading picture that knows
+ * `/recurring` is one column below `xl` and two columns above it. A loading picture that knows
  * only the first shape hands the reader a full-width list and then takes a third of it away the
  * moment the data lands — the horizontal version of the jump every skeleton in this file exists to
  * prevent. The geometry is therefore not copied here but imported: the assertions below are that
