@@ -135,4 +135,3 @@ describe('trailingMonths', () => {
     expect(trailingMonths('2026-03-14', 1)).toEqual(['2026-03-01'])
   })
 })
-

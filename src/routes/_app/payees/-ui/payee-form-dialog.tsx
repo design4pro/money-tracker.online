@@ -1,7 +1,10 @@
 import { useState } from 'react'
 
 import { ErrorPanel } from '#/components/app/accounts'
-import { CATEGORIZATION_MODES, isCategorizationMode } from '#/components/app/payees'
+import {
+  CATEGORIZATION_MODES,
+  isCategorizationMode,
+} from '#/components/app/payees'
 import {
   Button,
   Dialog,
@@ -104,7 +107,8 @@ export function PayeeFormDialog({
   async function submit() {
     setIsSaving(true)
     setFailure(null)
-    const logoDomain = draft.logoDomain.trim() === '' ? null : draft.logoDomain.trim()
+    const logoDomain =
+      draft.logoDomain.trim() === '' ? null : draft.logoDomain.trim()
     const note = draft.note.trim() === '' ? null : draft.note.trim()
     try {
       if (payee === null) {
@@ -230,7 +234,8 @@ export function PayeeFormDialog({
                       value={option.mode}
                       description={t(option.descriptionKey)}
                       isDisabled={
-                        option.mode !== 'off' && draft.defaultCategoryId === null
+                        option.mode !== 'off' &&
+                        draft.defaultCategoryId === null
                       }
                     >
                       {t(option.labelKey)}

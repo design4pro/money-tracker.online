@@ -45,7 +45,9 @@ const categories: ReadonlyArray<CategoryTreeItem> = [
   row('travel', 'Travel', null, { isSystem: true }),
 ]
 
-function renderTree(overrides: Partial<Parameters<typeof CategoryTree>[0]> = {}) {
+function renderTree(
+  overrides: Partial<Parameters<typeof CategoryTree>[0]> = {},
+) {
   const onMove = vi.fn()
   const noop = vi.fn()
   render(
@@ -76,7 +78,9 @@ describe('CategoryTree', () => {
   it('names a child row by its parent, because the indent says nothing aloud', () => {
     renderTree()
     expect(
-      screen.getAllByRole('row').map((element) => element.getAttribute('aria-label')),
+      screen
+        .getAllByRole('row')
+        .map((element) => element.getAttribute('aria-label')),
     ).toContain('Groceries, inside Food')
   })
 

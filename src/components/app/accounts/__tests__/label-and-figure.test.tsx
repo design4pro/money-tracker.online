@@ -121,8 +121,6 @@ describe('the per-currency totals card', () => {
     )
 
     // `PLN3 accounts` is what a margin alone produced.
-    expect(screen.getByRole('term').textContent).toBe(
-      'PLN 3 accounts',
-    )
+    expect(screen.getByRole('term').textContent).toBe('PLN 3 accounts')
   })
 })
