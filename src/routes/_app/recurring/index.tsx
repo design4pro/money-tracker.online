@@ -136,14 +136,28 @@ function RecurringListRoute() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+      {/*
+        The actions take a line of their own before they take the title's. Two buttons that will
+        not shrink beside a heading that will is how `Recurring` comes to render as `R` with a pill
+        painted over it, and how a 328px subtitle ends up in a 110px column one word per line.
+        `flex-wrap` puts the break where the reader expects it; the action row wraps inside itself
+        after that, so it never has to be narrower than a button.
+      */}
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        {/*
+          `basis-72` is what makes the break happen where it should. A wrap is decided on flex
+          bases, and this block's natural one is its subtitle set on a single line - about 700px,
+          wide enough to push the actions onto their own row on a 1280px desktop that has room for
+          both. Stating the measure the heading actually needs puts the decision back on the
+          actions: they sit beside the title wherever they fit and drop below it where they do not.
+        */}
+        <div className="min-w-0 grow basis-72">
           <h1 className="text-title font-bold text-ink">
             {t('recurring.title')}
           </h1>
           <p className="mt-1 text-body text-ink-2">{t('recurring.subtitle')}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
             icon={<Search aria-hidden="true" />}

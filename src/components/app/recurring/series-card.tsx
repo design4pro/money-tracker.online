@@ -67,7 +67,13 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
         isPaused && 'bg-surface-sunken',
       )}
     >
-      <div className="flex items-start justify-between gap-3">
+      {/*
+        The badges and the menu take a line of their own before they take the name's. They are
+        `shrink-0` and the name is not, so on a phone the card hands the whole deficit to the one
+        word the card is about and a `Records automatically` pill lands on top of it. `ms-auto`
+        keeps them at the end of whichever line they end up on.
+      */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-subtitle font-semibold text-ink">
             {/*
@@ -104,7 +110,7 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
           </p>
         </div>
 
-        <div className="relative z-10 flex shrink-0 items-center gap-2">
+        <div className="relative z-10 ms-auto flex shrink-0 items-center gap-2">
           {isPaused ? (
             <Badge tone="neutral">{t('recurring.series.paused')}</Badge>
           ) : null}

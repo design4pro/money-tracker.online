@@ -174,11 +174,21 @@ function MembersRoute() {
         <CardBody>
           <TableContainer>
             <Table aria-label={t('members.list.title')}>
+              {/* Widths below which a column stops being readable, so the table outgrows a phone
+                  and its container scrolls instead of dividing 328px four ways - the same fault
+                  the category rows had, in a table. */}
               <TableHeader>
-                <Column isRowHeader>{t('members.column.person')}</Column>
-                <Column>{t('members.column.role')}</Column>
-                <Column>{t('members.column.joined')}</Column>
-                <Column align="end">{t('members.column.actions')}</Column>
+                <Column isRowHeader minWidth={190}>
+                  {t('members.column.person')}
+                </Column>
+                <Column minWidth={120}>{t('members.column.role')}</Column>
+                <Column minWidth={120}>{t('members.column.joined')}</Column>
+                {/* 92, not the menu's 44px target plus padding: this heading is `Działania` in
+                    Polish, which measures 65px, and a floor that clips the word it is holding
+                    space for is the same defect one column further along. */}
+                <Column align="end" minWidth={92}>
+                  {t('members.column.actions')}
+                </Column>
               </TableHeader>
               <TableBody>
                 {members.members.map((person) => (

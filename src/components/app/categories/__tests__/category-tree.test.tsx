@@ -135,6 +135,41 @@ describe('CategoryTree', () => {
 
   it('says each row’s kind in words rather than in colour alone', () => {
     renderTree()
-    expect(screen.getAllByText('Money out').length).toBe(categories.length)
+    // Two copies per row: the badge, and the visually-hidden word that replaces it on a phone.
+    expect(screen.getAllByText('Money out').length).toBe(categories.length * 2)
+  })
+
+  /**
+   * The kind yields its width to the name below `sm`, and stays in the accessibility tree.
+   *
+   * A `Badge` is `shrink-0` and a name span is not, so a 328px row hands the whole deficit to the
+   * one element carrying its subject — which is how a child category came to render as `C.` beside
+   * a badge at full width. Dropping the badge on a phone is the fix; dropping the *fact* would
+   * trade a layout defect for an accessibility one, so the word is still there, unpainted.
+   *
+   * jsdom evaluates no media queries, so the swap can only be asserted through the two classes
+   * that encode it. That is the point of the test rather than a weakness of it: what must not
+   * change is that exactly one of the two copies is painted at any width, and someone deleting
+   * either class breaks this line.
+   */
+  it('keeps the kind spoken on a phone while the badge stops being painted', () => {
+    renderTree()
+    const copies = screen.getAllByText('Money out')
+
+    const spoken = copies.filter((element) =>
+      element.classList.contains('sr-only'),
+    )
+    const painted = copies.filter(
+      (element) => !element.classList.contains('sr-only'),
+    )
+
+    expect(spoken.length).toBe(categories.length)
+    expect(painted.length).toBe(categories.length)
+    for (const element of spoken) {
+      expect(element.className).toContain('sm:hidden')
+    }
+    for (const element of painted) {
+      expect(element.className).toContain('max-sm:hidden')
+    }
   })
 })

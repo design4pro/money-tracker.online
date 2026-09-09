@@ -361,6 +361,16 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
 - **Column Rule** (`border-panel`): the heavier rule - the spine before the balance column, the
   rule under a column heading, the frame of the current rail row, the section rule between two
   paper grounds. 1.94:1 on canvas, 1.77:1 on panel.
+- **Both rules are slate in dark, not green, and they are set higher there** (`border-subtle`
+  `#42454c`, 1.87:1 on canvas and 1.52:1 on raised; `border-panel` `#5a5d64`, 2.72:1 on canvas and
+  2.33:1 on panel). Two reasons, and neither is taste. Dark's whole canvas-to-raised tone span is
+  1.231:1, because `surface-raised` is pinned by `ink-2`'s 7:1 floor - light separates a card by
+  tone _and_ a rule, dark has only the rule, so the rule carries a larger share and is measured
+  against dark's own floor rather than re-valued from light's. And a green line on slate grounds
+  reads as an unconverted leftover rather than as printed ruling, which is what made the `info`
+  badge - whose entire chrome is a `border-panel` rule - glow at night. The floors are stated in
+  `src/styles/tokens.css` and checked per theme against every ground in
+  `src/styles/__tests__/tokens-contrast.test.ts`.
 - **Control Boundary** (`border-strong`): the edge of anything pressable or typeable. 4.33:1 on
   raised, 3.59:1 on sunken, clearing the 3:1 floor of WCAG 1.4.11 on every ground.
 
