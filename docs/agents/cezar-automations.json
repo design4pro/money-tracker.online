@@ -28,7 +28,7 @@
       "changedLabels": ["groom"],
       "excludeLabels": ["in-progress"],
       "lookbackDays": 3,
-      "maxRecords": 10
+      "maxRecords": 25
     },
     "task": {
       "prompt": "{{github.number}}",
@@ -48,7 +48,7 @@
       "changedLabels": ["autofix"],
       "excludeLabels": ["in-progress", "blocked", "do-not-merge", "spec"],
       "lookbackDays": 3,
-      "maxRecords": 5
+      "maxRecords": 25
     },
     "task": {
       "prompt": "{{github.number}}",
@@ -120,7 +120,7 @@
       "changedLabels": ["review-threads"],
       "excludeLabels": ["in-progress", "blocked", "do-not-merge"],
       "lookbackDays": 3,
-      "maxRecords": 5
+      "maxRecords": 25
     },
     "task": {
       "prompt": "{{github.number}}",
