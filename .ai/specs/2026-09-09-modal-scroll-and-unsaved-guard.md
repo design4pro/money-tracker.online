@@ -406,20 +406,49 @@ _Discard changes_, the dialog closes and the account list is unchanged.
 **Step 3.1 - The eight remaining form dialogs.** `Modal` → `FormModal`, `isDismissable={false}`
 removed, `isDirty` supplied: `budget-`, `category-`, `goal-`, `payee-` and `series-form-dialog` via
 `useIsDirty(draft)`; `contribution-dialog` and `refund-dialog` from their own `useState` fields;
-`adjust-balance-dialog` as **`result === null && (targetMinor !== null || note !== '')`** so that the
+`adjust-balance-dialog` as
+**`result === null && (targetMinor !== account.currentBalanceMinor || note !== '')`** so that the
 _Done_ button shown after a successful, already-written balance adjustment (`:239-257`) does not offer
-a completed money write for discard. _Verify:_ an e2e case for `adjust-balance-dialog` that submits an
-adjustment and presses _Done_, asserting no alert appears and the adjustment stands; `pnpm test`;
-`pnpm e2e`.
+a completed money write for discard. The comparison is against the opening balance and not against
+`null`, because `targetMinor` is seeded with `account.currentBalanceMinor` (`:78-80`) rather than left
+empty: `targetMinor !== null` would be true from the first render, so a pristine open would raise the
+alert on the scrim, Escape, the X and _Cancel_ alike - the false positive this spec exists to remove.
+_Verify:_ an e2e case for `adjust-balance-dialog` that submits an
+adjustment and presses _Done_, asserting no alert appears and the adjustment stands; a second case
+that opens the dialog, touches nothing and presses the scrim, asserting it closes with no alert;
+`pnpm test`; `pnpm e2e`.
 
 **Step 3.2 - The filter drawer becomes controlled, and its committing buttons stop asking.**
 `src/components/app/transactions/filter-bar.tsx` holds the open state that `DialogTrigger` holds
 today and passes `isOpen`/`onOpenChange` to `FormModal`, so `canClose` can hold. _Apply_ and
 _Reset filters_ (`:603-620`) call that `onOpenChange(false)` instead of the render-prop `close()`,
 because by then `onViewChange` has committed the work. Its own commit, per the rollback note.
+
+`useIsDirty(draft)` is **not** the hook for this call site, and for two reasons that both come from
+the drawer being unlike the nine form dialogs. Its state is not the dialog's: `panelDraft` and
+`sortDraft` are declared in `FilterBar` (`:305-306`), which stays mounted across opens, so the hook's
+snapshot-on-first-render is taken at page mount rather than at drawer-open - and `:372-378` re-seeds
+both drafts from `filters`/`sort` on **every** open, so after one _Apply_ (or a keystroke in the
+always-visible search field) the second open re-seeds `panelDraft` to a value the stale snapshot no
+longer matches and the drawer reads dirty before the user has touched it. And `LedgerFilters` carries
+array-valued keys (`accountIds`, `categoryIds`, `tagIds`, `payeeIds`, `paymentMethods`), which a
+per-key `Object.is` reports as changed whenever a fresh array of identical contents is built.
+
+So the drawer supplies its own expression, against its own snapshot re-taken at each open:
+
+- A new `isSameFilterView(a, b)` in `filter-chips.ts` - beside `countActiveFilters`, which already
+  enumerates exactly these keys - compares `{ filters, sort }` per key, the id and method lists
+  element-wise rather than by identity.
+- A ref, `openedWith`, is seeded with `{ filters, sort }` in the **same** `if (open)` branch at
+  `:372-378` that re-seeds the two drafts, so the baseline is the view the drawer opened on.
+- `isDirty = !isSameFilterView({ filters: panelDraft, sort: sortDraft }, openedWith.current)`.
+
 _Verify:_ e2e - open the drawer, change one filter, press the scrim, the alert appears;
 _Discard changes_ leaves the filters as they were before the drawer opened; reopen, change a filter,
-press _Apply_, **no alert**, the drawer closes and the new filter is applied.
+press _Apply_, **no alert**, the drawer closes and the new filter is applied; **apply a filter, reopen
+the drawer and press the scrim immediately - no alert**, which is the case the shared hook would have
+failed; plus a unit case for `isSameFilterView` reporting two filter sets with equal-but-distinct id
+arrays as the same view.
 
 **Step 3.3 - The gate and the evidence.** `grep -rl 'isDismissable={false}' src/` returns exactly two
 files - `confirm-delete-dialog.tsx` (Q4) and `form-modal.tsx` (the alert's own overlay). Full

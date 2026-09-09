@@ -48,39 +48,6 @@
         ],
         "createdAt": "2026-09-09T21:10:20.257Z",
         "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
-      },
-      {
-        "rule": "design-system-spacing",
-        "value": "*",
-        "files": [
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
-        ],
-        "createdAt": "2026-09-09T21:10:20.425Z",
-        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
-      },
-      {
-        "rule": "design-system-shadow",
-        "value": "*",
-        "files": [
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
-        ],
-        "createdAt": "2026-09-09T21:10:20.547Z",
-        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
-      },
-      {
-        "rule": "design-system-motion",
-        "value": "*",
-        "files": [
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-01-center-dialog-desktop.html",
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-02-center-dialog-mobile.html",
-          ".ai/specs/assets/modal-scroll-and-unsaved-guard/mockup-03-unsaved-changes-alert.html"
-        ],
-        "createdAt": "2026-09-09T21:10:20.651Z",
-        "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
       }
     ]
   }

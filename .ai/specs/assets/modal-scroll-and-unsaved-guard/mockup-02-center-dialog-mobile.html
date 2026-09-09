@@ -227,9 +227,12 @@
   <body>
     <h1>Centred dialog, 360 x 640 phone viewport</h1>
     <p class="lede">
-      The same eight-field placeholder form. At 360px the fault is worse than on
-      the desktop: the panel is taller than two viewports, so both the title and
-      the submit control are off screen.
+      The same eight-field placeholder form. Its 723px panel overflows this
+      640px viewport at both ends, so the title's first line sits 43px above the
+      scroll origin - unreachable by any gesture - and the submit control sits
+      below the fold. The desktop fixture loses more at the top (128px, the
+      whole header); what this width adds is that there is no room left to
+      recover it.
     </p>
 
     <div class="row">

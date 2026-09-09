@@ -63,10 +63,8 @@
         margin-bottom: 24px;
         flex-wrap: wrap;
       }
-      .case {
-        flex: 1 1 420px;
-        min-width: 420px;
-      }
+      /* Sized by its pinned .screen child, as in the sibling fixtures — a flex
+         basis here would fight the 900px the screen has to be. */
       .case > h2 {
         font-size: 13px;
         text-transform: uppercase;
@@ -89,6 +87,7 @@
       /* --- the simulated viewport ------------------------------------- */
       .screen {
         position: relative;
+        width: 900px;
         height: 470px;
         overflow: hidden; /* this box IS the viewport */
         background: var(--canvas);
