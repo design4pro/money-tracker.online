@@ -75,7 +75,14 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
       */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-subtitle font-semibold text-ink">
+          {/*
+            `h2`, not `h3`. A series is a top-level entry of `/recurring`, the same rank as the
+            `Due soon` panel beside it - it was never a subsection of that panel, and only read
+            like one while the panel happened to come first in the DOM. Now that the list leads,
+            an `h3` here would announce the outline as `h1` then a series name with the level
+            between them missing, which is the skip `docs/ACCESSIBILITY.md` rules out.
+          */}
+          <h2 className="text-subtitle font-semibold text-ink">
             {/*
               The whole card is the target: the name is a real link with a real accessible name,
               stretched over the row by a pseudo-element. The actions trigger sits above that
@@ -92,7 +99,7 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
             >
               {series.name}
             </Link>
-          </h3>
+          </h2>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
             <span>{t(`recurring.kind.${series.kind as RecurringKind}`)}</span>
             <span aria-hidden="true">·</span>
