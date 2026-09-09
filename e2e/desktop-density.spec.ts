@@ -335,3 +335,53 @@ for (const locale of LOCALES) {
     expect(await widthOf(rail)).toBeCloseTo(RAIL_TRACK, 0)
   })
 }
+
+/* -------------------------------------------------------------------------- */
+/* Phase 4 — `/budgets` pairs                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Half the well, plus room to spare.
+ *
+ * Two cards in 1156px with a 16px gutter are ~570px each. 620 is that with enough slack that the
+ * assertion is about "half the row", not about the exact gutter — a card that took the whole row
+ * would measure ~1156px, so nothing sits near the boundary.
+ */
+const PAIRED_CARD_MAX = 620
+
+for (const locale of LOCALES) {
+  test(`/budgets puts two cards on one row from lg and one card per row below it — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/budgets')
+
+    const cards = page.locator('main ul > li')
+    // Three, because pairing is only observable with a third card to wrap onto the second row.
+    expect(await cards.count()).toBeGreaterThanOrEqual(3)
+
+    const first = await boxOf(cards.nth(0))
+    const second = await boxOf(cards.nth(1))
+    const third = await boxOf(cards.nth(2))
+
+    // The pair: one row, two columns, neither of them the whole well.
+    expect(first.y).toBeCloseTo(second.y, 0)
+    expect(second.x).toBeGreaterThan(first.x + first.width - 1)
+    expect(first.width).toBeLessThanOrEqual(PAIRED_CARD_MAX)
+    expect(second.width).toBeLessThanOrEqual(PAIRED_CARD_MAX)
+
+    // And the third wraps rather than shrinking the row to fit it.
+    expect(third.x).toBeCloseTo(first.x, 0)
+    expect(third.y).toBeGreaterThan(first.y + first.height - 1)
+
+    // Below `lg` it is one column again, in DOM order.
+    await page.setViewportSize({ width: 1023, height: 900 })
+    const stackedFirst = await boxOf(cards.nth(0))
+    const stackedSecond = await boxOf(cards.nth(1))
+    expect(stackedSecond.x).toBeCloseTo(stackedFirst.x, 0)
+    expect(stackedSecond.y).toBeGreaterThan(
+      stackedFirst.y + stackedFirst.height - 1,
+    )
+  })
+}

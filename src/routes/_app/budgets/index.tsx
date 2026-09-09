@@ -176,10 +176,12 @@ function BudgetsListRoute() {
               </p>
             </Card>
           ) : (
-            /* One card, hairlines between the rows. No `overflow-hidden`: a focus ring in this
-               product is an `outline` and nothing may clip one — the rows round their own first
-               and last corners instead. */
-            <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
+            /* Two columns from `lg`, which halves the row to ~570px and closes the ~1000px of
+               empty rule a full-width budget row drew at 1440. A budget card is a name, a meter
+               and three facts — it does not use 1156px, and it does not need to, because there is
+               a second budget to put beside it. `items-start` so a card with an alert note does
+               not stretch the card next to it to match. */
+            <ul className="grid items-start gap-4 lg:grid-cols-2">
               {shown.map((budget) => (
                 <BudgetCard
                   key={budget.id}
