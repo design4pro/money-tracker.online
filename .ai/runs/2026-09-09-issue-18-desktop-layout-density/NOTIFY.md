@@ -62,3 +62,28 @@
 - **Problem, unchanged:** `pnpm test` reports two load-flaky 5s timeouts in
   `dashboard-data.test.ts`. Green alone (3/3 in 2.55s), unreachable from this branch's diff, and
   already flaky at checkpoint 1 before any of this existed. CI is the arbiter.
+
+## 2026-09-09T22:45:00Z — checkpoint 3 (Phase 4 closed, Steps 4.1 … 4.3)
+
+- **Checkpoint passed.** `typecheck`, `lint`, `build`, `prettier` green. `pnpm test` 2461/2462 —
+  the one failure is the same `dashboard-data.test.ts` 5s timeout every checkpoint has recorded.
+  Browser: 30/30 on `e2e/desktop-density.spec.ts`, 47/47 across `budgets.visual`, `narrow-viewport`
+  and `accessibility`, chromium, both locales.
+- **Red-then-green on both new browser cases.** Unpaired, the second budget card measured
+  `x = 244.4375` against the first's `446.4375` — directly below it. Uncapped, the filtered-empty
+  panel measured 1156px, the whole well, against a 912px bound.
+- **Decision:** the budget list's arrangement lives in `budgetListClass(count)`
+  (`src/components/app/budgets/list-layout.ts`), imported by the route and by the skeleton. Same
+  reason as `RECURRING_PANES`: the loading picture and the loaded screen agree by construction.
+- **Decision:** a workspace with exactly one budget takes `max-w-list`, not half a two-column grid.
+  A lone card in `lg:grid-cols-2` is the void the pairing exists to close, moved rather than removed.
+- **Decision:** `BudgetCard`'s `<li>` becomes its own bordered card. A hairline between rows says
+  "the row below is the next one", which stops being true the moment the next one is beside it.
+- **Decision:** the _unfiltered_ `BudgetEmptyState` is left alone. It is a dashed, centred call to
+  action for a workspace with no budgets at all, not a list that came back empty; only the filtered
+  panel that literally replaces the list took the band.
+- **Two claims a browser could not make**, asserted as unit cases instead: a one-budget workspace
+  (the seed holds three and the suite only reads it) and the loading picture (racing a browser
+  against a pending component would assert about how fast a local D1 answers).
+- **Problem, unchanged:** the `dashboard-data.test.ts` flake. Green alone, unreachable from this
+  branch's diff, flaky since before this work existed. CI is the arbiter.

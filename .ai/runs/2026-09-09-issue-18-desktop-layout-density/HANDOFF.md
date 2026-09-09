@@ -1,34 +1,38 @@
 # Handoff — 2026-09-09-issue-18-desktop-layout-density
 
-**Last updated:** 2026-09-09T20:25:00Z
+**Last updated:** 2026-09-09T22:45:00Z
 **Branch:** `feat/issue-18-desktop-layout-density`
 **PR:** https://github.com/design4pro/money-tracker.online/pull/156 (draft, claimed)
-**Current phase/step:** Phase 4 Step 4.1
-**Last commit:** `76d758d` — feat(recurring): give the loading picture the same two panes as the screen
+**Current phase/step:** Phase 5 Step 5.1
+**Last commit:** `a1f010f` — feat(budgets): follow the pairing through the skeleton and the filtered empty
 
 ## What just happened
 
-- Phase 2 landed in two commits: `/categories` and `/transactions/groups` both capped at
-  `max-w-list`, each covering its skeleton and empty state (and, on `/categories`, its error panel).
-  Step 2.1 finally exercised the token guard the spec predicted — deleting `--container-list` makes
-  `token-classes.test.ts` fail with `max-w-list` in `dead`.
-- Phase 3 landed in three commits: `/recurring` is a two-pane grid from `lg` up with `Due soon`
-  moved after the series list in the DOM, the rail's 20rem track asserted against collapse, and the
-  loading picture given the same geometry through the new shared `RECURRING_PANES` constant.
-- Checkpoint 2 passed. `typecheck`, `lint`, `build` and `prettier` green; `pnpm test` 2456/2458 with
-  the same two machine-flaky dashboard timeouts checkpoint 1 recorded; 64/64 across
-  `desktop-density`, `narrow-viewport` and `accessibility` on chromium in both locales.
-- Sixteen frames captured and read, including the `/recurring` 360 before/after pair the spec asks
-  for in the PR body.
+- Phase 4 landed in three commits. `/budgets` is a two-column grid from `lg` up, each `<li>` now its
+  own bordered card rather than a hairline-separated row; a workspace with exactly one budget takes
+  `max-w-list` instead of half the grid; the loading picture and the filtered-empty panel follow the
+  same geometry.
+- The decision lives in `budgetListClass(count)` (`src/components/app/budgets/list-layout.ts`), which
+  the route and the skeleton both import — so "the skeleton matches the screen" is true by
+  construction, the same pattern Phase 3 used for `RECURRING_PANES`.
+- Checkpoint 3 passed: `typecheck`, `lint`, `build`, `prettier` green; `pnpm test` 2461/2462 with the
+  one machine-flaky dashboard timeout checkpoints 1 and 2 already recorded; 30/30 on
+  `desktop-density` and 47/47 across `budgets.visual`, `narrow-viewport` and `accessibility`, both
+  locales, chromium.
+- Six frames captured and read, including a 1440 before/after pair showing the stacked full-width
+  rows becoming two ~570px cards on a row.
 
 ## Next concrete action
 
-- Step 4.1 — lay the budget list out as `grid gap-4 lg:grid-cols-2` with `items-start` in
-  `src/routes/_app/budgets/index.tsx`, leaving `BudgetCard` itself untouched. Verify with a **pair**
-  assertion: with ≥3 budgets, two cards share a row at 1440×900 (equal `y`, differing `x`) and each
-  is ≤ 620px; one column at 1023px and below.
-- Then 4.2 (a single budget renders at `max-w-list`, not at half the grid) and 4.3 (the same through
-  `budget-skeletons.tsx` and the filtered empty state), then **checkpoint 3**.
+- Step 5.1 — stop the dashboard widget grid equalising row heights: `items-start` on the grid in
+  `src/components/app/dashboard/widget-grid.tsx`, so a short widget stops being stretched to the
+  height of the tallest one in its row.
+- Then 5.2 (an **earn** assertion: the `/dashboard` header band still carries a rendered node within
+  32px of each of its two ends — a re-assertion of work `cf483b7`/`11e8848` already did, not a
+  change) and 5.3 (file the Net worth mid-card void as its own issue per spec Q10, record the number
+  in PLAN.md Follow-ups and in the PR body), then **checkpoint 4**.
+- Phase 6 after that: `accounts.filter.count` in EN + PL with the four Polish CLDR categories, the
+  `/accounts` filter-band counterweight, and the `/transactions` search field capped from `md` up.
 
 ## Blockers / open questions
 
