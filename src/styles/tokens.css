@@ -680,6 +680,16 @@
      its own width and drift from this again. The marketing surface is a
      deliberately narrower well and does not use this token. */
   --content-max: 80rem; /* 1280px */
+  /* A single column of list rows. The band the repository was missing: it names
+     the outer well above and the reading measure below, and had nothing between
+     them, so a screen that is one column of rows inherited the whole well and
+     spanned it - seven unnamed `max-w-*` answers in `src/routes/_app` were the
+     symptom. 56rem is derived, not chosen: a 1440px viewport leaves 1156px of
+     usable content width beside the rail, and 896px of it leaves a 260px tail -
+     22%, under the "roughly a third" this band exists to stay below - while
+     still giving a capped row more width than it uses today. Mapped into
+     Tailwind's container namespace by `app.css` and reached as `max-w-list`. */
+  --list-max: 56rem; /* 896px */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-start: env(safe-area-inset-left, 0px);

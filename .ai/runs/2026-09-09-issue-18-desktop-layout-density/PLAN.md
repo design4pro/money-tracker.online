@@ -14,7 +14,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 
 | Phase | Step | Title                                                                    | Exec   | Status | Commit |
 | ----- | ---- | ------------------------------------------------------------------------ | ------ | ------ | ------ |
-| 1     | 1.1  | Add `--list-max: 56rem` to `tokens.css`                                  | inline | todo   | —      |
+| 1     | 1.1  | Add `--list-max: 56rem` to `tokens.css`                                  | inline | done   | b4a8975|
 | 1     | 1.2  | Expose `--container-list` in `app.css`                                   | inline | todo   | —      |
 | 1     | 1.3  | Amend `DESIGN.md` → Layout with the three width bands                    | inline | todo   | —      |
 | 1     | 1.4  | Cap the eight `_app` page subtitles with `max-w-prose`                   | inline | todo   | —      |
