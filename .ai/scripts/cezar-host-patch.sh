@@ -30,6 +30,13 @@
 #    automation: without the flag the behaviour is byte-for-byte what it was, so `issue-regroom`,
 #    `issue-autofix` and `issue-spec` cannot start firing on PRs that happen to carry their label.
 #    Used by `pr-review-threads` (docs/agents/cezar-automations.json).
+# 5. Concurrent worktree creation (not reported upstream yet): `git worktree add -b` writes the
+#    new branch's upstream into the shared `.git/config`, and git's config lock has no retry, so
+#    two runs forking in the same moment leave one of them dead with "could not lock config file
+#    .git/config: File exists". `maxParallel` does not order them - cezar creates the worktree
+#    before it takes the repository-root lease - so a burst of automations loses all but one run.
+#    The patch retries, and because the branch is created before that config write fails, the
+#    retry lands on cezar's own reattach path, which writes no shared config at all.
 #
 # The cockpit is one per host and shared with planned.travel. That repository's copy of
 # .ai/scripts/cezar-host-patch.sh is identical apart from this paragraph; both are idempotent and
@@ -38,8 +45,7 @@
 #
 # "Either one is enough" holds only while the two copies are in step, and the order matters when
 # they are not. A copy older than this one aborts on the patch 4 site rather than reverting it -
-# that is deliberate, and the note above that patch says how. Until the sibling repository takes
-# this version, run this copy on the shared host.
+# that is deliberate, and the note above that patch says how.
 set -euo pipefail
 
 VERSION="${CEZ_VERSION:-0.10.1}"
@@ -88,6 +94,19 @@ if grep -qF "includePullRequests ? 'mixed' : 'issues'" "$DIST/automations/github
   echo "reverted the superseded 'mixed' label source"
 fi
 
+# Supersedes the first form of patch 4, whose re-emitted `family: 'issues'` push kept the stock key
+# order. That form writes patch 4's own marker, so a host carrying it is skipped by the marker check
+# in `patch` before FROM is ever looked at, and keeps the old order - which is the line a stale
+# sibling copy still matches and rewrites back to 'mixed'. The reorder below is worthless without
+# this. The trigger is the old-ordered 'prs' push: stock has no 'prs' push at all and the new form
+# emits it reordered, so it names that one form exactly, and `.orig` is guaranteed to exist because
+# only `patch` writes the line and it takes the copy first.
+if grep -qF "sources.push({ family: 'prs', activity: 'updated', opened: false, labels: true });" \
+  "$DIST/automations/github-poller.js"; then
+  cp "$DIST/automations/github-poller.js.orig" "$DIST/automations/github-poller.js"
+  echo "reverted the superseded patch 4 key order"
+fi
+
 patch "$DIST/automations/github-poller.js" 'cezar#914' \
   '        return z.array(timelineEventSchema).parse(JSON.parse(raw));' \
   "        // host patch, open-mercato/cezar#914: validate only the label rows of the timeline.
@@ -126,6 +145,26 @@ patch "$DIST/automations/github-poller.js" 'definition.filters.includePullReques
 patch "$DIST/skills-update.js" 'host patch: CEZ_SKILLS_AUTO_UPDATE' \
   "        if (process.env.CEZ_DRY_RUN === '1') {" \
   "        if (process.env.CEZ_DRY_RUN === '1' || process.env.CEZ_SKILLS_AUTO_UPDATE === '0') { // host patch: CEZ_SKILLS_AUTO_UPDATE=0 skips check and update" 2
+
+# The retry is deliberately not conditioned on the error text: the cockpit inherits the developer's
+# locale, and the message this host actually produced was Polish ("nie mozna zablokowac pliku
+# konfiguracyjnego"). Matching it would be a patch that silently stops working the day the host
+# changes language. Retrying every failure costs at most four attempts and about a second before
+# the original throw, and an unrecoverable cause still ends as an error.
+patch "$DIST/git-worktree.js" 'host patch: retry the config-lock race' \
+  "    const create = await git(repoRoot, ['worktree', 'add', '-b', branch, absolutePath, base]);" \
+  "    // host patch: retry the config-lock race between two runs forking at the same moment.
+    // 'worktree add -b' writes branch.<name>.remote/merge into the shared .git/config, and git's
+    // config lock has no retry. The branch is created before that write, so the retry reaches the
+    // reattach form, which writes no shared config. Not conditioned on the message - see above.
+    let create = await git(repoRoot, ['worktree', 'add', '-b', branch, absolutePath, base]);
+    for (let attempt = 1; !create.ok && attempt <= 4; attempt++) {
+        await new Promise((done) => setTimeout(done, 150 * attempt + Math.floor(Math.random() * 150)));
+        const forked = await git(repoRoot, ['show-ref', '--verify', '--quiet', branchRef]);
+        create = forked.ok
+            ? await git(repoRoot, ['worktree', 'add', absolutePath, branch])
+            : await git(repoRoot, ['worktree', 'add', '-b', branch, absolutePath, base]);
+    }"
 
 if [ -f "$PLIST" ]; then
   if plutil -extract EnvironmentVariables.CEZ_SKILLS_AUTO_UPDATE raw "$PLIST" >/dev/null 2>&1; then
