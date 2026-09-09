@@ -40,7 +40,7 @@ the rules of `SDLC.md`.
     `~/.cezar/config.json`) gates only the update; the patch makes `CEZ_SKILLS_AUTO_UPDATE=0` skip
     the check too. Recovery: remove the symlinks, `git checkout -- .claude/skills`, delete `.agents/`.
   - Two runs forking their worktree in the same moment lose the `.git/config` lock: `git worktree
-    add -b` writes the new branch's upstream into the shared config, git's config lock has no
+add -b` writes the new branch's upstream into the shared config, git's config lock has no
     retry, and the fork happens before cezar takes the repository-root lease, so `maxParallel`
     does not order it. Every loser dies with `worktree creation failed` before its workflow runs.
     The patch retries onto the reattach form, which writes no shared config.
@@ -236,17 +236,17 @@ full set for skills that write code and drops `Edit`/`Write` for the ones that m
 is the same nine workflows as `planned.travel`, under the same names; the setup step differs only
 where that repository provisions D1 and a basemap it needs and this one does not.
 
-| Workflow         | Agent step                                                               | Model                | Started by                                                                 |
-| ---------------- | ------------------------------------------------------------------------ | -------------------- | -------------------------------------------------------------------------- |
-| `issue-groom`    | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation `issue-groom` (`issue.opened`), `issue-regroom` (label `groom`) |
-| `issue-autofix`  | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation `issue-autofix` (label `autofix`)                               |
-| `spec`           | `/om-auto-write-spec {{task}}`                                           | opus                 | automation `issue-spec` (label `spec` on a `feature`)                      |
-| `implement-spec` | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged                        |
-| `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation `pr-autopilot` (`pull_request.opened` by a human maintainer)    |
-| `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                  |
-| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation `pr-review-threads` (label `review-threads` on a PR)            |
-| `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `.ai/scripts/housekeeping.sh`, or a human                      |
-| `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                       |
+| Workflow         | Agent step                                                               | Model                | Started by                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `issue-groom`    | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation `issue-groom` (`issue.opened`), `issue-regroom` (label `groom`)                                                               |
+| `issue-autofix`  | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation `issue-autofix` (label `autofix`)                                                                                             |
+| `spec`           | `/om-auto-write-spec {{task}}`                                           | opus                 | automation `issue-spec` (label `spec` on a `feature`)                                                                                    |
+| `implement-spec` | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
+| `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation `pr-autopilot` (`pull_request.opened` by a human maintainer)                                                                  |
+| `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                                                                                |
+| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation `pr-review-threads` (label `review-threads` on a PR)                                                                          |
+| `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `.ai/scripts/housekeeping.sh`, or a human                                                                                    |
+| `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                                                                                     |
 
 The task text an automation sends is the issue or PR number alone (`{{github.number}}`); a second
 token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled
