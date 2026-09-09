@@ -259,4 +259,3 @@ describe('Amount at the display step', () => {
     expect(marks[0]?.className).toBe('')
   })
 })
-
