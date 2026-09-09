@@ -347,7 +347,13 @@ function RulesListRoute() {
                   label={t('rules.drag.label', { name: rule.name })}
                   icon={<GripVertical aria-hidden="true" />}
                 />
-                <div className="min-w-0 flex-1 basis-48">
+                {/*
+                  `grow basis-48` rather than `flex-1 basis-48`: `flex-1` is the shorthand, so
+                  which of the two wins the basis is decided by their order in the generated
+                  stylesheet rather than by anything stated here. The route headers say the same
+                  thing the same way.
+                */}
+                <div className="min-w-0 grow basis-48">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-label text-ink">
                       {rule.name}
