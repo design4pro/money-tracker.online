@@ -39,6 +39,11 @@ the rules of `SDLC.md`.
     shows as hundreds of deleted files in `git status`. `skillsAutoUpdate: false` (kept in
     `~/.cezar/config.json`) gates only the update; the patch makes `CEZ_SKILLS_AUTO_UPDATE=0` skip
     the check too. Recovery: remove the symlinks, `git checkout -- .claude/skills`, delete `.agents/`.
+  - Two runs forking their worktree in the same moment lose the `.git/config` lock: `git worktree
+    add -b` writes the new branch's upstream into the shared config, git's config lock has no
+    retry, and the fork happens before cezar takes the repository-root lease, so `maxParallel`
+    does not order it. Every loser dies with `worktree creation failed` before its workflow runs.
+    The patch retries onto the reattach form, which writes no shared config.
   - A label event on a pull request never reaches an automation: the poller asks for `is:issue` and
     then drops any hit carrying `pull_request`, so `pull_request.opened` is the only PR trigger
     stock cezar has. The patch teaches both gates a `filters.includePullRequests` flag, opt-in per
