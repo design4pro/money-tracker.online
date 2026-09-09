@@ -268,8 +268,8 @@ describe('AccountLedger.requestRebuild', () => {
     await expect(running).rejects.toThrow('d1 refused the delete')
 
     // The failed pass released the lock but not the request it had accepted: clearing the dirty
-    // bit here would drop that caller's rebuild after it was told 200, and only the nightly cron
-    // would ever notice.
+    // bit here would drop that caller's rebuild after it was told 200, and with the nightly sweep
+    // still unbuilt, nothing would ever notice.
     expect(await ledger.read()).toMatchObject({ running: false, dirty: true })
     expect(await ledger.requestRebuild('acc')).toEqual({
       outcome: 'rebuilt',

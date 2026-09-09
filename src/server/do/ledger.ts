@@ -27,9 +27,12 @@
  * — so the pass it names is already lost, and coalescing onto it means coalescing onto something
  * that will never run. That is how an account's history used to stop updating permanently
  * (issue #22). A fresh instance starts with the lock free, which is the truth: nothing is running
- * in it. The cost is that a pass interrupted by eviction is lost rather than resumed, and the
- * nightly rebuild cron is what heals that — the same safety net a write path that forgot to open
- * a ledger batch falls into (ADR 0010).
+ * in it. The cost is that a pass interrupted by eviction is lost rather than resumed. ADR 0010
+ * names the nightly sweep as what heals that — the same safety net a write path that forgot to
+ * open a ledger batch falls into — but that sweep is not built yet, so today the repair is the
+ * next write to the account, and an account nobody writes to again keeps a stale chart until the
+ * sweep lands. That is a smaller failure than the permanent wedge it replaces, and it is bounded
+ * by one pass rather than by the lifetime of the object.
  *
  * ---------------------------------------------------------------------------
  * WHAT IS AND IS NOT WIRED UP TODAY
@@ -269,7 +272,11 @@ export class AccountLedger implements DurableObject {
       // on the throw path it belongs to a caller that was told `'coalesced'` and is still owed a
       // pass. Clearing it would discard that request silently. Left set, `GET /state` reports the
       // outstanding work and the next `requestRebuild` — which always rebuilds the whole history —
-      // serves it; the nightly cron is the backstop when no next request comes (ADR 0010).
+      // serves it. That next request is the only thing that serves it: ADR 0010 names a nightly
+      // sweep as the backstop, but the `0 3 * * *` slot has no handler yet (`src/server/worker.ts`
+      // lists it under work still owed), so until it does, an account nobody touches again stays
+      // stale. That is the argument for leaving the bit set rather than clearing it, not a reason
+      // it is safe to drop.
       this.running = false
     }
   }
