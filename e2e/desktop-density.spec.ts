@@ -238,6 +238,9 @@ for (const locale of LOCALES) {
 /* Phase 3 — `/recurring` earns its width with two panes                       */
 /* -------------------------------------------------------------------------- */
 
+/** The `Due soon` rail's grid track, 20rem, as `/recurring` states it from `lg` up. */
+const RAIL_TRACK = 320
+
 /**
  * The rendered box, refusing to measure something that is not on the page.
  *
@@ -304,5 +307,31 @@ for (const locale of LOCALES) {
         stackedSeries.y + stackedSeries.height - 1,
       )
     }
+  })
+
+  test(`the /recurring rail keeps its column when nothing is due — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/recurring')
+
+    const rail = page.locator('main div.grid').first().locator('> *').nth(1)
+    await expect(rail).toBeVisible()
+
+    // The rail's track is `20rem`, stated by the grid template rather than negotiated with what
+    // the rail happens to hold. That is the whole of "keep the column when nothing is due": an
+    // `auto` or `max-content` track would collapse toward the empty sentence and take the layout
+    // with it, and this number is what would change if somebody wrote one.
+    expect(await widthOf(rail)).toBeCloseTo(RAIL_TRACK, 0)
+
+    // And the same, with the rail actually emptied. There is no seeded workspace holding series
+    // with nothing outstanding, and writing recurring rows straight into D1 to make one would be a
+    // lot of fixture for a claim about a grid track - so the content is removed in the page and
+    // the track re-measured, which is the same variable isolated.
+    await rail.evaluate((element) => {
+      element.replaceChildren()
+    })
+    expect(await widthOf(rail)).toBeCloseTo(RAIL_TRACK, 0)
   })
 }
