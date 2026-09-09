@@ -68,7 +68,9 @@ the rules of `SDLC.md`.
   fine-grained PAT owned by that account (resource owner `design4pro`, only the two repositories,
   Contents, Issues and Pull requests read/write; **no Workflows, no Administration**: a run cannot
   push under `.github/workflows/` or delete a label; the organisation approves the token once,
-  under Settings → Personal access tokens). The plist sets `GH_CONFIG_DIR` and cezar forwards it,
+  under Settings → Personal access tokens). The full permission list, and what a run does for the
+  operations the missing ones would serve, is "Token scopes the pipeline needs" below. The plist
+  sets `GH_CONFIG_DIR` and cezar forwards it,
   so `gh` inside a run and `git push` over HTTPS (the global credential helper is `gh auth
 git-credential`, which reads the same variable) both act as the bot, while `~/.config/gh` and
   the developer's terminal stay the developer's. Commits carry `user.name design4pro-agent` and
@@ -77,6 +79,63 @@ git-credential`, which reads the same variable) both act as the bot, while `~/.c
 - Ports: the test environment (`.ai/scripts/test-env-up.sh`, the `om-prepare-test-env` contract)
   takes the first free port from **3011-3020**. 3010 is excluded on purpose: `vite.config.ts`
   binds it with `strictPort`, so it belongs to the developer's own dev server.
+
+### Token scopes the pipeline needs
+
+The permissions the bot's fine-grained PAT carries decide which tracker operations in
+`.ai/trackers/github.md` are real and which silently degrade, so the next scope change is checked
+against this list rather than against a run's behaviour. Verified against the live API on
+2026-09-09 as `design4pro-agent`; re-verify with the probe below after any change.
+
+| Repository permission | Operations it serves                                                              | Granted |
+| --------------------- | --------------------------------------------------------------------------------- | ------- |
+| Metadata: read        | **repo-info**, **default-branch**, the ruleset read below (implicit on every PAT) | yes     |
+| Contents: read/write  | `git push`, **get-pr-diff**                                                       | yes     |
+| Issues: read/write    | **get-issue**, **comment-issue**, the label and assignee guards                   | yes     |
+| Pull requests: r/w    | **open-pr**, **get-pr**, the review and review-thread operations                  | yes     |
+| Actions: read         | **list-runs**, **get-run**, **get-run-failed-logs**, **watch-run**                | yes     |
+| Checks: read          | **get-pr-checks** (`gh pr checks`, `commits/{sha}/check-runs`)                    | **no**  |
+| Commit statuses: read | **get-pr-checks**' status half (`commits/{sha}/status`)                           | **no**  |
+| Actions: write        | **rerun-failed**                                                                  | **no**  |
+| Administration: read  | **get-required-checks** (`branches/*/protection/*`)                               | **no**  |
+| Workflows             | pushing under `.github/workflows/`                                                | **no**  |
+
+The last two rows are refused on purpose (#133, and the Host identity bullet above): a run does not
+edit the workflows that judge it, and does not read or write branch protection. The three before
+them are simply not granted yet, and until they are, this is what a run must do instead — a
+degraded path, stated so it is not mistaken for the real gate:
+
+- **CI status.** Without Checks and Commit statuses, **get-pr-checks** answers `403 Resource not
+accessible by personal access token` — the GraphQL wording names `statusCheckRollup`. Every check
+  on this repository is produced by a workflow in `.github/workflows/`, so **list-runs** for the
+  head branch is the whole picture and is readable today. A run reports CI from workflow runs and
+  says in its report that the check-run view was unavailable.
+- **Required checks.** **get-required-checks** answers 403 here, and would answer 404 even with
+  Administration: read, because it reads _classic branch protection_ and this repository's gate is a
+  repository **ruleset**. The readable truth needs Metadata alone:
+  `gh api repos/{owner}/{repo}/rules/branches/{branch} --jq '.[].type'`. On 2026-09-09 both
+  `develop` and `main` resolved to `deletion`, `non_fast_forward`, `pull_request` and nothing else:
+  **no status check is required by the ruleset**, and the merge gate is the pull-request rule with
+  `required_approving_review_count: 0`. The descriptor's documented fallback — "treat every
+  reported check as required" — is therefore stricter than the gate, not a stand-in for it. That is
+  the safe direction, and a run may keep it; what it must not do is call it the required set.
+- **Re-running a job.** Without Actions: write, **rerun-failed** is refused (`run … cannot be
+rerun`). Re-running a job is a human action in this repository: a run that suspects infrastructure
+  rather than a real failure says so on the pull request, names the run id, and stops — it does not
+  retry the call and does not change code to chase a failure it could not disambiguate.
+
+Probe, from the bot's `gh` config, one repository at a time:
+
+```bash
+GH_CONFIG_DIR=~/.config/gh-agent gh api repos/design4pro/money-tracker.online/commits/HEAD/check-runs >/dev/null && echo "checks: read ok"
+GH_CONFIG_DIR=~/.config/gh-agent gh api repos/design4pro/money-tracker.online/commits/HEAD/status  >/dev/null && echo "statuses: read ok"
+GH_CONFIG_DIR=~/.config/gh-agent gh api repos/design4pro/money-tracker.online/rules/branches/develop --jq '.[].type'
+```
+
+Granting the three is one edit under Settings → Personal access tokens on the `design4pro-agent`
+account, re-approved once by the organisation; the descriptor half of the change (teaching
+**get-required-checks** the rulesets endpoint) lives in `design4pro/agent-kit`, which renders
+`.ai/trackers/github.md`.
 
 ### The cockpit process
 
