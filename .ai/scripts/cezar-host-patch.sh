@@ -38,8 +38,7 @@
 #
 # "Either one is enough" holds only while the two copies are in step, and the order matters when
 # they are not. A copy older than this one aborts on the patch 4 site rather than reverting it -
-# that is deliberate, and the note above that patch says how. Until the sibling repository takes
-# this version, run this copy on the shared host.
+# that is deliberate, and the note above that patch says how.
 set -euo pipefail
 
 VERSION="${CEZ_VERSION:-0.10.1}"
