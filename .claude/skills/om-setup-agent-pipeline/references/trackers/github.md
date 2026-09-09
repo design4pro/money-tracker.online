@@ -348,6 +348,33 @@ gh pr ready {prNumber}
 ```bash
 gh pr checks {prNumber} --json name,state,link
 ```
+Unreadable to a fine-grained PAT: the rollup expands to `CheckRun` nodes, fine-grained tokens have
+no `Checks` permission to grant, and `gh` exits non-zero with `Resource not accessible by personal
+access token`. Fall back to the Actions API, which asks only for `Actions: Read`:
+```bash
+sha=$(gh pr view {prNumber} --json headRefOid --jq .headRefOid)
+for run in $(gh api --paginate "repos/{owner}/{repo}/actions/runs?head_sha=$sha" --jq '.workflow_runs[].id'); do
+  gh api --paginate "repos/{owner}/{repo}/actions/runs/$run/jobs" \
+    --jq '.jobs[] | {name, state: (.conclusion // "pending" | ascii_upcase), link: .html_url}'
+done
+```
+`state` comes from the job's `conclusion`, never from its `status`. The Actions Jobs API splits
+what the rollup keeps in one field: `.status` is only the lifecycle stage
+(`queued`/`in_progress`/`completed`) and reads `completed` for a failed job exactly as it does for
+a passing one, while pass/fail lives in `.conclusion`. Upper-casing the conclusion lands on the
+vocabulary the primary command already emits (`SUCCESS`, `FAILURE`, `SKIPPED`, `CANCELLED`,
+`TIMED_OUT`, `ACTION_REQUIRED`, `NEUTRAL`); a job that has not concluded yet reports `PENDING`.
+Both calls paginate because each endpoint defaults to 30 items and truncates in silence — a large
+test matrix would drop checks with no signal at all, which is the one failure mode an operation
+that decides green-versus-red must not have.
+
+Two gaps to state rather than paper over. The fallback sees GitHub Actions jobs only — check runs
+published by other GitHub Apps (GitGuardian, Sentry, and the like) are invisible to it. And
+`head_sha=` returns *every* run for the commit, superseded attempts included, so a re-run leaves
+two rows carrying the same job name and different conclusions; read the newest run per workflow
+before calling a name red. Report what the fallback returns as the Actions jobs it is, and say
+that the App-published checks were out of reach, the same way **list-review-comments** states its
+own gap.
 
 #### get-required-checks
 Base branch → the set of required status checks. A 404 means branch protection is not readable — treat all reported checks as required.
