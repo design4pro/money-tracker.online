@@ -502,6 +502,22 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
   like the line that produced it, and the page is not marked.
 - **The summary strip**: three typed lines in a `dl`, label at the start, figure at the end, a
   `border-t` rule under each - never three tiles.
+- **Three width bands, and nothing improvised between them**. A block states which band it belongs
+  to; a screen that names none inherits the shell column and spans it, which is how a row carrying
+  four short facts comes to draw a rule across 1150px of nothing.
+  - `--content-max` (80rem, via `max-w-content`) - the shell column, and anything that earns it: a
+    grid, a ledger, a dashboard of widgets.
+  - `--list-max` (56rem, via `max-w-list`) - a single column of list rows. A 1440px viewport leaves
+    1156px of usable content width beside the rail, so this band leaves a 260px tail rather than a
+    600px one.
+  - `--measure` (64ch, via `prose-measure`) - running text of more than one paragraph. It also sets
+    the reading leading and the paragraph gap, so it is **not** a width utility and is not used as
+    one; a one-line subtitle that wants a cap and nothing else takes `max-w-prose`, which would
+    otherwise move off the 2.5rem pitch.
+  - **Capped blocks are start-aligned, never centred.** A block takes its band and nothing else, so
+    it keeps the shared start edge with the page's `<h1>`; centring inside an already-centred column
+    trades one void for two half-voids. The freed tail does nothing, which is the point - it is not
+    spanned by a rule.
 - **Reading measure**: `prose-measure` caps running text at 64ch and sets the reading leading
   (1.6) and paragraph gap (1.5em). A handful of descriptions cap themselves inline at 60-68ch
   instead (`max-w-prose` is 65ch) and keep the body leading; every cap sits under the 80-character
