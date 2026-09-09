@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { ErrorPanel } from '#/components/app/accounts'
 import {
   PeriodStatusBadge,
+  RECURRING_PANES,
   RecurringEmptyState,
   RecurringListSkeleton,
   SeriesCard,
@@ -184,19 +185,16 @@ function RecurringListRoute() {
         />
       ) : (
         /*
-          Two panes from `lg` up. `Due soon` is a rail - a short, fixed list somebody glances at -
-          and 20rem is the width it needs; the series list keeps `minmax(0,1fr)` so a long name
-          shrinks its own pane instead of pushing the rail off the row. `items-start` so the rail
-          ends at its last row rather than being stretched to the height of a list that may hold
-          twenty series.
+          Two panes from `lg` up - the tracks and why they are what they are live on
+          {@link RECURRING_PANES}, which the loading picture uses too.
 
-          The DOM order changes with it, in the same commit and deliberately: `Due soon` now comes
-          *after* the series list, so below `lg` it reads below the list rather than above it. The
-          reason somebody opens `/recurring` is the series they keep; the rail is the aside. Doing
-          it in the DOM rather than with `order` keeps the reading order and the visual order the
-          same thing at every width, which is WCAG 1.3.2.
+          The DOM order moved with them, deliberately: `Due soon` now comes *after* the series
+          list, so below `lg` it reads below the list rather than above it. The reason somebody
+          opens `/recurring` is the series they keep; the rail is the aside. Doing it in the DOM
+          rather than with `order` keeps the reading order and the visual order the same thing at
+          every width, which is WCAG 1.3.2.
         */
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className={RECURRING_PANES}>
           <div className="flex min-w-0 flex-col gap-6">
             <SegmentedFilter
               label={t('recurring.filter.label')}
