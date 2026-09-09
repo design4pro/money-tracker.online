@@ -168,7 +168,9 @@ function BudgetsListRoute() {
           />
 
           {shown.length === 0 ? (
-            <Card padding="lg" className="text-center">
+            /* The band the list it replaces would have taken, so switching the filter to something
+               with nothing in it does not also change the width of the page. */
+            <Card padding="lg" className="max-w-list text-center">
               <h2 className="text-subtitle font-semibold text-ink">
                 {t('budgets.empty.archived.title')}
               </h2>

@@ -1,6 +1,8 @@
 import { Card, Skeleton } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
+import { budgetListClass } from './list-layout'
+
 /**
  * The loading pictures for the two budget screens.
  *
@@ -20,17 +22,24 @@ function LoadingAnnouncement({ message }: { readonly message: string }) {
   )
 }
 
-/** The `/budgets` pending view: three cards with the meter's shape reserved. */
+/**
+ * The `/budgets` pending view: three cards with the meter's shape reserved.
+ *
+ * Three, and paired the way the loaded list pairs them — {@link budgetListClass} for a count that
+ * is not one, since a loading picture cannot know how many budgets are about to arrive and three
+ * is what it draws. A single-column skeleton followed by a two-column list is the same jump this
+ * file exists to prevent, taken sideways.
+ */
 export function BudgetListSkeleton() {
   const t = useTranslate()
   return (
     <div className="flex flex-col gap-6">
       <LoadingAnnouncement message={t('budgets.list.loading')} />
-      <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
+      <ul className={budgetListClass(3)}>
         {[0, 1, 2].map((row) => (
           <li
             key={row}
-            className="flex flex-col gap-3 border-t border-border-subtle px-4 py-4 first:border-t-0"
+            className="flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-4 shadow-card"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="w-full max-w-56">

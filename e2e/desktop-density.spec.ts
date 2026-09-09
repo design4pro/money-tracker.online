@@ -384,4 +384,22 @@ for (const locale of LOCALES) {
       stackedFirst.y + stackedFirst.height - 1,
     )
   })
+
+  test(`the filtered-empty budgets panel keeps the list band — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    // The seeded workspace has nothing archived, so this filter is the empty branch of the same
+    // screen the test above measures full.
+    await gotoApp(page, '/budgets?status=archived')
+
+    // The panel is the `<h2>`'s own card: the heading and the sentence under it are its only
+    // children, so the parent element is the block whose width is in question.
+    const panel = page.getByRole('heading', { level: 2 }).locator('xpath=..')
+
+    // A filter that finds nothing must not also change how wide the page is - the panel takes the
+    // band the list it replaces would have taken.
+    await expectCappedAtDesktopOnly(page, panel)
+  })
 }
