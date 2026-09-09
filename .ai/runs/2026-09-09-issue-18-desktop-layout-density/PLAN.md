@@ -27,7 +27,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 4     | 4.2  | Render a single budget at `max-w-list`                                   | inline | done   | 74fbbff |
 | 4     | 4.3  | Follow the pairing through `budget-skeletons.tsx` and the filtered empty | inline | done   | a1f010f |
 | 5     | 5.1  | Stop the dashboard widget grid equalising row heights                    | inline | done   | pending |
-| 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | todo   | —       |
+| 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | done   | pending |
 | 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | todo   | —       |
 | 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | todo   | —       |
 | 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | todo   | —       |

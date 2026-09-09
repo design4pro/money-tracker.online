@@ -447,3 +447,44 @@ for (const locale of LOCALES) {
     )
   })
 }
+
+/**
+ * How close to an end of the band a node has to be to count as carrying it.
+ *
+ * 32px is the gap the shell already uses between two adjacent controls, so a node inside it is
+ * flush with the end by the page's own vocabulary rather than by an arbitrary tolerance.
+ */
+const BAND_END_SLACK = 32
+
+for (const locale of LOCALES) {
+  test(`the dashboard header band carries a node at each of its ends — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/dashboard')
+
+    // An assertion on behaviour that already passes, and that is the point: issue #18 measured an
+    // empty ~1000px header strip here on 2026-09-03, the passbook work (`cf483b7`, `11e8848`)
+    // closed it, and this spec's Non-goals say so. Without a case, that claim rots the first time
+    // somebody empties the band again.
+    const band = page.locator('main header > div').first()
+    const bandBox = await boxOf(band)
+
+    const ends = await band.evaluate((root) => {
+      const own = root.getBoundingClientRect()
+      const boxes = [...root.querySelectorAll('*')]
+        .map((element) => element.getBoundingClientRect())
+        .filter((box) => box.width > 0 && box.height > 0)
+      return {
+        start: Math.min(...boxes.map((box) => box.left)) - own.left,
+        end: own.right - Math.max(...boxes.map((box) => box.right)),
+      }
+    })
+
+    // The band is worth asserting about only while it is wide enough to be empty.
+    expect(bandBox.width).toBeGreaterThan(900)
+    expect(ends.start).toBeLessThanOrEqual(BAND_END_SLACK)
+    expect(ends.end).toBeLessThanOrEqual(BAND_END_SLACK)
+  })
+}
