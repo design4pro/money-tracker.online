@@ -304,6 +304,12 @@ const messages = {
   'accounts.filter.active': 'Konta otwarte',
   'accounts.filter.archived': 'Konta zarchiwizowane',
   'accounts.filter.all': 'Otwarte i zarchiwizowane',
+  'accounts.filter.count': {
+    one: 'Widoczne {shown} z {total} konta',
+    few: 'Widoczne {shown} z {total} kont',
+    many: 'Widoczne {shown} z {total} kont',
+    other: 'Widoczne {shown} z {total} konta',
+  },
   'accounts.status.excluded': 'Poza raportami',
   'accounts.list.label': 'Twoje konta',
   'accounts.list.loading': 'Wczytujemy Twoje konta…',

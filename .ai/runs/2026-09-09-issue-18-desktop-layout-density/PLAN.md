@@ -29,7 +29,7 @@ Implementation Plan, which exceeds `engine.loopStepThreshold` (20).
 | 5     | 5.1  | Stop the dashboard widget grid equalising row heights                    | inline | done   | 3ec1aa0 |
 | 5     | 5.2  | Assert the dashboard header band still carries both ends                 | inline | done   | e1ca9d7 |
 | 5     | 5.3  | File the Net worth mid-card void as a follow-up issue                    | inline | done   | 9d3b368 |
-| 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | todo   | —       |
+| 6     | 6.1  | Add `accounts.filter.count` to both catalogues                           | inline | done   | pending |
 | 6     | 6.2  | Give the `/accounts` filter band a counterweight at its end              | inline | todo   | —       |
 | 6     | 6.3  | Cap the `/transactions` search field from `md` up                        | inline | todo   | —       |
 

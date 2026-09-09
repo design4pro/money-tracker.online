@@ -299,6 +299,10 @@ const messages = {
   'accounts.filter.active': 'Open accounts',
   'accounts.filter.archived': 'Archived accounts',
   'accounts.filter.all': 'Open and archived',
+  'accounts.filter.count': {
+    one: 'Showing {shown} of {total} account',
+    other: 'Showing {shown} of {total} accounts',
+  },
   'accounts.status.excluded': 'Outside reports',
   'accounts.list.label': 'Your accounts',
   'accounts.list.loading': 'Loading your accounts…',
