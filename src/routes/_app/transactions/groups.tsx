@@ -80,13 +80,22 @@ export const Route = createFileRoute('/_app/transactions/groups')({
   component: GroupsRoute,
 })
 
-/** Four rows, which is what the list usually holds and what the plan asks for. */
+/**
+ * Four rows, which is what the list usually holds and what the plan asks for.
+ *
+ * The card takes the same `max-w-list` band as the table it stands in for, so the arrival of the
+ * real table is a change of content and not a change of width.
+ */
 function GroupsSkeleton() {
   const t = useTranslate()
   return (
     <div className="flex flex-col gap-6">
       <Skeleton shape="text" lines={2} className="max-w-md" />
-      <Card aria-busy="true" aria-label={t('groups.loading')}>
+      <Card
+        aria-busy="true"
+        aria-label={t('groups.loading')}
+        className="max-w-list"
+      >
         <Skeleton shape="text" lines={4} />
       </Card>
     </div>
@@ -146,6 +155,7 @@ function GroupsRoute() {
 
       {groups.length === 0 ? (
         <EmptyState
+          className="max-w-list"
           title={t('groups.empty.title')}
           description={t('groups.empty.body')}
           action={
@@ -158,7 +168,13 @@ function GroupsRoute() {
           }
         />
       ) : (
-        <div className="flex flex-col gap-2">
+        /*
+          The table and the sentence that describes it share one band. Four columns are four
+          columns: stretched over the whole 1156px well they were a phone table with 600px of
+          nothing sewn into the middle of every row, and issue #18's own Out of scope forbids
+          inventing a fifth column to fill it. Start-aligned - `DESIGN.md` → Layout.
+        */
+        <div className="flex max-w-list flex-col gap-2">
           {/*
             The summary the plan asks for: it names what the totals are denominated in, as text,
             immediately before the table it describes, and the table points at it so a screen

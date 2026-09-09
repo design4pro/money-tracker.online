@@ -3,7 +3,7 @@ import { expect, test } from './support/console'
 import { gotoApp, useLocale } from './support/app'
 import { storageStateFor } from './support/session'
 
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import type { AppLocale } from './support/app'
 
 /**
@@ -171,6 +171,34 @@ async function clippedTextIn(block: Locator): Promise<ReadonlyArray<string>> {
   )
 }
 
+/**
+ * The whole cap contract for one block, at both widths.
+ *
+ * The page `<header>` is the reference width, not the viewport: it is the one block on these
+ * screens meant to span the content column - title on one side, primary action on the other - so
+ * its width is the width the capped block would have taken had nothing capped it. Comparing
+ * against it rather than against 1440 keeps this true whatever the rail, the gutters and a
+ * scrollbar cost on the machine running it.
+ *
+ * The 360px half is the other half of the promise: a phone never reaches the band, so a cap that
+ * changes anything there is a regression rather than this change.
+ */
+async function expectCappedAtDesktopOnly(page: Page, block: Locator) {
+  const band = page.locator('main header').first()
+  await expect(block).toBeVisible()
+
+  const wideBlock = await widthOf(block)
+  const wideBand = await widthOf(band)
+
+  // Capped, and the cap is doing something: the column it sits in is wider than it is.
+  expect(wideBlock).toBeLessThanOrEqual(LIST_BAND_MAX)
+  expect(wideBlock).toBeLessThan(wideBand - 1)
+
+  await page.setViewportSize({ width: 360, height: 800 })
+  await expect(block).toBeVisible()
+  expect(await widthOf(block)).toBeCloseTo(await widthOf(band), 0)
+}
+
 for (const locale of LOCALES) {
   test(`the category tree takes the list band and not the whole well — ${locale}`, async ({
     page,
@@ -179,27 +207,29 @@ for (const locale of LOCALES) {
     await useLocale(context, locale)
     await gotoApp(page, '/categories')
 
-    // The page `<header>` is the reference width, not the viewport: it is the one block on this
-    // screen meant to span the content column - title on one side, primary action on the other - so
-    // its width is the width the tree would have taken had nothing capped it. Comparing against it
-    // rather than against 1440 keeps this true whatever the rail, the gutters and a scrollbar cost
-    // on the machine running it.
     const tree = page.getByRole('grid').first()
-    const band = page.locator('main header').first()
     await expect(tree).toBeVisible()
-
-    const wideTree = await widthOf(tree)
-    const wideBand = await widthOf(band)
-
-    // Capped, and the cap is doing something: the column it sits in is wider than it is.
-    expect(wideTree).toBeLessThanOrEqual(LIST_BAND_MAX)
-    expect(wideTree).toBeLessThan(wideBand - 1)
     expect(await clippedTextIn(tree)).toEqual([])
 
-    // A phone never reaches the band, so the cap must be invisible there. The tree still fills the
-    // column, exactly as it did before this change.
-    await page.setViewportSize({ width: 360, height: 800 })
-    await expect(tree).toBeVisible()
-    expect(await widthOf(tree)).toBeCloseTo(await widthOf(band), 0)
+    await expectCappedAtDesktopOnly(page, tree)
+  })
+
+  test(`the groups table takes the list band and not the whole well — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/transactions/groups')
+
+    // The `TableContainer` carries the cap, not the grid inside it: the grid is allowed to outgrow
+    // its container and scroll, which is exactly what four `minWidth` columns do at 360px.
+    const container = page.getByRole('grid').first().locator('xpath=..')
+    await expect(container).toBeVisible()
+
+    // Four columns, still four columns. The spec's answer to "why not earn the width here" is that
+    // the table already has its headers and issue #18 forbids inventing a fifth to fill the void.
+    await expect(page.getByRole('columnheader')).toHaveCount(4)
+
+    await expectCappedAtDesktopOnly(page, container)
   })
 }
