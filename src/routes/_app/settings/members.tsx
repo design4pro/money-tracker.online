@@ -174,11 +174,18 @@ function MembersRoute() {
         <CardBody>
           <TableContainer>
             <Table aria-label={t('members.list.title')}>
+              {/* Widths below which a column stops being readable, so the table outgrows a phone
+                  and its container scrolls instead of dividing 328px four ways - the same fault
+                  the category rows had, in a table. */}
               <TableHeader>
-                <Column isRowHeader>{t('members.column.person')}</Column>
-                <Column>{t('members.column.role')}</Column>
-                <Column>{t('members.column.joined')}</Column>
-                <Column align="end">{t('members.column.actions')}</Column>
+                <Column isRowHeader minWidth={190}>
+                  {t('members.column.person')}
+                </Column>
+                <Column minWidth={120}>{t('members.column.role')}</Column>
+                <Column minWidth={120}>{t('members.column.joined')}</Column>
+                <Column align="end" minWidth={68}>
+                  {t('members.column.actions')}
+                </Column>
               </TableHeader>
               <TableBody>
                 {members.members.map((person) => (

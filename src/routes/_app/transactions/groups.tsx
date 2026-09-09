@@ -173,11 +173,28 @@ function GroupsRoute() {
               aria-label={t('groups.table.label')}
               aria-describedby="groups-total-summary"
             >
+              {/*
+                Each column states the width below which it stops being readable, so on a phone
+                the table outgrows its container and the container scrolls. Without them a
+                `ResizableTableContainer` divides whatever width it is given between four columns
+                however narrow that is, which is how a 360px page comes to show `EXPENS…` over
+                group names broken across two lines. The numbers are the columns themselves: a
+                name wide enough for two words, the two figures wide enough for their own headings,
+                and the menu's 44px target plus its cell padding.
+              */}
               <TableHeader>
-                <Column isRowHeader>{t('groups.column.name')}</Column>
-                <Column align="end">{t('groups.column.members')}</Column>
-                <Column align="end">{t('groups.column.total')}</Column>
-                <Column align="end">{t('groups.column.actions')}</Column>
+                <Column isRowHeader minWidth={140}>
+                  {t('groups.column.name')}
+                </Column>
+                <Column align="end" minWidth={110}>
+                  {t('groups.column.members')}
+                </Column>
+                <Column align="end" minWidth={110}>
+                  {t('groups.column.total')}
+                </Column>
+                <Column align="end" minWidth={68}>
+                  {t('groups.column.actions')}
+                </Column>
               </TableHeader>
               <TableBody>
                 {groups.map((group) => (

@@ -140,8 +140,10 @@ function BudgetDetailRoute() {
         </Link>
       </div>
 
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        {/* The heading states its own measure, so the actions decide the wrap rather than
+            the subtitle's ideal line - see `recurring/index.tsx`. */}
+        <div className="min-w-0 grow basis-72">
           <h1 className="text-title font-bold text-ink">{summary.name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-body text-ink-2">
             <span>
