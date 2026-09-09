@@ -87,3 +87,27 @@
   against a pending component would assert about how fast a local D1 answers).
 - **Problem, unchanged:** the `dashboard-data.test.ts` flake. Green alone, unreachable from this
   branch's diff, flaky since before this work existed. CI is the arbiter.
+
+## 2026-09-09T22:55:00Z — checkpoint 4 (Phase 5 closed, Steps 5.1 … 5.3)
+
+- **Checkpoint passed.** `typecheck`, `lint`, `build`, `prettier` green. **`pnpm test` 2463/2463 with
+  no caveat** — the `dashboard-data.test.ts` timeouts recorded at checkpoints 1, 2 and 3 did not
+  reproduce, which settles them as load on this machine rather than anything on this branch.
+  Browser: 68/68 across `desktop-density`, `accessibility` and `core-flow`, chromium, both locales.
+- **Red-then-green on both new browser cases.** Without `items-start` the three bottom-row dashboard
+  panels measured one shared height for three different amounts of content. And the header-band case,
+  which is green by design, was made to fail on purpose: deleting the band's right-hand group leaves
+  983.3px of empty band in `en` and 1004.9px in `pl` — issue #18's "empty ~1000px header strip",
+  reproduced to the pixel.
+- **Decision, wider than the spec's literal step:** `WidgetFrame`'s `height` prop was carried along.
+  Its `'fill'` branch worked by adding no class and relying on the grid's ambient stretch, so putting
+  `items-start` on the grid alone would have turned a documented prop into a silent no-op. `'fill'`
+  now renders `self-stretch` and `'content'` is the default; `Net worth` drops the `height="content"`
+  it needed when stretching was the default.
+- **Decision:** the header-band case asserts behaviour that already passes, on purpose. Its value is
+  that the Non-goals claim — "the passbook work already closed #18's header finding" — becomes
+  something a test says rather than something a document asserts.
+- **Follow-up filed:** the Net worth mid-card void is **issue #161** (spec Q10). Vertical density
+  inside a hand-rolled chart (ADR 0007); shares neither this spec's decision rule nor its token.
+- **Problem, resolved:** the `pnpm test` caveat carried since checkpoint 1 is closed by this run's
+  clean full suite.
