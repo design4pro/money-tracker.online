@@ -5,6 +5,7 @@ import { cn } from '#/lib/cn'
 import { Spinner } from './spinner'
 import {
   composeTw,
+  controlWash,
   disabledLabelled,
   focusRing,
   transitionBase,
@@ -39,8 +40,7 @@ export const buttonVariants = cva(
         secondary:
           'border border-border-strong bg-surface text-ink shadow-card data-[hovered]:border-ink-2 data-[hovered]:bg-surface-sunken data-[pressed]:bg-surface-sunken data-[pressed]:shadow-none data-[disabled]:border-border-subtle data-[disabled]:bg-surface-sunken data-[disabled]:text-ink-2',
         /** No chrome until touched. Toolbars, table rows, card affordances. */
-        ghost:
-          'text-ink-2 data-[hovered]:bg-hover data-[hovered]:text-ink data-[pressed]:bg-press data-[disabled]:text-ink-2 data-[disabled]:opacity-60',
+        ghost: `text-ink-2 ${controlWash} data-[disabled]:text-ink-2 data-[disabled]:opacity-60`,
         /** A quiet filled chip that sits inside a card without competing with it. */
         subtle:
           'bg-surface-sunken text-ink data-[hovered]:bg-hover data-[pressed]:bg-press data-[disabled]:text-ink-2 data-[disabled]:opacity-60',

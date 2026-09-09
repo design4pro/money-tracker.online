@@ -82,6 +82,14 @@ const PROBE_ATTRIBUTE = 'data-wash-probe'
 const PROBE = `[${PROBE_ATTRIBUTE}]`
 
 /**
+ * Long enough for `--duration-fast` (150ms in `src/styles/tokens.css`) to finish.
+ *
+ * Both halves of the wash are transitions — the ground and the promoted text — so the pair a
+ * reader actually sees is the one at the *end* of the fade, not at its start.
+ */
+const TRANSITION_SETTLE_MS = 250
+
+/**
  * The surfaces with no washed rows, written down so their absence is a claim rather than a gap.
  *
  * `/` and `/login` are marketing and a form; `/dashboard` draws its account lines inside widgets
@@ -226,6 +234,15 @@ test.describe('enhanced contrast', () => {
               hovered,
               `${surface.name}: row ${index} did not take :hover, so this scan is the resting state`,
             ).toBe(true)
+
+            // The promotion fades rather than snapping (`rowWashPromote`), so a scan taken the
+            // instant the pointer lands reads a colour part-way between `ink-2` and `ink` — which
+            // in dark is the failing ratio this file exists to catch, reported against a state no
+            // reader ever rests on. Wait out the token that governs the fade. A fixed wait rather
+            // than a `transitionend` race: the event bubbles from whichever descendant happens to
+            // transition, so there is no single element to listen on, and this is a duration the
+            // stylesheet declares rather than a guess.
+            await page.waitForTimeout(TRANSITION_SETTLE_MS)
 
             const measured = await measure(page, PROBE)
             await row.evaluate(

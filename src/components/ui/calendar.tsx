@@ -13,7 +13,7 @@ import {
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { composeTw, transitionBase } from './shared'
+import { composeTw, controlWash, transitionBase } from './shared'
 
 import type {
   DateValue,
@@ -25,8 +25,7 @@ import type { ReactNode } from 'react'
 const navButton = cn(
   'grid size-8 place-items-center rounded-md text-ink-2 cursor-pointer target-min',
   transitionBase,
-  'data-[hovered]:bg-hover data-[hovered]:text-ink',
-  'data-[pressed]:bg-press',
+  controlWash,
   'data-[disabled]:opacity-45 data-[disabled]:pointer-events-none',
   'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:outline-offset-2',
   '[&_svg]:size-4',

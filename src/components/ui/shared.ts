@@ -145,9 +145,12 @@ export const transitionSlow =
  * The promoted text measures 11.25:1 (dark) and 13.24:1 (light), so the row
  * gains contrast on hover rather than merely clearing the floor.
  *
- * `transition-colors` rather than `transition-[background-color]`: the text
- * colour is now part of the same state change, and a promotion that snaps while
- * the ground fades reads as a glitch.
+ * A promotion that snaps while the ground fades reads as a glitch, so both
+ * halves fade. The row's own `transition-colors` cannot do that on its behalf:
+ * `transition-property` is not inherited, and the colour that changes belongs to
+ * the descendant, not to the row. So the promotion carries its own — matched to
+ * the row's `duration-fast`, and neutralised with everything else by the
+ * `prefers-reduced-motion` sweep in `tokens.css`.
  */
 export const rowWash =
   'group/wash transition-colors duration-fast hover:bg-hover'
@@ -160,13 +163,37 @@ export const rowWash =
  * `Badge tone="info"` on a washed row measures the same 6.73:1 in dark that the
  * grey did, while spelling `text-info` rather than `text-ink-2`.
  */
-export const rowWashPromote = 'group-hover/wash:text-ink'
+export const rowWashPromote =
+  'transition-colors duration-fast group-hover/wash:text-ink'
 
 /**
  * Secondary text inside a `rowWash` row. Carries `text-ink-2` itself, so it
  * replaces that class rather than joining it.
  */
 export const rowWashSecondary = `text-ink-2 ${rowWashPromote}`
+
+/**
+ * Both interaction washes on a control that types itself in `ink-2`, each with
+ * the promotion it needs. Pair it with `text-ink-2`; it does not set the base.
+ *
+ * ## Why `pressed` needs its own promotion
+ *
+ * A pointer press is also a hover, so `data-[hovered]:text-ink` used to look
+ * like enough. A **keyboard** activation is not: React Aria sets `data-pressed`
+ * on Space/Enter with no `data-hovered` beside it, which left `ink-2` sitting on
+ * `--color-press` — the heaviest wash the palette has. Measured from
+ * `tokens.css`, that is 5.08:1 (dark, over `raised`) to 7.13:1 (light, over
+ * `surface`): over AA everywhere, under the 7:1 floor everywhere but one plane,
+ * and the worst text pair found anywhere in the issue #20 audit.
+ *
+ * No scanner can reach it — axe neither hovers nor holds a key down — so the
+ * guard is arithmetic: `styles/__tests__/tokens-contrast.test.ts` holds `ink` at
+ * 7:1 on every washed ground, which is the floor this promotion lands on.
+ */
+export const controlWash = [
+  'data-[hovered]:bg-hover data-[hovered]:text-ink',
+  'data-[pressed]:bg-press data-[pressed]:text-ink',
+].join(' ')
 
 /** Full-bleed scrim behind Modal and Drawer. */
 export const scrimSurface = [

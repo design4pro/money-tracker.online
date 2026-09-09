@@ -253,10 +253,11 @@ describe.each([
   })
 
   /*
-   * The promotion in `rowWash` / `rowWashSecondary` (`components/ui/shared.ts`)
-   * moves a hovered row's secondary text to `ink`, so this is the floor that
-   * promotion lands on. It has to hold on every plane a row can sit on — a
-   * hovered archived row is `surface-sunken` under the wash, not `surface`.
+   * The promotions in `rowWash` / `rowWashSecondary` and `controlWash`
+   * (`components/ui/shared.ts`) move washed secondary text to `ink`, so this is
+   * the floor both of them land on. It has to hold on every plane and under
+   * both washes: a hovered archived row is `surface-sunken` under `hover`, and a
+   * control activated from the keyboard is `press` with no hover beside it.
    */
   it('keeps --color-ink at 7:1 on every washed ground', () => {
     for (const wash of WASH_KEYS) {
@@ -279,8 +280,9 @@ describe.each([
    * 7:1, which is exactly the shape of issue #20.
    *
    * If this ever starts failing, `ink-2` now survives every wash on its own and
-   * `rowWashSecondary` can be reconsidered — until then, deleting the promotion
-   * puts the failing pair straight back on the page.
+   * `rowWashSecondary` / `controlWash` can be reconsidered — until then, deleting
+   * either promotion puts the failing pair straight back on the page. Nothing
+   * rendered can catch that: axe neither hovers nor holds a key down.
    */
   it('records that --color-ink-2 does not survive a wash, which is why rows promote', () => {
     const worst = Math.min(
