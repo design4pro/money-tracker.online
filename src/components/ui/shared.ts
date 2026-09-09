@@ -119,6 +119,55 @@ export const transitionBase =
 export const transitionSlow =
   'transition-[color,background-color,border-color,box-shadow,transform,translate,scale,rotate,opacity] duration-base ease-out-quint'
 
+/**
+ * The hover wash on a whole row, and the ink promotion that has to travel with
+ * it. Use the pair, never `hover:bg-hover` on its own.
+ *
+ * ## Why the promotion is not optional
+ *
+ * `--color-hover` is a low-alpha veil, so the ground under the row moves toward
+ * mid-grey — which costs *secondary* text contrast in both themes, because
+ * `ink-2` sits closer to the ground than `ink` does. Measured in Chromium at
+ * 1440x900 on the seeded workspace, `ink-2` on `bg-surface` goes 8.64:1 → 7.71:1
+ * in light and **8.06:1 → 6.73:1 in dark**. The dark figure is under the 7:1
+ * floor this palette is designed to (`docs/SPEC.md` §10), which is what issue #20
+ * measured. Nothing here ever failed AA; what failed is our own claim.
+ *
+ * Retuning `--color-hover` cannot fix it: no alpha holds 7:1 for `ink-2` across
+ * all five ground planes, and dropping it far enough makes the wash invisible.
+ * Promoting the text does, and it is what `nav-link`, `Button`, this file's own
+ * `collectionItemBase`, `Calendar`, `ComboBox`, `Field`, `NumberField` and
+ * `GridList`'s row-action button already do — each pairs its wash with
+ * `text-ink` on the same element. A row is the case those cannot cover, because
+ * the wash lands on the container while the secondary text sits on descendants;
+ * hence the named group.
+ *
+ * The promoted text measures 11.25:1 (dark) and 13.24:1 (light), so the row
+ * gains contrast on hover rather than merely clearing the floor.
+ *
+ * `transition-colors` rather than `transition-[background-color]`: the text
+ * colour is now part of the same state change, and a promotion that snaps while
+ * the ground fades reads as a glitch.
+ */
+export const rowWash =
+  'group/wash transition-colors duration-fast hover:bg-hover'
+
+/**
+ * The promotion on its own, for text that already names a token of its own.
+ *
+ * `--color-info` is the case this exists for: it *is* `ink-2`'s value under a
+ * different name — "a notice has no verdict, so it is typed in pencil" — so a
+ * `Badge tone="info"` on a washed row measures the same 6.73:1 in dark that the
+ * grey did, while spelling `text-info` rather than `text-ink-2`.
+ */
+export const rowWashPromote = 'group-hover/wash:text-ink'
+
+/**
+ * Secondary text inside a `rowWash` row. Carries `text-ink-2` itself, so it
+ * replaces that class rather than joining it.
+ */
+export const rowWashSecondary = `text-ink-2 ${rowWashPromote}`
+
 /** Full-bleed scrim behind Modal and Drawer. */
 export const scrimSurface = [
   'fixed inset-0 z-overlay bg-scrim',

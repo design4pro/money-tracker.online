@@ -1,3 +1,4 @@
+import { rowWashSecondary } from '#/components/ui'
 import { cn } from '#/lib/cn'
 
 import type { CSSProperties, ComponentType, ReactNode } from 'react'
@@ -188,7 +189,13 @@ export function AmountMeter({
         <p className="sr-only">{markReadings.join(', ')}</p>
       )}
 
-      <p className="text-caption text-ink-2 tabular">{caption}</p>
+      {/*
+        Both meters are drawn inside a hoverable list row, so the caption is secondary text on a
+        washed ground rather than on the plane the token names. `rowWashSecondary` carries the
+        `text-ink-2` and the promotion that has to travel with it; outside a `rowWash` ancestor —
+        a budget or goal detail page — the promotion half simply never matches.
+      */}
+      <p className={cn('text-caption tabular', rowWashSecondary)}>{caption}</p>
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { Label as RACLabel, Meter as RACMeter } from 'react-aria-components'
 import { AlertTriangle, Check, TrendingUp } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { composeTw, transitionBase } from './shared'
+import { composeTw, rowWashSecondary, transitionBase } from './shared'
 
 import type { MeterProps as RACMeterProps } from 'react-aria-components'
 import type { ReactNode } from 'react'
@@ -123,8 +123,14 @@ export function Meter({
               ? AlertTriangle
               : Check
 
+        // A meter is often drawn inside a hoverable list row — the credit line on an account
+        // card is one — so its two secondary strings sit on a washed ground rather than on the
+        // plane the token names. `rowWashSecondary` carries `text-ink-2` plus the promotion that
+        // has to travel with it, and its second half never matches outside a `rowWash` ancestor.
         const captionLine = caption ? (
-          <p className="text-caption text-ink-2 tabular">{caption}</p>
+          <p className={cn('text-caption tabular', rowWashSecondary)}>
+            {caption}
+          </p>
         ) : null
 
         return (
@@ -134,7 +140,12 @@ export function Meter({
                 {label === undefined ? (
                   <span />
                 ) : (
-                  <RACLabel className="flex items-center gap-1.5 text-label font-medium text-ink-2">
+                  <RACLabel
+                    className={cn(
+                      'flex items-center gap-1.5 text-label font-medium',
+                      rowWashSecondary,
+                    )}
+                  >
                     <Icon
                       aria-hidden="true"
                       className={cn(

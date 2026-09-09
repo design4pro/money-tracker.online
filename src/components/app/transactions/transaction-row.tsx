@@ -15,6 +15,8 @@ import {
   MenuItem,
   MenuTrigger,
   Popover,
+  rowWash,
+  rowWashSecondary,
 } from '#/components/ui'
 import { paintFor } from '#/components/app/categories'
 import { cn } from '#/lib/cn'
@@ -170,7 +172,8 @@ const TARGET_LINE = 'flex h-10 items-center justify-center max-sm:h-full'
 
 /** The meta line: the secondary facts of an entry, typed in pencil on one truncating line. */
 const META_LINE = cn(
-  'text-caption text-ink-2',
+  'text-caption',
+  rowWashSecondary,
   TYPED_LINE,
   // After the typed line, whose `block` this replaces; the line-height it set stays.
   'flex min-w-0 items-center gap-1.5 overflow-hidden',
@@ -359,8 +362,8 @@ function TransactionRowImpl({
       style={{ height: rowHeightFor(row, isWide) }}
       className={cn(
         ROW,
-        'bg-surface text-ink transition-[background-color] duration-fast',
-        'hover:bg-hover',
+        'bg-surface text-ink',
+        rowWash,
         isSelected &&
           'bg-brand-soft shadow-[inset_0_0_0_1px_var(--color-brand)] hover:bg-brand-soft',
       )}
@@ -389,7 +392,7 @@ function TransactionRowImpl({
       {/* ---- Date --------------------------------------------------------- */}
       <td
         {...cellProps(column.date)}
-        className={cn(CELL_BASE, CELL_RULE, AT_META, 'text-start text-ink-2')}
+        className={cn(CELL_BASE, CELL_RULE, AT_META, 'text-start', rowWashSecondary)}
       >
         {/* From `sm` up the column holds the date. The date is spoken in full on every row: a
             listener has no day heading above them to carry the context forward. */}
@@ -445,7 +448,7 @@ function TransactionRowImpl({
             <span
               className={cn(
                 'truncate text-label font-medium',
-                row.isPlanned ? 'text-ink-2' : 'text-ink',
+                row.isPlanned ? rowWashSecondary : 'text-ink',
                 TYPED_LINE,
               )}
             >
