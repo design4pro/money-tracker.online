@@ -8,6 +8,7 @@ At runtime: `om-setup-agent-pipeline` copies this file into the repository at `.
 
 - `gh` CLI installed and authenticated, and `jq` available (the label guards and several operations parse JSON with it). Verify with the **auth-check** operation before a batch run; fail fast when unauthenticated.
 - **Minimum `gh` version: 2.82.1** (released 2025-10-22). Older clients abort every label, assignee, and title/body edit on the retired Projects (classic) API — see the next section. **auth-check** warns when the installed client is older.
+- **`gh` >= 2.99.0 for image evidence.** `--attach` — native attachment upload on `issue`/`pr` `create`, `edit` and `comment` — landed in [v2.99.0](https://github.com/cli/cli/releases/tag/v2.99.0); it is what makes **attach-image-evidence** render inline. Below that version only that one operation degrades (to links), so **auth-check** warns rather than failing.
 - All operations accept an optional `{repo}` (`owner/name`); when omitted, `gh` infers it from the current checkout's git remote. Pass `--repo {owner}/{repo}` explicitly whenever a skill operates on a repository other than the current one.
 
 ### Projects (classic) deprecation — the failure that silently leaves a PR unlabeled
@@ -117,7 +118,7 @@ Read the labels back (`gh pr view {prNumber} --json labels`) whenever the label 
 ### Identity and repository
 
 #### auth-check
-Verify the CLI is authenticated and new enough. → exit status (non-zero when unauthenticated), plus a warning on stdout when the client predates the Projects (classic) fix.
+Verify the CLI is authenticated and new enough. → exit status (non-zero when unauthenticated), plus a warning on stdout when the client predates the Projects (classic) fix (2.82.1) or native attachment upload (2.99.0).
 ```bash
 gh auth status || exit 1
 
@@ -129,8 +130,13 @@ MIN_GH_VERSION=2.82.1
 if [ "$(printf '%s\n%s\n' "$MIN_GH_VERSION" "$GH_VERSION" | sort -V | head -n1)" != "$MIN_GH_VERSION" ]; then
   echo "WARNING: gh $GH_VERSION predates $MIN_GH_VERSION — 'gh pr edit'/'gh issue edit' fail on the Projects (classic) deprecation. Upgrade: https://github.com/cli/cli/blob/trunk/docs/install_linux.md#recommended-official"
 fi
+
+ATTACH_GH_VERSION=2.99.0
+if [ "$(printf '%s\n%s\n' "$ATTACH_GH_VERSION" "$GH_VERSION" | sort -V | head -n1)" != "$ATTACH_GH_VERSION" ]; then
+  echo "WARNING: gh $GH_VERSION predates $ATTACH_GH_VERSION — 'gh ... --attach' is unavailable, so attach-image-evidence posts links instead of inline images."
+fi
 ```
-`sort -V` exists on GNU and BSD/macOS `sort`; where it does not, compare `gh --version` against 2.82.1 by inspection and report the same warning.
+`sort -V` exists on GNU and BSD/macOS `sort`; where it does not, compare `gh --version` against 2.82.1 and 2.99.0 by inspection and report the same warnings.
 
 #### current-user
 → the automation user's login.
@@ -265,43 +271,31 @@ gh pr comment {prNumber} --body-file <path-or-process-substitution>
 ```
 
 #### attach-image-evidence
-`{prNumber}`, a markdown comment body (without the images), a `{slug}` (e.g. `pr-{prNumber}`), and a list of local PNG paths → post one comment with the images embedded **inline**, and return the comment URL.
+`{prNumber}` (or `{issueId}`), a markdown comment body (without the images), a `{slug}` (e.g. `pr-{prNumber}`), and a list of local PNG paths → post one comment with the images embedded **inline**, and return the comment URL.
 
-GitHub does not accept image bytes through the comment API, so make the images referenceable first. For a **public** repo, upload them to a dedicated **slash-free** evidence branch (never the change's own branch) via the Contents API and reference `raw.githubusercontent.com` URLs — those render inline in comments:
+`gh` uploads each file to GitHub's own attachment store and rewrites the markdown to the returned `https://github.com/user-attachments/assets/…` URL. Those render inline for every viewer who can read the repository, **private repositories included**, and nothing is committed to any branch:
 
 ```bash
-OWNER_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-EVIDENCE_BRANCH="qa-evidence-{slug}"                 # slash-free: some raw URLs 404 on slashed refs
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+# `--attach '<path>#<alt text>'` — the text after `#` becomes the alt text; without it
+# `gh` uses the filename. Up to 50 files per command. A path the body already references
+# as `![alt](./after.png)` is rewritten in place and keeps the body's alt text; every
+# other attachment is appended to the end of the comment, in flag order.
+gh pr comment {prNumber} --body-file <body-file> \
+  --attach '<artifacts-dir>/base-light-1440.png#Base, light, 1440x900' \
+  --attach '<artifacts-dir>/head-light-1440.png#Head, light, 1440x900'
 
-# create the evidence branch if missing (branched from the default branch head)
-gh api "repos/${OWNER_REPO}/git/refs/heads/${EVIDENCE_BRANCH}" >/dev/null 2>&1 || {
-  SHA=$(gh api "repos/${OWNER_REPO}/git/refs/heads/${DEFAULT_BRANCH}" --jq .object.sha)
-  gh api -X POST "repos/${OWNER_REPO}/git/refs" -f ref="refs/heads/${EVIDENCE_BRANCH}" -f sha="$SHA" >/dev/null
-}
-
-# upload each image. An image-sized base64 string blows the shell arg limit, so it
-# must never touch a command line — write it to a temp file and let `jq --rawfile`
-# read it into the JSON body, which `gh api --input -` sends over stdin. Pass the
-# existing blob sha to overwrite on re-runs.
-BODY_IMAGES=""
-for img in <image-paths>; do
-  path="{slug}/$(basename "$img")"
-  base64 < "$img" | tr -d '\n' > /tmp/ev-content.b64            # portable across GNU/BSD; no newlines
-  existing=$(gh api "repos/${OWNER_REPO}/contents/${path}?ref=${EVIDENCE_BRANCH}" --jq .sha 2>/dev/null || true)
-  jq -n --rawfile c /tmp/ev-content.b64 --arg m "qa evidence {slug}" --arg b "$EVIDENCE_BRANCH" --arg s "$existing" \
-     'if $s == "" then {message:$m,branch:$b,content:$c} else {message:$m,branch:$b,content:$c,sha:$s} end' \
-     | gh api -X PUT "repos/${OWNER_REPO}/contents/${path}" --input - >/dev/null
-  url="https://raw.githubusercontent.com/${OWNER_REPO}/${EVIDENCE_BRANCH}/${path}"
-  BODY_IMAGES="${BODY_IMAGES}\n![$(basename "$img")](${url})"
-done
-
-# assemble the comment (caller's body + the image markdown) and post it
-{ cat <body-file>; printf "%b" "$BODY_IMAGES"; } | gh pr comment {prNumber} --body-file -
 gh pr view {prNumber} --json url --jq .url
 ```
 
-Fallbacks: for a **private** repo the raw URLs need auth and will not render — post the comment with the image links plus the local artifact paths and note that inline rendering is unavailable (a private-visibility limit), rather than failing. When even the evidence branch cannot be pushed (no write access), degrade to listing the artifact paths in the comment. Never store evidence on the change's own branch, and never force-push.
+`gh issue comment {issueId}`, `gh issue create` and `gh pr create` take the same flag, which is how an issue carries evidence from the moment it is filed. `gh pr review` does **not** — attach the images to a comment and reference it from the review body.
+
+A caller that needs the asset URLs themselves rather than a posted comment (**om-prepare-issue** embeds them in a `## 📸 Evidence` section of the issue body) posts first and reads the rewritten markdown back:
+
+```bash
+gh issue view {issueId} --json body --jq .body        # now carries the user-attachments URLs
+```
+
+Requires **`gh` >= 2.99.0**, which **auth-check** warns about. Fallbacks, in order: on an older client, post through **comment-pr** / **comment-issue** with the local artifact paths listed and say that inline rendering needs a newer `gh`; when an upload itself fails, do the same rather than failing the caller. Never store evidence on the change's own branch — and do not resurrect the pre-2.99.0 workaround of pushing a `qa-evidence-*` branch and linking `raw.githubusercontent.com`, which cannot render at all on a private repository because those URLs require auth.
 
 #### assign-pr / unassign-pr
 Assignees live on the shared `/issues/` endpoint for PRs too — `{prNumber}` is the path segment.
