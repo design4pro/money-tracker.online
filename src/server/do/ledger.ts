@@ -219,9 +219,12 @@ export class AccountLedger implements DurableObject {
     this.running = true
     this.dirty = false
 
-    let current = await this.stored()
+    // Everything from here is inside the `try`, including the first read: a lock taken outside the
+    // block that releases it is the shape of the bug this class just had.
+    let current: LedgerRecord = EMPTY
     let outcome: RebuildOutcome = 'skipped'
     try {
+      current = await this.stored()
       // The loop is the coalescing window: anything that arrived while the pass ran set the
       // dirty bit, and one more whole-history rebuild answers all of it.
       for (;;) {
@@ -237,15 +240,16 @@ export class AccountLedger implements DurableObject {
       }
       return { outcome, runs: current.runs }
     } catch (error) {
-      current = {
-        lastRunAt: this.now(),
-        lastOutcome: 'failed',
-        runs: current.runs + 1,
-      }
-      await this.write(current)
+      // Logged before the bookkeeping write, so a storage failure cannot swallow the cause: a
+      // throw from that write would replace this one on the way out.
       this.logger.error('ledger rebuild failed', {
         accountId,
         error: error instanceof Error ? error.message : String(error),
+      })
+      await this.write({
+        lastRunAt: this.now(),
+        lastOutcome: 'failed',
+        runs: current.runs + 1,
       })
       throw error
     } finally {

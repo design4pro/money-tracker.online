@@ -161,6 +161,39 @@ describe('AccountLedger.requestRebuild', () => {
     })
   })
 
+  it('releases the lock when the storage read itself throws', async () => {
+    const storage = fakeStorage()
+    let reads = 0
+    const failingRead: AccountLedgerStorage = {
+      ...storage,
+      get: <T>(key: string) => {
+        reads += 1
+        return reads === 1
+          ? Promise.reject(new Error('storage operation cancelled'))
+          : storage.get<T>(key)
+      },
+    }
+    const ledger = new AccountLedger(
+      { storage: failingRead },
+      {},
+      {
+        logger: quiet,
+        now: () => 4_000,
+        rebuild: () => Promise.resolve<RebuildOutcome>('rebuilt'),
+      },
+    )
+
+    // The read happens after the lock is taken. If it were outside the block that releases it,
+    // this instance would answer `coalesced` to everything from here on.
+    await expect(ledger.requestRebuild('acc')).rejects.toThrow(
+      'storage operation cancelled',
+    )
+    expect(await ledger.requestRebuild('acc')).toEqual({
+      outcome: 'rebuilt',
+      runs: 2,
+    })
+  })
+
   it('reports the empty state for an object that has never run', async () => {
     const ledger = new AccountLedger(
       { storage: fakeStorage() },
