@@ -24,7 +24,8 @@
 # 4. Label events on pull requests: the poller scopes its label source to `is:issue` and then skips
 #    any search hit carrying `pull_request`, so `issue.labeled` can never fire on a PR and the only
 #    PR trigger cezar has is `pull_request.opened` - the wrong moment for anything a review job
-#    posts minutes later. The patch makes both gates honour a `filters.includePullRequests` flag,
+#    posts minutes later. The patch makes both gates honour a `filters.includePullRequests` flag -
+#    a second search source scoped to `is:pr`, and a widened pull_request check -
 #    which survives validation because `automationFiltersSchema` is `.passthrough()`. Opt-in per
 #    automation: without the flag the behaviour is byte-for-byte what it was, so `issue-regroom`,
 #    `issue-autofix` and `issue-spec` cannot start firing on PRs that happen to carry their label.
@@ -34,6 +35,11 @@
 # .ai/scripts/cezar-host-patch.sh is identical apart from this paragraph; both are idempotent and
 # check their own markers, so running either one is enough. This copy exists so a host that only
 # carries this checkout is still self-sufficient.
+#
+# "Either one is enough" holds only while the two copies are in step, and the order matters when
+# they are not. A copy older than this one aborts on the patch 4 site rather than reverting it -
+# that is deliberate, and the note above that patch says how. Until the sibling repository takes
+# this version, run this copy on the shared host.
 set -euo pipefail
 
 VERSION="${CEZ_VERSION:-0.10.1}"
@@ -73,6 +79,15 @@ JS
   echo "patched: $file"
 }
 
+# Supersedes the first form of patch 2, which asked for the 'mixed' family and so produced a
+# query /search/issues answers with HTTP 422. A host carrying it would otherwise be skipped by the
+# new marker and keep the broken line. Restoring the stock file is enough: every patch below
+# checks its own marker and re-applies.
+if grep -qF "includePullRequests ? 'mixed' : 'issues'" "$DIST/automations/github-poller.js"; then
+  cp "$DIST/automations/github-poller.js.orig" "$DIST/automations/github-poller.js"
+  echo "reverted the superseded 'mixed' label source"
+fi
+
 patch "$DIST/automations/github-poller.js" 'cezar#914' \
   '        return z.array(timelineEventSchema).parse(JSON.parse(raw));' \
   "        // host patch, open-mercato/cezar#914: validate only the label rows of the timeline.
@@ -84,10 +99,25 @@ patch "$DIST/automations/github-poller.js" 'cezar#914' \
 # the other's, so a marker taken from a comment would either be absent after patching or match the
 # wrong site. Keep each marker a string the patched file holds exactly once and the stock file not
 # at all - `grep -c` on both is the check.
-patch "$DIST/automations/github-poller.js" "includePullRequests ? 'mixed' : 'issues'" \
+#
+# The replacement below also reorders the keys of the re-emitted `family: 'issues'` push, and that
+# is load-bearing. The superseded form of this patch took the stock line as its FROM, so re-emitting
+# it byte-for-byte would leave a stale copy of this script - the sibling repository's, on the shared
+# host - a file whose own marker is absent and whose FROM still matches exactly once: it would
+# rewrite the line back to the 'mixed' form, silently restoring the HTTP 422 and leaving the 'prs'
+# push dangling beside it. With the keys reordered the stale script finds zero sites and its count
+# assertion aborts the run loudly instead. Key order is inert in JavaScript; this is the whole cost.
+patch "$DIST/automations/github-poller.js" 'if (definition.filters.includePullRequests)' \
   "            sources.push({ family: 'issues', activity: 'updated', opened: false, labels: true });" \
-  "            // host patch: includePullRequests widens the label source to PRs ('mixed' emits no is: qualifier).
-            sources.push({ family: definition.filters.includePullRequests ? 'mixed' : 'issues', activity: 'updated', opened: false, labels: true });"
+  "            // host patch: includePullRequests adds a second label source covering pull requests.
+            // Deliberately two sources rather than the 'mixed' family: 'mixed' emits no is:
+            // qualifier, and /search/issues rejects a query without one (HTTP 422, 'Query must
+            // include is:issue or is:pull-request'). That is not a narrower poll, it is no poll
+            // at all - every attempt errors and the automation backs off until it never runs.
+            // The key order differs from the stock line on purpose - see the note above this patch.
+            sources.push({ family: 'issues', labels: true, activity: 'updated', opened: false });
+            if (definition.filters.includePullRequests)
+                sources.push({ family: 'prs', labels: true, activity: 'updated', opened: false });"
 
 patch "$DIST/automations/github-poller.js" 'definition.filters.includePullRequests || !item.pull_request' \
   "                if (source.labels && !item.pull_request) {" \
