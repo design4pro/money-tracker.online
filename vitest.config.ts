@@ -15,23 +15,25 @@ const src = fileURLToPath(new URL('./src/', import.meta.url))
  * on the way to the first assertion is charged to whichever case triggers it. That is fine for a
  * pure function and wrong for every project below, each for its own reason:
  *
- * - `ui` builds a jsdom environment and transforms React Aria's module graph per file. Over a
- *   full run that is the single largest line in vitest's own summary, and the slowest case
- *   measured on a 16-core machine under the whole 161-file suite reached 4667 ms — 93% of the
- *   default, spent almost entirely before the component under test rendered.
- * - `tooling` runs the repository's shell hooks the only way that proves anything: `spawnSync`
- *   forks a real `bash` per assertion, so a case with a table of them is bound by how fast the
- *   OS schedules processes, not by its own logic. Slowest measured under the full suite: 2860 ms.
- * - `server` replays every file in `drizzle/` into a fresh in-memory SQLite per `beforeEach`, and
- *   its route-level tests pull application module graphs behind them. Slowest measured: 2901 ms.
+ * - `ui` builds a jsdom environment and transforms React Aria's module graph per file — together
+ *   the two largest lines in vitest's own run summary. Under the whole 161-file suite on a
+ *   16-core machine the slowest case reached 4667 ms, 93% of the default; run on its own that
+ *   same file's four cases take 233-563 ms each. So roughly four of those seconds are the file
+ *   starting up, charged to the first case, and not the component being exercised.
+ * - `tooling` runs the repository's shell hooks the only way that proves anything: `bash()` is
+ *   `spawnSync('bash', …)`, a real process fork per call, so a case that walks a table of
+ *   commands is bound by how fast the OS schedules processes. Slowest measured: 2860 ms.
+ * - `server` is the same shape from a third direction: its slowest case (2901 ms) compiles the
+ *   whole Tailwind stylesheet inside the case body, and its database tests replay every file in
+ *   `drizzle/` into a fresh in-memory SQLite per `beforeEach`.
  *
- * What those three share is that the expensive part is per *file* and lands on whichever case
+ * What the three share is that the expensive part is fixed per *file* and lands on whichever case
  * runs first, so the peak tracks the machine — how cold Vite's transform cache is, how many
  * workers are competing — rather than anything in the diff under test. It is not a simple load
  * multiplier either: the 4667 ms above was measured on an idle machine with a cold cache, while
  * the same suite run under twelve extra CPU burners peaked at 2712 ms with a warm one. That is
- * why the default turned `pnpm test` red locally and never on CI, whose runners are unloaded and
- * whose cache is always cold in the same way (#88).
+ * why the default turned `pnpm test` red locally and never on CI, whose runners are unloaded
+ * (#88).
  *
  * 15000 ms is roughly three times the worst case measured: wide enough that neither a cold cache
  * nor a contention spike is a failure, narrow enough that a genuinely hung test still fails the
