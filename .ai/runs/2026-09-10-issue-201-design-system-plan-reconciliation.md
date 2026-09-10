@@ -176,7 +176,7 @@ visible motion change across every primitive. Any diff touching `src/`, `e2e/`, 
 
 ### Phase 3: Join the guard
 
-- [ ] 3.1 Add plan 01 to the opt-in list
+- [x] 3.1 Add plan 01 to the opt-in list — bfbe7e0
 - [ ] 3.2 Spec lifecycle bookkeeping
 - [ ] 3.3 The full gate
 - [ ] 3.4 File the follow-ups
