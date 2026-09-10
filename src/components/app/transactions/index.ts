@@ -8,9 +8,6 @@
  * test for. The route is where a repository row becomes a {@link LedgerRow}.
  */
 
-export { AmountField, toInputValue, toMinor } from './amount-field'
-export type { AmountFieldProps } from './amount-field'
-
 export {
   AmountText,
   BalanceAmount,

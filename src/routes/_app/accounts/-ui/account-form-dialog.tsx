@@ -3,7 +3,6 @@ import { today } from '@internationalized/date'
 
 import {
   ACCOUNT_CATEGORY_ORDER,
-  AmountField,
   ErrorPanel,
   accountCategoryFacts,
   isAccountCategory,
@@ -17,6 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
+  MoneyField,
   Select,
   SelectItem,
   Switch,
@@ -42,7 +42,7 @@ import type { Account } from '#/server/db/types'
  *
  * ## Amounts never become floats, on either side of the wire
  *
- * Both money fields are {@link AmountField}, which emits integer minor units and nothing else,
+ * Both money fields are {@link MoneyField}, which emits integer minor units and nothing else,
  * and the payload carries those integers straight through. `createAccountSchema` is
  * `z.number().int()` at the boundary and again in the repository, so a client that ever sent
  * `1234.5` would be rejected before any arithmetic happened rather than silently rounded.
@@ -288,7 +288,7 @@ export function AccountFormDialog({
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <AmountField
+                  <MoneyField
                     locale={locale}
                     name="initialBalanceMinor"
                     label={t('accounts.field.initialBalance')}
@@ -318,7 +318,7 @@ export function AccountFormDialog({
                 </div>
 
                 {showsCreditLimit ? (
-                  <AmountField
+                  <MoneyField
                     locale={locale}
                     name="creditLimitMinor"
                     label={t('accounts.field.creditLimit')}

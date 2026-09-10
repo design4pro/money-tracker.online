@@ -933,13 +933,18 @@ None.
 
 `FND-22 missing → done` — the chart frame shipped as `src/components/charts/chart-frame.tsx`, with
 the axes, legend, visually-hidden table slot and datum focus ring the four chart types build on.
-`FND-23 missing → missing` — `MoneyField` was **never built**, and the responsibility it was minted
-to hold landed in two places instead: `src/components/app/transactions/amount-field.tsx` and
-`src/components/app/accounts/amount-field.tsx`, whose docblocks argue opposite premises about how an
-amount should be entered. That is a `docs/SPEC.md` §8 duplication of one interaction pattern. It is
-**not** a second money parser: both delegate to `src/lib/money/`, so `docs/MONEY.md` §7's one-parser
-rule is held. Whether the two agree numerically is unmeasured and is tracked separately — see this
-stage's Blockers. The row stays open.
+`FND-23 missing → done` — `MoneyField` shipped as `src/components/ui/money-field.tsx` under #106,
+after the differential test that issue required. It was long absent, and the responsibility it was
+minted to hold had landed in two places instead: `src/components/app/transactions/amount-field.tsx`
+and `src/components/app/accounts/amount-field.tsx`, whose docblocks argued opposite premises about
+how an amount should be entered. That was a `docs/SPEC.md` §8 duplication of one interaction
+pattern rather than a second money parser — both delegated to `src/lib/money/`, so `docs/MONEY.md`
+§7's one-parser rule was held throughout. Both are now deleted and all eleven call sites use the
+single owner. The measurement that unblocked it is in this stage's Blockers.
+
+The artefact is done; this stage's **browser evidence is not**, and cannot be until `01-S1`'s
+gallery route exists — no route under `src/routes` renders a component gallery today. That is a
+dependency on another stage rather than an open question about this component.
 
 Requisitioned by `16-S1` and `07-S3`.
 
@@ -972,9 +977,19 @@ None.
   `dataTable` slot rendered visually hidden, and roving-tabindex focus management over data points.
   A chart type that does not pass a `dataTable` does not type-check — the text equivalent is a
   required prop, not a convention, because `docs/ACCESSIBILITY.md` §3 claims it.
-- `money-field.tsx` composes RAC `NumberField` with `src/lib/money.ts`, taking `{ code, digits,
+- `money-field.tsx` composes RAC `TextField` with `src/lib/money.ts`, taking `{ currencyCode,
 locale }` and emitting branded `Minor`. It shows the currency symbol in the field's addon, never
-  inside the editable text.
+  inside the editable text, and states the currency's full name to assistive tech through
+  `aria-describedby`, because `TextField` hides every addon and a symbol is ambiguous between the
+  currencies that share it.
+
+  **This clause said `NumberField` until #106 measured the alternative.** `NumberField` hands back
+  a major-unit `number`, so scaling it means re-serialising a double; the table in
+  `src/components/ui/__tests__/money-field-conversion.test.ts` shows that route landing one minor
+  unit low at `MAX_MINOR` in each direction and throwing `MoneyOverflowError` past the boundary
+  where the string route reports `null`. `parseMoney` never converts, so it is exact. `digits` is
+  likewise not a parameter: it is read from the code, because two sources for one scale is how a
+  hard-coded `100` gets in.
 
 ### Quota
 
@@ -987,10 +1002,16 @@ None — no data access.
 ### Money invariant
 
 `MoneyField` **emits `Minor` and nothing else.** There is no code path in which it hands its consumer
-a float, a string or a number of major units. `money-field.test.ts` holds: _typing `1 234,56` in `pl`
-with EUR emits `123456`_; _typing `1234` with JPY emits `1234`_; _typing `1.2345` with KWD emits
-`1234` after half-to-even rounding and shows the rounded value back_; _a paste of a value with more
-decimals than `digits` rounds once, at parse, and never twice_.
+a float, a string or a number of major units. `money-field.test.tsx` holds: _typing `1 234,56` in `pl`
+with EUR emits `123456`_; _typing `1234` with JPY emits `1234`_; _pasting `1.2345` with KWD emits
+`1234` after half-to-even rounding_; _a paste of a value with more decimals than `digits` rounds
+once, at parse, and never twice_.
+
+This clause used to add _"and shows the rounded value back"_. The shipped component does not, and
+deliberately: the box holds what was typed until the amount or the currency changes from outside,
+so a figure does not rewrite itself under a cursor mid-keystroke. Rebuilding it from the committed
+integer cannot round a second time either way — `toAmountInputValue` only pads and slices — which
+is the property that clause was reaching for and which the test asserts directly.
 
 ### Verification
 
@@ -1005,15 +1026,22 @@ All seven §7 items and all ten §2 clauses, including the chart clause.
 
 ### Blockers
 
-- **Two amount fields, and no measurement of whether they agree.**
-  `src/components/app/transactions/amount-field.tsx` serialises through a canonical decimal string
-  and `src/components/app/accounts/amount-field.tsx` refuses React Aria's `NumberField` because it
-  hands back a major-unit float. Each docblock treats the other's approach as the defect. Both
-  delegate to `src/lib/money/`, so this is a `docs/SPEC.md` §8 duplication and **not** a second
-  parser, but whether `parseMoney` and `scaleDecimalString` agree on a half-way tie is
-  **unmeasured**. Disposition: **defer**. Consolidating the component is a money-path change and
-  belongs on its own PR with a committed differential test, not on a documentation reconciliation.
-  Tracked as #106, which requires the differential test before any consolidation.
+- **Two amount fields, and no measurement of whether they agree.** ~~Deferred~~ — **cleared by
+  #106.** `src/components/app/transactions/amount-field.tsx` serialised through a canonical decimal
+  string and `src/components/app/accounts/amount-field.tsx` refused React Aria's `NumberField`
+  because it hands back a major-unit float. Each docblock treated the other's approach as the
+  defect. Both delegated to `src/lib/money/`, so it was a `docs/SPEC.md` §8 duplication and **not**
+  a second parser — but whether `parseMoney` and `scaleDecimalString` agree on a half-way tie was
+  unmeasured, so consolidating was held for its own PR with a committed differential test.
+
+  The measurement is `src/components/ui/__tests__/money-field-conversion.test.ts`. `parseMoney`
+  **is** `scaleDecimalString` plus separator normalisation — it delegates — so the two cannot
+  disagree about a tie, and the table confirms it for `1.015`, `0.125`, `1.005`, `0.375`, `2.675`
+  and `8.835`, for `pl` `1 234,56`, and for JPY at zero digits and KWD at three. The float hop the
+  transactions field added cost nothing across all of those. It cost a minor unit at `MAX_MINOR`:
+  `90071992547409.91` scaled to `9007199254740990` rather than `9007199254740991`, the same figure
+  rendered back as `90071992547409.9`, and `90071992547409.92` threw `MoneyOverflowError` where
+  `parseMoney` reports `null`. The string route is the correct one and is what `MoneyField` ships.
 
 ---
 

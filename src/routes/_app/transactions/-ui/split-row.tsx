@@ -1,7 +1,12 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 
-import { AmountField } from '#/components/app/accounts'
-import { Button, Select, SelectItem, TextField } from '#/components/ui'
+import {
+  Button,
+  MoneyField,
+  Select,
+  SelectItem,
+  TextField,
+} from '#/components/ui'
 
 import type { Key } from 'react-aria-components'
 import type { CategoryOption } from '#/components/app/transactions'
@@ -105,7 +110,7 @@ export function SplitRow({
         ))}
       </Select>
 
-      <AmountField
+      <MoneyField
         locale={locale}
         label={t('splits.row.amount')}
         currencyCode={currencyCode}

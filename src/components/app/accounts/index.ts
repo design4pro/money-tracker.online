@@ -11,11 +11,12 @@
  *
  * ## One convention worth knowing before adding a file
  *
- * The two **formatting** components — {@link Amount} and {@link AmountField} — take `locale` as
- * a prop rather than reading it from context. They are the ones a list renders hundreds of, they
- * are the ones whose output a test wants to assert against a named locale, and being pure makes
- * both of those cheap. Everything else reads `useTranslate()` / `useLocale()`, because threading
- * a translator through six layers of composition is how copy ends up hard-coded.
+ * The **formatting** component {@link Amount} takes `locale` as a prop rather than reading it from
+ * context. It is the one a list renders hundreds of, it is the one whose output a test wants to
+ * assert against a named locale, and being pure makes both of those cheap — the same reasoning
+ * `components/ui`'s `MoneyField` follows. Everything else reads `useTranslate()` / `useLocale()`,
+ * because threading a translator through six layers of composition is how copy ends up
+ * hard-coded.
  *
  * ## Types from `src/server` are imported, values are not
  *
@@ -44,9 +45,6 @@ export { AccountDetailSkeleton, AccountListSkeleton } from './account-skeletons'
 
 export { Amount, DirectionalAmount } from './amount'
 export type { AmountProps, AmountSize, DirectionalAmountProps } from './amount'
-
-export { AmountField } from './amount-field'
-export type { AmountFieldProps } from './amount-field'
 
 export {
   ACCOUNT_CATEGORY_ORDER,

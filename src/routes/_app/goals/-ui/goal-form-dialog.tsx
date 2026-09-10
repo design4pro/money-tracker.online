@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { parseDate, today } from '@internationalized/date'
 
-import { AmountField, ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/accounts'
 import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
+  MoneyField,
   Select,
   SelectItem,
   TextField,
@@ -53,7 +54,7 @@ import type { GoalSummary } from '#/server/goals/summary'
  *
  * ## The target never becomes a float
  *
- * {@link AmountField} emits integer minor units and nothing else, and the payload carries those
+ * {@link MoneyField} emits integer minor units and nothing else, and the payload carries those
  * integers straight through. `createGoalSchema` is `z.number().int().positive()` at the boundary
  * and again in the repository, so a client that ever sent `1234.5` is rejected before any
  * arithmetic happens rather than silently rounded.
@@ -222,7 +223,7 @@ export function GoalFormDialog({
                 />
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <AmountField
+                  <MoneyField
                     locale={locale}
                     name="targetMinor"
                     label={t('goals.form.target')}

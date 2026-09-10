@@ -11,6 +11,7 @@ import {
   Form,
   FormActions,
   FormSection,
+  MoneyField,
   Radio,
   RadioGroup,
   Select,
@@ -21,7 +22,6 @@ import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { currencyName } from '#/lib/money'
 
-import { AmountField } from './amount-field'
 import { PAYMENT_METHOD_KEY } from './filter-chips'
 import { LEDGER_PAYMENT_METHODS } from './types'
 
@@ -42,11 +42,11 @@ import type {
  * ## Amount first, and focused
  *
  * Every entry starts with a number, so the amount is the first control in the DOM and takes focus
- * on mount when {@link TransactionFormProps.autoFocusAmount} is set. It is a React Aria
- * `NumberField` through {@link AmountField}, which means the decimal separator is the reader's own
- * (`12,50` in Polish, `12.50` in English) and `inputmode="decimal"` brings up the numeric keypad on
- * a phone. The value it emits is `Minor` — branded integer minor units — so
- * {@link TransactionFormProps.onSubmit} cannot be handed a float even by accident.
+ * on mount when {@link TransactionFormProps.autoFocusAmount} is set. It is the product's one
+ * {@link MoneyField}, which means the decimal separator is the reader's own (`12,50` in Polish,
+ * `12.50` in English) and `inputmode="decimal"` brings up the numeric keypad on a phone. The value
+ * it emits is `Minor` — branded integer minor units — so {@link TransactionFormProps.onSubmit}
+ * cannot be handed a float even by accident.
  *
  * ## The currency is the account's, and is never a separate question
  *
@@ -331,12 +331,15 @@ export function TransactionForm({
               buttons carry `isPending` — which is how every other form in this codebase says
               "saving" without taking a field away from whoever is typing in it.
             */}
-            <AmountField
+            <MoneyField
+              locale={locale}
               label={t('transactions.field.amount')}
               value={values.amountMinor}
               currencyCode={currencyCode}
               onChange={(amountMinor) => patch({ amountMinor })}
               errorMessage={shown.amountMinor}
+              invalidMessage={t('validation.amount.invalid')}
+              size="lg"
               isRequired
               autoFocus={autoFocusAmount}
               description={

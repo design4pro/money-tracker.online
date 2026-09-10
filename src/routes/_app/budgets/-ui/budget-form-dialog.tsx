@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { parseDate, today } from '@internationalized/date'
 
-import { AmountField, ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/accounts'
 import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
@@ -13,6 +13,7 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
+  MoneyField,
   Radio,
   RadioGroup,
   Select,
@@ -58,7 +59,7 @@ import type { BudgetSummary } from '#/server/budgets/summary'
  *
  * ## The limit never becomes a float
  *
- * {@link AmountField} emits integer minor units and nothing else, and the payload carries those
+ * {@link MoneyField} emits integer minor units and nothing else, and the payload carries those
  * integers straight through. `createBudgetSchema` is `z.number().int().positive()` at the
  * boundary and again in the repository, so a client that ever sent `1234.5` is rejected before
  * any arithmetic happens rather than silently rounded.
@@ -311,7 +312,7 @@ export function BudgetFormDialog({
                 )}
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <AmountField
+                  <MoneyField
                     locale={locale}
                     name="limitMinor"
                     label={t('budgets.form.limit')}

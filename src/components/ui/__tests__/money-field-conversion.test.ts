@@ -5,6 +5,7 @@ import {
   asCurrencyCode,
   asMinor,
   makeMoney,
+  minorFromBigInt,
   minorUnitDigits,
   MoneyOverflowError,
   parseMoney,
@@ -12,47 +13,73 @@ import {
   toAmountInputValue,
 } from '#/lib/money'
 
-import {
-  toInputValue,
-  toMinor,
-} from '#/components/app/transactions/amount-field'
-
 import type { Locale } from '#/lib/i18n'
+import type { CurrencyCode, Minor } from '#/lib/money'
 
 /**
- * The measurement issue #106 asked for before either amount field was allowed to absorb the
- * other: do the two conversions the product actually ships agree, and where do they not?
+ * The measurement issue #106 asked for before either amount field was allowed to absorb the other,
+ * and the record of why {@link MoneyField} converts the way it does.
  *
- * Two components named `amount-field.tsx` turn typed text into `Minor`, and each docblock treats
- * the other's approach as the defect:
+ * Two components named `amount-field.tsx` used to turn typed text into `Minor`, and each
+ * docblock treated the other's approach as the defect:
  *
- * - `app/accounts/amount-field.tsx` hands the raw text to `parseMoney`, which normalises the
+ * - `app/accounts/amount-field.tsx` handed the raw text to `parseMoney`, which normalises the
  *   separators and then moves the decimal point **inside the string** via `scaleDecimalString`.
- *   No float exists at any point.
- * - `app/transactions/amount-field.tsx` lets React Aria's `NumberField` parse the text into a
- *   decimal `number`, re-serialises that double to its shortest round-tripping decimal, and hands
- *   *that* string to the same `scaleDecimalString`. One float exists, in the middle.
+ *   No float existed at any point. This is the one that survived, as `ui/money-field.tsx`.
+ * - `app/transactions/amount-field.tsx` let React Aria's `NumberField` parse the text into a
+ *   decimal `number`, re-serialised that double to its shortest round-tripping decimal, and handed
+ *   *that* string to the same `scaleDecimalString`. One float existed, in the middle.
  *
- * Both therefore end in the same rounding routine, so `parseMoney` and `scaleDecimalString` cannot
- * disagree about a half-way tie: `parseMoney` *is* `scaleDecimalString` plus separator
- * normalisation. What the float in the middle can still cost is a value that no longer names the
+ * Both therefore ended in the same rounding routine, so `parseMoney` and `scaleDecimalString`
+ * cannot disagree about a half-way tie: `parseMoney` *is* `scaleDecimalString` plus separator
+ * normalisation. What the float in the middle could still cost is a value that no longer names the
  * decimal the person typed, and that is what the second half of this file pins down.
  *
- * The verdict, from the numbers below: the two paths agree on every amount a person can put in a
- * form, and diverge only at the `MAX_MINOR` boundary — where the string path is right and the
+ * The verdict, from the numbers below: the two paths agreed on every amount a person can put in a
+ * form, and diverged only at the `MAX_MINOR` boundary — where the string path is right and the
  * float path is wrong by one minor unit, or throws where the string path reports `null`.
+ *
+ * The float path is gone from the product and is reproduced here rather than imported, so the
+ * reason it went stays a thing this suite can check rather than a claim in a commit message. It is
+ * a faithful copy of the deleted `toMinor` / `toInputValue`.
  */
 
 const PLN = asCurrencyCode('PLN')
 const JPY = asCurrencyCode('JPY')
 const KWD = asCurrencyCode('KWD')
 
-/** What React Aria hands the transactions field for a given typed text. */
+/** What React Aria handed the deleted transactions field for a given typed text. */
 function asNumberField(locale: Locale, text: string, digits: number): number {
   return new NumberParser(locale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).parse(text)
+}
+
+/**
+ * The deleted `toMinor`: a double written out as the shortest plain decimal that round-trips to
+ * it, then scaled as a string. `Intl` never produces exponent form, which `scaleDecimalString`
+ * would refuse.
+ */
+const PLAIN_DECIMAL = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 20,
+  useGrouping: false,
+})
+
+function toMinor(value: number, code: CurrencyCode): Minor | null {
+  if (!Number.isFinite(value)) {
+    return null
+  }
+  const scaled = scaleDecimalString(
+    PLAIN_DECIMAL.format(value),
+    minorUnitDigits(code),
+  )
+  return scaled === null ? null : minorFromBigInt(scaled)
+}
+
+/** The deleted `toInputValue`: one division by the currency's scale. */
+function toInputValue(amountMinor: Minor, code: CurrencyCode): number {
+  return amountMinor / 10 ** minorUnitDigits(code)
 }
 
 describe('parseMoney against scaleDecimalString', () => {
@@ -110,7 +137,12 @@ describe('the string path against the float path', () => {
    * middle costs nothing here — including on the ties, where a naive `Math.round(value * 100)`
    * would already be wrong.
    */
-  it.each([
+  it.each<{
+    locale: Locale
+    text: string
+    code: CurrencyCode
+    expected: number
+  }>([
     { locale: 'en', text: '1.015', code: PLN, expected: 102 },
     { locale: 'en', text: '0.125', code: PLN, expected: 12 },
     { locale: 'en', text: '1.005', code: PLN, expected: 100 },
@@ -169,17 +201,25 @@ describe('the string path against the float path', () => {
    * that is stored.
    */
   it.each([
-    { minor: 101, text: '1.01', float: 1.01 },
-    { minor: 1234, text: '12.34', float: 12.34 },
+    { minor: 101, code: PLN, text: '1.01', float: 1.01 },
+    { minor: 1234, code: PLN, text: '12.34', float: 12.34 },
+    { minor: 5000, code: JPY, text: '5000', float: 5000 },
+    { minor: 1234, code: KWD, text: '1.234', float: 1.234 },
     {
       minor: 900_719_925_474_099,
+      code: PLN,
       text: '9007199254740.99',
       float: 9_007_199_254_740.99,
     },
-  ])('agree on the way out for $minor', ({ minor, text, float }) => {
-    expect(toAmountInputValue('en', makeMoney(asMinor(minor), PLN))).toBe(text)
-    expect(toInputValue(asMinor(minor), PLN)).toBe(float)
-  })
+  ])(
+    'agree on the way out for $minor in $code',
+    ({ minor, code, text, float }) => {
+      expect(toAmountInputValue('en', makeMoney(asMinor(minor), code))).toBe(
+        text,
+      )
+      expect(toInputValue(asMinor(minor), code)).toBe(float)
+    },
+  )
 
   it('loses a minor unit on the way out at MAX_MINOR, where the string path does not', () => {
     const minor = asMinor(9_007_199_254_740_991)
