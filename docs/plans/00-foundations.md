@@ -59,10 +59,11 @@ Nine of seventeen still open is the finding, not an embarrassment. Before this r
 one of the thirty-four rows read `→ done` and none had been re-measured after the work landed, so
 the document could not distinguish a stage that finished from one that never started. It can now.
 
-Two findings from the same reconciliation belong to the plan set rather than to any stage here, and
-are tracked as their own issues: `docs/plans/OPEN-FINDINGS.md` is named by `README.md` and does not
-exist (#107), and the other twenty-eight plan documents have not been measured at all (#108). This
-document is the only member of the guard's opt-in list until they are.
+Two findings from the same reconciliation belong to the plan set rather than to any stage here.
+`README.md` named a `docs/plans/OPEN-FINDINGS.md` that was never written; the promise was removed
+and `README.md` → _Where a finding goes_ now states the three homes a finding actually has (#107).
+The other twenty-eight plan documents have not been measured at all (#108), so this document is the
+only member of the guard's opt-in list until they are.
 
 ---
 
