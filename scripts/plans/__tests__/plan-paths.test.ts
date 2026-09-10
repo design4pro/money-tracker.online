@@ -12,27 +12,31 @@ import type { Violation } from '../audit.ts'
  *
  * ## Why the list is opt-in
  *
- * `docs/plans/` holds 29 plan documents. All 29 have now been *measured* - issue #108 ran the
- * audit over every one of them - and **27** of them carry drift nobody has read yet: 359 of their
- * 572 `Owned paths` entries name a file that is not on disk, and 220 of their 221 `→ done`
- * reference rows cite nothing that resolves. Guarding those today would turn 27 documents into a
+ * `docs/plans/` holds 29 stage plans, `00-` to `28-`. All 29 have now been *measured* - issue #108
+ * ran the audit over every one of them - and **26** of them carry drift nobody has read yet: 347 of
+ * their 558 `Owned paths` entries name a file that is not on disk, and 213 of their 214 `→ done`
+ * reference rows cite nothing that resolves. Guarding those today would turn 26 documents into a
  * red suite on a day nobody has read them, and a suite that is red for reasons the team has
  * decided not to fix teaches people to ignore it.
  *
- * Those four figures are the **unreconciled 27**, re-measured after this list gained its second
- * entry; they are not the audit's original totals, which covered 28 documents and are quoted on
- * issue #108. Whoever adds the third entry re-measures them again - a docblock that justifies an
- * opt-in guard with stale arithmetic is the failure the guard exists to prevent.
+ * Those four figures are the **unreconciled 26**, re-measured at `5eac91d` after this list gained
+ * its third entry; they are not the audit's original totals, which covered 28 documents and are
+ * quoted on issue #108. Whoever adds the fourth entry re-measures them again - a docblock that
+ * justifies an opt-in guard with stale arithmetic is the failure the guard exists to prevent.
+ * `98-verification-protocol.md` and `99-boundaries-and-blockers.md` are excluded from every count
+ * here and always were: neither declares a stage, so the audit has nothing to read in them.
  *
  * Measuring is not reconciling. A document joins this list when someone has read what did and did
  * not ship and corrected the document accordingly, which is a change one line long here and a
- * reviewer can see. The remaining 27 are tracked one row at a time on issue #108.
+ * reviewer can see. The remaining 26 are tracked one row at a time on issue #108.
  *
  * @see scripts/plans/audit.ts - the assertions, shared with the CLI report
  * @see .ai/specs/2026-09-07-foundations-plan-reconciliation.md
+ * @see .ai/specs/2026-09-08-design-system-plan-reconciliation.md - the third entry
  */
 const GUARDED_PLANS = [
   'docs/plans/00-foundations.md',
+  'docs/plans/01-design-system.md',
   'docs/plans/02-i18n.md',
 ] as const
 

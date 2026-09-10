@@ -169,10 +169,10 @@ visible motion change across every primitive. Any diff touching `src/`, `e2e/`, 
 
 ### Phase 2: Reconcile
 
-- [ ] 2.1 Correct the two Class A entries
-- [ ] 2.2 Requisition `DSY-04` into `00-foundations.md`
-- [ ] 2.3 Resolve the three invariant contradictions
-- [ ] 2.4 Fix the stale cross-plan citations and re-state the rows
+- [x] 2.1 Correct the two Class A entries — c78fd30
+- [x] 2.2 Requisition `DSY-04` into `00-foundations.md` — 6b9acfc
+- [x] 2.3 Resolve the three invariant contradictions — 7ffa28c
+- [x] 2.4 Fix the stale cross-plan citations and re-state the rows — 96e4fd3
 
 ### Phase 3: Join the guard
 
