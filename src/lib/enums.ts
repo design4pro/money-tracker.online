@@ -311,3 +311,31 @@ export type ExportStatus = (typeof EXPORT_STATUSES)[number]
 /** Which suggestion engine produced the proposal a person turned down. */
 export const SUGGESTION_KINDS = ['transfer_pair', 'duplicate'] as const
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number]
+
+/**
+ * Every occasion the product can notify a person about.
+ *
+ * The values are **not** invented here: each one is already exported as a `*_EVENT` constant by the
+ * module that decides the occasion happened — `BUDGET_THRESHOLD_EVENT` and `BUDGET_EXCEEDED_EVENT`
+ * in `#/server/budgets/thresholds`, `RECURRING_DUE_SOON_EVENT` and `RECURRING_OVERDUE_EVENT` in
+ * `#/server/recurring/reminders`, `GOAL_REACHED_EVENT` in `#/server/goals/reached`. This tuple is
+ * the *vocabulary*; those constants stay where they are, and
+ * `#/server/notify/__tests__/kinds.test.ts` asserts the two agree entry by entry, so a rename on
+ * either side fails at the seam instead of drifting.
+ *
+ * It lives here rather than beside the registry in `#/server/notify/kinds` for the reason this
+ * whole file exists: `src/server/db/schema.ts` builds a SQL `CHECK` from it, and importing the
+ * registry from the schema would close a cycle back through the budget repository.
+ *
+ * Only occasions with a producer are listed. `docs/plans/21-notifications.md` sketches ten more
+ * (`import.completed`, `member.joined`, …); each becomes one entry here plus two catalogue keys on
+ * the day something computes it.
+ */
+export const NOTIFICATION_KIND_IDS = [
+  'budget.threshold_crossed',
+  'budget.exceeded',
+  'recurring.due_soon',
+  'recurring.overdue',
+  'goal.reached',
+] as const
+export type NotificationKind = (typeof NOTIFICATION_KIND_IDS)[number]
