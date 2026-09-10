@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { auditPlan, mentionsPath } from '../audit.ts'
+import { CLASS_MAP_PLANS } from '../drift-classes.ts'
 import { parsePlan } from '../parse-plan.ts'
 import type { Violation } from '../audit.ts'
 
@@ -11,40 +12,44 @@ import type { Violation } from '../audit.ts'
  *
  * ## Why the list is opt-in
  *
- * `docs/plans/` holds 29 plan documents. All 29 have now been *measured* - issue #108 ran the
- * audit over every one of them - and **27** of them carry drift nobody has read yet: 359 of their
- * 572 `Owned paths` entries name a file that is not on disk, and 220 of their 221 `→ done`
- * reference rows cite nothing that resolves. Guarding those today would turn 27 documents into a
+ * `docs/plans/` holds 29 stage plans, `00-` to `28-`. All 29 have now been *measured* - issue #108
+ * ran the audit over every one of them - and **26** of them carry drift nobody has read yet: 347 of
+ * their 558 `Owned paths` entries name a file that is not on disk, and 213 of their 214 `→ done`
+ * reference rows cite nothing that resolves. Guarding those today would turn 26 documents into a
  * red suite on a day nobody has read them, and a suite that is red for reasons the team has
  * decided not to fix teaches people to ignore it.
  *
- * Those four figures are the **unreconciled 27**, re-measured after this list gained its second
- * entry; they are not the audit's original totals, which covered 28 documents and are quoted on
- * issue #108. Whoever adds the third entry re-measures them again - a docblock that justifies an
- * opt-in guard with stale arithmetic is the failure the guard exists to prevent.
+ * Those four figures are the **unreconciled 26**, re-measured at `5eac91d` after this list gained
+ * its third entry; they are not the audit's original totals, which covered 28 documents and are
+ * quoted on issue #108. Whoever adds the fourth entry re-measures them again - a docblock that
+ * justifies an opt-in guard with stale arithmetic is the failure the guard exists to prevent.
+ * `98-verification-protocol.md` and `99-boundaries-and-blockers.md` are excluded from every count
+ * here and always were: neither declares a stage, so the audit has nothing to read in them.
  *
  * Measuring is not reconciling. A document joins this list when someone has read what did and did
  * not ship and corrected the document accordingly, which is a change one line long here and a
- * reviewer can see. The remaining 27 are tracked one row at a time on issue #108.
+ * reviewer can see. The remaining 26 are tracked one row at a time on issue #108.
  *
  * @see scripts/plans/audit.ts - the assertions, shared with the CLI report
  * @see .ai/specs/2026-09-07-foundations-plan-reconciliation.md
+ * @see .ai/specs/2026-09-08-design-system-plan-reconciliation.md - the third entry
  */
 const GUARDED_PLANS = [
   'docs/plans/00-foundations.md',
+  'docs/plans/01-design-system.md',
   'docs/plans/02-i18n.md',
 ] as const
 
 /**
- * The one document `scripts/plans/drift-classes.ts` describes.
+ * The documents `scripts/plans/drift-classes.ts` describes, which is not the same set as
+ * {@link GUARDED_PLANS}: `02-i18n.md` was reconciled without a class map and is guarded anyway.
  *
- * The class map records the drift of `00-foundations.md` specifically - its entries, its landing
- * sites - and the CLI prints that same block whatever document it is given. So the two landing-site
- * cases below are keyed to this constant rather than run per {@link GUARDED_PLANS} entry: run
- * against `02-i18n.md` they would assert plan 00's landing sites against plan 02's prose and fail
- * for a reason that is about neither document.
+ * The two landing-site cases below are keyed to this register rather than run per
+ * {@link GUARDED_PLANS} entry. Run against a document the class map does not describe they would
+ * assert an empty set - green having checked nothing - and before the map carried a per-plan
+ * `plan` field they asserted plan 00's landing sites against whatever prose they were given.
  */
-const CLASS_MAP_PLAN = 'docs/plans/00-foundations.md'
+const CLASS_MAP_PLAN_PATHS = Object.keys(CLASS_MAP_PLANS)
 
 /**
  * Paths a plan may never claim to own, because they are generated and `AGENTS.md` forbids editing
@@ -93,14 +98,14 @@ describe.each(GUARDED_PLANS)('%s', (planPath) => {
  * altogether, left this suite green. Both docblocks in `audit.ts` state their intent as a
  * guarantee, which is what an assertion rather than a report line is for.
  *
- * They live outside the `describe.each` because they read {@link CLASS_MAP_PLAN} rather than the
- * document under test - see that constant for why.
+ * They live outside the guard's `describe.each` because they run per {@link CLASS_MAP_PLAN_PATHS}
+ * entry rather than per guarded document - see that constant for why.
  *
  * Both were watched failing on a hand-broken copy of the document and of the class map:
  * `.ai/runs/2026-09-09-landing-checks-assert/watched-failing.md`.
  */
-describe(`${CLASS_MAP_PLAN} landing sites`, () => {
-  const audit = auditPlan(CLASS_MAP_PLAN)
+describe.each(CLASS_MAP_PLAN_PATHS)('%s landing sites', (planPath) => {
+  const audit = auditPlan(planPath)
 
   it('resolves every recorded landing site on disk', () => {
     expect(audit.classes.unresolvedLandings).toEqual([])
@@ -108,6 +113,14 @@ describe(`${CLASS_MAP_PLAN} landing sites`, () => {
 
   it('names every recorded landing site somewhere in the document', () => {
     expect(audit.classes.unmentionedLandings).toEqual([])
+  })
+
+  // `expectedCounts` is the measurement each plan's rows were transcribed from, and until this
+  // case existed a mismatch only printed a MISMATCH line in the CLI report that nobody reads on a
+  // green run - so an entry appended without updating the counts, or filed under the wrong plan,
+  // changed the numbers and failed nothing.
+  it('counts every entry into the class its map recorded', () => {
+    expect(audit.classes.counts).toEqual(audit.classes.map?.expectedCounts)
   })
 })
 
