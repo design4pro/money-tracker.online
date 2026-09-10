@@ -6,6 +6,12 @@ One document per designed change. The directory a spec sits in is its state, the
 its `H1` names the issue and the pull requests behind it, and both are held together by
 `scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).
 
+## Draft — being written (1)
+
+| Spec                                                                                                                     | Date       | Issue                                                                 | Spec PR | Implementation |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- | ------- | -------------- |
+| [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md) | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | —       | —              |
+
 ## Ready — merged, waiting for a build (2)
 
 | Spec                                                                                                                            | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
