@@ -139,9 +139,9 @@ spec's per-Phase PRs; recorded here because the spec's Phasing section says othe
 
 ### Phase 1: Inventory
 
-- [ ] 1.1 Write `docs/STATE-INVENTORY.md`
-- [ ] 1.2 Link the inventory from `docs/plans/01-design-system.md`
-- [ ] 1.3 File the `ErrorPanel` ownership issue
+- [x] 1.1 Write `docs/STATE-INVENTORY.md` — d534169
+- [x] 1.2 Link the inventory from `docs/plans/01-design-system.md` — d534169
+- [x] 1.3 File the `ErrorPanel` ownership issue — #208
 
 ### Phase 2: Pending thresholds
 
