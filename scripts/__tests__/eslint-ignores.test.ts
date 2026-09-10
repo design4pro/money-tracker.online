@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 
 import { ESLint } from 'eslint'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 /**
  * `pnpm lint` is rung 5 of the gate, and what makes it worth running is that it reports on the
@@ -24,11 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
  */
 const root = resolve(__dirname, '../..')
 
-let eslint: ESLint
-
-beforeAll(() => {
-  eslint = new ESLint({ cwd: root })
-})
+const eslint = new ESLint({ cwd: root })
 
 describe('eslint.config.js ignores', () => {
   // Both shapes, because a `**` that only matched nested paths would still leave a file dropped
