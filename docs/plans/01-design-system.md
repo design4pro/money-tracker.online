@@ -62,7 +62,9 @@ to delete it.
   pointer state so a screenshot can capture them. `token-sheet.tsx` renders every token with its
   computed value and its measured contrast ratio against its intended background.
 - **States.** The gallery has no async surface and therefore no empty, skeleton or error state; it
-  says so on the page rather than leaving a reader to wonder.
+  says so on the page rather than leaving a reader to wonder. What every surface that _does_ have an
+  async surface declares for those three states is inventoried in `docs/STATE-INVENTORY.md`, which
+  also records the house rule separating a skeleton from a spinner.
 - **Tokens.** Every token this stage needs already exists from `00-S3`. If a primitive stage reports
   a missing token, it is a `00-foundations.md` requisition and never a hex literal here.
 - **Accessibility.** The gallery is the surface the AAA claims are demonstrated on: every hit area is
