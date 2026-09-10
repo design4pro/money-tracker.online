@@ -118,7 +118,7 @@ A fifth assertion inside `auditPlan`, plus one list and one whole-set test case.
    section becomes five. `describe.each(GUARDED_PLANS)` picks it up with no wiring, because its cases
    are generated from `audit.assertions`.
 4. **A whole-set case** in `plan-paths.test.ts` runs `sharedPathViolations` over every
-   `docs/plans/NN-*.md`, so the rule holds for the 29 documents that are not yet reconciled.
+   `docs/plans/NN-*.md`, so the rule holds for the 28 documents `GUARDED_PLANS` does not cover.
 5. **A parity case** asserts `SHARED_PATHS` against the first column of the README's _The eight
    shared paths_ table, so the encoded list cannot silently drift from the document that defines it.
 
@@ -176,9 +176,9 @@ match differently, and the difference is the whole reason the rule needs code ra
   mistake `mentionsPath` already exists to avoid elsewhere in this module (`audit.ts:169`–`:187`).
 - **`src/components/ui/**` by prefix.** An entry violates when it is the glob itself, the bare
   directory `src/components/ui`, or anything beneath it (`src/components/ui/index.ts`,
-  `src/components/ui/__tests__/data-table.test.tsx`). Twelve of plan 00's 29 entries are of the last
-  kind, so a rule matching only the literal glob would miss the case the README cares most about: a
-  feature stage claiming one primitive file.
+  `src/components/ui/__tests__/data-table.test.tsx`). Thirteen of plan 00's 29 entries are of the
+  last kind, so a rule matching only the literal glob would miss the case the README cares most
+  about: a feature stage claiming one primitive file.
 - **Comparison is on the path as written**, before `resolveOwnedPath` strips a trailing `/**`. A
   feature stage writing `src/styles/tokens.css/**` is malformed for a different reason and is already
   caught by assertions 1–2; the shared-path rule reports what the document says.
@@ -186,7 +186,8 @@ match differently, and the difference is the whole reason the rule needs code ra
 Both `— new` and `— edit` entries are in scope. `Owned paths` is an ownership declaration, and the
 README's rule is about the list, not the kind — a feature stage declaring
 `src/server/db/schema.ts — edit` is exactly the parallel-column-write collision the wave contract
-forbids. Plan 00 itself declares shared paths both ways (7 `edit`, and `new` at `00-S1`).
+forbids. Plan 00 itself declares shared paths both ways: 16 `new` and 13 `edit` across the 29, with
+`schema.ts` alone appearing as `new` at `00-S1` and as `edit` at six later stages.
 
 ### The exemption
 
@@ -392,6 +393,14 @@ Add both constants to `scripts/plans/audit.ts` beside `REQUIRED_HEADINGS`, with 
 `docs/plans/README.md`'s _The eight shared paths_ table. Add the parity case to
 `plan-paths.test.ts`: read the README, take the first column of that table, compare with
 `SHARED_PATHS` as a set.
+
+The parity case is the one place this design does read the README's markdown, so it says how: anchor
+on the `## The eight shared paths` heading, take the table rows that follow until the first blank
+line after them, and read the first cell of each with its backticks stripped. Anchoring on the
+heading rather than on a line number or on the table's second column is what keeps a prettier reflow,
+a reworded _Why it is shared_ cell or a new section above from failing the case for a reason that is
+about neither list. A case that cannot find the heading fails loudly rather than comparing against an
+empty set, which is the `toEqual([])` trap the guard's own docblock already warns about.
 _Verification:_ `pnpm exec vitest run --project=tooling scripts/plans` is green. Watched failing by
 deleting one entry from `SHARED_PATHS` and by adding a ninth — both directions, both naming the two
 lists.
@@ -405,7 +414,8 @@ assertions"_ section to five, stating what assertion 5 does **not** claim, in th
 existing four use.
 _Verification:_ `pnpm exec vitest run --project=tooling scripts/plans` green;
 `pnpm exec tsx scripts/plans/audit.ts docs/plans/00-foundations.md` prints five assertions, all PASS,
-and exits `0`. Watched failing by adding `- \`src/lib/money.ts\` — edit`to a stage in`docs/plans/02-i18n.md` and reverting.
+and exits `0`. Watched failing by adding an `Owned paths` entry naming `src/lib/money.ts` to a stage
+in `docs/plans/02-i18n.md`, then reverting it.
 
 **Step 1.3 — the whole-set case.**
 Re-measure first: run `sharedPathViolations` over every `docs/plans/NN-*.md` and confirm the count is
