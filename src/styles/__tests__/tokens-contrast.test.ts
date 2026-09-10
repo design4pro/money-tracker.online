@@ -15,10 +15,16 @@ import {
  * product actually ships and recomputes every ratio, so a token edited to look
  * nicer cannot quietly drop the palette below AAA.
  *
- * Thresholds:
- *   · 7:1  — body and UI text (WCAG 2.2 §1.4.6, AAA)
- *   · 3:1  — non-text: control boundaries, the focus indicator, chart fills
- *            (WCAG 2.2 §1.4.11)
+ * Thresholds, and which element each one actually applies to — stated rather
+ * than left to the reader, because the difference between 7 and 4.5 in this
+ * file is a deliberate design decision and not a typo:
+ *   · 7:1   — body and UI text (WCAG 2.2 §1.4.6, AAA)
+ *   · 4.5:1 — LARGE text under the same criterion: bold at ≥ 18.66px, or
+ *             regular at ≥ 24px. The only token on this grade is
+ *             `negative-bold`, and the only text it paints is the
+ *             `AmountMeter` headline (bold, 20px or 32px)
+ *   · 3:1   — non-text: control boundaries, the focus indicator, chart fills,
+ *             and the over-budget meter fill (WCAG 2.2 §1.4.11)
  */
 
 const cssPath = fileURLToPath(new URL('../tokens.css', import.meta.url))
@@ -35,6 +41,15 @@ const darkStart = css.indexOf(":root[data-theme='dark'] {")
 const lightEnd = css.indexOf('@media (prefers-color-scheme: dark) {')
 const lightSource = css.slice(0, lightEnd)
 const darkSource = css.slice(darkStart)
+
+/*
+ * Dark is declared at TWO sites — the media query for a reader who never
+ * touched the toggle, and the attribute selector for one who did. Every
+ * assertion below reads the second. The first is checked for parity instead,
+ * once, by `the two dark sites agree` further down: cheaper than doubling the
+ * suite, and it catches the only failure the split can actually produce.
+ */
+const mediaSource = css.slice(lightEnd, darkStart)
 
 function parse(source: string): Record<string, string> {
   const out: Record<string, string> = {}
@@ -68,6 +83,7 @@ interface Wash {
 
 const light = parse(lightSource)
 const dark = parse(darkSource)
+const media = parse(mediaSource)
 const lightWashes = parseWashes(lightSource)
 const darkWashes = parseWashes(darkSource)
 
@@ -136,6 +152,24 @@ const TEXT_KEYS = [
   'color-info',
 ] as const
 
+/**
+ * Text tokens on the LARGE-text grade: 4.5:1 on every ground, not 7:1.
+ *
+ * A token lands here only when every text it paints is large by WCAG's own
+ * definition. `negative-bold` qualifies because its one text job is the
+ * `AmountMeter` headline, which is bold at 20px (`md`) or 32px (`lg`). Adding a
+ * key to this list is a claim about every call site of that token, so it is a
+ * decision, not a convenience.
+ */
+const LARGE_TEXT_KEYS = ['color-negative-bold'] as const
+
+/**
+ * Solid fills that carry no text of their own — 1.4.11's 3:1 floor. The
+ * over-budget meter fill is the one that puts `negative-bold` here as well as
+ * above; the token is held to the stricter of its two floors.
+ */
+const GRAPHICAL_FILL_KEYS = ['color-negative-bold'] as const
+
 /** Solid fill → the foreground declared for it. */
 const FILL_PAIRS: Array<[string, string]> = [
   ['color-accent', 'color-on-accent'],
@@ -167,6 +201,8 @@ describe.each([
     const required = [
       ...GROUND_KEYS,
       ...TEXT_KEYS,
+      ...LARGE_TEXT_KEYS,
+      ...GRAPHICAL_FILL_KEYS,
       ...SERIES_KEYS,
       'color-border-strong',
       'color-border-panel',
@@ -188,6 +224,57 @@ describe.each([
       ).toBeGreaterThanOrEqual(7)
     }
   })
+
+  it.each(LARGE_TEXT_KEYS)(
+    '%s clears the 4.5:1 large-text floor on every ground',
+    (key) => {
+      for (const ground of GROUND_KEYS) {
+        const ratio = contrast(tokens[key], tokens[ground])
+        expect(
+          ratio,
+          `${themeName}: --${key} on --${ground} is ${ratio.toFixed(2)}:1, large-text floor 4.5`,
+        ).toBeGreaterThanOrEqual(4.5)
+      }
+    },
+  )
+
+  it.each(GRAPHICAL_FILL_KEYS)(
+    '%s clears the 3:1 graphical floor on every ground',
+    (key) => {
+      for (const ground of GROUND_KEYS) {
+        const ratio = contrast(tokens[key], tokens[ground])
+        expect(
+          ratio,
+          `${themeName}: --${key} on --${ground} is ${ratio.toFixed(2)}:1, graphical floor 3`,
+        ).toBeGreaterThanOrEqual(3)
+      }
+    },
+  )
+
+  /*
+   * A fill's neighbour is not always a ground. The tests above measure
+   * `negative-bold` against the five grounds because the over-budget fill it
+   * paints is always the full width of its track — `over` means the ratio passed
+   * 1, which the meter clamps to 100% — so the colour beside it is the card, and
+   * nothing of the track survives to be a boundary.
+   *
+   * The track is still the adjacency the moment a fill is PARTIAL, and this
+   * asserts the grade stays usable by one: 3.88:1 in light, 3.18:1 in dark. Both
+   * clear 1.4.11's 3:1, and dark's margin being that thin is the finding, not an
+   * oversight — it is why `src/components/ui/meter.tsx`, whose `dangerAt` prop
+   * leaves the adjacency to its caller, deliberately keeps `negative` at 5.02:1
+   * instead.
+   */
+  it.each(GRAPHICAL_FILL_KEYS)(
+    '%s stays separable from the meter track it can sit in',
+    (key) => {
+      const ratio = contrast(tokens[key], tokens['color-border-subtle'])
+      expect(
+        ratio,
+        `${themeName}: --${key} on --color-border-subtle is ${ratio.toFixed(2)}:1, graphical floor 3`,
+      ).toBeGreaterThanOrEqual(3)
+    },
+  )
 
   it.each(FILL_PAIRS)('%s carries %s at 7:1', (fill, on) => {
     const ratio = contrast(tokens[fill], tokens[on])
@@ -333,6 +420,37 @@ describe.each([
       ).toBeGreaterThanOrEqual(7)
     },
   )
+
+  /*
+   * The loud grade carries the same wash, at its own floor.
+   *
+   * `negative-bold` is large text by 1.4.6's own definition, so 4.5:1 rather
+   * than 7, and it gets no promotion either — the over-budget headline says
+   * "over" by being that red. Its binding ground is composited, not a plane: a
+   * budget row under the pointer. The previous value cleared every opaque plane
+   * and measured 4.45:1 here, and `e2e/contrast-enhanced.spec.ts` is what caught
+   * it — after the token had already shipped past this file. Asserting it here
+   * means the browser is no longer the only thing that knows.
+   *
+   * `hover` over `surface` only, deliberately. `press` over `surface`, and
+   * either wash over `surface-raised`, are below 4.5:1 for this grade today; no
+   * call site puts it on them, and #178 is where that is decided rather than
+   * pinned here by a test the palette would have to be redesigned to satisfy.
+   */
+  it.each(LARGE_TEXT_KEYS)(
+    '%s carries the hover wash on --color-surface at its large-text floor',
+    (key) => {
+      const washed = washOver(
+        washes['color-hover'],
+        rgbOf(tokens['color-surface']),
+      )
+      const measured = contrastRgb(rgbOf(tokens[key]), washed)
+      expect(
+        measured,
+        `${themeName}: --${key} on washed --color-surface is ${measured.toFixed(2)}:1, large-text floor 4.5`,
+      ).toBeGreaterThanOrEqual(4.5)
+    },
+  )
 })
 
 describe('the two themes are separately designed', () => {
@@ -462,6 +580,84 @@ describe('the two themes are separately designed', () => {
       pin,
       `dark ink-2 on raised is ${pin.toFixed(3)}:1 — raised cannot lift without it`,
     ).toBeLessThan(7.3)
+  })
+
+  /*
+   * Why the danger ink needs two grades at all, recorded rather than argued —
+   * the same shape as the note above about dark separating by rule.
+   *
+   * `negative` has to hold 7:1 against `surface-raised` because it is a caption
+   * ink as well as a headline one, and in dark that pins it to a pale salmon:
+   * red is the darkest primary, so on a dark ground a *redder* value is a
+   * *lower* ratio, and there is no deep red in sRGB anywhere near that floor.
+   * The number below is the whole argument in one line — even pure red, the
+   * most saturated danger hue that exists, does not clear the LARGE-text floor
+   * on dark's lightest ground, let alone the body-text one.
+   *
+   * If this ever starts failing, sRGB has been left behind (a P3 or Oklch
+   * palette) and the two grades should be re-derived rather than inherited.
+   */
+  it('records why one danger grade cannot serve both a caption and a headline', () => {
+    const purest = contrast('#ff0000', dark['color-surface-raised'])
+    expect(
+      purest,
+      `pure red on dark surface-raised is ${purest.toFixed(2)}:1`,
+    ).toBeLessThan(4.5)
+  })
+
+  /*
+   * …and the fix's own regression guard. The defect in #151 was not a ratio, it
+   * was a *look*: one text-grade token painting a 32px figure and a bar, both
+   * of which read as washed out. A future edit that re-values `negative-bold`
+   * back towards the text floor would restore the ratio and re-break the
+   * screen, and every threshold assertion above would stay green while it did.
+   * Chroma is what actually moved, so chroma is what is asserted.
+   */
+  it('keeps the loud grade more chromatic than the text grade in both themes', () => {
+    /**
+     * Absolute sRGB chroma, (max − min) / 255 — the channel spread, not HSV
+     * saturation. Normalising by `max` would make light's `#8a1a0d` score 0.91:
+     * an oxblood is *saturated*, it is simply dark, and the complaint in #151
+     * is about colourfulness rather than about purity. The spread separates the
+     * two grades the way an eye does, and does it in both themes at once.
+     */
+    const chroma = (hex: string) => {
+      const parts = [1, 3, 5].map((i) =>
+        Number.parseInt(hex.slice(i, i + 2), 16),
+      )
+      return (Math.max(...parts) - Math.min(...parts)) / 255
+    }
+
+    for (const [themeName, tokens] of [
+      ['light', light],
+      ['dark', dark],
+    ] as const) {
+      const bold = chroma(tokens['color-negative-bold'])
+      const text = chroma(tokens['color-negative'])
+      expect(
+        bold - text,
+        `${themeName}: negative-bold chroma ${bold.toFixed(2)} vs negative ${text.toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(0.2)
+    }
+  })
+
+  /*
+   * The split-brain guard, and it is the reason every assertion above may read
+   * one site and ignore the other.
+   *
+   * A themed colour is declared three times: bare `:root`, the media query, and
+   * `:root[data-theme='dark']`. Add a token to two of the three and nothing in
+   * this file notices — the suite parses light and site 3, both of which would
+   * be complete. What ships is a reader on a dark OS who never opened the theme
+   * menu inheriting the LIGHT value on a dark ground. For `negative-bold` that
+   * is `#c31300` on `#262930`: 2.37:1, below even AA, with a fully green run.
+   *
+   * Asserting equality rather than mere presence, because a value that drifts
+   * between the two sites is the same defect wearing a different hat: the same
+   * screen, two colours, decided by whether a preference was ever saved.
+   */
+  it('declares the same dark palette at both dark sites', () => {
+    expect(media).toEqual(dark)
   })
 
   it('shares no ground value between light and dark', () => {
