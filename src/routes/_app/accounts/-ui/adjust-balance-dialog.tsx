@@ -4,7 +4,6 @@ import { Info } from 'lucide-react'
 
 import {
   Amount,
-  AmountField,
   DirectionalAmount,
   ErrorPanel,
 } from '#/components/app/accounts'
@@ -18,6 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
+  MoneyField,
   TextAreaField,
 } from '#/components/ui'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
@@ -184,7 +184,7 @@ export function AdjustBalanceDialog({
 
                 {result === null ? (
                   <>
-                    <AmountField
+                    <MoneyField
                       locale={locale}
                       name="targetMinor"
                       label={t('accounts.adjust.field.target')}

@@ -293,7 +293,7 @@ export interface NewTransaction {
 /**
  * Records one transaction through `/transactions/new` and answers its id.
  *
- * The amount is *typed*, not set: `AmountField` parses what a person types in their own locale, so
+ * The amount is *typed*, not set: `MoneyField` parses what a person types in their own locale, so
  * a fixture that assigned a number would skip the parse the money specs are about.
  *
  * The id is read off the ledger row's own `href`, which is the link a reader would copy — the same
