@@ -111,8 +111,8 @@ const STATE_INK: Record<UtilisationState, string> = {
  *
  * `ui/Meter`'s danger fill stays on `negative` and that is not an oversight to be tidied up later.
  * This fill is only ever full — `over` means the ratio passed 1, which clamps it to the whole track
- * — so the colour beside it is the card, at 4.70:1. `ui/Meter` fires its danger state *below* 100%,
- * so its fill abuts the track, and there the loud grade measures 3.10:1 against `border-subtle`
+ * — so the colour beside it is the card, at 4.82:1. `ui/Meter` fires its danger state *below* 100%,
+ * so its fill abuts the track, and there the loud grade measures 3.18:1 against `border-subtle`
  * where `negative` measures 7.05:1. Two meters, two reds, one criterion read on two adjacencies.
  */
 const STATE_FILL: Record<UtilisationState, string> = {

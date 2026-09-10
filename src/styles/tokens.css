@@ -79,7 +79,7 @@
    it actually abuts is the card the meter sits on. That is why its binding
    ratios below are stated against the grounds. A PARTIAL fill abuts the track
    instead, and `--color-border-subtle` is a much closer neighbour: this value
-   measures 3.10:1 on it in dark and 3.88:1 in light. Both clear 1.4.11, and
+   measures 3.18:1 on it in dark and 3.88:1 in light. Both clear 1.4.11, and
    `tokens-contrast.test.ts` asserts them so the grade stays usable by a
    partial fill - but the margin is thin enough that `src/components/ui/meter.tsx`,
    whose danger fill IS partial, deliberately keeps `negative` there instead, at
@@ -274,9 +274,18 @@
        primary, so on a dark ground "redder" and "brighter" pull in opposite
        directions. Pure #ff0000 measures 3.64:1 on `raised` - below even the
        large-text floor. This is about the reddest value 4.5:1 leaves in sRGB,
-       and against #f6a898 it carries 1.93x the chroma at 0.58x the luminance,
-       which is the difference between a salmon and a danger colour. */
-    --color-negative-bold: #ff594a; /* 4.70:1 on raised, 5.79:1 on canvas; large-text floor 4.5:1 */
+       and against #f6a898 it carries 1.93x the chroma at 0.60x the luminance,
+       which is the difference between a salmon and a danger colour.
+
+       The binding ground is not a plane. `--color-hover` composites over
+       `surface` to #2b2d30, and a hovered budget row is where this text
+       actually sits, so that is the ground 4.5:1 has to be cleared on - the
+       same correction #159 made for `negative`, for the same reason. #ff594a
+       measured 4.46:1 there, over AA and under this grade's own floor, with
+       `e2e/contrast-enhanced.spec.ts` the only thing in the repository that
+       could see it. The value moved by five steps of green: same sRGB chroma,
+       1.3 degrees of hue. */
+    --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 5.93:1 on canvas, 4.57:1 under --color-hover; large-text floor 4.5:1 */
 
     --color-warning: #e9c46a; /* 8.71:1 on raised, 10.73:1 on canvas */
     --color-warning-soft: #332a12; /* carries --color-warning at 8.49:1 */
@@ -360,7 +369,7 @@
   --color-negative: #f6a898; /* 7.61:1 on raised, 7.20:1 under --color-hover. See the media query. */
   --color-negative-soft: #3a201b; /* 7.82:1 */
   --color-on-negative: #16171a; /* 9.37:1 */
-  --color-negative-bold: #ff594a; /* 4.70:1 on raised; large-text floor 4.5:1 */
+  --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 4.57:1 under --color-hover; large-text floor 4.5:1 */
 
   --color-warning: #e9c46a; /* 8.71:1 on raised */
   --color-warning-soft: #332a12; /* 8.49:1 */

@@ -259,7 +259,7 @@ describe.each([
    * nothing of the track survives to be a boundary.
    *
    * The track is still the adjacency the moment a fill is PARTIAL, and this
-   * asserts the grade stays usable by one: 3.88:1 in light, 3.10:1 in dark. Both
+   * asserts the grade stays usable by one: 3.88:1 in light, 3.18:1 in dark. Both
    * clear 1.4.11's 3:1, and dark's margin being that thin is the finding, not an
    * oversight — it is why `src/components/ui/meter.tsx`, whose danger fill is
    * partial by construction, deliberately keeps `negative` at 7.05:1 instead.

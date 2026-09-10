@@ -341,7 +341,8 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   the way the greys are).
 - **Loud Red** (`negative-bold`): the same ink at the grade that is not held to the text floor -
   the over-budget headline in `AmountMeter` and the over-budget meter fill, and nothing else.
-  5.09:1 on sunken, 6.15:1 on raised; dark `#ff594a` at 4.70:1 on raised. The floors that apply
+  5.09:1 on sunken, 6.15:1 on raised; dark `#ff5e4a` at 4.82:1 on raised and 4.57:1 on a hovered
+  row, which is the binding ground. The floors that apply
   are 4.5:1 (large text: bold at >= 18.66px, WCAG 1.4.6) and 3:1 (a fill, WCAG 1.4.11), so both
   values sit above the stricter of the two on every ground. It exists because one token cannot be
   both a caption ink and a danger colour: `negative` has to hold 7:1, and in dark that pins it to a
@@ -350,7 +351,7 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   **Nor for a partial fill.** `ui/Meter`'s danger state stays on `negative`, and the two meters
   differ because their fills do. The over-budget fill is always the whole track - `over` means the
   ratio passed 1, which clamps it - so its neighbour is the card. `ui/Meter` turns danger _before_
-  100%, so its fill abuts the track, and against `border-subtle` the loud grade measures 3.10:1
+  100%, so its fill abuts the track, and against `border-subtle` the loud grade measures 3.18:1
   where `negative` measures 5.02:1. Both clear 1.4.11, but a boundary the reader actually reads
   deserves the wider one. Same criterion, different adjacency.
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
