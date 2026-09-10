@@ -27,9 +27,15 @@ that make "every interactive element has five states" falsifiable.
 
 ### Reference rows
 
-`DSY-01 missing → done` — the Tailwind 4 `@theme` layer maps every token of `00-S3` to a utility.
-`DSY-02 missing → done` — the primitive gallery route renders every primitive in every state.
-`DSY-03 missing → done` — the state-matrix test.
+`DSY-01 missing → done` — the Tailwind 4 `@theme` layer is declared in `src/styles/app.css` and maps
+the `00-S3` tokens to utilities. Held in one direction only, by
+`src/styles/__tests__/token-classes.test.ts`: every token-shaped class in `src/` resolves to a
+registered token. The converse — every registered token is reachable as a utility, which is what
+_maps every token_ claims — is asserted by nothing (#217).
+`DSY-02 missing → missing` — the primitive gallery route renders every primitive in every state.
+`src/routes/_dev/` does not exist, so neither the route nor its two components do.
+`DSY-03 missing → missing` — the state-matrix test.
+`src/components/__tests__/state-matrix.test.tsx` is absent; issue #21 is what its absence costs.
 
 ### Owned paths
 
@@ -73,9 +79,11 @@ to delete it.
   says so on the page rather than leaving a reader to wonder.
 - **Tokens.** Every token this stage needs already exists from `00-S3`. If a primitive stage reports
   a missing token, it is a `00-foundations.md` requisition and never a hex literal here.
-- **Accessibility.** The gallery is the surface the AAA claims are demonstrated on: every hit area is
-  measured at ≥44×44 CSS px by the visual spec, and the focus ring is checked against
-  `docs/ACCESSIBILITY.md` §3's 2.4.11 / 2.4.12 statement at every scroll position.
+- **Accessibility.** The gallery is designed to be the surface the AAA claims are demonstrated on:
+  every hit area measured at ≥44×44 CSS px by the visual spec, and the focus ring checked against
+  `docs/ACCESSIBILITY.md` §3's 2.4.11 / 2.4.12 statement at every scroll position. It demonstrates
+  none of that today, because it does not exist — where the evidence for those five claims comes
+  from meanwhile is #215.
 
 ### Quota
 
@@ -88,11 +96,13 @@ gallery renders literals.
 
 ### Money invariant
 
-The gallery renders sample amounts through `formatAmount` from `src/lib/money.ts` in both `en` and
-`pl` and for a 0-, 2- and 3-digit currency, so that a regression in `digits` handling is **visible**
-rather than only unit-tested. No amount originates in this stage; every one is a literal minor-unit
-integer in the fixture. Held by `src/lib/__tests__/money.test.ts` (owned by `00-S4`); this stage adds
-no case of its own and says so.
+The gallery renders sample amounts through `formatMoney`, re-exported from `src/lib/money.ts`, in
+both `en` and `pl` and for a 0-, 2- and 3-digit currency, so that a regression in `digits` handling
+is **visible** rather than only unit-tested. No amount originates in this stage; every one is a
+literal minor-unit integer in the fixture. Held by the money suites owned by `00-S4` —
+`src/lib/__tests__/money-core.test.ts`, `src/lib/__tests__/money-convert.test.ts`,
+`src/lib/__tests__/money-allocate.test.ts` and `src/lib/__tests__/money-format.test.ts`; this stage
+adds no case of its own and says so.
 
 ### Verification
 
@@ -100,8 +110,8 @@ no case of its own and says so.
 - `state-matrix.test.tsx` enumerates the primitive barrel and **fails on any exported interactive
   primitive that does not render all five states** — the mechanical form of the §2 clause, so it
   cannot be ticked without being true.
-- `src/styles/__tests__/contrast.test.ts` (owned by `00-S3`) must be green; this stage does not
-  weaken it.
+- `src/styles/__tests__/tokens-contrast.test.ts` (owned by `00-S3`) must be green; this stage does
+  not weaken it.
 - Browser evidence: `/_dev/gallery`, both themes, 360 / 1280 / 2560 px — six frames — plus the forced
   hover, focus-visible, active, disabled and loading rows, which are the point of the stage.
 - axe at the configured rule set on `/_dev/gallery`: zero `serious`, zero `critical`. No `moderate`
@@ -114,7 +124,10 @@ means for every later stage, so ticking one it did not look at is worse here tha
 
 ### Blockers
 
-None.
+None for building the stage. One open question rides on it: `docs/ACCESSIBILITY.md` claims five AAA
+criteria and this stage's gallery is the surface they were designated to be demonstrated on. The
+gallery does not exist, so the provenance of those five claims is unsettled - #215. That is a
+question for a human, not a blocker on the code.
 
 ---
 
@@ -224,7 +237,17 @@ All seven §7 items and all ten §2 clauses, with the motion clause carrying thi
 
 ### Blockers
 
-None.
+- **`motion@^13.2.0` - disposition: defer (#213).** The package is declared in `package.json` and
+  imported by zero files under `src/`. This stage's `src/lib/motion.ts` is its only justification in
+  the repository, so the package and the stage are one decision: remove it, or schedule this stage.
+  `docs/SPEC.md` §3.1 freezes the dependency set and `AGENTS.md` puts the change under **Ask First**,
+  so nothing here touches `package.json`.
+- **The `[data-motion-transform]` reset is unimplemented (#214).** A live accessibility gap rather
+  than a documentation one; the row stays open and the defect is tracked on its own issue.
+- **The drift guard cannot see the shared-path rule (#216).** This stage is the first that could
+  trip it: repointing `src/styles/motion.css` at `src/styles/tokens.css` would have produced a
+  malformed stage that the guard would have passed. The requisition of `DSY-04` into `00-S3` avoids
+  it here; the assertion that would catch the next one is filed against the guard's owner.
 
 ---
 
@@ -237,8 +260,13 @@ boundary that keeps a second implementation from appearing.
 
 ### Reference rows
 
-`DSY-06 missing → done` — the primitive inventory document and the barrel contract.
-`DSY-07 missing → done` — the ESLint boundary rule for `src/components/ui/**`.
+`DSY-06 missing → partial` — the primitive inventory document and the barrel contract. The barrel
+shipped as `src/components/ui/index.ts`. The inventory did not: `docs/DESIGN-PRIMITIVES.md` is
+absent, and so is `src/components/__tests__/no-duplicate-primitives.test.ts`, which cross-checks the
+two against each other. The row stays open on the inventory half, which this stage still owns.
+`DSY-07 missing → done` — the ESLint boundary rule for `src/components/ui/**` is in
+`eslint.config.js`, as a `no-restricted-imports` block scoped to that directory: _components/ui never
+imports from server/. Pass data in as props._
 
 ### Owned paths
 
@@ -276,10 +304,20 @@ None — no data access.
 
 ### Money invariant
 
-The inventory records that there is **exactly one** amount input (`MoneyField`, `00-S10`) and
-**exactly one** amount column helper (`data-table.tsx`, `00-S8`) in the product, and that both
-delegate to `src/lib/money.ts`. `no-duplicate-primitives.test.ts` fails if a second component
-exporting a currency-formatting function appears anywhere under `src/components/`.
+The inventory records that there is **exactly one** amount input and **exactly one** amount column
+helper in the product, and that both delegate to `src/lib/money.ts`. Measured at the reconciliation:
+
+- The amount **input** is settled. `MoneyField` shipped as `src/components/ui/money-field.tsx` under
+  issue #106, which consolidated two feature-local amount fields into the one primitive `00-S10`
+  designated; `00-foundations.md` records it as `FND-23 missing → done`. The one-owner claim is true
+  of the tree today, and this document no longer describes it as a gap.
+- The amount **column helper** is still owed. `src/components/ui/data-table.tsx` does not exist, and
+  the only `data-table.tsx` in the tree is `src/components/charts/data-table.tsx`, which is the
+  chart text equivalent required by ADR 0007 and not a reusable table. `00-foundations.md` carries
+  that as `FND-18 missing → partial`; nothing here re-opens or duplicates it.
+
+`no-duplicate-primitives.test.ts` fails if a second component exporting a currency-formatting
+function appears anywhere under `src/components/`.
 
 ### Verification
 
@@ -297,4 +335,8 @@ exporting a currency-formatting function appears anywhere under `src/components/
 
 ### Blockers
 
-None.
+None for building the stage. One figure depends on it: `docs/plans/README.md` describes this plan as
+`~45 React Aria primitives`, which is not derivable from the tree - 40 modules besides the barrel, 80
+export statements, 118 exported symbols, and no counting rule anywhere. `docs/DESIGN-PRIMITIVES.md`
+is that counting rule, so the register figure is re-stated from the inventory once this stage ships
+(#218).
