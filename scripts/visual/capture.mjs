@@ -48,7 +48,7 @@
  *     --label A \
  *     --viewports 1440x900,360x800 \
  *     --themes light,dark \
- *     [--auth] [--state hover-row] \
+ *     [--auth] [--auth empty] [--state hover-row] \
  *     [--hover 'selector'] [--click 'selector'] [--settle 800] \
  *     [--enter 'selector'] [--enter-from https://host/] [--viewport-only] \
  *     [--force-state loading|error] [--force-from http://localhost:3010/accounts]
@@ -67,7 +67,15 @@ import { chromium } from '@playwright/test'
 
 import { anonymousOnlyRefusal } from './anonymous-only.mjs'
 
-const AUTH_STATE = 'e2e/.auth/demo.json'
+/**
+ * Where the Playwright setup project caches its signed-in sessions.
+ *
+ * `--auth` replays `demo`, the seeded workspace, which is what almost every capture wants. `--auth
+ * <name>` replays a different one — `empty` is how an empty state gets photographed at all, since
+ * the screens that have one only show it to a workspace with nothing in it.
+ */
+const AUTH_DIR = 'e2e/.auth'
+const DEFAULT_SESSION = 'demo'
 const DEV_TOOLBAR = '[data-testid="tanstack_devtools"]'
 
 /**
@@ -396,7 +404,19 @@ async function settleForced(page) {
 }
 
 async function main() {
-  const wantsAuth = flag('auth')
+  // A bare `--auth`, `--auth true` and `--auth demo` mean the same thing; `--auth <name>` picks
+  // another cached session. `--auth false` still means no.
+  const authArg = opt.auth
+  const wantsAuth = authArg !== undefined && authArg !== 'false'
+  const session =
+    typeof authArg === 'string' && authArg !== 'true'
+      ? authArg
+      : DEFAULT_SESSION
+  if (/[/\\]/.test(session)) {
+    console.error('capture: --auth must name a session, not a path')
+    process.exit(2)
+  }
+  const authState = `${AUTH_DIR}/${session}.json`
   const enter = typeof opt.enter === 'string' ? opt.enter : undefined
   const enterFrom =
     typeof opt['enter-from'] === 'string' ? opt['enter-from'] : undefined
@@ -445,9 +465,9 @@ async function main() {
     process.exit(2)
   }
 
-  if (wantsAuth && !existsSync(AUTH_STATE)) {
+  if (wantsAuth && !existsSync(authState)) {
     console.error(
-      `capture: --auth was asked for but ${AUTH_STATE} does not exist. ` +
+      `capture: --auth was asked for but ${authState} does not exist. ` +
         `Run the Playwright setup project first: pnpm exec playwright test --project=setup`,
     )
     process.exit(2)
@@ -457,7 +477,7 @@ async function main() {
 
   const browser = await chromium.launch()
   const context = await browser.newContext({
-    storageState: wantsAuth ? AUTH_STATE : undefined,
+    storageState: wantsAuth ? authState : undefined,
     deviceScaleFactor: 1,
     locale: 'en-GB',
     timezoneId: 'UTC',
@@ -580,7 +600,7 @@ async function main() {
       if (wantsAuth && new URL(page.url()).pathname.startsWith('/login')) {
         throw new Error(
           `--auth was asked for but ${url} redirected to ${page.url()}. The cached session in ` +
-            `${AUTH_STATE} is stale or the workspace is unseeded. Refresh it with: ` +
+            `${authState} is stale or the workspace is unseeded. Refresh it with: ` +
             `PLAYWRIGHT_BASE_URL=${origin} pnpm exec playwright test --project=setup`,
         )
       }
