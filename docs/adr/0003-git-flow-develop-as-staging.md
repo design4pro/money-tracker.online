@@ -145,11 +145,12 @@ an `allowed_merge_methods` parameter, today `["merge", "squash", "rebase"]`. Nar
 `["merge"]` refuses a squash at the button on `main` and touches nothing else.
 
 ```bash
-# Requires repository admin; no agent run holds it.
-gh api --method PUT repos/design4pro/money-tracker.online/rulesets/22037770 \
-  --input <(gh api repos/design4pro/money-tracker.online/rulesets/22037770 \
-    | jq '.rules |= map(if .type == "pull_request"
-          then .parameters.allowed_merge_methods = ["merge"] else . end)')
+# Requires repository admin; no agent run holds it. The PUT is a partial update, so it sends only
+# the `rules` array - handing the whole GET response back would post read-only fields with it.
+gh api repos/design4pro/money-tracker.online/rulesets/22037770 \
+  | jq '{rules: (.rules | map(if .type == "pull_request"
+        then .parameters.allowed_merge_methods = ["merge"] else . end))}' \
+  | gh api --method PUT repos/design4pro/money-tracker.online/rulesets/22037770 --input -
 ```
 
 **Until that is applied, this is a convention and not a mechanism.** #148 was merged by a person
