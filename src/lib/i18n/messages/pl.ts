@@ -2230,8 +2230,8 @@ const messages = {
   'rules.back': 'Wróć do zasad',
   'rules.list.loading': 'Wczytujemy Twoje zasady…',
   'rules.editor.loading': 'Wczytujemy edytor zasady…',
-  'rules.editor.error.title': 'Nie udało się wczytać edytora zasady',
-  'rules.editor.error.body':
+  'rules.editor.load.error.title': 'Nie udało się wczytać edytora zasady',
+  'rules.editor.load.error.body':
     'Żadna zasada nie została utworzona ani zmieniona. Spróbuj ponownie za chwilę.',
   'rules.error.title': 'Nie udało się wczytać zasad',
   'rules.error.body':

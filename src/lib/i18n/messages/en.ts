@@ -2184,8 +2184,11 @@ const messages = {
   'rules.back': 'Back to the rules',
   'rules.list.loading': 'Loading your rules…',
   'rules.editor.loading': 'Loading the rule editor…',
-  'rules.editor.error.title': 'The rule editor could not be loaded',
-  'rules.editor.error.body':
+  // `rules.editor.error.*` further down is the *save* failure. This pair is the load failure, and
+  // the two must not be merged: one says the rule you wrote is still unsaved, the other that the
+  // editor never opened.
+  'rules.editor.load.error.title': 'The rule editor could not be loaded',
+  'rules.editor.load.error.body':
     'No rule was created or changed. Try again in a moment.',
   'rules.error.title': 'The rules could not be loaded',
   'rules.error.body':
