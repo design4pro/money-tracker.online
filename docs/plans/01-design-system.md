@@ -33,13 +33,19 @@ that make "every interactive element has five states" falsifiable.
 
 ### Owned paths
 
-- `src/styles/theme.css` — new
-- `src/styles/app.css` — new
+- `src/styles/app.css` — edit
 - `src/routes/_dev/gallery.tsx` — new
 - `src/routes/_dev/-ui/state-grid.tsx` — new
 - `src/routes/_dev/-ui/token-sheet.tsx` — new
 - `src/components/__tests__/state-matrix.test.tsx` — new
 - `e2e/design-system.visual.spec.ts` — new
+
+This stage originally declared `src/styles/theme.css — new` beside `src/styles/app.css`. There is no
+`theme.css`: the Tailwind 4 `@theme inline` layer is declared inside `app.css`, and the two entries
+are one. `app.css` opens with the reason it stays there — `tokens.css` must land unlayered and
+_before_ the layer for a single `data-theme` attribute to repaint the product, and splitting the
+layer into a fourth file would put that ordering contract in two places. So the entry is `— edit`,
+and extracting the layer is explicitly not this plan's work.
 
 ### Data and migration
 
@@ -123,10 +129,18 @@ None.
 
 ### Owned paths
 
-- `src/styles/motion.css` — new
 - `src/lib/motion.ts` — new
 - `src/lib/__tests__/motion.test.ts` — new
 - `e2e/reduced-motion.visual.spec.ts` — new
+
+This stage originally declared `src/styles/motion.css — new`. The motion contract shipped, but it
+shipped inside `src/styles/tokens.css` — one of the eight shared paths that belong to
+`00-foundations.md` and to nothing else (`README.md` → _The eight shared paths_). Repointing the
+entry at the file where its subject actually lives would therefore make this stage **malformed**,
+and the drift guard would not catch it, because the guard checks that a path exists and not who is
+allowed to own it. The entry is removed rather than repointed, `DSY-04` is requisitioned into
+`00-S3`, and what this stage still asks of the shared file is written under _UI_ below as a
+requirement rather than as ownership.
 
 ### Data and migration
 
@@ -139,6 +153,15 @@ None.
 ### UI (route, components)
 
 - **Route.** None of its own; it is verified on `/_dev/gallery`.
+- **Requisition — `00-S3`, `src/styles/tokens.css`.** This stage does not own the motion tokens, the
+  keyframe set or the global reduced-motion block; `00-foundations.md` writes the shared files and
+  `DSY-04` records that they shipped. What this stage requires of them, as a requirement rather than
+  as ownership: a duration scale whose slowest step stays under the 400 ms ceiling, an easing set,
+  keyframes that animate `transform` and `opacity` only, and a `prefers-reduced-motion: reduce`
+  block that collapses every one of the durations rather than blanket-killing animation — because a
+  `!important` `animation: none` breaks components that wait on `animationend`, which is how a
+  dialog that never closes gets shipped. All of that is in the tree; the one clause that is not is
+  the `[data-motion-transform]` reset, and it stays an open requirement below.
 - **Components.** `src/lib/motion.ts` exports `useReducedMotion()` and the `motion` package's shared
   transition presets. Every animation in the product goes through one of them.
 - **States.** Not applicable — no async surface.
