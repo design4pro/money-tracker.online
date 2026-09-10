@@ -45,13 +45,13 @@ import { newId } from '#/server/db/ids'
 import { notificationPrefs, notifications } from '#/server/db/schema'
 
 import { allOf, createTenantRepository, createTenantTableAccess } from './base'
-import { DEFAULT_PAGE_SIZE, clampPageSize } from './pagination'
+import { clampPageSize, pageInputSchema } from './pagination'
 
 import type { NotificationKind } from '#/lib/enums'
 import type { NotificationPrefRow, NotificationRow } from '#/server/db/schema'
 import type { ChannelDefaults } from '#/server/notify/kinds'
 import type { TenantScope } from './base'
-import type { CursorPage } from './pagination'
+import type { CursorPage, PageInput } from './pagination'
 
 /** A repository rather than plain table access: {@link pageForReader} needs its keyset `page`. */
 const notificationRepo = createTenantRepository(notifications, 'notification')
@@ -98,11 +98,11 @@ export type InsertNotificationInput = z.infer<typeof insertSchema>
 /* Writes — the dispatcher's alone                                            */
 /* -------------------------------------------------------------------------- */
 
-/** `'written'` on a new row; `'deduped'` when this workspace already told this person this. */
-export type InsertOutcome = 'written' | 'deduped'
-
 /**
- * Writes one notification, or reports that this occasion already reached this person.
+ * Writes one notification and returns it, or `null` when this workspace already told this person.
+ *
+ * The row rather than a word, because the caller needs its `id`: the email leg is *about* a
+ * notification, and `#/server/notify/email` is handed the id of the row a reader will open.
  *
  * **`#/server/notify/dispatch` is the only intended caller.** See the module docblock.
  */
@@ -110,9 +110,9 @@ export async function insertNotification(
   scope: TenantScope,
   input: InsertNotificationInput,
   now: Date,
-): Promise<InsertOutcome> {
+): Promise<NotificationRow | null> {
   const parsed = insertSchema.parse(input)
-  const row = await notificationRepo.insertOnConflictDoNothing(
+  return notificationRepo.insertOnConflictDoNothing(
     scope,
     {
       id: newId(),
@@ -130,8 +130,6 @@ export async function insertNotification(
       notifications.dedupeKey,
     ],
   )
-
-  return row === null ? 'deduped' : 'written'
 }
 
 /* -------------------------------------------------------------------------- */
@@ -146,13 +144,14 @@ export async function insertNotification(
  */
 export async function pageForReader(
   scope: TenantScope,
-  options: { readonly cursor?: string | null; readonly limit?: number } = {},
+  input: PageInput = {},
 ): Promise<CursorPage<NotificationRow>> {
-  const limit = clampPageSize(options.limit ?? DEFAULT_PAGE_SIZE)
+  const parsed = pageInputSchema.parse(input)
   return notificationRepo.page(scope, {
     where: eq(notifications.userId, scope.ctx.userId),
-    limit,
-    cursor: options.cursor ?? null,
+    // Parsing rejects a limit above `MAX_PAGE_SIZE`; clamping is for the absent one.
+    limit: clampPageSize(parsed.limit),
+    cursor: parsed.cursor ?? null,
   })
 }
 

@@ -175,6 +175,29 @@ export async function listMembers(
 }
 
 /**
+ * Whether one person belongs to the scope's workspace.
+ *
+ * `listMembers(...).some(...)` answers the same question, and the notification dispatcher asks it
+ * once per recipient per occasion — a five-member household with twenty crossings would join
+ * `member` to `user` and build twenty full membership lists to decide twenty booleans. This is the
+ * indexed lookup that question actually is.
+ *
+ * It is a check on the *addressee*, not on the caller: `notify` uses it to refuse writing a row
+ * addressed to somebody who could never open it.
+ */
+export async function isMember(
+  scope: TenantScope,
+  userId: string,
+): Promise<boolean> {
+  const rows = await scope.db
+    .select({ id: member.id })
+    .from(member)
+    .where(allOf(tenantFilter(scope, member), eq(member.userId, userId)))
+    .limit(1)
+  return rows.length > 0
+}
+
+/**
  * The invitations still worth showing: `pending`, newest first.
  *
  * Expired ones are included and carry their `expiresAt`, so the screen can show "expired" with a

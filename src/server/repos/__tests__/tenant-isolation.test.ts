@@ -86,6 +86,8 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
+import { isMember } from '../members'
+import { notify } from '#/server/notify/dispatch'
 import {
   advanceImportBatch,
   createImportBatch,
@@ -1131,7 +1133,7 @@ describe('notifications cannot be read, counted or marked across a workspace bou
         },
         AT,
       ),
-    ).toBe('written')
+    ).not.toBeNull()
 
     // Absent from A's page and A's badge — not merely unreadable by id.
     expect((await pageForReader(world.scope)).items).toEqual([])
@@ -1156,14 +1158,14 @@ describe('notifications cannot be read, counted or marked across a workspace bou
         { userId: 'user-a', kind: KIND, payloadJson: '{"v":1}', dedupeKey },
         AT,
       ),
-    ).toBe('written')
+    ).not.toBeNull()
     expect(
       await insertNotification(
         world.otherScope,
         { userId: 'user-b', kind: KIND, payloadJson: '{"v":1}', dedupeKey },
         AT,
       ),
-    ).toBe('written')
+    ).not.toBeNull()
 
     expect(await countUnread(world.scope)).toBe(1)
     expect(await countUnread(world.otherScope)).toBe(1)
@@ -1177,9 +1179,9 @@ describe('notifications cannot be read, counted or marked across a workspace bou
       dedupeKey: 'budget:threshold:v1:budget-1:2026-03-01:80',
     }
 
-    expect(await insertNotification(world.scope, input, AT)).toBe('written')
+    expect(await insertNotification(world.scope, input, AT)).not.toBeNull()
     // The retry a cron makes after a transient failure, since the marker is written last.
-    expect(await insertNotification(world.scope, input, AT)).toBe('deduped')
+    expect(await insertNotification(world.scope, input, AT)).toBeNull()
     expect(await countUnread(world.scope)).toBe(1)
   })
 
@@ -1284,5 +1286,62 @@ describe('notifications cannot be read, counted or marked across a workspace bou
     )) {
       expect(statement).toContain('organization_id')
     }
+  })
+})
+
+describe('membership is a question about one workspace at a time', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('does not see B’s member from A’s scope, or the reverse', async () => {
+    await expect(isMember(world.scope, 'user-a')).resolves.toBe(true)
+    await expect(isMember(world.scope, 'user-b')).resolves.toBe(false)
+    await expect(isMember(world.otherScope, 'user-b')).resolves.toBe(true)
+    await expect(isMember(world.otherScope, 'user-a')).resolves.toBe(false)
+  })
+
+  it('scopes the lookup, so the answer cannot come from another workspace’s row', async () => {
+    harnessExecuted.length = 0
+    await isMember(world.scope, 'user-b')
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('from "member"'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+
+  it('turns notify into a no-op for somebody who belongs to the other workspace', async () => {
+    // The dispatcher’s own refusal, end to end: `user-b` exists and is a member *somewhere*, which
+    // is exactly the case a check on `user` rather than on `member` would wave through.
+    const outcome = await notify(
+      world.scope,
+      {
+        userId: 'user-b',
+        kind: 'budget.threshold_crossed',
+        payload: {
+          v: 1,
+          budgetId: 'budget-1',
+          budgetName: 'Groceries',
+          periodStart: '2026-03-01',
+          threshold: 80,
+          spentMinor: 160_000,
+          availableMinor: 200_000,
+          currencyCode: 'PLN',
+        },
+        dedupeKey: 'budget:threshold:v1:budget-1:2026-03-01:80',
+      },
+      new Date('2026-03-15T10:00:00.000Z'),
+    )
+
+    expect(outcome).toBe('skipped')
+    // Nothing written in either workspace — not A’s, and not the one `user-b` does belong to.
+    expect(await countUnread(world.scope)).toBe(0)
+    expect(await countUnread(world.otherScope)).toBe(0)
   })
 })
