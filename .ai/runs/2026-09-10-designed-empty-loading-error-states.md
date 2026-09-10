@@ -165,8 +165,8 @@ spec's per-Phase PRs; recorded here because the spec's Phasing section says othe
 - [x] 3.3 `/import/$batchId` pending and error components — fdff08a
 - [x] 3.4 `/invite/$invitationId` pending component — f1f8ca8
 - [x] 3.5 `/payees/$payeeId` pending component — c78022f, 3f8e31b
-- [ ] 3.6 `/transactions/rules`, `$ruleId` and `new` pending and error components
-- [ ] 3.7 Split not-found from error on `/transactions/$transactionId`
+- [x] 3.6 `/transactions/rules`, `$ruleId` and `new` pending and error components — 03dfd26
+- [x] 3.7 Split not-found from error on `/transactions/$transactionId` — d61f821
 
 ### Phase 4: Reachability, coverage and evidence
 
