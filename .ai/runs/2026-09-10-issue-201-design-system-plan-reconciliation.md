@@ -177,6 +177,9 @@ visible motion change across every primitive. Any diff touching `src/`, `e2e/`, 
 ### Phase 3: Join the guard
 
 - [x] 3.1 Add plan 01 to the opt-in list — bfbe7e0
-- [ ] 3.2 Spec lifecycle bookkeeping
-- [ ] 3.3 The full gate
-- [ ] 3.4 File the follow-ups
+- [x] 3.2 Spec lifecycle bookkeeping — 96e6715
+- [x] 3.3 The full gate — 173 files / 2640 tests passed, lint 0 errors, build clean
+- [x] 3.4 File the follow-ups — #213, #214, #215, #216, #217, #218; the seventh finding is issue #108, not duplicated
+
+> Step 3.4 ran before Phase 2 finished, because Steps 2.3 and 2.4 have to cite the issue numbers
+> from the row and `### Blockers` entries they rewrite. The order in the plan above is unchanged.
