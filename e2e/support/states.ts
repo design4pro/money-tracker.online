@@ -18,9 +18,11 @@ import type { Page, Route } from '@playwright/test'
  *
  * {@link SERVER_FN_PATTERN} is the whole surface because a screen's loading state is a property of the
  * screen, not of one read: `/import` waits on three server functions and holding one of them
- * proves nothing about what the reader sees. TanStack Start base64-encodes the function id into
- * the path, so matching a single one would mean matching an opaque string that changes when the
- * module moves.
+ * proves nothing about what the reader sees. Matching one would also mean matching a string this
+ * file cannot compute: the id in the path is the *module* under `vite dev`
+ * (`{"file":"/src/routes/_app.tsx…"}`, base64) and an opaque content hash under a production build
+ * (`/_serverFn/55a4d3d8…`, which appears nowhere but the bundle). Nothing about a server function
+ * is nameable from a test in both environments, and CI runs the second one.
  *
  * ## Releasing before unrouting
  *
@@ -48,20 +50,27 @@ const SERVER_FN_PATTERN = '**/_serverFn/**'
  * skeleton bars, and the account list is gone. With the shell held: zero `role="status"`, the list
  * still on screen.
  *
- * TanStack Start base64-encodes `{"file":…,"export":…}` into the path, so the module is readable
- * from the URL without the application having to declare anything.
+ * ## Which request it is, in a way that survives a production build
+ *
+ * By **arrival order**, not by name — see the file header for why no name works in both
+ * environments. The same router rule that makes the shell dangerous to hold also makes it
+ * identifiable: no loader beneath `_app` may start until `_app.beforeLoad` has resolved, so on a
+ * client-side navigation the shell's read is necessarily the *first* `/_serverFn/*` request the
+ * browser makes, and every request after it belongs to the routes whose pending state the hold
+ * exists to photograph. Measured on that same navigation, from the request log: the shell starts
+ * at 1909 ms and finishes at 1924 ms, the account-detail read starts at 1927 ms, and the two reads
+ * the detail screen makes start at 1974 ms. The gap is causal, not incidental.
+ *
+ * The id is remembered rather than just counted, so a repeat of the same read — TanStack Query is
+ * configured with `retry: 1` — is let through as well.
+ *
+ * This costs the helper its one precondition: install it on a page whose next server-function
+ * request is a client-side navigation's. That is what {@link holdServerFns} is for, and a hold
+ * installed anywhere else fails loudly rather than quietly — the read that was meant to be held
+ * goes through, no skeleton is drawn, and the count assertion reports zero.
  */
-const APP_SHELL_MODULE = '/src/routes/_app.tsx'
-
-/** The module a server-function URL names, or `''` when the path is not one this build wrote. */
-function moduleOf(url: string): string {
-  const parts = new URL(url).pathname.split('/_serverFn/')
-  if (parts.length < 2) return ''
-  try {
-    return Buffer.from(decodeURIComponent(parts[1]), 'base64').toString('utf8')
-  } catch {
-    return ''
-  }
+function serverFnIdOf(url: string): string {
+  return new URL(url).pathname.split('/_serverFn/')[1] ?? ''
 }
 
 /** A server-side failure, in the shape TanStack Start's client fetcher will surface as an error. */
@@ -96,13 +105,18 @@ type Routable = Pick<Page, 'route' | 'unroute'>
  *
  * Two things are easy to get wrong here and both produce a green test that proves nothing. A
  * `page.goto` will not do — it is served by SSR and produces no `/_serverFn/*` request at all. And
- * the shell's own read must be let through: see {@link APP_SHELL_MODULE}.
+ * the shell's own read must be let through: see {@link serverFnIdOf}.
  */
 export async function holdServerFns(
   page: Routable,
 ): Promise<ServerFnInterception> {
+  // The first id this interception sees; see `serverFnIdOf` for why that is the shell's. Assigned
+  // before the handler yields, so two requests arriving in the same tick cannot both claim it.
+  let shell: string | undefined
   return intercept(page, async (route, isReleased) => {
-    if (moduleOf(route.request().url()).includes(APP_SHELL_MODULE)) {
+    const id = serverFnIdOf(route.request().url())
+    shell ??= id
+    if (id === shell) {
       await route.continue().catch(() => undefined)
       return
     }
@@ -112,11 +126,20 @@ export async function holdServerFns(
 }
 
 /**
- * Answer every server-function request with a `500`, except the application shell's.
+ * Answer every server-function request with a `500`.
  *
- * The shell is excluded for the same reason as in {@link holdServerFns} and one more: a failing
- * `_app.beforeLoad` takes the whole shell to its own error boundary, so the screen under test never
- * renders and the assertion is about the wrong error panel.
+ * Every one, with no exception for the shell — and that is a statement about *where this helper may
+ * be installed*, not an oversight. A failing `_app.beforeLoad` takes the whole shell to its own
+ * error boundary, so the screen under test never renders and the assertion lands on the wrong
+ * error panel. The ordering rule {@link holdServerFns} uses cannot rescue this one: a failure test
+ * installs the interception on a blank page and then does a **full document load**, where the
+ * shell's read happens during SSR and the first request the browser makes is the client read under
+ * test, not the shell's.
+ *
+ * So the precondition is the installation order `states.spec.ts` already measures and documents:
+ * install this before a `page.goto`, and reach the failing read from the screen that load renders.
+ * A client-side navigation under this helper would fail the shell, and needs its own answer before
+ * it is written.
  *
  * Naturally idempotent under TanStack Query's `retry: 1`: each request is fulfilled on its own, so
  * the second attempt gets the same answer as the first rather than falling through to the server.
@@ -129,10 +152,6 @@ export async function failServerFns(
   page: Routable,
 ): Promise<ServerFnInterception> {
   return intercept(page, async (route) => {
-    if (moduleOf(route.request().url()).includes(APP_SHELL_MODULE)) {
-      await route.continue().catch(() => undefined)
-      return
-    }
     await route.fulfill(INTERNAL_SERVER_ERROR).catch(() => undefined)
   })
 }

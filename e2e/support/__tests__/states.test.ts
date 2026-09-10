@@ -25,17 +25,27 @@ import type { Page, Route } from '@playwright/test'
 /** What a stub route was asked to do, in the order it was asked. */
 type RouteCall = 'continue' | 'fulfill'
 
-/** The URL TanStack Start gives one server function: `{"file":…}`, base64, in the path. */
-function serverFnUrl(module: string): string {
-  const payload = JSON.stringify({
-    file: `${module}?tss-serverfn-split`,
-    export: 'thing_createServerFn_handler',
-  })
-  return `http://127.0.0.1:3016/_serverFn/${Buffer.from(payload).toString('base64')}`
+/**
+ * The URL TanStack Start gives one server function.
+ *
+ * A production build's shape, because that is the one CI serves: the id is an opaque content hash,
+ * and the arguments — where there are any — ride in `?payload=`, outside the path. Under
+ * `vite dev` the id is base64 of `{"file":…,"export":…}` instead; the helpers read neither, which
+ * is the point of the change these cases pin.
+ */
+function serverFnUrl(id: string, payload?: string): string {
+  const query =
+    payload === undefined ? '' : `?payload=${encodeURIComponent(payload)}`
+  return `http://127.0.0.1:3016/_serverFn/${id}${query}`
 }
 
-const SHELL_URL = serverFnUrl('/src/routes/_app.tsx')
-const SCREEN_URL = serverFnUrl('/src/routes/_app/accounts/-server/detail.ts')
+const SHELL_URL = serverFnUrl(
+  '55a4d3d846d083c813fe9965d7eebd9d27fffa91adbec60adc40b53caa1d6b7e',
+)
+const SCREEN_URL = serverFnUrl(
+  '8125d7715f0b26a4ab90f2b1cd0f9a4c50b7a6c0a4a4a7d9c9b62b1e4ff0a3d2',
+  '{"data":"demo-acc-1"}',
+)
 
 function stubRoute(log: Array<RouteCall>, url = SCREEN_URL) {
   return {
@@ -100,9 +110,15 @@ describe('holdServerFns', () => {
   })
 
   it('leaves a request open until the test releases', async () => {
+    // The shell's read goes first here and in the case below, because that is the order the router
+    // makes them in and the order the helper keys on: `_app.beforeLoad` resolves before any loader
+    // beneath it starts, and the screen's read is what a hold exists to suspend.
     const stub = stubPage()
     const held = await holdServerFns(stub.page)
     const log: Array<RouteCall> = []
+
+    await stub.deliver(stubRoute(log, SHELL_URL))
+    log.length = 0
 
     const request = stub.deliver(stubRoute(log))
     // The point of the helper: the screen stays in its loading state.
@@ -121,6 +137,9 @@ describe('holdServerFns', () => {
     const held = await holdServerFns(stub.page)
     const log: Array<RouteCall> = []
 
+    await stub.deliver(stubRoute(log, SHELL_URL))
+    log.length = 0
+
     const requests = [
       stub.deliver(stubRoute(log)),
       stub.deliver(stubRoute(log)),
@@ -134,10 +153,16 @@ describe('holdServerFns', () => {
   })
 
   it('lets the application shell through, because holding it freezes the router first', async () => {
-    // The measurement behind this is in `states.ts` → `APP_SHELL_MODULE`: `_app.beforeLoad` awaits
-    // the shell read, and TanStack Router resolves `beforeLoad` before it renders any pending
+    // The measurement behind this is in `states.ts` → `serverFnIdOf`: `_app.beforeLoad` awaits the
+    // shell read, and TanStack Router resolves `beforeLoad` before it renders any pending
     // component. Hold the shell and the loading state under test never appears at all — the URL
     // changes, the previous screen stays, and the spec passes or fails for the wrong reason.
+    //
+    // It is the *first* request that is let through rather than a named one, because no name for
+    // it exists in both environments: under `vite dev` the path carries the module, under the
+    // production build CI serves it carries an opaque hash. The router's own ordering is the thing
+    // that reads the same in both — no loader beneath `_app` starts until its `beforeLoad` has
+    // resolved.
     const stub = stubPage()
     await holdServerFns(stub.page)
     const log: Array<RouteCall> = []
@@ -149,6 +174,41 @@ describe('holdServerFns', () => {
     // Everything after it is still held.
     const screen = stub.deliver(stubRoute(log))
     expect(await hasSettled(screen)).toBe(false)
+  })
+
+  it('lets the shell through again on a retry, rather than only counting to one', async () => {
+    // TanStack Query is configured with `retry: 1`, so a shell read that fails once arrives twice.
+    // Holding the second attempt would freeze the router just as holding the first would, so the
+    // id is remembered rather than a request simply being counted off.
+    const stub = stubPage()
+    await holdServerFns(stub.page)
+    const log: Array<RouteCall> = []
+
+    await stub.deliver(stubRoute(log, SHELL_URL))
+    await stub.deliver(stubRoute(log, SHELL_URL))
+    expect(log).toEqual(['continue', 'continue'])
+
+    const screen = stub.deliver(stubRoute(log))
+    expect(await hasSettled(screen)).toBe(false)
+  })
+
+  it('reads the id from the path, so the same read with arguments is still held', async () => {
+    // `?payload=` carries a server function's arguments and is not part of its identity. A screen
+    // that reads the same function twice with different arguments must have both held, or half its
+    // loading state resolves while the test is photographing it.
+    const stub = stubPage()
+    await holdServerFns(stub.page)
+    const log: Array<RouteCall> = []
+
+    await stub.deliver(stubRoute(log, SHELL_URL))
+    const first = stub.deliver(
+      stubRoute(log, serverFnUrl('aaaa', '{"data":"one"}')),
+    )
+    const second = stub.deliver(
+      stubRoute(log, serverFnUrl('aaaa', '{"data":"two"}')),
+    )
+    expect(await hasSettled(first)).toBe(false)
+    expect(await hasSettled(second)).toBe(false)
   })
 
   it('can be released twice, because a test with a finally will', async () => {
@@ -187,15 +247,19 @@ describe('failServerFns', () => {
     expect(stub.patterns).toEqual([])
   })
 
-  it('never fails the application shell, whose boundary would replace the screen', async () => {
-    // A failing `_app.beforeLoad` takes the whole shell to its own error boundary, so the screen
-    // under test never renders and the assertion lands on the wrong error panel.
+  it('fails every server function alike, which is why installation order is the contract', async () => {
+    // This helper cannot recognise the shell: a failure test installs it on a blank page and then
+    // does a full document load, so the shell's read happens during SSR and the first request the
+    // browser makes is the client read under test — the arrival-order rule `holdServerFns` uses
+    // would fulfil exactly the wrong one. What keeps a failing `_app.beforeLoad` from taking the
+    // shell to its own error boundary is therefore the installation order `states.spec.ts`
+    // measures, not a special case here, and this pins the uniformity that ordering rests on.
     const stub = stubPage()
     await failServerFns(stub.page)
     const log: Array<RouteCall> = []
 
     await stub.deliver(stubRoute(log, SHELL_URL))
     await stub.deliver(stubRoute(log))
-    expect(log).toEqual(['continue', 'fulfill'])
+    expect(log).toEqual(['fulfill', 'fulfill'])
   })
 })
