@@ -3,7 +3,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft, Pencil, X } from 'lucide-react'
 
 import { ErrorPanel } from '#/components/app/accounts'
-import { PayeeAvatar } from '#/components/app/payees'
+import { PayeeAvatar, PayeeDetailSkeleton } from '#/components/app/payees'
 import {
   Badge,
   Button,
@@ -49,6 +49,7 @@ export const Route = createFileRoute('/_app/payees/$payeeId')({
     ])
     return { detail, categories }
   },
+  pendingComponent: PayeeDetailSkeleton,
   errorComponent: PayeeDetailError,
   head: ({ matches, loaderData }) =>
     pageHead(
