@@ -164,8 +164,8 @@ visible motion change across every primitive. Any diff touching `src/`, `e2e/`, 
 
 ### Phase 1: Classify
 
-- [ ] 1.1 The plan-01 class map
-- [ ] 1.2 Re-measure the seven rows
+- [x] 1.1 The plan-01 class map — b020c8a
+- [x] 1.2 Re-measure the seven rows — https://github.com/design4pro/money-tracker.online/pull/205#issuecomment-5623383237
 
 ### Phase 2: Reconcile
 
