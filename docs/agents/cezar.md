@@ -147,9 +147,12 @@ into a fact.
   scope grant. Note what that costs: a check
   posted by an installed GitHub App rather than by a workflow would be invisible to a run, and this
   paragraph would stop being true without any signal that it had.
-- **Required checks.** **get-required-checks** answers 403 here, and would answer 404 even with
-  Administration: read, because it reads _classic branch protection_ and this repository's gate is a
-  repository **ruleset**. The readable truth needs Metadata alone:
+- **Required checks.** **get-required-checks** answers 403 here on 2026-09-10 _with_ the drifted
+  Administration: read in hand — `branches/develop/protection/required_status_checks` refuses this
+  token whatever the picker grants, so do not read the 403 as the missing-permission signal the rest
+  of this section uses it for. The status code is moot anyway: that call reads _classic branch
+  protection_ and this repository's gate is a repository **ruleset**, so neither a 403 nor a 404 nor
+  a 200 from it would be the required set. The readable truth needs Metadata alone:
   `gh api repos/{owner}/{repo}/rules/branches/{branch} --jq '.[].type'`. On 2026-09-09 both
   `develop` and `main` resolved to `deletion`, `non_fast_forward`, `pull_request` and nothing else:
   **no status check is required by the ruleset**, and the merge gate is the pull-request rule with
@@ -173,8 +176,8 @@ into a fact.
 
 Probe, from the bot's `gh` config, once per repository — `planned.travel` carries the same token and
 the same expectations, so run it there too. `HEAD` in a REST path is the default branch's tip, which
-is what makes the first two lines stable to paste; the third prints the ruleset instead of a verdict,
-because reading it is the point.
+is what makes the first two lines stable to paste; the fourth prints the ruleset instead of a
+verdict, because reading it is the point.
 
 ```bash
 R=design4pro/money-tracker.online   # then repeat with design4pro/planned.travel
@@ -190,13 +193,15 @@ GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/rules/branches/develop" --jq '
 ```
 
 Both repositories are private, so an unauthenticated 200 cannot mask a missing permission. Were one
-made public, the first two endpoints would answer without authorization and the probe would report
+made public, the first three endpoints would answer without authorization and the probe would report
 a scope it does not have.
 
-Granting Checks: read and Actions: write is one edit under Settings → Personal access tokens on the
-`design4pro-agent` account, re-approved once by the organisation. The descriptor half of the change
-lives in `design4pro/agent-kit`, which renders `.ai/trackers/github.md`; the piece worth carrying
-there is teaching **get-required-checks** the rulesets endpoint, which needs no new scope at all.
+Nothing is left to grant on this token. There is no `Checks` permission to add, and Actions: write
+is already held; the one edit still owed under Settings → Personal access tokens on the
+`design4pro-agent` account is a **removal** — Workflows and Administration off, re-approved once by
+the organisation. The descriptor half of the change lives in `design4pro/agent-kit`, which renders
+`.ai/trackers/github.md`; the piece worth carrying there is teaching **get-required-checks** the
+rulesets endpoint, which needs no new scope at all.
 
 ### The cockpit process
 
