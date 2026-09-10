@@ -122,7 +122,13 @@ export type PlanFile = {
 const STAGE_HEADING = /^## Stage\s+(\S+)\s+[—-]\s+(.+)$/
 const SECTION_HEADING = /^### (.+)$/
 const OWNED_PATH = /^-\s+`([^`]+)`\s+[—-]\s+(new|edit)\b/
-const REFERENCE_ROW = /^`([A-Z]+-\d+)\s+(\w+)\s+→\s+(\w+)`\s*[—-]?\s*(.*)$/
+/**
+ * A row id's prefix may carry a digit: `docs/plans/02-i18n.md` mints `I18N-01` … `I18N-07`, and it
+ * is the only document in the set that does. Under the `[A-Z]+` this pattern used to have, all
+ * seven were dropped before the status guard ever saw them - and a plan declares no expected row
+ * count, so nothing reported it. Assertion 4 passed that document having read none of its rows.
+ */
+const REFERENCE_ROW = /^`([A-Z0-9]+-\d+)\s+(\w+)\s+→\s+(\w+)`\s*[—-]?\s*(.*)$/
 const BACKTICKED = /`([^`]+)`/g
 
 const isRowStatus = (value: string): value is RowStatus =>

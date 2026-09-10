@@ -11,18 +11,40 @@ import type { Violation } from '../audit.ts'
  *
  * ## Why the list is opt-in
  *
- * `docs/plans/` holds 29 plan documents and only this one has been measured. Guarding all of them
- * today would turn every one of the other 28 into a red suite nobody asked for, on a day nobody
- * has read them - and a suite that is red for reasons the team has decided not to fix teaches
- * people to ignore it. A document joins the list when it has been reconciled, which is a change
- * one line long and a reviewer can see.
+ * `docs/plans/` holds 29 plan documents. All 29 have now been *measured* - issue #108 ran the
+ * audit over every one of them - and **27** of them carry drift nobody has read yet: 359 of their
+ * 572 `Owned paths` entries name a file that is not on disk, and 220 of their 221 `→ done`
+ * reference rows cite nothing that resolves. Guarding those today would turn 27 documents into a
+ * red suite on a day nobody has read them, and a suite that is red for reasons the team has
+ * decided not to fix teaches people to ignore it.
  *
- * The 28 unmeasured documents are tracked as their own follow-up rather than left implicit here.
+ * Those four figures are the **unreconciled 27**, re-measured after this list gained its second
+ * entry; they are not the audit's original totals, which covered 28 documents and are quoted on
+ * issue #108. Whoever adds the third entry re-measures them again - a docblock that justifies an
+ * opt-in guard with stale arithmetic is the failure the guard exists to prevent.
+ *
+ * Measuring is not reconciling. A document joins this list when someone has read what did and did
+ * not ship and corrected the document accordingly, which is a change one line long here and a
+ * reviewer can see. The remaining 27 are tracked one row at a time on issue #108.
  *
  * @see scripts/plans/audit.ts - the assertions, shared with the CLI report
  * @see .ai/specs/2026-09-07-foundations-plan-reconciliation.md
  */
-const GUARDED_PLANS = ['docs/plans/00-foundations.md'] as const
+const GUARDED_PLANS = [
+  'docs/plans/00-foundations.md',
+  'docs/plans/02-i18n.md',
+] as const
+
+/**
+ * The one document `scripts/plans/drift-classes.ts` describes.
+ *
+ * The class map records the drift of `00-foundations.md` specifically - its entries, its landing
+ * sites - and the CLI prints that same block whatever document it is given. So the two landing-site
+ * cases below are keyed to this constant rather than run per {@link GUARDED_PLANS} entry: run
+ * against `02-i18n.md` they would assert plan 00's landing sites against plan 02's prose and fail
+ * for a reason that is about neither document.
+ */
+const CLASS_MAP_PLAN = 'docs/plans/00-foundations.md'
 
 /**
  * Paths a plan may never claim to own, because they are generated and `AGENTS.md` forbids editing
@@ -63,18 +85,23 @@ describe.each(GUARDED_PLANS)('%s', (planPath) => {
   it('never lists a generated file under `Owned paths`', () => {
     expect(generatedEntries(readFileSync(planPath, 'utf8'))).toEqual([])
   })
+})
 
-  // The two landing-site classes were computed and printed by the CLI and asserted by nothing, so
-  // a correction that repointed a moved subject at the wrong file, or dropped it from the prose
-  // altogether, left this suite green. Both docblocks in `audit.ts` state their intent as a
-  // guarantee, which is what an assertion rather than a report line is for.
-  //
-  // `drift-classes.ts` records the drift of `docs/plans/00-foundations.md`, so its landing sites
-  // are that document's. A second document joining `GUARDED_PLANS` will need the mention case
-  // keyed to the document the class map describes rather than run against every entry on the list.
-  //
-  // Both were watched failing on a hand-broken copy of the document and of the class map:
-  // `.ai/runs/2026-09-09-landing-checks-assert/watched-failing.md`.
+/**
+ * The two landing-site classes were computed and printed by the CLI and asserted by nothing, so a
+ * correction that repointed a moved subject at the wrong file, or dropped it from the prose
+ * altogether, left this suite green. Both docblocks in `audit.ts` state their intent as a
+ * guarantee, which is what an assertion rather than a report line is for.
+ *
+ * They live outside the `describe.each` because they read {@link CLASS_MAP_PLAN} rather than the
+ * document under test - see that constant for why.
+ *
+ * Both were watched failing on a hand-broken copy of the document and of the class map:
+ * `.ai/runs/2026-09-09-landing-checks-assert/watched-failing.md`.
+ */
+describe(`${CLASS_MAP_PLAN} landing sites`, () => {
+  const audit = auditPlan(CLASS_MAP_PLAN)
+
   it('resolves every recorded landing site on disk', () => {
     expect(audit.classes.unresolvedLandings).toEqual([])
   })
