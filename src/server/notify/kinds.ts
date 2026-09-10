@@ -104,13 +104,15 @@ export interface ChannelDefaults {
   readonly digest: boolean
 }
 
-export interface NotificationKindEntry<S extends z.ZodTypeAny = z.ZodTypeAny> {
-  readonly payload: S
+export interface NotificationKindEntry<
+  TPayload extends z.ZodTypeAny = z.ZodTypeAny,
+> {
+  readonly payload: TPayload
   readonly defaults: ChannelDefaults
   readonly titleKey: string
   readonly bodyKey: string
   /** Where the reader is taken. A function of the payload, so no route is spelled twice. */
-  readonly deepLink: (payload: z.infer<S>) => string
+  readonly deepLink: (payload: z.infer<TPayload>) => string
   /**
    * Whether this occasion may wait for the nightly digest.
    *
@@ -168,13 +170,13 @@ export const NOTIFICATION_KINDS = {
 } as const
 
 /** The payload a kind carries, inferred from that kind's own schema. */
-export type NotificationPayload<K extends NotificationKind> = z.infer<
-  (typeof NOTIFICATION_KINDS)[K]['payload']
+export type NotificationPayload<TKind extends NotificationKind> = z.infer<
+  (typeof NOTIFICATION_KINDS)[TKind]['payload']
 >
 
 /** The entry for a kind. The parameter type is what makes an unregistered kind a compile error. */
-export function notificationKind<K extends NotificationKind>(
-  kind: K,
-): (typeof NOTIFICATION_KINDS)[K] {
+export function notificationKind<TKind extends NotificationKind>(
+  kind: TKind,
+): (typeof NOTIFICATION_KINDS)[TKind] {
   return NOTIFICATION_KINDS[kind]
 }
