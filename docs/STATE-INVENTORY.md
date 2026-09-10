@@ -141,10 +141,58 @@ highlighted rail item naming a different screen, with **nothing announced** to a
 product about money that is worse than a blank hold: the numbers on screen are real, they are stale,
 and nothing says so.
 
-The cause is configuration. `src/router.tsx` set `defaultPreload`, `defaultPreloadStaleTime` and
-`defaultErrorComponent`, and **no** `defaultPendingMs`, `defaultPendingMinMs` or
-`defaultPendingComponent` — so the router held the previous route's component for the whole load.
-This is why "add a `pendingComponent` to seven route modules" is, on its own, worth very little:
+### The cause is two different things, and only one of them is configuration
+
+The spec that commissioned this inventory read the finding above as "`src/router.tsx` sets no
+pending thresholds". Re-measuring against the installed framework says that is not it, and the real
+answer has two halves.
+
+**The thresholds were never missing.** `@tanstack/router-core@1.171.27` applies
+`defaultPendingMs: 1000` and `defaultPendingMinMs: 500` before it spreads the caller's options
+(`dist/esm/router.js:620`). Restating either number in `src/router.tsx` would have changed nothing.
+
+**What was missing is a default pending _component_.** The router only offers a pending state when
+the pending match resolves one:
+
+```js
+// dist/esm/load-client.js:666
+const component = route.options.pendingComponent ?? router.options.defaultPendingComponent
+if (!component || typeof delay !== 'number' || delay === Infinity) { …; return }
+```
+
+A route with no `pendingComponent` and no router-level default therefore gets no pending state at
+all, and the previous route's component stays mounted for the whole load. Navigating to
+`/transactions/rules` — one of the seven bare surfaces — under a held `/_serverFn/*`, before and
+after adding `defaultPendingComponent`, same probe:
+
+| `src/router.tsx`                  | `role="status"` regions        | announced                | `aria-busy` |
+| --------------------------------- | ------------------------------ | ------------------------ | ----------- |
+| without `defaultPendingComponent` | 2 — both the previous screen's | `"50 of 600 loaded"`     | 0           |
+| with `defaultPendingComponent`    | 3                              | `+ "Loading this page…"` | 1           |
+
+**And the first client-side navigation of a tab is blocked before any of that can happen.** Reading
+the router's own store during the held navigation above:
+
+```
+status: "pending"   isLoading: true
+location: "/transactions"   resolvedLocation: "/dashboard"
+matches:        [__root__ success, /_app success, /_app/dashboard/ success]   ← the old screen
+pendingMatches: []
+held request:   /_serverFn/…  →  {"file":"/src/routes/_app.tsx…"}
+```
+
+The one held request is `_app.tsx`'s `loadShell`. `_app`'s `beforeLoad` awaits
+`queryClient.ensureQueryData` for it, and the client's query cache starts empty on a fresh document,
+so the **first** client-side navigation in a tab always makes that round trip. Until it returns the
+router produces no pending matches, so neither `_app`'s own `pendingComponent` nor the new route's
+can render, and the reader keeps the previous screen. Every navigation **after** the first resolves
+the shell from cache within its 30-second window and does render a loading state — which is exactly
+what the two rows of the table above measure.
+
+That first-navigation block is **not** fixed here. `_app.beforeLoad` is the session and tenant guard
+and `AGENTS.md` → Ask First covers it. It is recorded here so the next reader does not re-derive it.
+
+This is also why "add a `pendingComponent` to seven route modules" is, on its own, worth very little:
 nineteen surfaces already declared one and it did not render either.
 
 ## 4. The house style is already consistent
@@ -188,9 +236,10 @@ anything in #21, and bundling it would make that one issue two capabilities. It 
 - The **empty** state was a reachability gap, not a design gap. It is reached deliberately by a
   fifth read-only fixture workspace with no rows (`e2e/support/session.ts`), not by a query
   parameter that would put a test-only branch in production route code.
-- The **loading** state was a router configuration gap first and a per-route gap second.
-  `src/router.tsx` now sets pending thresholds, which is what makes the nineteen already-declared
-  skeletons worth anything, and the seven bare modules got one each.
+- The **loading** state was a missing router-level default first and a per-route gap second.
+  `src/router.tsx` now sets a `defaultPendingComponent`, which is what lets a route that draws no
+  shape of its own announce its load at all, and the seven bare modules got a shape each. The
+  first-navigation block in `_app.beforeLoad` is named above and left alone.
 - The **error** state was designed almost everywhere. The two gaps were the three modules declaring
   none, and `/transactions/$transactionId` conflating a broken read with a missing row — reconciled
   with what #16 landed rather than given a second error treatment beside it.
