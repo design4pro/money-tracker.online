@@ -104,6 +104,26 @@ describe('BudgetMeter', () => {
     )
   })
 
+  it('declares the weight the large-text grade is allowed by', () => {
+    // The premise under the assertion above, checked rather than asserted in prose. 4.5:1 is only
+    // legal on this figure because WCAG counts it as LARGE text, and at `md`'s 20px that needs the
+    // BOLD threshold (14pt bold), not the regular one (18pt) — so 700, and 600 will not do.
+    //
+    // Courier Prime ships 400 and 700 only, so `font-semibold` painted as 700 anyway and no frame
+    // would ever show this moving. The declared weight is what the criterion is read against and
+    // what `docs/ACCESSIBILITY.md` states in public, which is why it is worth a test at all.
+    meter({
+      spentMinor: asMinor(2_320_00),
+      remainingMinor: asMinor(-320_00),
+      ratio: 1.16,
+      state: 'over',
+    })
+
+    const headline = screen.getByText(/320[.,]00.*over/i)
+    expect(headline.className).toContain('font-bold')
+    expect(headline.className).not.toContain('font-semibold')
+  })
+
   it('stops the fill at the end of the track while the sentence keeps counting', () => {
     const track = meter({
       spentMinor: asMinor(2_320_00),

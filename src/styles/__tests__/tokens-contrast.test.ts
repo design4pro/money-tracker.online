@@ -42,6 +42,15 @@ const lightEnd = css.indexOf('@media (prefers-color-scheme: dark) {')
 const lightSource = css.slice(0, lightEnd)
 const darkSource = css.slice(darkStart)
 
+/*
+ * Dark is declared at TWO sites — the media query for a reader who never
+ * touched the toggle, and the attribute selector for one who did. Every
+ * assertion below reads the second. The first is checked for parity instead,
+ * once, by `the two dark sites agree` further down: cheaper than doubling the
+ * suite, and it catches the only failure the split can actually produce.
+ */
+const mediaSource = css.slice(lightEnd, darkStart)
+
 function parse(source: string): Record<string, string> {
   const out: Record<string, string> = {}
   const re = /--(color-[a-z0-9-]+):\s*(#[0-9a-f]{6})\s*;/gi
@@ -54,6 +63,7 @@ function parse(source: string): Record<string, string> {
 
 const light = parse(lightSource)
 const dark = parse(darkSource)
+const media = parse(mediaSource)
 
 function channel(value: number): number {
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
@@ -186,6 +196,30 @@ describe.each([
           `${themeName}: --${key} on --${ground} is ${ratio.toFixed(2)}:1, graphical floor 3`,
         ).toBeGreaterThanOrEqual(3)
       }
+    },
+  )
+
+  /*
+   * A fill's neighbour is not always a ground. The tests above measure
+   * `negative-bold` against the five grounds because the over-budget fill it
+   * paints is always the full width of its track — `over` means the ratio passed
+   * 1, which the meter clamps to 100% — so the colour beside it is the card, and
+   * nothing of the track survives to be a boundary.
+   *
+   * The track is still the adjacency the moment a fill is PARTIAL, and this
+   * asserts the grade stays usable by one: 3.88:1 in light, 3.10:1 in dark. Both
+   * clear 1.4.11's 3:1, and dark's margin being that thin is the finding, not an
+   * oversight — it is why `src/components/ui/meter.tsx`, whose danger fill is
+   * partial by construction, deliberately keeps `negative` at 7.05:1 instead.
+   */
+  it.each(GRAPHICAL_FILL_KEYS)(
+    '%s stays separable from the meter track it can sit in',
+    (key) => {
+      const ratio = contrast(tokens[key], tokens['color-border-subtle'])
+      expect(
+        ratio,
+        `${themeName}: --${key} on --color-border-subtle is ${ratio.toFixed(2)}:1, graphical floor 3`,
+      ).toBeGreaterThanOrEqual(3)
     },
   )
 
@@ -414,6 +448,25 @@ describe('the two themes are separately designed', () => {
         `${themeName}: negative-bold chroma ${bold.toFixed(2)} vs negative ${text.toFixed(2)}`,
       ).toBeGreaterThanOrEqual(0.2)
     }
+  })
+
+  /*
+   * The split-brain guard, and it is the reason every assertion above may read
+   * one site and ignore the other.
+   *
+   * A themed colour is declared three times: bare `:root`, the media query, and
+   * `:root[data-theme='dark']`. Add a token to two of the three and nothing in
+   * this file notices — the suite parses light and site 3, both of which would
+   * be complete. What ships is a reader on a dark OS who never opened the theme
+   * menu inheriting the LIGHT value on a dark ground. For `negative-bold` that
+   * is `#c31300` on `#262930`: 2.37:1, below even AA, with a fully green run.
+   *
+   * Asserting equality rather than mere presence, because a value that drifts
+   * between the two sites is the same defect wearing a different hat: the same
+   * screen, two colours, decided by whether a preference was ever saved.
+   */
+  it('declares the same dark palette at both dark sites', () => {
+    expect(media).toEqual(dark)
   })
 
   it('shares no ground value between light and dark', () => {

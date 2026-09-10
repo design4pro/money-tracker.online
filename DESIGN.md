@@ -344,6 +344,12 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   both a caption ink and a danger colour: `negative` has to hold 7:1, and in dark that pins it to a
   pale salmon, since red is luminance-poor and no deeper red in sRGB reaches that floor. **Never
   put body-size text in it**, and never reach for it as a general "stronger red".
+  **Nor for a partial fill.** `ui/Meter`'s danger state stays on `negative`, and the two meters
+  differ because their fills do. The over-budget fill is always the whole track - `over` means the
+  ratio passed 1, which clamps it - so its neighbour is the card. `ui/Meter` turns danger _before_
+  100%, so its fill abuts the track, and against `border-subtle` the loud grade measures 3.10:1
+  where `negative` measures 7.05:1. Both clear 1.4.11, but a boundary the reader actually reads
+  deserves the wider one. Same criterion, different adjacency.
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
   9.26:1 on raised; on `warning-soft` 7.79:1. Dark `#e9c46a`.
 - **Notice** (`info`): a system notice with no verdict - "Hidden", "Planned", "Auto", a scope. It

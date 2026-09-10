@@ -108,6 +108,12 @@ const STATE_INK: Record<UtilisationState, string> = {
  * text one. `negative` is pinned pale in dark by the 7:1 floor it has to hold as a caption ink, and
  * a bar painted in it reads as salmon rather than as a state worth acting on (#151). `positive` and
  * `warning` have no second grade yet and keep their text-grade values.
+ *
+ * `ui/Meter`'s danger fill stays on `negative` and that is not an oversight to be tidied up later.
+ * This fill is only ever full — `over` means the ratio passed 1, which clamps it to the whole track
+ * — so the colour beside it is the card, at 4.70:1. `ui/Meter` fires its danger state *below* 100%,
+ * so its fill abuts the track, and there the loud grade measures 3.10:1 against `border-subtle`
+ * where `negative` measures 7.05:1. Two meters, two reds, one criterion read on two adjacencies.
  */
 const STATE_FILL: Record<UtilisationState, string> = {
   under: 'bg-positive',

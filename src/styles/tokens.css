@@ -72,6 +72,18 @@
    is luminance-poor and no deeper red in sRGB reaches that floor. `negative`
    keeps every body-size job it had and stays at 7:1; nothing moved off it.
 
+   Which ground a FILL is measured against is not the same question as for
+   text, and the answer differs per fill. The over-budget fill is always the
+   full width of its track - `over` means the ratio passed 1, which the meter
+   clamps to 100% - so nothing of the track survives beside it and the colour
+   it actually abuts is the card the meter sits on. That is why its binding
+   ratios below are stated against the grounds. A PARTIAL fill abuts the track
+   instead, and `--color-border-subtle` is a much closer neighbour: this value
+   measures 3.10:1 on it in dark and 3.88:1 in light. Both clear 1.4.11, and
+   `tokens-contrast.test.ts` asserts them so the grade stays usable by a
+   partial fill - but the margin is thin enough that `src/components/ui/meter.tsx`,
+   whose danger fill IS partial, deliberately keeps `negative` at 7.05:1 there.
+
    ---------------------------------------------------------------------------
    SURFACE SEPARATION - a design floor, per theme
    ---------------------------------------------------------------------------
@@ -253,10 +265,10 @@
     /* Dark is the whole reason this grade exists, and also the reason it is a
        vermilion rather than the deep red the eye expects: red is the darkest
        primary, so on a dark ground "redder" and "brighter" pull in opposite
-       directions. Pure #ff0000 measures 3.55:1 on `raised` - below even the
-       large-text floor. This is the reddest value 4.5:1 leaves in sRGB, and
-       against #f5a08f it is a third of the luminance at two-thirds more
-       chroma, which is the difference between salmon and a danger colour. */
+       directions. Pure #ff0000 measures 3.64:1 on `raised` - below even the
+       large-text floor. This is about the reddest value 4.5:1 leaves in sRGB,
+       and against #f5a08f it carries 1.77x the chroma at 0.62x the luminance,
+       which is the difference between a salmon and a danger colour. */
     --color-negative-bold: #ff594a; /* 4.70:1 on raised, 5.79:1 on canvas; large-text floor 4.5:1 */
 
     --color-warning: #e9c46a; /* 8.71:1 on raised, 10.73:1 on canvas */

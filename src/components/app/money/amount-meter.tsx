@@ -49,9 +49,10 @@ export interface AmountMeterProps {
   /**
    * Tone class for the headline. `text-negative-bold` on an overspend, `text-ink` otherwise.
    *
-   * The headline renders bold at `text-subtitle` (20px) or `text-title` (32px), which is large text
-   * under WCAG and so is scored at 4.5:1, not 7:1. A caller passing a body-size tone here is not
-   * wrong, but a caller passing a 4.5:1-grade tone to a smaller step would be.
+   * The headline renders at `font-bold` (700) at `text-subtitle` (20px) or `text-title` (32px).
+   * Both are large text under WCAG — 20px bold clears the 18.66px bold threshold, 32px clears the
+   * 24px regular one — and large text is scored at 4.5:1, not 7:1. A caller passing a body-size
+   * tone here is not wrong, but a caller passing a 4.5:1-grade tone to a smaller step would be.
    */
   readonly headlineTone: string
   /** The state in a word. */
@@ -116,9 +117,22 @@ export function AmountMeter({
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        {/*
+          `font-bold`, not `font-semibold`, and the difference is load-bearing rather than
+          cosmetic. WCAG's large-text threshold — the one that lets `headlineTone` be a 4.5:1 grade
+          at `text-subtitle`'s 20px — is written as "14 point BOLD", and 600 is semi-bold. Courier
+          Prime ships 400 and 700 only, so 600 has always PAINTED as 700 by font matching, which is
+          precisely why nothing looked wrong; but the declared weight is what the criterion is read
+          against, and what `docs/ACCESSIBILITY.md` now states in public. So it is declared.
+
+          It is declared rather than left to `--text-subtitle--font-weight` (which is already 700)
+          because `--tw-font-weight` is what the step's utility actually reads, and an ancestor
+          weight utility would win over the token. The grade's premise should not depend on what no
+          parent happens to set.
+        */}
         <p
           className={cn(
-            'font-semibold tabular',
+            'font-bold tabular',
             size === 'lg' ? 'text-title' : 'text-subtitle',
             headlineTone,
           )}
