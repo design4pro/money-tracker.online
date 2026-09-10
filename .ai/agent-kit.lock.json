@@ -67,7 +67,7 @@
       "mode": "100644"
     },
     ".claude/hooks/__tests__/hooks.test.ts": {
-      "sha256": "5108993a2ca7859bb1729d070a0798efdf10b4899b9a674e141e020163b0245f",
+      "sha256": "2465215172519f0f15bdb0b4045ac0b1fdc0ac3ac14008b8e0b18230d28aacdb",
       "mode": "100644"
     },
     ".claude/hooks/format-file.sh": {

@@ -537,9 +537,9 @@ describe('guard-generated.sh, on a branch that already changes a guarded file', 
   // hook, and git exports `GIT_DIR` into every hook process; `-C` does not override it. Before the
   // scrub, every call in this fixture addressed the repository being committed to rather than
   // `root`, so `git init` re-initialised it - as bare, since `GIT_DIR` came without
-  // `GIT_WORK_TREE` - and the two `git config` calls overwrote its identity (#174). Nothing here
-  // went red: the fixture's later steps failed against the wrong repository, these cases still
-  // passed, and the damage was in the developer's own `.git/config`. This is what would go red.
+  // `GIT_WORK_TREE` - and the two `git config` calls overwrote its identity. Nothing went red: the
+  // fixture's later steps failed against the wrong repository, these cases still passed, and the
+  // damage was in the developer's own `.git/config`. This is what would go red.
   it('addresses the temporary repository even with GIT_DIR inherited', () => {
     const previous = process.env.GIT_DIR
     process.env.GIT_DIR = join(root, 'inherited.git')
