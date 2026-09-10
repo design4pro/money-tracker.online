@@ -30,11 +30,12 @@ const MARKDOWN_REFERENCE = /`([^`\s]+\.md)`/g
 
 /**
  * `NN-kebab-area.md` is the filename *scheme* the register defines two paragraphs above the table,
- * not a file. `NN` is the scheme's own placeholder for the two-digit ordinal, so a token carrying
- * it is never a filename and is skipped rather than listed as missing.
+ * not a file. The anchor matters: `NN` is the scheme's placeholder for the **leading** two-digit
+ * ordinal, so only a token that starts with it is a scheme. Skipping any token merely containing
+ * `NN` would quietly exempt real filenames - `PLANNING.md`, `ANNUAL.md` - and a guard with a silent
+ * hole in it is worse than none, because it is trusted.
  */
-const isFilenameScheme = (reference: string): boolean =>
-  reference.includes('NN')
+const FILENAME_SCHEME = /^NN-/
 
 /**
  * The candidate paths a bare filename could mean, in the order the register uses them. A reference
@@ -43,22 +44,33 @@ const isFilenameScheme = (reference: string): boolean =>
 const candidates = (reference: string): Array<string> =>
   reference.includes('/') ? [reference] : [`docs/plans/${reference}`, reference]
 
-const danglingReferences = (
-  markdown: string,
-  resolves: (path: string) => boolean = existsSync,
-): Array<string> =>
+/** Every document the register names, once each, schemes excluded. */
+const markdownReferences = (markdown: string): Array<string> =>
   [
     ...new Set(
       [...markdown.matchAll(MARKDOWN_REFERENCE)].map((match) => match[1]),
     ),
   ]
-    .filter((reference) => !isFilenameScheme(reference))
-    .filter((reference) => !candidates(reference).some(resolves))
+    .filter((reference) => !FILENAME_SCHEME.test(reference))
     .sort()
+
+const danglingReferences = (
+  markdown: string,
+  resolves: (path: string) => boolean = existsSync,
+): Array<string> =>
+  markdownReferences(markdown).filter(
+    (reference) => !candidates(reference).some(resolves),
+  )
 
 describe(REGISTER, () => {
   it('names no markdown document that is missing from the tree', () => {
-    expect(danglingReferences(readFileSync(REGISTER, 'utf8'))).toEqual([])
+    const register = readFileSync(REGISTER, 'utf8')
+
+    // Asserted first, because the rule reads the register through one regex: if the document ever
+    // stopped naming its files in backticks, every later expectation would be handed an empty array
+    // and this case would pass green having looked at nothing at all.
+    expect(markdownReferences(register).length).toBeGreaterThan(0)
+    expect(danglingReferences(register)).toEqual([])
   })
 })
 
@@ -68,10 +80,11 @@ describe(REGISTER, () => {
  * The case above was watched red against the register as `origin/develop` still carried it -
  * `AssertionError: expected [ 'OPEN-FINDINGS.md' ] to deeply equal []` - and green against the
  * repaired one, so it is not a case that would pass over any document at all. Re-running that check
- * means restoring a document this change repaired, so the three cases below hold the evidence
+ * means restoring a document this change repaired, so the four cases below hold the evidence
  * permanently instead: the first is the register's own wording from before #107 and goes red on
- * exactly the token that was wrong, and the other two are the two ways this rule could be red for
- * the wrong reason.
+ * exactly the token that was wrong, and the other three are the ways this rule could be wrong in
+ * either direction - red on a document that is simply somewhere else, or silent on a filename the
+ * scheme rule swallowed.
  */
 describe('the register reference rule', () => {
   const resolves = (path: string): boolean =>
@@ -100,5 +113,11 @@ describe('the register reference rule', () => {
     expect(
       danglingReferences('`NN-kebab-area.md` — a two-digit ordinal.', resolves),
     ).toEqual([])
+  })
+
+  it('still flags a real filename that merely contains the scheme placeholder', () => {
+    expect(danglingReferences('See `PLANNING.md`.', resolves)).toEqual([
+      'PLANNING.md',
+    ])
   })
 })

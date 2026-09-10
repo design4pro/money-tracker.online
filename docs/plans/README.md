@@ -64,7 +64,8 @@ validation.
 
 Every authored file in this directory is listed here. There are no others, and nothing outside this
 list may be added without amending this table first. Nothing sits beside the table either: an audit
-of these plans writes no file into this directory, and where its findings do go is stated below.
+of these plans writes no file into this directory, and _Where a finding goes_ below says where its
+findings do go.
 
 | File                              | Scope — one line each                                                                                               |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
