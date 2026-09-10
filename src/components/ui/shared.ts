@@ -195,9 +195,30 @@ export const controlWash = [
   'data-[pressed]:bg-press data-[pressed]:text-ink',
 ].join(' ')
 
-/** Full-bleed scrim behind Modal and Drawer. */
+/**
+ * Full-bleed scrim behind Modal and Drawer.
+ *
+ * `h-dvh` on top of `inset-0`, because the two disagree on a phone and the
+ * panel inside believes the second one. A `position: fixed` box with no height
+ * resolves against the *initial containing block*, which is the **large**
+ * viewport — the height the page would have with the URL bar retracted, held
+ * still so a fixed element does not resize as the bar comes and goes. Every
+ * height in `dialog.tsx` is `dvh`, the **dynamic** viewport, which is what is
+ * actually on screen right now. Centre a `dvh`-tall panel inside an `lvh`-tall
+ * scrim and its bottom edge sits below the fold by half the toolbar, and there
+ * is no scroll range to recover it: the panel is *shorter* than the scrim, so
+ * the scrim has nothing to scroll. An explicit height overrides the `bottom`
+ * from `inset-0` and settles the disagreement in favour of the visible one.
+ *
+ * `dvh` rather than React Aria's `--visual-viewport-height`, which it sets on
+ * this element and which would additionally shrink for the on-screen keyboard:
+ * that property tracks the visual viewport's *size* but not its `offsetTop`, so
+ * adopting it without also handling the offset trades one mismatch for another.
+ * The keyboard case is a larger change than the toolbar one and is not this
+ * change's subject.
+ */
 export const scrimSurface = [
-  'fixed inset-0 z-overlay bg-scrim',
+  'fixed inset-0 h-dvh z-overlay bg-scrim',
   'data-[entering]:animate-fade-in data-[exiting]:animate-fade-out',
 ].join(' ')
 

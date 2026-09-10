@@ -23,7 +23,7 @@ export const DialogTrigger = RACDialogTrigger
 
 const modalVariants = cva(
   [
-    'relative w-full bg-surface-raised text-ink shadow-modal',
+    'relative flex w-full flex-col bg-surface-raised text-ink shadow-modal',
     'data-[entering]:animate-dialog-in data-[exiting]:animate-dialog-out',
   ],
   {
@@ -43,7 +43,20 @@ const modalVariants = cva(
        * trap is a second place for that trap to be wrong.
        */
       placement: {
-        center: 'rounded-xl',
+        /**
+         * `max-h` is what makes `DialogBody` a scroll port at all: `Dialog`
+         * takes its bound from this box, so without one the body's `flex-1`
+         * has an unbounded column to fill and its `overflow-y-auto` never has
+         * anything to do — the scrim scrolls instead, and a centred flex child
+         * cannot be scrolled back to in the block-start direction.
+         *
+         * `my-auto` rather than `items-center` on the scrim, because auto
+         * margins in the cross axis centre while there is free space and
+         * collapse to zero when there is none. That keeps the block-start
+         * overflow reachable in the residual case where a panel refuses to
+         * shrink below the viewport.
+         */
+        center: 'rounded-xl my-auto max-h-[calc(100dvh-2rem)]',
         drawer:
           'rounded-t-2xl max-w-none sm:max-w-none mt-auto max-h-[92dvh] pb-[var(--safe-bottom)] data-[entering]:animate-drawer-in data-[exiting]:animate-drawer-out',
         'drawer-end':
@@ -96,7 +109,7 @@ export function Modal({
         overlayClassName,
         scrimSurface,
         'flex p-4',
-        docked ? 'p-0' : 'items-center justify-center overflow-y-auto',
+        docked ? 'p-0' : 'justify-center overflow-y-auto',
       )}
     >
       <RACModal className={cn(modalVariants({ size, placement }), className)}>
@@ -115,12 +128,19 @@ export interface DialogProps extends Omit<RACDialogProps, 'className'> {
  *
  * `role` defaults to `dialog`; pass `role="alertdialog"` for a destructive
  * confirmation, which is the one case where interrupting the reader is correct.
+ *
+ * It is a **flex item** of the panel's column rather than a box that inherits
+ * the panel's `max-height`. `max-height: inherit` took the parent's *computed*
+ * value, so it read `none` wherever the panel set no bound of its own — which
+ * was every centred dialog, and `drawer-end`, whose `max-h-none` says so
+ * explicitly. `min-h-0 flex-1` needs no bound to be inherited: the panel's own
+ * height is the constraint, whichever variant supplied it.
  */
 export function Dialog({ className, ...props }: DialogProps) {
   return (
     <RACDialog
       {...props}
-      className={cn('flex max-h-[inherit] flex-col outline-hidden', className)}
+      className={cn('flex min-h-0 flex-1 flex-col outline-hidden', className)}
     />
   )
 }
@@ -159,7 +179,7 @@ export function DialogHeader({
   return (
     <div
       className={cn(
-        'flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4',
+        'flex shrink-0 items-start justify-between gap-4 border-b border-border-subtle px-5 py-4',
         className,
       )}
     >
@@ -199,7 +219,15 @@ export function DialogBody({
         // The scrollable region of a dialog, and therefore the one that has to
         // reserve room so a focused control at its edge is not clipped
         // (WCAG 2.2 §2.4.12).
-        'min-h-0 flex-1 overflow-y-auto px-5 py-4 focus-safe',
+        //
+        // `relative` is what keeps it the containing block for its own
+        // absolutely positioned descendants. React Aria hides the real input of
+        // a `Switch`, a `Select` and a `RadioGroup` inside a `VisuallyHidden`,
+        // which is `position: absolute` — and with no positioned ancestor
+        // nearer than the panel, those boxes sat outside this scroll port and
+        // outside its clip, giving the scrim hundreds of pixels of scroll range
+        // that moved the panel's header off the top of the screen.
+        'relative min-h-0 flex-1 overflow-y-auto px-5 py-4 focus-safe',
         className,
       )}
     />
@@ -214,7 +242,7 @@ export function DialogFooter({
     <div
       {...props}
       className={cn(
-        'flex flex-wrap items-center justify-end gap-2 border-t border-border-subtle px-5 py-4',
+        'flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border-subtle px-5 py-4',
         className,
       )}
     />

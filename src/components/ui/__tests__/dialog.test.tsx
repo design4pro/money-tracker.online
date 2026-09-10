@@ -98,6 +98,32 @@ describe('Modal + Dialog', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('sizes the scrim in the same viewport unit the panel is capped in', async () => {
+    const user = userEvent.setup()
+    render(<Example />)
+
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+
+    // A class assertion, deliberately, and the reason is worth writing down: no
+    // engine available to this repository's tests can witness the fault it
+    // guards. `position: fixed` with `inset-0` and no height resolves against
+    // the *initial containing block*, which on a mobile browser is the **large**
+    // viewport — the one that ignores a shown URL bar. The panel is capped in
+    // `dvh`, the **dynamic** viewport. Centre a `dvh`-tall panel inside an
+    // `lvh`-tall box and its bottom edge lands below the fold by half the
+    // toolbar, with no scroll range anywhere to reach it, because the panel is
+    // shorter than the scrim. Headless Chromium and Playwright's device
+    // emulation both have no dynamic toolbar, so `dvh === lvh === innerHeight`
+    // there and a measured assertion would pass whether or not the bug is
+    // present. What can be asserted is the invariant that was violated: the two
+    // boxes name the same viewport.
+    const scrim = document.querySelector('[data-scrim]')
+    const panel = screen.getByRole('dialog').parentElement
+
+    expect(scrim?.className).toMatch(/\bh-dvh\b/)
+    expect(panel?.className).toMatch(/dvh/)
+  })
+
   it('hides the rest of the document from assistive technology while open', async () => {
     const user = userEvent.setup()
     render(<Example />)
