@@ -1,5 +1,12 @@
 # Modal windows: bound the panel to the viewport, and refuse to discard a touched form
 
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | implemented |
+| **Issue**          | #167        |
+| **Spec PR**        | #162        |
+| **Implementation** | #172, #175  |
+
 ## 📝 TLDR
 
 A centred dialog in this repository has no height bound, so a form longer than the viewport grows

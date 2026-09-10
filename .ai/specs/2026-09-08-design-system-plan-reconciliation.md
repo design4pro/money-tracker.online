@@ -1,5 +1,12 @@
 # Design-system plan reconciliation
 
+| Field              | Value |
+| ------------------ | ----- |
+| **Status**         | ready |
+| **Issue**          | #201  |
+| **Spec PR**        | #97   |
+| **Implementation** | none  |
+
 ## 📝 TLDR
 
 `docs/plans/01-design-system.md` describes a design system that half exists and half never started,
