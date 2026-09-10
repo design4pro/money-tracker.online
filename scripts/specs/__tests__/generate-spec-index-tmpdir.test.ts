@@ -1,5 +1,11 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 
@@ -27,8 +33,11 @@ import { afterAll, describe, expect, it } from 'vitest'
  * invariant belongs to the script the gate actually invokes - a copy of it in this file would keep
  * passing after someone edited the real one.
  *
- * Running it regenerates `.ai/specs/README.md`, which is a no-op in a tree where the gate is green
- * and exactly what rung 4 does two rungs earlier in the same run.
+ * Running the real command means the real generator writes `.ai/specs/README.md`, so the case puts
+ * the file back byte for byte afterwards: `pnpm test` leaves the working tree exactly as it found
+ * it, and a developer never has to wonder why a run they did not ask for touched a tracked file.
+ * What is under test is that the command runs at all; what it produces is rung 4's own
+ * `git diff --exit-code`.
  *
  * @see package.json - the `generate-spec-index` script
  * @see https://github.com/design4pro/money-tracker.online/issues/221
@@ -64,18 +73,26 @@ describe('pnpm generate-spec-index', () => {
       readFileSync(join(root, 'package.json'), 'utf8'),
     ) as { scripts: Record<string, string> }
 
-    const result = spawnSync(scripts['generate-spec-index'], {
-      cwd: root,
-      shell: true,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        // What `pnpm run` puts there, so a command reaching for a `node_modules` binary resolves
-        // it and fails on the path length rather than on `command not found`.
-        PATH: `${join(root, 'node_modules', '.bin')}${delimiter}${process.env.PATH ?? ''}`,
-        TMPDIR: longTmpdir(),
-      },
-    })
+    const index = join(root, '.ai', 'specs', 'README.md')
+    const before = readFileSync(index)
+
+    let result
+    try {
+      result = spawnSync(scripts['generate-spec-index'], {
+        cwd: root,
+        shell: true,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          // What `pnpm run` puts there, so a command reaching for a `node_modules` binary resolves
+          // it and fails on the path length rather than on `command not found`.
+          PATH: `${join(root, 'node_modules', '.bin')}${delimiter}${process.env.PATH ?? ''}`,
+          TMPDIR: longTmpdir(),
+        },
+      })
+    } finally {
+      writeFileSync(index, before)
+    }
 
     expect(result.stderr, result.stderr).not.toContain('EINVAL')
     expect(result.status, result.stderr).toBe(0)
