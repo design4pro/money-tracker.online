@@ -33,6 +33,37 @@ import type { Page, Route } from '@playwright/test'
 /** Every TanStack Start server function, whatever it is called. */
 const SERVER_FN_PATTERN = '**/_serverFn/**'
 
+/**
+ * The application shell's own read, which a hold must let through.
+ *
+ * Measured, not assumed. `_app.beforeLoad` awaits `ensureQueryData(loadShell)`, and TanStack Router
+ * resolves `beforeLoad` before it will render any match's pending component. Holding that request
+ * therefore freezes the router one step *before* the loading state it was installed to photograph:
+ * the URL changes, the rail highlights the new tab, and the previous screen stays on the page with
+ * nothing announced — which is exactly the failure `docs/STATE-INVENTORY.md` §3 records.
+ *
+ * Letting it through and holding everything after it is the difference between a probe that proves
+ * nothing and one that renders the skeleton. Measured on a client-side navigation from `/accounts`
+ * to `/accounts/demo-acc-1` with the shell excluded: `main` holds one `role="status"` and eleven
+ * skeleton bars, and the account list is gone. With the shell held: zero `role="status"`, the list
+ * still on screen.
+ *
+ * TanStack Start base64-encodes `{"file":…,"export":…}` into the path, so the module is readable
+ * from the URL without the application having to declare anything.
+ */
+const APP_SHELL_MODULE = '/src/routes/_app.tsx'
+
+/** The module a server-function URL names, or `''` when the path is not one this build wrote. */
+function moduleOf(url: string): string {
+  const parts = new URL(url).pathname.split('/_serverFn/')
+  if (parts.length < 2) return ''
+  try {
+    return Buffer.from(decodeURIComponent(parts[1]), 'base64').toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
 /** A server-side failure, in the shape TanStack Start's client fetcher will surface as an error. */
 const INTERNAL_SERVER_ERROR = {
   status: 500,
@@ -57,24 +88,35 @@ export interface ServerFnInterception {
 type Routable = Pick<Page, 'route' | 'unroute'>
 
 /**
- * Hold every server-function request open until released.
+ * Hold every server-function request open until released, except the application shell's.
  *
  * The pending state is what a reader sees while a loader is in flight, so this is how a
  * `pendingComponent` is photographed: navigate **client-side** with this installed, and the screen
- * stays in its loading state for as long as the test needs. A `page.goto` will not do — it is
- * served by SSR and produces no `/_serverFn/*` request at all.
+ * stays in its loading state for as long as the test needs.
+ *
+ * Two things are easy to get wrong here and both produce a green test that proves nothing. A
+ * `page.goto` will not do — it is served by SSR and produces no `/_serverFn/*` request at all. And
+ * the shell's own read must be let through: see {@link APP_SHELL_MODULE}.
  */
 export async function holdServerFns(
   page: Routable,
 ): Promise<ServerFnInterception> {
   return intercept(page, async (route, isReleased) => {
+    if (moduleOf(route.request().url()).includes(APP_SHELL_MODULE)) {
+      await route.continue().catch(() => undefined)
+      return
+    }
     await isReleased
     await route.continue().catch(() => undefined)
   })
 }
 
 /**
- * Answer every server-function request with a `500`.
+ * Answer every server-function request with a `500`, except the application shell's.
+ *
+ * The shell is excluded for the same reason as in {@link holdServerFns} and one more: a failing
+ * `_app.beforeLoad` takes the whole shell to its own error boundary, so the screen under test never
+ * renders and the assertion is about the wrong error panel.
  *
  * Naturally idempotent under TanStack Query's `retry: 1`: each request is fulfilled on its own, so
  * the second attempt gets the same answer as the first rather than falling through to the server.
@@ -87,6 +129,10 @@ export async function failServerFns(
   page: Routable,
 ): Promise<ServerFnInterception> {
   return intercept(page, async (route) => {
+    if (moduleOf(route.request().url()).includes(APP_SHELL_MODULE)) {
+      await route.continue().catch(() => undefined)
+      return
+    }
     await route.fulfill(INTERNAL_SERVER_ERROR).catch(() => undefined)
   })
 }

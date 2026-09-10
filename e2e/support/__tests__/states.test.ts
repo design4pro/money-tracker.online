@@ -25,8 +25,21 @@ import type { Page, Route } from '@playwright/test'
 /** What a stub route was asked to do, in the order it was asked. */
 type RouteCall = 'continue' | 'fulfill'
 
-function stubRoute(log: Array<RouteCall>) {
+/** The URL TanStack Start gives one server function: `{"file":…}`, base64, in the path. */
+function serverFnUrl(module: string): string {
+  const payload = JSON.stringify({
+    file: `${module}?tss-serverfn-split`,
+    export: 'thing_createServerFn_handler',
+  })
+  return `http://127.0.0.1:3016/_serverFn/${Buffer.from(payload).toString('base64')}`
+}
+
+const SHELL_URL = serverFnUrl('/src/routes/_app.tsx')
+const SCREEN_URL = serverFnUrl('/src/routes/_app/accounts/-server/detail.ts')
+
+function stubRoute(log: Array<RouteCall>, url = SCREEN_URL) {
   return {
+    request: () => ({ url: () => url }),
     continue: async () => {
       log.push('continue')
     },
@@ -120,6 +133,24 @@ describe('holdServerFns', () => {
     expect(stub.unrouted).toEqual(['**/_serverFn/**'])
   })
 
+  it('lets the application shell through, because holding it freezes the router first', async () => {
+    // The measurement behind this is in `states.ts` → `APP_SHELL_MODULE`: `_app.beforeLoad` awaits
+    // the shell read, and TanStack Router resolves `beforeLoad` before it renders any pending
+    // component. Hold the shell and the loading state under test never appears at all — the URL
+    // changes, the previous screen stays, and the spec passes or fails for the wrong reason.
+    const stub = stubPage()
+    await holdServerFns(stub.page)
+    const log: Array<RouteCall> = []
+
+    const shell = stub.deliver(stubRoute(log, SHELL_URL))
+    await shell
+    expect(log).toEqual(['continue'])
+
+    // Everything after it is still held.
+    const screen = stub.deliver(stubRoute(log))
+    expect(await hasSettled(screen)).toBe(false)
+  })
+
   it('can be released twice, because a test with a finally will', async () => {
     const stub = stubPage()
     const held = await holdServerFns(stub.page)
@@ -154,5 +185,17 @@ describe('failServerFns', () => {
 
     await failing.release()
     expect(stub.patterns).toEqual([])
+  })
+
+  it('never fails the application shell, whose boundary would replace the screen', async () => {
+    // A failing `_app.beforeLoad` takes the whole shell to its own error boundary, so the screen
+    // under test never renders and the assertion lands on the wrong error panel.
+    const stub = stubPage()
+    await failServerFns(stub.page)
+    const log: Array<RouteCall> = []
+
+    await stub.deliver(stubRoute(log, SHELL_URL))
+    await stub.deliver(stubRoute(log))
+    expect(log).toEqual(['continue', 'fulfill'])
   })
 })
