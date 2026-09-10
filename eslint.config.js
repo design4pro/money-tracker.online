@@ -127,6 +127,11 @@ export default [
       // of them eslint exhausts the heap before it finishes. `.ai/cezar/.gitignore` already keeps
       // them out of git.
       '.ai/cezar/worktrees/**',
+      // Where a pipeline run parks a scratch checkout. Same failure as the worktrees above and
+      // the same `.gitignore` entry behind it, but it was reached from the other direction: a
+      // run that left one behind made `pnpm lint` red on a file nobody wrote and pointed the
+      // reader at `parserOptions.project` rather than at the stray directory (#203).
+      '.ai/tmp/**',
       // Agent tooling that GitHub's own surfaces read — skills, agent definitions, hooks. Same
       // reason as `.claude/**`: vendored configuration for tools around the project, written
       // against no tsconfig of ours.

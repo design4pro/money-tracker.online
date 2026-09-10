@@ -122,6 +122,7 @@ import {
   EXPORT_FORMATS,
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
+  NOTIFICATION_KIND_IDS,
 } from '#/lib/enums'
 
 /**
@@ -162,6 +163,7 @@ export {
   EXPORT_FORMATS,
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
+  NOTIFICATION_KIND_IDS,
 } from '#/lib/enums'
 export type {
   PlanId,
@@ -197,6 +199,7 @@ export type {
   ExportFormat,
   ExportStatus,
   SuggestionKind,
+  NotificationKind,
 } from '#/lib/enums'
 
 /* -------------------------------------------------------------------------- */
@@ -2719,3 +2722,108 @@ export const suggestionDismissals = sqliteTable(
 )
 
 export type SuggestionDismissalRow = typeof suggestionDismissals.$inferSelect
+
+/**
+ * One occasion, delivered to one person, in one workspace.
+ *
+ * `dedupe_key` is the load-bearing column and it does not repeat the primary key's job. The budget
+ * cron re-evaluates every threshold every fifteen minutes; the recurring cron runs hourly. The key
+ * names the **semantic occasion** — this budget, this period, this threshold — so a second attempt
+ * at the same occasion is a unique-constraint no-op rather than the ninety-sixth identical row of
+ * somebody's day. The producers already build these keys (`crossingMarkerKey`,
+ * `reminderMarkerKey`) and `#/server/notify/dispatch` reuses them rather than deriving a second
+ * one, because two records of one fact drift.
+ *
+ * The unique index is scoped to the workspace **and the person**: two households may legitimately
+ * hold the same key, and both members of one household get their own row — with their own
+ * `read_at` — for a single crossing.
+ *
+ * `payload_json` stores integers and codes, never a rendered string. A Polish member of an
+ * English-preferring household must read their own formatting off the same row, and a stored
+ * `"1 234,56 zł"` cannot be re-rendered. Every payload carries its own `v`; the schemas in
+ * `#/server/notify/kinds` widen only, and a narrowing is a new kind id.
+ *
+ * `user_id` cascades rather than nulling: a notification with no recipient is unreadable by
+ * construction, and orphans would make the unread count a lie.
+ */
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    payloadJson: text('payload_json').notNull(),
+    dedupeKey: text('dedupe_key').notNull(),
+    /** Null means unread. */
+    readAt: integer('read_at', { mode: 'timestamp_ms' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('notifications_organization_id_user_id_dedupe_key_unique').on(
+      table.organizationId,
+      table.userId,
+      table.dedupeKey,
+    ),
+    // "This person's notifications, newest first" — the list `21-S3` renders.
+    index('notifications_organization_id_user_id_created_at_idx').on(
+      table.organizationId,
+      table.userId,
+      table.createdAt,
+    ),
+    // The unread count. It renders on every screen, and without this index it scans the reader's
+    // whole history to answer a number in a badge.
+    index('notifications_organization_id_user_id_read_at_idx').on(
+      table.organizationId,
+      table.userId,
+      table.readAt,
+    ),
+    enumCheck('notifications_kind_check', table.kind, NOTIFICATION_KIND_IDS),
+  ],
+)
+
+export type NotificationRow = typeof notifications.$inferSelect
+
+/**
+ * What one person wants to hear about, per kind, in one workspace.
+ *
+ * **A missing row is not a missing preference** — it means "use the kind's defaults", and rows are
+ * created only when somebody changes something. Seeding three booleans per kind per member would
+ * write the defaults out longhand and freeze today's values into every existing household the day
+ * a default is revised.
+ *
+ * `updated_at` is here and is not decoration: "when did this person turn budget email off" is a
+ * question a support conversation asks, and three booleans with no timestamp cannot answer it.
+ */
+export const notificationPrefs = sqliteTable(
+  'notification_prefs',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    inApp: integer('in_app', { mode: 'boolean' }).notNull(),
+    email: integer('email', { mode: 'boolean' }).notNull(),
+    digest: integer('digest', { mode: 'boolean' }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex('notification_prefs_organization_id_user_id_kind_unique').on(
+      table.organizationId,
+      table.userId,
+      table.kind,
+    ),
+    enumCheck(
+      'notification_prefs_kind_check',
+      table.kind,
+      NOTIFICATION_KIND_IDS,
+    ),
+  ],
+)
+
+export type NotificationPrefRow = typeof notificationPrefs.$inferSelect

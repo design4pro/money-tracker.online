@@ -198,10 +198,12 @@ export function Meter({
                   state === 'warning' && 'bg-warning',
                   // Full is not a virtue here, so the fill is the foreground
                   // token rather than the positive one. 70% of `ink` composited
-                  // over the track measures 5.24:1 in light and 5.98:1 in dark;
-                  // `warning` is 6.16:1 / 6.22:1 and `negative` 8.25:1 / 7.05:1
-                  // on the same track — all far past the 3:1 WCAG 2.2 §1.4.11
-                  // asks of a graphical object.
+                  // over the track measures 4.57:1 in light and 4.79:1 in dark;
+                  // `positive` is 5.90:1 / 5.67:1, `warning` 5.84:1 / 5.75:1
+                  // and `negative` 5.92:1 / 5.02:1 on the same track — all well
+                  // clear of the 3:1 WCAG 2.2 §1.4.11 asks of a graphical
+                  // object. `src/styles/__tests__/tokens-contrast.test.ts`
+                  // recomputes all four rather than quoting them from here.
                   state === 'ok' &&
                     (tone === 'neutral' ? 'bg-ink/70' : 'bg-positive'),
                 )}

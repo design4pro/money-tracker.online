@@ -214,8 +214,10 @@ describe('the reminder branch', () => {
 
     expect(report.dispatched).toBe(1)
     expect(report.failures).toBe(0)
-    // Plan 21 has not landed. The gap is reported rather than hidden, so a production log says
-    // plainly that reminders are computed and not delivered.
+    // `false` because this suite's module graph never imports `#/server/notify/install` — the
+    // Worker entry does, and `#/server/notify/__tests__/install.test.ts` is what asserts the flag
+    // flips. What this case checks is that the gap is *reported* rather than hidden, so a
+    // production log says plainly when reminders are computed and not delivered.
     expect(report.dispatcherInstalled).toBe(false)
   })
 

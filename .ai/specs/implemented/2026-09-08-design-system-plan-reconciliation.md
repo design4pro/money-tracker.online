@@ -1,11 +1,11 @@
 # Design-system plan reconciliation
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | ready |
-| **Issue**          | #201  |
-| **Spec PR**        | #97   |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | implemented |
+| **Issue**          | #201        |
+| **Spec PR**        | #97         |
+| **Implementation** | #205        |
 
 ## 📝 TLDR
 
@@ -436,6 +436,46 @@ No assumption carries `⚠ NEEDS HUMAN CONFIRMATION`: every one is a documentati
 editing Markdown, and none weakens security, tenant scoping, the money path, the accessibility claim
 or a `BACKWARD_COMPATIBILITY.md` surface. Q4 is the closest to a product decision and is resolved in
 the direction that changes no shipped pixel.
+
+## 🔁 Amendment — PR #205
+
+Four things the build found that this document, written at `1b4d72f`, could not know. They are
+recorded here rather than left as a silent divergence between the design and what shipped.
+
+**1. `scripts/plans/audit.mts` does not exist.** Issue #77's deliverable shipped the audit as
+`scripts/plans/audit.ts`. Every step above that names the `.mts` filename means the `.ts` one. Issue
+#201 carries the same correction.
+
+**2. The class map's container had to gain a plan dimension.** `scripts/plans/drift-classes.ts`
+described `00-foundations.md` alone: `EXPECTED_CLASS_COUNTS` was one global total and `auditPlan`
+printed that same block whatever document it was handed, so auditing plan 01 reported 29 entries "no
+longer declared by the plan" and 23 landing sites plan 01 never names — all of them plan 00's.
+Appending a flat array of plan-01 rows would have made those figures worse and would have pointed
+the guard's two landing-site cases at plan 01's landing sites asserted against plan 00's prose. Each
+entry now carries a `plan` field, the expected counts are keyed by plan in `CLASS_MAP_PLANS`, and
+`auditPlan` filters to the document under test. This is the re-derivation the _Edge Cases_ table
+asks for — "the class data is stable, only its container is not" — and not a second module.
+
+**3. The guard's opt-in list already held two entries, so plan 01 is the third, not the second.**
+`docs/plans/02-i18n.md` joined it under #108 after this spec merged. Step 3.1 above says "bringing
+the list to two files"; it brought it to three. The `GUARDED_PLANS` docblock obliges whoever adds an
+entry to re-measure the totals it quotes for the still-unreconciled documents, which this build did
+at `5eac91d`: 26 remaining documents, all carrying drift, 347 of their 558 `Owned paths` entries
+absent, 213 of their 214 `→ done` rows citing nothing that resolves.
+
+**4. `src/components/ui/money-field.tsx` exists now, so half of Step 2.4's §8 claim is resolved.**
+It shipped under #106 / PR #198 and `docs/plans/00-foundations.md` already records it as
+`FND-23 missing → done`. Step 2.4 tells this build to re-state `01-S3`'s "exactly one amount input /
+one amount column helper" claim as an open `docs/SPEC.md` §8 violation; at `5eac91d` only the
+**column helper** (`src/components/ui/data-table.tsx`, absent, `FND-18 missing → partial`) is open,
+and the amount input is settled. The re-statement was narrowed accordingly.
+
+Two smaller divergences, for completeness. The spec's `src/styles/tokens.css:616` and `:682` are
+stale — at `5eac91d` the motion tokens are `:703`–`:711` under a heading at `:691` and the
+reduced-motion block is at `:779`, and the class map records the re-derived numbers. And Step 3.3
+asks for seven follow-up issues; six were filed (#213, #214, #215, #216, #217, #218) because
+finding 7, "the remaining plan files carry the same drift", is already tracked by open issue #108
+and a duplicate would have split it.
 
 ## 📋 Phasing
 

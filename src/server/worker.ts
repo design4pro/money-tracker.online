@@ -28,6 +28,12 @@ import './ledger'
 // unenforced — silently, which is the failure mode this import exists to prevent.
 import './billing/install'
 
+// Side effect only: installs the three notification dispatchers. Without it the seams in
+// `./budgets/thresholds`, `./recurring/reminders` and `./goals/reached` keep their `NOOP_*`
+// defaults, every crossing and reminder the crons find is computed and then dropped, and the run
+// summaries say `dispatcherInstalled: false`.
+import './notify/install'
+
 import { runBudgetPeriodSweep } from './cron/budget-periods'
 import { runBudgetThresholdSweep } from './cron/budget-thresholds'
 import {

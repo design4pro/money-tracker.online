@@ -77,9 +77,14 @@ export interface ThresholdCrossing {
 /**
  * The dedupe marker, exactly as `12-S3` specifies it.
  *
- * Versioned (`v1`) because the key is the only record that a notification was sent: changing what
- * a crossing means later must re-arm every budget rather than silently inheriting markers written
- * under the old rule.
+ * Versioned (`v1`) because changing what a crossing means later must re-arm every budget rather
+ * than silently inheriting markers written under the old rule.
+ *
+ * Since `21-S1` the marker is no longer the *only* record that a notification was sent — the
+ * `notifications` row is, and `#/server/notify/adapters` reuses this exact key as its `dedupe_key`
+ * so the two name the same occasion. The marker still decides whether the sweep dispatches at all,
+ * and it is written after a successful dispatch so a transient failure retries; the row's scoped
+ * unique index is what makes that retry harmless.
  */
 export function crossingMarkerKey(crossing: {
   readonly budgetId: string

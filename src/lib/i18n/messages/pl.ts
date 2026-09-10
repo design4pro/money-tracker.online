@@ -1282,6 +1282,25 @@ const messages = {
   },
   'notifications.badge': '{count}+',
 
+  'notifications.kind.budgetThresholdCrossed.title':
+    'Budżet {budget} osiągnął {threshold}%',
+  'notifications.kind.budgetThresholdCrossed.body':
+    'W tym okresie wydano {spent} z {available} w budżecie {budget}.',
+  'notifications.kind.budgetExceeded.title': 'Budżet {budget} wyczerpany',
+  'notifications.kind.budgetExceeded.body':
+    'Przekroczono o {overspent} kwotę {available} przewidzianą na {budget}.',
+  'notifications.kind.recurringDueSoon.title':
+    'Płatność {series} przypada {date}',
+  'notifications.kind.recurringDueSoon.body':
+    'Kwota {amount} za {series} przypada na {date}.',
+  'notifications.kind.recurringOverdue.title':
+    'Płatność {series} przypadała {date}',
+  'notifications.kind.recurringOverdue.body':
+    'Kwota {amount} za {series} przypadała na {date} i wciąż nie została zapisana.',
+  'notifications.kind.goalReached.title': 'Cel {goal} osiągnięty',
+  'notifications.kind.goalReached.body':
+    'Cel {goal} jest zrealizowany — odłożono {contributed} z {target}.',
+
   /* -- Accessibility ------------------------------------------------------ */
   'a11y.skipToContent': 'Przejdź do treści głównej',
   'a11y.showSuggestions': 'Pokaż podpowiedzi',
