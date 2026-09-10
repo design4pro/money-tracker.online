@@ -140,6 +140,36 @@ describe('parsePlan', () => {
   })
 })
 
+/**
+ * A row id whose prefix carries a digit.
+ *
+ * `docs/plans/02-i18n.md` mints its rows `I18N-01` … `I18N-07`, and it is the only document in the
+ * set that does - every other prefix is letters alone. An id pattern of `[A-Z]+-\d+` matches none
+ * of the seven, so the parser returned no rows for that document at all, and because a plan
+ * declares no expected row count there was nothing to report the gap against. Assertion 4 - every
+ * `→ done` row cites a path that resolves - therefore passed `02-i18n.md` having read none of its
+ * seven rows, which is worse than failing it.
+ *
+ * The fixture is its own rather than a sixth shape added to `FIXTURE`, because this is a defect
+ * with one document behind it and the shared fixture is the grammar.
+ */
+describe('a reference row whose id prefix carries a digit', () => {
+  const FIXTURE_DIGIT_ID = `## Stage 02-S1 — The locale table
+
+### Reference rows
+
+\`I18N-01 missing → done\` — the frozen table is \`src/lib/i18n/locales.ts\`.
+`
+
+  it('is parsed rather than silently dropped', () => {
+    const rows = parsePlan(FIXTURE_DIGIT_ID).stages[0].referenceRows
+
+    expect(rows.map((row) => row.id)).toEqual(['I18N-01'])
+    expect(rows[0].to).toBe('done')
+    expect(citations(rows[0])).toEqual(['src/lib/i18n/locales.ts'])
+  })
+})
+
 describe('citations', () => {
   const plan = parsePlan(FIXTURE)
 
