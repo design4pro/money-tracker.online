@@ -20,7 +20,7 @@ path_. The rejection is a human reading a document.
 This spec adds the fifth assertion to `auditPlan`, in the same `Violation` shape as the other four,
 so a failure names the stage, the line and the path; single-sources the eight-path list against the
 README table that defines it; and runs the assertion over **every** plan document rather than only
-the two on the guard's opt-in list. That last part is safe today because it was measured: of the 640
+the three on the guard's opt-in list. That last part is safe today because it was measured: of the 638
 `Owned paths` entries in the 31 plan documents, 29 name a shared path and all 29 are in
 `00-foundations.md`, which is the one document allowed to declare them.
 
@@ -68,8 +68,8 @@ generated file by hand. That rule is adjacent to this one and deliberately stays
 
 ### The measurement
 
-Every number below came from a script run against this branch at `80f53e8`, which is
-`origin/develop` exactly (`git rev-list --count origin/develop..HEAD` → `0`). The script parsed each
+Every number below came from a script run against this branch after it was merged up to
+`origin/develop` at `37789ca` (`git rev-list --count origin/develop..HEAD` → `0` for the base side). The script parsed each
 document with the repository's own `parsePlan` — not a second regex — and matched `Owned paths`
 entries against the eight paths using the prefix rule this spec specifies below.
 
@@ -77,24 +77,28 @@ entries against the eight paths using the prefix rule this spec specifies below.
 | -------------------------------------------------------- | --------------------------- |
 | Plan documents matching `docs/plans/NN-*.md`             | 31 (`00`–`28`, `98`, `99`)  |
 | Stages across them                                       | 104                         |
-| `Owned paths` entries across them                        | 640                         |
+| `Owned paths` entries across them                        | 638                         |
 | Entries naming one of the eight shared paths             | **29**                      |
 | Documents carrying at least one such entry               | **1** (`00-foundations.md`) |
 | Entries in every document other than `00-foundations.md` | **0**                       |
-| Documents on `GUARDED_PLANS` today                       | 2                           |
+| Documents on `GUARDED_PLANS` today                       | 3                           |
 
-The 29 break down as: 8 exact-path entries (`schema.ts` ×7 across `00-S1`, `00-S5`, `00-S7`, `00-S9`,
-`00-S11`, `00-S14`, `00-S17`; `worker.ts` ×2; `wrangler.jsonc` ×2; `tokens.css`; `money.ts`;
-`plans.ts` ×2) and 13 entries under the `src/components/ui/**` glob, of which one is the glob itself
-(`00-S6`, line 599) and twelve are individual files beneath it (`index.ts`, `data-table.tsx`,
-`grid-list.tsx`, `money-field.tsx`, `install-prompt.tsx`, `offline-banner.tsx` and their tests).
+The 29 break down as: 15 exact-path entries naming 6 of the eight paths (`schema.ts` ×7 across
+`00-S1`, `00-S5`, `00-S7`, `00-S9`, `00-S11`, `00-S14`, `00-S17`; `worker.ts` ×2; `wrangler.jsonc`
+×2; `plans.ts` ×2; `tokens.css`; `money.ts`) and 14 entries on the `src/components/ui/**` side, of
+which one is the glob itself (`00-S6`, line 608) and thirteen are individual files beneath it
+(`index.ts` ×4, `data-table.tsx`, `grid-list.tsx`, `money-field.tsx`, `install-prompt.tsx`,
+`offline-banner.tsx` and four of their tests). Seven of the eight paths are represented; the one
+that never appears is `src/routeTree.gen.ts`, which `GENERATED_PATHS` already rejects under
+`Owned paths` on the three `GUARDED_PLANS` documents — the overlap Q6 keeps deliberately, and the
+reason it is an overlap rather than a duplicate is that this assertion also covers the other 28.
 
 Two consequences follow, and both shape the design:
 
 1. **The exemption is not a courtesy, it is 29 entries.** An assertion without it turns the one
    document allowed to declare shared paths into 29 failures.
 2. **The assertion can run over the whole set today and stay green.** Unlike the four drift
-   assertions — opt-in because 27 unreconciled documents carry drift nobody has read
+   assertions — opt-in because 26 unreconciled documents carry drift nobody has read
    (`plan-paths.test.ts:11`–`:28`) — this rule has zero violations outside the exempt document. So
    the acceptance criterion on #216, _"a stage in **any plan** but `00-foundations.md`"_, is
    achievable now rather than one document at a time.
@@ -326,7 +330,7 @@ cannot affect a deployed Worker, a migration, a binding or a rendered pixel.
 
 | Risk                                                                  | Likelihood | Mitigation                                                                                                                                        |
 | --------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The whole-set case turns 29 unreconciled documents red                | Measured 0 | 640 entries scanned, 29 shared-path hits, all in the exempt document. Step 1.3 re-measures before the case is added, and fails the step if not 0. |
+| The whole-set case turns 26 unreconciled documents red                | Measured 0 | 638 entries scanned, 29 shared-path hits, all in the exempt document. Step 1.3 re-measures before the case is added, and fails the step if not 0. |
 | The rule blocks a legitimate correction, as it nearly did for `01-S2` | Real       | That is the intent: the correction was illegitimate. The requisition route stays open and untouched, and this spec asserts nothing about prose.   |
 | A prefix rule over-matches (`src/components/ui-kit/x.tsx`)            | Low        | Prefix is `src/components/ui` **plus a path separator**, never a bare string prefix. Fixture case in Step 2.2 pins it.                            |
 | `SHARED_PATHS` drifts from the README                                 | Low        | The parity case. Without it the guard silently enforces a stale list — the same failure class the issue reports one level down.                   |
@@ -408,7 +412,7 @@ Re-measure first: run `sharedPathViolations` over every `docs/plans/NN-*.md` and
 still 0 outside `00-foundations.md`. If it is not, stop and report — the number in this spec is stale
 and the scope question reopens. Then add `describe.each` over the globbed document list, asserting
 `sharedPathViolations` is empty for each, with a docblock stating why this rule is whole-set while
-the four drift assertions are opt-in (they are red on 27 unreconciled documents; this one is green on
+the four drift assertions are opt-in (they are red on 26 unreconciled documents; this one is green on
 all 31).
 _Verification:_ the suite lists 31 cases and all pass. Watched failing on a hand-broken copy of a
 document that is **not** on `GUARDED_PLANS` — that is the specific hole this Step closes, and a break
@@ -419,7 +423,7 @@ Three inline-fixture cases, in the style of the existing `the generated-path rul
 filename that must not match (`src/lib/money-format.ts`), a sibling directory that must not match
 (`src/components/ui-kit/x.tsx`), and a file beneath the glob that must
 (`src/components/ui/__tests__/data-table.test.tsx`). Fixtures rather than real documents, for the
-reason `plan-paths.test.ts:114`–`:122` already gives: the real documents contain no pair where the
+reason `plan-paths.test.ts:128`–`:131` already gives: the real documents contain no pair where the
 rules disagree, so only a fixture can show the difference.
 _Verification:_ the three cases pass; each watched failing against a naive `includes` implementation.
 
@@ -450,9 +454,9 @@ asked. Each is reversible in review; none carries `⚠ NEEDS HUMAN CONFIRMATION`
 | --- | ------------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Q1  | Where does the eight-path list live — `audit.ts` or the test file? | `audit.ts`, exported, beside `REQUIRED_HEADINGS`                       | The assertion lives in `auditPlan`; a list in the test would force the module to import from its own test and would leave the CLI unable to print what it asserts.                                           |
 | Q2  | Is the list kept in sync with `docs/plans/README.md` by hand?      | No — a parity case asserts it against the README table                 | A hand-copied list re-creates the reported failure one level down: a documented rule that only a human checks. Test-only, ~15 lines, fully reversible.                                                       |
-| Q3  | Which documents does the assertion run over?                       | Every `docs/plans/NN-*.md`, not only `GUARDED_PLANS`                   | #216's acceptance says "any plan", and it is achievable: measured 0 violations outside `00-foundations.md` across all 31 documents and 640 entries.                                                          |
+| Q3  | Which documents does the assertion run over?                       | Every `docs/plans/NN-*.md`, not only `GUARDED_PLANS`                   | #216's acceptance says "any plan", and it is achievable: measured 0 violations outside `00-foundations.md` across all 31 documents and 638 entries.                                                          |
 | Q4  | Do `— edit` entries count, or only `— new`?                        | Both                                                                   | `Owned paths` is an ownership declaration and the README's rule is about the list, not the kind; a parallel `schema.ts — edit` is the collision the contract forbids.                                        |
-| Q5  | How is `src/components/ui/**` matched?                             | The directory itself and anything beneath it, by path-separator prefix | 12 of plan 00's 29 entries are individual files under the glob; a literal-glob-only rule would miss a feature stage claiming one primitive, the likeliest case.                                              |
+| Q5  | How is `src/components/ui/**` matched?                             | The directory itself and anything beneath it, by path-separator prefix | 13 of plan 00's 29 entries are individual files under the glob; a literal-glob-only rule would miss a feature stage claiming one primitive, the likeliest case.                                              |
 | Q6  | What about `src/routeTree.gen.ts`, already in `GENERATED_PATHS`?   | Both rules stay; the overlap is intentional                            | They have different exemptions. Only keeping both preserves the README's stricter "never listed under Owned paths, by anyone" for plan 00 itself.                                                            |
 | Q7  | Is the exemption keyed on the full path or the basename?           | Basename `00-foundations.md`                                           | The CLI accepts any path shape; a full-string comparison would report 29 violations the moment a caller passed an absolute path.                                                                             |
 | Q8  | Does the rule read anything besides `Owned paths`?                 | No — reference rows and prose are out of scope                         | The README's requisition route is prose under **Data and migration**; asserting against prose would make the documented escape hatch unusable.                                                               |
