@@ -27,19 +27,31 @@ that make "every interactive element has five states" falsifiable.
 
 ### Reference rows
 
-`DSY-01 missing → done` — the Tailwind 4 `@theme` layer maps every token of `00-S3` to a utility.
-`DSY-02 missing → done` — the primitive gallery route renders every primitive in every state.
-`DSY-03 missing → done` — the state-matrix test.
+`DSY-01 missing → done` — the Tailwind 4 `@theme` layer is declared in `src/styles/app.css` and maps
+the `00-S3` tokens to utilities. Held in one direction only, by
+`src/styles/__tests__/token-classes.test.ts`: every token-shaped class in `src/` resolves to a
+registered token. The converse — every registered token is reachable as a utility, which is what
+_maps every token_ claims — is asserted by nothing (#217).
+`DSY-02 missing → missing` — the primitive gallery route renders every primitive in every state.
+`src/routes/_dev/` does not exist, so neither the route nor its two components do.
+`DSY-03 missing → missing` — the state-matrix test.
+`src/components/__tests__/state-matrix.test.tsx` is absent; issue #21 is what its absence costs.
 
 ### Owned paths
 
-- `src/styles/theme.css` — new
-- `src/styles/app.css` — new
+- `src/styles/app.css` — edit
 - `src/routes/_dev/gallery.tsx` — new
 - `src/routes/_dev/-ui/state-grid.tsx` — new
 - `src/routes/_dev/-ui/token-sheet.tsx` — new
 - `src/components/__tests__/state-matrix.test.tsx` — new
 - `e2e/design-system.visual.spec.ts` — new
+
+This stage originally declared `src/styles/theme.css — new` beside `src/styles/app.css`. There is no
+`theme.css`: the Tailwind 4 `@theme inline` layer is declared inside `app.css`, and the two entries
+are one. `app.css` opens with the reason it stays there — `tokens.css` must land unlayered and
+_before_ the layer for a single `data-theme` attribute to repaint the product, and splitting the
+layer into a fourth file would put that ordering contract in two places. So the entry is `— edit`,
+and extracting the layer is explicitly not this plan's work.
 
 ### Data and migration
 
@@ -54,9 +66,11 @@ to delete it.
 
 ### UI (route, components)
 
-- **Route.** `/_dev/gallery`, SSR (default), dev-only per above. It is the visual evidence surface
-  for every foundations primitive stage: `00-S6`, `00-S8`, `00-S10`, `00-S13` and `00-S16` all cite
-  its frames rather than building their own route.
+- **Route.** `/_dev/gallery`, SSR (default), dev-only per above. It is designed to be the visual
+  evidence surface for every foundations primitive stage — `00-S6`, `00-S8`, `00-S10`, `00-S13` and
+  `00-S16` will cite its frames rather than build their own route. Written in the future tense
+  deliberately: the route does not exist, and the frames those five stages were expected to cite
+  were never captured. Nothing may be ticked against this surface until it ships.
 - **Components.** `state-grid.tsx` renders one primitive family per section, each in **rest, hover,
   focus-visible, active, disabled and loading**, forced through data attributes rather than real
   pointer state so a screenshot can capture them. `token-sheet.tsx` renders every token with its
@@ -65,9 +79,11 @@ to delete it.
   says so on the page rather than leaving a reader to wonder.
 - **Tokens.** Every token this stage needs already exists from `00-S3`. If a primitive stage reports
   a missing token, it is a `00-foundations.md` requisition and never a hex literal here.
-- **Accessibility.** The gallery is the surface the AAA claims are demonstrated on: every hit area is
-  measured at ≥44×44 CSS px by the visual spec, and the focus ring is checked against
-  `docs/ACCESSIBILITY.md` §3's 2.4.11 / 2.4.12 statement at every scroll position.
+- **Accessibility.** The gallery is designed to be the surface the AAA claims are demonstrated on:
+  every hit area measured at ≥44×44 CSS px by the visual spec, and the focus ring checked against
+  `docs/ACCESSIBILITY.md` §3's 2.4.11 / 2.4.12 statement at every scroll position. It demonstrates
+  none of that today, because it does not exist — where the evidence for those five claims comes
+  from meanwhile is #215.
 
 ### Quota
 
@@ -80,11 +96,13 @@ gallery renders literals.
 
 ### Money invariant
 
-The gallery renders sample amounts through `formatAmount` from `src/lib/money.ts` in both `en` and
-`pl` and for a 0-, 2- and 3-digit currency, so that a regression in `digits` handling is **visible**
-rather than only unit-tested. No amount originates in this stage; every one is a literal minor-unit
-integer in the fixture. Held by `src/lib/__tests__/money.test.ts` (owned by `00-S4`); this stage adds
-no case of its own and says so.
+The gallery renders sample amounts through `formatMoney`, re-exported from `src/lib/money.ts`, in
+both `en` and `pl` and for a 0-, 2- and 3-digit currency, so that a regression in `digits` handling
+is **visible** rather than only unit-tested. No amount originates in this stage; every one is a
+literal minor-unit integer in the fixture. Held by the money suites owned by `00-S4` —
+`src/lib/__tests__/money-core.test.ts`, `src/lib/__tests__/money-convert.test.ts`,
+`src/lib/__tests__/money-allocate.test.ts` and `src/lib/__tests__/money-format.test.ts`; this stage
+adds no case of its own and says so.
 
 ### Verification
 
@@ -92,8 +110,8 @@ no case of its own and says so.
 - `state-matrix.test.tsx` enumerates the primitive barrel and **fails on any exported interactive
   primitive that does not render all five states** — the mechanical form of the §2 clause, so it
   cannot be ticked without being true.
-- `src/styles/__tests__/contrast.test.ts` (owned by `00-S3`) must be green; this stage does not
-  weaken it.
+- `src/styles/__tests__/tokens-contrast.test.ts` (owned by `00-S3`) must be green; this stage does
+  not weaken it.
 - Browser evidence: `/_dev/gallery`, both themes, 360 / 1280 / 2560 px — six frames — plus the forced
   hover, focus-visible, active, disabled and loading rows, which are the point of the stage.
 - axe at the configured rule set on `/_dev/gallery`: zero `serious`, zero `critical`. No `moderate`
@@ -106,7 +124,10 @@ means for every later stage, so ticking one it did not look at is worse here tha
 
 ### Blockers
 
-None.
+None for building the stage. One open question rides on it: `docs/ACCESSIBILITY.md` claims five AAA
+criteria and this stage's gallery is the surface they were designated to be demonstrated on. The
+gallery does not exist, so the provenance of those five claims is unsettled - #215. That is a
+question for a human, not a blocker on the code.
 
 ---
 
@@ -118,15 +139,29 @@ None.
 
 ### Reference rows
 
-`DSY-04 missing → done` — the motion tokens, the keyframe set and the global reduced-motion block.
-`DSY-05 missing → done` — the reduced-motion test that proves a preference actually removes motion.
+`DSY-05 missing → missing` — the reduced-motion test that proves a preference actually removes
+motion. `e2e/reduced-motion.visual.spec.ts` is absent, and so is the `[data-motion-transform]` hook
+the stage designed, which appears nowhere under `src/` or `e2e/`.
+
+`DSY-04` — the motion tokens, the keyframe set and the global reduced-motion block — is **not** a
+row of this stage. Its subject shipped inside `src/styles/tokens.css`, a shared path this plan may
+never own, so the row was requisitioned into `00-S3` of `00-foundations.md`, where it reads
+`missing → done`. This stage requires that contract; it does not write it.
 
 ### Owned paths
 
-- `src/styles/motion.css` — new
 - `src/lib/motion.ts` — new
 - `src/lib/__tests__/motion.test.ts` — new
 - `e2e/reduced-motion.visual.spec.ts` — new
+
+This stage originally declared `src/styles/motion.css — new`. The motion contract shipped, but it
+shipped inside `src/styles/tokens.css` — one of the eight shared paths that belong to
+`00-foundations.md` and to nothing else (`README.md` → _The eight shared paths_). Repointing the
+entry at the file where its subject actually lives would therefore make this stage **malformed**,
+and the drift guard would not catch it, because the guard checks that a path exists and not who is
+allowed to own it. The entry is removed rather than repointed, `DSY-04` is requisitioned into
+`00-S3`, and what this stage still asks of the shared file is written under _UI_ below as a
+requirement rather than as ownership.
 
 ### Data and migration
 
@@ -139,16 +174,33 @@ None.
 ### UI (route, components)
 
 - **Route.** None of its own; it is verified on `/_dev/gallery`.
+- **Requisition — `00-S3`, `src/styles/tokens.css`.** This stage does not own the motion tokens, the
+  keyframe set or the global reduced-motion block; `00-foundations.md` writes the shared files and
+  `DSY-04` records that they shipped. What this stage requires of them, as a requirement rather than
+  as ownership: a duration scale whose slowest step stays under the 400 ms ceiling, an easing set,
+  keyframes that animate `transform` and `opacity` only, and a `prefers-reduced-motion: reduce`
+  block that collapses every one of the durations rather than blanket-killing animation — because a
+  `!important` `animation: none` breaks components that wait on `animationend`, which is how a
+  dialog that never closes gets shipped. All of that is in the tree; the one clause that is not is
+  the `[data-motion-transform]` reset, and it stays an open requirement below.
 - **Components.** `src/lib/motion.ts` exports `useReducedMotion()` and the `motion` package's shared
   transition presets. Every animation in the product goes through one of them.
 - **States.** Not applicable — no async surface.
-- **Tokens.** Durations 150–260 ms and the easing set live in `tokens.css` from `00-S3`; this stage
-  consumes them. Nothing over 400 ms exists in the product except a deliberately-declared ambient
-  loop, and there is none in v1.
+- **Tokens.** The duration scale and the easing set live in `tokens.css` from `00-S3`; this stage
+  consumes them. The scale that shipped is **90 / 150 / 220 / 320 ms** with four easings. This
+  document previously asserted a 150–260 ms band, which was never true of the tree; the band was a
+  _value_ inside a shared path this plan does not own, so the document moves to the shipped values
+  rather than the values moving to the document. **The invariant is the 400 ms ceiling**: nothing
+  over 400 ms exists in the product except a deliberately-declared ambient loop, and there is none
+  in v1. Whether 320 ms is the right slowest step is a separate question and is not settled here.
 - **Accessibility.** `prefers-reduced-motion: reduce` collapses every animation to `0.01ms` and one
-  iteration, resets `transform` on `[data-motion-transform]`, and keeps indeterminate progress
-  indicators readable. **Motion is transform and opacity only** — a layout-affecting animation is a
-  layout shift wearing a nicer name.
+  iteration and keeps indeterminate progress indicators readable — both shipped, in the
+  reduced-motion block of `tokens.css`. **Motion is transform and opacity only** — a
+  layout-affecting animation is a layout shift wearing a nicer name. One clause of this contract is
+  **unimplemented**: reduced motion never resets `transform` on a parked element, and the
+  `[data-motion-transform]` hook designed for it exists nowhere in the tree. It is kept as an open
+  requirement rather than deleted, because deleting it would erase the only written record that the
+  enforcement was designed.
 
 ### Quota
 
@@ -168,8 +220,11 @@ node_ and enforced in review by the rule being written down here rather than ass
 ### Verification
 
 - Command gate.
-- `motion.test.ts`: every exported preset is within 150–260 ms, animates only `transform` and
-  `opacity`, and returns a zero-duration variant under the reduced-motion flag.
+- `motion.test.ts`: every exported preset stays under the 400 ms ceiling, resolves its duration from
+  a `tokens.css` duration token rather than a literal, animates only `transform` and `opacity`, and
+  returns a zero-duration variant under the reduced-motion flag. The assertion is the ceiling and
+  the token indirection, not a band: a band would re-assert a shared-path value this stage does not
+  own, which is the contradiction that made this document wrong about the tree.
 - `e2e/reduced-motion.visual.spec.ts`: with `prefers-reduced-motion: reduce`, a frame captured
   immediately after paint is **pixel-identical** to one captured 1 s later on the same route. That is
   the falsifiable form of "reduced motion is honoured"; reading the CSS is not.
@@ -182,7 +237,17 @@ All seven §7 items and all ten §2 clauses, with the motion clause carrying thi
 
 ### Blockers
 
-None.
+- **`motion@^13.2.0` - disposition: defer (#213).** The package is declared in `package.json` and
+  imported by zero files under `src/`. This stage's `src/lib/motion.ts` is its only justification in
+  the repository, so the package and the stage are one decision: remove it, or schedule this stage.
+  `docs/SPEC.md` §3.1 freezes the dependency set and `AGENTS.md` puts the change under **Ask First**,
+  so nothing here touches `package.json`.
+- **The `[data-motion-transform]` reset is unimplemented (#214).** A live accessibility gap rather
+  than a documentation one; the row stays open and the defect is tracked on its own issue.
+- **The drift guard cannot see the shared-path rule (#216).** This stage is the first that could
+  trip it: repointing `src/styles/motion.css` at `src/styles/tokens.css` would have produced a
+  malformed stage that the guard would have passed. The requisition of `DSY-04` into `00-S3` avoids
+  it here; the assertion that would catch the next one is filed against the guard's owner.
 
 ---
 
@@ -195,8 +260,13 @@ boundary that keeps a second implementation from appearing.
 
 ### Reference rows
 
-`DSY-06 missing → done` — the primitive inventory document and the barrel contract.
-`DSY-07 missing → done` — the ESLint boundary rule for `src/components/ui/**`.
+`DSY-06 missing → partial` — the primitive inventory document and the barrel contract. The barrel
+shipped as `src/components/ui/index.ts`. The inventory did not: `docs/DESIGN-PRIMITIVES.md` is
+absent, and so is `src/components/__tests__/no-duplicate-primitives.test.ts`, which cross-checks the
+two against each other. The row stays open on the inventory half, which this stage still owns.
+`DSY-07 missing → done` — the ESLint boundary rule for `src/components/ui/**` is in
+`eslint.config.js`, as a `no-restricted-imports` block scoped to that directory: _components/ui never
+imports from server/. Pass data in as props._
 
 ### Owned paths
 
@@ -234,10 +304,20 @@ None — no data access.
 
 ### Money invariant
 
-The inventory records that there is **exactly one** amount input (`MoneyField`, `00-S10`) and
-**exactly one** amount column helper (`data-table.tsx`, `00-S8`) in the product, and that both
-delegate to `src/lib/money.ts`. `no-duplicate-primitives.test.ts` fails if a second component
-exporting a currency-formatting function appears anywhere under `src/components/`.
+The inventory records that there is **exactly one** amount input and **exactly one** amount column
+helper in the product, and that both delegate to `src/lib/money.ts`. Measured at the reconciliation:
+
+- The amount **input** is settled. `MoneyField` shipped as `src/components/ui/money-field.tsx` under
+  issue #106, which consolidated two feature-local amount fields into the one primitive `00-S10`
+  designated; `00-foundations.md` records it as `FND-23 missing → done`. The one-owner claim is true
+  of the tree today, and this document no longer describes it as a gap.
+- The amount **column helper** is still owed. `src/components/ui/data-table.tsx` does not exist, and
+  the only `data-table.tsx` in the tree is `src/components/charts/data-table.tsx`, which is the
+  chart text equivalent required by ADR 0007 and not a reusable table. `00-foundations.md` carries
+  that as `FND-18 missing → partial`; nothing here re-opens or duplicates it.
+
+`no-duplicate-primitives.test.ts` fails if a second component exporting a currency-formatting
+function appears anywhere under `src/components/`.
 
 ### Verification
 
@@ -255,4 +335,10 @@ exporting a currency-formatting function appears anywhere under `src/components/
 
 ### Blockers
 
-None.
+None for building the stage. One figure depends on it: `docs/plans/README.md` describes this plan as
+`~45 React Aria primitives`, which is not derivable from the tree: `src/components/ui/` holds 40
+modules besides the barrel, and the barrel re-exports them in 80 statements — 118 value symbols and
+69 types, 187 names in all. Not one of those five numbers is 45, and no counting rule anywhere says
+which of them a "primitive" is. `docs/DESIGN-PRIMITIVES.md`
+is that counting rule, so the register figure is re-stated from the inventory once this stage ships
+(#218).
