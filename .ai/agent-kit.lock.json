@@ -1,5 +1,5 @@
 {
-  "kitVersion": 17,
+  "kitVersion": 18,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -111,7 +111,7 @@
       "mode": "100644"
     },
     "scripts/ci/__tests__/review-threads-label.test.mjs": {
-      "sha256": "3b729625f46362d6d827841a2a6033d9aaac26d553b0f31a4f56e2ea19b18c30",
+      "sha256": "8cb372eedaf9a2e8b15fafa2c8908ca44eafe9094172e9d4e130ebabc64b42e5",
       "mode": "100644"
     },
     "scripts/ci/claude-review-ran.mjs": {
@@ -123,7 +123,7 @@
       "mode": "100644"
     },
     "scripts/ci/review-threads-label.mjs": {
-      "sha256": "3aab6b4fd29db41ce9312e99c8d0c8977e87eb35ca425f7f8a2c5632171d623a",
+      "sha256": "6edb09a8220a3fe431e126bc39e4881baf46beece33d785f9132990665c49d9a",
       "mode": "100644"
     }
   },

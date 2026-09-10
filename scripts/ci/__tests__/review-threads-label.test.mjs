@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { decide, LABEL } from '../review-threads-label.mjs'
+import { decide, LABEL, readReviewState } from '../review-threads-label.mjs'
 
 const HEAD = 'abc1234def5678'
 
@@ -116,5 +116,65 @@ describe('decide', () => {
       }),
     )
     expect(reason).toContain('2 unresolved')
+  })
+})
+
+/**
+ * `decide` is only ever as good as the read that feeds it. One page is 100 review threads, and a
+ * pull request that has been through several review rounds has more - so a read that stops at the
+ * first page hands `decide` a set with nothing open in it and gets back the same "nothing open" a
+ * genuinely clean pull request produces. That is the failure this walk exists to prevent, and the
+ * second case below is it: the same fixture, read one page deep, calling a red pull request clean.
+ *
+ * The page fetcher is injected for the reason `decide` is exported - the walk becomes a table of
+ * pages rather than something that only happens against GitHub.
+ */
+
+const rawThread = (over = {}) => ({
+  isResolved: false,
+  isOutdated: false,
+  comments: { nodes: [{ author: { login: 'claude' } }] },
+  ...over,
+})
+
+/** A full page of threads somebody already settled - the shape that hides the live ones. */
+const settled = (count) =>
+  Array.from({ length: count }, () => rawThread({ isResolved: true }))
+
+/** One `reviewThreads` page as GitHub returns it. `endCursor` null means this is the last one. */
+const page = (threads, { endCursor = null, labels = [] } = {}) => ({
+  labels: { nodes: labels.map((name) => ({ name })) },
+  reviewThreads: {
+    pageInfo: { hasNextPage: endCursor !== null, endCursor },
+    nodes: threads,
+  },
+})
+
+describe('readReviewState', () => {
+  it('walks to the page the live threads are on, and arms on what it finds', () => {
+    const pages = [page(settled(100), { endCursor: 'page-2' }), page([rawThread()])]
+    const asked = []
+
+    const state = readReviewState((cursor) => {
+      asked.push(cursor)
+      return pages[asked.length - 1]
+    })
+
+    expect(asked).toEqual([null, 'page-2'])
+    expect(state.threads).toHaveLength(101)
+    expect(decide(input(state)).act).toBe('label')
+  })
+
+  it('would have called that same pull request clean off its first page alone', () => {
+    const firstPageOnly = readReviewState(() => page(settled(100)))
+
+    expect(decide(input(firstPageOnly)).act).toBe('skip')
+  })
+
+  it('carries the labels through, which is the other half of what decide reads', () => {
+    const state = readReviewState(() => page([rawThread()], { labels: ['in-progress'] }))
+
+    expect(state.labels).toEqual(['in-progress'])
+    expect(decide(input(state)).reason).toContain('in-progress')
   })
 })
