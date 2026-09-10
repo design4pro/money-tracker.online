@@ -9,7 +9,7 @@ import { cn } from '#/lib/cn'
 import { Description, FieldError, FieldGroup, Label, fieldRow } from './field'
 import { ListBox } from './list-box'
 import { Popover } from './popover'
-import { composeTw, fieldSizes, transitionBase } from './shared'
+import { composeTw, controlWash, fieldSizes, transitionBase } from './shared'
 
 import type { ComboBoxProps as RACComboBoxProps } from 'react-aria-components'
 import type { ReactNode } from 'react'
@@ -107,8 +107,7 @@ export function ComboBox<T extends object>({
           className={cn(
             'grid w-9 shrink-0 place-items-center self-stretch text-ink-2 cursor-pointer target-min',
             transitionBase,
-            'data-[hovered]:bg-hover data-[hovered]:text-ink',
-            'data-[pressed]:bg-press',
+            controlWash,
             'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
             '[&_svg]:size-4',
           )}

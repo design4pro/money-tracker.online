@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 
+import { rowWash, rowWashSecondary } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { AccountStateBadges } from './account-badges'
@@ -90,7 +91,7 @@ export function AccountCard({
         // The row no longer floats on a sheet of its own, so the wash is what says *this whole
         // band is one target*. It is a hover affordance only — the link inside still draws the
         // product's one focus ring, and nothing here depends on the wash being seen.
-        'transition-colors duration-fast hover:bg-hover',
+        rowWash,
         // Archived is a surface, never an opacity — see the docblock.
         isArchived && 'bg-surface-sunken',
       )}
@@ -123,7 +124,7 @@ export function AccountCard({
 
         <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {isAccountCategory(account.category) ? (
-            <span className="text-label text-ink-2">
+            <span className={cn('text-label', rowWashSecondary)}>
               {t(accountCategoryFacts(account.category).labelKey)}
             </span>
           ) : null}
@@ -146,7 +147,7 @@ export function AccountCard({
             tone="value"
           />
           {isForeign ? (
-            <p className="mt-0.5 text-caption text-ink-2">
+            <p className={cn('mt-0.5 text-caption', rowWashSecondary)}>
               <span>
                 {t('accounts.balance.inBase', {
                   currency: baseCurrencyCode,

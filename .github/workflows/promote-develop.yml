@@ -69,6 +69,15 @@ jobs:
           body=$(printf '%s\n' \
             'Automated promotion pull request, opened by `.github/workflows/promote-develop.yml`.' \
             '' \
+            '> [!IMPORTANT]' \
+            '> **Merge this with a merge commit** - "Create a merge commit", or' \
+            '> `gh pr merge --merge`. Never squash and never rebase.' \
+            '>' \
+            '> The second parent is the only thing that tells `main` it already contains what' \
+            '> `develop` contains. A squash writes the content onto `main` under a commit with no' \
+            '> ancestral link to what it flattened, so the next promotion re-proposes these same' \
+            '> commits - see ADR 0003, amendment 2026-09-09.' \
+            '' \
             'Merging this deploys **production**. It stays open and keeps collecting commits until a' \
             'human merges it, so the diff between staging and production is always one click away.' \
             '' \

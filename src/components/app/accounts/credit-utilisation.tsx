@@ -1,6 +1,6 @@
 import { AlertTriangle, TrendingUp } from 'lucide-react'
 
-import { Meter } from '#/components/ui'
+import { Meter, rowWashSecondary } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { formatPercent, useLocale, useTranslate } from '#/lib/i18n'
 import {
@@ -190,7 +190,10 @@ export function CreditUtilisation({
 
   return (
     <div className={className}>
-      <p className="text-micro tracking-label uppercase text-ink-2">
+      {/* Inside the account row, so on a washed ground under the pointer — see `rowWash`. */}
+      <p
+        className={cn('text-micro tracking-label uppercase', rowWashSecondary)}
+      >
         {t('accounts.credit.title')}
       </p>
       <Meter

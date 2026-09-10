@@ -335,7 +335,10 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
 - **Green Ink** (`positive`): money in, on track, within budget. 7.75:1 on sunken, 9.36:1 on
   raised; on `positive-soft` 7.96:1. Dark `#7fd9a8`.
 - **Red Ink** (`negative`): money out, overdrawn, destructive confirmation, validation failure.
-  7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f5a08f`.
+  7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f6a898` (7.61:1 on raised,
+  and 7.20:1 on the ground `--color-hover` leaves over `surface` - the one hue tuned against a
+  _washed_ ground rather than a plane, because a verdict hue cannot be promoted to `ink` on hover
+  the way the greys are).
 - **Loud Red** (`negative-bold`): the same ink at the grade that is not held to the text floor -
   the over-budget headline in `AmountMeter` and the over-budget meter fill, and nothing else.
   5.09:1 on sunken, 6.15:1 on raised; dark `#ff594a` at 4.70:1 on raised. The floors that apply

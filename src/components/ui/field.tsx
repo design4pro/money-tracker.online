@@ -8,6 +8,7 @@ import {
 import { cn } from '#/lib/cn'
 import {
   composeTw,
+  controlWash,
   fieldSurface,
   focusRingWithin,
   transitionBase,
@@ -210,8 +211,7 @@ export function FieldGroup({ className, ...props }: FieldGroupProps) {
 export const fieldEndButton = cn(
   'grid w-9 shrink-0 place-items-center self-stretch text-ink-2 cursor-pointer target-min',
   transitionBase,
-  'data-[hovered]:bg-hover data-[hovered]:text-ink',
-  'data-[pressed]:bg-press',
+  controlWash,
   'data-[disabled]:opacity-45 data-[disabled]:pointer-events-none',
   'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
   '[&_svg]:size-4',
