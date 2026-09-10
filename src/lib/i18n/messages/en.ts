@@ -122,6 +122,13 @@ const messages = {
   'action.skip': 'Skip',
   'action.learnMore': 'Learn more',
 
+  /* -- Dialogs ------------------------------------------------------------ */
+  'dialog.unsaved.title': 'Unsaved changes',
+  'dialog.unsaved.body':
+    'This form has changes that have not been saved. Close it now and they are discarded.',
+  'dialog.unsaved.discard': 'Discard changes',
+  'dialog.unsaved.keepEditing': 'Keep editing',
+
   /* -- Shared vocabulary -------------------------------------------------- */
   'common.yes': 'Yes',
   'common.no': 'No',

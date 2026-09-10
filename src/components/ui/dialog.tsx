@@ -75,6 +75,23 @@ export interface ModalProps
   className?: string
   /** Class on the scrim rather than on the panel. */
   overlayClassName?: string
+  /**
+   * Consulted before every close, and a `false` return leaves the dialog open.
+   *
+   * Every close React Aria performs — a press on the scrim, Escape, and the
+   * `close` from `Dialog`'s render props, which is what the header's X and
+   * every footer button in this repository call — ends in the overlay state's
+   * `close()`. On a **controlled** overlay that calls `onOpenChange(false)` and
+   * changes nothing itself, so wrapping `onOpenChange` once covers every path.
+   *
+   * It therefore only holds for a controlled `Modal`. Inside a `DialogTrigger`
+   * the state is React Aria's own and closes whatever this returns.
+   *
+   * The mechanism lives here; what a refusal *means* does not. `components/ui`
+   * carries no copy — see `DialogHeader`'s `closeLabel` — so the
+   * unsaved-changes guard that uses this is `components/app/shell/form-modal`.
+   */
+  canClose?: () => boolean
 }
 
 /**
@@ -85,9 +102,10 @@ export interface ModalProps
  * out of the dialog, the scroll lock (including the iOS rubber-band case), the
  * Escape handler and the focus restore on close.
  *
- * `isDismissable` defaults to `true` here, and should be turned OFF for any
- * dialog that would lose the user's work — a half-finished transaction, an
- * import mapping. An accidental click on the scrim is not consent to discard.
+ * `isDismissable` defaults to `true` here. A dialog that would lose the user's
+ * work takes {@link ModalProps.canClose} instead of turning it off: an
+ * accidental click on the scrim is not consent to discard, but neither is a
+ * dialog with nothing in it worth walling somebody into.
  */
 export function Modal({
   children,
@@ -96,13 +114,32 @@ export function Modal({
   size,
   placement,
   isDismissable = true,
+  canClose,
+  onOpenChange,
   ...props
 }: ModalProps) {
   const docked = placement === 'drawer' || placement === 'drawer-end'
 
+  function handleOpenChange(isOpen: boolean) {
+    if (!isOpen && canClose !== undefined && !canClose()) return
+    onOpenChange?.(isOpen)
+  }
+
+  // Handed over only when there is something to hand over. React Aria warns —
+  // "This modals state is controlled by a trigger, place onOpenChange on the
+  // trigger instead" — for any `Modal` inside a `DialogTrigger` that is given
+  // one, and `docs/SPEC.md` §2.10 turns a console line red. An uncontrolled
+  // modal has no `canClose` to honour either: the guard needs the open state to
+  // refuse to change, and inside a trigger that state is not the caller's.
+  const controlled =
+    canClose === undefined && onOpenChange === undefined
+      ? {}
+      : { onOpenChange: handleOpenChange }
+
   return (
     <RACModalOverlay
       {...props}
+      {...controlled}
       isDismissable={isDismissable}
       data-scrim=""
       className={composeTw(

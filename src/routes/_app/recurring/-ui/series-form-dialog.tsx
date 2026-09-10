@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { parseDate, today as todayIn } from '@internationalized/date'
 
 import { AmountField, ErrorPanel } from '#/components/app/accounts'
+import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Checkbox,
@@ -12,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   NumberField,
   Radio,
   RadioGroup,
@@ -279,6 +279,8 @@ export function SeriesFormDialog({
   const needsAccount = draft.automation === 'auto' && draft.accountId === null
   const isValid = trimmedName !== '' && hasAmount && !needsAccount
 
+  const isDirty = useIsDirty(draft)
+
   function patch(change: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...change }))
   }
@@ -353,12 +355,11 @@ export function SeriesFormDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="lg"
-      // A half-filled series form is work. A stray press on the scrim is not consent to lose it.
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -777,7 +778,7 @@ export function SeriesFormDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }
 

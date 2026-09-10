@@ -5,6 +5,7 @@ import {
   CATEGORIZATION_MODES,
   isCategorizationMode,
 } from '#/components/app/payees'
+import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -12,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   Radio,
   RadioGroup,
   Select,
@@ -100,6 +100,8 @@ export function PayeeFormDialog({
 
   const trimmedName = draft.name.trim()
 
+  const isDirty = useIsDirty(draft)
+
   function patch(change: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...change }))
   }
@@ -146,11 +148,11 @@ export function PayeeFormDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="lg"
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -274,6 +276,6 @@ export function PayeeFormDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }

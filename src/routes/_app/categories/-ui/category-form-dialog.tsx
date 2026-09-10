@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { ErrorPanel } from '#/components/app/accounts'
 import { CATEGORY_HUES, CategoryColourField } from '#/components/app/categories'
+import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -9,7 +10,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   Select,
   SelectItem,
   TextField,
@@ -121,6 +121,8 @@ export function CategoryFormDialog({
 
   const trimmedName = draft.name.trim()
 
+  const isDirty = useIsDirty(draft)
+
   function patch(change: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...change }))
   }
@@ -161,12 +163,11 @@ export function CategoryFormDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      // A half-filled form is work; a stray press on the scrim is not consent to lose it.
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -277,6 +278,6 @@ export function CategoryFormDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }
