@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { auditPlan, mentionsPath } from '../audit.ts'
+import { CLASS_MAP_PLANS } from '../drift-classes.ts'
 import { parsePlan } from '../parse-plan.ts'
 import type { Violation } from '../audit.ts'
 
@@ -36,15 +37,15 @@ const GUARDED_PLANS = [
 ] as const
 
 /**
- * The one document `scripts/plans/drift-classes.ts` describes.
+ * The documents `scripts/plans/drift-classes.ts` describes, which is not the same set as
+ * {@link GUARDED_PLANS}: `02-i18n.md` was reconciled without a class map and is guarded anyway.
  *
- * The class map records the drift of `00-foundations.md` specifically - its entries, its landing
- * sites - and the CLI prints that same block whatever document it is given. So the two landing-site
- * cases below are keyed to this constant rather than run per {@link GUARDED_PLANS} entry: run
- * against `02-i18n.md` they would assert plan 00's landing sites against plan 02's prose and fail
- * for a reason that is about neither document.
+ * The two landing-site cases below are keyed to this register rather than run per
+ * {@link GUARDED_PLANS} entry. Run against a document the class map does not describe they would
+ * assert an empty set - green having checked nothing - and before the map carried a per-plan
+ * `plan` field they asserted plan 00's landing sites against whatever prose they were given.
  */
-const CLASS_MAP_PLAN = 'docs/plans/00-foundations.md'
+const CLASS_MAP_PLAN_PATHS = Object.keys(CLASS_MAP_PLANS)
 
 /**
  * Paths a plan may never claim to own, because they are generated and `AGENTS.md` forbids editing
@@ -93,14 +94,14 @@ describe.each(GUARDED_PLANS)('%s', (planPath) => {
  * altogether, left this suite green. Both docblocks in `audit.ts` state their intent as a
  * guarantee, which is what an assertion rather than a report line is for.
  *
- * They live outside the `describe.each` because they read {@link CLASS_MAP_PLAN} rather than the
- * document under test - see that constant for why.
+ * They live outside the guard's `describe.each` because they run per {@link CLASS_MAP_PLAN_PATHS}
+ * entry rather than per guarded document - see that constant for why.
  *
  * Both were watched failing on a hand-broken copy of the document and of the class map:
  * `.ai/runs/2026-09-09-landing-checks-assert/watched-failing.md`.
  */
-describe(`${CLASS_MAP_PLAN} landing sites`, () => {
-  const audit = auditPlan(CLASS_MAP_PLAN)
+describe.each(CLASS_MAP_PLAN_PATHS)('%s landing sites', (planPath) => {
+  const audit = auditPlan(planPath)
 
   it('resolves every recorded landing site on disk', () => {
     expect(audit.classes.unresolvedLandings).toEqual([])
