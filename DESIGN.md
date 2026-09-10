@@ -27,6 +27,7 @@ colors:
   negative: '#8a1a0d'
   negative-soft: '#f8e3df'
   on-negative: '#ffffff'
+  negative-bold: '#c31300'
   warning: '#614106'
   warning-soft: '#f7ead3'
   on-warning: '#ffffff'
@@ -334,7 +335,27 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
 - **Green Ink** (`positive`): money in, on track, within budget. 7.75:1 on sunken, 9.36:1 on
   raised; on `positive-soft` 7.96:1. Dark `#7fd9a8`.
 - **Red Ink** (`negative`): money out, overdrawn, destructive confirmation, validation failure.
-  7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f5a08f`.
+  7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f6a898` (7.61:1 on raised,
+  and 7.20:1 on the ground `--color-hover` leaves over `surface` - the one hue tuned against a
+  _washed_ ground rather than a plane, because a verdict hue cannot be promoted to `ink` on hover
+  the way the greys are).
+- **Loud Red** (`negative-bold`): the same ink at the grade that is not held to the text floor -
+  the over-budget headline in `AmountMeter` and the over-budget meter fill, and nothing else.
+  5.09:1 on sunken, 6.15:1 on raised; dark `#ff5e4a` at 4.82:1 on raised and 4.57:1 on a hovered
+  row, which is the binding ground. The floors that apply
+  are 4.5:1 (large text: bold at >= 18.66px, WCAG 1.4.6) and 3:1 (a fill, WCAG 1.4.11), so both
+  values sit above the stricter of the two on every ground. It exists because one token cannot be
+  both a caption ink and a danger colour: `negative` has to hold 7:1, and in dark that pins it to a
+  pale salmon, since red is luminance-poor and no deeper red in sRGB reaches that floor. **Never
+  put body-size text in it**, and never reach for it as a general "stronger red".
+  **Nor for a partial fill.** `ui/Meter`'s danger state stays on `negative`, and the two meters
+  differ because their fills can. The over-budget fill is always the whole track - `over` means the
+  ratio passed 1, which clamps it - so its neighbour is the card, and the component fixes that.
+  `ui/Meter` takes its threshold from a `dangerAt` prop, so the adjacency is the caller's: at the
+  default of `1` that fill is full too, and below 1 it is partial and abuts the track, where the
+  loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1. Both clear
+  1.4.11, but a primitive that cannot know which boundary it will get takes the value that holds on
+  either. Same criterion, two adjacencies.
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
   9.26:1 on raised; on `warning-soft` 7.79:1. Dark `#e9c46a`.
 - **Notice** (`info`): a system notice with no verdict - "Hidden", "Planned", "Auto", a scope. It
@@ -361,6 +382,16 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
 - **Column Rule** (`border-panel`): the heavier rule - the spine before the balance column, the
   rule under a column heading, the frame of the current rail row, the section rule between two
   paper grounds. 1.94:1 on canvas, 1.77:1 on panel.
+- **Both rules are slate in dark, not green, and they are set higher there** (`border-subtle`
+  `#42454c`, 1.87:1 on canvas and 1.52:1 on raised; `border-panel` `#5a5d64`, 2.72:1 on canvas and
+  2.33:1 on panel). Two reasons, and neither is taste. Dark's whole canvas-to-raised tone span is
+  1.231:1, because `surface-raised` is pinned by `ink-2`'s 7:1 floor - light separates a card by
+  tone _and_ a rule, dark has only the rule, so the rule carries a larger share and is measured
+  against dark's own floor rather than re-valued from light's. And a green line on slate grounds
+  reads as an unconverted leftover rather than as printed ruling, which is what made the `info`
+  badge - whose entire chrome is a `border-panel` rule - glow at night. The floors are stated in
+  `src/styles/tokens.css` and checked per theme against every ground in
+  `src/styles/__tests__/tokens-contrast.test.ts`.
 - **Control Boundary** (`border-strong`): the edge of anything pressable or typeable. 4.33:1 on
   raised, 3.59:1 on sunken, clearing the 3:1 floor of WCAG 1.4.11 on every ground.
 
@@ -492,6 +523,22 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
   like the line that produced it, and the page is not marked.
 - **The summary strip**: three typed lines in a `dl`, label at the start, figure at the end, a
   `border-t` rule under each - never three tiles.
+- **Three width bands, and nothing improvised between them**. A block states which band it belongs
+  to; a screen that names none inherits the shell column and spans it, which is how a row carrying
+  four short facts comes to draw a rule across 1150px of nothing.
+  - `--content-max` (80rem, via `max-w-content`) - the shell column, and anything that earns it: a
+    grid, a ledger, a dashboard of widgets.
+  - `--list-max` (56rem, via `max-w-list`) - a single column of list rows. A 1440px viewport leaves
+    1156px of usable content width beside the rail, so this band leaves a 260px tail rather than a
+    600px one.
+  - `--measure` (64ch, via `prose-measure`) - running text of more than one paragraph. It also sets
+    the reading leading and the paragraph gap, so it is **not** a width utility and is not used as
+    one; a one-line subtitle that wants a cap and nothing else takes `max-w-prose`, which would
+    otherwise move off the 2.5rem pitch.
+  - **Capped blocks are start-aligned, never centred.** A block takes its band and nothing else, so
+    it keeps the shared start edge with the page's `<h1>`; centring inside an already-centred column
+    trades one void for two half-voids. The freed tail does nothing, which is the point - it is not
+    spanned by a rule.
 - **Reading measure**: `prose-measure` caps running text at 64ch and sets the reading leading
   (1.6) and paragraph gap (1.5em). A handful of descriptions cap themselves inline at 60-68ch
   instead (`max-w-prose` is 65ch) and keep the body leading; every cap sits under the 80-character
@@ -670,9 +717,16 @@ wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 ### Meter
 
 An 8px track at `sm` radius in `border-subtle` (so the fill's stop is readable against it), the
-fill in `positive` on track, `warning` near the limit, `negative` over it; past 100% the fill runs
-hatched as well as red. The headline beside it is the remainder, and the state is carried by a
-word and a lucide icon before colour.
+fill in `positive` on track, `warning` near the limit, and red over it; past 100% the fill runs
+hatched as well as red. _Which_ red is not one answer: `ui/Meter` is the generic primitive and its
+threshold is a `dangerAt` prop, so its fill may abut the track or the card depending on the caller,
+and it keeps `negative` - the grade that clears both. The money meters know: `over` means the ratio
+passed 1, which clamps the fill to the whole track, so `AmountMeter` and `BudgetMeter` take
+`negative-bold` against the card. The two callers that reach `ui/Meter`'s danger state both pass a
+threshold of `1`, so today that split shows up as two reds for one verdict; #180 is where that is
+settled. The headline beside it is the remainder, and `negative-bold` too
+when it is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor.
+The state is carried by a word and a lucide icon before colour.
 
 ### Navigation
 

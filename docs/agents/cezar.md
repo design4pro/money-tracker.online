@@ -40,7 +40,7 @@ the rules of `SDLC.md`.
     `~/.cezar/config.json`) gates only the update; the patch makes `CEZ_SKILLS_AUTO_UPDATE=0` skip
     the check too. Recovery: remove the symlinks, `git checkout -- .claude/skills`, delete `.agents/`.
   - Two runs forking their worktree in the same moment lose the `.git/config` lock: `git worktree
-    add -b` writes the new branch's upstream into the shared config, git's config lock has no
+add -b` writes the new branch's upstream into the shared config, git's config lock has no
     retry, and the fork happens before cezar takes the repository-root lease, so `maxParallel`
     does not order it. Every loser dies with `worktree creation failed` before its workflow runs.
     The patch retries onto the reattach form, which writes no shared config.
@@ -93,45 +93,66 @@ against this list rather than against a run's behaviour. Which permission an ope
 fixed by GitHub's API and is the durable half of this section; which ones the token actually holds
 is a snapshot, dated in the last column and re-checked with the probe below.
 
-| Repository permission     | Operations it serves                                                              | Held 2026-09-09 |
+| Repository permission     | Operations it serves                                                              | Held 2026-09-10 |
 | ------------------------- | --------------------------------------------------------------------------------- | --------------- |
 | Metadata: read            | **repo-info**, **default-branch**, the ruleset read below (implicit on every PAT) | yes             |
 | Contents: read/write      | `git push`                                                                        | yes             |
 | Issues: read/write        | **get-issue**, **comment-issue**, the label and assignee guards                   | yes             |
 | Pull requests: read/write | **create-pr**, **get-pr**, **get-pr-diff**, the review and review-thread ops      | yes             |
 | Actions: read             | **list-runs**, **get-run**, **get-run-failed-logs**, **watch-run**                | yes             |
+| Actions: write            | **rerun-failed**                                                                  | yes             |
 | Commit statuses: read     | **get-pr-checks**' status half (`commits/{sha}/status`)                           | yes             |
-| Checks: read              | **get-pr-checks** (`gh pr checks`, `commits/{sha}/check-runs`)                    | **no**          |
-| Actions: write            | **rerun-failed**                                                                  | **no**          |
-| Administration: read      | **get-required-checks** (`branches/*/protection/*`)                               | **no**          |
-| Workflows                 | pushing under `.github/workflows/`                                                | **no**          |
+| Artifact metadata: read   | nothing the pipeline calls                                                        | yes             |
+| Administration: read      | — (refused by policy; see below, and it would buy nothing)                        | **yes** — drift |
+| Workflows: read/write     | — (refused by policy: pushing under `.github/workflows/`)                         | **yes** — drift |
 
-The last two rows are refused on purpose, by the Host identity bullet above. Workflows, so a run
-cannot edit the workflows that judge it. Administration, because a run has no business in the branch
-protection settings — and it would buy nothing here anyway, for the reason under "Required checks"
-below. The two above them are simply not granted yet (#133 asks for them), and until they are, this
-is what a run does instead — a degraded path, stated so it is not mistaken for the real gate. Stated
-here, not enforced: the skills read `.ai/trackers/github.md`, and teaching them this belongs to
+**There is no `Checks` permission to grant.** A fine-grained PAT's repository-permission picker
+offers 34 entries and none of them is that one; `Checks` is a GitHub App permission. GitHub's
+"Permissions required for fine-grained personal access tokens" reference documents 30 repository
+permissions with no `Checks` section, and `GET /repos/{owner}/{repo}/commits/{ref}/check-runs` does
+not appear on that page at all — that endpoint is simply not reachable by this token type. So the
+`403 Resource not accessible by personal access token` on the check-run half of the rollup is the
+ceiling of the credential, not a missing grant, and no scope change lifts it. Verified in the token
+UI and against the API reference on 2026-09-10; the finding is on #133. A classic PAT reads check
+runs with `repo`, which is why the same command succeeds from a developer's shell and fails from the
+cockpit — do not read one as evidence about the other.
+
+The last two rows are drift, not policy. The Host identity bullet above refuses both, and the
+token's own description says "No Workflows, no Administration", but the settings page for
+`cezar-cockpit` on 2026-09-10 reads "Read access to administration, artifact metadata, commit
+statuses, and metadata / Read and Write access to actions, code, issues, pull requests, and
+workflows". Workflows: write lets a run push changes to the workflows that judge it, which is the
+one thing this section exists to prevent. Administration: read buys nothing here, for the reason
+under "Required checks" below. Both should come off at the next regeneration. Stated here, not
+enforced: the skills read `.ai/trackers/github.md`, and teaching them this belongs to
 `design4pro/agent-kit`, which renders that file.
 
-Treat the last column as a reading, not a setting. While #133 was being written, `commits/{sha}/status`
-answered 403 at 07:40Z and 200 at 07:57Z for the same SHA and the same `gh` config, which is how the
-"Commit statuses" row came to say yes. Nothing in the repository would have noticed either value
-changing; the probe is what turns the column back into a fact.
+Treat the last column as a reading, not a setting. It has now been wrong in both directions. While
+#133 was being written, `commits/{sha}/status` answered 403 at 07:40Z and 200 at 07:57Z for the same
+SHA and the same `gh` config, which is how the "Commit statuses" row came to say yes; and the four
+rows this revision corrects had all been recorded from a run's behaviour rather than from the token
+page, which is why three of them said "no" about permissions the token holds. Nothing in the
+repository would have noticed; the probe below, and the settings page, are what turn the column back
+into a fact.
 
-- **CI status.** Checks: read is the one that bites. Without it **get-pr-checks** answers
-  `403 Resource not accessible by personal access token`; the GraphQL wording names
-  `statusCheckRollup`, and once Commit statuses landed it narrowed to the per-context nodes
-  underneath it — the rollup resolves, the check runs inside it do not. Commit statuses being
-  readable buys nothing on its own here, because nothing posts a commit status to this repository:
+- **CI status.** The check-run view is the one that bites, and it is permanently out of reach:
+  **get-pr-checks** answers `403 Resource not accessible by personal access token`; the GraphQL
+  wording names `statusCheckRollup`, and once Commit statuses landed it narrowed to the per-context
+  nodes underneath it — the rollup resolves, the check runs inside it do not. No permission fixes
+  that, for the reason above. Commit statuses being
+  readable buys nothing on its own here either, because nothing posts a commit status to this repository:
   every check comes from a workflow in `.github/workflows/`, so `commits/HEAD/status` reports zero
   statuses and **list-runs** for the head branch is the whole picture. A run reports CI from workflow
-  runs and says in its report that the check-run view was unavailable. Note what that costs: a check
+  runs and says in its report that the check-run view was unavailable — permanently, not pending a
+  scope grant. Note what that costs: a check
   posted by an installed GitHub App rather than by a workflow would be invisible to a run, and this
   paragraph would stop being true without any signal that it had.
-- **Required checks.** **get-required-checks** answers 403 here, and would answer 404 even with
-  Administration: read, because it reads _classic branch protection_ and this repository's gate is a
-  repository **ruleset**. The readable truth needs Metadata alone:
+- **Required checks.** **get-required-checks** answers 403 here on 2026-09-10 _with_ the drifted
+  Administration: read in hand — `branches/develop/protection/required_status_checks` refuses this
+  token whatever the picker grants, so do not read the 403 as the missing-permission signal the rest
+  of this section uses it for. The status code is moot anyway: that call reads _classic branch
+  protection_ and this repository's gate is a repository **ruleset**, so neither a 403 nor a 404 nor
+  a 200 from it would be the required set. The readable truth needs Metadata alone:
   `gh api repos/{owner}/{repo}/rules/branches/{branch} --jq '.[].type'`. On 2026-09-09 both
   `develop` and `main` resolved to `deletion`, `non_fast_forward`, `pull_request` and nothing else:
   **no status check is required by the ruleset**, and the merge gate is the pull-request rule with
@@ -146,33 +167,41 @@ changing; the probe is what turns the column back into a fact.
   same read against `design4pro/planned.travel` returns a `required_status_checks` rule on its
   `develop`. Two repositories share this token and disagree about their gate, which is the argument
   for reading the ruleset per repository rather than assuming either answer.
-- **Re-running a job.** Without Actions: write, **rerun-failed** is refused (`run … cannot be
-rerun`). Re-running a job is a human action in this repository: a run that suspects infrastructure
-  rather than a real failure says so on the pull request, names the run id, and stops — it does not
-  retry the call and does not change code to chase a failure it could not disambiguate.
+- **Re-running a job.** Actions: write is held as of 2026-09-10, so **rerun-failed** has the grant
+  it needs; #133 recorded it as missing from a run's behaviour before the token page was read.
+  Re-running is still bounded by judgement rather than by permission: a run that suspects
+  infrastructure rather than a real failure may re-run the job once, and if the second attempt fails
+  the same way it says so on the pull request, names the run id, and stops — it does not keep
+  retrying and does not change code to chase a failure it could not disambiguate.
 
 Probe, from the bot's `gh` config, once per repository — `planned.travel` carries the same token and
 the same expectations, so run it there too. `HEAD` in a REST path is the default branch's tip, which
-is what makes the first two lines stable to paste; the third prints the ruleset instead of a verdict,
-because reading it is the point.
+is what makes the first two lines stable to paste; the fourth prints the ruleset instead of a
+verdict, because reading it is the point.
 
 ```bash
 R=design4pro/money-tracker.online   # then repeat with design4pro/planned.travel
+# Expected to FAIL: no fine-grained PAT can read check runs. A pass here means the config is
+# authenticating as something other than the bot's fine-grained token.
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/commits/HEAD/check-runs" >/dev/null 2>&1 \
-  && echo "checks: read ok" || echo "checks: read MISSING"
+  && echo "check runs: readable — NOT the fine-grained token" || echo "check runs: refused, as expected"
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/commits/HEAD/status" >/dev/null 2>&1 \
   && echo "commit statuses: read ok" || echo "commit statuses: read MISSING"
+GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/actions/runs?per_page=1" >/dev/null 2>&1 \
+  && echo "actions: read ok" || echo "actions: read MISSING"
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/rules/branches/develop" --jq '.[].type'
 ```
 
 Both repositories are private, so an unauthenticated 200 cannot mask a missing permission. Were one
-made public, the first two endpoints would answer without authorization and the probe would report
+made public, the first three endpoints would answer without authorization and the probe would report
 a scope it does not have.
 
-Granting Checks: read and Actions: write is one edit under Settings → Personal access tokens on the
-`design4pro-agent` account, re-approved once by the organisation. The descriptor half of the change
-lives in `design4pro/agent-kit`, which renders `.ai/trackers/github.md`; the piece worth carrying
-there is teaching **get-required-checks** the rulesets endpoint, which needs no new scope at all.
+Nothing is left to grant on this token. There is no `Checks` permission to add, and Actions: write
+is already held; the one edit still owed under Settings → Personal access tokens on the
+`design4pro-agent` account is a **removal** — Workflows and Administration off, re-approved once by
+the organisation. The descriptor half of the change lives in `design4pro/agent-kit`, which renders
+`.ai/trackers/github.md`; the piece worth carrying there is teaching **get-required-checks** the
+rulesets endpoint, which needs no new scope at all.
 
 ### The cockpit process
 
@@ -236,17 +265,17 @@ full set for skills that write code and drops `Edit`/`Write` for the ones that m
 is the same nine workflows as `planned.travel`, under the same names; the setup step differs only
 where that repository provisions D1 and a basemap it needs and this one does not.
 
-| Workflow         | Agent step                                                               | Model                | Started by                                                                 |
-| ---------------- | ------------------------------------------------------------------------ | -------------------- | -------------------------------------------------------------------------- |
-| `issue-groom`    | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation `issue-groom` (`issue.opened`), `issue-regroom` (label `groom`) |
-| `issue-autofix`  | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation `issue-autofix` (label `autofix`)                               |
-| `spec`           | `/om-auto-write-spec {{task}}`                                           | opus                 | automation `issue-spec` (label `spec` on a `feature`)                      |
-| `implement-spec` | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged                        |
-| `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation `pr-autopilot` (`pull_request.opened` by a human maintainer)    |
-| `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                  |
-| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation `pr-review-threads` (label `review-threads` on a PR)            |
-| `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `.ai/scripts/housekeeping.sh`, or a human                      |
-| `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                       |
+| Workflow         | Agent step                                                               | Model                | Started by                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `issue-groom`    | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation `issue-groom` (`issue.opened`), `issue-regroom` (label `groom`)                                                               |
+| `issue-autofix`  | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation `issue-autofix` (label `autofix`)                                                                                             |
+| `spec`           | `/om-auto-write-spec {{task}}`                                           | opus                 | automation `issue-spec` (label `spec` on a `feature`)                                                                                    |
+| `implement-spec` | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
+| `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation `pr-autopilot` (`pull_request.opened` by a human maintainer)                                                                  |
+| `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                                                                                |
+| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation `pr-review-threads` (label `review-threads` on a PR)                                                                          |
+| `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `.ai/scripts/housekeeping.sh`, or a human                                                                                    |
+| `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                                                                                     |
 
 The task text an automation sends is the issue or PR number alone (`{{github.number}}`); a second
 token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled

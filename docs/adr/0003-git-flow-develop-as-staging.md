@@ -107,3 +107,55 @@ for a fix, `feat/<slug>` for a feature and `spec/<slug>` for a design-only pull 
 a document under `.ai/specs/`; `claude/*` for hand-started sessions and `cez/<id8>` (Cezar's
 worktree branches, never pushed) stay. All of them open a pull request to `develop`, and nothing
 here changes what promotes to `main`.
+
+## Amendment 2026-09-09 (the promotion is a merge, never a squash)
+
+The Decision above says "Promotion is a pull request `develop` → **`main`**" and stops there. It
+names the pull request and not the strategy, which is how a squash reads as compliant with this
+record - and on 2026-09-08 one was. This amendment names the strategy.
+
+**The promotion pull request merges with a merge commit.** `gh pr merge <n> --merge`, or the
+"Create a merge commit" button, and never `--squash` or `--rebase`. Everywhere else in this
+repository squash is right and stays right: a feature branch into `develop` is one unit of work and
+deserves one commit. The promotion is not a unit of work. It is the moment `main` learns that it
+already contains what `develop` contains, and the only thing that carries that knowledge is the
+second parent.
+
+**What #148 cost.** `d284141` ("chore(release): promote develop to main (#148)") has one parent;
+the four promotions before it - `df614f0` (#146), `890b19b` (#142), `31aa0de` (#129), `0ebf5ed`
+(#123) - have two each. A squash writes the content onto `main` under a new commit with no
+ancestral link to the commits it flattened, so `main` stopped being an ancestor of `develop` and
+the next promotion pull request, #153, re-proposed four commits production already had. It still
+merged cleanly, because the four files in the gap happened to be byte-identical on both sides.
+That was luck. This record expects a hotfix to be cut from `main`, and the first hotfix touching a
+re-proposed file turns the same gap into a conflict on a release pull request - the one pull
+request nobody wants to resolve conflicts on.
+
+**The repair is a back-merge, not a rewrite.** `1c90329` ("Merge branch 'main' into develop")
+merged `main` into `develop`, and `main` is an ancestor of `develop` again; `origin/main...develop`
+and `origin/main..develop` now report the same 37 files. Nothing on `main` was rewritten and
+nothing should be: `AGENTS.md` forbids a force-push to `main`, the content there is correct, and the
+history is a record of what happened rather than a thing to tidy. A back-merge is what the next
+squash would need too, which is a reason not to need it.
+
+**`allow_squash_merge` stays on, repository-wide.** Turning it off would take the right strategy
+away from every feature branch to guard one pull request a week. The guard belongs on the branch
+that needs it, and GitHub can put it there: the `main` ruleset's `pull_request` rule already carries
+an `allowed_merge_methods` parameter, today `["merge", "squash", "rebase"]`. Narrowing it to
+`["merge"]` refuses a squash at the button on `main` and touches nothing else.
+
+```bash
+# Requires repository admin; no agent run holds it. The PUT is a partial update, so it sends only
+# the `rules` array - handing the whole GET response back would post read-only fields with it.
+gh api repos/design4pro/money-tracker.online/rulesets/22037770 \
+  | jq '{rules: (.rules | map(if .type == "pull_request"
+        then .parameters.allowed_merge_methods = ["merge"] else . end))}' \
+  | gh api --method PUT repos/design4pro/money-tracker.online/rulesets/22037770 --input -
+```
+
+**Until that is applied, this is a convention and not a mechanism.** #148 was merged by a person
+clicking a button, so the tooling default was never the only path to a squash and closing the
+tooling seam alone does not close this one. What the repository has in the meantime is written
+instruction in three places - this record, the repo-local `om-approve-merge-pr` extension, and the
+body of the promotion pull request itself - and written instruction is exactly as strong as the
+attention of whoever is merging.

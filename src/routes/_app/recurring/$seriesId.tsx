@@ -136,7 +136,9 @@ function SeriesDetailRoute() {
       </Link>
 
       <Card className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
+        {/* The status badge and the menu wrap under the name rather than across it - see
+            `series-card.tsx` for why a `shrink-0` pill beside a shrinking heading loses. */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-title font-bold text-ink">{series.name}</h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
@@ -161,7 +163,7 @@ function SeriesDetailRoute() {
               </span>
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="ms-auto flex shrink-0 items-center gap-2">
             <Badge tone={series.isActive ? 'brand' : 'neutral'}>
               {t(
                 series.isActive

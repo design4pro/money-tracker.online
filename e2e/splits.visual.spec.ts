@@ -1,6 +1,6 @@
 import { expect, test } from './support/console'
 
-import { gotoApp, useLocale, useTheme } from './support/app'
+import { openTransactionDetailPanel, useLocale, useTheme } from './support/app'
 import { expectNoSeriousViolations } from './support/budgets'
 import { storageStateFor } from './support/session'
 
@@ -101,26 +101,11 @@ const LABELS: Readonly<Record<AppLocale, SplitLabels>> = {
 /**
  * Opens the first transaction in the ledger and returns its split editor.
  *
- * The row is reached by following the list's own link rather than by a seeded id: the demo
- * workspace's contents are the seed's business, and a spec that hard-codes an id fails for a reason
- * that has nothing to do with splits the first time the fixture changes.
+ * The navigation, the wait for the screen to finish loading and the failure message all live in
+ * `support/app.ts`; see the note on the same helper in `refunds.visual.spec.ts`.
  */
 async function openSplitEditor(page: Page, labels: SplitLabels) {
-  await gotoApp(page, '/transactions')
-
-  const firstRow = page.locator('a[href^="/transactions/"]').first()
-  await expect(firstRow).toBeVisible()
-  await firstRow.click()
-  await expect(page).toHaveURL(/\/transactions\/[^/]+$/)
-
-  const editor = page.getByRole('region', { name: labels.panel })
-  await expect(
-    editor,
-    // Not a diagnosis; see the note on the same assertion in `refunds.visual.spec.ts`. The editor
-    // has been mounted since 11-S1 landed, so naming the mount as the cause is now always wrong.
-    `No region named "${labels.panel}" on the transaction detail screen (the name is locale-dependent).`,
-  ).toBeVisible()
-  return editor
+  return openTransactionDetailPanel(page, labels.panel)
 }
 
 for (const theme of THEMES) {

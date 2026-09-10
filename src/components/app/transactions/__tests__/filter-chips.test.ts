@@ -4,7 +4,11 @@ import En from '#/lib/i18n/messages/en'
 import { createTranslator } from '#/lib/i18n'
 import { asCurrencyCode } from '#/lib/money'
 
-import { countActiveFilters, describeFilters } from '../filter-chips'
+import {
+  countActiveFilters,
+  describeFilters,
+  isSameFilterView,
+} from '../filter-chips'
 import { emptyReference } from '../types'
 
 import type { LedgerFilters, TransactionReference } from '../types'
@@ -94,5 +98,75 @@ describe('describeFilters', () => {
     expect(chips({ hasAttachment: false })[0].label).toBe(
       t('transactions.chip.withoutReceipt'),
     )
+  })
+})
+
+/**
+ * The comparison behind the filter panel's unsaved-changes guard.
+ *
+ * The panel's draft is rebuilt from `filters` at every open, so a reference comparison would call
+ * an untouched panel dirty and ask about work nobody did. The array fields are the other half: an
+ * id list is a new array on every edit, and one that ends up holding the same ids is not a change.
+ */
+describe('isSameFilterView', () => {
+  it('reads a rebuilt but equal filter set as the same view', () => {
+    const opened: LedgerFilters = {
+      text: 'fuel',
+      accountIds: ['acc_1', 'acc_2'],
+      paymentMethods: ['card'],
+    }
+    expect(
+      isSameFilterView(opened, {
+        text: 'fuel',
+        accountIds: ['acc_1', 'acc_2'],
+        paymentMethods: ['card'],
+      }),
+    ).toBe(true)
+  })
+
+  it('treats an absent key and an undefined one as the same narrowing', () => {
+    expect(isSameFilterView({ text: 'fuel' }, { text: 'fuel', from: undefined }))
+      .toBe(true)
+  })
+
+  it('sees a changed scalar', () => {
+    expect(isSameFilterView({ text: 'fuel' }, { text: 'rent' })).toBe(false)
+    expect(isSameFilterView({}, { hasAttachment: false })).toBe(false)
+  })
+
+  for (const key of [
+    'accountIds',
+    'accountGroupIds',
+    'categoryIds',
+    'tagIds',
+    'payeeIds',
+  ] as const) {
+    it(`compares ${key} element-wise`, () => {
+      expect(isSameFilterView({ [key]: ['a'] }, { [key]: ['a'] })).toBe(true)
+      expect(isSameFilterView({ [key]: ['a'] }, { [key]: ['b'] })).toBe(false)
+      expect(isSameFilterView({ [key]: ['a'] }, { [key]: ['a', 'b'] })).toBe(
+        false,
+      )
+    })
+  }
+
+  it('compares paymentMethods element-wise, order included', () => {
+    expect(
+      isSameFilterView(
+        { paymentMethods: ['card', 'cash'] },
+        { paymentMethods: ['card', 'cash'] },
+      ),
+    ).toBe(true)
+    expect(
+      isSameFilterView(
+        { paymentMethods: ['card', 'cash'] },
+        { paymentMethods: ['cash', 'card'] },
+      ),
+    ).toBe(false)
+  })
+
+  it('sees a narrowing that was added or dropped', () => {
+    expect(isSameFilterView({}, { accountIds: ['acc_1'] })).toBe(false)
+    expect(isSameFilterView({ accountIds: ['acc_1'] }, {})).toBe(false)
   })
 })

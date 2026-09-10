@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ErrorPanel } from '#/components/app/accounts'
+import { FormModal } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -8,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   Radio,
   RadioGroup,
   Spinner,
@@ -79,6 +79,10 @@ export function RefundDialog({
   const [isSaving, setIsSaving] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
+  // `EXTERNAL` is what the group is seeded with, so it is the pristine value rather than a choice
+  // anybody made. Moving off it is the only edit this form has to lose.
+  const isDirty = selected !== EXTERNAL
+
   useEffect(() => {
     let cancelled = false
     void suggestRefundTargets({ data: { refundTransactionId } })
@@ -121,11 +125,11 @@ export function RefundDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -217,7 +221,7 @@ export function RefundDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }
 

@@ -119,9 +119,106 @@ export const transitionBase =
 export const transitionSlow =
   'transition-[color,background-color,border-color,box-shadow,transform,translate,scale,rotate,opacity] duration-base ease-out-quint'
 
-/** Full-bleed scrim behind Modal and Drawer. */
+/**
+ * The hover wash on a whole row, and the ink promotion that has to travel with
+ * it. Use the pair, never `hover:bg-hover` on its own.
+ *
+ * ## Why the promotion is not optional
+ *
+ * `--color-hover` is a low-alpha veil, so the ground under the row moves toward
+ * mid-grey — which costs *secondary* text contrast in both themes, because
+ * `ink-2` sits closer to the ground than `ink` does. Measured in Chromium at
+ * 1440x900 on the seeded workspace, `ink-2` on `bg-surface` goes 8.64:1 → 7.71:1
+ * in light and **8.06:1 → 6.73:1 in dark**. The dark figure is under the 7:1
+ * floor this palette is designed to (`docs/SPEC.md` §10), which is what issue #20
+ * measured. Nothing here ever failed AA; what failed is our own claim.
+ *
+ * Retuning `--color-hover` cannot fix it: no alpha holds 7:1 for `ink-2` across
+ * all five ground planes, and dropping it far enough makes the wash invisible.
+ * Promoting the text does, and it is what `nav-link`, `Button`, this file's own
+ * `collectionItemBase`, `Calendar`, `ComboBox`, `Field`, `NumberField` and
+ * `GridList`'s row-action button already do — each pairs its wash with
+ * `text-ink` on the same element. A row is the case those cannot cover, because
+ * the wash lands on the container while the secondary text sits on descendants;
+ * hence the named group.
+ *
+ * The promoted text measures 11.25:1 (dark) and 13.24:1 (light), so the row
+ * gains contrast on hover rather than merely clearing the floor.
+ *
+ * A promotion that snaps while the ground fades reads as a glitch, so both
+ * halves fade. The row's own `transition-colors` cannot do that on its behalf:
+ * `transition-property` is not inherited, and the colour that changes belongs to
+ * the descendant, not to the row. So the promotion carries its own — matched to
+ * the row's `duration-fast`, and neutralised with everything else by the
+ * `prefers-reduced-motion` sweep in `tokens.css`.
+ */
+export const rowWash =
+  'group/wash transition-colors duration-fast hover:bg-hover'
+
+/**
+ * The promotion on its own, for text that already names a token of its own.
+ *
+ * `--color-info` is the case this exists for: it *is* `ink-2`'s value under a
+ * different name — "a notice has no verdict, so it is typed in pencil" — so a
+ * `Badge tone="info"` on a washed row measures the same 6.73:1 in dark that the
+ * grey did, while spelling `text-info` rather than `text-ink-2`.
+ */
+export const rowWashPromote =
+  'transition-colors duration-fast group-hover/wash:text-ink'
+
+/**
+ * Secondary text inside a `rowWash` row. Carries `text-ink-2` itself, so it
+ * replaces that class rather than joining it.
+ */
+export const rowWashSecondary = `text-ink-2 ${rowWashPromote}`
+
+/**
+ * Both interaction washes on a control that types itself in `ink-2`, each with
+ * the promotion it needs. Pair it with `text-ink-2`; it does not set the base.
+ *
+ * ## Why `pressed` needs its own promotion
+ *
+ * A pointer press is also a hover, so `data-[hovered]:text-ink` used to look
+ * like enough. A **keyboard** activation is not: React Aria sets `data-pressed`
+ * on Space/Enter with no `data-hovered` beside it, which left `ink-2` sitting on
+ * `--color-press` — the heaviest wash the palette has. Measured from
+ * `tokens.css`, that is 5.08:1 (dark, over `raised`) to 7.13:1 (light, over
+ * `surface`): over AA everywhere, under the 7:1 floor everywhere but one plane,
+ * and the worst text pair found anywhere in the issue #20 audit.
+ *
+ * No scanner can reach it — axe neither hovers nor holds a key down — so the
+ * guard is arithmetic: `styles/__tests__/tokens-contrast.test.ts` holds `ink` at
+ * 7:1 on every washed ground, which is the floor this promotion lands on.
+ */
+export const controlWash = [
+  'data-[hovered]:bg-hover data-[hovered]:text-ink',
+  'data-[pressed]:bg-press data-[pressed]:text-ink',
+].join(' ')
+
+/**
+ * Full-bleed scrim behind Modal and Drawer.
+ *
+ * `h-dvh` on top of `inset-0`, because the two disagree on a phone and the
+ * panel inside believes the second one. A `position: fixed` box with no height
+ * resolves against the *initial containing block*, which is the **large**
+ * viewport — the height the page would have with the URL bar retracted, held
+ * still so a fixed element does not resize as the bar comes and goes. Every
+ * height in `dialog.tsx` is `dvh`, the **dynamic** viewport, which is what is
+ * actually on screen right now. Centre a `dvh`-tall panel inside an `lvh`-tall
+ * scrim and its bottom edge sits below the fold by half the toolbar, and there
+ * is no scroll range to recover it: the panel is *shorter* than the scrim, so
+ * the scrim has nothing to scroll. An explicit height overrides the `bottom`
+ * from `inset-0` and settles the disagreement in favour of the visible one.
+ *
+ * `dvh` rather than React Aria's `--visual-viewport-height`, which it sets on
+ * this element and which would additionally shrink for the on-screen keyboard:
+ * that property tracks the visual viewport's *size* but not its `offsetTop`, so
+ * adopting it without also handling the offset trades one mismatch for another.
+ * The keyboard case is a larger change than the toolbar one and is not this
+ * change's subject.
+ */
 export const scrimSurface = [
-  'fixed inset-0 z-overlay bg-scrim',
+  'fixed inset-0 h-dvh z-overlay bg-scrim',
   'data-[entering]:animate-fade-in data-[exiting]:animate-fade-out',
 ].join(' ')
 

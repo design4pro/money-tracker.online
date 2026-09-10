@@ -61,6 +61,50 @@
    Non-text contrast (WCAG 1.4.11) has its own floor of 3:1 and applies to
    `border-strong`, the focus indicator, and the category series fills.
 
+   One token is deliberately NOT at 7:1, and the exception is named rather than
+   assumed. `negative-bold` is the danger ink at the loud grade: it paints the
+   `AmountMeter` headline - bold at 20px or 32px, which is LARGE TEXT by WCAG's
+   own definition and is therefore scored by 1.4.6 at **4.5:1**, not 7:1 - and
+   the over-budget meter fill, a graphical object under 1.4.11 at **3:1**. One
+   value serves both, held to the stricter of the two floors. It exists because
+   `negative` cannot serve all three jobs at once: pinned at 7:1 against
+   `surface-raised`, its dark value can only ever be a pale salmon, because red
+   is luminance-poor and no deeper red in sRGB reaches that floor. `negative`
+   keeps every body-size job it had and stays at 7:1; nothing moved off it.
+
+   Which ground a FILL is measured against is not the same question as for
+   text, and the answer differs per fill. The over-budget fill is always the
+   full width of its track - `over` means the ratio passed 1, which the meter
+   clamps to 100% - so nothing of the track survives beside it and the colour
+   it actually abuts is the card the meter sits on. That is why its binding
+   ratios below are stated against the grounds. A PARTIAL fill abuts the track
+   instead, and `--color-border-subtle` is a much closer neighbour: this value
+   measures 3.18:1 on it in dark and 3.88:1 in light. Both clear 1.4.11, and
+   `tokens-contrast.test.ts` asserts them so the grade stays usable by a
+   partial fill - but the margin is thin enough that `src/components/ui/meter.tsx`,
+   whose `dangerAt` prop leaves the adjacency to its caller, deliberately keeps
+   `negative` there instead, at 5.02:1 in dark and 5.92:1 in light.
+
+   ---------------------------------------------------------------------------
+   SURFACE SEPARATION - a design floor, per theme
+   ---------------------------------------------------------------------------
+   1.4.11 does not bind a rule that divides two grounds, so the two decorative
+   rules carry a floor of their own, stated per theme and checked by
+   `tokens-contrast.test.ts` against EVERY ground each one can land on:
+
+     `border-subtle`   light >= 1.30:1   dark >= 1.50:1
+     `border-panel`    light >= 1.75:1   dark >= 2.20:1
+
+   The floors are not equal across themes, and that asymmetry is the whole
+   point. Light separates a card from the page with tone AND a rule; dark
+   cannot, because `surface-raised` is pinned by the 7:1 text floor (`ink-2`
+   sits at 7.11:1 on it), which caps the entire canvas -> raised tone span at
+   1.231:1 - three planes inside a step light spends on one. So in dark the
+   RULE carries the separation, and it has to be measured on dark's own terms
+   rather than re-valued from light's. A token that is a comfortable step in
+   light can be a rendering seam in dark, and mirroring light's number is
+   exactly how that goes unnoticed.
+
    A token added without a measured ratio beside it is not finished.
    ========================================================================== */
 
@@ -88,7 +132,7 @@
      deliberately faint (1.44:1 on canvas) so a page full of it reads as paper
      rather than as a grid. `strong` is a control boundary and clears 3:1 on
      every ground. `panel` separates two grounds that are both paper. */
-  --color-border-subtle: #c3d1c4;
+  --color-border-subtle: #c3d1c4; /* 1.44:1 on canvas, 1.31:1 on sunken */
   --color-border-panel: #a8b5a9; /* 1.94:1 on canvas, 1.77:1 on panel */
   --color-border-strong: #6f7d71; /* 4.33:1 on raised, 3.59:1 on sunken */
 
@@ -114,6 +158,12 @@
   --color-negative: #8a1a0d; /* 7.78:1 on sunken, 9.40:1 on raised */
   --color-negative-soft: #f8e3df; /* carries --color-negative at 7.63:1 */
   --color-on-negative: #ffffff; /* 9.40:1 on negative */
+
+  /* The same ink at the loud grade - the over-budget headline and the meter
+     fill, and nothing body-size. Light has the deep red already, so what the
+     headroom buys here is chroma: `negative` is an oxblood, which is the right
+     weight for a caption and the wrong one for a 32px figure or a bar. */
+  --color-negative-bold: #c31300; /* 5.09:1 on sunken, 6.15:1 on raised; large-text floor 4.5:1 */
 
   --color-warning: #614106; /* 7.67:1 on sunken, 9.26:1 on raised */
   --color-warning-soft: #f7ead3; /* carries --color-warning at 7.79:1 */
@@ -185,8 +235,14 @@
     --color-ink-2: #b9b5aa; /* 7.11:1 on raised, 8.75:1 on canvas */
     --color-on-accent: #16171a; /* 9.14:1 on accent, 11.33:1 on accent-hover */
 
-    --color-border-subtle: #2f3a33;
-    --color-border-panel: #4a5249; /* 2.21:1 on canvas, 1.90:1 on panel */
+    /* At night the form's printed green ruling is not what a rule is made of:
+       the grounds here are slate, and a green line on slate reads as a tint
+       somebody forgot to convert rather than as the ruling of a page - which
+       is exactly how the `info` badge, whose whole chrome is a `border-panel`
+       rule, came to glow. So both rules are slate too, and both are set from
+       dark's own floors rather than re-valued from the light pair. */
+    --color-border-subtle: #42454c; /* 1.87:1 on canvas, 1.52:1 on raised */
+    --color-border-panel: #5a5d64; /* 2.72:1 on canvas, 2.33:1 on panel */
     --color-border-strong: #7f8a80; /* 4.06:1 on raised, 4.99:1 on canvas */
 
     --color-accent: #c5aef2; /* canvas ink on it: 9.14:1 */
@@ -203,9 +259,33 @@
     --color-positive-soft: #17302a; /* carries --color-positive at 8.30:1 */
     --color-on-positive: #16171a; /* 10.58:1 on positive */
 
-    --color-negative: #f5a08f; /* 7.15:1 on raised, 8.80:1 on canvas */
-    --color-negative-soft: #3a201b; /* carries --color-negative at 7.35:1 */
-    --color-on-negative: #16171a; /* 8.80:1 on negative */
+    /* Lightened from #f5a08f (same hue, same saturation, L 0.761 -> 0.781) so it clears 7:1 on
+       the ground a hovered row actually has. `--color-hover` composites over `--color-surface`
+       to #2b2d30, where the old value measured 6.76:1 — over AA, under the floor this palette is
+       designed to. Issue #20. The greys answer the same problem by promoting to `--color-ink`
+       under the wash (`rowWash` in components/ui/shared.ts); a verdict hue cannot, because the
+       hue is the meaning, so the token moves instead. */
+    --color-negative: #f6a898; /* 7.61:1 on raised, 9.37:1 on canvas, 7.20:1 under --color-hover */
+    --color-negative-soft: #3a201b; /* carries --color-negative at 7.82:1 */
+    --color-on-negative: #16171a; /* 9.37:1 on negative */
+
+    /* Dark is the whole reason this grade exists, and also the reason it is a
+       vermilion rather than the deep red the eye expects: red is the darkest
+       primary, so on a dark ground "redder" and "brighter" pull in opposite
+       directions. Pure #ff0000 measures 3.64:1 on `raised` - below even the
+       large-text floor. This is about the reddest value 4.5:1 leaves in sRGB,
+       and against #f6a898 it carries 1.93x the chroma at 0.60x the luminance,
+       which is the difference between a salmon and a danger colour.
+
+       The binding ground is not a plane. `--color-hover` composites over
+       `surface` to #2b2d30, and a hovered budget row is where this text
+       actually sits, so that is the ground 4.5:1 has to be cleared on - the
+       same correction #159 made for `negative`, for the same reason. #ff594a
+       measured 4.46:1 there, over AA and under this grade's own floor, with
+       `e2e/contrast-enhanced.spec.ts` the only thing in the repository that
+       could see it. The value moved by five steps of green: same sRGB chroma,
+       1.3 degrees of hue. */
+    --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 5.93:1 on canvas, 4.57:1 under --color-hover; large-text floor 4.5:1 */
 
     --color-warning: #e9c46a; /* 8.71:1 on raised, 10.73:1 on canvas */
     --color-warning-soft: #332a12; /* carries --color-warning at 8.49:1 */
@@ -268,8 +348,8 @@
   --color-ink-2: #b9b5aa; /* 7.11:1 on raised, 8.75:1 on canvas */
   --color-on-accent: #16171a; /* 9.14:1 on accent */
 
-  --color-border-subtle: #2f3a33;
-  --color-border-panel: #4a5249; /* 2.21:1 on canvas, 1.90:1 on panel */
+  --color-border-subtle: #42454c; /* 1.87:1 on canvas, 1.52:1 on raised */
+  --color-border-panel: #5a5d64; /* 2.72:1 on canvas, 2.33:1 on panel */
   --color-border-strong: #7f8a80; /* 4.06:1 on raised */
 
   --color-accent: #c5aef2;
@@ -286,9 +366,10 @@
   --color-positive-soft: #17302a; /* 8.30:1 */
   --color-on-positive: #16171a; /* 10.58:1 */
 
-  --color-negative: #f5a08f; /* 7.15:1 on raised */
-  --color-negative-soft: #3a201b; /* 7.35:1 */
-  --color-on-negative: #16171a; /* 8.80:1 */
+  --color-negative: #f6a898; /* 7.61:1 on raised, 7.20:1 under --color-hover. See the media query. */
+  --color-negative-soft: #3a201b; /* 7.82:1 */
+  --color-on-negative: #16171a; /* 9.37:1 */
+  --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 4.57:1 under --color-hover; large-text floor 4.5:1 */
 
   --color-warning: #e9c46a; /* 8.71:1 on raised */
   --color-warning-soft: #332a12; /* 8.49:1 */
@@ -654,6 +735,16 @@
      its own width and drift from this again. The marketing surface is a
      deliberately narrower well and does not use this token. */
   --content-max: 80rem; /* 1280px */
+  /* A single column of list rows. The band the repository was missing: it names
+     the outer well above and the reading measure below, and had nothing between
+     them, so a screen that is one column of rows inherited the whole well and
+     spanned it - seven unnamed `max-w-*` answers in `src/routes/_app` were the
+     symptom. 56rem is derived, not chosen: a 1440px viewport leaves 1156px of
+     usable content width beside the rail, and 896px of it leaves a 260px tail -
+     22%, under the "roughly a third" this band exists to stay below - while
+     still giving a capped row more width than it uses today. Mapped into
+     Tailwind's container namespace by `app.css` and reached as `max-w-list`. */
+  --list-max: 56rem; /* 896px */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-start: env(safe-area-inset-left, 0px);

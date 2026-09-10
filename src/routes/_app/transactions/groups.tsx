@@ -80,13 +80,22 @@ export const Route = createFileRoute('/_app/transactions/groups')({
   component: GroupsRoute,
 })
 
-/** Four rows, which is what the list usually holds and what the plan asks for. */
+/**
+ * Four rows, which is what the list usually holds and what the plan asks for.
+ *
+ * The card takes the same `max-w-list` band as the table it stands in for, so the arrival of the
+ * real table is a change of content and not a change of width.
+ */
 function GroupsSkeleton() {
   const t = useTranslate()
   return (
     <div className="flex flex-col gap-6">
       <Skeleton shape="text" lines={2} className="max-w-md" />
-      <Card aria-busy="true" aria-label={t('groups.loading')}>
+      <Card
+        aria-busy="true"
+        aria-label={t('groups.loading')}
+        className="max-w-list"
+      >
         <Skeleton shape="text" lines={4} />
       </Card>
     </div>
@@ -131,7 +140,9 @@ function GroupsRoute() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-title font-bold text-ink">{t('groups.title')}</h1>
-          <p className="mt-1 text-body text-ink-2">{t('groups.subtitle')}</p>
+          <p className="mt-1 max-w-prose text-body text-ink-2">
+            {t('groups.subtitle')}
+          </p>
         </div>
         <Button
           variant="primary"
@@ -144,6 +155,7 @@ function GroupsRoute() {
 
       {groups.length === 0 ? (
         <EmptyState
+          className="max-w-list"
           title={t('groups.empty.title')}
           description={t('groups.empty.body')}
           action={
@@ -156,7 +168,13 @@ function GroupsRoute() {
           }
         />
       ) : (
-        <div className="flex flex-col gap-2">
+        /*
+          The table and the sentence that describes it share one band. Four columns are four
+          columns: stretched over the whole 1156px well they were a phone table with 600px of
+          nothing sewn into the middle of every row, and issue #18's own Out of scope forbids
+          inventing a fifth column to fill it. Start-aligned - `DESIGN.md` → Layout.
+        */
+        <div className="flex max-w-list flex-col gap-2">
           {/*
             The summary the plan asks for: it names what the totals are denominated in, as text,
             immediately before the table it describes, and the table points at it so a screen
@@ -173,11 +191,28 @@ function GroupsRoute() {
               aria-label={t('groups.table.label')}
               aria-describedby="groups-total-summary"
             >
+              {/*
+                Each column states the width below which it stops being readable, so on a phone
+                the table outgrows its container and the container scrolls. Without them a
+                `ResizableTableContainer` divides whatever width it is given between four columns
+                however narrow that is, which is how a 360px page comes to show `EXPENS…` over
+                group names broken across two lines. The numbers are the columns themselves: a
+                name wide enough for two words, the two figures wide enough for their own headings,
+                and the menu's 44px target plus its cell padding.
+              */}
               <TableHeader>
-                <Column isRowHeader>{t('groups.column.name')}</Column>
-                <Column align="end">{t('groups.column.members')}</Column>
-                <Column align="end">{t('groups.column.total')}</Column>
-                <Column align="end">{t('groups.column.actions')}</Column>
+                <Column isRowHeader minWidth={140}>
+                  {t('groups.column.name')}
+                </Column>
+                <Column align="end" minWidth={110}>
+                  {t('groups.column.members')}
+                </Column>
+                <Column align="end" minWidth={110}>
+                  {t('groups.column.total')}
+                </Column>
+                <Column align="end" minWidth={68}>
+                  {t('groups.column.actions')}
+                </Column>
               </TableHeader>
               <TableBody>
                 {groups.map((group) => (
@@ -343,6 +378,7 @@ function GroupFormDialog({
               event.preventDefault()
               if (name.trim() !== '') void save()
             }}
+            className="contents"
           >
             <DialogHeader
               title={

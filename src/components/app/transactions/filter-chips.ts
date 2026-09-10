@@ -11,6 +11,7 @@
 
 import { formatCalendarDate } from '#/lib/i18n'
 import { formatMoney, money } from '#/lib/money'
+import { isSameShallow } from '#/lib/shallow-equal'
 
 import type { Locale, Translate } from '#/lib/i18n'
 import type { CurrencyCode, Minor } from '#/lib/money'
@@ -51,6 +52,22 @@ export function countActiveFilters(filters: LedgerFilters): number {
   ]
   const named = parts.filter((part) => part !== undefined).length
   return named + (amountSet ? 1 : 0)
+}
+
+/**
+ * Whether two filter sets narrow the ledger the same way.
+ *
+ * This is what the filter panel's unsaved-changes guard asks. It cannot use the `useIsDirty` hook
+ * the form dialogs share, for a reason the panel has and they do not: the panel outlives its own
+ * open — it is mounted with the bar — so its baseline has to be re-taken at each open rather than at
+ * first render. The comparison underneath is the same one, {@link isSameShallow}, which is what
+ * keeps a panel that half fills {@link LedgerFilters} with arrays honest about them.
+ *
+ * The comparison walks the keys of both sides rather than a list written out here, so a filter added
+ * to {@link LedgerFilters} later is compared without anybody remembering to come back.
+ */
+export function isSameFilterView(a: LedgerFilters, b: LedgerFilters): boolean {
+  return isSameShallow(a, b)
 }
 
 function namesFor(

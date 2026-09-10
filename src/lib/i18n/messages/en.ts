@@ -122,6 +122,13 @@ const messages = {
   'action.skip': 'Skip',
   'action.learnMore': 'Learn more',
 
+  /* -- Dialogs ------------------------------------------------------------ */
+  'dialog.unsaved.title': 'Unsaved changes',
+  'dialog.unsaved.body':
+    'This form has changes that have not been saved. Close it now and they are discarded.',
+  'dialog.unsaved.discard': 'Discard changes',
+  'dialog.unsaved.keepEditing': 'Keep editing',
+
   /* -- Shared vocabulary -------------------------------------------------- */
   'common.yes': 'Yes',
   'common.no': 'No',
@@ -299,6 +306,10 @@ const messages = {
   'accounts.filter.active': 'Open accounts',
   'accounts.filter.archived': 'Archived accounts',
   'accounts.filter.all': 'Open and archived',
+  'accounts.filter.count': {
+    one: 'Showing {shown} of {total} account',
+    other: 'Showing {shown} of {total} accounts',
+  },
   'accounts.status.excluded': 'Outside reports',
   'accounts.list.label': 'Your accounts',
   'accounts.list.loading': 'Loading your accounts…',

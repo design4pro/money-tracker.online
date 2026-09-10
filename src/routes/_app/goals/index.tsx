@@ -128,10 +128,14 @@ function GoalsListRoute() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        {/* The heading states its own measure, so the actions decide the wrap rather than
+            the subtitle's ideal line - see `recurring/index.tsx`. */}
+        <div className="min-w-0 grow basis-72">
           <h1 className="text-title font-bold text-ink">{t('goals.title')}</h1>
-          <p className="mt-1 text-body text-ink-2">{t('goals.subtitle')}</p>
+          <p className="mt-1 max-w-prose text-body text-ink-2">
+            {t('goals.subtitle')}
+          </p>
         </div>
         <Button
           variant="primary"

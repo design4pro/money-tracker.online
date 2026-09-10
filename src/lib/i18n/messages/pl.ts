@@ -121,6 +121,13 @@ const messages = {
   'action.skip': 'Pomiń',
   'action.learnMore': 'Dowiedz się więcej',
 
+  /* -- Dialogs ------------------------------------------------------------ */
+  'dialog.unsaved.title': 'Niezapisane zmiany',
+  'dialog.unsaved.body':
+    'Ten formularz zawiera zmiany, które nie zostały zapisane. Zamknięcie go teraz je odrzuci.',
+  'dialog.unsaved.discard': 'Odrzuć zmiany',
+  'dialog.unsaved.keepEditing': 'Wróć do edycji',
+
   /* -- Shared vocabulary -------------------------------------------------- */
   'common.yes': 'Tak',
   'common.no': 'Nie',
@@ -304,6 +311,12 @@ const messages = {
   'accounts.filter.active': 'Konta otwarte',
   'accounts.filter.archived': 'Konta zarchiwizowane',
   'accounts.filter.all': 'Otwarte i zarchiwizowane',
+  'accounts.filter.count': {
+    one: 'Widoczne {shown} z {total} konta',
+    few: 'Widoczne {shown} z {total} kont',
+    many: 'Widoczne {shown} z {total} kont',
+    other: 'Widoczne {shown} z {total} konta',
+  },
   'accounts.status.excluded': 'Poza raportami',
   'accounts.list.label': 'Twoje konta',
   'accounts.list.loading': 'Wczytujemy Twoje konta…',

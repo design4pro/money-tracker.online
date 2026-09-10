@@ -1,6 +1,7 @@
 import { Repeat } from 'lucide-react'
 
 import { amountReading } from '#/components/app/money'
+import { rowWashSecondary } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, money } from '#/lib/money'
@@ -46,10 +47,10 @@ const TONE_CLASS: Record<AmountTone, string> = {
   // doing the work and colour is the third channel rather than the first.
   income: 'text-positive font-semibold',
   expense: 'text-negative',
-  transfer: 'text-ink-2',
+  transfer: rowWashSecondary,
   // A planned line is written in pencil: the secondary ink, never the stamp violet the product
   // spends on what is settled. The word beside the row is the channel; the grey only agrees.
-  planned: 'text-ink-2',
+  planned: rowWashSecondary,
 }
 
 function toneOf(
@@ -156,7 +157,9 @@ export function ConvertedAmount({
   const formatted = formatMoney(locale, value, { display: 'narrowSymbol' })
 
   return (
-    <span className={cn('block tabular text-caption text-ink-2', className)}>
+    <span
+      className={cn('block tabular text-caption', rowWashSecondary, className)}
+    >
       <span aria-hidden="true">{formatted}</span>
       <span className="sr-only">
         {t('money.amountIn', { currency: amountReading(t, locale, value) })}
@@ -247,7 +250,7 @@ export function BalanceAmount({
     <span
       className={cn(
         'font-bold whitespace-nowrap tabular',
-        isPlanned ? 'text-ink-2' : 'text-ink',
+        isPlanned ? rowWashSecondary : 'text-ink',
         className,
       )}
     >

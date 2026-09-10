@@ -50,6 +50,23 @@ nothing else. The bespoke layer is removed in full.
    `.ai/specs/`, landed on a `spec/<slug>` PR with `Refs #n`) → `om-prepare-issue` per phase. There
    are no PRD issues, no native sub-issues, no `blocked_by` graph and no Owned paths. `docs/plans/`
    stays the backlog source; a stage becomes one issue.
+   Amended 2026-09-09, for the other entry into a spec - the `spec` label on an existing `feature`
+   issue, which runs `om-auto-write-spec` rather than the planning chain above: **that FR issue is
+   the implementation ticket, and no second issue is filed for building what the spec describes.**
+   The spec PR's `Refs #n` keeps it open on purpose; a duplicate issue would put the `Closes #n`
+   that `om-close-fixed-issues` reads on only one of the two. `om-prepare-issue` per phase stays the
+   rule where it was written for - a `docs/plans/` stage large enough that its spec decomposes into
+   phases - and is not the answer to a single FR. What was missing is the signal that a merged spec
+   is ready to build, and that is a label, not an issue: a human adds `autofix` to the FR once the
+   spec PR merges, `om-auto-fix-issue` classifies it as a feature and its feature route resolves the
+   merged spec and delegates to `om-auto-implement-spec` - the `implement-spec` workflow is that
+   same skill started by hand from the cockpit, with the issue number as its task so the
+   implementation PR can carry `Closes #n`. `om-auto-write-spec` names the spec path and that next
+   step in a comment on the issue before releasing its claim
+   (`.ai/skills/om-auto-write-spec/SKILL.md`), which also makes spec resolution deterministic: it
+   scans the issue's comments for a path under `.ai/specs/`. Merging the spec PR deliberately does
+   **not** start the build - it approves the design, and whether to spend a build run on it stays a
+   human's call. The sibling project records the same amendment in its ADR 0018.
 6. **Review is `om-auto-review-pr`,** started by a Cezar automation on `pull_request.opened`. The
    `claude-code-review` Action is removed. The visual judgement stays a human's (0016); the review
    names the screens and the capture command.

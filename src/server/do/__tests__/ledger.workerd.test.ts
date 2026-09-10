@@ -1,4 +1,4 @@
-import { env, runInDurableObject } from 'cloudflare:test'
+import { env, evictDurableObject, runInDurableObject } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
 
 import { dbFromEnv } from '../../db/from-env'
@@ -10,14 +10,16 @@ import type { AccountLedger } from '../ledger'
  * `AccountLedger` inside workerd, on a real `DurableObjectState`.
  *
  * The Node tests next door construct it with a fake storage object and prove the coalescing
- * algorithm. They cannot prove the two things that make it a Durable Object at all, and both are
- * failures that appear only in production:
+ * algorithm. They cannot prove the three things that make it a Durable Object at all, and all
+ * three are failures that appear only in production:
  *
  * 1. **The storage round-trip is real.** `storage.put` serialises with the structured clone
  *    algorithm, not `JSON.stringify`, and reads back through the same. A record a fake accepted
  *    can still be one workerd refuses.
  * 2. **Two requests to one id are two turns, not two racers.** That is the entire reason this
  *    class exists, and a fake in a single-threaded test cannot make it false.
+ * 3. **An instance can go away between requests.** Eviction is the event the lock's design turns
+ *    on, and only the real runtime performs it.
  *
  * The D1 binding is real too, with `drizzle/` applied to it by `vitest.setup.workerd.ts`. That
  * setup is itself the assertion that every migration is SQL D1 accepts; the last test here adds
@@ -49,7 +51,7 @@ describe('AccountLedger in workerd', () => {
     expect(typeof (state as { lastRunAt: unknown }).lastRunAt).toBe('number')
   })
 
-  it('serialises concurrent requests to one account into one pass at a time', async () => {
+  it('serialises a burst to one account and coalesces it into fewer passes', async () => {
     const stub = stubFor('acc-concurrent')
 
     // Ten requests dispatched without awaiting each other. Against a fake this proves nothing:
@@ -68,20 +70,21 @@ describe('AccountLedger in workerd', () => {
     ).json()
     expect(state.running).toBe(false)
     expect(state.dirty).toBe(false)
-    // Ten, not one. `serialise()` chains every request onto `this.tail`, so the second one does
-    // not start until the first has run its `finally` and cleared `running` - which means it
-    // never observes `running` and never coalesces. Serialisation is what the object is for and
-    // it holds; the coalescing window simply does not open for a burst arriving at one live
-    // instance. The next test covers the case where it does.
-    expect(state.runs).toBe(10)
+    // Fewer passes than requests, which is the whole claim: the requests that arrive while the
+    // first pass is awaiting D1 set the dirty bit and are answered by one extra pass. How many
+    // land inside that window depends on the runtime's delivery, so the assertion is the property
+    // rather than a number - the Node tests pin the exact count, where the port's timing is the
+    // test's to control.
+    expect(state.runs).toBeGreaterThanOrEqual(1)
+    expect(state.runs).toBeLessThan(10)
   })
 
-  it('coalesces onto a pass that a previous instance left running', async () => {
-    const stub = stubFor('acc-coalesced')
+  it('rebuilds after an evicted instance left a running flag behind', async () => {
+    const stub = stubFor('acc-evicted')
 
-    // The only way `running` is true when a request arrives: the instance that set it went away
-    // before its `finally` ran - evicted, or the isolate torn down mid-pass. The record survives
-    // in storage, which is the whole reason the lock is persisted rather than held in memory.
+    // The record the pre-fix implementation persisted and then never cleared: `running: true`,
+    // written by an instance that went away before its `finally` ran. Seeding it and evicting is
+    // the reproduction - the flag is in storage, and nothing is alive that could clear it.
     await runInDurableObject(stub, (_instance, state) =>
       state.storage.put({
         ledger: {
@@ -93,12 +96,24 @@ describe('AccountLedger in workerd', () => {
         },
       }),
     )
+    await evictDurableObject(stub)
 
+    // It used to answer `coalesced` here, and for every request after it, forever: this account's
+    // balance history stopped updating and nothing reported it (issue #22).
     const response = await stub.fetch(
-      'https://ledger/rebuild?accountId=acc-coalesced',
+      'https://ledger/rebuild?accountId=acc-evicted',
       { method: 'POST' },
     )
-    expect(await response.json()).toEqual({ outcome: 'coalesced', runs: 4 })
+    expect(await response.json()).toEqual({ outcome: 'skipped', runs: 5 })
+
+    const state = await (await stub.fetch('https://ledger/state')).json()
+    expect(state).toMatchObject({ running: false, dirty: false, runs: 5 })
+
+    // And the flag is gone from storage, so the wedged state cannot be read back into existence.
+    const persisted = await runInDurableObject(stub, (_instance, objectState) =>
+      objectState.storage.get('ledger'),
+    )
+    expect(persisted).not.toHaveProperty('running')
   })
 
   it('keeps two accounts in two objects', async () => {

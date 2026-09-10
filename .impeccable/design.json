@@ -130,7 +130,7 @@
           "#c0cec1",
           "#e5f3e6"
         ],
-        "dark": "#2f3a33"
+        "dark": "#42454c"
       },
       "border-panel": {
         "role": "neutral",
@@ -146,7 +146,7 @@
           "#c0cdc1",
           "#e5f3e6"
         ],
-        "dark": "#4a5249"
+        "dark": "#5a5d64"
       },
       "border-strong": {
         "role": "neutral",
@@ -354,7 +354,7 @@
           "#ffb3a6",
           "#ffe9e5"
         ],
-        "dark": "#f5a08f"
+        "dark": "#f6a898"
       },
       "negative-soft": {
         "role": "tertiary",

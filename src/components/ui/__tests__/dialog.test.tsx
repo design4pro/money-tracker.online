@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { useState } from 'react'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -38,6 +39,110 @@ function Example({ isDismissable = true }: { isDismissable?: boolean }) {
     </DialogTrigger>
   )
 }
+
+/**
+ * The controlled shape `canClose` is documented to hold for.
+ *
+ * `isOpen` and `onOpenChange` are the caller's, so every close React Aria
+ * performs comes back through one function — which is the whole reason one
+ * wrapper covers the scrim, Escape and the header's X alike.
+ */
+function ControlledExample({
+  canClose,
+  onOpenChange,
+}: {
+  canClose?: () => boolean
+  onOpenChange?: (isOpen: boolean) => void
+}) {
+  const [isOpen, setOpen] = useState(true)
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={(next) => {
+        setOpen(next)
+        onOpenChange?.(next)
+      }}
+      canClose={canClose}
+    >
+      <Dialog>
+        {({ close }) => (
+          <>
+            <DialogHeader title="Edit account" onClose={close} />
+            <DialogBody>
+              <button type="button">Inside</button>
+            </DialogBody>
+          </>
+        )}
+      </Dialog>
+    </Modal>
+  )
+}
+
+/** The three gestures that all end in the overlay state's `close()`. */
+const CLOSE_GESTURES = [
+  [
+    'a press on the scrim',
+    async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(document.querySelector('[data-scrim]') as HTMLElement)
+    },
+  ],
+  [
+    'Escape',
+    async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.keyboard('{Escape}')
+    },
+  ],
+  [
+    'the close button in the header',
+    async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('button', { name: 'Close' }))
+    },
+  ],
+] as const
+
+describe('Modal canClose', () => {
+  for (const [gesture, perform] of CLOSE_GESTURES) {
+    it(`refuses ${gesture} while canClose returns false`, async () => {
+      const user = userEvent.setup()
+      const onOpenChange = vi.fn()
+      render(
+        <ControlledExample
+          canClose={() => false}
+          onOpenChange={onOpenChange}
+        />,
+      )
+
+      await perform(user)
+
+      expect(screen.getByRole('dialog', { name: 'Edit account' })).toBeTruthy()
+      // Not merely still open: the caller was never told to close, so nothing
+      // downstream of `onOpenChange` — a route's state, a reset — has run.
+      expect(onOpenChange).not.toHaveBeenCalled()
+    })
+
+    it(`allows ${gesture} while canClose returns true`, async () => {
+      const user = userEvent.setup()
+      const onOpenChange = vi.fn()
+      render(
+        <ControlledExample canClose={() => true} onOpenChange={onOpenChange} />,
+      )
+
+      await perform(user)
+
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(onOpenChange).toHaveBeenCalledWith(false)
+    })
+  }
+
+  it('never consults canClose on the way open', async () => {
+    const canClose = vi.fn(() => false)
+    render(<ControlledExample canClose={canClose} />)
+
+    expect(screen.getByRole('dialog', { name: 'Edit account' })).toBeTruthy()
+    expect(canClose).not.toHaveBeenCalled()
+  })
+})
 
 describe('Modal + Dialog', () => {
   it('names the dialog from its Heading slot="title"', async () => {
@@ -96,6 +201,32 @@ describe('Modal + Dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Close' }))
 
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('sizes the scrim in the same viewport unit the panel is capped in', async () => {
+    const user = userEvent.setup()
+    render(<Example />)
+
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+
+    // A class assertion, deliberately, and the reason is worth writing down: no
+    // engine available to this repository's tests can witness the fault it
+    // guards. `position: fixed` with `inset-0` and no height resolves against
+    // the *initial containing block*, which on a mobile browser is the **large**
+    // viewport — the one that ignores a shown URL bar. The panel is capped in
+    // `dvh`, the **dynamic** viewport. Centre a `dvh`-tall panel inside an
+    // `lvh`-tall box and its bottom edge lands below the fold by half the
+    // toolbar, with no scroll range anywhere to reach it, because the panel is
+    // shorter than the scrim. Headless Chromium and Playwright's device
+    // emulation both have no dynamic toolbar, so `dvh === lvh === innerHeight`
+    // there and a measured assertion would pass whether or not the bug is
+    // present. What can be asserted is the invariant that was violated: the two
+    // boxes name the same viewport.
+    const scrim = document.querySelector('[data-scrim]')
+    const panel = screen.getByRole('dialog').parentElement
+
+    expect(scrim?.className).toMatch(/\bh-dvh\b/)
+    expect(panel?.className).toMatch(/dvh/)
   })
 
   it('hides the rest of the document from assistive technology while open', async () => {

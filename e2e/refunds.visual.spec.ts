@@ -1,6 +1,6 @@
 import { expect, test } from './support/console'
 
-import { gotoApp, useLocale, useTheme } from './support/app'
+import { openTransactionDetailPanel, useLocale, useTheme } from './support/app'
 import { expectNoSeriousViolations } from './support/budgets'
 import { storageStateFor } from './support/session'
 
@@ -97,29 +97,12 @@ const LABELS: Readonly<Record<AppLocale, RefundLabels>> = {
 /**
  * Opens the first transaction in the ledger and returns its refund panel.
  *
- * The row is reached by following the list's own link rather than by a seeded id: the demo
- * workspace's contents are the seed's business, and a spec that hard-codes an id fails for a reason
- * that has nothing to do with refunds the first time the fixture changes.
+ * The navigation, the wait for the screen to finish loading and the failure message all live in
+ * `support/app.ts`: the split and receipts specs open a panel on the same screen the same way, and
+ * three copies of that walk meant the WebKit flake in it (#82) had to be fixed three times.
  */
 async function openRefundPanel(page: Page, labels: RefundLabels) {
-  await gotoApp(page, '/transactions')
-
-  const firstRow = page.locator('a[href^="/transactions/"]').first()
-  await expect(firstRow).toBeVisible()
-  await firstRow.click()
-  await expect(page).toHaveURL(/\/transactions\/[^/]+$/)
-
-  const panel = page.getByRole('region', { name: labels.panel })
-  await expect(
-    panel,
-    // Not a diagnosis. This message used to say the panel was unmounted and name the file to
-    // mount it in; it has been mounted since 10-S2 landed, so the message outlived its own cause
-    // and now sends a reader to repair what is not broken. A failed `toBeVisible` cannot know
-    // why - the row may not have opened, the panel may not have rendered, the accessible name
-    // may not be the one this locale expects - so it reports what it looked for instead.
-    `No region named "${labels.panel}" on the transaction detail screen (the name is locale-dependent).`,
-  ).toBeVisible()
-  return panel
+  return openTransactionDetailPanel(page, labels.panel)
 }
 
 for (const theme of THEMES) {

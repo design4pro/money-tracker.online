@@ -73,7 +73,10 @@ export function InviteDialog({
     <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="sm">
       <Dialog>
         {({ close }) => (
-          <Form onSubmit={(event) => void submit(event, close)}>
+          <Form
+            onSubmit={(event) => void submit(event, close)}
+            className="contents"
+          >
             <DialogHeader
               title={t('members.invite.title')}
               description={t('members.invite.description')}

@@ -746,32 +746,41 @@ which is `12-S2`'s.
 
 ### Stage id
 
-`00-S8` · Wave 2 · effort **M**.
+`00-S8` · Wave 2 · effort **L**. Raised from **M** by #105: the stage owes a primitive again, not
+only the one missing test.
 
 ### Reference rows
 
 `FND-18 missing → partial` — the capabilities shipped, none of them as a `src/components/ui`
 primitive: the virtualised shell is `src/components/app/transactions/transaction-list.tsx`, the
 filter bar `src/components/app/transactions/filter-bar.tsx`, and the keyboard reorder path
-`GridListMoveButton` inside `src/components/ui/grid-list.tsx`. Open on one measured count, not on a
-judgment about placement: that move path has **no test anywhere in the tree**, so
-`src/components/ui/__tests__/grid-list.test.tsx` is still owed by this stage. Placement is settled
-under the plan set's precedence rule and is not re-litigated here.
+`GridListMoveButton` inside `src/components/ui/grid-list.tsx`. Open on two measured counts. That
+move path has **no test anywhere in the tree**, so `src/components/ui/__tests__/grid-list.test.tsx`
+is still owed; and #105 scheduled `src/components/ui/data-table.tsx`, so the reusable table is owed
+too — neither of its landing sites is a primitive, and eleven feature plans name `data-table` in
+their component lists: `06`, `07`, `08`, `11`, `12`, `13`, `14`, `15`, `19`, `24` and `28`. The
+placement of what already shipped is settled under the plan set's precedence rule and is not
+re-litigated here.
 
 Requisitioned by `07-S2` (the transaction list) and `08-S2` (the category tree).
 
 ### Owned paths
 
+- `src/components/ui/data-table.tsx` — new
+- `src/components/ui/__tests__/data-table.test.tsx` — new
 - `src/components/ui/grid-list.tsx` — edit
 - `src/components/ui/__tests__/grid-list.test.tsx` — new
 - `src/components/ui/index.ts` — edit
 
-Three of this stage's four primitives shipped outside `src/components/ui`, so they are outside
-this plan's remit and are named here only so the move is on the record. The data table split in
-two: `src/components/charts/data-table.tsx` is the chart text equivalent (ADR 0007, owned by
+The data table is on this list again because #105 scheduled it, not because the measurement that
+took it off was wrong. What shipped split in two and neither half is a primitive:
+`src/components/charts/data-table.tsx` is the chart text equivalent (ADR 0007, owned by
 `16-charts.md`) and `src/components/app/transactions/transaction-list.tsx` is the virtualised list
-(owned by `07-transactions-core.md`). The filter bar shipped as
-`src/components/app/transactions/filter-bar.tsx`, also `07`'s. The reorder menu did not ship as a
+(owned by `07-transactions-core.md`). Both stay where they are; neither is edited here.
+
+The stage's other two absent primitives are outside this plan's remit and are named here only so
+the move is on the record. The filter bar shipped as
+`src/components/app/transactions/filter-bar.tsx`, `07`'s. The reorder menu did not ship as a
 menu at all: the keyboard move path is `GridListMoveButton` inside the existing `grid-list.tsx`
 primitive, which is where the rows it reorders already lived — that entry stays here, as an edit,
 because it is the one piece of this stage still inside the shared directory.
@@ -788,7 +797,9 @@ None.
 
 - `data-table.tsx` is `@tanstack/react-table` headless plus `@tanstack/react-virtual`, rendering our
   own markup — a `<table>` with real `<th scope>`, not a grid of divs. Row selection is a real
-  checkbox column with an accessible name per row.
+  checkbox column with an accessible name per row. It is the column-parameterised primitive the
+  feature plans reuse, and it is not `src/components/charts/data-table.tsx`, which renders one
+  chart's fixed text equivalent from already-formatted strings and takes no column definitions.
 - `reorder-menu.tsx` is the **non-drag path** that must sit beside every `@dnd-kit` surface in this
   product: a menu offering _Move up_, _Move down_, _Move to top_, _Move to bottom_ and _Move to…_.
   A drag affordance without this menu is a defect, not a follow-up.
@@ -822,13 +833,15 @@ All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
-- **`@tanstack/react-table`, declared and imported by nothing.** It is in `package.json`, and zero
-  files under `src/` import it. This stage is the only justification for it anywhere in the
-  repository, and the `data-table.tsx` that justified it never landed — the virtualised list that
-  did land uses `@tanstack/react-virtual` alone. Disposition: **defer**. `docs/SPEC.md` §3.1 makes
-  the dependency freeze absolute and `AGENTS.md` puts adding or removing a package under
-  **Ask First**, so a plan reconciliation is not where that call is spent. A human decides: remove
-  the package, or schedule the stage that would use it. Tracked as #105.
+- **`@tanstack/react-table`, declared and imported by nothing — decided, no longer blocking.** The
+  package is in `package.json` and zero files under `src/` import it, because the `data-table.tsx`
+  that justified it never landed. The reconciliation deferred the call rather than making it, since
+  `docs/SPEC.md` §3.1 makes the dependency freeze absolute and `AGENTS.md` puts adding or removing a
+  package under **Ask First**. #105 put the two options to a human — remove the package, or schedule
+  the stage that would use it — and the answer was **schedule the stage**. So this stage owns
+  `src/components/ui/data-table.tsx` again, and the dependency has a justification once more.
+  Nothing is installed or removed: the package was already pinned by §3, and changing that set stays
+  a human's call in an ADR.
 
 ---
 

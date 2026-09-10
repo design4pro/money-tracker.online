@@ -72,3 +72,12 @@ that is one command step and one `/om-…` slash command, and every write to Git
 tracker descriptor. `setup-e2e.sh` became `.ai/scripts/test-env-up.sh` and `test-env-down.sh`, the
 `om-prepare-test-env` contract; still the repository's own file, not an orchestrator's, which is
 what this record asked for. The cockpit template moved to `scripts/cezar/launchd/`.
+
+## Amendment 2026-09-10
+
+**The cockpit template left the repository, so the path named above leads nowhere.** It moved twice
+more: first to `.ai/scripts/launchd/`, when the cezar helpers were consolidated under `.ai/scripts/`
+and `scripts/cezar/` was removed; then out of this repository altogether, because the cockpit is one
+service per host and its plist was never this repository's property. The template and its cutover
+runbook live in `design4pro/agent-kit` (`host/launchd/dev.cezar.cockpit.plist`), and
+`docs/agents/cezar.md` is the pointer that follows them.

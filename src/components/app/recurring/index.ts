@@ -24,6 +24,8 @@ export type { PeriodStatusBadgeProps } from './period-status'
 export { RecurringEmptyState } from './recurring-empty-state'
 export type { RecurringEmptyStateProps } from './recurring-empty-state'
 
+export { RECURRING_PANES } from './panes'
+
 export {
   CandidateListSkeleton,
   RecurringListSkeleton,

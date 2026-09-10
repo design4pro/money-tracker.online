@@ -8,6 +8,7 @@ import {
   DirectionalAmount,
   ErrorPanel,
 } from '#/components/app/accounts'
+import { FormModal } from '#/components/app/shell'
 import {
   Button,
   Card,
@@ -17,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   TextAreaField,
 } from '#/components/ui'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
@@ -95,6 +95,22 @@ export function AdjustBalanceDialog({
       ? subtractMinor(targetMinor, account.currentBalanceMinor)
       : null
 
+  // The `result === null` guard is what stops a *completed* money write being offered for
+  // discard: once the adjustment is written the footer swaps to a single Done, and pressing it
+  // must not ask about work that is already in the ledger.
+  //
+  // The comparison is against the opening balance rather than against `null`, because
+  // `targetMinor` is seeded with `account.currentBalanceMinor` above. `targetMinor !== null`
+  // would be true from the first render, so a pristine open would raise the alert on the scrim,
+  // Escape, the X and Cancel alike.
+  //
+  // `!isToday` is the third field. The spec's expression named only the amount and the note; a
+  // reader who moved the booking date and nothing else would have been read as pristine, and
+  // under-reporting is the direction this guard is not allowed to fail in.
+  const isDirty =
+    result === null &&
+    (targetMinor !== account.currentBalanceMinor || note !== '' || !isToday)
+
   async function submit() {
     if (targetMinor === null) {
       return
@@ -120,11 +136,11 @@ export function AdjustBalanceDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -260,7 +276,7 @@ export function AdjustBalanceDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 
   function renderPreview() {

@@ -83,6 +83,7 @@ function CategoriesError({
   const t = useTranslate()
   return (
     <ErrorPanel
+      className="max-w-list"
       title={t('categories.error.title')}
       body={t('empty.error.body')}
       detail={error.message}
@@ -149,7 +150,7 @@ function CategoriesRoute() {
           <h1 className="text-title font-bold text-ink">
             {t('categories.title')}
           </h1>
-          <p className="mt-1 text-body text-ink-2">
+          <p className="mt-1 max-w-prose text-body text-ink-2">
             {t('categories.subtitle')}
           </p>
         </div>
@@ -193,33 +194,42 @@ function CategoriesRoute() {
             {t('categories.filter.showArchived')}
           </Switch>
 
-          <CategoryTree
-            categories={rows}
-            onEdit={(id) => {
-              const category = byId.get(id)
-              if (category !== undefined) setPending({ kind: 'form', category })
-            }}
-            onAddChild={(id) =>
-              setPending({ kind: 'form', category: null, parentId: id })
-            }
-            onArchive={(id) => {
-              const category = byId.get(id)
-              if (category !== undefined)
-                setPending({ kind: 'archive', category })
-            }}
-            onRestore={(id) =>
-              withRefusal(async () => {
-                await restoreCategory({ data: { categoryId: id } })
-                toast.success(t('categories.toast.restored'))
-              })
-            }
-            onDelete={(id) => {
-              const category = byId.get(id)
-              if (category !== undefined)
-                setPending({ kind: 'delete', category })
-            }}
-            onMove={applyMove}
-          />
+          {/*
+            One column of rows, so it takes the list band rather than the whole well. A row holds a
+            name, a swatch, a badge and an overflow menu; there is no fifth fact to promote to a
+            column, and the ~900px of nothing between badge and menu at 1440 was a promise of a
+            column that does not exist. Start-aligned, never centred - `DESIGN.md` → Layout.
+          */}
+          <div className="max-w-list">
+            <CategoryTree
+              categories={rows}
+              onEdit={(id) => {
+                const category = byId.get(id)
+                if (category !== undefined)
+                  setPending({ kind: 'form', category })
+              }}
+              onAddChild={(id) =>
+                setPending({ kind: 'form', category: null, parentId: id })
+              }
+              onArchive={(id) => {
+                const category = byId.get(id)
+                if (category !== undefined)
+                  setPending({ kind: 'archive', category })
+              }}
+              onRestore={(id) =>
+                withRefusal(async () => {
+                  await restoreCategory({ data: { categoryId: id } })
+                  toast.success(t('categories.toast.restored'))
+                })
+              }
+              onDelete={(id) => {
+                const category = byId.get(id)
+                if (category !== undefined)
+                  setPending({ kind: 'delete', category })
+              }}
+              onMove={applyMove}
+            />
+          </div>
         </>
       )}
 

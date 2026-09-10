@@ -71,11 +71,17 @@ export function ImportHistory({ batches }: ImportHistoryProps) {
   return (
     <TableContainer>
       <Table aria-label={t('import.history.table')}>
+        {/* As on `/settings/members`: a floor per column, so a phone scrolls the table rather
+            than clipping a file name and a heading at once. */}
         <TableHeader>
-          <Column isRowHeader>{t('import.history.column.file')}</Column>
-          <Column>{t('import.history.column.status')}</Column>
-          <Column align="end">{t('import.history.column.rows')}</Column>
-          <Column>{t('import.history.column.created')}</Column>
+          <Column isRowHeader minWidth={170}>
+            {t('import.history.column.file')}
+          </Column>
+          <Column minWidth={120}>{t('import.history.column.status')}</Column>
+          <Column align="end" minWidth={100}>
+            {t('import.history.column.rows')}
+          </Column>
+          <Column minWidth={120}>{t('import.history.column.created')}</Column>
         </TableHeader>
         <TableBody>
           {batches.map((batch) => {

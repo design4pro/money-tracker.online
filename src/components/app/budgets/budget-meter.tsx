@@ -90,16 +90,36 @@ const STATE_ICONS: Record<
   over: TrendingUp,
 }
 
+/**
+ * The verdict row is `text-caption` — body-size text, so it stays on the 7:1 inks.
+ *
+ * The headline beside it does not: it is bold at 20px (`md`) or 32px (`lg`), which is LARGE TEXT by
+ * WCAG's definition and is scored by 1.4.6 at 4.5:1 rather than 7:1. An overspend therefore takes
+ * `text-negative-bold` below, the grade that spends that headroom on chroma.
+ */
 const STATE_INK: Record<UtilisationState, string> = {
   under: 'text-positive',
   approaching: 'text-warning',
   over: 'text-negative',
 }
 
+/**
+ * The fill is a graphical object, not text, so `over` takes the loud danger grade rather than the
+ * text one. `negative` is pinned pale in dark by the 7:1 floor it has to hold as a caption ink, and
+ * a bar painted in it reads as salmon rather than as a state worth acting on (#151). `positive` and
+ * `warning` have no second grade yet and keep their text-grade values.
+ *
+ * `ui/Meter`'s danger fill stays on `negative` and that is not an oversight to be tidied up later.
+ * This fill is only ever full — `over` means the ratio passed 1, which clamps it to the whole track
+ * — so the colour beside it is the card, at 4.82:1. `ui/Meter` takes its threshold from a
+ * `dangerAt` prop, so a caller can put its fill against the track instead, and there the loud grade
+ * measures 3.18:1 against `border-subtle` where `negative` measures 5.02:1. Two meters, two reds,
+ * one criterion read on two adjacencies.
+ */
 const STATE_FILL: Record<UtilisationState, string> = {
   under: 'bg-positive',
   approaching: 'bg-warning',
-  over: 'bg-negative',
+  over: 'bg-negative-bold',
 }
 
 export function BudgetMeter({
@@ -177,7 +197,7 @@ export function BudgetMeter({
           ? t('budgets.overspent', { amount: money(-remainingMinor) })
           : t('budgets.remaining', { amount: money(remainingMinor) })
       }
-      headlineTone={isOver ? 'text-negative' : 'text-ink'}
+      headlineTone={isOver ? 'text-negative-bold' : 'text-ink'}
       verdict={verdict}
       VerdictIcon={Icon}
       verdictTone={STATE_INK[state]}
