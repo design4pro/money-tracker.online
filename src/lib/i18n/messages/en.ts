@@ -1243,6 +1243,30 @@ const messages = {
   },
   'notifications.badge': '{count}+',
 
+  /*
+    One title and one body per notification kind, keyed by the registry in
+    `#/server/notify/kinds`. Every amount and every date arrives as a placeholder and is formatted
+    by the reader's own locale at render time: the stored row holds integers and codes, so the same
+    row reads correctly to a Polish member of an English-preferring household. A pre-formatted
+    amount in one of these strings would break exactly that.
+  */
+  'notifications.kind.budgetThresholdCrossed.title':
+    '{budget} is at {threshold}%',
+  'notifications.kind.budgetThresholdCrossed.body':
+    'You have spent {spent} of {available} in {budget} this period.',
+  'notifications.kind.budgetExceeded.title': '{budget} is spent',
+  'notifications.kind.budgetExceeded.body':
+    'You are {overspent} over the {available} you set for {budget}.',
+  'notifications.kind.recurringDueSoon.title': '{series} is due {date}',
+  'notifications.kind.recurringDueSoon.body':
+    '{amount} for {series} is due on {date}.',
+  'notifications.kind.recurringOverdue.title': '{series} was due {date}',
+  'notifications.kind.recurringOverdue.body':
+    '{amount} for {series} was due on {date} and is not recorded yet.',
+  'notifications.kind.goalReached.title': 'You reached {goal}',
+  'notifications.kind.goalReached.body':
+    '{goal} is complete — you put aside {contributed} of {target}.',
+
   /* -- Accessibility ------------------------------------------------------ */
   'a11y.skipToContent': 'Skip to main content',
   /*

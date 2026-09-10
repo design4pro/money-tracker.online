@@ -7,11 +7,15 @@ One dispatcher, three channels: **in-app**, **email**, and **digest**. Push is d
 Android Chrome and desktop is a multi-week project with a permission prompt that most people decline,
 and email plus in-app covers every notification this product actually sends.
 
-Plans 12, 13 and 15 shipped in wave 3 against a **named no-op dispatcher** (`notifyNoop`) so they
-could ship their alert logic without waiting for this plan. `21-S1` replaces it, and the replacement
-is a test assertion, not a hope: `notifications.test.ts` asserts the exported `notify` is not
-`notifyNoop`, because a permanent no-op is a silent feature failure that nobody notices until a
-person asks why they never got their budget alert.
+Plans 12, 13 and 15 shipped in wave 3 against **named no-op dispatchers** so they could ship their
+alert logic without waiting for this plan. There are three, one per producer, and they are named
+rather than empty so that "nothing is being sent yet" is greppable: `NOOP_ALERT_DISPATCHER` in
+`src/server/budgets/thresholds.ts`, `NOOP_REMINDER_DISPATCHER` in `src/server/recurring/reminders.ts`
+and `NOOP_GOAL_REACHED_DISPATCHER` in `src/server/goals/reached.ts`. `21-S1` replaces all three, and
+the replacement is a test assertion, not a hope: each module exports an `is*Installed()` predicate,
+the two crons report it in their run summaries, and `src/server/notify/__tests__/install.test.ts`
+asserts all three flip — because a permanent no-op is a silent feature failure that nobody notices
+until a person asks why they never got their budget alert.
 
 Everything user-visible here is **workspace-scoped and per-user**: a notification belongs to a person
 in a workspace, and two members of a household get their own read state and their own preferences.
@@ -27,24 +31,35 @@ in a workspace, and two members of a household get their own read state and thei
 ### Reference rows
 
 `NOTIF-01 missing → done` — the notification store and the scoped repository.
-`NOTIF-02 missing → done` — the dispatcher replacing `notifyNoop`, with per-user preference
-resolution and deduplication.
+`NOTIF-02 missing → done` — the dispatcher replacing the three `NOOP_*` constants, with per-user
+preference resolution and deduplication.
 
 ### Owned paths
 
 - `src/server/repos/notifications.ts` — new
-- `src/server/repos/__tests__/notifications.test.ts` — new
 - `src/server/notify/dispatch.ts` — new
 - `src/server/notify/kinds.ts` — new
+- `src/server/notify/adapters.ts` — new
+- `src/server/notify/install.ts` — new
+- `src/server/notify/copy.ts` — new; the kind → catalogue-key + parameters mapping, which formats
+  nothing so that a mixed-locale household renders one stored row two ways
+- `src/server/notify/dedupe.ts` — new; the one dedupe key this stage had to invent, the other two
+  being reused verbatim from the producers that already build them
+- `src/server/notify/email.ts` — new; the seam `21-S2` installs its enqueuer into
 - `src/server/notify/__tests__/dispatch.test.ts` — new
-- `src/server/fns/notifications.ts` — new
+
+`src/server/fns/notifications.ts` moved to `21-S3`: the reader's server functions have no consumer
+until the screen that calls them exists, and a stage that ships an unused public surface has nothing
+to verify it against.
 
 ### Data and migration
 
-Requisitions into `00-S9`: `notifications` (`id`, `workspace_id`, `user_id`, `kind`, `payload_json`,
-`dedupe_key`, `read_at`, `created_at`), unique on `(workspace_id, user_id, dedupe_key)`, indexed on
-`(workspace_id, user_id, created_at desc)`; and `notification_prefs` (`id`, `workspace_id`,
-`user_id`, `kind`, `in_app`, `email`, `digest`), unique on `(workspace_id, user_id, kind)`.
+Requisitions into `00-S9`: `notifications` (`id`, `organization_id`, `user_id`, `kind`,
+`payload_json`, `dedupe_key`, `read_at`, `created_at`), unique on
+`(organization_id, user_id, dedupe_key)`, indexed on `(organization_id, user_id, created_at desc)`;
+and `notification_prefs` (`id`, `organization_id`, `user_id`, `kind`, `in_app`, `email`, `digest`),
+unique on `(organization_id, user_id, kind)`. The tenant column is `organization_id` everywhere in
+this tree (ADR 0002); `workspace` is the word the product uses for it, not the column.
 
 **`dedupe_key` is the load-bearing column.** The 15-minute cron re-evaluates every budget threshold
 every quarter hour; without a dedupe key a person crossing 80% of their grocery budget receives 96
@@ -58,16 +73,24 @@ row.
 - **`kinds.ts`** is the registry: every notification kind with its `id`, its Zod payload schema, its
   default channel settings, its i18n key for title and body, its deep link, and whether it is
   **digestible** (can be batched into a daily summary) or **immediate**. Adding a notification is one
-  entry here plus two translation keys — nothing else in the system enumerates kinds. Initial set:
-  `budget.threshold`, `budget.exceeded`, `recurring.due`, `recurring.recorded`, `recurring.failed`,
-  `goal.reached`, `goal.off_track`, `import.completed`, `import.failed`, `export.ready`,
-  `rule.paused`, `billing.payment_failed`, `billing.plan_changed`, `member.invited`,
-  `member.joined`.
+  entry here plus two translation keys — nothing else in the system enumerates kinds. The initial set
+  is the five occasions the tree actually computes, named by the constants the producers already
+  export: `budget.threshold_crossed`, `budget.exceeded` (`src/server/budgets/thresholds.ts`),
+  `recurring.due_soon`, `recurring.overdue` (`src/server/recurring/reminders.ts`) and `goal.reached`
+  (`src/server/goals/reached.ts`). The rest of the list this plan once sketched —
+  `import.completed`, `member.joined`, `billing.payment_failed` and the others — each becomes one
+  entry plus two catalogue keys on the day something computes it. A kind with no producer is a
+  vocabulary entry a SQL `CHECK` accepts and nothing ever writes.
 - **`dispatch.ts`** exports `notify(scope, { userId, kind, payload, dedupeKey })`. It resolves the
-  person's preferences (row, falling back to the kind's defaults), writes the in-app row if enabled,
-  enqueues an email if enabled and the kind is immediate, and marks it for the digest otherwise. It
-  is the **only** module that writes `notifications`, and the repository's write methods are not
-  exported to callers outside it.
+  person's preferences (row, falling back to the kind's defaults), writes the row, and enqueues an
+  email if enabled and the kind is immediate. It is the **only** module that writes `notifications`,
+  and the repository's write function is documented as having exactly that one caller.
+
+  **"Marks it for the digest" needs no column.** A digestible notification _is_ its row: `21-S2`'s
+  nightly digest selects rows whose kind is digestible, whose `read_at` is null and whose
+  `created_at` falls in the window. A `digest_pending` flag would be a second record of the same
+  fact, and the two drift the first time a row is read between the write and the sweep.
+
 - **Failure isolation.** A dispatcher throw must never fail the business operation that triggered it.
   `notify` catches, logs with the kind and workspace, and returns — a budget alert that fails to send
   must not roll back the transaction that crossed the threshold. The test asserts a throwing email
@@ -108,10 +131,11 @@ _A notification carries a rendered amount, and it must be the amount that caused
 ### Verification
 
 - Command gate: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
-- `notifications.test.ts`: the **no-op replacement assertion** (`expect(notify).not.toBe(notifyNoop)`
-  and that `notifyNoop` is no longer imported anywhere outside its own deprecation shim); the dedupe
-  test firing 100 identical alerts and asserting one row; preference resolution with and without a
-  stored row.
+- `install.test.ts`: the **no-op replacement assertion** — in a module graph rebuilt with
+  `vi.resetModules()`, all three `is*Installed()` predicates report `false` before the install module
+  is imported and `true` after it.
+- `dispatch.test.ts`: the dedupe test firing 100 identical alerts and asserting one row; preference
+  resolution with and without a stored row.
 - `dispatch.test.ts`: the four money cases; the failure-isolation case; the non-member case.
 - No browser evidence.
 
@@ -150,7 +174,7 @@ None.
 
 ### Data and migration
 
-Requisitions into `00-S9`: `email_deliveries` (`id`, `workspace_id`, `user_id`, `kind`, `to_hash`,
+Requisitions into `00-S9`: `email_deliveries` (`id`, `organization_id`, `user_id`, `kind`, `to_hash`,
 `provider_message_id`, `status` in `queued|sent|bounced|complained|suppressed`, `error_code`,
 `created_at`, `sent_at`) and `email_suppressions` (`email_hash`, `reason`, `created_at`).
 

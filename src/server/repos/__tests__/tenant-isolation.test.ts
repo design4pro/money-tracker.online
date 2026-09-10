@@ -70,6 +70,7 @@ import {
   reopenPeriod,
 } from '../budget-periods'
 import {
+  addSecondMember,
   createBudgetWorld,
   executed as harnessExecuted,
   seedBudget,
@@ -77,6 +78,16 @@ import {
   seedPeriod,
   seedTransaction,
 } from './budget-harness'
+import {
+  countUnread,
+  insertNotification,
+  listPrefsFor,
+  markRead,
+  pageForReader,
+  upsertPref,
+} from '../notifications'
+import { isMember } from '../members'
+import { notify } from '#/server/notify/dispatch'
 import {
   advanceImportBatch,
   createImportBatch,
@@ -426,6 +437,31 @@ describe('inserts land in the caller’s workspace and nowhere else', () => {
 
     expect(rows.map((row) => row.organizationId)).toEqual([ORG_A, ORG_A])
     await expect(accountRepo.count(b)).resolves.toBe(B_ACCOUNTS.length)
+  })
+
+  it('stamps the tenant column on a conflict-tolerant insert too', async () => {
+    // The `ON CONFLICT` path is a second write route into the table, so it needs the same proof as
+    // `insert`: a smuggled workspace id loses to the stamp, and the row is not reachable from B.
+    const smuggled = {
+      id: 'acc-a-98',
+      organizationId: ORG_B,
+      name: 'Smuggled',
+      currencyCode: 'PLN',
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as unknown as Parameters<typeof accountRepo.insertOnConflictDoNothing>[1]
+
+    const row = await accountRepo.insertOnConflictDoNothing(a, smuggled, [
+      accounts.id,
+    ])
+
+    expect(row?.organizationId).toBe(ORG_A)
+    await expect(accountRepo.findById(b, 'acc-a-98')).resolves.toBeNull()
+
+    // The second offer of the same key is `null`, and it does not raise.
+    await expect(
+      accountRepo.insertOnConflictDoNothing(a, smuggled, [accounts.id]),
+    ).resolves.toBeNull()
   })
 })
 
@@ -1072,5 +1108,240 @@ describe('import batches cannot be reached or aimed across a workspace boundary'
     )) {
       expect(statement).toContain('organization_id')
     }
+  })
+})
+
+describe('notifications cannot be read, counted or marked across a workspace boundary', () => {
+  const AT = new Date('2026-03-15T10:00:00.000Z')
+  const KIND = 'budget.threshold_crossed' as const
+
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('never lets A list, count or mark B’s notification', async () => {
+    expect(
+      await insertNotification(
+        world.otherScope,
+        {
+          userId: 'user-b',
+          kind: KIND,
+          payloadJson: '{"v":1}',
+          dedupeKey: 'budget:threshold:v1:b',
+        },
+        AT,
+      ),
+    ).not.toBeNull()
+
+    // Absent from A's page and A's badge — not merely unreadable by id.
+    expect((await pageForReader(world.scope)).items).toEqual([])
+    expect(await countUnread(world.scope)).toBe(0)
+
+    // And A cannot mark it, even holding the id.
+    const theirs = (await pageForReader(world.otherScope)).items
+    expect(theirs).toHaveLength(1)
+    expect(await markRead(world.scope, { ids: [theirs[0].id] }, AT)).toBe(0)
+
+    // B's row is untouched, as B sees it.
+    expect(await countUnread(world.otherScope)).toBe(1)
+    expect((await pageForReader(world.otherScope)).items[0].readAt).toBeNull()
+  })
+
+  it('lets two workspaces hold the same dedupe key, because the index is scoped', async () => {
+    const dedupeKey = 'budget:threshold:v1:budget-1:2026-03-01:80'
+
+    expect(
+      await insertNotification(
+        world.scope,
+        { userId: 'user-a', kind: KIND, payloadJson: '{"v":1}', dedupeKey },
+        AT,
+      ),
+    ).not.toBeNull()
+    expect(
+      await insertNotification(
+        world.otherScope,
+        { userId: 'user-b', kind: KIND, payloadJson: '{"v":1}', dedupeKey },
+        AT,
+      ),
+    ).not.toBeNull()
+
+    expect(await countUnread(world.scope)).toBe(1)
+    expect(await countUnread(world.otherScope)).toBe(1)
+  })
+
+  it('reports the same key twice in one workspace as deduped, and stores one row', async () => {
+    const input = {
+      userId: 'user-a',
+      kind: KIND,
+      payloadJson: '{"v":1}',
+      dedupeKey: 'budget:threshold:v1:budget-1:2026-03-01:80',
+    }
+
+    expect(await insertNotification(world.scope, input, AT)).not.toBeNull()
+    // The retry a cron makes after a transient failure, since the marker is written last.
+    expect(await insertNotification(world.scope, input, AT)).toBeNull()
+    expect(await countUnread(world.scope)).toBe(1)
+  })
+
+  it('shows one person only the workspace they are acting in', async () => {
+    // The sharpest case the scoped index has to survive: the *same* `user_id` on both rows, so
+    // nothing but the workspace predicate separates them.
+    await addSecondMember(world.db)
+    const bInA = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+
+    await insertNotification(
+      world.otherScope,
+      {
+        userId: 'user-b',
+        kind: KIND,
+        payloadJson: '{"v":1}',
+        dedupeKey: 'shared-key',
+      },
+      AT,
+    )
+    await insertNotification(
+      bInA,
+      {
+        userId: 'user-b',
+        kind: KIND,
+        payloadJson: '{"v":2}',
+        dedupeKey: 'shared-key',
+      },
+      AT,
+    )
+
+    const fromA = (await pageForReader(bInA)).items
+    const fromB = (await pageForReader(world.otherScope)).items
+    expect(fromA).toHaveLength(1)
+    expect(fromB).toHaveLength(1)
+    expect(fromA[0].payloadJson).toBe('{"v":2}')
+    expect(fromB[0].payloadJson).toBe('{"v":1}')
+  })
+
+  it('never lets a preference written in one workspace reach another', async () => {
+    await addSecondMember(world.db)
+    const bInA = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+
+    await upsertPref(
+      world.otherScope,
+      { kind: KIND, inApp: false, email: false, digest: false },
+      AT,
+    )
+    await upsertPref(
+      bInA,
+      { kind: KIND, inApp: true, email: false, digest: true },
+      AT,
+    )
+
+    // Two rows for the same person and kind, one per workspace, each read back through its own.
+    const inA = (await listPrefsFor(bInA, 'user-b')).get(KIND)
+    const inB = (await listPrefsFor(world.otherScope, 'user-b')).get(KIND)
+    expect(inA?.inApp).toBe(true)
+    expect(inB?.inApp).toBe(false)
+    expect(inA?.id).not.toBe(inB?.id)
+
+    // And A's owner, who wrote nothing, still has no row at all — defaults, not someone else's.
+    expect((await listPrefsFor(world.scope, 'user-a')).size).toBe(0)
+  })
+
+  it('scopes every statement the notification repository runs', async () => {
+    harnessExecuted.length = 0
+    await insertNotification(
+      world.scope,
+      {
+        userId: 'user-a',
+        kind: KIND,
+        payloadJson: '{"v":1}',
+        dedupeKey: 'k',
+      },
+      AT,
+    )
+    await pageForReader(world.scope)
+    await countUnread(world.scope)
+    await markRead(world.scope, { ids: ['no-such-id'] }, AT)
+    await upsertPref(
+      world.scope,
+      { kind: KIND, inApp: true, email: true, digest: true },
+      AT,
+    )
+
+    const statements = harnessExecuted.filter(
+      (statement) =>
+        statement.includes('notifications') ||
+        statement.includes('notification_prefs'),
+    )
+    expect(statements.length).toBeGreaterThan(0)
+    for (const statement of statements.filter(
+      (candidate) => !candidate.startsWith('insert'),
+    )) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+})
+
+describe('membership is a question about one workspace at a time', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('does not see B’s member from A’s scope, or the reverse', async () => {
+    await expect(isMember(world.scope, 'user-a')).resolves.toBe(true)
+    await expect(isMember(world.scope, 'user-b')).resolves.toBe(false)
+    await expect(isMember(world.otherScope, 'user-b')).resolves.toBe(true)
+    await expect(isMember(world.otherScope, 'user-a')).resolves.toBe(false)
+  })
+
+  it('scopes the lookup, so the answer cannot come from another workspace’s row', async () => {
+    harnessExecuted.length = 0
+    await isMember(world.scope, 'user-b')
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('from "member"'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+
+  it('turns notify into a no-op for somebody who belongs to the other workspace', async () => {
+    // The dispatcher’s own refusal, end to end: `user-b` exists and is a member *somewhere*, which
+    // is exactly the case a check on `user` rather than on `member` would wave through.
+    const outcome = await notify(
+      world.scope,
+      {
+        userId: 'user-b',
+        kind: 'budget.threshold_crossed',
+        payload: {
+          v: 1,
+          budgetId: 'budget-1',
+          budgetName: 'Groceries',
+          periodStart: '2026-03-01',
+          threshold: 80,
+          spentMinor: 160_000,
+          availableMinor: 200_000,
+          currencyCode: 'PLN',
+        },
+        dedupeKey: 'budget:threshold:v1:budget-1:2026-03-01:80',
+      },
+      new Date('2026-03-15T10:00:00.000Z'),
+    )
+
+    expect(outcome).toBe('skipped')
+    // Nothing written in either workspace — not A’s, and not the one `user-b` does belong to.
+    expect(await countUnread(world.scope)).toBe(0)
+    expect(await countUnread(world.otherScope)).toBe(0)
   })
 })
