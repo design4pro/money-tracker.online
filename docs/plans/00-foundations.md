@@ -758,8 +758,9 @@ filter bar `src/components/app/transactions/filter-bar.tsx`, and the keyboard re
 move path has **no test anywhere in the tree**, so `src/components/ui/__tests__/grid-list.test.tsx`
 is still owed; and #105 scheduled `src/components/ui/data-table.tsx`, so the reusable table is owed
 too — neither of its landing sites is a primitive, and eleven feature plans name `data-table` in
-their component lists. The placement of what already shipped is settled under the plan set's
-precedence rule and is not re-litigated here.
+their component lists: `06`, `07`, `08`, `11`, `12`, `13`, `14`, `15`, `19`, `24` and `28`. The
+placement of what already shipped is settled under the plan set's precedence rule and is not
+re-litigated here.
 
 Requisitioned by `07-S2` (the transaction list) and `08-S2` (the category tree).
 
