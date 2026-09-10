@@ -303,3 +303,55 @@ test.describe('a docked drawer keeps behaving', () => {
     })
   })
 })
+
+/**
+ * The two dialogs that put a `<Form>` between `Dialog` and its parts.
+ *
+ * Ten of the twelve in-dialog forms carry `className="contents"`, which makes the form a DOM parent
+ * that is not a layout box, so `DialogHeader`, `DialogBody` and `DialogFooter` stay direct flex
+ * items of the panel's column. These two did not, and under the contract this file asserts that is
+ * no longer a cosmetic difference: a `<Form>` is `flex flex-col` with the default automatic minimum
+ * size, so it refuses to shrink below its content height. The panel now has a hard cap and nothing
+ * in the chain clips, so the form renders straight through the bottom of the rounded box, over the
+ * scrim, with no scroll anywhere to bring it back.
+ *
+ * A landscape phone is the honest viewport for this: it is short enough that a two-field dialog
+ * exceeds the cap, and it is a real orientation rather than a contrived one.
+ *
+ * The group form is the case here; `settings/-ui/invite-dialog` is the other one and is not, because
+ * its trigger is `isDisabled={seatsLeft <= 0}` and the demo workspace's plan has no seat to spare, so
+ * the dialog cannot be opened at all from the fixture this suite signs in as. It carries the same
+ * one-line correction, and the mechanism it depends on is the one measured below.
+ */
+test.describe('a dialog whose form is its own layout box', () => {
+  test.use({ viewport: { width: 740, height: 360 } })
+
+  test('the group form keeps its content inside the panel', async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, 'en')
+    await gotoApp(page, '/transactions/groups')
+    await page.getByRole('button', { name: 'New group' }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    await expectPanelInsideViewport(page)
+    await expect(
+      dialog.getByRole('heading', { name: 'New group' }),
+    ).toBeInViewport({ ratio: 1 })
+    await expect(
+      dialog.getByRole('button', { name: 'Create', exact: true }),
+    ).toBeInViewport({ ratio: 1 })
+
+    // And the overflow has to land in the body, not on the scrim. A form that is its own layout box
+    // takes the bound away from `DialogBody`'s `flex-1`, so the port exists and never has anything
+    // to do while the panel grows past the screen instead.
+    const measured = await measureDialog(page)
+    expect(
+      measured.scrollPortOverflows,
+      'The group form is taller than a 360px-tall viewport, so DialogBody should be the box with the overflow.',
+    ).toBe(true)
+  })
+})

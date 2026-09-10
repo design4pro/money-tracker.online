@@ -360,6 +360,7 @@ function GroupFormDialog({
               event.preventDefault()
               if (name.trim() !== '') void save()
             }}
+            className="contents"
           >
             <DialogHeader
               title={
