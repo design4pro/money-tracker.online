@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ArrowDownUp, ListFilter, Plus, X } from 'lucide-react'
 import { getLocalTimeZone, parseDate, today } from '@internationalized/date'
 
+import { FormModal } from '#/components/app/shell'
 import {
   Badge,
   Button,
@@ -14,8 +15,6 @@ import {
   DialogBody,
   DialogFooter,
   DialogHeader,
-  DialogTrigger,
-  Modal,
   Radio,
   RadioGroup,
   SearchField,
@@ -31,6 +30,7 @@ import {
   PAYMENT_METHOD_KEY,
   countActiveFilters,
   describeFilters,
+  isSameFilterView,
 } from './filter-chips'
 import { LEDGER_PAYMENT_METHODS, LEDGER_SORT_FIELDS } from './types'
 
@@ -302,8 +302,30 @@ export function FilterBar({
 }: FilterBarProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const [isPanelOpen, setPanelOpen] = useState(false)
   const [panelDraft, setPanelDraft] = useState<LedgerFilters>(filters)
   const [sortDraft, setSortDraft] = useState<LedgerSort>(sort)
+
+  // The panel is mounted with the bar and outlives every one of its own opens, so its baseline is
+  // re-taken at each open rather than at first render. That is the whole reason this one dialog
+  // states its dirtiness by hand instead of reaching for `useIsDirty`.
+  const openedWith = useRef<{ filters: LedgerFilters; sort: LedgerSort }>({
+    filters,
+    sort,
+  })
+
+  function openPanel() {
+    setPanelDraft(filters)
+    setSortDraft(sort)
+    openedWith.current = { filters, sort }
+    setPanelOpen(true)
+  }
+
+  // Ordering is edited in the same panel and discarded by the same close, so it counts.
+  const isPanelDirty =
+    !isSameFilterView(panelDraft, openedWith.current.filters) ||
+    sortDraft.field !== openedWith.current.sort.field ||
+    sortDraft.direction !== openedWith.current.sort.direction
 
   const chips = useMemo(
     () => describeFilters({ filters, reference, t, locale }),
@@ -369,261 +391,254 @@ export function FilterBar({
           className="hidden md:flex"
         />
 
-        <DialogTrigger
-          onOpenChange={(open) => {
-            if (open) {
-              setPanelDraft(filters)
-              setSortDraft(sort)
-            }
-          }}
+        <Button variant="secondary" icon={<ListFilter />} onPress={openPanel}>
+          {t('transactions.filter.title')}
+          {activeCount === 0 ? null : (
+            <Badge tone="neutral" size="sm" className="ms-1">
+              {activeCount}
+            </Badge>
+          )}
+        </Button>
+        <FormModal
+          placement="drawer-end"
+          isOpen={isPanelOpen}
+          onOpenChange={setPanelOpen}
+          isDirty={isPanelDirty}
         >
-          <Button variant="secondary" icon={<ListFilter />}>
-            {t('transactions.filter.title')}
-            {activeCount === 0 ? null : (
-              <Badge tone="neutral" size="sm" className="ms-1">
-                {activeCount}
-              </Badge>
-            )}
-          </Button>
-          <Modal placement="drawer-end" isDismissable={false}>
-            <Dialog>
-              {({ close }) => (
-                <>
-                  <DialogHeader
-                    title={t('transactions.filter.title')}
-                    description={t('transactions.filter.description')}
-                    closeLabel={t('action.close')}
-                    onClose={close}
-                  />
-                  <DialogBody className="flex flex-col gap-5">
-                    {/* Below `md` the bar has no room for these, so this is where they live. They
+          <Dialog>
+            {({ close }) => (
+              <>
+                <DialogHeader
+                  title={t('transactions.filter.title')}
+                  description={t('transactions.filter.description')}
+                  closeLabel={t('action.close')}
+                  onClose={close}
+                />
+                <DialogBody className="flex flex-col gap-5">
+                  {/* Below `md` the bar has no room for these, so this is where they live. They
                         are drafted like every other control in the panel and take effect on
                         Apply — a control that acted immediately while its neighbours waited would
                         be the panel disagreeing with itself. */}
-                    <div className="flex flex-col gap-4 md:hidden">
-                      <DateRangePicker
-                        label={t('transactions.filter.dateRange')}
-                        calendarLabel={t('transactions.filter.openCalendar')}
-                        value={toRange(panelDraft)}
-                        maxValue={maxDate}
-                        onChange={(range) => patchDraft(fromRange(range))}
-                      />
-                      <div className="flex flex-col gap-2">
-                        <span className="text-label font-medium text-ink-2">
-                          {t('transactions.sort.label')}
-                        </span>
-                        <SortControls
-                          sort={sortDraft}
-                          onChange={setSortDraft}
-                        />
-                      </div>
+                  <div className="flex flex-col gap-4 md:hidden">
+                    <DateRangePicker
+                      label={t('transactions.filter.dateRange')}
+                      calendarLabel={t('transactions.filter.openCalendar')}
+                      value={toRange(panelDraft)}
+                      maxValue={maxDate}
+                      onChange={(range) => patchDraft(fromRange(range))}
+                    />
+                    <div className="flex flex-col gap-2">
+                      <span className="text-label font-medium text-ink-2">
+                        {t('transactions.sort.label')}
+                      </span>
+                      <SortControls sort={sortDraft} onChange={setSortDraft} />
                     </div>
+                  </div>
 
-                    <RadioGroup
-                      label={t('transactions.filter.direction')}
-                      orientation="horizontal"
-                      value={panelDraft.direction ?? 'any'}
-                      onChange={(value) =>
-                        patchDraft({
-                          direction:
-                            value === 'any'
-                              ? undefined
-                              : (value as LedgerFilters['direction']),
-                        })
-                      }
-                    >
-                      <Radio value="any">{t('common.all')}</Radio>
-                      <Radio value="income">
-                        {t('transactions.direction.income')}
-                      </Radio>
-                      <Radio value="expense">
-                        {t('transactions.direction.expense')}
-                      </Radio>
-                    </RadioGroup>
+                  <RadioGroup
+                    label={t('transactions.filter.direction')}
+                    orientation="horizontal"
+                    value={panelDraft.direction ?? 'any'}
+                    onChange={(value) =>
+                      patchDraft({
+                        direction:
+                          value === 'any'
+                            ? undefined
+                            : (value as LedgerFilters['direction']),
+                      })
+                    }
+                  >
+                    <Radio value="any">{t('common.all')}</Radio>
+                    <Radio value="income">
+                      {t('transactions.direction.income')}
+                    </Radio>
+                    <Radio value="expense">
+                      {t('transactions.direction.expense')}
+                    </Radio>
+                  </RadioGroup>
 
-                    {reference.accounts.length === 0 ? null : (
-                      <CheckboxPicker
-                        label={t('transactions.field.account')}
-                        options={reference.accounts}
-                        selected={panelDraft.accountIds ?? []}
-                        onChange={(next) => patchDraft({ accountIds: next })}
-                      />
-                    )}
-
-                    {reference.accountGroups.length === 0 ? null : (
-                      <CheckboxPicker
-                        label={t('transactions.filter.accountGroup')}
-                        options={reference.accountGroups}
-                        selected={panelDraft.accountGroupIds ?? []}
-                        onChange={(next) =>
-                          patchDraft({ accountGroupIds: next })
-                        }
-                      />
-                    )}
-
-                    {reference.categories.length === 0 ? null : (
-                      <SearchablePicker
-                        label={t('transactions.field.category')}
-                        options={reference.categories}
-                        selected={panelDraft.categoryIds ?? []}
-                        onChange={(next) => patchDraft({ categoryIds: next })}
-                        placeholder={t(
-                          'transactions.filter.categoryPlaceholder',
-                        )}
-                        emptyState={t('transactions.filter.noMatches')}
-                        removeLabel={(name) =>
-                          t('transactions.filter.remove', { name })
-                        }
-                      />
-                    )}
-
-                    {reference.payees.length === 0 ? null : (
-                      <SearchablePicker
-                        label={t('transactions.field.payee')}
-                        options={reference.payees}
-                        selected={panelDraft.payeeIds ?? []}
-                        onChange={(next) => patchDraft({ payeeIds: next })}
-                        placeholder={t('transactions.filter.payeePlaceholder')}
-                        emptyState={t('transactions.filter.noMatches')}
-                        removeLabel={(name) =>
-                          t('transactions.filter.remove', { name })
-                        }
-                      />
-                    )}
-
-                    {reference.tags.length === 0 ? null : (
-                      <SearchablePicker
-                        label={t('transactions.field.tags')}
-                        options={reference.tags}
-                        selected={panelDraft.tagIds ?? []}
-                        onChange={(next) => patchDraft({ tagIds: next })}
-                        placeholder={t('transactions.filter.tagPlaceholder')}
-                        emptyState={t('transactions.filter.noMatches')}
-                        removeLabel={(name) =>
-                          t('transactions.filter.remove', { name })
-                        }
-                      />
-                    )}
-
+                  {reference.accounts.length === 0 ? null : (
                     <CheckboxPicker
-                      label={t('transactions.field.paymentMethod')}
-                      options={LEDGER_PAYMENT_METHODS.map((method) => ({
-                        id: method,
-                        name: t(PAYMENT_METHOD_KEY[method]),
-                      }))}
-                      selected={panelDraft.paymentMethods ?? []}
-                      onChange={(next) =>
-                        patchDraft({
-                          paymentMethods:
-                            next as LedgerFilters['paymentMethods'],
-                        })
+                      label={t('transactions.field.account')}
+                      options={reference.accounts}
+                      selected={panelDraft.accountIds ?? []}
+                      onChange={(next) => patchDraft({ accountIds: next })}
+                    />
+                  )}
+
+                  {reference.accountGroups.length === 0 ? null : (
+                    <CheckboxPicker
+                      label={t('transactions.filter.accountGroup')}
+                      options={reference.accountGroups}
+                      selected={panelDraft.accountGroupIds ?? []}
+                      onChange={(next) => patchDraft({ accountGroupIds: next })}
+                    />
+                  )}
+
+                  {reference.categories.length === 0 ? null : (
+                    <SearchablePicker
+                      label={t('transactions.field.category')}
+                      options={reference.categories}
+                      selected={panelDraft.categoryIds ?? []}
+                      onChange={(next) => patchDraft({ categoryIds: next })}
+                      placeholder={t('transactions.filter.categoryPlaceholder')}
+                      emptyState={t('transactions.filter.noMatches')}
+                      removeLabel={(name) =>
+                        t('transactions.filter.remove', { name })
                       }
                     />
+                  )}
 
-                    <fieldset className="flex flex-col gap-3">
-                      <legend className="text-label font-medium text-ink-2">
-                        {t('transactions.filter.amountRange')}
-                      </legend>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <AmountField
-                          label={t('transactions.filter.amountMin')}
-                          currencyCode={amountCurrency}
-                          value={
-                            (panelDraft.amountMinMinor ?? null) as Minor | null
-                          }
-                          onChange={(value) =>
-                            patchDraft({
-                              amountMinMinor: value ?? undefined,
-                              amountCurrency,
-                            })
-                          }
-                        />
-                        <AmountField
-                          label={t('transactions.filter.amountMax')}
-                          currencyCode={amountCurrency}
-                          value={
-                            (panelDraft.amountMaxMinor ?? null) as Minor | null
-                          }
-                          onChange={(value) =>
-                            patchDraft({
-                              amountMaxMinor: value ?? undefined,
-                              amountCurrency,
-                            })
-                          }
-                        />
-                        <Select
-                          label={t('common.currency')}
-                          selectedKey={amountCurrency}
-                          onSelectionChange={(key) =>
-                            patchDraft({ amountCurrency: String(key) })
-                          }
-                        >
-                          {currencyOptions.map((code) => (
-                            <SelectItem key={code} id={code} textValue={code}>
-                              {code}
-                            </SelectItem>
-                          ))}
-                        </Select>
-                      </div>
-                    </fieldset>
+                  {reference.payees.length === 0 ? null : (
+                    <SearchablePicker
+                      label={t('transactions.field.payee')}
+                      options={reference.payees}
+                      selected={panelDraft.payeeIds ?? []}
+                      onChange={(next) => patchDraft({ payeeIds: next })}
+                      placeholder={t('transactions.filter.payeePlaceholder')}
+                      emptyState={t('transactions.filter.noMatches')}
+                      removeLabel={(name) =>
+                        t('transactions.filter.remove', { name })
+                      }
+                    />
+                  )}
 
-                    <Select
-                      label={t('transactions.filter.receipt')}
-                      selectedKey={
-                        panelDraft.hasAttachment === undefined
-                          ? 'any'
-                          : String(panelDraft.hasAttachment)
+                  {reference.tags.length === 0 ? null : (
+                    <SearchablePicker
+                      label={t('transactions.field.tags')}
+                      options={reference.tags}
+                      selected={panelDraft.tagIds ?? []}
+                      onChange={(next) => patchDraft({ tagIds: next })}
+                      placeholder={t('transactions.filter.tagPlaceholder')}
+                      emptyState={t('transactions.filter.noMatches')}
+                      removeLabel={(name) =>
+                        t('transactions.filter.remove', { name })
                       }
-                      onSelectionChange={(key) =>
-                        patchDraft({
-                          hasAttachment:
-                            key === 'any' ? undefined : key === 'true',
-                        })
-                      }
-                    >
-                      <SelectItem id="any" textValue={t('common.all')}>
-                        {t('common.all')}
-                      </SelectItem>
-                      <SelectItem
-                        id="true"
-                        textValue={t('transactions.chip.withReceipt')}
+                    />
+                  )}
+
+                  <CheckboxPicker
+                    label={t('transactions.field.paymentMethod')}
+                    options={LEDGER_PAYMENT_METHODS.map((method) => ({
+                      id: method,
+                      name: t(PAYMENT_METHOD_KEY[method]),
+                    }))}
+                    selected={panelDraft.paymentMethods ?? []}
+                    onChange={(next) =>
+                      patchDraft({
+                        paymentMethods: next as LedgerFilters['paymentMethods'],
+                      })
+                    }
+                  />
+
+                  <fieldset className="flex flex-col gap-3">
+                    <legend className="text-label font-medium text-ink-2">
+                      {t('transactions.filter.amountRange')}
+                    </legend>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <AmountField
+                        label={t('transactions.filter.amountMin')}
+                        currencyCode={amountCurrency}
+                        value={
+                          (panelDraft.amountMinMinor ?? null) as Minor | null
+                        }
+                        onChange={(value) =>
+                          patchDraft({
+                            amountMinMinor: value ?? undefined,
+                            amountCurrency,
+                          })
+                        }
+                      />
+                      <AmountField
+                        label={t('transactions.filter.amountMax')}
+                        currencyCode={amountCurrency}
+                        value={
+                          (panelDraft.amountMaxMinor ?? null) as Minor | null
+                        }
+                        onChange={(value) =>
+                          patchDraft({
+                            amountMaxMinor: value ?? undefined,
+                            amountCurrency,
+                          })
+                        }
+                      />
+                      <Select
+                        label={t('common.currency')}
+                        selectedKey={amountCurrency}
+                        onSelectionChange={(key) =>
+                          patchDraft({ amountCurrency: String(key) })
+                        }
                       >
-                        {t('transactions.chip.withReceipt')}
-                      </SelectItem>
-                      <SelectItem
-                        id="false"
-                        textValue={t('transactions.chip.withoutReceipt')}
-                      >
-                        {t('transactions.chip.withoutReceipt')}
-                      </SelectItem>
-                    </Select>
-                  </DialogBody>
-                  <DialogFooter>
-                    <Button
-                      variant="ghost"
-                      onPress={() => {
-                        // Ordering is not a filter, so "Reset filters" does not touch it.
-                        onViewChange({}, sort)
-                        close()
-                      }}
+                        {currencyOptions.map((code) => (
+                          <SelectItem key={code} id={code} textValue={code}>
+                            {code}
+                          </SelectItem>
+                        ))}
+                      </Select>
+                    </div>
+                  </fieldset>
+
+                  <Select
+                    label={t('transactions.filter.receipt')}
+                    selectedKey={
+                      panelDraft.hasAttachment === undefined
+                        ? 'any'
+                        : String(panelDraft.hasAttachment)
+                    }
+                    onSelectionChange={(key) =>
+                      patchDraft({
+                        hasAttachment:
+                          key === 'any' ? undefined : key === 'true',
+                      })
+                    }
+                  >
+                    <SelectItem id="any" textValue={t('common.all')}>
+                      {t('common.all')}
+                    </SelectItem>
+                    <SelectItem
+                      id="true"
+                      textValue={t('transactions.chip.withReceipt')}
                     >
-                      {t('transactions.filter.reset')}
-                    </Button>
-                    <Button
-                      variant="primary"
-                      onPress={() => {
-                        onViewChange(prune(panelDraft), sortDraft)
-                        close()
-                      }}
+                      {t('transactions.chip.withReceipt')}
+                    </SelectItem>
+                    <SelectItem
+                      id="false"
+                      textValue={t('transactions.chip.withoutReceipt')}
                     >
-                      {t('action.apply')}
-                    </Button>
-                  </DialogFooter>
-                </>
-              )}
-            </Dialog>
-          </Modal>
-        </DialogTrigger>
+                      {t('transactions.chip.withoutReceipt')}
+                    </SelectItem>
+                  </Select>
+                </DialogBody>
+                {/* Both of these *commit* the draft, so they close through the panel's own open
+                      state rather than through the render-prop `close` the guard sits on. Asking
+                      "discard your changes?" about work that was just applied would be a question
+                      with no true answer. Every other way out — the scrim, Escape, the X — still
+                      goes through `close`. */}
+                <DialogFooter>
+                  <Button
+                    variant="ghost"
+                    onPress={() => {
+                      // Ordering is not a filter, so "Reset filters" does not touch it.
+                      onViewChange({}, sort)
+                      setPanelOpen(false)
+                    }}
+                  >
+                    {t('transactions.filter.reset')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onPress={() => {
+                      onViewChange(prune(panelDraft), sortDraft)
+                      setPanelOpen(false)
+                    }}
+                  >
+                    {t('action.apply')}
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </Dialog>
+        </FormModal>
 
         {/* One action, two shapes. Below `md` it is a 44px icon target on the same row as the
             search box rather than a full-width block that pushes the ledger down a screen; from
