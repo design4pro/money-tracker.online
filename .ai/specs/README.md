@@ -8,9 +8,9 @@ its `H1` names the issue and the pull requests behind it, and both are held toge
 
 ## Draft — being written (1)
 
-| Spec                                                                                                                     | Date       | Issue                                                                 | Spec PR | Implementation |
-| ------------------------------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- | ------- | -------------- |
-| [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md) | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | —       | —              |
+| Spec                                                                                                                     | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
+| [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md) | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | [#220](https://github.com/design4pro/money-tracker.online/pull/220) | —              |
 
 ## Ready — merged, waiting for a build (1)
 

@@ -4,7 +4,7 @@
 | ------------------ | ----- |
 | **Status**         | draft |
 | **Issue**          | #219  |
-| **Spec PR**        | none  |
+| **Spec PR**        | #220  |
 | **Implementation** | none  |
 
 ## 📝 TLDR
@@ -182,6 +182,11 @@ carries `onDelete: 'cascade'` — so only the `user_id` choice needs stating.
 plan's column list: "when did this person turn budget email off" is a question a support conversation
 asks, and three booleans with no timestamps cannot answer it.
 
+**Nothing writes this table in `21-S1`.** `setPref` moves to `21-S3` with the settings screen (Q7) and
+no row is seeded (Q6), so the table ships read-only: `notify` resolves preferences from it and finds it
+empty, which is exactly the defaults path. That is a consequence of two stated decisions rather than an
+omission, and it is written here so a reader does not go looking for the writer.
+
 **Rows are created lazily.** Absence means "use the kind's defaults"; nothing seeds a row for an
 existing or a new member. A backfill of three booleans × five kinds × every member restates the
 defaults and freezes today's values into every existing household the moment a default is revised.
@@ -256,13 +261,25 @@ Order of operations:
    `'skipped'` and logs. Never an orphan row addressed to somebody who cannot see it.
 2. **Preference resolution.** The stored row for `(organization, user, kind)` if there is one, else
    the kind's `defaults`.
-3. **In-app write**, when `inApp` is enabled, through the repository's insert. A unique violation on
-   `dedupe_key` returns `'deduped'` — the expected path, caught by constraint name rather than by
-   message text, and not logged as an error.
+3. **The row is written whenever any channel is enabled** — `inApp` **or** `email` **or** `digest` —
+   through the repository's insert. A unique violation on `dedupe_key` returns `'deduped'` — the
+   expected path, caught by constraint name rather than by message text, and not logged as an error.
+   Only when all three are off is nothing written, and that is the `'skipped'` case.
 4. **Email**, when `email` is enabled **and** `suppressEmail` is not set **and** the kind is
-   `immediate`, handed to the email seam.
+   `immediate`, handed to the email seam with the id of the row step 3 wrote.
 5. **Every step is wrapped.** A throw becomes `'failed'` plus one `logger.error` carrying the kind and
    the `organizationId`. `notify` itself never throws.
+
+**`in_app` governs the bell, not the row.** The three preference booleans are independent, so
+`in_app: false, email: true` — "mail me, do not clutter the bell" — is reachable the moment `21-S3`
+ships `setPref`, and the row has to be written on that path for two reasons that have nothing to do
+with the reader. The row **is** the dedupe record: the guarantee lives in the unique index on
+`(organization_id, user_id, dedupe_key)`, so a stage that skipped the insert would leave the email leg
+with no dedupe at all, and a cron retry would mail the same occasion twice. The row is also what
+`21-S2`'s digest selects, so `in_app: false, digest: true` would otherwise be a preference combination
+that silently delivers nothing. Writing it unconditionally keeps one record of one occasion; `21-S3`
+filters on `in_app` when it renders the list and the unread count. `notificationId` therefore always
+names a real row, which is what lets the email seam's signature take a non-nullable `string`.
 
 `suppressEmail` exists for exactly one caller. A recurring series carries its own `notifyEmail` flag
 (`DueReminder.notifyEmail`), which says whether _this series_ wants reminders at all — a different
@@ -391,7 +408,8 @@ key a stored row references cannot be removed or renamed, and a placeholder rena
 | A goal is withdrawn from and reaches its target again              | Nothing. The dedupe key is the goal, not the crossing transaction — a stated decision, not an accident.                                                                                                                                                                                                                                                                     |
 | Two households cross the same threshold                            | Both get rows: the unique index is scoped, so keys cannot collide across `organization_id`.                                                                                                                                                                                                                                                                                 |
 | Two members of one household, one crossing                         | Two rows, one per member, each with its own `read_at` and its own preference resolution.                                                                                                                                                                                                                                                                                    |
-| A member has `in_app: false` and `email: false` for the kind       | Nothing written, `'skipped'`. A row nobody asked for is not a safe default; the person turned it off.                                                                                                                                                                                                                                                                       |
+| A member has `in_app: false`, `email: false` and `digest: false`   | Nothing written, `'skipped'`. A row nobody asked for is not a safe default; the person turned every channel off.                                                                                                                                                                                                                                                            |
+| A member has `in_app: false` but `email` or `digest` on            | The row is written anyway and `'written'` is returned: it is the dedupe record and the digest's source. `21-S3` filters it out of the bell and the unread count. See **API Contracts**.                                                                                                                                                                                     |
 | The recipient is not a member of the scope's workspace             | Nothing written, `'skipped'`, one log line. Never an orphan row.                                                                                                                                                                                                                                                                                                            |
 | `listMembers` throws inside the request path (a goal contribution) | The adapter's whole body is wrapped, so the contribution stays committed and the response succeeds. One log line; the notification is lost, which is the correct trade at that seam.                                                                                                                                                                                        |
 | The notification write throws inside a cron sweep                  | The adapter throws, the sweep does not reach the marker writes, the cron wrapper counts one `failures` and logs the `organizationId`, and the next tick retries the occasion.                                                                                                                                                                                               |
@@ -419,13 +437,15 @@ first behaviour change in three shipped features. That last one is the real risk
   by a caller (ADR 0002).
 - **Message catalogue** — the ten keys above become referenced by stored rows on the first write.
 
-**Existing tests that change, and why that is not a narrowing.** Assertions in
-`src/server/cron/__tests__/recurring.test.ts` and the budget cron suite encode
-`dispatcherInstalled: false` as the current truth. They become `true` — the fact under test unchanged,
-its value flipped because this stage is what flips it. The `NOOP_*` default assertions in
+**Existing tests that change — and it is fewer than it looks.** No assertion in either cron suite
+changes, and no assertion anywhere is narrowed. `install.ts` is side-effect-only and reached through
+`src/server/worker.ts`, which neither cron suite imports, so `dispatcherInstalled` stays `false` in
+those graphs and both suites pass untouched; only the stale comment at
+`src/server/cron/__tests__/recurring.test.ts` is reworded to say why. The `NOOP_*` default assertions in
 `thresholds.test.ts` and its siblings **stay exactly as they are**: they test each module's default
 before installation, which is still the default. `AGENTS.md` → Ask First covers narrowing a test; none
-is narrowed, and the diff should be read with that distinction in hand.
+is narrowed, none is deleted, and the only new suite is `install.test.ts`, which asserts the four
+predicates are `true` inside its own `vi.resetModules()` graph.
 
 **Rollback, in three parts.**
 
@@ -468,6 +488,7 @@ resolution is argued in the section named beside it.
 | Q9  | `notify` never throws, but the sweeps need a failure to stop the marker write | Both: an outcome return; cron adapters throw on `'failed'`, the request-path adapter wraps its whole body                                                                                                              | Architecture         |
 | Q10 | Series `notifyEmail` flag or the per-kind preference?                         | Both, as an AND, via a one-way `suppressEmail` argument that can never widen a preference                                                                                                                              | API Contracts        |
 | Q11 | `goal.reached` has no producer dedupe key — what is it?                       | `goal:reached:v1:{goalId}`; a re-reached goal notifies once, ever                                                                                                                                                      | Data Model           |
+| Q12 | Is the in-app row written when `in_app` is off but `email` or `digest` is on? | **Yes — the row is written whenever any channel is on.** It is the dedupe record and the digest's source; skipping it would leave the email leg undeduplicated and make `in_app: false, digest: true` deliver nothing  | API Contracts        |
 
 None carries `⚠ NEEDS HUMAN CONFIRMATION`: each is a code-level choice reversible in a follow-up, and
 none weakens tenant scoping, the money rules or a `BACKWARD_COMPATIBILITY.md` surface. The one
@@ -545,20 +566,34 @@ phase (`docs/SPEC.md` §8).
 
 10. **Write the adapters.** `src/server/notify/adapters.ts`: one per seam. Each resolves
     `listMembers(scope)` and the members' preferences once, then calls `notify` per recipient, reusing
-    the producer's dedupe key. The recurring adapter passes the series' `notifyEmail` through as
-    `suppressEmail`. The goals adapter wraps its **entire body**; the two cron adapters throw on any
-    `'failed'`.
+    the producer's dedupe key. The recurring adapter passes the series' `notifyEmail` through **negated** —
+    `suppressEmail: !reminder.notifyEmail` — because the two flags carry opposite polarity:
+    `DueReminder.notifyEmail` is _"whether the workspace asked for this one by email"_, and
+    `suppressEmail` is the one-way off switch. Passing it through unnegated inverts both sides.
+    The goals adapter wraps its **entire body**; the two cron adapters throw on any `'failed'`.
     _Verify:_ `adapters.test.ts` — a two-member household gets two rows for one crossing; a cron
     adapter throws when a recipient fails; the goals adapter does not, even when `listMembers` itself
-    throws; the member and preference reads happen once for a multi-event batch.
+    throws; the member and preference reads happen once for a multi-event batch. **A polarity case:**
+    a series with `notifyEmail: true` reaches `notify` with `suppressEmail: false` and one with
+    `notifyEmail: false` with `suppressEmail: true` — the assertion that catches the inversion, which
+    step 7's `notify`-level case cannot see.
 11. **Install.** `src/server/notify/install.ts` (side-effect only, in the style of
     `src/server/billing/install.ts`) plus one `import './notify/install'` in `src/server/worker.ts`
     beside `./ledger` and `./billing/install`.
     _Verify:_ a dedicated `install.test.ts` using `vi.resetModules()`, with `set*Dispatcher(null)` in
     `afterEach`, asserts the four `is*Installed()` predicates return `true` after the import. The
     isolation is not optional: the neighbouring suites assert the `NOOP_*` defaults are still the
-    defaults, and a shared module graph would make those two facts fight. The existing
-    `dispatcherInstalled: false` assertions in the two cron suites are updated to `true`.
+    defaults, and a shared module graph would make those two facts fight.
+    **The two cron suites are not edited, and the reason is the same isolation.** `install.ts` is
+    side-effect-only and reached through `src/server/worker.ts`; neither cron suite imports the Worker
+    entry, so neither observes an installed dispatcher and both keep reporting `false` after this stage.
+    `budget-thresholds.test.ts` must not be touched at all — it is not a snapshot of today's truth but a
+    test of the predicate itself, asserting `false`, installing a dispatcher, asserting `true`, restoring
+    `NOOP_ALERT_DISPATCHER` and asserting `false` again; flipping its assertions breaks it, and
+    `AGENTS.md` → Ask First gates that edit. In `recurring.test.ts` only the **comment** above the
+    assertion changes — "Plan 21 has not landed" becomes the accurate reason, that an isolated module
+    graph installs nothing — while the `false` it explains stays exactly as it is.
+    _Verify:_ both cron suites pass unmodified except for that comment.
 12. **Correct the plan.** `docs/plans/21-notifications.md`: replace the `notifyNoop` references in the
     Area brief and in `21-S1`'s Verification with the three real `NOOP_*` constants; correct the
     registry kind names to the exported constants; correct `workspace_id` to `organization_id` in
@@ -567,9 +602,13 @@ phase (`docs/SPEC.md` §8).
     doc comment in `src/server/budgets/thresholds.ts` that calls the marker key _"the only record
     that a notification was sent"_ — after this stage the `notifications` row is, and that comment is
     what a future reader will trust.
-    _Verify:_ `rg 'notifyNoop|workspace_id' docs/plans/21-notifications.md` returns nothing;
+    _Verify:_ `rg 'notifyNoop' docs/plans/21-notifications.md` returns nothing;
     `rg "budget\.threshold'|recurring\.due'" docs/plans/21-notifications.md` returns nothing;
-    `rg 'only record that a notification was sent' src/` returns nothing.
+    `rg 'only record that a notification was sent' src/` returns nothing. **`workspace_id` is checked
+    against `21-S1` only** — `awk '/^## Stage 21-S2/{exit} /workspace_id/{print}' docs/plans/21-notifications.md`
+    returns nothing. The unscoped grep cannot pass: `21-S2`'s `email_deliveries` requisition names
+    `workspace_id` too, and correcting another stage's table is not this stage's business — `21-S2`
+    fixes its own when it is built.
 13. **Run the full gate** (`AGENTS.md` → Validation Commands), then update this spec's `Status` and
     `Implementation` fields and re-run `pnpm generate-spec-index`.
 
