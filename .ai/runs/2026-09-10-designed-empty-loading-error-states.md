@@ -170,8 +170,8 @@ spec's per-Phase PRs; recorded here because the spec's Phasing section says othe
 
 ### Phase 4: Reachability, coverage and evidence
 
-- [ ] 4.1 Add the empty fixture workspace
-- [ ] 4.2 Write `e2e/support/states.ts`
+- [x] 4.1 Add the empty fixture workspace — e15dbea
+- [x] 4.2 Write `e2e/support/states.ts` — d73e93e
 - [ ] 4.3 Write `e2e/states.spec.ts`
 - [ ] 4.4 Axe-scan the empty states
 - [ ] 4.5 Add `--force-state` to `scripts/visual/capture.mjs`
