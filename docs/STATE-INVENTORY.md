@@ -192,6 +192,14 @@ what the two rows of the table above measure.
 That first-navigation block is **not** fixed here. `_app.beforeLoad` is the session and tenant guard
 and `AGENTS.md` → Ask First covers it. It is recorded here so the next reader does not re-derive it.
 
+It does, however, decide the shape of the test helper. `e2e/support/states.ts` lets the shell's own
+request through and holds everything after it, because a hold that includes the shell freezes the
+router one step before the loading state it was installed to photograph. Measured on a client-side
+navigation from `/accounts` to `/accounts/demo-acc-1`: with the shell held, zero `role="status"`
+regions and the account list still on screen; with it let through, one `role="status"` and eleven
+skeleton bars inside `main`, and the list gone. That measurement is what `e2e/states.spec.ts`
+asserts, so the loading state is evidence rather than a claim.
+
 This is also why "add a `pendingComponent` to seven route modules" is, on its own, worth very little:
 nineteen surfaces already declared one and it did not render either.
 
