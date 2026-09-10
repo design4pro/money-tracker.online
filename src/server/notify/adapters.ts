@@ -26,6 +26,11 @@
  * `#/server/fns/goals`, after a contribution has committed: a notification that cannot be written
  * must not turn a saved contribution into an error on the person's screen. That asymmetry is
  * deliberate and it is the reason the two are separate functions rather than one with a flag.
+ *
+ * Silent toward the person is not silent toward the operator, though. `#/server/goals/reached`
+ * says of its own seam that swallowing a failure "would make a permanently broken channel
+ * invisible, which is the one outcome worse than a loud one", and the goals path has no cron
+ * summary to land in. {@link logGoalDispatchFailure} is where it lands instead.
  */
 
 import { subtractMinor } from '#/lib/money'
@@ -35,6 +40,7 @@ import {
   crossingMarkerKey,
 } from '#/server/budgets/thresholds'
 import { GOAL_REACHED_EVENT } from '#/server/goals/reached'
+import { loggerFromEnv } from '#/server/observability/logger'
 import { reminderMarkerKey } from '#/server/recurring/markers'
 import { listMembers } from '#/server/repos/members'
 
@@ -50,25 +56,31 @@ import type { RecurringReminderDispatcher } from '#/server/recurring/reminders'
 import type { TenantScope } from '#/server/repos/scope'
 import type { NotifyOutcome } from './dispatch'
 
+type Outcomes = ReadonlyArray<{
+  readonly kind: string
+  readonly outcome: NotifyOutcome
+}>
+
 /**
- * Throws when any dispatch failed, naming how many and of what.
+ * How many dispatches failed and of what, or `null` when none did.
  *
- * The message carries counts and kinds, never a `userId`: it reaches a log line, and who did not
- * get told is not a fact a log needs in order to say that something is broken.
+ * The sentence carries counts and kinds, never a `userId`: it ends up in a log line either way, and
+ * who did not get told is not a fact a log needs in order to say that something is broken. It is
+ * built here rather than at each of the three call sites so the cron's escalation and the goals
+ * path's log line are the same sentence.
  */
-function escalate(
-  outcomes: ReadonlyArray<{
-    readonly kind: string
-    readonly outcome: NotifyOutcome
-  }>,
-): void {
+function describeFailures(outcomes: Outcomes): string | null {
   const failed = outcomes.filter((entry) => entry.outcome === 'failed')
-  if (failed.length === 0) return
+  if (failed.length === 0) return null
 
   const kinds = [...new Set(failed.map((entry) => entry.kind))].sort()
-  throw new Error(
-    `${failed.length} notification dispatch(es) failed for ${kinds.join(', ')}`,
-  )
+  return `${failed.length} notification dispatch(es) failed for ${kinds.join(', ')}`
+}
+
+/** Throws {@link describeFailures} when there is one. What the two cron adapters do with it. */
+function escalate(outcomes: Outcomes): void {
+  const message = describeFailures(outcomes)
+  if (message !== null) throw new Error(message)
 }
 
 /** What both budget kinds carry. The exceeded one adds `overspentMinor` on top. */
@@ -194,6 +206,38 @@ export const notifyRecurringReminders: RecurringReminderDispatcher = async (
 }
 
 /**
+ * The operator's copy of a failure the person is deliberately not shown.
+ *
+ * The two cron adapters escalate, and the sweep's own `catch` has both a {@link Logger} and a
+ * workspace to name. The goals path has neither: it ends in a handler that must not rethrow. So it
+ * reaches the binding itself, which is what `#/server/fns/members` does for the same reason — the
+ * import is dynamic because `cloudflare:workers` does not resolve in the `server` test project, and
+ * `vitest.config.ts` forbids it in that graph.
+ *
+ * The whole thing is guarded. An adapter whose contract is "never throws" must not acquire a new
+ * way to throw in the act of acquiring a way to be seen.
+ */
+async function logGoalDispatchFailure(
+  scope: TenantScope,
+  message: string,
+  error?: unknown,
+): Promise<void> {
+  try {
+    const { env } = await import('cloudflare:workers')
+    loggerFromEnv(env, {
+      context: {
+        component: 'worker',
+        route: GOAL_REACHED_EVENT,
+        orgId: scope.ctx.organizationId,
+      },
+    }).error(message, error)
+  } catch {
+    // No Worker environment — a plain Node test run, or a sink that itself failed. The caller's
+    // contract is unchanged either way.
+  }
+}
+
+/**
  * Announces one reached goal to everybody in the household.
  *
  * The whole body is wrapped: this runs inside the request that recorded the contribution, and the
@@ -207,25 +251,38 @@ export const notifyGoalReached: GoalReachedDispatcher = async (
   try {
     const members = await listMembers(scope)
     const dedupeKey = goalReachedDedupeKey({ goalId: event.goalId })
+    const outcomes: Array<{ kind: string; outcome: NotifyOutcome }> = []
 
     for (const member of members) {
-      await notify(scope, {
-        userId: member.userId,
+      outcomes.push({
         kind: GOAL_REACHED_EVENT,
-        payload: {
-          v: 1,
-          goalId: event.goalId,
-          name: event.name,
-          targetMinor: event.targetMinor,
-          contributedMinor: event.contributedMinor,
-          currencyCode: event.currencyCode,
-          transactionId: event.transactionId,
-        },
-        dedupeKey,
+        outcome: await notify(scope, {
+          userId: member.userId,
+          kind: GOAL_REACHED_EVENT,
+          payload: {
+            v: 1,
+            goalId: event.goalId,
+            name: event.name,
+            targetMinor: event.targetMinor,
+            contributedMinor: event.contributedMinor,
+            currencyCode: event.currencyCode,
+            transactionId: event.transactionId,
+          },
+          dedupeKey,
+        }),
       })
     }
-  } catch {
-    // Deliberately silent. See the module docblock: the alternative is a saved contribution that
-    // reports itself as an error.
+
+    // Where the cron adapters throw, this one logs: the same sentence, a different destination.
+    const failures = describeFailures(outcomes)
+    if (failures !== null) await logGoalDispatchFailure(scope, failures)
+  } catch (error) {
+    // Silent to the caller — a saved contribution must not report itself as an error — and loud in
+    // the log, which is the whole point of the distinction.
+    await logGoalDispatchFailure(
+      scope,
+      'goal reached notification dispatch failed',
+      error,
+    )
   }
 }

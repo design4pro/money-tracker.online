@@ -197,9 +197,15 @@ export async function markRead(
 /**
  * Every stored preference row for one person, as a map keyed by kind.
  *
- * Read once per workspace per cron tick rather than once per recipient-event: a five-member
- * household with twenty crossings is a hundred lookups otherwise, inside a tick that also has every
- * other workspace to sweep.
+ * All of them in one read rather than one read per kind: `notify` needs the person's answer for the
+ * kind in hand, and a household that has customised five kinds would otherwise be five statements
+ * to answer one boolean triple.
+ *
+ * It is still called once per recipient-event — `#/server/notify/dispatch` asks per dispatch, so a
+ * five-member household with twenty crossings performs a hundred of these. That is accepted rather
+ * than overlooked: the reads are indexed on `(organization_id, user_id)`, they run inside a cron
+ * rather than a request, and hoisting them would mean passing resolved channels into `notify`,
+ * which is the one place a caller must not be able to influence.
  */
 export async function listPrefsFor(
   scope: TenantScope,

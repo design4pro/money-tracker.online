@@ -90,12 +90,21 @@ export async function notify<TKind extends NotificationKind>(
     // digest selects from. `inApp` is a question about the badge and the list, and both are the
     // reader's, which is `21-S3`: filtering there costs a `WHERE`, whereas not writing the row here
     // would mean a person with email on and in-app off gets an email referring to nothing.
+    // Parsed, not merely typed. The registry's schema is what `21-S2` and `21-S3` will read these
+    // rows back through, and a stored row outlives the code that wrote it: a `v` that is not `1` or
+    // a four-letter currency code is a row nothing can ever render, and it is unfixable once
+    // written. The types catch a producer with the wrong shape; this catches one with the wrong
+    // value, and a throw here becomes `'failed'`, which the cron adapters already escalate.
+    const payload = entry.payload.parse(
+      args.payload,
+    ) as NotificationPayload<TKind>
+
     const row = await insertNotification(
       scope,
       {
         userId: args.userId,
         kind: args.kind,
-        payloadJson: JSON.stringify(args.payload),
+        payloadJson: JSON.stringify(payload),
         dedupeKey: args.dedupeKey,
       },
       now,
@@ -116,7 +125,7 @@ export async function notify<TKind extends NotificationKind>(
           userId: args.userId,
           notificationId: row.id,
           kind: args.kind,
-          payload: args.payload,
+          payload,
         })
       } catch {
         // `'written'`, not `'failed'`: the row is committed and the person will see it. Reporting

@@ -233,6 +233,11 @@ describe('escalation', () => {
   it('does not make the goals adapter throw, even when listMembers itself fails', async () => {
     // The contribution has already committed. A notification that cannot be written must not come
     // back to the person as an error about their money.
+    //
+    // The failure is logged rather than dropped, and *that* is what this also pins down: the log
+    // reaches its binding through a dynamic `cloudflare:workers` import, which does not resolve in
+    // this project's plain Node graph. The adapter's contract is "never throws", so the attempt to
+    // become visible must not itself become a way to fail.
     await expect(
       notifyGoalReached(brokenScope(), {
         goalId: 'goal-1',
@@ -243,6 +248,24 @@ describe('escalation', () => {
         transactionId: 'txn-1',
       }),
     ).resolves.toBeUndefined()
+  })
+
+  it('stays silent to its caller when a dispatch fails after the membership read', async () => {
+    // The other half of the same promise: `listMembers` answers, every `notify` after it returns
+    // `'failed'`, and the count that the cron adapters would throw is logged here instead. Nothing
+    // reaches the request, and nothing is written.
+    await expect(
+      notifyGoalReached(failsAfterMembers(), {
+        goalId: 'goal-1',
+        name: 'New bike',
+        targetMinor: 400_000 as Minor,
+        contributedMinor: 400_000 as Minor,
+        currencyCode: 'PLN',
+        transactionId: 'txn-1',
+      }),
+    ).resolves.toBeUndefined()
+
+    expect(await countUnread(world.scope)).toBe(0)
   })
 
   it('still writes the goal row when nothing is broken', async () => {

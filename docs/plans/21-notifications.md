@@ -41,6 +41,11 @@ preference resolution and deduplication.
 - `src/server/notify/kinds.ts` — new
 - `src/server/notify/adapters.ts` — new
 - `src/server/notify/install.ts` — new
+- `src/server/notify/copy.ts` — new; the kind → catalogue-key + parameters mapping, which formats
+  nothing so that a mixed-locale household renders one stored row two ways
+- `src/server/notify/dedupe.ts` — new; the one dedupe key this stage had to invent, the other two
+  being reused verbatim from the producers that already build them
+- `src/server/notify/email.ts` — new; the seam `21-S2` installs its enqueuer into
 - `src/server/notify/__tests__/dispatch.test.ts` — new
 
 `src/server/fns/notifications.ts` moved to `21-S3`: the reader's server functions have no consumer
@@ -81,10 +86,11 @@ row.
   email if enabled and the kind is immediate. It is the **only** module that writes `notifications`,
   and the repository's write function is documented as having exactly that one caller.
 
-  **"Marks it for the digest" needs no column.** A digestible notification *is* its row: `21-S2`'s
+  **"Marks it for the digest" needs no column.** A digestible notification _is_ its row: `21-S2`'s
   nightly digest selects rows whose kind is digestible, whose `read_at` is null and whose
   `created_at` falls in the window. A `digest_pending` flag would be a second record of the same
   fact, and the two drift the first time a row is read between the write and the sweep.
+
 - **Failure isolation.** A dispatcher throw must never fail the business operation that triggered it.
   `notify` catches, logs with the kind and workspace, and returns — a budget alert that fails to send
   must not roll back the transaction that crossed the threshold. The test asserts a throwing email

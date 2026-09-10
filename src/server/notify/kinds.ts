@@ -173,10 +173,3 @@ export const NOTIFICATION_KINDS = {
 export type NotificationPayload<TKind extends NotificationKind> = z.infer<
   (typeof NOTIFICATION_KINDS)[TKind]['payload']
 >
-
-/** The entry for a kind. The parameter type is what makes an unregistered kind a compile error. */
-export function notificationKind<TKind extends NotificationKind>(
-  kind: TKind,
-): (typeof NOTIFICATION_KINDS)[TKind] {
-  return NOTIFICATION_KINDS[kind]
-}

@@ -315,7 +315,28 @@ describe('the email leg', () => {
 })
 
 describe('notify never throws at its caller', () => {
-  it('returns failed and logs when the database is gone', async () => {
+  it('refuses a payload the kind’s own schema rejects, and stores nothing', async () => {
+    // A value the compiler accepts and the schema does not. `currencyCode` is `string` to the type
+    // system and `z.string().length(3)` to the registry, which is exactly the class of mistake the
+    // types cannot see: a stored row outlives the code that wrote it, `21-S2` reads these back
+    // through the same schema, and a row nothing can render is unfixable once written.
+    const outcome = await notify(
+      world.scope,
+      {
+        userId: 'user-a',
+        kind: DIGESTIBLE,
+        payload: { ...thresholdPayload, currencyCode: 'PLNX' },
+        dedupeKey: 'k',
+      },
+      AT,
+    )
+
+    expect(outcome).toBe('failed')
+    expect(await countUnread(world.scope)).toBe(0)
+    expect(enqueued).toEqual([])
+  })
+
+  it('returns failed rather than throwing when the database is gone', async () => {
     const broken = {
       ...world.scope,
       db: {
