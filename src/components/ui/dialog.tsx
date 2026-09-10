@@ -125,10 +125,21 @@ export function Modal({
     onOpenChange?.(isOpen)
   }
 
+  // Handed over only when there is something to hand over. React Aria warns —
+  // "This modals state is controlled by a trigger, place onOpenChange on the
+  // trigger instead" — for any `Modal` inside a `DialogTrigger` that is given
+  // one, and `docs/SPEC.md` §2.10 turns a console line red. An uncontrolled
+  // modal has no `canClose` to honour either: the guard needs the open state to
+  // refuse to change, and inside a trigger that state is not the caller's.
+  const controlled =
+    canClose === undefined && onOpenChange === undefined
+      ? {}
+      : { onOpenChange: handleOpenChange }
+
   return (
     <RACModalOverlay
       {...props}
-      onOpenChange={handleOpenChange}
+      {...controlled}
       isDismissable={isDismissable}
       data-scrim=""
       className={composeTw(
