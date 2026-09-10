@@ -68,11 +68,55 @@ export const TENANT_B: Credentials = {
   password: FIXTURE_PASSWORD,
 }
 
+/**
+ * A workspace with nothing in it, so the empty states can be photographed rather than described.
+ *
+ * ## Read-only, and that is a contract rather than a habit
+ *
+ * `DEMO` is read-only because a run must leave `verify.mjs`'s counters where it found them. This
+ * one is read-only for a stronger reason: *empty* is the whole of what it provides. One test that
+ * creates an account here to check something unrelated silently turns every empty-state assertion
+ * in `states.spec.ts` into an assertion about a workspace with one account in it — and it fails on
+ * the *next* run, in a different file, for a reason that is nowhere near the change that caused it.
+ *
+ * So nothing writes through this session. A test that needs rows uses {@link TENANT_A} or
+ * {@link TENANT_B}, which exist to be written to and whose tests each name their own rows.
+ *
+ * It is a separate account rather than tenant B emptied between runs because emptying is a write,
+ * and a suite that empties a workspace it also runs tests against has an ordering problem the
+ * moment two files run in parallel.
+ */
+export const EMPTY: Credentials = {
+  name: 'E2E Empty Workspace',
+  email: 'e2e-empty@money-tracker.online',
+  password: FIXTURE_PASSWORD,
+}
+
 const AUTH_DIR = fileURLToPath(new URL('../.auth/', import.meta.url))
 
-/** Where one session's cookies are cached. Keep the ids in step with `auth.setup.ts`. */
-export function storageStateFor(id: 'demo' | 'tenant-a' | 'tenant-b'): string {
+/** One cached session. Keep the ids in step with `auth.setup.ts`. */
+export type SessionId = 'demo' | 'tenant-a' | 'tenant-b' | 'empty'
+
+/** Where one session's cookies are cached. */
+export function storageStateFor(id: SessionId): string {
   return `${AUTH_DIR}${id}.json`
+}
+
+/**
+ * How long to wait out a `429`, and how many times.
+ *
+ * The sign-in window is ten attempts a minute, so a full minute is the only wait that is certain to
+ * clear it; two of them is the budget. Three fixture workspaces and the demo session are four
+ * sign-ins per run, which is well under the limit — this exists for the case where two runs of the
+ * suite overlap on one machine, which is the ordinary shape of a local re-run while CI is going.
+ */
+const RATE_LIMIT_WAIT_MS = 60_000
+const RATE_LIMIT_ATTEMPTS = 2
+
+const HTTP_TOO_MANY_REQUESTS = 429
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /**
@@ -81,18 +125,35 @@ export function storageStateFor(id: 'demo' | 'tenant-a' | 'tenant-b'): string {
  * Sign-in is tried before sign-up on purpose: on every run after the first the fixture accounts
  * already exist, and asking for a sign-up we know will be refused would spend a slot in the
  * five-per-five-minutes window to learn something the sign-in already told us.
+ *
+ * A `429` is waited out rather than reported. It is the one status here that says nothing about the
+ * product: the limiter is doing exactly what `src/server/auth/config.ts` asks it to, and a suite
+ * that fails on its own fixtures' rate limit reports an outage that does not exist. Every other
+ * refusal is raised immediately with both responses quoted.
  */
 export async function ensureSignedIn(
   api: APIRequestContext,
   credentials: Credentials,
 ): Promise<void> {
-  const signIn = await api.post('/api/auth/sign-in/email', {
-    data: {
-      email: credentials.email,
-      password: credentials.password,
-      rememberMe: true,
-    },
-  })
+  const attemptSignIn = () =>
+    api.post('/api/auth/sign-in/email', {
+      data: {
+        email: credentials.email,
+        password: credentials.password,
+        rememberMe: true,
+      },
+    })
+
+  let signIn = await attemptSignIn()
+  for (
+    let attempt = 0;
+    signIn.status() === HTTP_TOO_MANY_REQUESTS && attempt < RATE_LIMIT_ATTEMPTS;
+    attempt += 1
+  ) {
+    await sleep(RATE_LIMIT_WAIT_MS)
+    signIn = await attemptSignIn()
+  }
+
   if (signIn.ok()) return
 
   const signUp = await api.post('/api/auth/sign-up/email', {
@@ -132,7 +193,7 @@ export async function cacheSession(
   playwright: Playwright,
   baseURL: string,
   credentials: Credentials,
-  id: 'demo' | 'tenant-a' | 'tenant-b',
+  id: SessionId,
 ): Promise<void> {
   await mkdir(AUTH_DIR, { recursive: true })
   const api = await apiContext(playwright, baseURL)

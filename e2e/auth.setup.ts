@@ -2,7 +2,13 @@ import { expect, test as setup } from '@playwright/test'
 
 import { organizationIdFor } from './support/d1'
 import { installYenFixture } from './support/fixtures'
-import { DEMO, TENANT_A, TENANT_B, cacheSession } from './support/session'
+import {
+  DEMO,
+  EMPTY,
+  TENANT_A,
+  TENANT_B,
+  cacheSession,
+} from './support/session'
 
 /**
  * The `setup` project: every session the suite runs as, minted once.
@@ -18,11 +24,13 @@ setup('demo session', async ({ playwright, baseURL }) => {
 })
 
 /**
- * The two workspaces the tenant boundary is attacked across, and the zero-decimal fixture.
+ * The two workspaces the tenant boundary is attacked across, the empty one, and the zero-decimal
+ * fixture.
  *
- * They are provisioned in one serial step rather than as two parallel ones because a first run has
- * to sign both of them up, and `/sign-up/email` allows five attempts every five minutes — a
- * budget shared with the sign-up `core-flow.spec.ts` performs for real.
+ * They are provisioned in one serial step rather than as parallel ones because a first run has to
+ * sign all three of them up, and `/sign-up/email` allows five attempts every five minutes — a
+ * budget shared with the sign-up `core-flow.spec.ts` performs for real. Three plus one is four,
+ * which is why the empty workspace joins this step instead of becoming a fourth one.
  *
  * `support/fixtures.ts` explains why the yen rows are written to D1 rather than clicked into
  * existence.
@@ -33,6 +41,8 @@ setup('fixture workspaces', async ({ playwright, baseURL }) => {
 
   await cacheSession(playwright, origin, TENANT_A, 'tenant-a')
   await cacheSession(playwright, origin, TENANT_B, 'tenant-b')
+  // Nothing is written through this one, ever: `EMPTY`'s docblock says why.
+  await cacheSession(playwright, origin, EMPTY, 'empty')
 
   const organizationId = await organizationIdFor(TENANT_A.email)
   expect(
