@@ -701,10 +701,16 @@ wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 ### Meter
 
 An 8px track at `sm` radius in `border-subtle` (so the fill's stop is readable against it), the
-fill in `positive` on track, `warning` near the limit, `negative-bold` over it; past 100% the fill
-runs hatched as well as red. The headline beside it is the remainder - `negative-bold` too when it
-is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor - and
-the state is carried by a word and a lucide icon before colour.
+fill in `positive` on track, `warning` near the limit, and red over it; past 100% the fill runs
+hatched as well as red. _Which_ red is not one answer: `ui/Meter` is the generic primitive and its
+threshold is a `dangerAt` prop, so its fill may abut the track or the card depending on the caller,
+and it keeps `negative` - the grade that clears both. The money meters know: `over` means the ratio
+passed 1, which clamps the fill to the whole track, so `AmountMeter` and `BudgetMeter` take
+`negative-bold` against the card. The two callers that reach `ui/Meter`'s danger state both pass a
+threshold of `1`, so today that split shows up as two reds for one verdict; #180 is where that is
+settled. The headline beside it is the remainder, and `negative-bold` too
+when it is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor.
+The state is carried by a word and a lucide icon before colour.
 
 ### Navigation
 
