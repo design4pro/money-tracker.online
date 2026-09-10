@@ -79,6 +79,31 @@ describe('BudgetMeter', () => {
     expect(track.parentElement?.querySelector('svg')).toBeTruthy()
   })
 
+  it('draws the overspend in the loud danger grade and the caption in the text one', () => {
+    // #151: `negative` has to hold 7:1 because it is a caption ink, and in dark that pins it to a
+    // pale salmon — so a 32px figure and a bar painted in it read as washed out. The two elements
+    // WCAG does not hold to 7:1 — large text at 4.5:1, a fill at 3:1 — take `negative-bold`.
+    const track = meter({
+      spentMinor: asMinor(2_320_00),
+      remainingMinor: asMinor(-320_00),
+      ratio: 1.16,
+      state: 'over',
+    })
+
+    const headline = screen.getByText(/320[.,]00.*over/i)
+    expect(headline.className).toContain('text-negative-bold')
+
+    const fill = track.firstElementChild as HTMLElement
+    expect(fill.className).toContain('bg-negative-bold')
+
+    // …and the other half of the ticket: nothing body-size moved off the 7:1 token. The verdict
+    // rides at `text-caption`, so it stays where it was.
+    expect(screen.getByText('Over budget').className).toContain('text-negative')
+    expect(screen.getByText('Over budget').className).not.toContain(
+      'text-negative-bold',
+    )
+  })
+
   it('stops the fill at the end of the track while the sentence keeps counting', () => {
     const track = meter({
       spentMinor: asMinor(2_320_00),

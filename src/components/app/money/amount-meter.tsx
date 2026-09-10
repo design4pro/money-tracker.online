@@ -46,14 +46,23 @@ export interface AmountMeterProps {
   readonly valueText: string
   /** The headline figure: what is left, or what it went over by. */
   readonly headline: ReactNode
-  /** Tone class for the headline. `text-negative` on an overspend, `text-ink` otherwise. */
+  /**
+   * Tone class for the headline. `text-negative-bold` on an overspend, `text-ink` otherwise.
+   *
+   * The headline renders bold at `text-subtitle` (20px) or `text-title` (32px), which is large text
+   * under WCAG and so is scored at 4.5:1, not 7:1. A caller passing a body-size tone here is not
+   * wrong, but a caller passing a 4.5:1-grade tone to a smaller step would be.
+   */
   readonly headlineTone: string
   /** The state in a word. */
   readonly verdict: string
   readonly VerdictIcon: ComponentType<{ className?: string }>
   /** Tone class for the verdict row. */
   readonly verdictTone: string
-  /** Fill class for the track — `bg-positive`, `bg-warning`, `bg-negative`. */
+  /**
+   * Fill class for the track — `bg-positive`, `bg-warning`, `bg-negative-bold`. A fill is a
+   * graphical object (WCAG 1.4.11, 3:1), never text, so it is not held to the text floor.
+   */
   readonly fillTone: string
   /** Draw the fill hatched as well as recoloured. The fourth channel. */
   readonly isHatched: boolean

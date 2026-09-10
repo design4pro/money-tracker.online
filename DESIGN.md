@@ -27,6 +27,7 @@ colors:
   negative: '#8a1a0d'
   negative-soft: '#f8e3df'
   on-negative: '#ffffff'
+  negative-bold: '#c31300'
   warning: '#614106'
   warning-soft: '#f7ead3'
   on-warning: '#ffffff'
@@ -335,6 +336,14 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   raised; on `positive-soft` 7.96:1. Dark `#7fd9a8`.
 - **Red Ink** (`negative`): money out, overdrawn, destructive confirmation, validation failure.
   7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f5a08f`.
+- **Loud Red** (`negative-bold`): the same ink at the grade that is not held to the text floor -
+  the over-budget headline in `AmountMeter` and the over-budget meter fill, and nothing else.
+  5.09:1 on sunken, 6.15:1 on raised; dark `#ff594a` at 4.70:1 on raised. The floors that apply
+  are 4.5:1 (large text: bold at >= 18.66px, WCAG 1.4.6) and 3:1 (a fill, WCAG 1.4.11), so both
+  values sit above the stricter of the two on every ground. It exists because one token cannot be
+  both a caption ink and a danger colour: `negative` has to hold 7:1, and in dark that pins it to a
+  pale salmon, since red is luminance-poor and no deeper red in sRGB reaches that floor. **Never
+  put body-size text in it**, and never reach for it as a general "stronger red".
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
   9.26:1 on raised; on `warning-soft` 7.79:1. Dark `#e9c46a`.
 - **Notice** (`info`): a system notice with no verdict - "Hidden", "Planned", "Auto", a scope. It
@@ -680,9 +689,10 @@ wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 ### Meter
 
 An 8px track at `sm` radius in `border-subtle` (so the fill's stop is readable against it), the
-fill in `positive` on track, `warning` near the limit, `negative` over it; past 100% the fill runs
-hatched as well as red. The headline beside it is the remainder, and the state is carried by a
-word and a lucide icon before colour.
+fill in `positive` on track, `warning` near the limit, `negative-bold` over it; past 100% the fill
+runs hatched as well as red. The headline beside it is the remainder - `negative-bold` too when it
+is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor - and
+the state is carried by a word and a lucide icon before colour.
 
 ### Navigation
 
