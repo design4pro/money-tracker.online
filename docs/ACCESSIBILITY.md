@@ -62,10 +62,12 @@ loud grade at `>= 1` — where the danger state needs `percentage >= 100` — an
 (#180). The measured ratio for each value against every ground it can land on is recorded beside the
 declaration in `src/styles/tokens.css`, and `src/styles/__tests__/tokens-contrast.test.ts` recomputes
 on every run the five opaque planes plus the hover wash over `surface` — the composited ground a
-hovered row actually has — each at the threshold that applies to that grade, and both grades against
-the track a partial fill would stop on. The remaining composited grounds in those comments, `press`
-and either wash over `surface-raised`, are hand-measured; #178 is where what `negative-bold` is
-worth on them gets decided. No body-size text moved: everything that was at 7:1 is still at 7:1.
+hovered row actually has — each at the threshold that applies to that grade, and, against the track a
+partial fill would stop on, every fill a meter can paint: both danger grades, `positive`, `warning`,
+and the neutral `bg-ink/70` composite, which is not a token and so has no ratio recorded beside a
+declaration anywhere (#199). The remaining composited grounds in those comments, `press` and either
+wash over `surface-raised`, are hand-measured; #178 is where what `negative-bold` is worth on them
+gets decided. No body-size text moved: everything that was at 7:1 is still at 7:1.
 
 ### 2.2 A published statement is a representation, and an overstated one is a liability
 
