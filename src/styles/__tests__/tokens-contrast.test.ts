@@ -265,20 +265,55 @@ describe.each([
    * moved once already, and the figure the decision was made on should be
    * recomputed on every run rather than quoted from a comment.
    *
+   * The two calmer states stop short of the end of the track by construction, so
+   * they are on this list for the same reason and not as a precaution: `positive`
+   * paints an in-range `intent` meter and `warning` the band above `warnAt`.
+   * Their figures lived only in a comment in `meter.tsx` until #199, where all
+   * six were found overstated — which is the whole argument for this case.
+   *
    * `negative` is 5.92:1 in light and 5.02:1 in dark, `negative-bold` 3.88:1 and
-   * 3.18:1. All four clear 1.4.11's 3:1; dark's bold margin being that thin is
-   * why the partial case takes the text grade rather than the loud one.
+   * 3.18:1, `positive` 5.90:1 and 5.67:1, `warning` 5.84:1 and 5.75:1. All clear
+   * 1.4.11's 3:1; dark's bold margin being that thin is why the partial case
+   * takes the text grade rather than the loud one.
    */
-  it.each([...GRAPHICAL_FILL_KEYS, 'color-negative'])(
-    '%s stays separable from the meter track it can sit in',
-    (key) => {
-      const ratio = contrast(tokens[key], tokens['color-border-subtle'])
-      expect(
-        ratio,
-        `${themeName}: --${key} on --color-border-subtle is ${ratio.toFixed(2)}:1, graphical floor 3`,
-      ).toBeGreaterThanOrEqual(3)
-    },
-  )
+  it.each([
+    ...GRAPHICAL_FILL_KEYS,
+    'color-negative',
+    'color-positive',
+    'color-warning',
+  ])('%s stays separable from the meter track it can sit in', (key) => {
+    const ratio = contrast(tokens[key], tokens['color-border-subtle'])
+    expect(
+      ratio,
+      `${themeName}: --${key} on --color-border-subtle is ${ratio.toFixed(2)}:1, graphical floor 3`,
+    ).toBeGreaterThanOrEqual(3)
+  })
+
+  /*
+   * The `neutral` tone's fill is the one meter fill that is not a token.
+   *
+   * `ui/Meter` paints it `bg-ink/70` — the foreground ink at 70%, because being
+   * full is not a virtue for a credit line — so what actually meets the track is
+   * a composite, and no ratio recorded beside a declaration in `tokens.css` can
+   * cover it. `washOver` already composites; the only difference is that this
+   * alpha comes from a utility class rather than from an `rgb(… / α)` token, so
+   * the 0.7 below is the half of the pair that has to be kept in step by hand.
+   *
+   * 4.57:1 in light and 4.79:1 in dark — the weakest of the four fills that can
+   * stop short on the track, and still half again the 3:1 floor.
+   */
+  it('keeps the neutral ok fill separable from the meter track', () => {
+    const track = rgbOf(tokens['color-border-subtle'])
+    const fill = washOver(
+      { rgb: rgbOf(tokens['color-ink']), alpha: 0.7 },
+      track,
+    )
+    const ratio = contrastRgb(fill, track)
+    expect(
+      ratio,
+      `${themeName}: --color-ink at 70% on --color-border-subtle is ${ratio.toFixed(2)}:1, graphical floor 3`,
+    ).toBeGreaterThanOrEqual(3)
+  })
 
   it.each(FILL_PAIRS)('%s carries %s at 7:1', (fill, on) => {
     const ratio = contrast(tokens[fill], tokens[on])
