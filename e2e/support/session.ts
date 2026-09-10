@@ -113,6 +113,16 @@ export function storageStateFor(id: SessionId): string {
 const RATE_LIMIT_WAIT_MS = 60_000
 const RATE_LIMIT_ATTEMPTS = 2
 
+/**
+ * The longest one sign-in can take when the limiter is firing.
+ *
+ * Exported because the waiting above is only real if the test doing it is allowed to last that
+ * long: `playwright.config.ts` puts 30s on every test and the `setup` project does not override it,
+ * so without this budget a `429` would end as a timeout with none of the diagnosis the wait exists
+ * to provide. `auth.setup.ts` multiplies it by the number of sign-ins each of its steps performs.
+ */
+export const RATE_LIMIT_BUDGET_MS = RATE_LIMIT_ATTEMPTS * RATE_LIMIT_WAIT_MS
+
 const HTTP_TOO_MANY_REQUESTS = 429
 
 function sleep(ms: number): Promise<void> {

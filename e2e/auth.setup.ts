@@ -5,6 +5,7 @@ import { installYenFixture } from './support/fixtures'
 import {
   DEMO,
   EMPTY,
+  RATE_LIMIT_BUDGET_MS,
   TENANT_A,
   TENANT_B,
   cacheSession,
@@ -16,9 +17,21 @@ import {
  * `playwright.config.ts` makes all three browser projects depend on this file, and its docblock
  * states why: `/sign-in/email` allows ten attempts a minute, so a suite that signs in per test
  * spends its budget on fixtures and then reports the `429` as a product failure.
+ *
+ * ## Why both steps set their own timeout
+ *
+ * `ensureSignedIn` waits a `429` out rather than reporting it, for up to `RATE_LIMIT_BUDGET_MS` per
+ * sign-in. The file-level default is the 30s `playwright.config.ts` puts on every test, which is
+ * less than one such wait — so a limiter that fires would end the step as a timeout, and the wait
+ * would never once run to completion. Each step therefore states the ceiling its own sign-ins can
+ * reach. It is a budget, not an expectation: a run where nothing is limited is unaffected.
  */
 
+/** The ordinary 30s of `playwright.config.ts`, on top of whatever waiting a limiter forces. */
+const SETUP_WORK_MS = 30_000
+
 setup('demo session', async ({ playwright, baseURL }) => {
+  setup.setTimeout(SETUP_WORK_MS + RATE_LIMIT_BUDGET_MS)
   setup.skip(baseURL === undefined, 'no baseURL configured')
   await cacheSession(playwright, baseURL as string, DEMO, 'demo')
 })
@@ -36,6 +49,8 @@ setup('demo session', async ({ playwright, baseURL }) => {
  * existence.
  */
 setup('fixture workspaces', async ({ playwright, baseURL }) => {
+  // Three sign-ins, so three times the budget.
+  setup.setTimeout(SETUP_WORK_MS + 3 * RATE_LIMIT_BUDGET_MS)
   setup.skip(baseURL === undefined, 'no baseURL configured')
   const origin = baseURL as string
 
