@@ -336,7 +336,9 @@ function appears anywhere under `src/components/`.
 ### Blockers
 
 None for building the stage. One figure depends on it: `docs/plans/README.md` describes this plan as
-`~45 React Aria primitives`, which is not derivable from the tree - 40 modules besides the barrel, 80
-export statements, 118 exported symbols, and no counting rule anywhere. `docs/DESIGN-PRIMITIVES.md`
+`~45 React Aria primitives`, which is not derivable from the tree: `src/components/ui/` holds 40
+modules besides the barrel, and the barrel re-exports them in 80 statements — 118 value symbols and
+69 types, 187 names in all. Not one of those five numbers is 45, and no counting rule anywhere says
+which of them a "primitive" is. `docs/DESIGN-PRIMITIVES.md`
 is that counting rule, so the register figure is re-stated from the inventory once this stage ships
 (#218).

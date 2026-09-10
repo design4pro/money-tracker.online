@@ -79,7 +79,12 @@ export type DriftEntry = {
 export type PlanClassMap = {
   /** The commit this plan's drift was measured at. It never moves. */
   readonly asOf: string
-  /** Entry counts per class, as measured. The audit asserts the reported figures against these. */
+  /**
+   * Entry counts per class, as measured. `scripts/plans/__tests__/plan-paths.test.ts` asserts this
+   * plan's rows against them and the CLI report prints a MISMATCH line, so an entry appended
+   * without updating the counts - or filed under the wrong {@link DriftEntry.plan} - fails a test
+   * rather than quietly changing the arithmetic.
+   */
   readonly expectedCounts: Readonly<Record<DriftClass, number>>
 }
 

@@ -58,7 +58,7 @@ import {
   DRIFT_ENTRIES,
 } from './drift-classes.ts'
 import type { OwnedPathEntry, PlanFile, Stage } from './parse-plan.ts'
-import type { DriftClass } from './drift-classes.ts'
+import type { DriftClass, PlanClassMap } from './drift-classes.ts'
 
 /** The twelve `###` headings `docs/plans/TEMPLATE.md` requires of every stage, in order. */
 export const REQUIRED_HEADINGS = [
@@ -111,17 +111,17 @@ export type AuditReport = {
 
 export type ClassReport = {
   /**
-   * Whether `drift-classes.ts` describes the document under audit at all. False for the plans that
-   * have not been reconciled: their entries are unclassified, and printing another document's
-   * classes against them is what this flag exists to stop.
+   * This document's entry in `drift-classes.ts`, or null when the file does not describe it - which
+   * is the case for the plans nobody has reconciled yet. Their entries are unclassified, and
+   * printing another document's classes against them is what this null exists to stop.
+   *
+   * One nullable field rather than a `described` flag beside a nullable `asOf` and a nullable
+   * `expectedCounts`: those three can only ever be null together, and a shape that can express
+   * "described but with no as-of commit" invites a reader to handle a state that cannot happen.
    */
-  readonly described: boolean
-  /** The commit this plan's drift was measured at, or null when it has no class map. */
-  readonly asOf: string | null
+  readonly map: PlanClassMap | null
   /** Entries per class, counted from this plan's rows in `drift-classes.ts`. */
   readonly counts: Readonly<Record<DriftClass, number>>
-  /** The counts that measurement produced, for the report's mismatch check. */
-  readonly expectedCounts: Readonly<Record<DriftClass, number>> | null
   /** Class-map rows the plan no longer declares - the Phase 2 progress measure. */
   readonly corrected: ReadonlyArray<string>
   /** Class-map rows still declared by the plan exactly as recorded. */
@@ -346,10 +346,8 @@ export const auditPlan = (planPath: string): AuditReport => {
       },
     ],
     classes: {
-      described: classMap !== null,
-      asOf: classMap?.asOf ?? null,
+      map: classMap,
       counts: classCounts,
-      expectedCounts: classMap?.expectedCounts ?? null,
       corrected: planEntries
         .filter((row) => !stillDeclared.has(`${row.stage} ${row.path}`))
         .map((row) => `${row.stage} ${row.path}`),
@@ -378,17 +376,17 @@ export const auditPlan = (planPath: string): AuditReport => {
  */
 const classSection = (audit: AuditReport): Array<string> => {
   const { classes } = audit
-  if (!classes.described || classes.expectedCounts === null) {
+  if (classes.map === null) {
     return [
       'Drift classes',
       `  ${audit.planPath} has no class map in \`drift-classes.ts\` — its entries are unclassified.`,
     ]
   }
 
-  const expected = classes.expectedCounts
+  const { asOf, expectedCounts: expected } = classes.map
 
   return [
-    `Drift classes (from \`drift-classes.ts\`, as of \`${classes.asOf}\`)`,
+    `Drift classes (from \`drift-classes.ts\`, as of \`${asOf}\`)`,
     ...DRIFT_CLASSES.map(
       (driftClass) =>
         `  ${driftClass}  ${String(classes.counts[driftClass]).padStart(2)} entries` +

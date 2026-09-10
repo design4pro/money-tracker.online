@@ -114,6 +114,14 @@ describe.each(CLASS_MAP_PLAN_PATHS)('%s landing sites', (planPath) => {
   it('names every recorded landing site somewhere in the document', () => {
     expect(audit.classes.unmentionedLandings).toEqual([])
   })
+
+  // `expectedCounts` is the measurement each plan's rows were transcribed from, and until this
+  // case existed a mismatch only printed a MISMATCH line in the CLI report that nobody reads on a
+  // green run - so an entry appended without updating the counts, or filed under the wrong plan,
+  // changed the numbers and failed nothing.
+  it('counts every entry into the class its map recorded', () => {
+    expect(audit.classes.counts).toEqual(audit.classes.map?.expectedCounts)
+  })
 })
 
 /**
