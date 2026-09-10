@@ -161,9 +161,9 @@ spec's per-Phase PRs; recorded here because the spec's Phasing section says othe
 ### Phase 3: Close the seven bare surfaces
 
 - [x] 3.1 Settle the console-policy question for a deliberate 500 — 0e658aa
-- [ ] 3.2 `/import` pending and error components
-- [ ] 3.3 `/import/$batchId` pending and error components
-- [ ] 3.4 `/invite/$invitationId` pending component
+- [x] 3.2 `/import` pending and error components — 5353c20
+- [x] 3.3 `/import/$batchId` pending and error components — fdff08a
+- [x] 3.4 `/invite/$invitationId` pending component — f1f8ca8
 - [x] 3.5 `/payees/$payeeId` pending component — c78022f, 3f8e31b
 - [ ] 3.6 `/transactions/rules`, `$ruleId` and `new` pending and error components
 - [ ] 3.7 Split not-found from error on `/transactions/$transactionId`
