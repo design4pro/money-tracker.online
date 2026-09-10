@@ -6,10 +6,11 @@ One document per designed change. The directory a spec sits in is its state, the
 its `H1` names the issue and the pull requests behind it, and both are held together by
 `scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).
 
-## Ready — merged, waiting for a build (2)
+## Ready — merged, waiting for a build (3)
 
 | Spec                                                                                                                            | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
 | ------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
+| [Plan guard: assert the eight shared paths under `Owned paths`](2026-09-10-plan-guard-shared-path-assertion.md)                 | 2026-09-10 | [#216](https://github.com/design4pro/money-tracker.online/issues/216) | —                                                                   | —              |
 | [Designed empty, loading and error states — evidence, gaps and reachability](2026-09-09-designed-empty-loading-error-states.md) | 2026-09-09 | [#21](https://github.com/design4pro/money-tracker.online/issues/21)   | [#135](https://github.com/design4pro/money-tracker.online/pull/135) | —              |
 | [Design-system plan reconciliation](2026-09-08-design-system-plan-reconciliation.md)                                            | 2026-09-08 | [#201](https://github.com/design4pro/money-tracker.online/issues/201) | [#97](https://github.com/design4pro/money-tracker.online/pull/97)   | —              |
 
