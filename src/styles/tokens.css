@@ -82,8 +82,8 @@
    measures 3.18:1 on it in dark and 3.88:1 in light. Both clear 1.4.11, and
    `tokens-contrast.test.ts` asserts them so the grade stays usable by a
    partial fill - but the margin is thin enough that `src/components/ui/meter.tsx`,
-   whose danger fill IS partial, deliberately keeps `negative` there instead, at
-   5.02:1 in dark and 5.92:1 in light.
+   whose `dangerAt` prop leaves the adjacency to its caller, deliberately keeps
+   `negative` there instead, at 5.02:1 in dark and 5.92:1 in light.
 
    ---------------------------------------------------------------------------
    SURFACE SEPARATION - a design floor, per theme

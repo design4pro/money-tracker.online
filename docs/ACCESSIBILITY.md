@@ -55,9 +55,12 @@ which is a graphical object under **1.4.11** at 3:1. One value serves both, held
 the two floors. It exists because the body-grade `negative` cannot also be a danger colour — pinned
 at 7:1 as a caption ink, its dark value can only be a pale salmon, since red is luminance-poor and no
 deeper red in sRGB reaches that floor. The measured ratio for each value against every ground it can
-land on is recorded beside the declaration in `src/styles/tokens.css` and recomputed on every run by
-`src/styles/__tests__/tokens-contrast.test.ts`, at the threshold that applies to that grade. No
-body-size text moved: everything that was at 7:1 is still at 7:1.
+land on is recorded beside the declaration in `src/styles/tokens.css`, and
+`src/styles/__tests__/tokens-contrast.test.ts` recomputes on every run the five opaque planes plus
+the hover wash over `surface` — the composited ground a hovered row actually has — each at the
+threshold that applies to that grade. The remaining composited grounds in those comments, `press`
+and either wash over `surface-raised`, are hand-measured; #178 is where what `negative-bold` is
+worth on them gets decided. No body-size text moved: everything that was at 7:1 is still at 7:1.
 
 ### 2.2 A published statement is a representation, and an overstated one is a liability
 

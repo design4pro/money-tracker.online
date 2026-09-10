@@ -177,14 +177,17 @@ export function Meter({
                   // `AmountMeter`, which took the loud grade for its own danger
                   // fill in #151, is the track rather than the token.
                   //
-                  // This fill is PARTIAL by construction: `dangerAt` fires below
-                  // 100%, so what the danger colour abuts is `border-subtle`,
-                  // and the boundary the reader reads is fill-against-track.
-                  // `negative` holds 5.02:1 there in dark; `negative-bold`
-                  // holds 3.18:1. The over-budget fill has no such edge — `over`
-                  // means the ratio passed 1, which clamps the fill to the whole
-                  // track, so its neighbour is the card and the loud grade costs
-                  // nothing. Same criterion, different adjacency, two answers.
+                  // Which boundary this fill has is the CALLER'S choice, not
+                  // this component's: `dangerAt` is a prop. At its default of `1`
+                  // the danger state needs `percentage >= 100`, which the width
+                  // below clamps to the whole track, so the neighbour is the card
+                  // — and that is every caller today. Set below 1, the fill is
+                  // partial and abuts `border-subtle`, where `negative` holds
+                  // 5.02:1 in dark and `negative-bold` only 3.18:1. A primitive
+                  // that cannot know which one it will get takes the value that
+                  // holds on both. `AmountMeter` can know: `over` means the ratio
+                  // passed 1, so its fill is full by construction and the loud
+                  // grade costs it nothing there.
                   state === 'danger' && 'bg-negative',
                   state === 'warning' && 'bg-warning',
                   // Full is not a virtue here, so the fill is the foreground

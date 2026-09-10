@@ -261,8 +261,9 @@ describe.each([
    * The track is still the adjacency the moment a fill is PARTIAL, and this
    * asserts the grade stays usable by one: 3.88:1 in light, 3.18:1 in dark. Both
    * clear 1.4.11's 3:1, and dark's margin being that thin is the finding, not an
-   * oversight — it is why `src/components/ui/meter.tsx`, whose danger fill is
-   * partial by construction, deliberately keeps `negative` at 7.05:1 instead.
+   * oversight — it is why `src/components/ui/meter.tsx`, whose `dangerAt` prop
+   * leaves the adjacency to its caller, deliberately keeps `negative` at 5.02:1
+   * instead.
    */
   it.each(GRAPHICAL_FILL_KEYS)(
     '%s stays separable from the meter track it can sit in',
@@ -417,6 +418,37 @@ describe.each([
         measured,
         `${themeName}: --${key} on washed --color-surface is ${measured.toFixed(2)}:1`,
       ).toBeGreaterThanOrEqual(7)
+    },
+  )
+
+  /*
+   * The loud grade carries the same wash, at its own floor.
+   *
+   * `negative-bold` is large text by 1.4.6's own definition, so 4.5:1 rather
+   * than 7, and it gets no promotion either — the over-budget headline says
+   * "over" by being that red. Its binding ground is composited, not a plane: a
+   * budget row under the pointer. The previous value cleared every opaque plane
+   * and measured 4.45:1 here, and `e2e/contrast-enhanced.spec.ts` is what caught
+   * it — after the token had already shipped past this file. Asserting it here
+   * means the browser is no longer the only thing that knows.
+   *
+   * `hover` over `surface` only, deliberately. `press` over `surface`, and
+   * either wash over `surface-raised`, are below 4.5:1 for this grade today; no
+   * call site puts it on them, and #178 is where that is decided rather than
+   * pinned here by a test the palette would have to be redesigned to satisfy.
+   */
+  it.each(LARGE_TEXT_KEYS)(
+    '%s carries the hover wash on --color-surface at its large-text floor',
+    (key) => {
+      const washed = washOver(
+        washes['color-hover'],
+        rgbOf(tokens['color-surface']),
+      )
+      const measured = contrastRgb(rgbOf(tokens[key]), washed)
+      expect(
+        measured,
+        `${themeName}: --${key} on washed --color-surface is ${measured.toFixed(2)}:1, large-text floor 4.5`,
+      ).toBeGreaterThanOrEqual(4.5)
     },
   )
 })
