@@ -5,7 +5,7 @@ import {
   describeConsoleFailure,
 } from './console-policy'
 
-import type { ConsoleReport } from './console-policy'
+import type { ConsoleReport, ExpectedConsoleMessage } from './console-policy'
 import type { Page, TestInfo } from '@playwright/test'
 
 /**
@@ -38,14 +38,26 @@ import type { Page, TestInfo } from '@playwright/test'
  * failure is the one worth reading — a page that 500s writes to the console *because* it 500'd.
  */
 
-/** Attaches the listeners and returns the report, which fills as the test runs. */
-export function watchConsole(page: Page): ConsoleReport {
+/**
+ * Attaches the listeners and returns the report, which fills as the test runs.
+ *
+ * `expected` is read at classification time rather than copied, so a caller may keep pushing to it
+ * after the listeners are attached — which is what lets a test declare its expectations in the
+ * test body, next to the interception that causes them, instead of before the page exists.
+ */
+export function watchConsole(
+  page: Page,
+  expected: readonly ExpectedConsoleMessage[] = [],
+): ConsoleReport {
   const fatal: string[] = []
   const tolerated: string[] = []
 
   page.on('console', (message) => {
     const text = message.text()
-    const verdict = classifyConsoleMessage({ type: message.type(), text })
+    const verdict = classifyConsoleMessage(
+      { type: message.type(), text },
+      expected,
+    )
     if (verdict === 'fatal') fatal.push(`console.${message.type()}: ${text}`)
     else if (verdict === 'tolerated') tolerated.push(text)
   })
@@ -92,12 +104,34 @@ export async function assertConsoleClean(
  * `test`, with the console watched for the whole of every test body.
  *
  * Import this instead of `@playwright/test` in every spec. `expect` is re-exported unchanged.
+ *
+ * ## Declaring output a test causes on purpose
+ *
+ * The fixture is still `auto: true`, so a spec is watched whether or not its author thought about
+ * the console. A spec that deliberately makes the server fail takes the fixture by name and says
+ * so, beside the interception that causes it:
+ *
+ * ```ts
+ * test('the accounts list offers a retry when the read breaks', async ({ page, expectConsole }) => {
+ *   expectConsole(DELIBERATE_SERVER_FAILURE)
+ *   using _failure = await failServerFns(page)
+ *   // …
+ * })
+ * ```
+ *
+ * The declaration lasts for that test only. It is deliberately not a second tolerance table: see
+ * the note on {@link ExpectedConsoleMessage}.
  */
-export const test = base.extend<{ consoleNet: void }>({
-  consoleNet: [
+export const test = base.extend<{
+  expectConsole: (expected: readonly ExpectedConsoleMessage[]) => void
+}>({
+  expectConsole: [
     async ({ page }, use, testInfo) => {
-      const report = watchConsole(page)
-      await use()
+      const expected: ExpectedConsoleMessage[] = []
+      const report = watchConsole(page, expected)
+      await use((more) => {
+        expected.push(...more)
+      })
       await assertConsoleClean(report, testInfo)
     },
     { auto: true },
@@ -105,5 +139,12 @@ export const test = base.extend<{ consoleNet: void }>({
 })
 
 export { expect }
-export { TOLERATED_CONSOLE_WARNINGS } from './console-policy'
-export type { ConsoleReport, ConsoleVerdict } from './console-policy'
+export {
+  DELIBERATE_SERVER_FAILURE,
+  TOLERATED_CONSOLE_WARNINGS,
+} from './console-policy'
+export type {
+  ConsoleReport,
+  ConsoleVerdict,
+  ExpectedConsoleMessage,
+} from './console-policy'

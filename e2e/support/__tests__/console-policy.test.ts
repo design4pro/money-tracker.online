@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DELIBERATE_SERVER_FAILURE,
   TOLERATED_CONSOLE_WARNINGS,
   classifyConsoleMessage,
   describeConsoleFailure,
@@ -92,6 +93,69 @@ describe('classifyConsoleMessage', () => {
         type: 'warning',
         text: `[budgets] The resource http://localhost:3010/src/main.tsx${PRELOAD}`,
       }),
+    ).toBe('fatal')
+  })
+})
+
+/**
+ * The per-test declarations, which are the only way a spec may assert an error state.
+ *
+ * The cases that matter are the negative ones: a declaration must cover the test that made it and
+ * nothing else, and an undeclared run must keep every verdict it had before the mechanism existed.
+ */
+describe('classifyConsoleMessage with a test declaring expected output', () => {
+  const FIVE_HUNDRED =
+    'Failed to load resource: the server responded with a status of 500 (Internal Server Error)'
+
+  it.each([
+    FIVE_HUNDRED,
+    'Warning: Error in route match: /_app/accounts//accounts/{"status":"active"}',
+    '%o\n\n%s\n\n%s boom The above error occurred in the <MatchInnerImpl> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundary.',
+  ])('tolerates what a deliberate 500 writes: %s', (text) => {
+    const type = text.startsWith('Warning:') ? 'warning' : 'error'
+    expect(
+      classifyConsoleMessage({ type, text }, DELIBERATE_SERVER_FAILURE),
+    ).toBe('tolerated')
+  })
+
+  it('leaves those same messages fatal for a test that declared nothing', () => {
+    expect(classifyConsoleMessage({ type: 'error', text: FIVE_HUNDRED })).toBe(
+      'fatal',
+    )
+  })
+
+  it('does not tolerate a different status a test never asked for', () => {
+    expect(
+      classifyConsoleMessage(
+        {
+          type: 'error',
+          text: 'Failed to load resource: the server responded with a status of 404 (Not Found)',
+        },
+        DELIBERATE_SERVER_FAILURE,
+      ),
+    ).toBe('fatal')
+  })
+
+  it('does not let a declaration cover an unrelated failure in the same test', () => {
+    expect(
+      classifyConsoleMessage(
+        {
+          type: 'error',
+          text: 'Warning: Each child in a list should have a unique "key" prop.',
+        },
+        DELIBERATE_SERVER_FAILURE,
+      ),
+    ).toBe('fatal')
+  })
+
+  it('never rescues an uncaught exception, which never reaches the classifier at all', () => {
+    // `watchConsole` pushes every `pageerror` straight onto `fatal` without asking the classifier,
+    // so this pins the classifier's own half: `assert` is fatal whatever a test declared.
+    expect(
+      classifyConsoleMessage(
+        { type: 'assert', text: FIVE_HUNDRED },
+        DELIBERATE_SERVER_FAILURE,
+      ),
     ).toBe('fatal')
   })
 })
