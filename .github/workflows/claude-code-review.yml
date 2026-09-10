@@ -59,17 +59,26 @@ jobs:
         with:
           fetch-depth: 1
 
-      # The checkout above is the pull request's own merge commit, and the step below hands the
-      # gate to `.claude/hooks/git-guardrails.sh` - so the branch under review would otherwise
-      # supply the hook that judges it. Take the hook, and the settings that register it, from the
-      # base branch instead.
-      - name: Take the agent hooks from the base branch
+      # One rule, written out once here because this job is two of the three places that have to
+      # follow it: nothing the branch under review supplies may judge that branch or run with a
+      # write token. The checkout above is the pull request's own merge commit, so this step takes
+      # back from the base branch everything the branch would otherwise be supplying to itself -
+      # `.claude/hooks` and the `.claude/settings.json` that registers them, which are the gate the
+      # step below hands the review to, and `scripts/ci`, whose scripts three later steps run, the
+      # last of them on `github.token` under this job's `pull-requests: write` (#103). The third
+      # place is `rearm-review-threads`, which checks the base ref out wholesale for the same
+      # reason.
+      #
+      # A path the pull request *adds* under those trees survives this checkout - it restores, it
+      # does not clean. Harmless while every step names the script it runs; not harmless the moment
+      # one globs.
+      - name: Take the agent hooks and the CI scripts from the base branch
         if: steps.gate.outputs.configured == 'true'
         env:
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           git fetch --depth 1 origin "$BASE"
-          git checkout FETCH_HEAD -- .claude/settings.json .claude/hooks
+          git checkout FETCH_HEAD -- .claude/settings.json .claude/hooks scripts/ci
 
       # `continue-on-error`, because the two steps that follow decide what the outcome meant: a
       # spent usage limit reviewed nothing and is not a finding, a review that was denied its tools
@@ -189,7 +198,7 @@ jobs:
     steps:
       # The base branch, never the pull request's own tree: this job runs a repository script with
       # a write token, and the branch under review must not be the one that supplies it. Same
-      # reasoning as "Take the agent hooks from the base branch" above.
+      # reasoning as "Take the agent hooks and the CI scripts from the base branch" above.
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.ref }}

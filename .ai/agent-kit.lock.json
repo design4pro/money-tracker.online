@@ -1,5 +1,5 @@
 {
-  "kitVersion": 18,
+  "kitVersion": 20,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -91,7 +91,7 @@
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {
-      "sha256": "d1abbdc354f1e6813cec1c00c1eb15168fb81a7bae7fc01539a5f853e042012a",
+      "sha256": "dcd3fadd11ff01394da33a51ddd1290b694ffb768c1cd12ed3512eecc927726c",
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
@@ -112,6 +112,10 @@
     },
     "scripts/ci/__tests__/review-threads-label.test.mjs": {
       "sha256": "8cb372eedaf9a2e8b15fafa2c8908ca44eafe9094172e9d4e130ebabc64b42e5",
+      "mode": "100644"
+    },
+    "scripts/ci/__tests__/review-workflow-base-checkout.test.ts": {
+      "sha256": "5ca9ba9953c1ec1edda1a334f30476bc940d0afd458874c23a25757ae0838900",
       "mode": "100644"
     },
     "scripts/ci/claude-review-ran.mjs": {

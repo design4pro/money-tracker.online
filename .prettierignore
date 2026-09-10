@@ -64,6 +64,7 @@ docs/agents/cezar-automations.json
 scripts/ci/__tests__/claude-review-ran.test.mjs
 scripts/ci/__tests__/claude-usage-limit.test.mjs
 scripts/ci/__tests__/review-threads-label.test.mjs
+scripts/ci/__tests__/review-workflow-base-checkout.test.ts
 scripts/ci/claude-review-ran.mjs
 scripts/ci/claude-usage-limit.mjs
 scripts/ci/review-threads-label.mjs
