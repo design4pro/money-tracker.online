@@ -70,6 +70,16 @@ spec's per-Phase PRs; recorded here because the spec's Phasing section says othe
   _Verification:_ the Phase 4 e2e case holding `/_serverFn/*` on a client-side navigation asserts a
   `role="status"` region appears within the threshold and that `h1` is no longer the previous
   route's.
+
+  > **Corrected while executing.** The step title is kept for the Progress parser, but the premise
+  > under it was wrong and the commit does something else. `@tanstack/router-core@1.171.27` already
+  > applies `defaultPendingMs: 1000` and `defaultPendingMinMs: 500` before it spreads the caller's
+  > options (`dist/esm/router.js:620`), so restating them changes nothing. What was actually missing
+  > is a default pending **component**: without one, `load-client.js:666` has nothing to show and the
+  > previous screen simply stays. The commit therefore sets `defaultPendingComponent: RoutePending`
+  > and lowers `defaultPendingMs` to 300, leaving `defaultPendingMinMs` at its framework default.
+  > The before/after measurement is in `docs/STATE-INVENTORY.md` §3.
+
 - **2.2 Re-photograph `/accounts`, `/budgets` and `/goals`** in the loading state to confirm the
   nineteen declared skeletons now render and the layout does not jump. _Verification:_ frames in
   `.ai/qa/artifacts_*/`, read by a human; no console output outside policy.
@@ -145,16 +155,16 @@ spec's per-Phase PRs; recorded here because the spec's Phasing section says othe
 
 ### Phase 2: Pending thresholds
 
-- [ ] 2.1 Set `defaultPendingMs` and `defaultPendingMinMs` on `src/router.tsx`
+- [x] 2.1 Set `defaultPendingMs` and `defaultPendingMinMs` on `src/router.tsx` — 7f3ddbb
 - [ ] 2.2 Re-photograph `/accounts`, `/budgets` and `/goals` loading
 
 ### Phase 3: Close the seven bare surfaces
 
-- [ ] 3.1 Settle the console-policy question for a deliberate 500
+- [x] 3.1 Settle the console-policy question for a deliberate 500 — 0e658aa
 - [ ] 3.2 `/import` pending and error components
 - [ ] 3.3 `/import/$batchId` pending and error components
 - [ ] 3.4 `/invite/$invitationId` pending component
-- [ ] 3.5 `/payees/$payeeId` pending component
+- [x] 3.5 `/payees/$payeeId` pending component — c78022f, 3f8e31b
 - [ ] 3.6 `/transactions/rules`, `$ruleId` and `new` pending and error components
 - [ ] 3.7 Split not-found from error on `/transactions/$transactionId`
 
