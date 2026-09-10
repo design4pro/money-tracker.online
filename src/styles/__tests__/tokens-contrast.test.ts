@@ -299,6 +299,14 @@ describe.each([
    * alpha comes from a utility class rather than from an `rgb(… / α)` token, so
    * the 0.7 below is the half of the pair that has to be kept in step by hand.
    *
+   * Why an sRGB blend is the right model for it, since the utility does not ship
+   * as one: Tailwind emits `color-mix(in oklab, var(--color-ink) 70%, transparent)`.
+   * Mixing against `transparent` premultiplies it away, so the result is `ink`
+   * itself at alpha 0.7 — the oklab space never touches a channel — and the
+   * browser then composites that over the track in sRGB, which is `washOver`.
+   * The pre-`color-mix` fallback Tailwind emits beside it is the opaque token,
+   * i.e. strictly more contrast, so it cannot be the binding case either.
+   *
    * 4.57:1 in light and 4.79:1 in dark — the weakest of the four fills that can
    * stop short on the track, and still half again the 3:1 floor.
    */
