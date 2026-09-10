@@ -174,5 +174,5 @@ spec's per-Phase PRs; recorded here because the spec's Phasing section says othe
 - [x] 4.2 Write `e2e/support/states.ts` — d73e93e
 - [x] 4.3 Write `e2e/states.spec.ts` — e5915f2
 - [x] 4.4 Axe-scan the empty states — 47db8b8
-- [ ] 4.5 Add `--force-state` to `scripts/visual/capture.mjs`
+- [x] 4.5 Add `--force-state` to `scripts/visual/capture.mjs` — 60bf1ef
 - [ ] 4.6 Capture the evidence
