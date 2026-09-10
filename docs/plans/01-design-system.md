@@ -60,9 +60,11 @@ to delete it.
 
 ### UI (route, components)
 
-- **Route.** `/_dev/gallery`, SSR (default), dev-only per above. It is the visual evidence surface
-  for every foundations primitive stage: `00-S6`, `00-S8`, `00-S10`, `00-S13` and `00-S16` all cite
-  its frames rather than building their own route.
+- **Route.** `/_dev/gallery`, SSR (default), dev-only per above. It is designed to be the visual
+  evidence surface for every foundations primitive stage — `00-S6`, `00-S8`, `00-S10`, `00-S13` and
+  `00-S16` will cite its frames rather than build their own route. Written in the future tense
+  deliberately: the route does not exist, and the frames those five stages were expected to cite
+  were never captured. Nothing may be ticked against this surface until it ships.
 - **Components.** `state-grid.tsx` renders one primitive family per section, each in **rest, hover,
   focus-visible, active, disabled and loading**, forced through data attributes rather than real
   pointer state so a screenshot can capture them. `token-sheet.tsx` renders every token with its
@@ -171,13 +173,21 @@ None.
 - **Components.** `src/lib/motion.ts` exports `useReducedMotion()` and the `motion` package's shared
   transition presets. Every animation in the product goes through one of them.
 - **States.** Not applicable — no async surface.
-- **Tokens.** Durations 150–260 ms and the easing set live in `tokens.css` from `00-S3`; this stage
-  consumes them. Nothing over 400 ms exists in the product except a deliberately-declared ambient
-  loop, and there is none in v1.
+- **Tokens.** The duration scale and the easing set live in `tokens.css` from `00-S3`; this stage
+  consumes them. The scale that shipped is **90 / 150 / 220 / 320 ms** with four easings. This
+  document previously asserted a 150–260 ms band, which was never true of the tree; the band was a
+  _value_ inside a shared path this plan does not own, so the document moves to the shipped values
+  rather than the values moving to the document. **The invariant is the 400 ms ceiling**: nothing
+  over 400 ms exists in the product except a deliberately-declared ambient loop, and there is none
+  in v1. Whether 320 ms is the right slowest step is a separate question and is not settled here.
 - **Accessibility.** `prefers-reduced-motion: reduce` collapses every animation to `0.01ms` and one
-  iteration, resets `transform` on `[data-motion-transform]`, and keeps indeterminate progress
-  indicators readable. **Motion is transform and opacity only** — a layout-affecting animation is a
-  layout shift wearing a nicer name.
+  iteration and keeps indeterminate progress indicators readable — both shipped, in the
+  reduced-motion block of `tokens.css`. **Motion is transform and opacity only** — a
+  layout-affecting animation is a layout shift wearing a nicer name. One clause of this contract is
+  **unimplemented**: reduced motion never resets `transform` on a parked element, and the
+  `[data-motion-transform]` hook designed for it exists nowhere in the tree. It is kept as an open
+  requirement rather than deleted, because deleting it would erase the only written record that the
+  enforcement was designed.
 
 ### Quota
 
@@ -197,8 +207,11 @@ node_ and enforced in review by the rule being written down here rather than ass
 ### Verification
 
 - Command gate.
-- `motion.test.ts`: every exported preset is within 150–260 ms, animates only `transform` and
-  `opacity`, and returns a zero-duration variant under the reduced-motion flag.
+- `motion.test.ts`: every exported preset stays under the 400 ms ceiling, resolves its duration from
+  a `tokens.css` duration token rather than a literal, animates only `transform` and `opacity`, and
+  returns a zero-duration variant under the reduced-motion flag. The assertion is the ceiling and
+  the token indirection, not a band: a band would re-assert a shared-path value this stage does not
+  own, which is the contradiction that made this document wrong about the tree.
 - `e2e/reduced-motion.visual.spec.ts`: with `prefers-reduced-motion: reduce`, a frame captured
   immediately after paint is **pixel-identical** to one captured 1 s later on the same route. That is
   the falsifiable form of "reduced motion is honoured"; reading the CSS is not.
