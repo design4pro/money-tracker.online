@@ -190,7 +190,8 @@ the shell from cache within its 30-second window and does render a loading state
 what the two rows of the table above measure.
 
 That first-navigation block is **not** fixed here. `_app.beforeLoad` is the session and tenant guard
-and `AGENTS.md` → Ask First covers it. It is recorded here so the next reader does not re-derive it.
+and `AGENTS.md` → Ask First covers it. It is recorded here so the next reader does not re-derive it,
+and filed as [#230](https://github.com/design4pro/money-tracker.online/issues/230).
 
 It does, however, decide the shape of the test helper. `e2e/support/states.ts` lets the shell's own
 request through and holds everything after it, because a hold that includes the shell freezes the
@@ -247,7 +248,7 @@ anything in #21, and bundling it would make that one issue two capabilities. It 
 - The **loading** state was a missing router-level default first and a per-route gap second.
   `src/router.tsx` now sets a `defaultPendingComponent`, which is what lets a route that draws no
   shape of its own announce its load at all, and the seven bare modules got a shape each. The
-  first-navigation block in `_app.beforeLoad` is named above and left alone.
+  first-navigation block in `_app.beforeLoad` is named above, left alone, and filed as #230.
 - The **error** state was designed almost everywhere. The two gaps were the three modules declaring
   none, and `/transactions/$transactionId` conflating a broken read with a missing row — reconciled
   with what #16 landed rather than given a second error treatment beside it.
