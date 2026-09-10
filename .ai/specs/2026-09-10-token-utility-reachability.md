@@ -52,7 +52,8 @@ is unfalsifiable, and the fix is an assertion rather than an edit to the prose.
 
 ### 3. The gap is 22 tokens, and it is not hypothetical
 
-Measured on this worktree with `tailwindcss@4.1.18` (the pinned version, `package.json:77`), loading
+Measured on this worktree with `tailwindcss@4.1.18` (`package.json:77` declares `^4.1.18`; the stack
+is frozen by `docs/SPEC.md` §3, so an upgrade is a separate, _Ask First_ decision), loading
 `src/styles/app.css` through `__unstable__loadDesignSystem` — the same front end the existing case
 uses — then compiling every name `getClassList()` offers and collecting every `var(--…)` the output
 reads:
@@ -113,15 +114,25 @@ implemented as throwaway probes against this worktree, over the same 140 declare
 | **Broad** — read by the CSS of at least one compilable utility      | **22**               | none found                                                                      |
 | **Narrow** — a namespace-derived (or same-named) candidate resolves | 34                   | **13 false positives and 1 false negative** — the two lists differ by 14 tokens |
 
-The narrow rule's 13 false positives are tokens that **are** reachable, through a hand-written
-`@utility` rather than through `@theme inline`: `--color-highlighter` (`mark-pen`), `--measure`,
-`--leading-reading`, `--paragraph-gap` (`prose-measure`), `--focus-width`, `--focus-gap`,
-`--focus-reserve` (`focus-ring`, `focus-ring-inset`, `focus-ring-within`, `focus-safe`), `--nav-h`,
-`--impersonation-h`, `--safe-top` (`h-chrome`, `top-chrome`, `pt-chrome`), `--content-max`,
-`--list-max` (`max-w-content`, `max-w-list`) and `--spacing` (4,653 utilities). Each would need an
-allowlist entry saying "a hand-written `@utility` reads it" — the same sentence thirteen times, which
-is precisely the rot the existing case's docblock argues against at `token-classes.test.ts:36-56`
-(_"a gate blind to the most probable instance of the bug it exists to find is not a gate"_).
+The narrow rule's 13 false positives are tokens that **are** reachable, and they miss the derivation
+in two different ways:
+
+- **Ten are read by a hand-written `@utility` rather than by `@theme inline`:**
+  `--color-highlighter` (`mark-pen`), `--measure`, `--leading-reading`, `--paragraph-gap`
+  (`prose-measure`), `--focus-width`, `--focus-gap`, `--focus-reserve` (`focus-ring`,
+  `focus-ring-inset`, `focus-ring-within`, `focus-safe`), `--nav-h`, `--impersonation-h`,
+  `--safe-top` (`h-chrome`, `top-chrome`, `pt-chrome`).
+- **Three are read by `@theme inline` under a name that is not the token's:** `--content-max` and
+  `--list-max` are aliased into Tailwind's container namespace at `app.css:167-168`
+  (`--container-content: var(--content-max);`), so the class is `max-w-content`, not `max-w-*-max`;
+  and `--spacing` (`app.css:154`) carries no namespace suffix at all while 4,653 spacing utilities
+  read it.
+
+Both ways are the same underlying problem: the narrow rule needs the utility's name to be derivable
+from the token's name, and in this stylesheet it frequently is not. Thirteen allowlist entries whose
+reason is "the derivation does not apply here" suppress nothing real — they are precisely the rot the
+existing case's docblock argues against at `token-classes.test.ts:36-56` (_"a gate blind to the most
+probable instance of the bug it exists to find is not a gate"_).
 
 Its one false negative is worse: `--radius-full` **passes** the narrow rule, because `rounded-full`
 resolves — to Tailwind's built-in `calc(infinity * 1px)`, never reading the token. A rule that asks
@@ -299,7 +310,8 @@ file.
 existing case body into one memoized module-level helper in `token-classes.test.ts`, used by both
 cases. No behaviour change to the existing assertion.
 _Verify:_ `pnpm exec vitest run --project=server src/styles/__tests__/token-classes.test.ts` — the
-existing case still passes, and the loader runs once per file.
+existing case still passes. Memoization is a review item, not a machine-checked one: both cases pass
+identically with or without it, so the helper's single call site is what the reviewer reads.
 
 **1.2 — Add the case, red, with an empty allowlist.** Add
 `it('every token registered in tokens.css is reachable through a utility', …)`: strip comments from
