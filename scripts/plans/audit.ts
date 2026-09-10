@@ -53,12 +53,12 @@ import { pathToFileURL } from 'node:url'
 
 import { citations, isOpen, parsePlan, resolveOwnedPath } from './parse-plan.ts'
 import {
+  CLASS_MAP_PLANS,
   DRIFT_CLASSES,
   DRIFT_ENTRIES,
-  EXPECTED_CLASS_COUNTS,
 } from './drift-classes.ts'
 import type { OwnedPathEntry, PlanFile, Stage } from './parse-plan.ts'
-import type { DriftClass } from './drift-classes.ts'
+import type { DriftClass, PlanClassMap } from './drift-classes.ts'
 
 /** The twelve `###` headings `docs/plans/TEMPLATE.md` requires of every stage, in order. */
 export const REQUIRED_HEADINGS = [
@@ -110,7 +110,17 @@ export type AuditReport = {
 }
 
 export type ClassReport = {
-  /** Entries per class, counted from `drift-classes.ts`. */
+  /**
+   * This document's entry in `drift-classes.ts`, or null when the file does not describe it - which
+   * is the case for the plans nobody has reconciled yet. Their entries are unclassified, and
+   * printing another document's classes against them is what this null exists to stop.
+   *
+   * One nullable field rather than a `described` flag beside a nullable `asOf` and a nullable
+   * `expectedCounts`: those three can only ever be null together, and a shape that can express
+   * "described but with no as-of commit" invites a reader to handle a state that cannot happen.
+   */
+  readonly map: PlanClassMap | null
+  /** Entries per class, counted from this plan's rows in `drift-classes.ts`. */
   readonly counts: Readonly<Record<DriftClass, number>>
   /** Class-map rows the plan no longer declares - the Phase 2 progress measure. */
   readonly corrected: ReadonlyArray<string>
@@ -282,10 +292,15 @@ export const auditPlan = (planPath: string): AuditReport => {
   const stillDeclared = new Set(
     entries.map(({ stage, entry }) => `${stage.id} ${entry.path}`),
   )
+  // Only this document's rows. The map holds every reconciled plan, and the stage-id namespaces
+  // are disjoint, so an unfiltered read would report another plan's entries as ones this document
+  // had corrected - which is exactly the reading a class report is for.
+  const classMap = CLASS_MAP_PLANS[planPath] ?? null
+  const planEntries = DRIFT_ENTRIES.filter((row) => row.plan === planPath)
   const classCounts = Object.fromEntries(
     DRIFT_CLASSES.map((driftClass) => [
       driftClass,
-      DRIFT_ENTRIES.filter((row) => row.driftClass === driftClass).length,
+      planEntries.filter((row) => row.driftClass === driftClass).length,
     ]),
   ) as Record<DriftClass, number>
 
@@ -331,25 +346,62 @@ export const auditPlan = (planPath: string): AuditReport => {
       },
     ],
     classes: {
+      map: classMap,
       counts: classCounts,
-      corrected: DRIFT_ENTRIES.filter(
-        (row) => !stillDeclared.has(`${row.stage} ${row.path}`),
-      ).map((row) => `${row.stage} ${row.path}`),
-      outstanding: DRIFT_ENTRIES.filter((row) =>
-        stillDeclared.has(`${row.stage} ${row.path}`),
-      ).map((row) => `${row.stage} ${row.path}`),
+      corrected: planEntries
+        .filter((row) => !stillDeclared.has(`${row.stage} ${row.path}`))
+        .map((row) => `${row.stage} ${row.path}`),
+      outstanding: planEntries
+        .filter((row) => stillDeclared.has(`${row.stage} ${row.path}`))
+        .map((row) => `${row.stage} ${row.path}`),
       unresolvedLandings: [
-        ...new Set(DRIFT_ENTRIES.flatMap((row) => row.landedAt)),
+        ...new Set(planEntries.flatMap((row) => row.landedAt)),
       ]
         .filter((path) => !existsSync(path))
         .sort(),
       unmentionedLandings: [
-        ...new Set(DRIFT_ENTRIES.flatMap((row) => row.landedAt)),
+        ...new Set(planEntries.flatMap((row) => row.landedAt)),
       ]
         .filter((path) => !mentionsPath(markdown, path))
         .sort(),
     },
   }
+}
+
+/**
+ * The drift-class block of the report.
+ *
+ * A plan with no class map gets one line saying so rather than a table of zeroes: zeroes would read
+ * as "measured, nothing found", and for the 26 plans nobody has read yet the truth is the opposite.
+ */
+const classSection = (audit: AuditReport): Array<string> => {
+  const { classes } = audit
+  if (classes.map === null) {
+    return [
+      'Drift classes',
+      `  ${audit.planPath} has no class map in \`drift-classes.ts\` — its entries are unclassified.`,
+    ]
+  }
+
+  const { asOf, expectedCounts: expected } = classes.map
+
+  return [
+    `Drift classes (from \`drift-classes.ts\`, as of \`${asOf}\`)`,
+    ...DRIFT_CLASSES.map(
+      (driftClass) =>
+        `  ${driftClass}  ${String(classes.counts[driftClass]).padStart(2)} entries` +
+        (classes.counts[driftClass] === expected[driftClass]
+          ? ''
+          : ` — MISMATCH, expected ${expected[driftClass]}`),
+    ),
+    `  total ${Object.values(classes.counts).reduce((a, b) => a + b, 0)} entries, of which ${classes.corrected.length} no longer declared by the plan and ${classes.outstanding.length} still declared`,
+    classes.unresolvedLandings.length === 0
+      ? '  every recorded landing site resolves on disk'
+      : `  landing sites that do NOT resolve: ${classes.unresolvedLandings.join(', ')}`,
+    classes.unmentionedLandings.length === 0
+      ? '  every recorded landing site is named in the plan'
+      : `  landing sites the plan never names: ${classes.unmentionedLandings.join(', ')}`,
+  ]
 }
 
 const report = (audit: AuditReport): string => {
@@ -376,21 +428,7 @@ const report = (audit: AuditReport): string => {
       (path) => `  ${path} — declared ${declared(path)}, found ${found(path)}`,
     ),
     '',
-    'Drift classes (from `drift-classes.ts`, as of `f0ce37a`)',
-    ...DRIFT_CLASSES.map(
-      (driftClass) =>
-        `  ${driftClass}  ${String(audit.classes.counts[driftClass]).padStart(2)} entries` +
-        (audit.classes.counts[driftClass] === EXPECTED_CLASS_COUNTS[driftClass]
-          ? ''
-          : ` — MISMATCH, expected ${EXPECTED_CLASS_COUNTS[driftClass]}`),
-    ),
-    `  total ${Object.values(audit.classes.counts).reduce((a, b) => a + b, 0)} entries, of which ${audit.classes.corrected.length} no longer declared by the plan and ${audit.classes.outstanding.length} still declared`,
-    audit.classes.unresolvedLandings.length === 0
-      ? '  every recorded landing site resolves on disk'
-      : `  landing sites that do NOT resolve: ${audit.classes.unresolvedLandings.join(', ')}`,
-    audit.classes.unmentionedLandings.length === 0
-      ? '  every recorded landing site is named in the plan'
-      : `  landing sites the plan never names: ${audit.classes.unmentionedLandings.join(', ')}`,
+    ...classSection(audit),
     '',
     'Assertions',
   ]
