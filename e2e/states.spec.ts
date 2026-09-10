@@ -1,12 +1,17 @@
 import { DELIBERATE_SERVER_FAILURE, expect, test } from './support/console'
 
 import { gotoApp, waitForHydration } from './support/app'
+import { expectNoWcagViolations } from './support/axe-scan'
 import { storageStateFor } from './support/session'
 import { failServerFns, holdServerFns } from './support/states'
+import { openSurface } from './support/surfaces'
 
 import en from '#/lib/i18n/messages/en'
 
+import type { AppLocale, AppTheme } from './support/app'
+import type { Surface } from './support/surfaces'
 import type { MessageKey } from '#/lib/i18n'
+import type { Browser } from '@playwright/test'
 
 /**
  * Issue #21's actual complaint, answered where the answer can be checked.
@@ -66,6 +71,12 @@ interface EmptySurface {
  * `/import` is here for its **history** rather than for the page: the two upload cards are always
  * present, and the empty half of that screen is the table under them.
  */
+/** Named because the axe matrix below scans this one in the cells it does not scan the rest in. */
+const EMPTY_RECURRING: EmptySurface = {
+  path: '/recurring',
+  title: 'recurring.empty.title',
+}
+
 const EMPTY_SURFACES: readonly EmptySurface[] = [
   { path: '/accounts', title: 'accounts.empty.title' },
   { path: '/transactions', title: 'transactions.empty.title' },
@@ -73,7 +84,7 @@ const EMPTY_SURFACES: readonly EmptySurface[] = [
   { path: '/payees', title: 'payees.empty.title' },
   { path: '/budgets', title: 'budgets.empty.title' },
   { path: '/goals', title: 'goals.empty.title' },
-  { path: '/recurring', title: 'recurring.empty.title' },
+  EMPTY_RECURRING,
   { path: '/transactions/rules', title: 'rules.empty.title' },
   { path: '/import', title: 'import.history.empty.title' },
 ]
@@ -99,6 +110,94 @@ test.describe('a workspace with nothing in it', () => {
     })
   }
 })
+
+/** The empty surface as `openSurface` wants it. The path is the name: it is what a failure reads. */
+function surfaceOf(empty: EmptySurface): Surface {
+  return { name: empty.path, path: empty.path, session: 'empty' }
+}
+
+/** One theme and one locale — the two axes that change the rendered document. */
+interface Cell {
+  readonly theme: AppTheme
+  readonly locale: AppLocale
+}
+
+/** The cell every empty surface is scanned in. */
+const BASE_CELL: Cell = { theme: 'light', locale: 'en' }
+
+/** The other three cells of the same matrix, scanned on one surface. See below for why. */
+const VARIANT_CELLS: readonly Cell[] = [
+  { theme: 'dark', locale: 'en' },
+  { theme: 'light', locale: 'pl' },
+  { theme: 'dark', locale: 'pl' },
+]
+
+/**
+ * The empty states, at the same WCAG A/AA bar `accessibility.spec.ts` holds the populated ones to.
+ *
+ * An empty state that fails a success criterion fails it for the reader who has the least context
+ * to recover from it — someone who has just signed up and has nothing on screen to orient by. That
+ * is the whole reason these are scanned rather than only asserted for their copy.
+ *
+ * ## Why the matrix is 9 + 3 rather than 9 × 4
+ *
+ * `accessibility.spec.ts` runs every surface in both themes and both locales because each of its
+ * surfaces renders different markup — a grid, a set of cards, a meter. These nine do not: every one
+ * of them is the same `EmptyState` component with different copy, and theme and locale are
+ * properties of *that component*, not of the screen it sits on. Scanning `/goals` in dark Polish
+ * after `/accounts` has been scanned in dark Polish re-checks one contrast pair four more times and
+ * finds nothing new.
+ *
+ * So the axes are split by what each one can actually catch. Every surface is scanned once, because
+ * what varies per surface is the *composition* — the heading level the page gives the empty state,
+ * whether an action button is present, what sits around it. And one surface is scanned in the three
+ * remaining cells, because what varies per cell belongs to the shared component: the dashed border
+ * and muted description text in a second palette, and a translated heading and button label.
+ *
+ * `/recurring` carries the variants because it renders the most of the component in each cell: it
+ * is the only empty state in the product that passes a `secondaryAction`, so its cell scans a
+ * `primary` and a `secondary` button side by side — two different token pairs — as well as the
+ * icon, the heading and the description every other one has.
+ */
+test.describe('an empty screen is still an accessible screen', () => {
+  for (const surface of EMPTY_SURFACES) {
+    test(`${surface.path} has no WCAG A or AA violations · ${BASE_CELL.theme} · ${BASE_CELL.locale}`, async ({
+      browser,
+    }) => {
+      await scanEmpty(browser, surfaceOf(surface), BASE_CELL)
+    })
+  }
+
+  for (const cell of VARIANT_CELLS) {
+    test(`${EMPTY_RECURRING.path} has no WCAG A or AA violations · ${cell.theme} · ${cell.locale}`, async ({
+      browser,
+    }) => {
+      await scanEmpty(browser, surfaceOf(EMPTY_RECURRING), cell)
+    })
+  }
+})
+
+async function scanEmpty(
+  browser: Browser,
+  surface: Surface,
+  cell: Cell,
+): Promise<void> {
+  const { context, page } = await openSurface(
+    browser,
+    surface,
+    cell.theme,
+    cell.locale,
+  )
+
+  try {
+    await expectNoWcagViolations(
+      page,
+      `empty ${surface.name} · ${cell.theme} · ${cell.locale}`,
+    )
+  } finally {
+    await context.close()
+  }
+}
 
 test.describe('a read that has not come back yet', () => {
   test.use({ storageState: storageStateFor('demo') })
