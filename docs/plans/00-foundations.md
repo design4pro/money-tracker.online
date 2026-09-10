@@ -309,8 +309,17 @@ z-index of `DESIGN.md`, in both themes.
 `FND-06 missing → done` — `src/styles/tokens.css` carries the token contract with `DESIGN.md`'s
 front matter as its source, and `src/styles/__tests__/tokens-contrast.test.ts` holds the contrast
 floor over it.
+`DSY-04 missing → done` — the motion tokens, the keyframe set and the global reduced-motion block.
+The four durations, the four easings and the `prefers-reduced-motion: reduce` block are in
+`src/styles/tokens.css`; the keyframe set is in `src/styles/app.css`. The `[data-motion-transform]`
+reset the row's original stage designed is **not** implemented and stays open there.
 
 Requisitioned by `01-S1`, which cannot build a primitive against tokens that do not exist.
+
+`DSY-04` keeps its `DSY` prefix while living here. It was minted by `01-design-system.md` and
+requisitioned into this stage by the design-system plan reconciliation (issue #201), because its
+subject landed inside `tokens.css` and a plan that is not this one may never own a shared path. A
+row is closed by exactly one stage, and this is that stage; `01-S2` carries a pointer, not a copy.
 
 ### Owned paths
 

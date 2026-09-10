@@ -124,8 +124,14 @@ None.
 
 ### Reference rows
 
-`DSY-04 missing → done` — the motion tokens, the keyframe set and the global reduced-motion block.
-`DSY-05 missing → done` — the reduced-motion test that proves a preference actually removes motion.
+`DSY-05 missing → missing` — the reduced-motion test that proves a preference actually removes
+motion. `e2e/reduced-motion.visual.spec.ts` is absent, and so is the `[data-motion-transform]` hook
+the stage designed, which appears nowhere under `src/` or `e2e/`.
+
+`DSY-04` — the motion tokens, the keyframe set and the global reduced-motion block — is **not** a
+row of this stage. Its subject shipped inside `src/styles/tokens.css`, a shared path this plan may
+never own, so the row was requisitioned into `00-S3` of `00-foundations.md`, where it reads
+`missing → done`. This stage requires that contract; it does not write it.
 
 ### Owned paths
 
