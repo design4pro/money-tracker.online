@@ -83,3 +83,43 @@ export function ImportPageSkeleton() {
     </div>
   )
 }
+
+/** The four step labels' stand-ins, at the widths the words themselves take. */
+const STEP_WIDTHS = ['w-24', 'w-20', 'w-28', 'w-32'] as const
+
+/**
+ * The `/import/$batchId` pending view: the header, the four-step rail, and the current step's body.
+ *
+ * The rail is drawn at its full length on purpose. Upload, map, review, import is a promise the
+ * screen makes before a reader is inside the flow, and a skeleton that shows two steps and then
+ * grows to four breaks that promise in the one moment it is being made.
+ *
+ * The in-component `FileUnavailable` state is a different thing and is left alone: it is what the
+ * *upload step* shows when the stored file cannot be read back, and it appears long after this
+ * skeleton has gone.
+ */
+export function ImportBatchSkeleton() {
+  const t = useTranslate()
+  return (
+    <div className="flex flex-col gap-6">
+      <LoadingAnnouncement message={t('import.detail.loading')} />
+
+      <div className="space-y-2">
+        <Skeleton shape="block" className="h-8 w-40 rounded-md" />
+        <Skeleton shape="text" className="h-3 w-56" />
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {STEP_WIDTHS.map((width) => (
+          <Skeleton key={width} shape="text" className={`h-4 ${width}`} />
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <Skeleton shape="text" className="h-4 w-32" />
+        <Skeleton shape="text" className="h-3 w-full max-w-prose" />
+        <Skeleton shape="block" className="h-40 w-full rounded-lg" />
+      </div>
+    </div>
+  )
+}
