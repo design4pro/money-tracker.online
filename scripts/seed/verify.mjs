@@ -25,9 +25,81 @@
  */
 
 import { execFile } from 'node:child_process'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
+
+/**
+ * How many times one query may meet the lock before the audit gives up on it.
+ *
+ * Five retries on the schedule below spend at most 7.75 s waiting, which is the budget for a
+ * *contended* query rather than for the run: a query that never meets the lock pays nothing, and
+ * on every run so far all but a handful do. A lock held longer than that is not the transient
+ * contention this exists for and should be reported rather than waited out.
+ */
+export const BUSY_ATTEMPTS = 6
+
+/** The first wait. Each retry doubles it: 250, 500, 1000, 2000, 4000 ms. */
+const BUSY_FIRST_DELAY_MS = 250
+
+const BUSY_PATTERN = /SQLITE_BUSY|database is locked/i
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Everything the subprocess said, wherever it said it. `execFile` rejects with all three. */
+function detailOf(error) {
+  const detail = [error?.stderr, error?.stdout]
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+  return detail || String(error?.message ?? error)
+}
+
+/**
+ * Did this fail because somebody else holds the database file, rather than because the query is
+ * wrong? Deliberately narrow: the audit's value is that a check which lost its subject fails
+ * loudly, and a predicate that matched broadly would sit in a backoff loop for a schema error.
+ */
+export function isBusy(error) {
+  return BUSY_PATTERN.test(detailOf(error))
+}
+
+/**
+ * Waits out a locked database instead of failing on it.
+ *
+ * Every query below shells out to a fresh `wrangler d1 execute --local`, and in CI it does so
+ * against the same on-disk file the `vite preview` server still has open through workerd. SQLite
+ * refuses a contended lock immediately - `SQLITE_BUSY database is locked` - rather than blocking,
+ * so a query that lands mid-write dies even though the lock clears milliseconds later. That is a
+ * property of the two processes, not of the fixture, and it turned a branch red on data the audit
+ * had already checked four times over (#83).
+ *
+ * `wait` is injectable so the tests can assert the schedule without spending it.
+ */
+export async function retryWhileBusy(
+  attempt,
+  {
+    attempts = BUSY_ATTEMPTS,
+    firstDelayMs = BUSY_FIRST_DELAY_MS,
+    wait = sleep,
+  } = {},
+) {
+  for (let n = 1; ; n += 1) {
+    try {
+      return await attempt()
+    } catch (error) {
+      if (n >= attempts || !isBusy(error)) throw error
+      const delay = firstDelayMs * 2 ** (n - 1)
+      // On stderr, and always: a run that quietly took eight seconds longer per query is a
+      // machine getting slower, and the next person to read this log should see it happening.
+      process.stderr.write(
+        `  the local database is locked - retrying in ${delay} ms (${n}/${attempts - 1})\n`,
+      )
+      await wait(delay)
+    }
+  }
+}
 
 /** The day every date in the fixture is an offset from. Must match `seed.mjs`. */
 const EXPECTED_ANCHOR = '2026-09-30'
@@ -125,27 +197,25 @@ function parseArgs(argv) {
 async function d1(args, sql) {
   let stdout
   try {
-    ;({ stdout } = await run(
-      'pnpm',
-      [
-        'exec',
-        'wrangler',
-        'd1',
-        'execute',
-        args.db,
-        args.remote ? '--remote' : '--local',
-        '--json',
-        '--command',
-        sql,
-      ],
-      { maxBuffer: 64 * 1024 * 1024 },
+    ;({ stdout } = await retryWhileBusy(() =>
+      run(
+        'pnpm',
+        [
+          'exec',
+          'wrangler',
+          'd1',
+          'execute',
+          args.db,
+          args.remote ? '--remote' : '--local',
+          '--json',
+          '--command',
+          sql,
+        ],
+        { maxBuffer: 64 * 1024 * 1024 },
+      ),
     ))
   } catch (error) {
-    const detail = [error?.stderr, error?.stdout]
-      .filter(Boolean)
-      .join('\n')
-      .trim()
-    throw new Error(detail || String(error?.message ?? error))
+    throw new Error(detailOf(error))
   }
   const start = stdout.indexOf('[')
   return JSON.parse(stdout.slice(start))[0]?.results ?? []
@@ -734,9 +804,17 @@ async function main() {
   out('\nThe demo workspace is consistent.')
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
-  )
-  process.exit(1)
-})
+// Only when run as a command, exactly as `seed.mjs` guards its own `main()`. Without this the
+// module audits a workspace as a side effect of being imported, which puts `retryWhileBusy` -
+// the one part of this file a unit test can reach - behind eighty wrangler subprocesses.
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    )
+    process.exit(1)
+  })
+}
