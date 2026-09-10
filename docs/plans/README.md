@@ -60,13 +60,11 @@ validation.
 
 ---
 
-## The thirty-three files
+## The thirty-two files
 
 Every authored file in this directory is listed here. There are no others, and nothing outside this
-list may be added without amending this table first. One file sits beside the table rather than in
-it because it is generated, not authored: `OPEN-FINDINGS.md`, the per-plan findings register the
-adversarial plan audits write. It tracks the files below, never adds scope of its own, and is exempt
-from this table and from the filename scheme.
+list may be added without amending this table first. Nothing sits beside the table either: an audit
+of these plans writes no file into this directory, and where its findings do go is stated below.
 
 | File                              | Scope — one line each                                                                                               |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -108,6 +106,23 @@ from this table and from the filename scheme.
 `NN-kebab-area.md` — a two-digit ordinal that fixes reading order, then a lowercase kebab-case area
 name. `TEMPLATE.md` is the only authored file exempt from the ordinal. **One plan per area; a plan
 never spawns a second file, it grows another stage.**
+
+### Where a finding goes
+
+An audit that measures a plan against the tree produces findings, and none of them becomes a file
+here. There is no findings register in this directory and there is not meant to be one: the plan set
+is the backlog source and GitHub Issues is the execution surface, so a register would be a second
+backlog competing with the tracker. Three destinations, chosen by what the finding is:
+
+- **It stops a stage** → that stage's own **Blockers** heading, stated before the stage is scheduled
+  rather than discovered mid-run (`TEMPLATE.md` → _Blockers_).
+- **It is work, and no stage owns it yet** → a tracker issue (`om-prepare-issue`), back-linked from
+  the plan it came from so the next reader of that plan meets it rather than having to search. The
+  reconciliation of `00-foundations.md` filed #105–#108 that way, and that document names all four.
+- **It will not be done** → an entry in `99-boundaries-and-blockers.md` under one of its four
+  dispositions, added deliberately and with the reason written down.
+
+A finding that fits none of the three has not been decided yet, and deciding it is the work.
 
 ---
 
