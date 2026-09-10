@@ -57,9 +57,15 @@ export function BudgetCard({ budget, actions }: BudgetCardProps) {
   const utilisation = budget.utilisation
 
   return (
+    /*
+      Its own ground, because the list around it is a two-column grid rather than one stacked card:
+      a hairline between rows says "the row below is the next one", which stops being true the
+      moment the next one is beside it instead. No `overflow-hidden` — a focus ring in this product
+      is an `outline` and nothing may clip one.
+    */
     <li
       className={cn(
-        'relative flex flex-col gap-3 border-t border-border-subtle px-4 py-4 first:rounded-t-xl first:border-t-0 last:rounded-b-xl',
+        'relative flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-4 shadow-card',
         rowWash,
         isArchived && 'bg-surface-sunken',
       )}

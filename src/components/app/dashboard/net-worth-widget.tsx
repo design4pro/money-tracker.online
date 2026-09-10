@@ -16,7 +16,8 @@ import type { CurrencyCode, Minor } from '#/lib/money'
  * label tile: a figure is a line of the book with its label at the start and the figure at the
  * end, the way the header sets Money in, Money out and Difference. Net worth is now the head line
  * of the same `dl` as its breakdown, one step larger than the two lines under it, and the panel
- * ends where its last rule ends (`WidgetFrame height="content"`).
+ * ends where its last rule ends (the `WidgetGrid` default since issue #18; it needed
+ * `WidgetFrame height="content"` to get there when stretching was the default).
  *
  * The caption stays directly under the lines it qualifies: it says what every figure above is
  * counted in, and a caption two blocks away from the number it qualifies is a caption nobody

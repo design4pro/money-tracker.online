@@ -133,7 +133,9 @@ function GoalsListRoute() {
             the subtitle's ideal line - see `recurring/index.tsx`. */}
         <div className="min-w-0 grow basis-72">
           <h1 className="text-title font-bold text-ink">{t('goals.title')}</h1>
-          <p className="mt-1 text-body text-ink-2">{t('goals.subtitle')}</p>
+          <p className="mt-1 max-w-prose text-body text-ink-2">
+            {t('goals.subtitle')}
+          </p>
         </div>
         <Button
           variant="primary"

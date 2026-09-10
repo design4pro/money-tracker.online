@@ -8,6 +8,7 @@ import {
   BudgetCard,
   BudgetEmptyState,
   BudgetListSkeleton,
+  budgetListClass,
 } from '#/components/app/budgets'
 import { SegmentedFilter } from '#/components/app/nav'
 import { Button, Card, toast } from '#/components/ui'
@@ -128,7 +129,9 @@ function BudgetsListRoute() {
           <h1 className="text-title font-bold text-ink">
             {t('budgets.title')}
           </h1>
-          <p className="mt-1 text-body text-ink-2">{t('budgets.subtitle')}</p>
+          <p className="mt-1 max-w-prose text-body text-ink-2">
+            {t('budgets.subtitle')}
+          </p>
         </div>
         <Button
           variant="primary"
@@ -165,7 +168,12 @@ function BudgetsListRoute() {
           />
 
           {shown.length === 0 ? (
-            <Card padding="lg" className="text-center">
+            /* A heading and a sentence, so it stops at the list band like every other block of
+               running text on these screens - not because it matches the list it replaces. It does
+               not: `budgetListClass` caps at the band only for a single budget, and the paired
+               grid above takes the whole well. What is being avoided here is a filter that finds
+               nothing and answers with one sentence ruled across 1156px. */
+            <Card padding="lg" className="max-w-list text-center">
               <h2 className="text-subtitle font-semibold text-ink">
                 {t('budgets.empty.archived.title')}
               </h2>
@@ -174,10 +182,9 @@ function BudgetsListRoute() {
               </p>
             </Card>
           ) : (
-            /* One card, hairlines between the rows. No `overflow-hidden`: a focus ring in this
-               product is an `outline` and nothing may clip one — the rows round their own first
-               and last corners instead. */
-            <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
+            /* Two columns from `lg` when there are two budgets to put on a row, the list band when
+               there is only one. Both cases and why they differ: {@link budgetListClass}. */
+            <ul className={budgetListClass(shown.length)}>
               {shown.map((budget) => (
                 <BudgetCard
                   key={budget.id}

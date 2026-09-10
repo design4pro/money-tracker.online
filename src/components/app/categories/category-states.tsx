@@ -14,6 +14,7 @@ export function CategoryEmptyState({ onCreate }: { onCreate: () => void }) {
   const t = useTranslate()
   return (
     <EmptyState
+      className="max-w-list"
       icon={<FolderTree aria-hidden="true" />}
       title={t('categories.empty.title')}
       description={t('categories.empty.body')}
@@ -33,6 +34,10 @@ export function CategoryEmptyState({ onCreate }: { onCreate: () => void }) {
  * Every `Skeleton` is `aria-hidden`; the region that owns the load says "Loading" once. Two of the
  * eight are indented, because a skeleton that does not resemble the thing it stands in for makes
  * the real content look like a layout jump when it arrives.
+ *
+ * It carries the same `max-w-list` cap as the tree it stands in for. A skeleton wider than its
+ * content is the layout jump this component exists to prevent, only measured in width instead of
+ * height.
  */
 export function CategoryTreeSkeleton() {
   const t = useTranslate()
@@ -41,7 +46,7 @@ export function CategoryTreeSkeleton() {
       role="status"
       aria-live="polite"
       aria-label={t('categories.loading')}
-      className="flex flex-col gap-1"
+      className="flex max-w-list flex-col gap-1"
     >
       {[0, 1, 2, 3, 4, 5, 6, 7].map((row) => (
         <div

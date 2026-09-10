@@ -1,6 +1,8 @@
 import { Card, Skeleton } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
+import { RECURRING_PANES } from './panes'
+
 /**
  * The loading pictures for the three recurring screens.
  *
@@ -20,30 +22,43 @@ function LoadingAnnouncement({ message }: { readonly message: string }) {
   )
 }
 
-/** The `/recurring` pending view: three cards with the amount and due line reserved. */
+/**
+ * The `/recurring` pending view: three cards with the amount and due line reserved, beside the
+ * `Due soon` rail.
+ *
+ * The panes come from {@link RECURRING_PANES}, the same constant the screen itself uses, so the
+ * loading picture and the loaded screen cannot drift apart.
+ */
 export function RecurringListSkeleton() {
   const t = useTranslate()
   return (
     <div className="flex flex-col gap-6">
       <LoadingAnnouncement message={t('recurring.list.loading')} />
-      <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
-        {[0, 1, 2].map((row) => (
-          <li
-            key={row}
-            className="flex flex-col gap-3 border-t border-border-subtle px-4 py-4 first:border-t-0"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="w-full max-w-56">
-                <Skeleton shape="text" className="h-4 w-40" />
-                <Skeleton shape="text" className="mt-2 h-3 w-52" />
+      <div className={RECURRING_PANES}>
+        <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
+          {[0, 1, 2].map((row) => (
+            <li
+              key={row}
+              className="flex flex-col gap-3 border-t border-border-subtle px-4 py-4 first:border-t-0"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="w-full max-w-56">
+                  <Skeleton shape="text" className="h-4 w-40" />
+                  <Skeleton shape="text" className="mt-2 h-3 w-52" />
+                </div>
+                <Skeleton shape="block" className="size-9 rounded-md" />
               </div>
-              <Skeleton shape="block" className="size-9 rounded-md" />
-            </div>
-            <Skeleton shape="text" className="h-4 w-32" />
-            <Skeleton shape="text" className="h-3 w-2/3" />
-          </li>
-        ))}
-      </ul>
+              <Skeleton shape="text" className="h-4 w-32" />
+              <Skeleton shape="text" className="h-3 w-2/3" />
+            </li>
+          ))}
+        </ul>
+
+        <Card className="flex flex-col gap-3">
+          <Skeleton shape="text" className="h-4 w-32" />
+          <Skeleton shape="text" lines={3} />
+        </Card>
+      </div>
     </div>
   )
 }

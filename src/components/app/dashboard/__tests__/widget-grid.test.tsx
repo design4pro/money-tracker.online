@@ -55,4 +55,26 @@ describe('WidgetGrid', () => {
     expect(screen.getAllByRole('region')).toHaveLength(2)
     expect(screen.getByRole('region', { name: 'Accounts' })).toBeTruthy()
   })
+
+  it('leaves a panel at its own height unless it asks to fill the row', () => {
+    // The two halves of one contract. The grid stopped stretching its rows (issue #18: a four-line
+    // summary beside a 300px chart was drawn with 160px of empty floor), which is only safe while
+    // `height="fill"` still says what it says — a default that quietly turns a prop into a no-op is
+    // worse than the stretch it removed.
+    renderWidget(
+      <WidgetGrid label="Dashboard panels">
+        <WidgetFrame title="Net worth">A</WidgetFrame>
+        <WidgetFrame title="Cash flow" height="fill">
+          B
+        </WidgetFrame>
+      </WidgetGrid>,
+    )
+
+    const list = screen.getByRole('list', { name: 'Dashboard panels' })
+    expect(list.className).toContain('items-start')
+
+    const items = within(list).getAllByRole('listitem')
+    expect(items[0]?.className).not.toContain('self-stretch')
+    expect(items[1]?.className).toContain('self-stretch')
+  })
 })
