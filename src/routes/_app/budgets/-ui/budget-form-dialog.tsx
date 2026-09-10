@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { parseDate, today } from '@internationalized/date'
 
 import { AmountField, ErrorPanel } from '#/components/app/accounts'
+import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Checkbox,
@@ -12,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   Radio,
   RadioGroup,
   Select,
@@ -175,6 +175,8 @@ export function BudgetFormDialog({
   const hasLimit = draft.limitMinor !== null && draft.limitMinor > 0
   const isValid = trimmedName !== '' && hasLimit && draft.thresholds.length > 0
 
+  const isDirty = useIsDirty(draft)
+
   function patch(change: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...change }))
   }
@@ -230,12 +232,11 @@ export function BudgetFormDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="lg"
-      // A half-filled budget form is work. A stray press on the scrim is not consent to lose it.
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -470,6 +471,6 @@ export function BudgetFormDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }

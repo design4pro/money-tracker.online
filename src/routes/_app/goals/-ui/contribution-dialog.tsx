@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ErrorPanel } from '#/components/app/accounts'
+import { FormModal } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -8,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   Select,
   SelectItem,
   Spinner,
@@ -76,6 +76,11 @@ export function ContributionDialog({
   // control gives no reason, and a keyboard user pressing it learns nothing.
   const [hasTriedToSubmit, setHasTriedToSubmit] = useState(false)
 
+  // The whole form is one choice, so having made it is the whole of "dirty". The successful path
+  // never reaches the guard: `submit` closes through `onOpenChange`, the prop, not through the
+  // render-prop `close`.
+  const isDirty = selected !== null
+
   useEffect(() => {
     let cancelled = false
     void loadContributionCandidates({ data: { goalId: goal.id } })
@@ -109,11 +114,11 @@ export function ContributionDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="md"
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -167,7 +172,7 @@ export function ContributionDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }
 
