@@ -82,7 +82,7 @@
   },
   {
     "name": "pr-autopilot",
-    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr.",
+    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - that is what makes claude-code-review.yml run on it and produce the check the main ruleset requires - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml must therefore open it carrying `merge-queue`, which `excludeLabels` already stands down on; it does not yet, so a promotion here still spends a full run reaching the only conclusion open to it - a promotion carries no change of its own, is not the automation's PR to fix, is already reviewed on the promotion diff, and merging it deploys production.",
     "events": ["pull_request.opened"],
     "intervalSeconds": 300,
     "filters": {
