@@ -4,6 +4,15 @@ import { render, screen } from '@testing-library/react'
 import { Meter } from '../meter'
 
 /**
+ * The classes on the fill — the one child of the track, addressed through the role list rather
+ * than through a colour, so a case that asserts a colour cannot select on the answer.
+ */
+const fillClass = (root: HTMLElement) =>
+  root
+    .querySelector('[role="meter progressbar"] > div > div')
+    ?.getAttribute('class') ?? ''
+
+/**
  * What a reader is told a `Meter` is, and how much of it is full.
  *
  * The first case is not a style assertion. `e2e/accessibility.spec.ts` corrects one axe-core
@@ -14,15 +23,6 @@ import { Meter } from '../meter'
  * matching a shape nobody has reasoned about. This test is the tripwire on that string, and it
  * fails in `pnpm test` — seconds — rather than in a browser suite minutes later.
  */
-/**
- * The classes on the fill — the one child of the track, addressed through the role list rather
- * than through a colour, so a case that asserts a colour cannot select on the answer.
- */
-const fillClass = (root: HTMLElement) =>
-  root
-    .querySelector('[role="meter progressbar"] > div > div')
-    ?.getAttribute('class') ?? ''
-
 describe('Meter', () => {
   it('carries the ARIA fallback role list, with the value attributes that list needs', () => {
     render(

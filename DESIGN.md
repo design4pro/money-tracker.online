@@ -356,8 +356,8 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   the loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1. Both clear
   1.4.11, and the thin margin is not spent where the adjacency does not force it. Same criterion,
   two adjacencies - told apart by the threshold, so one over-limit verdict is one red across the
-  product. The danger **icon** is on neither grade's business: it is a 14px glyph, not large text
-  and not a fill, so it stays on `negative`.
+  product. The danger **icon** is on neither grade: it is a 14px glyph, which is neither large text
+  nor a fill, so it stays on `negative`.
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
   9.26:1 on raised; on `warning-soft` 7.79:1. Dark `#e9c46a`.
 - **Notice** (`info`): a system notice with no verdict - "Hidden", "Planned", "Auto", a scope. It
@@ -725,9 +725,9 @@ way. `over` means the ratio passed 1, which clamps the fill to the whole track, 
 and `BudgetMeter` take `negative-bold` against the card. `ui/Meter` takes its threshold from a
 `dangerAt` prop and reads it: at `>= 1` its danger fill is full too and takes the same grade, which
 is the case both callers that exist are in, so one over-limit verdict reads in one red. Below 1 the
-fill can stop on the track and keeps `negative`, the grade with the margin against
-`border-subtle`. The danger icon is a 14px glyph and stays on `negative` either way.
-The headline beside it is the remainder, and `negative-bold` too
+fill can stop on the track and keeps `negative`, the grade with the margin against `border-subtle`.
+The danger icon is a 14px glyph and stays on `negative` either way. The headline beside it is the
+remainder, and `negative-bold` too
 when it is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor.
 The state is carried by a word and a lucide icon before colour.
 
