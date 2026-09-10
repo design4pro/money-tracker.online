@@ -114,8 +114,12 @@ export async function assertConsoleClean(
  * ```ts
  * test('the accounts list offers a retry when the read breaks', async ({ page, expectConsole }) => {
  *   expectConsole(DELIBERATE_SERVER_FAILURE)
- *   using _failure = await failServerFns(page)
- *   // …
+ *   const failure = await failServerFns(page)
+ *   try {
+ *     // …
+ *   } finally {
+ *     await failure.release()
+ *   }
  * })
  * ```
  *
