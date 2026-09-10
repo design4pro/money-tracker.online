@@ -48,17 +48,22 @@ label, and every chart carries a text equivalent. That is a stronger outcome tha
 it is still not a 1.4.6 tick.
 
 One token sits on 1.4.6's own **large-text** threshold rather than its body one, and that is worth
-stating plainly, because at a glance it looks like a lapse. `negative-bold` paints exactly two
-things: the over-budget headline in `AmountMeter`, which is bold at 20px or 32px and is therefore
-large text by the criterion's own definition and scored at **4.5:1**; and the over-budget meter fill,
-which is a graphical object under **1.4.11** at 3:1. One value serves both, held to the stricter of
-the two floors. It exists because the body-grade `negative` cannot also be a danger colour — pinned
-at 7:1 as a caption ink, its dark value can only be a pale salmon, since red is luminance-poor and no
-deeper red in sRGB reaches that floor. The measured ratio for each value against every ground it can
-land on is recorded beside the declaration in `src/styles/tokens.css`, and
-`src/styles/__tests__/tokens-contrast.test.ts` recomputes on every run the five opaque planes plus
-the hover wash over `surface` — the composited ground a hovered row actually has — each at the
-threshold that applies to that grade. The remaining composited grounds in those comments, `press`
+stating plainly, because at a glance it looks like a lapse. `negative-bold` paints exactly two kinds
+of thing: the over-budget headline in `AmountMeter`, which is bold at 20px or 32px and is therefore
+large text by the criterion's own definition and scored at **4.5:1**; and an over-limit meter fill
+that covers its whole track, which is a graphical object under **1.4.11** at 3:1. One value serves
+both, held to the stricter of the two floors. It exists because the body-grade `negative` cannot also
+be a danger colour — pinned at 7:1 as a caption ink, its dark value can only be a pale salmon, since
+red is luminance-poor and no deeper red in sRGB reaches that floor. "Whole track" is the load-bearing
+half of the second job: a full fill's neighbour is the card, a partial one's is `border-subtle`, and
+there the loud grade measures 3.18:1 in dark against `negative`'s 5.02:1. `AmountMeter` and
+`BudgetMeter` are full by construction; `ui/Meter` decides from its own `dangerAt` prop, taking the
+loud grade at `>= 1` — where the danger state needs `percentage >= 100` — and `negative` below it
+(#180). The measured ratio for each value against every ground it can land on is recorded beside the
+declaration in `src/styles/tokens.css`, and `src/styles/__tests__/tokens-contrast.test.ts` recomputes
+on every run the five opaque planes plus the hover wash over `surface` — the composited ground a
+hovered row actually has — each at the threshold that applies to that grade, and both grades against
+the track a partial fill would stop on. The remaining composited grounds in those comments, `press`
 and either wash over `surface-raised`, are hand-measured; #178 is where what `negative-bold` is
 worth on them gets decided. No body-size text moved: everything that was at 7:1 is still at 7:1.
 

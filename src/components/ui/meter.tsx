@@ -150,6 +150,10 @@ export function Meter({
                       aria-hidden="true"
                       className={cn(
                         'size-3.5 shrink-0',
+                        // The glyph stays on the text grade whichever grade the
+                        // fill below takes: `negative-bold` is scoped to large
+                        // text and to a full-track fill, and a 14px icon is
+                        // neither (`DESIGN.md` → Tertiary).
                         state === 'danger' && 'text-negative',
                         state === 'warning' && 'text-warning',
                         state === 'ok' && 'text-positive',
@@ -173,22 +177,24 @@ export function Meter({
                 className={cn(
                   'h-full rounded-sm',
                   transitionBase,
-                  // `negative`, not `negative-bold` — and the difference from
-                  // `AmountMeter`, which took the loud grade for its own danger
-                  // fill in #151, is the track rather than the token.
+                  // Which boundary this fill has is the CALLER'S choice —
+                  // `dangerAt` is a prop — but it is a choice this component can
+                  // READ, which is what #180 settles. At `dangerAt >= 1` the
+                  // danger state needs `percentage >= 100`, which the width below
+                  // clamps to the whole track: nothing of the track survives as a
+                  // boundary, the neighbour is the card, and the loud grade costs
+                  // nothing. That is `AmountMeter`'s case (#151) and it is the
+                  // case both callers that exist are in, so one verdict now reads
+                  // in one red across the product rather than two.
                   //
-                  // Which boundary this fill has is the CALLER'S choice, not
-                  // this component's: `dangerAt` is a prop. At its default of `1`
-                  // the danger state needs `percentage >= 100`, which the width
-                  // below clamps to the whole track, so the neighbour is the card
-                  // — and that is every caller today. Set below 1, the fill is
-                  // partial and abuts `border-subtle`, where `negative` holds
-                  // 5.02:1 in dark and `negative-bold` only 3.18:1. A primitive
-                  // that cannot know which one it will get takes the value that
-                  // holds on both. `AmountMeter` can know: `over` means the ratio
-                  // passed 1, so its fill is full by construction and the loud
-                  // grade costs it nothing there.
-                  state === 'danger' && 'bg-negative',
+                  // Below 1 the fill can stop short and abut `border-subtle`,
+                  // where `negative` holds 5.02:1 in dark and `negative-bold`
+                  // only 3.18:1. Both clear 1.4.11's 3:1, and the thin margin is
+                  // not spent where the adjacency does not force it.
+                  // `src/styles/__tests__/tokens-contrast.test.ts` recomputes
+                  // both figures rather than trusting this comment.
+                  state === 'danger' &&
+                    (dangerAt >= 1 ? 'bg-negative-bold' : 'bg-negative'),
                   state === 'warning' && 'bg-warning',
                   // Full is not a virtue here, so the fill is the foreground
                   // token rather than the positive one. 70% of `ink` composited
