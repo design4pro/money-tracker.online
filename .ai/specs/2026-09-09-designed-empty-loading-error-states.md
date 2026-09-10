@@ -1,5 +1,12 @@
 # Designed empty, loading and error states — evidence, gaps and reachability
 
+| Field              | Value |
+| ------------------ | ----- |
+| **Status**         | ready |
+| **Issue**          | #21   |
+| **Spec PR**        | #135  |
+| **Implementation** | none  |
+
 ## 📝 TLDR
 
 The blind comparison round of 2026-09-03 recorded "no designed empty or loading state" against

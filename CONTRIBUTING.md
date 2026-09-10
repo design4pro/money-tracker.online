@@ -111,7 +111,8 @@ The backlog is GitHub Issues on `design4pro/money-tracker.online`. An issue is r
 carries one category label, a priority, a risk and the sections `om-prepare-issue` writes (Summary,
 Spec, Analysis, How to implement, Out of scope); `om-auto-manage-issues` checks that Definition of
 Ready and fills in the labels. A feature that needs more than one run gets a spec in `.ai/specs/`
-first and one issue per phase. Every pull request carries `Closes #n`: merging to `develop` does
+first and one issue per phase; `.ai/specs/README.md` lists every spec with its state, its issue
+and the pull requests that built it, and `.ai/specs/AGENTS.md` is the contract for that directory. Every pull request carries `Closes #n`: merging to `develop` does
 not close an issue natively, `om-close-fixed-issues` does. Full contract:
 `docs/agents/issue-tracker.md`; lifecycle and labels: `SDLC.md`.
 

@@ -3,11 +3,12 @@ name: CI
 # The gate. The rungs below are the definition of "green" for this repository,
 # in this order and with these commands:
 #
-#   1. route-tree  pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts
-#   2. db-drift    pnpm db:generate     && git diff --exit-code -- drizzle/
-#   3. typecheck   tsc --noEmit
-#   4. lint        eslint
-#   5. vitest      vitest run
+#   1. route-tree  pnpm generate-routes     && git diff --exit-code -- src/routeTree.gen.ts
+#   2. db-drift    pnpm db:generate         && git diff --exit-code -- drizzle/
+#   3. spec-index  pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md
+#   4. typecheck   tsc --noEmit
+#   5. lint        eslint
+#   6. vitest      vitest run
 #
 # CI adds two rungs the sandbox cannot afford on every iteration: a production
 # build, and the browser suites (e2e + accessibility). Changing a rung here
@@ -53,7 +54,7 @@ env:
   VITE_ENVIRONMENT: ci
 
 jobs:
-  # Rungs 1-4 plus the build, in ladder order.
+  # Rungs 1-5 plus the build, in ladder order.
   verify:
     name: generated · typecheck · lint · build
     # A develop→main (or main→develop) pull request duplicates the push-triggered
@@ -133,11 +134,30 @@ jobs:
             exit 1
           fi
 
-      # Rung 3.
+      # Rung 3 - the spec index.
+      #
+      # `.ai/specs/README.md` is generated from the metadata table in each spec.
+      # Regenerating it here proves the committed index names the same states,
+      # issues and pull requests the documents do - a spec whose table was edited
+      # without regenerating is otherwise only discovered by a reader trusting a
+      # stale row.
+      - name: Generate the spec index
+        run: pnpm generate-spec-index
+
+      - name: Check the committed spec index is current
+        run: |
+          set -euo pipefail
+          # As with the route tree: `git diff` cannot see a file git has never
+          # been told about, and the first spec added to an empty status
+          # directory is exactly that case.
+          git add --intent-to-add -- .ai/specs/README.md
+          git diff --exit-code -- .ai/specs/README.md
+
+      # Rung 4.
       - name: Typecheck
         run: pnpm typecheck
 
-      # Rung 4.
+      # Rung 5.
       #
       # ESLint spends its time building a typed program and then walking it, and
       # on a pull request almost none of that work is new. `--cache` skips a file
@@ -204,7 +224,7 @@ jobs:
             exit 1
           fi
 
-  # Rung 5, with coverage. Its own job rather than a sixth step in `verify`: the
+  # Rung 6, with coverage. Its own job rather than a seventh step in `verify`: the
   # suite is CPU-bound and independent of the build, so running the two in
   # parallel is the whole gate's critical path minus whichever is shorter.
   test:
@@ -232,7 +252,7 @@ jobs:
       - name: Run the unit suite with coverage
         run: pnpm test:coverage
 
-      # The other half of rung 5. `test:coverage` excludes the `workerd` project
+      # The other half of rung 6. `test:coverage` excludes the `workerd` project
       # because it cannot be instrumented; vitest.config.ts records why, next to
       # the project itself. This step is not optional: without it the Durable
       # Object tests would run nowhere in CI, which is worse than the red check

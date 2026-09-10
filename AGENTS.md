@@ -21,8 +21,9 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   change (skill `i18n-messages`).
 - Named exports only, route modules excepted. `components/ui` never fetches and never imports from
   `server/`.
-- Regenerate, never edit: `src/routeTree.gen.ts` (`pnpm generate-routes`) and `drizzle/`
-  (`pnpm db:generate`). Migrations are additive.
+- Regenerate, never edit: `src/routeTree.gen.ts` (`pnpm generate-routes`), `drizzle/`
+  (`pnpm db:generate`) and `.ai/specs/README.md` (`pnpm generate-spec-index`). Migrations are
+  additive.
 - Anything slow is enqueued on `TASKS`; balances are rebuilt through the `LEDGER` Durable Object.
 - Conventional Commits in English, scope = module or plan area. Branches `fix/issue-<n>-<slug>`,
   `feat/issue-<n>-<slug>`, `spec/<slug>`. PRs target `develop` and carry `Closes #<n>`.
@@ -58,6 +59,7 @@ The gate every PR passes, in this order (`validation.commands` in `.ai/agentic.c
 
 - `pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts`
 - `pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/`
+- `pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md`
 - `pnpm typecheck`
 - `pnpm lint`
 - `pnpm test`
@@ -89,6 +91,7 @@ repo) is not a gate either; keep what you touch prettier-clean.
 | Background work, cron, email                   | `src/server/queue/`, `src/server/cron/`, `src/server/email/`; `wrangler.jsonc`           | Idempotent handlers; one `kind` per job; keys not sentences in envelopes                        |
 | Bindings, secrets, deploys                     | `wrangler.jsonc`; `docs/DEPLOY.md`; `docs/SECURITY.md`; `.dev.vars.example`              | Append-only DO migrations; never a secret in a log or a PR                                      |
 | A new feature or area                          | `docs/plans/README.md` and the area's plan; `docs/agents/out-of-scope.md`                | Plans are the backlog source; a rejected request is not re-litigated                            |
+| A specification: writing, finding or retiring  | `.ai/specs/AGENTS.md`; `.ai/specs/README.md`                                             | The directory is the status; the table names issue and PRs; the index is generated              |
 | A product decision                             | `docs/adr/`                                                                              | One ADR per decision; amend rather than rewrite                                                 |
 | Comparing against the reference product        | `docs/agents/reference.md`                                                               | Rendered pixels only; nothing else crosses                                                      |
 | Working while someone else edits the checkout  | `docs/agents/shared-checkout.md`                                                         | 3010 is the developer's port; agents take 3011-3020                                             |
