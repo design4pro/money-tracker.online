@@ -82,7 +82,8 @@
    measures 3.10:1 on it in dark and 3.88:1 in light. Both clear 1.4.11, and
    `tokens-contrast.test.ts` asserts them so the grade stays usable by a
    partial fill - but the margin is thin enough that `src/components/ui/meter.tsx`,
-   whose danger fill IS partial, deliberately keeps `negative` at 7.05:1 there.
+   whose danger fill IS partial, deliberately keeps `negative` there instead, at
+   5.02:1 in dark and 5.92:1 in light.
 
    ---------------------------------------------------------------------------
    SURFACE SEPARATION - a design floor, per theme
@@ -273,7 +274,7 @@
        primary, so on a dark ground "redder" and "brighter" pull in opposite
        directions. Pure #ff0000 measures 3.64:1 on `raised` - below even the
        large-text floor. This is about the reddest value 4.5:1 leaves in sRGB,
-       and against #f5a08f it carries 1.77x the chroma at 0.62x the luminance,
+       and against #f6a898 it carries 1.93x the chroma at 0.58x the luminance,
        which is the difference between a salmon and a danger colour. */
     --color-negative-bold: #ff594a; /* 4.70:1 on raised, 5.79:1 on canvas; large-text floor 4.5:1 */
 

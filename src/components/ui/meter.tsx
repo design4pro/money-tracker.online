@@ -180,7 +180,7 @@ export function Meter({
                   // This fill is PARTIAL by construction: `dangerAt` fires below
                   // 100%, so what the danger colour abuts is `border-subtle`,
                   // and the boundary the reader reads is fill-against-track.
-                  // `negative` holds 7.05:1 there in dark; `negative-bold`
+                  // `negative` holds 5.02:1 there in dark; `negative-bold`
                   // holds 3.10:1. The over-budget fill has no such edge — `over`
                   // means the ratio passed 1, which clamps the fill to the whole
                   // track, so its neighbour is the card and the loud grade costs
