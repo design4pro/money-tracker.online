@@ -416,9 +416,9 @@ export function FilterBar({
                 />
                 <DialogBody className="flex flex-col gap-5">
                   {/* Below `md` the bar has no room for these, so this is where they live. They
-                        are drafted like every other control in the panel and take effect on
-                        Apply — a control that acted immediately while its neighbours waited would
-                        be the panel disagreeing with itself. */}
+                      are drafted like every other control in the panel and take effect on
+                      Apply — a control that acted immediately while its neighbours waited would
+                      be the panel disagreeing with itself. */}
                   <div className="flex flex-col gap-4 md:hidden">
                     <DateRangePicker
                       label={t('transactions.filter.dateRange')}
@@ -610,10 +610,10 @@ export function FilterBar({
                   </Select>
                 </DialogBody>
                 {/* Both of these *commit* the draft, so they close through the panel's own open
-                      state rather than through the render-prop `close` the guard sits on. Asking
-                      "discard your changes?" about work that was just applied would be a question
-                      with no true answer. Every other way out — the scrim, Escape, the X — still
-                      goes through `close`. */}
+                    state rather than through the render-prop `close` the guard sits on. Asking
+                    "discard your changes?" about work that was just applied would be a question
+                    with no true answer. Every other way out — the scrim, Escape, the X — still
+                    goes through `close`. */}
                 <DialogFooter>
                   <Button
                     variant="ghost"
