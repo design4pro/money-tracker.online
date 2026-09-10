@@ -17,6 +17,9 @@ export { AriaI18nProvider } from './aria-i18n'
 export { BrandMark, Wordmark } from './brand-mark'
 export type { WordmarkProps } from './brand-mark'
 
+export { FormModal, useIsDirty } from './form-modal'
+export type { FormModalProps } from './form-modal'
+
 export {
   LOCALE_COOKIE,
   readLocaleCookieValue,

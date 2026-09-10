@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 
-import { Badge } from '#/components/ui'
+import { Badge, rowWash, rowWashSecondary } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { formatCalendarDateRange, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
@@ -66,7 +66,7 @@ export function BudgetCard({ budget, actions }: BudgetCardProps) {
     <li
       className={cn(
         'relative flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-4 shadow-card',
-        'transition-colors duration-fast hover:bg-hover',
+        rowWash,
         isArchived && 'bg-surface-sunken',
       )}
     >
@@ -90,7 +90,12 @@ export function BudgetCard({ budget, actions }: BudgetCardProps) {
               {budget.name}
             </Link>
           </h2>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
+          <p
+            className={cn(
+              'mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption',
+              rowWashSecondary,
+            )}
+          >
             <span>
               {t(PERIOD_LABELS[budget.period] ?? 'budgets.period.monthly')}
             </span>
@@ -139,7 +144,12 @@ export function BudgetCard({ budget, actions }: BudgetCardProps) {
             currencyCode={budget.currencyCode}
           />
 
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
+          <p
+            className={cn(
+              'flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption',
+              rowWashSecondary,
+            )}
+          >
             {budget.daysLeft === null ? null : (
               <span>{t('budgets.daysLeft', { count: budget.daysLeft })}</span>
             )}

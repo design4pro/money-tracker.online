@@ -87,6 +87,7 @@
   --color-negative: var(--color-negative);
   --color-negative-soft: var(--color-negative-soft);
   --color-on-negative: var(--color-on-negative);
+  --color-negative-bold: var(--color-negative-bold);
   --color-warning: var(--color-warning);
   --color-warning-soft: var(--color-warning-soft);
   --color-on-warning: var(--color-on-warning);

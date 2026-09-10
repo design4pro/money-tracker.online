@@ -121,6 +121,13 @@ const messages = {
   'action.skip': 'Pomiń',
   'action.learnMore': 'Dowiedz się więcej',
 
+  /* -- Dialogs ------------------------------------------------------------ */
+  'dialog.unsaved.title': 'Niezapisane zmiany',
+  'dialog.unsaved.body':
+    'Ten formularz zawiera zmiany, które nie zostały zapisane. Zamknięcie go teraz je odrzuci.',
+  'dialog.unsaved.discard': 'Odrzuć zmiany',
+  'dialog.unsaved.keepEditing': 'Wróć do edycji',
+
   /* -- Shared vocabulary -------------------------------------------------- */
   'common.yes': 'Tak',
   'common.no': 'Nie',

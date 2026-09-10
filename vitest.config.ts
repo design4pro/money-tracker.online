@@ -9,6 +9,40 @@ import viteReact from '@vitejs/plugin-react'
 const src = fileURLToPath(new URL('./src/', import.meta.url))
 
 /**
+ * The per-case budget for the three projects that pay a fixed startup cost per file.
+ *
+ * Vitest's default is 5000 ms, and it is a budget for the *case*: whatever the runner does lazily
+ * on the way to the first assertion is charged to whichever case triggers it. That is fine for a
+ * pure function and wrong for every project below, each for its own reason:
+ *
+ * - `ui` builds a jsdom environment and transforms React Aria's module graph per file — together
+ *   the two largest lines in vitest's own run summary. Under the whole 161-file suite on a
+ *   16-core machine the slowest case reached 4667 ms, 93% of the default; run on its own that
+ *   same file's four cases take 233-563 ms each. So roughly four of those seconds are the file
+ *   starting up, charged to the first case, and not the component being exercised.
+ * - `tooling` runs the repository's shell hooks the only way that proves anything: `bash()` is
+ *   `spawnSync('bash', …)`, a real process fork per call, so a case that walks a table of
+ *   commands is bound by how fast the OS schedules processes. Slowest measured: 2860 ms.
+ * - `server` is the same shape from a third direction: its slowest case (2901 ms) compiles the
+ *   whole Tailwind stylesheet inside the case body, and its database tests replay every file in
+ *   `drizzle/` into a fresh in-memory SQLite per `beforeEach`.
+ *
+ * What the three share is that the expensive part is fixed per *file* and lands on whichever case
+ * runs first, so the peak tracks the machine — how cold Vite's transform cache is, how many
+ * workers are competing — rather than anything in the diff under test. It is not a simple load
+ * multiplier either: the 4667 ms above was measured on an idle machine with a cold cache, while
+ * the same suite run under twelve extra CPU burners peaked at 2712 ms with a warm one. That is
+ * why the default turned `pnpm test` red locally and never on CI, whose runners are unloaded
+ * (#88).
+ *
+ * 15000 ms is roughly three times the worst case measured: wide enough that neither a cold cache
+ * nor a contention spike is a failure, narrow enough that a genuinely hung test still fails the
+ * run rather than hanging it. It is set per project rather than in the root block on purpose —
+ * `workerd` keeps the default, because nothing there has come near it.
+ */
+const SLOW_STARTUP_TEST_TIMEOUT_MS = 15_000
+
+/**
  * Four projects, because the code under test needs different worlds:
  *
  * - `ui` runs component tests in jsdom with the React plugin.
@@ -111,6 +145,7 @@ export default defineConfig({
            */
           execArgv: ['--no-experimental-webstorage'],
           setupFiles: ['./vitest.setup.dom.ts'],
+          testTimeout: SLOW_STARTUP_TEST_TIMEOUT_MS,
           include: [
             'src/components/**/*.test.{ts,tsx}',
             'src/lib/**/*.test.{ts,tsx}',
@@ -134,6 +169,7 @@ export default defineConfig({
             '.claude/hooks/__tests__/*.test.ts',
             'e2e/support/__tests__/*.test.ts',
           ],
+          testTimeout: SLOW_STARTUP_TEST_TIMEOUT_MS,
           restoreMocks: true,
         },
       },
@@ -151,6 +187,7 @@ export default defineConfig({
           ],
           // The workerd project owns these; run in Node they would fail on `cloudflare:test`.
           exclude: ['src/server/**/*.workerd.test.ts'],
+          testTimeout: SLOW_STARTUP_TEST_TIMEOUT_MS,
           restoreMocks: true,
         },
       },

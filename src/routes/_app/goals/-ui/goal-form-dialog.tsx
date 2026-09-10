@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { parseDate, today } from '@internationalized/date'
 
 import { AmountField, ErrorPanel } from '#/components/app/accounts'
+import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   DatePicker,
@@ -10,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   Select,
   SelectItem,
   TextField,
@@ -135,6 +135,8 @@ export function GoalFormDialog({
   const hasTarget = draft.targetMinor !== null && draft.targetMinor > 0
   const isValid = trimmedName !== '' && hasTarget
 
+  const isDirty = useIsDirty(draft)
+
   function patch(change: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...change }))
   }
@@ -168,12 +170,11 @@ export function GoalFormDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="lg"
-      // A half-filled goal form is work. A stray press on the scrim is not consent to lose it.
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -313,7 +314,7 @@ export function GoalFormDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }
 

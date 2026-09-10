@@ -79,6 +79,51 @@ describe('BudgetMeter', () => {
     expect(track.parentElement?.querySelector('svg')).toBeTruthy()
   })
 
+  it('draws the overspend in the loud danger grade and the caption in the text one', () => {
+    // #151: `negative` has to hold 7:1 because it is a caption ink, and in dark that pins it to a
+    // pale salmon — so a 32px figure and a bar painted in it read as washed out. The two elements
+    // WCAG does not hold to 7:1 — large text at 4.5:1, a fill at 3:1 — take `negative-bold`.
+    const track = meter({
+      spentMinor: asMinor(2_320_00),
+      remainingMinor: asMinor(-320_00),
+      ratio: 1.16,
+      state: 'over',
+    })
+
+    const headline = screen.getByText(/320[.,]00.*over/i)
+    expect(headline.className).toContain('text-negative-bold')
+
+    const fill = track.firstElementChild as HTMLElement
+    expect(fill.className).toContain('bg-negative-bold')
+
+    // …and the other half of the ticket: nothing body-size moved off the 7:1 token. The verdict
+    // rides at `text-caption`, so it stays where it was.
+    expect(screen.getByText('Over budget').className).toContain('text-negative')
+    expect(screen.getByText('Over budget').className).not.toContain(
+      'text-negative-bold',
+    )
+  })
+
+  it('declares the weight the large-text grade is allowed by', () => {
+    // The premise under the assertion above, checked rather than asserted in prose. 4.5:1 is only
+    // legal on this figure because WCAG counts it as LARGE text, and at `md`'s 20px that needs the
+    // BOLD threshold (14pt bold), not the regular one (18pt) — so 700, and 600 will not do.
+    //
+    // Courier Prime ships 400 and 700 only, so `font-semibold` painted as 700 anyway and no frame
+    // would ever show this moving. The declared weight is what the criterion is read against and
+    // what `docs/ACCESSIBILITY.md` states in public, which is why it is worth a test at all.
+    meter({
+      spentMinor: asMinor(2_320_00),
+      remainingMinor: asMinor(-320_00),
+      ratio: 1.16,
+      state: 'over',
+    })
+
+    const headline = screen.getByText(/320[.,]00.*over/i)
+    expect(headline.className).toContain('font-bold')
+    expect(headline.className).not.toContain('font-semibold')
+  })
+
   it('stops the fill at the end of the track while the sentence keeps counting', () => {
     const track = meter({
       spentMinor: asMinor(2_320_00),

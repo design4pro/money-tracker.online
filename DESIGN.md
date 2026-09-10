@@ -27,6 +27,7 @@ colors:
   negative: '#8a1a0d'
   negative-soft: '#f8e3df'
   on-negative: '#ffffff'
+  negative-bold: '#c31300'
   warning: '#614106'
   warning-soft: '#f7ead3'
   on-warning: '#ffffff'
@@ -334,7 +335,27 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
 - **Green Ink** (`positive`): money in, on track, within budget. 7.75:1 on sunken, 9.36:1 on
   raised; on `positive-soft` 7.96:1. Dark `#7fd9a8`.
 - **Red Ink** (`negative`): money out, overdrawn, destructive confirmation, validation failure.
-  7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f5a08f`.
+  7.78:1 on sunken, 9.40:1 on raised; on `negative-soft` 7.63:1. Dark `#f6a898` (7.61:1 on raised,
+  and 7.20:1 on the ground `--color-hover` leaves over `surface` - the one hue tuned against a
+  _washed_ ground rather than a plane, because a verdict hue cannot be promoted to `ink` on hover
+  the way the greys are).
+- **Loud Red** (`negative-bold`): the same ink at the grade that is not held to the text floor -
+  the over-budget headline in `AmountMeter` and the over-budget meter fill, and nothing else.
+  5.09:1 on sunken, 6.15:1 on raised; dark `#ff5e4a` at 4.82:1 on raised and 4.57:1 on a hovered
+  row, which is the binding ground. The floors that apply
+  are 4.5:1 (large text: bold at >= 18.66px, WCAG 1.4.6) and 3:1 (a fill, WCAG 1.4.11), so both
+  values sit above the stricter of the two on every ground. It exists because one token cannot be
+  both a caption ink and a danger colour: `negative` has to hold 7:1, and in dark that pins it to a
+  pale salmon, since red is luminance-poor and no deeper red in sRGB reaches that floor. **Never
+  put body-size text in it**, and never reach for it as a general "stronger red".
+  **Nor for a partial fill.** `ui/Meter`'s danger state stays on `negative`, and the two meters
+  differ because their fills can. The over-budget fill is always the whole track - `over` means the
+  ratio passed 1, which clamps it - so its neighbour is the card, and the component fixes that.
+  `ui/Meter` takes its threshold from a `dangerAt` prop, so the adjacency is the caller's: at the
+  default of `1` that fill is full too, and below 1 it is partial and abuts the track, where the
+  loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1. Both clear
+  1.4.11, but a primitive that cannot know which boundary it will get takes the value that holds on
+  either. Same criterion, two adjacencies.
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
   9.26:1 on raised; on `warning-soft` 7.79:1. Dark `#e9c46a`.
 - **Notice** (`info`): a system notice with no verdict - "Hidden", "Planned", "Auto", a scope. It
@@ -696,9 +717,16 @@ wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 ### Meter
 
 An 8px track at `sm` radius in `border-subtle` (so the fill's stop is readable against it), the
-fill in `positive` on track, `warning` near the limit, `negative` over it; past 100% the fill runs
-hatched as well as red. The headline beside it is the remainder, and the state is carried by a
-word and a lucide icon before colour.
+fill in `positive` on track, `warning` near the limit, and red over it; past 100% the fill runs
+hatched as well as red. _Which_ red is not one answer: `ui/Meter` is the generic primitive and its
+threshold is a `dangerAt` prop, so its fill may abut the track or the card depending on the caller,
+and it keeps `negative` - the grade that clears both. The money meters know: `over` means the ratio
+passed 1, which clamps the fill to the whole track, so `AmountMeter` and `BudgetMeter` take
+`negative-bold` against the card. The two callers that reach `ui/Meter`'s danger state both pass a
+threshold of `1`, so today that split shows up as two reds for one verdict; #180 is where that is
+settled. The headline beside it is the remainder, and `negative-bold` too
+when it is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor.
+The state is carried by a word and a lucide icon before colour.
 
 ### Navigation
 

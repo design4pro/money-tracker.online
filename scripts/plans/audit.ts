@@ -126,6 +126,9 @@ export type ClassReport = {
    * `landedAt` paths the plan document never mentions - as a bullet or in prose. The other half
    * of Step 2.1: a correction that silently drops a moved subject leaves the plan smaller and no
    * more honest, so every recorded landing site has to be written down somewhere in the document.
+   *
+   * {@link mentionsPath} is what "mentions" means here: the path written out at a path boundary,
+   * not merely contained in a longer name.
    */
   readonly unmentionedLandings: ReadonlyArray<string>
 }
@@ -162,6 +165,26 @@ const declared = (path: string): 'file' | 'directory' =>
 
 /** True when the path is present **and** is the kind of thing the entry declared. */
 const satisfied = (path: string): boolean => found(path) === declared(path)
+
+/**
+ * Whether a plan document names this path - the rule behind
+ * {@link ClassReport.unmentionedLandings}.
+ *
+ * `markdown.includes(path)` is a substring test rather than a "names this path" test:
+ * `src/lib/money.ts` would count as named by a document that only ever writes
+ * `src/lib/money.tsx`, because the shorter string sits inside the longer one. So the match is
+ * anchored to a path boundary at each end.
+ *
+ * The two ends are anchored differently, because the two ways of extending a path mean different
+ * things. A prefix makes it another path - `packages/app/src/lib/money.tsx` is not this file - so
+ * `/` closes the match on the left. A suffix beginning `/` opens a child instead of renaming
+ * anything, and `src/server/queue/handlers/` does name the directory `src/server/queue/handlers`,
+ * which is a landing site this project records.
+ */
+export const mentionsPath = (markdown: string, path: string): boolean =>
+  new RegExp(
+    `(?<![A-Za-z0-9._/-])${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9._-])`,
+  ).test(markdown)
 
 /**
  * Run the audit over one plan document.
@@ -323,7 +346,7 @@ export const auditPlan = (planPath: string): AuditReport => {
       unmentionedLandings: [
         ...new Set(DRIFT_ENTRIES.flatMap((row) => row.landedAt)),
       ]
-        .filter((path) => !markdown.includes(path))
+        .filter((path) => !mentionsPath(markdown, path))
         .sort(),
     },
   }

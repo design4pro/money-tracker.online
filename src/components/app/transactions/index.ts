@@ -40,6 +40,7 @@ export {
   PAYMENT_METHOD_KEY,
   countActiveFilters,
   describeFilters,
+  isSameFilterView,
 } from './filter-chips'
 export type { FilterChip } from './filter-chips'
 

@@ -1,6 +1,7 @@
 import { cva } from 'class-variance-authority'
 
 import { cn } from '#/lib/cn'
+import { rowWashPromote } from './shared'
 
 import type { VariantProps } from 'class-variance-authority'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
@@ -21,8 +22,13 @@ export const badgeVariants = cva(
          * A neutral status with no verdict - "Hidden", "Planned", "Auto". Typed in pencil inside
          * a one-pixel `border-panel` rule on whatever ground it lands on: a ruled label, not a
          * wash. Only `settled` carries the stamp ink.
+         *
+         * It is the one tone with no fill of its own, so on a hoverable row its ground is the
+         * row's - and `--color-info` is `ink-2`'s value, which the interaction wash costs the
+         * same 7:1 it costs the grey. `rowWashPromote` is the same answer `rowWashSecondary`
+         * gives, minus the base colour this variant already names.
          */
-        info: 'border-border-panel text-info',
+        info: `border-border-panel text-info ${rowWashPromote}`,
         /**
          * The highlighter: the typed word stays in `ink`, and a run of `highlighter` is drawn
          * behind it the way a pen is run over a line that has been checked - past both ends,

@@ -1,0 +1,359 @@
+<!doctype html>
+<!--
+  Illustrative static mockup for .ai/specs/2026-09-09-modal-scroll-and-unsaved-guard.md
+  No app code, no build step, no external requests. Placeholder data only.
+
+  The blocked-dismiss state: a touched form dialog, the scrim press refused, and
+  the unsaved-changes alertdialog stacked over it. Copy is the `en` catalogue
+  text proposed in the spec's Copy section.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Unsaved changes alert over a touched form dialog</title>
+    <style>
+      :root {
+        --canvas: #f5f4ee;
+        --surface-raised: #ffffff;
+        --ink: #262420;
+        --ink-2: #4b4941;
+        --border-subtle: #c3d1c4;
+        --accent: #4a2a82;
+        --on-accent: #ffffff;
+        --danger: #8a2b1f;
+      }
+      .dark {
+        --canvas: #16171a;
+        --surface-raised: #262930;
+        --ink: #ebe8df;
+        --ink-2: #b9b5aa;
+        --border-subtle: #42454c;
+        --accent: #c5aef2;
+        --on-accent: #16171a;
+        --danger: #f0a99f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #dedbd2;
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        color: #262420;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      .lede {
+        margin: 0 0 20px;
+        color: #4b4941;
+        max-width: 70ch;
+      }
+      .row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .case > h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 6px;
+        color: #1f5c3a;
+      }
+      .case > p {
+        margin: 0 0 8px;
+        font-size: 12px;
+        color: #4b4941;
+        width: 520px;
+        min-height: 48px;
+      }
+
+      .screen {
+        position: relative;
+        width: 520px;
+        height: 440px;
+        overflow: hidden;
+        background: var(--canvas);
+        border: 2px solid #a8b5a9;
+        border-radius: 6px;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        background: rgb(38 36 32 / 0.48);
+        display: flex;
+        padding: 16px;
+        align-items: center;
+        justify-content: center;
+      }
+      .panel {
+        position: relative;
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100% - 32px);
+        background: var(--surface-raised);
+        color: var(--ink);
+        border-radius: 4px;
+        box-shadow:
+          0 2px 8px -2px rgb(38 36 32 / 0.14),
+          0 32px 72px -16px rgb(38 36 32 / 0.3);
+      }
+      .behind {
+        filter: blur(0.4px);
+      }
+      .dhead,
+      .dfoot {
+        padding: 14px 18px;
+        flex: none;
+      }
+      .dhead {
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .dfoot {
+        border-top: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .dtitle {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0;
+      }
+      .ddesc {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      .dbody {
+        padding: 14px 18px;
+        min-height: 0;
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .field label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--ink-2);
+        margin-bottom: 4px;
+      }
+      .field .control {
+        height: 34px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 2px;
+        background: var(--canvas);
+        color: var(--ink);
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
+        font-size: 13px;
+      }
+      .field .control.edited {
+        border-color: var(--accent);
+      }
+      .btn {
+        border: 1px solid var(--border-subtle);
+        background: transparent;
+        color: var(--ink);
+        border-radius: 2px;
+        padding: 7px 14px;
+        font-size: 13px;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--on-accent);
+        border-color: var(--accent);
+      }
+      .btn.danger {
+        color: var(--danger);
+        border-color: var(--danger);
+      }
+      .btn.focused {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .x {
+        position: absolute;
+        inset-inline-end: 14px;
+        top: 12px;
+        color: var(--ink-2);
+        font-size: 16px;
+      }
+
+      /* the stacked alertdialog */
+      .alert-layer {
+        position: absolute;
+        inset: 0;
+        background: rgb(38 36 32 / 0.32);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 3;
+      }
+      .alert {
+        width: 100%;
+        max-width: 340px;
+        background: var(--surface-raised);
+        color: var(--ink);
+        border-radius: 4px;
+        box-shadow:
+          0 2px 8px -2px rgb(38 36 32 / 0.14),
+          0 32px 72px -16px rgb(38 36 32 / 0.3);
+      }
+      .alert .dfoot {
+        flex-wrap: wrap;
+      }
+      .alert p.body {
+        margin: 0;
+        font-size: 13px;
+        color: var(--ink-2);
+      }
+      .pointer {
+        position: absolute;
+        inset-inline-start: 24px;
+        top: 24px;
+        z-index: 4;
+        background: #b3241a;
+        color: #fff;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Blocked dismiss: the unsaved-changes alert</h1>
+    <p class="lede">
+      The form behind has been touched, so the press on the scrim did not close
+      it. The dialog stays mounted and keeps every value; the alert asks the one
+      question the press left open. Focus starts on <em>Keep editing</em>, and
+      Escape on the alert answers <em>Keep editing</em> too.
+    </p>
+
+    <div class="row">
+      <div class="case">
+        <h2>Light</h2>
+        <p>
+          Placeholder data. The edited field is drawn with an accent rule only
+          to show which value would be lost; the product does not mark edited
+          fields.
+        </p>
+        <div class="screen">
+          <div class="pointer">scrim pressed &rarr; refused</div>
+          <div class="overlay">
+            <div class="panel behind">
+              <div class="dhead">
+                <span class="x">&times;</span>
+                <p class="dtitle">New budget</p>
+                <p class="ddesc">A cap for one category, for one month.</p>
+              </div>
+              <div class="dbody">
+                <div class="field">
+                  <label>Name</label>
+                  <div class="control edited">Groceries, October</div>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <div class="control">Food and drink</div>
+                </div>
+                <div class="field">
+                  <label>Cap</label>
+                  <div class="control edited">1 200,00</div>
+                </div>
+              </div>
+              <div class="dfoot">
+                <button class="btn">Cancel</button
+                ><button class="btn primary">Create</button>
+              </div>
+            </div>
+          </div>
+          <div class="alert-layer">
+            <div class="alert">
+              <div class="dhead"><p class="dtitle">Unsaved changes</p></div>
+              <div class="dbody">
+                <p class="body">
+                  This form has changes that have not been saved. Close it now
+                  and they are discarded.
+                </p>
+              </div>
+              <div class="dfoot">
+                <button class="btn danger">Discard changes</button>
+                <button class="btn primary focused">Keep editing</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="case dark">
+        <h2>Dark</h2>
+        <p>
+          The same state in the dark theme; the alert sits on
+          <code>surface-raised</code> over its own scrim so the two layers still
+          separate.
+        </p>
+        <div class="screen">
+          <div class="pointer">scrim pressed &rarr; refused</div>
+          <div class="overlay">
+            <div class="panel behind">
+              <div class="dhead">
+                <span class="x">&times;</span>
+                <p class="dtitle">New budget</p>
+                <p class="ddesc">A cap for one category, for one month.</p>
+              </div>
+              <div class="dbody">
+                <div class="field">
+                  <label>Name</label>
+                  <div class="control edited">Groceries, October</div>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <div class="control">Food and drink</div>
+                </div>
+                <div class="field">
+                  <label>Cap</label>
+                  <div class="control edited">1 200,00</div>
+                </div>
+              </div>
+              <div class="dfoot">
+                <button class="btn">Cancel</button
+                ><button class="btn primary">Create</button>
+              </div>
+            </div>
+          </div>
+          <div class="alert-layer">
+            <div class="alert">
+              <div class="dhead"><p class="dtitle">Unsaved changes</p></div>
+              <div class="dbody">
+                <p class="body">
+                  This form has changes that have not been saved. Close it now
+                  and they are discarded.
+                </p>
+              </div>
+              <div class="dfoot">
+                <button class="btn danger">Discard changes</button>
+                <button class="btn primary focused">Keep editing</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

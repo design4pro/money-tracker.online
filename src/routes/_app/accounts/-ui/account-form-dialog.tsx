@@ -8,6 +8,7 @@ import {
   accountCategoryFacts,
   isAccountCategory,
 } from '#/components/app/accounts'
+import { FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   DatePicker,
@@ -16,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   Form,
-  Modal,
   Select,
   SelectItem,
   Switch,
@@ -147,6 +147,8 @@ export function AccountFormDialog({
     facts.carriesCreditLimit || draft.creditLimitMinor !== null
   const trimmedName = draft.name.trim()
 
+  const isDirty = useIsDirty(draft)
+
   function patch(change: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...change }))
   }
@@ -196,12 +198,11 @@ export function AccountFormDialog({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       size="lg"
-      // A half-filled account form is work. A stray press on the scrim is not consent to lose it.
-      isDismissable={false}
+      isDirty={isDirty}
     >
       <Dialog>
         {({ close }) => (
@@ -359,6 +360,6 @@ export function AccountFormDialog({
           </>
         )}
       </Dialog>
-    </Modal>
+    </FormModal>
   )
 }

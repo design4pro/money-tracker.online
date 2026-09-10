@@ -6,7 +6,7 @@ import {
 
 import { cn } from '#/lib/cn'
 import { Checkbox } from './checkbox'
-import { composeTw, transitionBase } from './shared'
+import { composeTw, controlWash, transitionBase } from './shared'
 
 import type {
   GridListItemProps as RACGridListItemProps,
@@ -128,8 +128,7 @@ export function GridListMoveButton({
       className={cn(
         'grid size-7 place-items-center rounded-md text-ink-2 cursor-pointer target-min',
         transitionBase,
-        'data-[hovered]:bg-hover data-[hovered]:text-ink',
-        'data-[pressed]:bg-press',
+        controlWash,
         'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:outline-offset-2',
         '[&_svg]:size-4',
         className,

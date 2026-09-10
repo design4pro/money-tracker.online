@@ -12,6 +12,7 @@ export type {
   AccountLedgerOptions,
   AccountLedgerState,
   AccountLedgerStorage,
+  LedgerState,
   RebuildOutcome,
   RebuildPort,
 } from './ledger'

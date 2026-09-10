@@ -2,7 +2,7 @@ import { Label as RACLabel, Meter as RACMeter } from 'react-aria-components'
 import { AlertTriangle, Check, TrendingUp } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { composeTw, transitionBase } from './shared'
+import { composeTw, rowWashSecondary, transitionBase } from './shared'
 
 import type { MeterProps as RACMeterProps } from 'react-aria-components'
 import type { ReactNode } from 'react'
@@ -123,8 +123,14 @@ export function Meter({
               ? AlertTriangle
               : Check
 
+        // A meter is often drawn inside a hoverable list row — the credit line on an account
+        // card is one — so its two secondary strings sit on a washed ground rather than on the
+        // plane the token names. `rowWashSecondary` carries `text-ink-2` plus the promotion that
+        // has to travel with it, and its second half never matches outside a `rowWash` ancestor.
         const captionLine = caption ? (
-          <p className="text-caption text-ink-2 tabular">{caption}</p>
+          <p className={cn('text-caption tabular', rowWashSecondary)}>
+            {caption}
+          </p>
         ) : null
 
         return (
@@ -134,7 +140,12 @@ export function Meter({
                 {label === undefined ? (
                   <span />
                 ) : (
-                  <RACLabel className="flex items-center gap-1.5 text-label font-medium text-ink-2">
+                  <RACLabel
+                    className={cn(
+                      'flex items-center gap-1.5 text-label font-medium',
+                      rowWashSecondary,
+                    )}
+                  >
                     <Icon
                       aria-hidden="true"
                       className={cn(
@@ -162,6 +173,21 @@ export function Meter({
                 className={cn(
                   'h-full rounded-sm',
                   transitionBase,
+                  // `negative`, not `negative-bold` — and the difference from
+                  // `AmountMeter`, which took the loud grade for its own danger
+                  // fill in #151, is the track rather than the token.
+                  //
+                  // Which boundary this fill has is the CALLER'S choice, not
+                  // this component's: `dangerAt` is a prop. At its default of `1`
+                  // the danger state needs `percentage >= 100`, which the width
+                  // below clamps to the whole track, so the neighbour is the card
+                  // — and that is every caller today. Set below 1, the fill is
+                  // partial and abuts `border-subtle`, where `negative` holds
+                  // 5.02:1 in dark and `negative-bold` only 3.18:1. A primitive
+                  // that cannot know which one it will get takes the value that
+                  // holds on both. `AmountMeter` can know: `over` means the ratio
+                  // passed 1, so its fill is full by construction and the loud
+                  // grade costs it nothing there.
                   state === 'danger' && 'bg-negative',
                   state === 'warning' && 'bg-warning',
                   // Full is not a virtue here, so the fill is the foreground

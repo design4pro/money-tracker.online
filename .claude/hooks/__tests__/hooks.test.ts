@@ -5,7 +5,12 @@
 // there is the pinned stack (`pnpm add`) and the environment dump. Under GitHub Actions the review
 // job reads untrusted PR content with a write token, so every gh mutation stays blocked there.
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -490,7 +495,18 @@ describe('guard-generated.sh, on a branch that already changes a guarded file', 
   // answer it. `origin/develop` is a local ref: the hook never reaches the network.
   const root = mkdtempSync(join(tmpdir(), 'guard-diff-'))
   const git = (...args: string[]) =>
-    spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' })
+    spawnSync('git', ['-C', root, ...args], {
+      encoding: 'utf8',
+      // `-C` does not win over an inherited `GIT_DIR`: run from a git hook - which is what
+      // `.husky/pre-commit` does - these calls would re-initialise the real repository and
+      // overwrite its identity instead of touching the temporary one.
+      env: {
+        ...process.env,
+        GIT_DIR: undefined,
+        GIT_WORK_TREE: undefined,
+        GIT_INDEX_FILE: undefined,
+      },
+    })
   const write = (rel: string, body: string) => {
     mkdirSync(join(root, rel, '..'), { recursive: true })
     writeFileSync(join(root, rel), body)
@@ -516,6 +532,31 @@ describe('guard-generated.sh, on a branch that already changes a guarded file', 
       { ...env, CLAUDE_PROJECT_DIR: root },
       root,
     )
+
+  // The scrub above, asserted rather than trusted. `.husky/pre-commit` runs this suite from a git
+  // hook, and git exports `GIT_DIR` into every hook process; `-C` does not override it. Before the
+  // scrub, every call in this fixture addressed the repository being committed to rather than
+  // `root`, so `git init` re-initialised it - as bare, since `GIT_DIR` came without
+  // `GIT_WORK_TREE` - and the two `git config` calls overwrote its identity. Nothing went red: the
+  // fixture's later steps failed against the wrong repository, these cases still passed, and the
+  // damage was in the developer's own `.git/config`. This is what would go red.
+  it('addresses the temporary repository even with GIT_DIR inherited', () => {
+    const previous = process.env.GIT_DIR
+    process.env.GIT_DIR = join(root, 'inherited.git')
+    try {
+      const resolved = git('rev-parse', '--absolute-git-dir')
+      expect(resolved.status, resolved.stderr).toBe(0)
+      expect(realpathSync(resolved.stdout.trim())).toBe(
+        realpathSync(join(root, '.git')),
+      )
+    } finally {
+      if (previous === undefined) {
+        delete process.env.GIT_DIR
+      } else {
+        process.env.GIT_DIR = previous
+      }
+    }
+  })
 
   it('lets a cezar run amend a guarded file the branch already changes', () => {
     expect(edit('.ai/trackers/github.md', AGENT).status).toBe(0)
