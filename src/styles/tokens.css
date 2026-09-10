@@ -81,9 +81,15 @@
    instead, and `--color-border-subtle` is a much closer neighbour: this value
    measures 3.18:1 on it in dark and 3.88:1 in light. Both clear 1.4.11, and
    `tokens-contrast.test.ts` asserts them so the grade stays usable by a
-   partial fill - but the margin is thin enough that `src/components/ui/meter.tsx`,
-   whose `dangerAt` prop leaves the adjacency to its caller, deliberately keeps
-   `negative` there instead, at 5.02:1 in dark and 5.92:1 in light.
+   partial fill - but the margin is thin enough that `src/components/ui/meter.tsx`
+   keeps `negative` there instead, at 5.02:1 in dark and 5.92:1 in light, and
+   `tokens-contrast.test.ts` recomputes those two figures as well.
+
+   That primitive reads its own `dangerAt` prop to tell the two adjacencies
+   apart (#180): at `>= 1` the danger state needs `percentage >= 100`, so the
+   fill is the whole track and takes the loud grade like the money meters;
+   below 1 it can stop short on the track and keeps `negative`. One over-limit
+   verdict, one red, without spending the thin margin where it is not forced.
 
    ---------------------------------------------------------------------------
    SURFACE SEPARATION - a design floor, per theme

@@ -253,19 +253,23 @@ describe.each([
 
   /*
    * A fill's neighbour is not always a ground. The tests above measure
-   * `negative-bold` against the five grounds because the over-budget fill it
-   * paints is always the full width of its track — `over` means the ratio passed
-   * 1, which the meter clamps to 100% — so the colour beside it is the card, and
-   * nothing of the track survives to be a boundary.
+   * `negative-bold` against the five grounds because every fill that takes it is
+   * the full width of its track — the money meters' `over` means the ratio passed
+   * 1, and `ui/Meter` only reaches for the grade when `dangerAt >= 1`, which needs
+   * `percentage >= 100` and clamps the width to 100% (#180). So the colour beside
+   * it is the card, and nothing of the track survives to be a boundary.
    *
-   * The track is still the adjacency the moment a fill is PARTIAL, and this
-   * asserts the grade stays usable by one: 3.88:1 in light, 3.18:1 in dark. Both
-   * clear 1.4.11's 3:1, and dark's margin being that thin is the finding, not an
-   * oversight — it is why `src/components/ui/meter.tsx`, whose `dangerAt` prop
-   * leaves the adjacency to its caller, deliberately keeps `negative` at 5.02:1
-   * instead.
+   * The track is the adjacency the moment a fill is PARTIAL, which is `ui/Meter`
+   * below `dangerAt` of 1 — the case that keeps `negative`. Both grades are
+   * measured against it here: which one ships on the track is a decision that has
+   * moved once already, and the figure the decision was made on should be
+   * recomputed on every run rather than quoted from a comment.
+   *
+   * `negative` is 5.92:1 in light and 5.02:1 in dark, `negative-bold` 3.88:1 and
+   * 3.18:1. All four clear 1.4.11's 3:1; dark's bold margin being that thin is
+   * why the partial case takes the text grade rather than the loud one.
    */
-  it.each(GRAPHICAL_FILL_KEYS)(
+  it.each([...GRAPHICAL_FILL_KEYS, 'color-negative'])(
     '%s stays separable from the meter track it can sit in',
     (key) => {
       const ratio = contrast(tokens[key], tokens['color-border-subtle'])

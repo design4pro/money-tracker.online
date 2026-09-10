@@ -109,12 +109,13 @@ const STATE_INK: Record<UtilisationState, string> = {
  * a bar painted in it reads as salmon rather than as a state worth acting on (#151). `positive` and
  * `warning` have no second grade yet and keep their text-grade values.
  *
- * `ui/Meter`'s danger fill stays on `negative` and that is not an oversight to be tidied up later.
  * This fill is only ever full — `over` means the ratio passed 1, which clamps it to the whole track
- * — so the colour beside it is the card, at 4.82:1. `ui/Meter` takes its threshold from a
- * `dangerAt` prop, so a caller can put its fill against the track instead, and there the loud grade
- * measures 3.18:1 against `border-subtle` where `negative` measures 5.02:1. Two meters, two reds,
- * one criterion read on two adjacencies.
+ * — so the colour beside it is the card, at 4.82:1. `ui/Meter` reaches the same conclusion from its
+ * `dangerAt` prop (#180): at `>= 1` its danger fill is full too and takes this grade, so the two
+ * meters now read one over-limit verdict in one red. Below 1 that fill can stop on the track, where
+ * the loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1, so it
+ * keeps `negative`. One criterion, two adjacencies — told apart by the threshold rather than by the
+ * component.
  */
 const STATE_FILL: Record<UtilisationState, string> = {
   under: 'bg-positive',
