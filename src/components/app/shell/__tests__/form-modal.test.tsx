@@ -215,4 +215,35 @@ describe('useIsDirty', () => {
     rerender({ name: 'Bank', amount: 125 })
     expect(result.current).toBe(true)
   })
+
+  // Two of the six dialogs hold list state: `budget-form-dialog`'s thresholds and
+  // categories, `series-form-dialog`'s reminders. A `CheckboxGroup` replaces its
+  // value wholesale on every toggle, so ticking one off and back on hands the hook
+  // a new array holding the same members — an identity comparison would call the
+  // form dirty for the rest of its life over an edit that undid itself.
+  it('compares an array value by its members, not by its identity', () => {
+    const { result, rerender } = renderHook(
+      (draft: { name: string; thresholds: ReadonlyArray<number> }) =>
+        useIsDirty(draft),
+      { initialProps: { name: 'Groceries', thresholds: [80, 100] } },
+    )
+
+    expect(result.current).toBe(false)
+
+    rerender({ name: 'Groceries', thresholds: [80] })
+    expect(result.current).toBe(true)
+
+    rerender({ name: 'Groceries', thresholds: [80, 100] })
+    expect(result.current).toBe(false)
+  })
+
+  it('reads a reordered list as a change, because order is something the user chose', () => {
+    const { result, rerender } = renderHook(
+      (draft: { remindBefore: ReadonlyArray<number> }) => useIsDirty(draft),
+      { initialProps: { remindBefore: [1, 3] } },
+    )
+
+    rerender({ remindBefore: [3, 1] })
+    expect(result.current).toBe(true)
+  })
 })

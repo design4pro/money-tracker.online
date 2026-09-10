@@ -9,6 +9,7 @@ import {
   Modal,
 } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
+import { isSameShallow } from '#/lib/shallow-equal'
 
 import type { ModalProps } from '#/components/ui'
 
@@ -157,21 +158,23 @@ export function FormModal({
  * routes mount the dialog only while it is open and key it by the row being
  * edited: a fresh open is a fresh component, so first render *is* the open.
  *
- * **Value contract.** Each value is compared with `Object.is`, so it must be a
- * primitive or referentially stable while unchanged. That holds for every draft
- * in this repository today — `CalendarDate` and the minor-unit integers are
- * replaced, never mutated — and a violation over-reports rather than
- * under-reports: the guard asks about a form nobody edited, which is a nuisance
- * rather than lost work.
+ * **Value contract.** {@link isSameShallow} compares a list by its members and
+ * everything else with `Object.is`, so a value that is neither must be
+ * referentially stable while unchanged. That holds for every draft in this
+ * repository today — `CalendarDate` and the minor-unit integers are replaced,
+ * never mutated — and a violation over-reports rather than under-reports: the
+ * guard asks about a form nobody edited, which is a nuisance rather than lost
+ * work. The list case is not a nicety: a `CheckboxGroup` replaces its value
+ * wholesale on every toggle, so `budget-form-dialog`'s thresholds and
+ * `series-form-dialog`'s reminders would otherwise read as permanently dirty
+ * after a tick that was undone.
  *
- * It is **not** the hook for a dialog whose state outlives its own open, or one
- * whose draft holds arrays; `filter-bar` is both, and supplies its own
- * expression against a baseline re-taken at each open.
+ * It is **not** the hook for a dialog whose state outlives its own open;
+ * `filter-bar` is one, and supplies its own expression against a baseline
+ * re-taken at each open.
  */
 export function useIsDirty<T extends object>(draft: T): boolean {
   const openedWith = useRef(draft)
 
-  return (Object.keys(draft) as (keyof T)[]).some(
-    (key) => !Object.is(draft[key], openedWith.current[key]),
-  )
+  return !isSameShallow(draft, openedWith.current)
 }

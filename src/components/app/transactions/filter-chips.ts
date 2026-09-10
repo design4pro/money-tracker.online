@@ -11,6 +11,7 @@
 
 import { formatCalendarDate } from '#/lib/i18n'
 import { formatMoney, money } from '#/lib/money'
+import { isSameShallow } from '#/lib/shallow-equal'
 
 import type { Locale, Translate } from '#/lib/i18n'
 import type { CurrencyCode, Minor } from '#/lib/money'
@@ -57,37 +58,16 @@ export function countActiveFilters(filters: LedgerFilters): number {
  * Whether two filter sets narrow the ledger the same way.
  *
  * This is what the filter panel's unsaved-changes guard asks. It cannot use the `useIsDirty` hook
- * the form dialogs share, for two reasons the panel has and they do not: the panel outlives its own
+ * the form dialogs share, for a reason the panel has and they do not: the panel outlives its own
  * open — it is mounted with the bar — so its baseline has to be re-taken at each open rather than at
- * first render; and half of {@link LedgerFilters} is arrays, which a per-key `Object.is` would call
- * changed on every keystroke that rebuilt one.
+ * first render. The comparison underneath is the same one, {@link isSameShallow}, which is what
+ * keeps a panel that half fills {@link LedgerFilters} with arrays honest about them.
  *
  * The comparison walks the keys of both sides rather than a list written out here, so a filter added
- * to {@link LedgerFilters} later is compared without anybody remembering to come back. Order matters
- * inside an array: the panel builds its id lists from the reference order, so a difference in order
- * is a difference the panel did not produce, and over-reporting is the safe direction for a guard.
+ * to {@link LedgerFilters} later is compared without anybody remembering to come back.
  */
 export function isSameFilterView(a: LedgerFilters, b: LedgerFilters): boolean {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
-
-  for (const key of keys) {
-    const left = a[key as keyof LedgerFilters]
-    const right = b[key as keyof LedgerFilters]
-
-    if (Array.isArray(left) && Array.isArray(right)) {
-      if (
-        left.length !== right.length ||
-        left.some((value, index) => !Object.is(value, right[index]))
-      ) {
-        return false
-      }
-      continue
-    }
-
-    if (!Object.is(left, right)) return false
-  }
-
-  return true
+  return isSameShallow(a, b)
 }
 
 function namesFor(

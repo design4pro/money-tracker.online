@@ -238,6 +238,38 @@ test.describe('the transactions filter panel', () => {
     await expect(page.getByRole('dialog')).toBeHidden()
   })
 
+  test('closes without a question after a filter was ticked and unticked again', async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, 'en')
+    await gotoApp(page, '/transactions')
+    await openPanel(page)
+
+    // A checkbox group replaces its whole value on every toggle, so unticking the last option
+    // writes an empty list where the view it opened from has no such narrowing at all. Nothing
+    // was left to discard, so nothing may be asked about.
+    //
+    // Scoped to the payment-method group and driven from the keyboard for the same two reasons
+    // `chooseIncome` is: an account may well be called "Cash" too, and React Aria's input is
+    // visually hidden under the drawn box, so a click lands on the decorative span.
+    const cash = page
+      .getByRole('dialog')
+      .getByRole('group', { name: 'Payment method' })
+      .getByRole('checkbox', { name: 'Cash', exact: true })
+
+    await cash.focus()
+    await page.keyboard.press('Space')
+    await expect(cash).toBeChecked()
+    await page.keyboard.press('Space')
+    await expect(cash).not.toBeChecked()
+
+    await pressEscape(page)
+
+    await expect(alert(page)).toBeHidden()
+    await expect(page.getByRole('dialog')).toBeHidden()
+  })
+
   test('reopening after a discarded edit starts from the applied view', async ({
     page,
     context,

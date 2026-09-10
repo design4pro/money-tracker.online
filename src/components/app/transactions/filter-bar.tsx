@@ -95,15 +95,57 @@ const SORT_LABEL: Record<LedgerSortField, MessageKey> = {
   account: 'transactions.field.account',
 }
 
-/** Drops the keys whose value is an empty array, so `{ tagIds: [] }` never reaches the URL. */
-function prune(filters: LedgerFilters): LedgerFilters {
-  const entries = Object.entries(filters).filter(([, value]) => {
+/**
+ * The draft with every key that narrows nothing taken off — the shape the URL will carry.
+ *
+ * An empty array goes, so `{ tagIds: [] }` never reaches the URL. An amount currency with neither
+ * bound to denominate goes with it: `toSearch` already refuses to emit one, and the panel's own
+ * controls resolve a currency into the draft the moment either amount field is touched, so
+ * keeping it here would let a bound that was typed and cleared again read as a narrowing forever.
+ */
+export function pruneFilters(filters: LedgerFilters): LedgerFilters {
+  const hasAmountBound =
+    filters.amountMinMinor !== undefined || filters.amountMaxMinor !== undefined
+
+  const entries = Object.entries(filters).filter(([key, value]) => {
     if (value === undefined) {
+      return false
+    }
+    if (key === 'amountCurrency' && !hasAmountBound) {
       return false
     }
     return !(Array.isArray(value) && value.length === 0)
   })
   return Object.fromEntries(entries)
+}
+
+/** The draft and the view it was opened from, as the panel's guard compares them. */
+interface PanelView {
+  readonly filters: LedgerFilters
+  readonly sort: LedgerSort
+}
+
+/**
+ * Whether the panel holds a draft that closing would discard.
+ *
+ * Both sides are pruned first, because they reach the comparison in different shapes: the baseline
+ * comes from `toFilters`, which emits no key for a narrowing that is not in force, while the draft
+ * is whatever the controls last wrote. Unticking the last checkbox in a group writes `[]` where
+ * the baseline has no key at all, and clearing an amount leaves the currency the field resolved —
+ * both mean "no narrowing", and a guard that read them otherwise would ask about work nobody did
+ * for the rest of that open.
+ *
+ * Ordering is edited in the same panel and discarded by the same close, so it counts too.
+ */
+export function isPanelDirty(draft: PanelView, openedWith: PanelView): boolean {
+  return (
+    !isSameFilterView(
+      pruneFilters(draft.filters),
+      pruneFilters(openedWith.filters),
+    ) ||
+    draft.sort.field !== openedWith.sort.field ||
+    draft.sort.direction !== openedWith.sort.direction
+  )
 }
 
 /* -------------------------------------------------------------------------- */
@@ -321,11 +363,10 @@ export function FilterBar({
     setPanelOpen(true)
   }
 
-  // Ordering is edited in the same panel and discarded by the same close, so it counts.
-  const isPanelDirty =
-    !isSameFilterView(panelDraft, openedWith.current.filters) ||
-    sortDraft.field !== openedWith.current.sort.field ||
-    sortDraft.direction !== openedWith.current.sort.direction
+  const isDirty = isPanelDirty(
+    { filters: panelDraft, sort: sortDraft },
+    openedWith.current,
+  )
 
   const chips = useMemo(
     () => describeFilters({ filters, reference, t, locale }),
@@ -347,7 +388,7 @@ export function FilterBar({
   const maxDate = today(getLocalTimeZone()).add({ years: 5 })
 
   const update = (patch: LedgerFilters) =>
-    onViewChange(prune({ ...filters, ...patch }), sort)
+    onViewChange(pruneFilters({ ...filters, ...patch }), sort)
 
   const patchDraft = (patch: LedgerFilters) =>
     setPanelDraft((current) => ({ ...current, ...patch }))
@@ -403,7 +444,7 @@ export function FilterBar({
           placement="drawer-end"
           isOpen={isPanelOpen}
           onOpenChange={setPanelOpen}
-          isDirty={isPanelDirty}
+          isDirty={isDirty}
         >
           <Dialog>
             {({ close }) => (
@@ -628,7 +669,7 @@ export function FilterBar({
                   <Button
                     variant="primary"
                     onPress={() => {
-                      onViewChange(prune(panelDraft), sortDraft)
+                      onViewChange(pruneFilters(panelDraft), sortDraft)
                       setPanelOpen(false)
                     }}
                   >
