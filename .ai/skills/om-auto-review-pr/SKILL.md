@@ -61,7 +61,8 @@ additions to step 2 and step 11:
 ## Rules
 
 - Never apply `qa-approved` or `qa-self-verified`.
-- Never add `review-threads`. It is the human trigger for the `pr-review-threads` automation, and a
+- Never add `review-threads`. The `claude-review` job applies it from
+  `scripts/ci/review-threads-label.mjs`, once per head SHA, when a review leaves live threads, and a
   skill that applies it after leaving threads open would start a run on its own work. Name the open
   threads in the report instead and let a person decide.
 - Pending CI is not a reason to wait: the browser suite runs on every PR and finishes in minutes.
