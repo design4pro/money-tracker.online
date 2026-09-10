@@ -1,7 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from './support/console'
 
-import { gotoApp, useLocale, useTheme } from './support/app'
 // The axe-core meter defect is corrected in `support/axe-defects.ts` rather than here, because
 // `.github/a11y/axe-scan.mjs` scans the same pages and has to forgive the same node. Two copies of
 // a three-condition correction with a 2027 re-check date would drift on the first edit.
@@ -9,11 +8,13 @@ import {
   RAC_METER_FALLBACK_ROLE,
   withoutKnownAxeDefects,
 } from './support/axe-defects'
-import { storageStateFor } from './support/session'
+// The surface list and the way a surface is opened are shared with `contrast-enhanced.spec.ts`.
+import { ACCOUNTS, openSurface, SURFACES } from './support/surfaces'
 
 import type { AppLocale, AppTheme } from './support/app'
 import type { Violation } from './support/axe-defects'
-import type { Browser, BrowserContext, Page } from '@playwright/test'
+import type { Surface } from './support/surfaces'
+import type { Browser } from '@playwright/test'
 
 /**
  * `@axe-core/playwright` over the four screens a reader cannot avoid, in both themes and both
@@ -59,52 +60,6 @@ const WCAG_AA_TAGS = [
   'wcag22aa',
 ] as const
 
-interface Surface {
-  readonly name: string
-  readonly path: string
-  /** `undefined` = the signed-out visitor, which is the only way to see `/login`. */
-  readonly session: 'demo' | undefined
-}
-
-/**
- * The screens a reader cannot avoid: the four named in the brief, plus the three that wave 3 added.
- *
- * They are read with the seeded demo session, never written to, so `scripts/seed/verify.mjs` still
- * finds every counter it asserts. Reading the *demo* workspace also matters for what axe sees:
- * `/transactions` there is a populated grid and `/dashboard` a populated set of cards, so the scan
- * covers rendered rows, badges and figures rather than seven empty-state illustrations.
- *
- * `/budgets`, `/recurring` and `/goals` are here rather than only in their own per-route specs
- * because those specs assert the plans' narrower bar — zero `serious`, zero `critical`, one theme,
- * one locale. This file's bar is every WCAG A/AA violation at any impact, in **both** themes and
- * **both** locales, and the three new surfaces carry exactly the things that axis catches: a
- * hand-written `role="meter"` whose accessible value is a sentence, a status word that must survive
- * translation, and a hue per verdict in two palettes. Their detail routes are not listed: an id in
- * the path makes the surface a seeded row rather than a route, and the per-route visual specs
- * already scan those with the same rule set.
- */
-/** Named, because the meter case at the foot of this file opens this same surface. */
-const ACCOUNTS: Surface = {
-  name: 'accounts',
-  path: '/accounts',
-  session: 'demo',
-}
-
-const SURFACES: readonly Surface[] = [
-  // The landing page is first because it is the only surface most visitors ever load, and
-  // because its own copy now states that WCAG 2.2 AA is enforced by a gate that fails the build.
-  // A page making that claim while sitting outside the gate would be the one accessibility
-  // falsehood this product cannot afford.
-  { name: 'landing', path: '/', session: undefined },
-  { name: 'sign in', path: '/login', session: undefined },
-  { name: 'dashboard', path: '/dashboard', session: 'demo' },
-  ACCOUNTS,
-  { name: 'transactions', path: '/transactions', session: 'demo' },
-  { name: 'budgets', path: '/budgets', session: 'demo' },
-  { name: 'recurring', path: '/recurring', session: 'demo' },
-  { name: 'savings goals', path: '/goals', session: 'demo' },
-]
-
 const THEMES: readonly AppTheme[] = ['light', 'dark']
 const LOCALES: readonly AppLocale[] = ['en', 'pl']
 
@@ -140,48 +95,6 @@ function report(violations: readonly Violation[], label: string): string {
     `${violations.length} WCAG A/AA violation(s) on ${label}:\n` +
     violations.map(describeViolation).join('\n')
   )
-}
-
-/**
- * A context and a hydrated page for one surface, in one theme and one locale.
- *
- * The caller owns the context and must close it — which is why this answers both.
- */
-async function openSurface(
-  browser: Browser,
-  surface: Surface,
-  theme: AppTheme,
-  locale: AppLocale,
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext(
-    surface.session === undefined
-      ? { storageState: { cookies: [], origins: [] } }
-      : { storageState: storageStateFor(surface.session) },
-  )
-
-  // Both before the first navigation: the locale is negotiated on the server from this cookie,
-  // and the theme is applied by the pre-paint bootstrap script. Applied afterwards, each would
-  // scan a document that corrected itself after axe had already read it.
-  await useLocale(context, locale)
-  const page = await context.newPage()
-  await useTheme(page, theme)
-
-  await gotoApp(page, surface.path)
-  // Axe reads the accessibility tree, which is only final once React has attached its handlers
-  // and its `aria-*` state — `gotoApp` waits for that. `main` being visible is the extra claim
-  // that the route resolved rather than landing on an error boundary that would scan clean.
-  await expect(page.locator('main')).toBeVisible()
-  await expect(page.locator('html')).toHaveAttribute('lang', locale)
-
-  // WCAG 2.2 §2.4.2: the tab names the page before the product, in the reader's language - the
-  // same words as the screen's own `<h1>`, composed by `src/routes/-lib/page-title.ts`. The
-  // landing page is the one surface that keeps the root's sentence, by design.
-  if (surface.path !== '/') {
-    const heading = (await page.locator('h1').first().innerText()).trim()
-    await expect(page).toHaveTitle(`${heading} · Money Tracker`)
-  }
-
-  return { context, page }
 }
 
 async function scan(

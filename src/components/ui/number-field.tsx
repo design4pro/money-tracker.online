@@ -7,7 +7,7 @@ import { Minus, Plus } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
 import { Description, FieldError, FieldGroup, Label, fieldRow } from './field'
-import { composeTw, fieldSizes, transitionBase } from './shared'
+import { composeTw, controlWash, fieldSizes, transitionBase } from './shared'
 
 import type { NumberFieldProps as RACNumberFieldProps } from 'react-aria-components'
 import type { ReactNode } from 'react'
@@ -35,8 +35,7 @@ const stepperClasses = cn(
   'grid place-items-center self-stretch w-9 shrink-0 text-ink-2 cursor-pointer',
   'target-min',
   transitionBase,
-  'data-[hovered]:bg-hover data-[hovered]:text-ink',
-  'data-[pressed]:bg-press',
+  controlWash,
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
   'outline-focus data-[focus-visible]:outline-2 data-[focus-visible]:outline-solid data-[focus-visible]:-outline-offset-2',
   '[&_svg]:size-4',

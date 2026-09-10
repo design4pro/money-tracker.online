@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 
-import { Badge } from '#/components/ui'
+import { Badge, rowWash, rowWashSecondary } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
@@ -63,7 +63,7 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
     <li
       className={cn(
         'relative flex flex-col gap-3 border-t border-border-subtle px-4 py-4 first:rounded-t-xl first:border-t-0 last:rounded-b-xl',
-        'transition-colors duration-fast hover:bg-hover',
+        rowWash,
         isPaused && 'bg-surface-sunken',
       )}
     >
@@ -93,7 +93,12 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
               {series.name}
             </Link>
           </h3>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
+          <p
+            className={cn(
+              'mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption',
+              rowWashSecondary,
+            )}
+          >
             <span>{t(`recurring.kind.${series.kind as RecurringKind}`)}</span>
             <span aria-hidden="true">·</span>
             <span>
@@ -160,7 +165,7 @@ function DueNote({
   const locale = useLocale()
 
   if (next === null) {
-    return <span className="text-ink-2">{t('recurring.due.none')}</span>
+    return <span className={rowWashSecondary}>{t('recurring.due.none')}</span>
   }
 
   const days = daysBetween(today, next.dueOn)
@@ -178,13 +183,13 @@ function DueNote({
   }
   if (days <= 7) {
     return (
-      <span className="text-ink-2">
+      <span className={rowWashSecondary}>
         {t('recurring.due.in', { count: days })}
       </span>
     )
   }
   return (
-    <span className="text-ink-2">
+    <span className={rowWashSecondary}>
       {t('recurring.due.on', {
         date: formatCalendarDate(locale, next.dueOn, 'medium'),
       })}

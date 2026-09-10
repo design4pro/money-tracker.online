@@ -46,23 +46,75 @@ function parse(source: string): Record<string, string> {
   return out
 }
 
+/** The translucent tokens, which `parse` skips: `rgb(r g b / a)`. */
+function parseWashes(source: string): Record<string, Wash> {
+  const out: Record<string, Wash> = {}
+  const re =
+    /--(color-[a-z0-9-]+):\s*rgb\((\d+)\s+(\d+)\s+(\d+)\s*\/\s*([0-9.]+)\)\s*;/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(source)) !== null) {
+    out[match[1]] = {
+      rgb: [Number(match[2]), Number(match[3]), Number(match[4])],
+      alpha: Number(match[5]),
+    }
+  }
+  return out
+}
+
+interface Wash {
+  readonly rgb: readonly [number, number, number]
+  readonly alpha: number
+}
+
 const light = parse(lightSource)
 const dark = parse(darkSource)
+const lightWashes = parseWashes(lightSource)
+const darkWashes = parseWashes(darkSource)
 
 function channel(value: number): number {
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
 }
 
-function luminance(hex: string): number {
+function rgbOf(hex: string): [number, number, number] {
   const [r, g, b] = [1, 3, 5].map((i) =>
-    channel(Number.parseInt(hex.slice(i, i + 2), 16) / 255),
+    Number.parseInt(hex.slice(i, i + 2), 16),
   )
+  return [r, g, b]
+}
+
+function luminance(rgb: readonly [number, number, number]): number {
+  const [r, g, b] = rgb.map((value) => channel(value / 255))
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-function contrast(a: string, b: string): number {
+function contrastRgb(
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
   return (hi + 0.05) / (lo + 0.05)
+}
+
+function contrast(a: string, b: string): number {
+  return contrastRgb(rgbOf(a), rgbOf(b))
+}
+
+/**
+ * The ground a translucent wash actually leaves behind.
+ *
+ * `--color-hover` and `--color-press` are painted *over* an opaque plane rather
+ * than replacing it, so the pair a reader sees under the pointer is the text
+ * against this composite — never against the plane the token names.
+ */
+function washOver(
+  wash: Wash,
+  ground: readonly [number, number, number],
+): [number, number, number] {
+  const [r, g, b] = ground.map(
+    (channelValue, index) =>
+      wash.rgb[index] * wash.alpha + channelValue * (1 - wash.alpha),
+  )
+  return [r, g, b]
 }
 
 const GROUND_KEYS = [
@@ -174,6 +226,113 @@ describe.each([
       ).toBeGreaterThanOrEqual(3)
     }
   })
+})
+
+/**
+ * The interaction washes, composited onto the planes they are painted over.
+ *
+ * Every assertion above measures text at rest, against one of the five opaque
+ * grounds. A row under the pointer is not at rest: `--color-hover` is a
+ * low-alpha veil drawn *over* whichever plane the row sits on, so the ground
+ * the reader actually sees is the composite and the ratio moves with it.
+ *
+ * Nothing sampled that state until issue #20 — neither this file, which knew
+ * only the opaque planes, nor axe, which never hovers. The gap is what let a
+ * pair below the 7:1 floor this palette is designed to (`docs/SPEC.md` §10)
+ * ship unseen. Nothing there failed AA; what failed was our own claim.
+ */
+const WASH_KEYS = ['color-hover', 'color-press'] as const
+
+describe.each([
+  ['light', light, lightWashes],
+  ['dark', dark, darkWashes],
+])('%s interaction washes', (themeName, tokens, washes) => {
+  it('declares both washes with an alpha this file can composite', () => {
+    const missing = WASH_KEYS.filter((key) => !(key in washes))
+    expect(missing, `${themeName}: undeclared washes`).toEqual([])
+  })
+
+  /*
+   * The promotions in `rowWash` / `rowWashSecondary` and `controlWash`
+   * (`components/ui/shared.ts`) move washed secondary text to `ink`, so this is
+   * the floor both of them land on. It has to hold on every plane and under
+   * both washes: a hovered archived row is `surface-sunken` under `hover`, and a
+   * control activated from the keyboard is `press` with no hover beside it.
+   */
+  it('keeps --color-ink at 7:1 on every washed ground', () => {
+    for (const wash of WASH_KEYS) {
+      for (const ground of GROUND_KEYS) {
+        const washed = washOver(washes[wash], rgbOf(tokens[ground]))
+        const measured = contrastRgb(rgbOf(tokens['color-ink']), washed)
+        expect(
+          measured,
+          `${themeName}: --color-ink on --${ground} under --${wash} is ${measured.toFixed(2)}:1`,
+        ).toBeGreaterThanOrEqual(7)
+      }
+    }
+  })
+
+  /*
+   * The honest number, and the reason the promotion exists. `ink-2` sits closer
+   * to the ground than `ink` does, so the veil costs it more: the worst pair is
+   * 5.08:1 (dark, `press` over `surface-raised`) and even plain `hover` drops it
+   * to 6.73:1 in dark and 6.69:1 in light. All of those clear AA and none clears
+   * 7:1, which is exactly the shape of issue #20.
+   *
+   * If this ever starts failing, `ink-2` now survives every wash on its own and
+   * `rowWashSecondary` / `controlWash` can be reconsidered — until then, deleting
+   * either promotion puts the failing pair straight back on the page. Nothing
+   * rendered can catch that: axe neither hovers nor holds a key down.
+   */
+  it('records that --color-ink-2 does not survive a wash, which is why rows promote', () => {
+    const worst = Math.min(
+      ...WASH_KEYS.flatMap((wash) =>
+        GROUND_KEYS.map((ground) =>
+          contrastRgb(
+            rgbOf(tokens['color-ink-2']),
+            washOver(washes[wash], rgbOf(tokens[ground])),
+          ),
+        ),
+      ),
+    )
+    expect(
+      worst,
+      `${themeName}: worst washed --color-ink-2 pair is ${worst.toFixed(2)}:1`,
+    ).toBeLessThan(7)
+    // …but never below AA, which is the gate rather than the claim.
+    expect(worst).toBeGreaterThanOrEqual(4.5)
+  })
+
+  /*
+   * The verdict hues get no promotion, so they carry the wash themselves.
+   *
+   * `ink-2` can be promoted to `ink` under a wash because grey is a weight, not
+   * a meaning. `negative` cannot: an overdrawn balance repainted in the body ink
+   * stops saying it is overdrawn. So these four have to hold 7:1 on the washed
+   * ground unaided, and dark `--color-negative` was lightened to #f6a898 to make
+   * that true — it measured 6.76:1 here before issue #20.
+   *
+   * `surface` is the plane, not every ground: it is where every live list row
+   * sits. An *archived* row moves to `surface-sunken`, and in light that lands
+   * `positive`, `negative` and `warning` at 6.87-6.97:1 — measured, recorded in
+   * the PR for issue #20, and not fixed here, because closing it means moving
+   * three light hues rather than one dark one. `e2e/contrast-enhanced.spec.ts`
+   * is what would go red the day the seed renders such a row.
+   */
+  it.each(['color-brand', 'color-positive', 'color-negative', 'color-warning'])(
+    '%s carries the hover wash on --color-surface unaided',
+    (key) => {
+      const washed = washOver(
+        washes['color-hover'],
+        rgbOf(tokens['color-surface']),
+      )
+      const measured = contrastRgb(rgbOf(tokens[key]), washed)
+      expect(
+        measured,
+        `${themeName}: --${key} on washed --color-surface is ${measured.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(7)
+    },
+  )
 })
 
 describe('the two themes are separately designed', () => {
