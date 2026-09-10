@@ -5,6 +5,7 @@ import {
   Modal as RACModal,
   ModalOverlay as RACModalOverlay,
 } from 'react-aria-components'
+import { createContext, useContext, useEffect, useId, useState } from 'react'
 import { X } from 'lucide-react'
 import { cva } from 'class-variance-authority'
 
@@ -161,6 +162,22 @@ export interface DialogProps extends Omit<RACDialogProps, 'className'> {
 }
 
 /**
+ * How the header's description reaches the dialog that has to point
+ * `aria-describedby` at it.
+ *
+ * The id has to travel **upward**: the paragraph is rendered by `DialogHeader`,
+ * a child of the element carrying the attribute, and whether there is a
+ * description at all is something only the header knows. React Aria does expose
+ * a description slot, but `useDialog` mints that id for `role="alertdialog"`
+ * only, so an ordinary dialog would still describe nothing.
+ *
+ * `null` outside a `Dialog`, where there is nothing to describe.
+ */
+const DialogDescriptionContext = createContext<
+  ((id: string | undefined) => void) | null
+>(null)
+
+/**
  * The dialog body. Always inside a `Modal`.
  *
  * `role` defaults to `dialog`; pass `role="alertdialog"` for a destructive
@@ -173,12 +190,23 @@ export interface DialogProps extends Omit<RACDialogProps, 'className'> {
  * explicitly. `min-h-0 flex-1` needs no bound to be inherited: the panel's own
  * height is the constraint, whichever variant supplied it.
  */
-export function Dialog({ className, ...props }: DialogProps) {
+export function Dialog({ className, children, ...props }: DialogProps) {
+  const [describedBy, setDescribedBy] = useState<string>()
+
   return (
     <RACDialog
+      // Before the spread, so a caller passing its own `aria-describedby` still
+      // wins over the header's.
+      aria-describedby={describedBy}
       {...props}
       className={cn('flex min-h-0 flex-1 flex-col outline-hidden', className)}
-    />
+    >
+      {(renderProps) => (
+        <DialogDescriptionContext.Provider value={setDescribedBy}>
+          {typeof children === 'function' ? children(renderProps) : children}
+        </DialogDescriptionContext.Provider>
+      )}
+    </RACDialog>
   )
 }
 
@@ -213,6 +241,16 @@ export function DialogHeader({
   onClose,
   className,
 }: DialogHeaderProps) {
+  const descriptionId = useId()
+  const registerDescription = useContext(DialogDescriptionContext)
+  const hasDescription = Boolean(description)
+
+  useEffect(() => {
+    if (registerDescription === null) return
+    registerDescription(hasDescription ? descriptionId : undefined)
+    return () => registerDescription(undefined)
+  }, [registerDescription, descriptionId, hasDescription])
+
   return (
     <div
       className={cn(
@@ -228,7 +266,9 @@ export function DialogHeader({
           {title}
         </RACHeading>
         {description ? (
-          <p className="mt-1 text-caption text-ink-2">{description}</p>
+          <p id={descriptionId} className="mt-1 text-caption text-ink-2">
+            {description}
+          </p>
         ) : null}
       </div>
       {hideClose ? null : (
