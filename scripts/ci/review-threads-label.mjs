@@ -111,21 +111,74 @@ function gh(args, input) {
 function graphql(query, variables) {
   const args = ['api', 'graphql', '-f', `query=${query}`]
   for (const [key, value] of Object.entries(variables))
-    args.push('-F', `${key}=${value}`)
+    // `-F` types the value, which is what makes `number` an Int rather than a string. `-f` is what
+    // keeps every other variable a string, including a page cursor that happens to be all digits.
+    args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`)
   return JSON.parse(gh(args))
 }
 
 const THREADS_QUERY = `
-query($owner:String!,$repo:String!,$number:Int!){
+query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$number){
       labels(first:100){ nodes{ name } }
-      reviewThreads(first:100){
+      reviewThreads(first:100,after:$cursor){
+        pageInfo{ hasNextPage endCursor }
         nodes{ isResolved isOutdated comments(first:1){ nodes{ author{ login } } } }
       }
     }
   }
 }`
+
+/**
+ * Every review thread on the pull request, flattened into the two inputs `decide` reads.
+ *
+ * One page is 100 threads and a pull request that has been through several review rounds has more.
+ * Reading the first page alone hands `decide` a set with nothing open in it, and the `skip` it
+ * returns is word for word the one a genuinely clean pull request produces - so the pull request
+ * is never armed and the job log says nothing was wrong. Walking to the end of the connection is
+ * what closes that, and unlike a bigger or a last-page read it does not depend on which order
+ * GitHub returns the threads in.
+ *
+ * `fetchPage` is injected for the reason `decide` is exported: the walk is then a table of pages
+ * rather than something that only happens against GitHub.
+ *
+ * @param {(cursor: string | null) => {
+ *   labels: { nodes: Array<{ name: string }> },
+ *   reviewThreads: {
+ *     pageInfo: { hasNextPage: boolean, endCursor: string | null },
+ *     nodes: Array<{
+ *       isResolved: boolean,
+ *       isOutdated: boolean,
+ *       comments: { nodes: Array<{ author: { login: string } | null }> },
+ *     }>,
+ *   },
+ * }} fetchPage
+ * @returns {{
+ *   threads: Array<{ isResolved: boolean, isOutdated: boolean, author: string }>,
+ *   labels: string[],
+ * }}
+ */
+export function readReviewState(fetchPage) {
+  const threads = []
+  let labels = []
+  let cursor = null
+  for (;;) {
+    const pr = fetchPage(cursor)
+    // Labels hang off the pull request, not the page, so every page repeats them; the last read
+    // wins and they are identical either way.
+    labels = pr.labels.nodes.map((label) => label.name)
+    for (const thread of pr.reviewThreads.nodes)
+      threads.push({
+        isResolved: thread.isResolved,
+        isOutdated: thread.isOutdated,
+        author: thread.comments.nodes[0]?.author?.login ?? '',
+      })
+    const { hasNextPage, endCursor } = pr.reviewThreads.pageInfo
+    if (!hasNextPage) return { threads, labels }
+    cursor = endCursor
+  }
+}
 
 function main() {
   const repo = process.env.GH_REPO ?? ''
@@ -139,14 +192,16 @@ function main() {
     process.exit(1)
   }
 
-  const pr = graphql(THREADS_QUERY, { owner, repo: name, number }).data
-    .repository.pullRequest
-  const threads = pr.reviewThreads.nodes.map((thread) => ({
-    isResolved: thread.isResolved,
-    isOutdated: thread.isOutdated,
-    author: thread.comments.nodes[0]?.author?.login ?? '',
-  }))
-  const labels = pr.labels.nodes.map((label) => label.name)
+  const { threads, labels } = readReviewState((cursor) =>
+    graphql(THREADS_QUERY, {
+      owner,
+      repo: name,
+      number,
+      // Omitted rather than passed as null on the first page: `gh -f cursor=` would send the empty
+      // string, and `after:""` is not `after:null`.
+      ...(cursor === null ? {} : { cursor }),
+    }).data.repository.pullRequest,
+  )
 
   const comments = JSON.parse(
     gh([
