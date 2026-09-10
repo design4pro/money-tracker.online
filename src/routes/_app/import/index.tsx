@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 
+import { ErrorPanel } from '#/components/app/accounts'
 import { Card } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { listAccounts } from '#/server/fns/accounts'
@@ -9,6 +10,7 @@ import { pageHead } from '#/routes/-lib/page-title'
 
 import { loadImportSources } from './-server/sources'
 import { ImportHistory } from './-ui/import-history'
+import { ImportPageSkeleton } from './-ui/import-states'
 import { Notice } from './-ui/notice'
 import { UploadCard } from './-ui/upload-card'
 
@@ -49,9 +51,36 @@ export const Route = createFileRoute('/_app/import/')({
     ])
     return { catalogue, accounts, history }
   },
+  pendingComponent: ImportPageSkeleton,
+  errorComponent: ImportPageError,
   head: ({ matches }) => pageHead(matches, (t) => t('import.title')),
   component: ImportIndexRoute,
 })
+
+/**
+ * The page did not load — which, on this screen, is a sentence about what was *not* uploaded.
+ *
+ * The loader is three reads and no write, so nothing a reader was part-way through can have been
+ * disturbed by the failure. Saying so is the first thing somebody standing over a bank statement
+ * needs to know, before the retry is worth offering.
+ */
+function ImportPageError({
+  error,
+  reset,
+}: {
+  readonly error: Error
+  readonly reset: () => void
+}) {
+  const t = useTranslate()
+  return (
+    <ErrorPanel
+      title={t('import.load.error.title')}
+      body={t('import.load.error.body')}
+      detail={error.message}
+      onRetry={reset}
+    />
+  )
+}
 
 function ImportIndexRoute() {
   const t = useTranslate()
