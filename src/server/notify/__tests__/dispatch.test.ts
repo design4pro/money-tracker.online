@@ -9,7 +9,6 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { createLogger } from '#/server/observability/logger'
 import {
   addSecondMember,
   createBudgetWorld,
@@ -23,7 +22,6 @@ import {
 import { setNotificationEmailEnqueuer } from '../email'
 import { notify } from '../dispatch'
 
-import type { LogRecord } from '#/server/observability/logger'
 import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
 import type { NotificationEmailArgs } from '../email'
 
@@ -48,23 +46,10 @@ const thresholdPayload = {
 const exceededPayload = { ...thresholdPayload, overspentMinor: 5_000 } as const
 
 let world: BudgetWorld
-let records: Array<LogRecord>
 let enqueued: Array<NotificationEmailArgs>
-
-function logger() {
-  return createLogger({
-    level: 'debug',
-    sink: {
-      write: (record) => {
-        records.push(record)
-      },
-    },
-  })
-}
 
 beforeEach(async () => {
   world = await createBudgetWorld()
-  records = []
   enqueued = []
   setNotificationEmailEnqueuer(async (_scope, args) => {
     enqueued.push(args)
@@ -88,7 +73,6 @@ describe('the dedupe key', () => {
             kind: DIGESTIBLE,
             payload: thresholdPayload,
             dedupeKey: 'budget:threshold:v1:budget-1:2026-03-01:80',
-            logger: logger(),
           },
           AT,
         ),
@@ -102,7 +86,7 @@ describe('the dedupe key', () => {
 })
 
 describe('the membership check', () => {
-  it('writes nothing for a userId who is not a member, and says so', async () => {
+  it('writes nothing for a userId who is not a member', async () => {
     const outcome = await notify(
       world.scope,
       {
@@ -110,23 +94,12 @@ describe('the membership check', () => {
         kind: DIGESTIBLE,
         payload: thresholdPayload,
         dedupeKey: 'k',
-        logger: logger(),
       },
       AT,
     )
 
     expect(outcome).toBe('skipped')
     expect(await countUnread(world.scope)).toBe(0)
-    expect(
-      records.some((record) =>
-        record.msg.includes('addressed to a non-member'),
-      ),
-    ).toBe(true)
-    // The message names the workspace but never the person, so a log is not a membership oracle.
-    const warned = records.find((record) =>
-      record.msg.includes('addressed to a non-member'),
-    )
-    expect(JSON.stringify(warned)).not.toContain('user-b')
   })
 
   it('writes for somebody who joined the workspace', async () => {
@@ -140,7 +113,6 @@ describe('the membership check', () => {
           kind: DIGESTIBLE,
           payload: thresholdPayload,
           dedupeKey: 'k',
-          logger: logger(),
         },
         AT,
       ),
@@ -289,7 +261,6 @@ describe('the email leg', () => {
         kind: IMMEDIATE,
         payload: exceededPayload,
         dedupeKey: 'k',
-        logger: logger(),
       },
       AT,
     )
@@ -298,9 +269,6 @@ describe('the email leg', () => {
     // dedupe key that is already taken.
     expect(outcome).toBe('written')
     expect(await countUnread(world.scope)).toBe(1)
-    expect(
-      records.some((record) => record.msg.includes('could not be enqueued')),
-    ).toBe(true)
   })
 
   it('is suppressed by suppressEmail, and the row still lands', async () => {
@@ -364,17 +332,10 @@ describe('notify never throws at its caller', () => {
         kind: DIGESTIBLE,
         payload: thresholdPayload,
         dedupeKey: 'k',
-        logger: logger(),
       },
       AT,
     )
 
     expect(outcome).toBe('failed')
-    expect(
-      records.some(
-        (record) =>
-          record.level === 'error' && record.msg.includes('dispatch failed'),
-      ),
-    ).toBe(true)
   })
 })

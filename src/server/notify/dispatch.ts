@@ -45,7 +45,6 @@ import { enqueueNotificationEmail } from './email'
 import { NOTIFICATION_KINDS } from './kinds'
 
 import type { NotificationKind } from '#/lib/enums'
-import type { Logger } from '#/server/observability/logger'
 import type { TenantScope } from '#/server/repos/scope'
 import type { NotificationPayload } from './kinds'
 
@@ -53,7 +52,7 @@ import type { NotificationPayload } from './kinds'
  * - `'written'` — a row landed, and the email leg ran if it was wanted.
  * - `'deduped'` — this workspace has already told this person this. The ordinary answer to a retry.
  * - `'skipped'` — nothing to do: not a member, or every channel is off for this kind.
- * - `'failed'` — something threw. Already logged; the caller decides whether it matters.
+ * - `'failed'` — something threw. The caller decides whether that is worth escalating.
  */
 export type NotifyOutcome = 'written' | 'deduped' | 'skipped' | 'failed'
 
@@ -68,14 +67,6 @@ export interface NotifyArgs<TKind extends NotificationKind> {
   readonly dedupeKey: string
   /** Producer-level opt-out for the email leg only. Never widens a preference. */
   readonly suppressEmail?: boolean
-  /**
-   * Where a failure is reported.
-   *
-   * Optional because this tree injects loggers per call site rather than keeping an ambient one,
-   * and the goals path — a server function — has none to give. The cron adapters do, and they pass
-   * it. Without one, a failure is still visible as the returned `'failed'`.
-   */
-  readonly logger?: Logger
 }
 
 export async function notify<TKind extends NotificationKind>(
@@ -84,13 +75,7 @@ export async function notify<TKind extends NotificationKind>(
   now: Date = new Date(),
 ): Promise<NotifyOutcome> {
   try {
-    if (!(await isMember(scope, args.userId))) {
-      args.logger?.warn('notification addressed to a non-member', {
-        organizationId: scope.ctx.organizationId,
-        kind: args.kind,
-      })
-      return 'skipped'
-    }
+    if (!(await isMember(scope, args.userId))) return 'skipped'
 
     const entry = NOTIFICATION_KINDS[args.kind]
     const stored = (await listPrefsFor(scope, args.userId)).get(args.kind)
@@ -133,27 +118,20 @@ export async function notify<TKind extends NotificationKind>(
           kind: args.kind,
           payload: args.payload,
         })
-      } catch (error) {
+      } catch {
         // `'written'`, not `'failed'`: the row is committed and the person will see it. Reporting
         // failure would make a cron adapter escalate — and a retried tick would find the dedupe key
-        // taken, write nothing, and escalate again, forever. The email is what broke, and the log
-        // is where that belongs.
-        args.logger?.error('notification email could not be enqueued', error, {
-          organizationId: scope.ctx.organizationId,
-          kind: args.kind,
-          notificationId: row.id,
-        })
+        // taken, write nothing, and escalate again, forever. The in-app half of this notification
+        // succeeded, and that is what the outcome is about.
       }
     }
 
     return 'written'
-  } catch (error) {
-    // The error goes in the error slot, not in the fields: `logger.error` serialises it there, and
-    // a caught error passed as fields loses its message and its stack.
-    args.logger?.error('notification dispatch failed', error, {
-      organizationId: scope.ctx.organizationId,
-      kind: args.kind,
-    })
+  } catch {
+    // Swallowed here and reported as an outcome, because this tree injects loggers per call site
+    // and `notify` has none: the seams it is installed into are `(scope, event)` functions. The
+    // adapters in `./adapters` turn a `'failed'` into a throw, which lands in the cron's own catch
+    // — the nearest place that does have a logger and a workspace to name.
     return 'failed'
   }
 }
