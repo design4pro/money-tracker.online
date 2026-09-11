@@ -293,25 +293,28 @@ jobs:
     strategy:
       fail-fast: false
       # `include:` rather than two axes, because the legs are deliberately
-      # uneven. Measured on `develop` c730f99 (run 34598125641): `mobile-safari`
-      # spent 868s of its 900s budget, `chromium` 648s, and the fixed cost a leg
-      # pays before its first test - checkout, build, seeded D1, server, the
-      # `setup` project - is ~152s of either figure.
+      # uneven. Two clocks, and they measure different things: `globalTimeout`
+      # caps the Playwright process at 900s, while `timeout-minutes` below caps
+      # the whole job - so the ~152s a leg spends before that process starts
+      # (checkout, build, seeded D1, server) is charged to the second clock and
+      # not the first. Measured on `develop` c730f99 (run 34598125641): the
+      # `mobile-safari` suite spent 868s of the 900s, `chromium` 648s.
       #
       # `--shard` divides by test count and not by duration, so the halves are
-      # not halves and the honest numbers are not 868/2. Per-file timings from
-      # that run's blob report, mapped onto the split `--list` actually
-      # produces: shard 1/2 draws `accessibility`, `contrast-enhanced` and
-      # `desktop-density` - 386s between them - and comes to 486s of test time
-      # against shard 2/2's 402s. With setup and the fixed cost that is legs of
-      # ~638s and ~554s against the 900s cap, down from 868s.
+      # not halves and the honest numbers are not 868/2: `accessibility`,
+      # `contrast-enhanced` and `desktop-density` are 386s of the 858s between
+      # them and land in one leg. Per-file timings from that run's blob report,
+      # mapped onto the split `--list` produces, predicted 486s and 402s of
+      # suite time. Measured after the split (run 34616634305): 7.8m and 6.8m
+      # of suite, 595s and 524s of job, 123 + 115 passed, `0 did not run`.
       #
-      # Two shards rather than three for the same reason: splitting by count
-      # does not break that cluster up, so a third leg gives 610s / 426s / 405s
-      # - the leg that matters moves 28s, for a whole extra runner. `chromium`
-      # stays whole on the same evidence: 648s of 900s is not the leg running
-      # out of clock. A leg that grows towards the cap gets a shard here; the
-      # number in playwright.config.ts does not move.
+      # Two shards rather than three on the same timings: splitting by count
+      # does not break that cluster up, so a third leg predicts 458s / 274s /
+      # 253s of suite time - the leg that matters moves 28s, for a whole extra
+      # runner. `chromium` stays whole on the same evidence: it runs its 252 in
+      # 10.6m, which is not the leg running out of clock. A leg that grows
+      # towards the cap gets a shard here; the number in playwright.config.ts
+      # does not move.
       matrix:
         include:
           - project: chromium
