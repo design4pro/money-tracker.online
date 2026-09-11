@@ -56,6 +56,8 @@ twelve composited pairs pass 4.5:1 and eight do not. The dark `hover` over `surf
 
 ## Progress
 
+PR: #256
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Record the scope and pin it
@@ -66,5 +68,5 @@ twelve composited pairs pass 4.5:1 and eight do not. The dark `hover` over `surf
 - [x] 1.4 Restate the negative-bold declaration comments in tokens.css — 7272927
 - [x] 1.5 Carry the canonical statement into DESIGN.md — 2660109
 - [x] 1.6 Resolve docs/ACCESSIBILITY.md §2.1 — d6e9630
-- [ ] 1.7 Record the spec lifecycle
+- [x] 1.7 Record the spec lifecycle — cdb9faf
 - [ ] 1.8 Run the full validation gate and pnpm e2e
