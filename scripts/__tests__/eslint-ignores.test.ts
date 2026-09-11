@@ -53,11 +53,21 @@ const gitignoredDirectoriesUnderAi = execFileSync(
   .filter((file) => file === '.gitignore' || file.startsWith('.ai/'))
   .flatMap((file) => {
     const base = dirname(file)
-    return readFileSync(resolve(root, file), 'utf8')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.endsWith('/') && !line.startsWith('#'))
-      .map((entry) => (base === '.' ? entry : `${base}/${entry}`))
+    return (
+      readFileSync(resolve(root, file), 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        // A comment is not an entry, and a negation (`!frames/`) re-includes a directory rather
+        // than ignoring it - reading either as ignored would fail this test for a path eslint is
+        // right to walk.
+        .filter(
+          (line) =>
+            line.endsWith('/') &&
+            !line.startsWith('#') &&
+            !line.startsWith('!'),
+        )
+        .map((entry) => (base === '.' ? entry : `${base}/${entry}`))
+    )
   })
   .filter((path) => path.startsWith('.ai/'))
 
