@@ -17,8 +17,8 @@ nothing announced. The guard is not the problem and does not move: it keeps awai
 no part of a protected route paints before the session and the tenant are confirmed. What changes is
 that the shell the server already resolved during SSR now **crosses into the client's cache before
 the first client render**, through `@tanstack/react-router`'s own `dehydrate`/`hydrate` router
-options, so the guard's `await` resolves from cache instead of from the network. Three lines of
-router configuration, one extracted constant, no new dependency, no schema change, no message key.
+options, so the guard's `await` resolves from cache instead of from the network. Two router options
+carrying two values, one extracted constant, no new dependency, no schema change, no message key.
 
 ## 📝 Problem Statement
 
@@ -94,9 +94,9 @@ in `@tanstack/router-core@1.171.27`:
 | Browser | `dist/esm/load-client.js:1088`           | `await waitFor(router.options.hydrate?.(dehydratedRouter.dehydratedData), …)` |
 
 The ordering is the part that makes this work rather than merely plausible: `load-client.js:1088`
-awaits `hydrate` **before** the match-hydration loop at `:1117` and before any client render. So a
-`hydrate` that calls `queryClient.setQueryData(SHELL_QUERY_KEY, shell)` leaves the cache warm before
-the tab is capable of a client-side navigation at all.
+awaits `hydrate` **before** the match-hydration loop at `:1119` (whose bound `shared` is computed at
+`:1117`) and before any client render. So a `hydrate` that seeds `SHELL_QUERY_KEY` leaves the cache
+warm before the tab is capable of a client-side navigation at all.
 
 After that, the first navigation's `ensureQueryData` takes its cached branch —
 `@tanstack/query-core@5.102.8`, `build/modern/queryClient.js:75-82`:
@@ -142,10 +142,19 @@ contract moves to a small module both sides import:
 src/components/app/shell/shell-query.ts
 ```
 
-It exports `SHELL_QUERY_KEY`, `SHELL_STALE_TIME`, the `shellQueryOptions()` factory that
-`beforeLoad` passes to `ensureQueryData`, and the `ShellData` type re-export. It imports nothing
-from `#/server` and fetches nothing itself — the `queryFn` stays an argument, supplied by
-`_app.tsx`, which is the only module that may reach `loadShell`. That keeps
+It exports `SHELL_QUERY_KEY`, `SHELL_STALE_TIME` and the `shellQueryOptions()` factory that
+`beforeLoad` passes to `ensureQueryData`. It does **not** re-export `ShellData`: that type already
+lives one directory up in `src/components/app/shell/types.ts` and is already exported from that
+directory's `index.ts`, so a second export would be the "one concept, one owner" rule broken by the
+module that cites it. Consumers import the type from where it lives.
+
+It is reached by a deep import rather than through the barrel — `src/router.tsx` already deep-imports
+`route-pending` (`src/router.tsx:19`), and adding a query-key module to a barrel whose docblock says
+"nothing in this directory fetches" would invite the barrel into `src/routes/_app.tsx`'s import graph
+for no gain. `src/components/app/shell/index.ts` is therefore left alone.
+
+The module imports nothing from `#/server` and fetches nothing itself — the `queryFn` stays an
+argument, supplied by `_app.tsx`, which is the only module that may reach `loadShell`. That keeps
 `AGENTS.md` → Always ("`components/ui` never fetches and never imports from `server/`") true of the
 shell module as well, and keeps the server function's dynamic-import discipline
 (`src/routes/_app.tsx:93-100`) intact.
@@ -153,15 +162,48 @@ shell module as well, and keeps the server function's dynamic-import discipline
 **2. The channel.** `src/router.tsx` gains two options beside the ones #21 added:
 
 ```ts
-dehydrate: () => ({ shell: queryClient.getQueryData<ShellData>(SHELL_QUERY_KEY) ?? null }),
-hydrate: ({ shell }) => {
-  if (shell) queryClient.setQueryData(SHELL_QUERY_KEY, shell)
+dehydrate: () => ({
+  shell: queryClient.getQueryData<ShellData>(SHELL_QUERY_KEY) ?? null,
+  // The server's own stamp, not the browser's. See "Why the timestamp travels" below.
+  shellUpdatedAt:
+    queryClient.getQueryState(SHELL_QUERY_KEY)?.dataUpdatedAt ?? null,
+}),
+hydrate: ({ shell, shellUpdatedAt }) => {
+  if (shell) {
+    queryClient.setQueryData(SHELL_QUERY_KEY, shell, {
+      updatedAt: shellUpdatedAt ?? undefined,
+    })
+  }
 },
 ```
 
 `getQueryData` returns `undefined` on any document where `_app` never matched — the marketing page,
-`/login`, `/invite/$invitationId` — so those documents carry `{ shell: null }` and seed nothing. See
-**Edge Cases** for why that is asserted rather than assumed.
+`/login`, `/invite/$invitationId` — so those documents carry `{ shell: null, shellUpdatedAt: null }`
+and seed nothing. See **Edge Cases** for why that is asserted rather than assumed.
+
+#### Why the timestamp travels
+
+`setQueryData` reaches `query.js:57-66`, which dispatches `dataUpdatedAt: options?.updatedAt`. Pass
+no options and the reducer stamps `Date.now()` — **the moment of hydration in the browser**, not the
+moment the server resolved the shell. Everything downstream measures freshness from that stamp:
+`isStaleByTime` compares `SHELL_STALE_TIME` against `dataUpdatedAt`, and Q3's `revalidateIfStale`
+fires off it.
+
+Dropping the stamp would therefore silently widen the refresh window to
+`SHELL_STALE_TIME + (hydration − SSR resolution)`, which on a slow connection with a streamed
+document is not a rounding error. It would also make the cadence claim in **Why Q2 + Q3 is a
+tightening** false as written, in the one area `AGENTS.md` → Ask First names explicitly. So the
+server's `dataUpdatedAt` crosses the wire beside the data, and `SetDataOptions.updatedAt` — which
+exists for exactly this — puts it back.
+
+**The alternative, and why it was not taken.** `@tanstack/query-core` exports its own `dehydrate` /
+`hydrate` pair, and `hydration.js:28-40`'s `dehydrateQuery` preserves the whole `query.state` —
+`dataUpdatedAt` included — plus a `dehydratedAt` stamp. Filtering it to this one key with
+`DehydrateOptions.shouldDehydrateQuery` would carry the timestamp without the explicit field above,
+and an implementer who prefers it should take it. It is not the default here because it dehydrates
+`query.state` wholesale — `status`, `fetchStatus`, `error`, `errorUpdatedAt`, `fetchFailureCount` —
+into a document that needs exactly two values, which is a wider serialized surface than the anonymous-document
+assertion in Step 5 can cheaply reason about. Two named fields are the narrower promise.
 
 **3. The guard, unchanged in shape.** `src/routes/_app.tsx` keeps its `await`, its redirect, its
 `pendingComponent` and its `errorComponent`. It passes `shellQueryOptions({ queryFn })` where it
@@ -227,8 +269,8 @@ a defect being closed under the existing AA claim, not a new claim.
 
 | Scenario                                                       | Behaviour                                                                                                                                                                                                                                                                                                                                                                                      |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Anonymous document** (`/`, `/login`, `/invite/$id`)          | `_app` never matched, so `getQueryData` is `undefined` and the payload carries `{ shell: null }`. No session-derived field is serialized into a signed-out document. Asserted, not assumed — see Phase 1 Step 5.                                                                                                                                                                               |
-| **`hydrate` receives `null`**                                  | `setQueryData` is skipped. The cache stays empty and behaviour is exactly today's: the first navigation fetches and blocks. A reader who signs in on `/login` and is redirected into the app arrives via a document load, which re-primes.                                                                                                                                                     |
+| **Anonymous document** (`/`, `/login`, `/invite/$id`)          | `_app` never matched, so `getQueryData` and `getQueryState` are both `undefined` and the payload carries `{ shell: null, shellUpdatedAt: null }`. No session-derived field is serialized into a signed-out document. Asserted, not assumed — see Phase 1 Step 5.                                                                                                                               |
+| **`hydrate` receives `null`**                                  | `setQueryData` is skipped, `shellUpdatedAt` with it. The cache stays empty and behaviour is exactly today's: the first navigation fetches and blocks. A reader who signs in on `/login` and is redirected into the app arrives via a document load, which re-primes.                                                                                                                           |
 | **Session revoked between the document load and a navigation** | The guard is unchanged: it still awaits, still receives a shell, still redirects to `/login` when the shell is `null`. A revoked session's _chrome_ may be one navigation stale; its _data_ cannot be, because every server function underneath calls `requireOrg()` for itself (`src/routes/_app.tsx:27-31`). Q3 tightens this window rather than widening it — see **Resolved assumptions**. |
 | **The primed entry is garbage-collected**                      | Verified: the shell query has no observers, so `query.js:28` schedules collection at construction and `removable.js:17` defaults the client-side `gcTime` to `3e5` — five minutes. Without Q2 the priming would be a five-minute privilege and the block would return silently. This is the failure mode the spec would ship with if Q2 were defaulted the other way.                          |
 | **`dehydrate` throws**                                         | It cannot: `getQueryData` is a synchronous cache read that returns `undefined` for a missing key. `hydrate` is guarded by the `if (shell)`. Neither reaches the network. A malformed payload is a framework-level deserialization failure that already takes the document down independently of this change.                                                                                   |
@@ -316,13 +358,41 @@ source:
   30-second `SHELL_STALE_TIME` at `_app.tsx:46` currently changes nothing about this call. The
   intent written at `_app.tsx:37-41` is not implemented by the code beneath it.
 - **After Q2 + Q3, a navigating reader's shell refreshes at most once per thirty seconds,** in the
-  background, on the next navigation past the stale mark. A motionless reader's cadence is
-  unchanged: never — and unchanged is the relevant comparison.
+  background, on the next navigation past the stale mark. Thirty seconds measured from the moment
+  the **server** resolved the shell, not from the moment the browser hydrated it — which is what the
+  `shellUpdatedAt` field in **Architecture** point 2 buys, and what the window would silently lose
+  without it. A motionless reader's cadence is unchanged: never — and unchanged is the relevant
+  comparison.
 
 There is therefore no window in which the proposal is staler than what ships today, and one in
 which it is ten times fresher. The security floor is untouched either way: `beforeLoad` is UX, every
 server function calls `requireOrg()` for itself, and a revoked session's _data_ calls fail
 regardless of what the chrome says (`src/routes/_app.tsx:27-31`, ADR 0002).
+
+### What Q3 costs at the next query-core major
+
+`revalidateIfStale` is an option of a **deprecated** surface, and a reader confirming Q3 should know
+its supported lifetime. In the installed `@tanstack/query-core@5.102.8`,
+`build/modern/hydration-Bjs0MSgg.d.ts`:
+
+| Line       | What it says                                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `:464-467` | `ensureQueryData` is `@deprecated`: _"Use `queryClient.query({ ...options, staleTime: 'static' })` instead. This method will be removed in the next major version."_                                         |
+| `:796-799` | `EnsureQueryDataOptions` is itself `@deprecated`, and **`revalidateIfStale` is declared only there** — not on `FetchQueryOptions`, and not on the `QueryExecuteOptions` that the replacement `query()` takes |
+| `:584`     | `StaleTime = number                                                                                                                                                                                          | 'static'`, and `'static'` means never stale |
+
+Three consequences, none of which changes this spec's answer:
+
+1. **Nothing is deepened by this change.** `_app.tsx:153` already calls `ensureQueryData`. Q3 adds a
+   field to a call that exists; it does not introduce the dependency on the deprecated method.
+2. **The stack is pinned** (`docs/SPEC.md` §3), so the removal is a future upgrade's problem, not
+   this build's, and upgrading is an Ask First item in its own right.
+3. **The vendor's suggested replacement is not a drop-in, and would invert Q3.**
+   `query({ ...options, staleTime: 'static' })` marks the entry permanently fresh, which is the
+   opposite of "refetch in the background past thirty seconds". So a query-core major upgrade owes
+   this behaviour a deliberate re-implementation — most likely an explicit staleness check plus
+   `prefetchQuery`, which is what `queryClient.js:80-81` does internally today — and not a mechanical
+   find-and-replace. Whoever opens that upgrade should read this section first.
 
 ## 📝 Visual change expected
 
@@ -382,9 +452,10 @@ _Verify:_ the new case fails, and fails for the documented reason (zero `role="s
 
 **Step 3 — Open the channel.**
 Add `dehydrate` and `hydrate` to `getRouter()` in `src/router.tsx`, reading and writing
-`SHELL_QUERY_KEY` through the Step 1 module. Docblock them the way the surrounding options are
-docblocked — what the channel is for, and the `load-client.js:1088`-before-`:1117` ordering that
-makes it sound.
+`SHELL_QUERY_KEY` through the Step 1 module, and carrying `shellUpdatedAt` beside the data as
+**Architecture** point 2 specifies. Docblock them the way the surrounding options are docblocked —
+what the channel is for, the `load-client.js:1088`-before-`:1119` ordering that makes it sound, and
+why the server's `dataUpdatedAt` travels rather than being restamped at hydration.
 _Verify:_ Step 2's case turns green. `pnpm test` and `pnpm build` green.
 
 **Step 4 — Make the priming outlive five minutes, and make the refresh real.**
@@ -392,8 +463,11 @@ Apply Q2 and Q3 in `shellQueryOptions`: `gcTime: Number.POSITIVE_INFINITY` and
 `revalidateIfStale: true`, with the reasoning from **Why Q2 + Q3 is a tightening** in the docblock
 and a correction to the now-inaccurate comment at `src/routes/_app.tsx:37-41`.
 _Verify:_ a unit test over `shellQueryOptions` asserting both fields and the 30-second
-`staleTime`. A browser assertion that a second navigation past the stale mark still renders from
-cache without a blocking wait.
+`staleTime`. A unit test over `hydrate` asserting that the primed entry's `dataUpdatedAt` is the
+value the payload carried and **not** the time of the call — the one assertion that keeps the
+thirty-second window honest; `queryClient.getQueryState(SHELL_QUERY_KEY)?.dataUpdatedAt` reads it
+back. A browser assertion that a second navigation past the stale mark still renders from cache
+without a blocking wait.
 
 **Step 5 — Assert the guard's answer is unchanged, and that nothing leaks into a signed-out
 document.**
@@ -404,8 +478,18 @@ Two browser assertions, both new:
    dehydration.
 2. An anonymous document (`/` and `/login`) carries **no** session-derived field in its dehydrated
    payload. This is the assertion that pays for touching a module in every visitor's entry chunk.
-   _Verify:_ both green; assertion 2 must be written so that it would fail if `dehydrate` returned the
-   shell unconditionally.
+
+   The payload is not reachable from a page object: `ssr-server.js:346` serializes it into the
+   document with `crossSerializeStream`, so it exists as script text, not as a property a test can
+   read. Assert it on the **served document** rather than on the live page — fetch `/` and `/login`
+   with the test's request context and search the response body for the signed-out fixture's own
+   email and workspace slug, which are the session-derived values that would appear if `dehydrate`
+   stopped discriminating. Searching for known-secret values rather than for the field name is what
+   makes the assertion survive a rename of `shell`.
+
+   _Verify:_ both green. Assertion 2 must be shown to fail when `dehydrate` returns the shell
+   unconditionally — make that edit locally, watch it go red, and revert it; a test that has never
+   failed proves nothing about the case it is guarding.
 
 **Step 6 — Reconcile the documents that record the block as permanent, and capture the frames.**
 `docs/STATE-INVENTORY.md` §3 and §6 describe this as measured-and-left-alone and name #230;
