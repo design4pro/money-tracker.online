@@ -108,9 +108,9 @@ the spec rather than as a silent divergence.
 
 ### Phase 1: The reset and the hook
 
-- [ ] 1.1 Add the declaration
-- [ ] 1.2 Attribute the five primitives
-- [ ] 1.3 Assert the markup
+- [x] 1.1 Add the declaration — e089d9f
+- [x] 1.2 Attribute the five primitives — 96bc950
+- [x] 1.3 Assert the markup — 5ede183
 
 ### Phase 2: The runtime proof
 
