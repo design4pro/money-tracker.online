@@ -157,8 +157,9 @@ function GroupsRoute() {
         <EmptyState
           className="max-w-list"
           // The empty branch is the screen's only content under its `<h1>`, and `EmptyState`
-          // defaults to `3` - so leaving it out announced `h1` then `h3`. See `groups.empty`'s
-          // neighbours: every empty state that sits directly under a page title passes `2`.
+          // defaults to `3` - so leaving it out announced `h1` then `h3`. Every empty state that
+          // sits directly under a page title passes `2`; the two that keep the default sit inside
+          // a section that owns an `<h2>`.
           headingLevel={2}
           title={t('groups.empty.title')}
           description={t('groups.empty.body')}
