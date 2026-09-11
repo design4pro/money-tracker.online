@@ -1,5 +1,5 @@
 {
-  "kitVersion": 22,
+  "kitVersion": 23,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -95,11 +95,15 @@
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
-      "sha256": "b493da21caca4f24e8b2db69fd8a7c4d0dd4420cee7e79c1fa036a49fe403bc7",
+      "sha256": "7a912f2cef335af56b09a3f138ce69db0c8ac1e6a0704b999b46d199c8738705",
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {
       "sha256": "da024300418bc7369cbd592af3a092cb4958c5745c9200f70ed64480ed8287f9",
+      "mode": "100644"
+    },
+    "scripts/ci/__tests__/claude-credential-gate.test.ts": {
+      "sha256": "9599bc3944ce12e1bb5e84e918ae6552f05e7b82a9c16448d09c8b731f73722a",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-review-ran.test.mjs": {

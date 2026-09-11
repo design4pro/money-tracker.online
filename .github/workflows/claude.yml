@@ -48,7 +48,27 @@ jobs:
       actions: read
 
     steps:
+      # The `secrets` context is not available in a job-level `if`, so the gate is a first step -
+      # the same shape claude-code-review.yml and deploy.yml use for their own credentials.
+      #
+      # Without it a missing or expired token fails the action, `claude-usage-limit.mjs` then finds
+      # no execution file, and the job goes red with an ENOENT that names neither the missing secret
+      # nor the fix. This workflow is interactive - somebody wrote the trigger phrase and is
+      # watching - so what comes back should say what is wrong rather than look like a broken job.
+      - name: Check the answering credentials are configured
+        id: gate
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::warning::CLAUDE_CODE_OAUTH_TOKEN is unset - skipping the answer to this mention."
+            echo "::warning::Generate one with \`claude setup-token\` and set it as a repository secret."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out
+        if: steps.gate.outputs.configured == 'true'
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
@@ -57,12 +77,14 @@ jobs:
       # works. Installing here rather than leaving it to figure out the package
       # manager saves it a couple of turns on every single run.
       - name: Set up the toolchain
+        if: steps.gate.outputs.configured == 'true'
         uses: ./.github/actions/setup
 
       # `continue-on-error`, because the step that follows decides what the failure meant: a spent
       # usage limit answered nothing and is not a bug, anything else still fails the job.
       - name: Answer the mention
         id: claude
+        if: steps.gate.outputs.configured == 'true'
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
@@ -73,6 +95,8 @@ jobs:
           claude_args: |
             --max-turns 40
 
+      # A skipped step's outcome is `skipped`, so the credential gate above short-circuits this
+      # one too - the same note claude-code-review.yml carries over its own copy of this step.
       - name: Treat an exhausted Claude limit as a skipped answer
         if: always() && steps.claude.outcome == 'failure'
         env:
