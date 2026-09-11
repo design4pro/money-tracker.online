@@ -136,6 +136,10 @@ describe('eslint.config.js ignores', () => {
   // without descending into it (the worktrees above), and `check-ignore --verbose` names the entry
   // that ignored it, globs and nesting resolved. Only an existing directory can be told from a file
   // - and the machine that has one is the machine writing its entry and running this gate.
+  //
+  // Scoped to entries *about* `.ai/`, not to every entry that happens to ignore something under it:
+  // a repository-wide `node_modules` would otherwise be reported the moment one appeared below
+  // `.ai/`, and `node_modules/` is not a rewrite anyone wants.
   it('ignores every existing directory under .ai/ with an entry ending in /', () => {
     const directories = execFileSync(
       'git',
@@ -152,6 +156,8 @@ describe('eslint.config.js ignores', () => {
     )
       .split('\n')
       .filter((path) => path.endsWith('/'))
+    // `spawnSync` rather than `execFileSync` as above: `check-ignore` exits 1 when nothing matched,
+    // which is the ordinary clean result here and which `execFileSync` would raise as an exception.
     const checked = spawnSync('git', ['check-ignore', '--verbose', '--stdin'], {
       cwd: root,
       encoding: 'utf8',
