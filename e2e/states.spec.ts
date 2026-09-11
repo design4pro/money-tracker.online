@@ -109,11 +109,12 @@ test.describe('a workspace with nothing in it', () => {
       // would be an error boundary wearing an empty state's copy.
       await expect(page.locator('main')).toBeVisible()
 
-      // At the level the page gives it, which is the part of an empty state only the empty session
-      // can see. `EmptyState` defaults `headingLevel` to `3`, so a screen that renders it straight
-      // under its `<h1>` and says nothing announces a subsection with no section — issue #166. The
-      // populated suite cannot catch that here: `/transactions/rules` has two seeded rules, so its
-      // empty branch exists on no other session.
+      // At the level the page gives it, which is the half of an empty state the `demo` session
+      // cannot be relied on to show. `EmptyState` defaults `headingLevel` to `3`, so a screen that
+      // renders it straight under its `<h1>` and says nothing announces a subsection with no
+      // section — issue #166. `/transactions` and `/import` reach their empty branch on this
+      // session alone; the rest are here because this is where the branch is guaranteed rather
+      // than incidental.
       await expectOutlineWithoutSkips(page, `empty ${surface.path}`)
     })
   }
