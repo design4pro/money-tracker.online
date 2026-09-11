@@ -62,7 +62,7 @@ export interface AmountMeterProps {
   /** Tone class for the verdict row. */
   readonly verdictTone: string
   /**
-   * Fill class for the track — `bg-positive`, `bg-warning`, `bg-negative-bold`. A fill is a
+   * Fill class for the track — `bg-positive`, `bg-warning-bold`, `bg-negative-bold`. A fill is a
    * graphical object (WCAG 1.4.11, 3:1), never text, so it is not held to the text floor.
    */
   readonly fillTone: string

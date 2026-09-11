@@ -90,10 +90,17 @@ const STATE_INK: Record<GoalMeterState, string> = {
   archived: 'text-ink-2',
 }
 
+/**
+ * The verdict row above stays on the text grades; a fill is a graphical object under WCAG 1.4.11 at
+ * 3:1 and is not held to the 7:1 the caption is. `overdue` therefore takes `warning-bold`, the same
+ * grade `BudgetMeter`'s `approaching` and `ui/Meter`'s warning band paint (#171) — one caution
+ * verdict in one amber, rather than the split #180 had to come back for on the danger side. The
+ * `AlertTriangle` beside it keeps `text-warning`: a 14px glyph is not what the loud grade is for.
+ */
 const STATE_FILL: Record<GoalMeterState, string> = {
   saving: 'bg-brand',
   reached: 'bg-positive',
-  overdue: 'bg-warning',
+  overdue: 'bg-warning-bold',
   archived: 'bg-ink-2',
 }
 

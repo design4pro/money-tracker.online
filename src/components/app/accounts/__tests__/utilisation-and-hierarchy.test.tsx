@@ -144,11 +144,14 @@ describe('the credit utilisation block', () => {
     )
     expect(iconNames(approaching.container)).toContain('lucide-triangle-alert')
     expect(approaching.getByText(/Approaching limit/u)).toBeTruthy()
+    // Spelled out to the grade, for the reason the `over` case below records: `bg-warning-bold`
+    // contains `bg-warning`, so the looser assertion would pass on either token and be blind to
+    // which one #171 actually shipped.
     expect(
       approaching.container
         .querySelector('[role="meter progressbar"] > div > div')
         ?.getAttribute('class'),
-    ).toContain('bg-warning')
+    ).toContain('bg-warning-bold')
     approaching.unmount()
 
     const over = withI18n(

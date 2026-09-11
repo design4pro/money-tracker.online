@@ -719,7 +719,7 @@ wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 ### Meter
 
 An 8px track at `sm` radius in `border-subtle` (so the fill's stop is readable against it), the
-fill in `positive` on track, `warning` near the limit, and red over it; past 100% the fill runs
+fill in `positive` on track, `warning-bold` near the limit, and red over it; past 100% the fill runs
 hatched as well as red. _Which_ red follows the adjacency, and every meter works it out the same
 way. `over` means the ratio passed 1, which clamps the fill to the whole track, so `AmountMeter`
 and `BudgetMeter` take `negative-bold` against the card. `ui/Meter` takes its threshold from a
@@ -730,6 +730,16 @@ The danger icon is a 14px glyph and stays on `negative` either way. The headline
 remainder, and `negative-bold` too
 when it is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor.
 The state is carried by a word and a lucide icon before colour.
+
+The caution fill has no adjacency to work out, because `warning-bold` clears 3:1 against the track
+and against the card alike. The fill usually stops short on the track, but `ui/Meter`'s warning band
+can run the whole width when `dangerAt` is above 1, since danger is then unreachable. Either way
+`BudgetMeter`'s `approaching`, `ui/Meter`'s warning band and `GoalMeter`'s `overdue` take
+`warning-bold` unconditionally, and one caution verdict reads in one amber. That grade is a fill
+and nothing else — no headline is ever a caution tone, the verdict word and the 14px triangle keep
+`warning` at 7:1, and a caller that wants loud caution TEXT has to re-measure the token at 4.5:1
+first. What the 3:1 floor bought differs by theme and is measured rather than assumed: dark gets
+full chroma at nearly the old weight, light has to lighten to get any (`src/styles/tokens.css`).
 
 ### Navigation
 

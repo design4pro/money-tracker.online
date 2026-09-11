@@ -24,7 +24,10 @@ import {
  *             `negative-bold`, and the only text it paints is the
  *             `AmountMeter` headline (bold, 20px or 32px)
  *   · 3:1   — non-text: control boundaries, the focus indicator, chart fills,
- *             and the over-budget meter fill (WCAG 2.2 §1.4.11)
+ *             the over-budget meter fill, and the caution meter fill
+ *             (WCAG 2.2 §1.4.11). `warning-bold` sits ONLY here: unlike
+ *             `negative-bold` it paints no text at all, so 4.5:1 never
+ *             applies to it and is not borrowed by analogy
  */
 
 const cssPath = fileURLToPath(new URL('../tokens.css', import.meta.url))
@@ -160,15 +163,27 @@ const TEXT_KEYS = [
  * `AmountMeter` headline, which is bold at 20px (`md`) or 32px (`lg`). Adding a
  * key to this list is a claim about every call site of that token, so it is a
  * decision, not a convenience.
+ *
+ * `warning-bold` is deliberately NOT here, and the absence is the decision
+ * (#171). No `headlineTone` is ever a warning tone — `BudgetMeter` leaves the
+ * `approaching` headline on `text-ink` and `GoalMeter` never reaches for a
+ * caution one — so the loud caution grade paints no text at any size, and a
+ * 4.5:1 assertion on it would be a claim about call sites that do not exist.
+ * The day one does, this is the list it has to join, and the value has to be
+ * re-measured to get there.
  */
 const LARGE_TEXT_KEYS = ['color-negative-bold'] as const
 
 /**
  * Solid fills that carry no text of their own — 1.4.11's 3:1 floor. The
  * over-budget meter fill is the one that puts `negative-bold` here as well as
- * above; the token is held to the stricter of its two floors.
+ * above; the token is held to the stricter of its two floors. `warning-bold` is
+ * here and on no other list, because every job it has is a meter fill.
  */
-const GRAPHICAL_FILL_KEYS = ['color-negative-bold'] as const
+const GRAPHICAL_FILL_KEYS = [
+  'color-negative-bold',
+  'color-warning-bold',
+] as const
 
 /** Solid fill → the foreground declared for it. */
 const FILL_PAIRS: Array<[string, string]> = [
@@ -267,14 +282,22 @@ describe.each([
    *
    * The two calmer states stop short of the end of the track by construction, so
    * they are on this list for the same reason and not as a precaution: `positive`
-   * paints an in-range `intent` meter and `warning` the band above `warnAt`.
+   * paints an in-range `intent` meter and `warning-bold` the band above `warnAt`.
    * Their figures lived only in a comment in `meter.tsx` until #199, where all
    * six were found overstated — which is the whole argument for this case.
    *
+   * `warning` itself stays on this list after #171 moved every caution fill onto
+   * the loud grade. It no longer paints a track, so the assertion is a guard
+   * rather than a live figure — and keeping it costs nothing while deleting it
+   * would mean a future edit that puts the text grade back on a bar has to
+   * rediscover what it is worth there.
+   *
    * `negative` is 5.92:1 in light and 5.02:1 in dark, `negative-bold` 3.88:1 and
-   * 3.18:1, `positive` 5.90:1 and 5.67:1, `warning` 5.84:1 and 5.75:1. All clear
-   * 1.4.11's 3:1; dark's bold margin being that thin is why the partial case
-   * takes the text grade rather than the loud one.
+   * 3.18:1, `positive` 5.90:1 and 5.67:1, `warning-bold` 3.43:1 and 5.28:1, and
+   * `warning` 5.84:1 and 5.75:1. All clear 1.4.11's 3:1; dark's bold DANGER
+   * margin being that thin is why the partial danger case takes the text grade
+   * rather than the loud one, and the caution case has no such problem in dark
+   * — its thin side is light, at 3.43:1.
    */
   it.each([
     ...GRAPHICAL_FILL_KEYS,
@@ -660,7 +683,7 @@ describe('the two themes are separately designed', () => {
    * screen, and every threshold assertion above would stay green while it did.
    * Chroma is what actually moved, so chroma is what is asserted.
    */
-  it('keeps the loud grade more chromatic than the text grade in both themes', () => {
+  it('keeps each loud grade more chromatic than its text grade in both themes', () => {
     /**
      * Absolute sRGB chroma, (max − min) / 255 — the channel spread, not HSV
      * saturation. Normalising by `max` would make light's `#8a1a0d` score 0.91:
@@ -679,13 +702,87 @@ describe('the two themes are separately designed', () => {
       ['light', light],
       ['dark', dark],
     ] as const) {
-      const bold = chroma(tokens['color-negative-bold'])
-      const text = chroma(tokens['color-negative'])
-      expect(
-        bold - text,
-        `${themeName}: negative-bold chroma ${bold.toFixed(2)} vs negative ${text.toFixed(2)}`,
-      ).toBeGreaterThanOrEqual(0.2)
+      for (const grade of ['negative', 'warning'] as const) {
+        const bold = chroma(tokens[`color-${grade}-bold`])
+        const text = chroma(tokens[`color-${grade}`])
+        expect(
+          bold - text,
+          `${themeName}: ${grade}-bold chroma ${bold.toFixed(2)} vs ${grade} ${text.toFixed(2)}`,
+        ).toBeGreaterThanOrEqual(0.2)
+      }
     }
+  })
+
+  /*
+   * The caution grade's own record, and it is the opposite finding to the danger
+   * one above (#171).
+   *
+   * Red could not be loud in dark because the 7:1 floor took the hue away: even
+   * pure red misses 4.5:1, so `negative-bold` had to spend luminance. Amber is
+   * luminance-rich, so nothing takes the hue away — the 3:1 graphical floor is
+   * not binding on it at all, and `warning-bold` could have been picked anywhere
+   * in a very wide band. It was not. The pale gold's defect was its blue channel,
+   * not its weight, so dark's value is the same hue at full sRGB chroma and very
+   * nearly the same luminance, which is why the two assertions below point in
+   * opposite directions.
+   *
+   * If a future edit re-values dark's `warning-bold` by descending toward the
+   * floor instead, these two go red together and name what was traded away.
+   */
+  it('records that dark buys the caution grade with chroma rather than with weight', () => {
+    const bold = dark['color-warning-bold']
+    const text = dark['color-warning']
+
+    // Full sRGB chroma: the blue channel is gone, which is the whole move.
+    const blue = Number.parseInt(bold.slice(5, 7), 16)
+    expect(blue, `dark warning-bold blue channel is ${blue}`).toBe(0)
+
+    // And the weight stayed put — well under a quarter of a stop between the two
+    // grades on the lightest ground either can land on.
+    const separation = contrast(bold, text)
+    expect(
+      separation,
+      `dark warning-bold vs warning is ${separation.toFixed(2)}:1`,
+    ).toBeLessThan(1.25)
+
+    // Which leaves it nowhere near the floor it is actually held to.
+    const onRaised = contrast(bold, dark['color-surface-raised'])
+    expect(
+      onRaised,
+      `dark warning-bold on surface-raised is ${onRaised.toFixed(2)}:1`,
+    ).toBeGreaterThan(7)
+  })
+
+  /*
+   * …and the trade light had to make instead, recorded for the same reason.
+   *
+   * Light's `warning` is a bistre, and this hue cannot get more colourful in sRGB
+   * without also getting lighter. Held to the weight `warning` itself has against
+   * the track, the most chromatic value in the band is 0.388 — against `warning`'s
+   * own 0.357, which is no move at all. So light's grade IS lighter than its text
+   * grade, deliberately, and that asymmetry between the themes is measured rather
+   * than assumed.
+   */
+  it('records that light buys the caution grade with weight, because chroma is not free there', () => {
+    const onTrackBold = contrast(
+      light['color-warning-bold'],
+      light['color-border-subtle'],
+    )
+    const onTrackText = contrast(
+      light['color-warning'],
+      light['color-border-subtle'],
+    )
+    expect(
+      onTrackBold,
+      `light warning-bold on the track is ${onTrackBold.toFixed(2)}:1 vs warning's ${onTrackText.toFixed(2)}:1`,
+    ).toBeLessThan(onTrackText)
+
+    // But stopped short of the floor rather than at it: the margin is what a
+    // later edit to `border-subtle` gets to spend before this becomes a defect.
+    expect(
+      onTrackBold,
+      `light warning-bold on the track is ${onTrackBold.toFixed(2)}:1, graphical floor 3`,
+    ).toBeGreaterThanOrEqual(3.3)
   })
 
   /*
