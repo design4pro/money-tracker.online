@@ -122,16 +122,28 @@ export default [
       // not written against the project's tsconfig - which stopped being true of them when that
       // `include` was added, and without this they sit outside `pnpm lint` and Prettier.
       '!.claude/hooks/__tests__',
+      // Every directory under `.ai/` a `.gitignore` refuses to track, one entry per entry there.
+      // The pairing is not a convention to remember: `scripts/__tests__/eslint-ignores.test.ts`
+      // reads those `.gitignore` files and fails when a directory in them is missing from this
+      // list, because twice now the gap was found by a `pnpm lint` going red rather than by a
+      // test (#203, #229).
+      //
       // A cezar run worktree is a second checkout of this repository nested inside it. Linting it
       // reports every file twice, against a tsconfig it is not part of, and on a host with a few
-      // of them eslint exhausts the heap before it finishes. `.ai/cezar/.gitignore` already keeps
-      // them out of git.
+      // of them eslint exhausts the heap before it finishes.
       '.ai/cezar/worktrees/**',
-      // Where a pipeline run parks a scratch checkout. Same failure as the worktrees above and
-      // the same `.gitignore` entry behind it, but it was reached from the other direction: a
-      // run that left one behind made `pnpm lint` red on a file nobody wrote and pointed the
-      // reader at `parserOptions.project` rather than at the stray directory (#203).
+      '.ai/cezar/runs/**',
+      '.ai/cezar/tmp/**',
+      // Where a pipeline run parks a scratch checkout. Same failure as the worktrees above, but
+      // it was reached from the other direction: a run that left one behind made `pnpm lint` red
+      // on a file nobody wrote and pointed the reader at `parserOptions.project` rather than at
+      // the stray directory (#203).
       '.ai/tmp/**',
+      // And the same failure a third time (#229): `om-auto-qa-pr` writes a Playwright config and
+      // a spec, both TypeScript and both in no tsconfig, next to the frames it captures — so
+      // producing UI QA evidence was enough to turn the gate red on the machine that produced it.
+      '.ai/qa/artifacts_*/**',
+      '.ai/qa/test-env.lock/**',
       // Agent tooling that GitHub's own surfaces read — skills, agent definitions, hooks. Same
       // reason as `.claude/**`: vendored configuration for tools around the project, written
       // against no tsconfig of ours.
