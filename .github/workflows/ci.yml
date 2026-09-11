@@ -284,7 +284,7 @@ jobs:
   # is worth more than the runner minutes. `needs-e2e` is gone with the gate it
   # rationed - there is no label to add, because there is nothing to opt into.
   e2e:
-    name: e2e · ${{ matrix.project }}
+    name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
     runs-on: ubuntu-latest
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
     # so the run's own clock is the one that fires first and names the test it
@@ -292,8 +292,27 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
+      # `include:` rather than two axes, because the legs are deliberately
+      # uneven. Measured on `develop` c730f99 (run 34598125641): `mobile-safari`
+      # spent 868s of its 900s budget, `chromium` 648s, and the fixed cost a leg
+      # pays before its first test - checkout, build, seeded D1, server, the
+      # `setup` project - is ~152s of either figure. So `mobile-safari` splits
+      # 125/125 by `--list` into two legs of about 152 + 358 = ~510s and has a
+      # real budget again, while `chromium` stays whole: 648s of 900s is not the
+      # leg running out of clock, and a second one would buy headroom it is not
+      # using for another ~152s of runner time. A leg that grows towards the cap
+      # gets a shard here; the number in playwright.config.ts does not move.
       matrix:
-        project: [chromium, mobile-safari]
+        include:
+          - project: chromium
+            shard: 1
+            shards: 1
+          - project: mobile-safari
+            shard: 1
+            shards: 2
+          - project: mobile-safari
+            shard: 2
+            shards: 2
     # Keep in step with the `@playwright/test` devDependency in package.json:
     # the image carries the browsers that version expects, and a mismatch is
     # reported as a missing executable rather than as a wrong one.
@@ -307,9 +326,9 @@ jobs:
       - name: Prepare the browser-test environment
         uses: ./.github/actions/e2e-env
         with:
-          # Both projects seed an identical database; auditing the seed once is
-          # proof enough.
-          verify-seed: ${{ matrix.project == 'chromium' }}
+          # Every leg seeds an identical database; auditing the seed once is
+          # proof enough, so one named leg does it rather than one per project.
+          verify-seed: ${{ matrix.project == 'chromium' && matrix.shard == 1 }}
 
       # `PLAYWRIGHT_BASE_URL` points the suite at the server the composite action
       # already started and seeded, so the config starts none of its own.
@@ -317,11 +336,16 @@ jobs:
       # `merge-reports` consumes - traces and failure screenshots travel inside
       # the blob. The `setup` project is not named here: it is declared as a
       # dependency of both browser projects, so Playwright runs it first on its
-      # own, and naming it as well would only run it twice.
+      # own, and naming it as well would only run it twice - once per shard is
+      # already the price of splitting. `--shard` divides by test count and not
+      # by duration, so a leg that draws the slow files stays the slow one;
+      # check a split against the per-file timings before trusting it.
       - name: Run the suite
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3010
-        run: pnpm exec playwright test --project=${{ matrix.project }} --reporter=blob
+        run: >-
+          pnpm exec playwright test --project=${{ matrix.project }}
+          --shard=${{ matrix.shard }}/${{ matrix.shards }} --reporter=blob
 
       # The directory is `blob-report`, not vitest's dot-prefixed convention:
       # `upload-artifact` treats a dot-prefixed path as hidden and silently
@@ -330,7 +354,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-blob-${{ matrix.project }}
+          name: e2e-blob-${{ matrix.project }}-${{ matrix.shard }}
           path: blob-report
           retention-days: 3
           if-no-files-found: ignore
@@ -339,7 +363,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-server-log-${{ matrix.project }}
+          name: e2e-server-log-${{ matrix.project }}-${{ matrix.shard }}
           path: server.log
           retention-days: 3
           if-no-files-found: ignore
