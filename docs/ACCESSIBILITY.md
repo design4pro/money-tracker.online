@@ -63,11 +63,20 @@ loud grade at `>= 1` — where the danger state needs `percentage >= 100` — an
 declaration in `src/styles/tokens.css`, and `src/styles/__tests__/tokens-contrast.test.ts` recomputes
 on every run the five opaque planes plus the hover wash over `surface` — the composited ground a
 hovered row actually has — each at the threshold that applies to that grade, and, against the track a
-partial fill would stop on, every fill a meter can paint: both danger grades, `positive`, `warning`,
-and the neutral `bg-ink/70` composite, which is not a token and so has no ratio recorded beside a
-declaration anywhere (#199). The remaining composited grounds in those comments, `press` and either
-wash over `surface-raised`, are hand-measured; #178 is where what `negative-bold` is worth on them
-gets decided. No body-size text moved: everything that was at 7:1 is still at 7:1.
+partial fill would stop on, every fill a meter can paint: both danger grades, both caution grades,
+`positive`, and the neutral `bg-ink/70` composite, which is not a token and so has no ratio recorded
+beside a declaration anywhere (#199). The remaining composited grounds in those comments, `press` and
+either wash over `surface-raised`, are hand-measured; #178 is where what `negative-bold` is worth on
+them gets decided. No body-size text moved: everything that was at 7:1 is still at 7:1.
+
+A second loud grade, `warning-bold`, was added for the caution meter fill (#171), and it is **not** a
+1.4.6 exception at all — it is on this page only so that reading the palette does not suggest
+otherwise. It paints no text at any size: no headline is ever a caution tone, and the verdict word
+and the 14px triangle beside the bar keep `warning` at 7:1. So the only criterion that reaches it is
+**1.4.11** at 3:1, which it clears on every ground and on the track in both themes, and
+`tokens-contrast.test.ts` deliberately lists it under the graphical fills rather than under the
+large-text keys — a 4.5:1 assertion on it would be a claim about call sites that do not exist. The
+claim this document makes is therefore unchanged by it in both directions.
 
 ### 2.2 A published statement is a representation, and an overstated one is a liability
 

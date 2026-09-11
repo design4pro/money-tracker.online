@@ -104,6 +104,32 @@ describe('BudgetMeter', () => {
     )
   })
 
+  it('draws the near-the-limit bar in the loud caution grade and the caption in the text one', () => {
+    // #171: the same shape one grade over. `warning` holds 7:1 because it is a caption ink, and in
+    // dark that leaves the bar a pale gold rather than a caution tone. A fill is a graphical object
+    // at 3:1, so it takes `warning-bold` — and unlike the danger pair this grade paints NO text at
+    // all, which is why the headline below stays on `text-ink` rather than following the bar.
+    const track = meter({
+      spentMinor: asMinor(1_800_00),
+      remainingMinor: asMinor(200_00),
+      ratio: 0.9,
+      state: 'approaching',
+    })
+
+    const fill = track.firstElementChild as HTMLElement
+    expect(fill.className).toContain('bg-warning-bold')
+
+    // The verdict rides at `text-caption`, so it stays on the 7:1 ink.
+    const verdict = screen.getByText('Close to the limit')
+    expect(verdict.className).toContain('text-warning')
+    expect(verdict.className).not.toContain('text-warning-bold')
+
+    // And the headline is the remainder, not a verdict, so it never reaches for a caution tone.
+    const headline = screen.getByText(/200[.,]00/)
+    expect(headline.className).toContain('text-ink')
+    expect(headline.className).not.toContain('text-warning')
+  })
+
   it('declares the weight the large-text grade is allowed by', () => {
     // The premise under the assertion above, checked rather than asserted in prose. 4.5:1 is only
     // legal on this figure because WCAG counts it as LARGE text, and at `md`'s 20px that needs the

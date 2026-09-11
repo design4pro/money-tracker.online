@@ -61,8 +61,8 @@
    Non-text contrast (WCAG 1.4.11) has its own floor of 3:1 and applies to
    `border-strong`, the focus indicator, and the category series fills.
 
-   One token is deliberately NOT at 7:1, and the exception is named rather than
-   assumed. `negative-bold` is the danger ink at the loud grade: it paints the
+   Two tokens are deliberately NOT at 7:1, and each exception is named rather
+   than assumed. `negative-bold` is the danger ink at the loud grade: it paints the
    `AmountMeter` headline - bold at 20px or 32px, which is LARGE TEXT by WCAG's
    own definition and is therefore scored by 1.4.6 at **4.5:1**, not 7:1 - and
    the over-budget meter fill, a graphical object under 1.4.11 at **3:1**. One
@@ -71,6 +71,33 @@
    `surface-raised`, its dark value can only ever be a pale salmon, because red
    is luminance-poor and no deeper red in sRGB reaches that floor. `negative`
    keeps every body-size job it had and stays at 7:1; nothing moved off it.
+
+   `warning-bold` is the caution tone at the loud grade and its exception is a
+   NARROWER one: it paints no text at all - no `headlineTone` is ever set to a
+   warning tone, so the only 1.4.6 grade `warning` has is the body one it keeps
+   - and every job it does have is a meter fill. So 1.4.11's **3:1** is the only
+   floor that applies to it, and it is stated that way rather than borrowed from
+   `negative-bold`'s 4.5:1 by analogy (#171). Do not put text on this token; a
+   caller that wants a loud warning HEADLINE has to re-measure it at 4.5:1
+   first, which is why `tokens-contrast.test.ts` lists it under the graphical
+   fills and NOT under the large-text keys.
+
+   What that floor buys is not what it looks like, and the measurement is the
+   whole point of the split. In DARK the 3:1 floor is not binding on this hue at
+   all: every value in the 25-50 degree amber band is reachable at FULL sRGB
+   chroma while still measuring >= 3.38:1 on the track and >= 5.13:1 on every
+   ground. The defect in `#e9c46a` was never its weight - amber is
+   luminance-rich, which is why the 7:1 floor cost it so much less than it cost
+   red - it was the blue channel at 106 washing the hue out. So dark spends the
+   chroma and NOT the luminance: `#ffb100` is the same hue (41.6 against the
+   text grade's 42.5) at twice the colourfulness and very nearly the same
+   weight, and it lands at 8.00:1 on `surface-raised` rather than anywhere near
+   the floor. LIGHT cannot do that. Held to the weight `--color-warning` itself
+   has on the track (5.84:1), the most chromatic value this hue reaches is 0.388
+   - against the text grade's own 0.357, which is no move at all. Light
+   therefore has to pay in luminance for what dark gets free, and `#945e00` is
+   that trade taken deliberately: 3.43:1 on the track, still a real margin over
+   the floor, for 0.580 of chroma.
 
    Which ground a FILL is measured against is not the same question as for
    text, and the answer differs per fill. The over-budget fill is always the
@@ -90,6 +117,17 @@
    fill is the whole track and takes the loud grade like the money meters;
    below 1 it can stop short on the track and keeps `negative`. One over-limit
    verdict, one red, without spending the thin margin where it is not forced.
+
+   `warning-bold` has no such split to make, because its fill is PARTIAL by
+   construction: `approaching` means the ratio has not reached 1 yet, and
+   `ui/Meter`'s warning band ends where `dangerAt` begins. So the track is
+   always one of its neighbours - 5.28:1 in dark, 3.43:1 in light - and the
+   card is the other, since the fill is the full height of an 8px track and its
+   long edges abut the surface the meter sits on. Both adjacencies are asserted
+   at 3:1, and every meter fill that reads as caution takes this one grade:
+   `BudgetMeter`'s `approaching`, `ui/Meter`'s warning band, and `GoalMeter`'s
+   `overdue`. Splitting them was the defect #180 had to come back for on the
+   danger side, and it is not repeated here.
 
    ---------------------------------------------------------------------------
    SURFACE SEPARATION - a design floor, per theme
@@ -174,6 +212,13 @@
   --color-warning: #614106; /* 7.67:1 on sunken, 9.26:1 on raised */
   --color-warning-soft: #f7ead3; /* carries --color-warning at 7.79:1 */
   --color-on-warning: #ffffff; /* 9.26:1 on warning */
+
+  /* The caution tone at the loud grade - every meter fill that reads as
+     caution, and nothing else. Light is where this grade costs something: the
+     bistre above is the right weight for a caption and the wrong one for a bar,
+     and this hue cannot get more colourful without also getting lighter. This
+     is that trade stopped short of the floor rather than at it. */
+  --color-warning-bold: #945e00; /* 4.50:1 on sunken, 5.44:1 on raised, 3.43:1 on border-subtle; graphical floor 3:1 */
 
   /* A notice has no verdict, so it is typed in pencil, not stamped: `info` is
      `ink-2`'s value and its ground is the printed tint, not the stamp wash. */
@@ -297,6 +342,15 @@
     --color-warning-soft: #332a12; /* carries --color-warning at 8.49:1 */
     --color-on-warning: #16171a; /* 10.73:1 on warning */
 
+    /* Dark is where the caution grade is free. The value above is not pale
+       because it is light - it is pale because its blue channel sits at 106,
+       and dropping that to 0 costs 0.71:1 of the 8.71 it had. Same hue, twice
+       the chroma, the weight left alone: the bar stops reading as gold leaf and
+       starts reading as a caution tone, and the 14px `AlertTriangle` and the
+       caption beside it keep the text grade, so the block reads as one tone at
+       two weights rather than as two colours (#171). */
+    --color-warning-bold: #ffb100; /* 8.00:1 on raised, 9.85:1 on canvas, 5.28:1 on border-subtle; graphical floor 3:1 */
+
     --color-info: #b9b5aa; /* = ink-2. 7.11:1 on raised, 8.75:1 on canvas */
     --color-info-soft: #111214; /* = sunken. carries --color-info at 9.15:1 */
     --color-on-info: #16171a; /* 8.75:1 on info */
@@ -380,6 +434,7 @@
   --color-warning: #e9c46a; /* 8.71:1 on raised */
   --color-warning-soft: #332a12; /* 8.49:1 */
   --color-on-warning: #16171a; /* 10.73:1 */
+  --color-warning-bold: #ffb100; /* 8.00:1 on raised, 5.28:1 on border-subtle; graphical floor 3:1 */
 
   --color-info: #b9b5aa; /* = ink-2. 7.11:1 on raised */
   --color-info-soft: #111214; /* = sunken. carries --color-info at 9.15:1 */
