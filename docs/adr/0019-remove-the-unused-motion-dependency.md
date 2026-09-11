@@ -1,4 +1,4 @@
-# 0018. The `motion` package is removed from the dependency set
+# 0019. The `motion` package is removed from the dependency set
 
 Status: accepted
 Date: 2026-09-11

@@ -118,7 +118,7 @@ whole class of failures nobody can explain.
 
 The set itself is changed by a human, in an ADR, with the reason attached - the freeze binds
 stages and agent runs, not the decision record. It binds both directions: `@cloudflare/vitest-pool-workers`
-is the one addition so far (ADR 0015) and `motion` the one removal (ADR 0018), declared and imported
+is the one addition so far (ADR 0015) and `motion` the one removal (ADR 0019), declared and imported
 by nothing. A `### Blockers` row is still how a stage reports needing a package.
 
 ---

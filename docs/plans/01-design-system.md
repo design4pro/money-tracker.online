@@ -188,7 +188,7 @@ None.
 - **Components.** `src/lib/motion.ts` exports `useReducedMotion()` and the shared transition presets,
   whose durations resolve from the `tokens.css` scale rather than from literals. Every animation in
   the product goes through one of them. The presets are hand-rolled: the `motion` package this clause
-  once named was removed by ADR 0018, because it was declared and imported by nothing and this stage
+  once named was removed by ADR 0019, because it was declared and imported by nothing and this stage
   was its only justification. A preset that genuinely needs a JS animation library is a new
   dependency decision, made in a new ADR.
 - **States.** Not applicable — no async surface.
@@ -243,7 +243,7 @@ All seven §7 items and all ten §2 clauses, with the motion clause carrying thi
 
 ### Blockers
 
-- **`motion@^13.2.0` - resolved (#213, ADR 0018).** The package was declared in `package.json` and
+- **`motion@^13.2.0` - resolved (#213, ADR 0019).** The package was declared in `package.json` and
   imported by zero files; this stage's `src/lib/motion.ts` was its only justification, so the package
   and the stage were one decision. A human took it and **removed the package** rather than scheduling
   this stage to justify it. The entry is kept rather than deleted, because the record of a dependency
