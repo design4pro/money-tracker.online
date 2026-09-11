@@ -116,10 +116,20 @@ const STATE_INK: Record<UtilisationState, string> = {
  * the loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1, so it
  * keeps `negative`. One criterion, two adjacencies — told apart by the threshold rather than by the
  * component.
+ *
+ * `approaching` takes the same treatment one grade over (#171). Its fill is partial by construction
+ * — the ratio has not reached 1 — so both the track and the card are neighbours, and both are
+ * asserted at 1.4.11's 3:1 rather than at the 7:1 the caption above holds. `warning-bold` paints no
+ * text anywhere, so 3:1 is the only floor it answers to; what that bought in dark was chroma rather
+ * than depth, which is why the bar is no longer a pale gold while the icon and the caption beside it
+ * stay on `warning`.
+ *
+ * `under` keeps `positive`: an on-track meter is not a state anybody has to act on, and a second
+ * grade for it would be colour spent on the absence of a problem.
  */
 const STATE_FILL: Record<UtilisationState, string> = {
   under: 'bg-positive',
-  approaching: 'bg-warning',
+  approaching: 'bg-warning-bold',
   over: 'bg-negative-bold',
 }
 

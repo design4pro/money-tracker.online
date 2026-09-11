@@ -152,8 +152,9 @@ export function Meter({
                         'size-3.5 shrink-0',
                         // The glyph stays on the text grade whichever grade the
                         // fill below takes: `negative-bold` is scoped to large
-                        // text and to a full-track fill, and a 14px icon is
-                        // neither (`DESIGN.md` → Tertiary).
+                        // text and to a full-track fill, `warning-bold` to a
+                        // fill alone, and a 14px icon is none of those
+                        // (`DESIGN.md` → Tertiary).
                         state === 'danger' && 'text-negative',
                         state === 'warning' && 'text-warning',
                         state === 'ok' && 'text-positive',
@@ -195,15 +196,30 @@ export function Meter({
                   // both figures rather than trusting this comment.
                   state === 'danger' &&
                     (dangerAt >= 1 ? 'bg-negative-bold' : 'bg-negative'),
-                  state === 'warning' && 'bg-warning',
+                  // The warning band has no such choice to make, and the reason
+                  // is that it does not need one rather than that the adjacency
+                  // is fixed. At any `dangerAt <= 1` the band stops where danger
+                  // starts, so the track survives beside it; above 1 danger is
+                  // unreachable — `percentage` is clamped to 100 — and the band
+                  // can run the full width, where the neighbour is the card
+                  // instead. `warning-bold` is measured for BOTH: 5.28:1 in dark
+                  // and 3.43:1 in light against `border-subtle`, and 8.00:1 /
+                  // 4.50:1 against the lightest and darkest ground it can land
+                  // on, all asserted in
+                  // `src/styles/__tests__/tokens-contrast.test.ts`. That is what
+                  // the danger grade could not do, and it is why this one is
+                  // unconditional. `BudgetMeter` and `GoalMeter` paint the same
+                  // grade, so one caution verdict reads in one amber (#171).
+                  state === 'warning' && 'bg-warning-bold',
                   // Full is not a virtue here, so the fill is the foreground
                   // token rather than the positive one. 70% of `ink` composited
                   // over the track measures 4.57:1 in light and 4.79:1 in dark;
-                  // `positive` is 5.90:1 / 5.67:1, `warning` 5.84:1 / 5.75:1
-                  // and `negative` 5.92:1 / 5.02:1 on the same track — all well
-                  // clear of the 3:1 WCAG 2.2 §1.4.11 asks of a graphical
-                  // object. `src/styles/__tests__/tokens-contrast.test.ts`
-                  // recomputes all four rather than quoting them from here.
+                  // `positive` is 5.90:1 / 5.67:1, `warning-bold` 3.43:1 /
+                  // 5.28:1 and `negative` 5.92:1 / 5.02:1 on the same track —
+                  // all well clear of the 3:1 WCAG 2.2 §1.4.11 asks of a
+                  // graphical object.
+                  // `src/styles/__tests__/tokens-contrast.test.ts` recomputes
+                  // all four rather than quoting them from here.
                   state === 'ok' &&
                     (tone === 'neutral' ? 'bg-ink/70' : 'bg-positive'),
                 )}

@@ -57,6 +57,21 @@ describe('GoalMeter', () => {
     expect(track.getAttribute('aria-valuemax')).toBe('100')
   })
 
+  it('paints an overdue bar in the same caution grade every other meter uses', () => {
+    // #171 moved every caution fill onto `warning-bold` at once, rather than leaving this one on
+    // the text grade for a later ticket to find — which is exactly the split #180 had to come back
+    // for after #151 did it to the danger side. The verdict word keeps `text-warning`: the grade
+    // has no text job at any size.
+    const track = meter({ state: 'overdue' })
+
+    const fill = track.firstElementChild as HTMLElement
+    expect(fill.className).toContain('bg-warning-bold')
+
+    const verdict = screen.getByText(/Past its date/u)
+    expect(verdict.className).toContain('text-warning')
+    expect(verdict.className).not.toContain('text-warning-bold')
+  })
+
   it('says the state in words as well as in hue', () => {
     const words: Record<string, RegExp> = {
       saving: /Saving/u,

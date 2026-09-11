@@ -105,6 +105,57 @@ describe('Meter', () => {
     expect(painted).not.toContain('bg-negative-bold')
   })
 
+  it('paints the warning band in the loud caution grade, whatever the danger threshold is', () => {
+    // #171. Unlike the danger grade above, this one does not read `dangerAt`, and the reason is
+    // that it does not have to: `warning-bold` clears 1.4.11's 3:1 on BOTH adjacencies a fill can
+    // have — 5.28:1 in dark and 3.43:1 in light against `border-subtle`, 8.00:1 and 4.50:1 against
+    // the grounds — so no threshold can put it somewhere it was not measured for. The three cases
+    // below are the three the prop can produce.
+    const atDefault = render(
+      <Meter label="Used" value={0.85} minValue={0} maxValue={1} />,
+    )
+    expect(fillClass(atDefault.container)).toContain('bg-warning-bold')
+    atDefault.unmount()
+
+    const belowOne = render(
+      <Meter
+        label="Used"
+        value={0.85}
+        minValue={0}
+        maxValue={1}
+        dangerAt={0.9}
+      />,
+    )
+    expect(fillClass(belowOne.container)).toContain('bg-warning-bold')
+    belowOne.unmount()
+
+    // Above 1 the danger state is unreachable — `percentage` is clamped to 100 — so the warning
+    // band runs the full width of the track and its only neighbour is the card. Still this grade.
+    const aboveOne = render(
+      <Meter
+        label="Used"
+        value={1.3}
+        minValue={0}
+        maxValue={1}
+        dangerAt={1.2}
+      />,
+    )
+    const full = fillClass(aboveOne.container)
+    expect(full).toContain('bg-warning-bold')
+    expect(full).not.toContain('bg-negative')
+  })
+
+  it('leaves the warning icon on the text grade', () => {
+    // Same rule as the danger glyph below: a 14px icon is not a fill, and `warning-bold` has no
+    // text job at any size. The triangle keeps the 7:1 ink while the bar under it goes loud.
+    const { container } = render(
+      <Meter label="Used" value={0.85} minValue={0} maxValue={1} />,
+    )
+    const icon = container.querySelector('svg')?.getAttribute('class') ?? ''
+    expect(icon).toContain('text-warning')
+    expect(icon).not.toContain('text-warning-bold')
+  })
+
   it('leaves the danger icon on the text grade in both cases', () => {
     // The fill is a graphical object at 3:1; a 14px glyph is not the large text 4.5:1 is scored
     // on. `DESIGN.md` scopes `negative-bold` to an over-budget headline and a full-track fill,
