@@ -2,6 +2,7 @@ import { DELIBERATE_SERVER_FAILURE, expect, test } from './support/console'
 
 import { gotoApp } from './support/app'
 import { expectNoWcagViolations } from './support/axe-scan'
+import { expectOutlineWithoutSkips } from './support/headings'
 import { storageStateFor } from './support/session'
 import { failServerFns, holdServerFns } from './support/states'
 import { openSurface } from './support/surfaces'
@@ -66,7 +67,7 @@ interface EmptySurface {
 }
 
 /**
- * The nine screens a brand-new workspace lands on with nothing to show.
+ * The ten screens a brand-new workspace lands on with nothing to show.
  *
  * `/import` is here for its **history** rather than for the page: the two upload cards are always
  * present, and the empty half of that screen is the table under them.
@@ -86,6 +87,7 @@ const EMPTY_SURFACES: readonly EmptySurface[] = [
   { path: '/goals', title: 'goals.empty.title' },
   EMPTY_RECURRING,
   { path: '/transactions/rules', title: 'rules.empty.title' },
+  { path: '/transactions/groups', title: 'groups.empty.title' },
   { path: '/import', title: 'import.history.empty.title' },
 ]
 
@@ -107,6 +109,14 @@ test.describe('a workspace with nothing in it', () => {
       // And the screen it belongs to is still around it. An empty state that replaced the page
       // would be an error boundary wearing an empty state's copy.
       await expect(page.locator('main')).toBeVisible()
+
+      // At the level the page gives it, which is the half of an empty state the `demo` session
+      // cannot be relied on to show. `EmptyState` defaults `headingLevel` to `3`, so a screen that
+      // renders it straight under its `<h1>` and says nothing announces a subsection with no
+      // section — issue #166. `/transactions` and `/import` reach their empty branch on this
+      // session alone; the rest are here because this is where the branch is guaranteed rather
+      // than incidental.
+      await expectOutlineWithoutSkips(page, `empty ${surface.path}`)
     })
   }
 })
@@ -139,10 +149,10 @@ const VARIANT_CELLS: readonly Cell[] = [
  * to recover from it — someone who has just signed up and has nothing on screen to orient by. That
  * is the whole reason these are scanned rather than only asserted for their copy.
  *
- * ## Why the matrix is 9 + 3 rather than 9 × 4
+ * ## Why the matrix is 10 + 3 rather than 10 × 4
  *
  * `accessibility.spec.ts` runs every surface in both themes and both locales because each of its
- * surfaces renders different markup — a grid, a set of cards, a meter. These nine do not: every one
+ * surfaces renders different markup — a grid, a set of cards, a meter. These ten do not: every one
  * of them is the same `EmptyState` component with different copy, and theme and locale are
  * properties of *that component*, not of the screen it sits on. Scanning `/goals` in dark Polish
  * after `/accounts` has been scanned in dark Polish re-checks one contrast pair four more times and

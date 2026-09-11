@@ -11,7 +11,16 @@ export interface EmptyStateProps {
   action?: ReactNode
   /** A quieter alternative beside it — "Import a file". */
   secondaryAction?: ReactNode
-  /** Heading level. Pick whatever keeps the page outline correct. */
+  /**
+   * Heading level. Pick whatever keeps the page outline correct.
+   *
+   * The default is `3`, which is right under a section's `<h2>` and wrong straight under a screen's
+   * `<h1>`. Issue #166 asked whether it should be `2` instead, and the answer is no: the two call
+   * sites that rely on the default — the import history and a transaction's attachment list — are
+   * both inside a section that owns an `<h2>`, so flipping it would break the outlines that are
+   * currently right to repair the ones a call site should have stated. Passing it is the fix; the
+   * guard is `expectOutlineWithoutSkips` in `e2e/support/headings.ts`.
+   */
   headingLevel?: 2 | 3 | 4 | 5 | 6
   className?: string
 }
