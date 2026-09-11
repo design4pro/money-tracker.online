@@ -63,7 +63,14 @@ export function CandidateCard({
     <li className="flex flex-col gap-3 border-t border-border-subtle px-4 py-4 first:rounded-t-xl first:border-t-0 last:rounded-b-xl">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-subtitle font-semibold text-ink">{name}</h3>
+          {/*
+            `h2`, for the reason `series-card.tsx` gives at the same spot: a candidate is a
+            top-level entry of `/recurring/candidates`, and the only other heading on that screen
+            is its `<h1>`. An `h3` announced the outline as `h1` then a proposal name with the
+            level between them missing, and left the two row cards of one feature disagreeing
+            about their own rank.
+          */}
+          <h2 className="text-subtitle font-semibold text-ink">{name}</h2>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-ink-2">
             {candidate.frequency === null ? null : (
               <span>

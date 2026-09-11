@@ -2,6 +2,7 @@ import { DELIBERATE_SERVER_FAILURE, expect, test } from './support/console'
 
 import { gotoApp } from './support/app'
 import { expectNoWcagViolations } from './support/axe-scan'
+import { expectOutlineWithoutSkips } from './support/headings'
 import { storageStateFor } from './support/session'
 import { failServerFns, holdServerFns } from './support/states'
 import { openSurface } from './support/surfaces'
@@ -107,6 +108,13 @@ test.describe('a workspace with nothing in it', () => {
       // And the screen it belongs to is still around it. An empty state that replaced the page
       // would be an error boundary wearing an empty state's copy.
       await expect(page.locator('main')).toBeVisible()
+
+      // At the level the page gives it, which is the part of an empty state only the empty session
+      // can see. `EmptyState` defaults `headingLevel` to `3`, so a screen that renders it straight
+      // under its `<h1>` and says nothing announces a subsection with no section — issue #166. The
+      // populated suite cannot catch that here: `/transactions/rules` has two seeded rules, so its
+      // empty branch exists on no other session.
+      await expectOutlineWithoutSkips(page, `empty ${surface.path}`)
     })
   }
 })

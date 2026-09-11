@@ -296,6 +296,11 @@ function RulesListRoute() {
 
       {rules.length === 0 ? (
         <EmptyState
+          // With no rules there are no paused banners either, so this is the only thing under the
+          // screen's `<h1>` and `EmptyState`'s default of `3` announced a skipped level. Found
+          // while widening issue #166's guard: the demo workspace seeds two rules, so this branch
+          // renders on the `empty` session and nowhere else.
+          headingLevel={2}
           title={t('rules.empty.title')}
           description={t('rules.empty.body')}
           action={
