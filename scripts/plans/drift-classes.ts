@@ -502,7 +502,7 @@ export const DRIFT_ENTRIES: ReadonlyArray<DriftEntry> = [
     kind: 'new',
     driftClass: 'C',
     landedAt: [],
-    note: 'Never shipped anywhere, and it is the only justification in the repository for `motion@^13.2.0`, which is declared in `package.json` and imported by zero files under `src/`. Removing the package and building the stage are both decisions for a human under the dependency freeze; the entry stays open either way.',
+    note: 'Never shipped anywhere. It was the only justification in the repository for `motion@^13.2.0`, and a human resolved that under the dependency freeze by removing the package (#213, ADR 0018) rather than by scheduling the stage. The entry stays open: the module is still owed, its presets are now hand-rolled against the `tokens.css` duration scale, and a preset that genuinely needs a JS animation library is a new dependency decision in a new ADR.',
   },
   {
     plan: PLAN_01,
