@@ -61,6 +61,7 @@ test-results
 .github/workflows/claude-code-review.yml
 .github/workflows/claude.yml
 docs/agents/cezar-automations.json
+scripts/ci/__tests__/claude-credential-gate.test.ts
 scripts/ci/__tests__/claude-review-ran.test.mjs
 scripts/ci/__tests__/claude-usage-limit.test.mjs
 scripts/ci/__tests__/review-threads-label.test.mjs
