@@ -4,6 +4,7 @@ import { gotoApp, useLocale, useTheme } from './app'
 import { storageStateFor } from './session'
 
 import type { AppLocale, AppTheme } from './app'
+import type { SessionId } from './session'
 import type { Browser, BrowserContext, Page } from '@playwright/test'
 
 /**
@@ -19,8 +20,13 @@ import type { Browser, BrowserContext, Page } from '@playwright/test'
 export interface Surface {
   readonly name: string
   readonly path: string
-  /** `undefined` = the signed-out visitor, which is the only way to see `/login`. */
-  readonly session: 'demo' | undefined
+  /**
+   * `undefined` = the signed-out visitor, which is the only way to see `/login`.
+   *
+   * {@link SURFACES} below is all `demo`, because a populated workspace is what those scans need.
+   * `states.spec.ts` builds its own list on the `empty` session for the opposite reason.
+   */
+  readonly session: SessionId | undefined
 }
 
 /** Named, because `accessibility.spec.ts` opens this same surface for its meter case. */

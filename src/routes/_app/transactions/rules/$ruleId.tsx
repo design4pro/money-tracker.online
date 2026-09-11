@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 
 import { ErrorPanel } from '#/components/app/accounts'
+import { RuleEditorSkeleton } from '#/components/app/transactions'
 import { toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { deleteRule, loadRule, updateRule } from '#/server/fns/rules'
@@ -45,6 +46,7 @@ export const Route = createFileRoute('/_app/transactions/rules/$ruleId')({
     ])
     return { rule, reference }
   },
+  pendingComponent: RuleEditorSkeleton,
   errorComponent: RuleDetailError,
   head: ({ matches, loaderData }) =>
     pageHead(

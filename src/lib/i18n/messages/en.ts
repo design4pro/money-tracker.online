@@ -596,6 +596,9 @@ const messages = {
   'transactions.detail.noTags': 'No tags on this entry.',
   'transactions.detail.noAttachments': 'No receipt attached.',
   'transactions.detail.noRefunds': 'No refund linked.',
+  'transactions.detail.error.title': 'This transaction could not be loaded',
+  'transactions.detail.error.body':
+    'Nothing was changed. Try again in a moment.',
   'transactions.detail.notFound.title': 'That transaction is not here',
   'transactions.detail.notFound.body':
     'It may have been deleted, or the address may be wrong.',
@@ -838,6 +841,7 @@ const messages = {
   'payees.defaultCategory.summary': 'Suggests {name}',
   'payees.detail.back': 'Back to payees',
   'payees.detail.noCategory': 'Suggests no category',
+  'payees.detail.loading': 'Loading this payee…',
   'payees.detail.error.title': 'This payee could not be loaded',
   'payees.detail.error.body':
     'The request did not come back. Nothing has been changed — try again.',
@@ -1243,6 +1247,30 @@ const messages = {
   },
   'notifications.badge': '{count}+',
 
+  /*
+    One title and one body per notification kind, keyed by the registry in
+    `#/server/notify/kinds`. Every amount and every date arrives as a placeholder and is formatted
+    by the reader's own locale at render time: the stored row holds integers and codes, so the same
+    row reads correctly to a Polish member of an English-preferring household. A pre-formatted
+    amount in one of these strings would break exactly that.
+  */
+  'notifications.kind.budgetThresholdCrossed.title':
+    '{budget} is at {threshold}%',
+  'notifications.kind.budgetThresholdCrossed.body':
+    'You have spent {spent} of {available} in {budget} this period.',
+  'notifications.kind.budgetExceeded.title': '{budget} is spent',
+  'notifications.kind.budgetExceeded.body':
+    'You are {overspent} over the {available} you set for {budget}.',
+  'notifications.kind.recurringDueSoon.title': '{series} is due {date}',
+  'notifications.kind.recurringDueSoon.body':
+    '{amount} for {series} is due on {date}.',
+  'notifications.kind.recurringOverdue.title': '{series} was due {date}',
+  'notifications.kind.recurringOverdue.body':
+    '{amount} for {series} was due on {date} and is not recorded yet.',
+  'notifications.kind.goalReached.title': 'You reached {goal}',
+  'notifications.kind.goalReached.body':
+    '{goal} is complete — you put aside {contributed} of {target}.',
+
   /* -- Accessibility ------------------------------------------------------ */
   'a11y.skipToContent': 'Skip to main content',
   /*
@@ -1579,6 +1607,7 @@ const messages = {
   'invite.state.alreadyMember': 'You are already in this household.',
   'invite.state.wrongAccount':
     'This invitation was sent to {email}. Sign out and sign in with that address to accept it.',
+  'invite.loading': 'Loading this invitation…',
   'invite.notFound': 'This invitation link does not lead anywhere.',
   'invite.goToApp': 'Go to the household',
 
@@ -2177,6 +2206,14 @@ const messages = {
   'rules.new': 'New rule',
   'rules.list.label': 'Rules, in the order they run',
   'rules.back': 'Back to the rules',
+  'rules.list.loading': 'Loading your rules…',
+  'rules.editor.loading': 'Loading the rule editor…',
+  // `rules.editor.error.*` further down is the *save* failure. This pair is the load failure, and
+  // the two must not be merged: one says the rule you wrote is still unsaved, the other that the
+  // editor never opened.
+  'rules.editor.load.error.title': 'The rule editor could not be loaded',
+  'rules.editor.load.error.body':
+    'No rule was created or changed. Try again in a moment.',
   'rules.error.title': 'The rules could not be loaded',
   'rules.error.body':
     'Nothing was changed. Try again, and if it keeps happening the detail below is what to send us.',
@@ -2477,6 +2514,15 @@ const messages = {
   'import.upload.error.tooLarge':
     '{name} is larger than {size}. Export a shorter period and bring it in as two files.',
   'import.upload.error.failed': 'The file was not read: {reason}',
+
+  'import.list.loading': 'Loading your imports…',
+  'import.load.error.title': 'The import page could not be loaded',
+  'import.load.error.body':
+    'Nothing was uploaded and nothing was changed. Try again in a moment.',
+  'import.detail.loading': 'Loading this import…',
+  'import.detail.error.title': 'This import could not be loaded',
+  'import.detail.error.body':
+    'The file and its rows are untouched. Try again in a moment.',
 
   'import.history.title': 'Import history',
   'import.history.body':

@@ -372,6 +372,23 @@ export interface TenantTableAccess<TTable extends TenantTable> {
     scope: TenantScope,
     values: TenantInsert<TTable>,
   ) => Promise<TTable['$inferSelect']>
+  /**
+   * The row, or `null` when a unique index on `target` says this workspace already has it.
+   *
+   * For the caller whose duplicate is an expected answer rather than a fault — a cron that
+   * re-offers the same occasion after a transient failure, an idempotent replay. `null` is that
+   * answer, decided by the database in one statement: a read-then-write pre-check lets two
+   * concurrent ticks both find the row absent, and matching the error text a failed insert would
+   * have raised is not portable, since SQLite names the columns and D1 wraps the message again.
+   *
+   * `target` names the index's columns, which is what SQLite's `ON CONFLICT` clause takes. Only a
+   * *unique* index counts: a conflict on anything else is still a thrown error, as it should be.
+   */
+  insertOnConflictDoNothing: (
+    scope: TenantScope,
+    values: TenantInsert<TTable>,
+    target: ReadonlyArray<SQLiteColumn>,
+  ) => Promise<TTable['$inferSelect'] | null>
   insertMany: (
     scope: TenantScope,
     values: ReadonlyArray<TenantInsert<TTable>>,
@@ -486,6 +503,26 @@ export function createTenantTableAccess<TTable extends TenantTable>(
     return row
   }
 
+  async function insertOnConflictDoNothing(
+    scope: TenantScope,
+    values: TenantInsert<TTable>,
+    target: ReadonlyArray<SQLiteColumn>,
+  ): Promise<Row | null> {
+    // Stamped after the caller's payload, for the reason spelled out in `insertMany`.
+    const record = {
+      ...values,
+      organizationId: scope.ctx.organizationId,
+    } as SQLiteInsertValue<TTable>
+
+    const rows = (await scope.db
+      .insert(table)
+      .values(record)
+      .onConflictDoNothing({ target: [...target] })
+      .returning()) as Array<Row>
+
+    return rows.at(0) ?? null
+  }
+
   async function updateWhere(
     scope: TenantScope,
     where: SQL,
@@ -526,6 +563,7 @@ export function createTenantTableAccess<TTable extends TenantTable>(
     count: countRows,
     sumOf,
     insert,
+    insertOnConflictDoNothing,
     insertMany,
     updateWhere,
     removeWhere,

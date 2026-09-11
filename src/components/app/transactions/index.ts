@@ -69,6 +69,8 @@ export type {
   TransactionsEmptyProps,
 } from './list-states'
 
+export { RuleEditorSkeleton, RulesListSkeleton } from './rule-skeletons'
+
 export { KeyboardShortcuts } from './keyboard-shortcuts'
 
 export { ListSummary } from './list-summary'

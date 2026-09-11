@@ -16,6 +16,8 @@ import {
   lazyRouteComponent,
 } from '@tanstack/react-router'
 
+import { RoutePending } from '#/components/app/shell/route-pending'
+
 import { routeTree } from './routeTree.gen'
 
 import type { ReactNode } from 'react'
@@ -51,6 +53,34 @@ export function getRouter() {
     // before the click lands, which is most of the difference between "instant" and "fine".
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
+    /**
+     * The floor under every route that has not furnished its own loading state.
+     *
+     * Without it the router has nothing to offer while a match loads, and TanStack's answer to
+     * "no pending component" is to leave the previous route's component mounted for the whole
+     * load. Measured on a client-side navigation from `/dashboard` to `/transactions` with every
+     * `/_serverFn/*` response held open: the URL read `/transactions`, the rail highlighted
+     * `/transactions`, and the `h1` said `"Dashboard"` with zero `role="status"` regions, for as
+     * long as the hold lasted.
+     *
+     * In a product about money that is the worst of the options. The figures on screen are real,
+     * they belong to a screen the reader has already left, and nothing says so. A skeleton says
+     * "this is loading" in one announced sentence; stale figures say something false silently.
+     *
+     * A route that draws its own shape still wins - `pendingComponent` on the route takes
+     * precedence over this - so this is the floor, never the per-surface answer.
+     */
+    defaultPendingComponent: RoutePending,
+    /**
+     * 300ms, against TanStack's default of 1000.
+     *
+     * The threshold exists so a fast navigation does not flash a skeleton, and a second of stale
+     * content is a fine trade on a page of prose. It is not a fine trade here, for the reason
+     * above: what sits on screen during those milliseconds is somebody's account balance under
+     * the wrong heading. `defaultPendingMinMs` keeps its framework default of 500ms, which is
+     * what stops the skeleton itself from flickering once it has been committed to.
+     */
+    defaultPendingMs: 300,
     /**
      * The floor under every route that has not furnished its own failure state.
      *

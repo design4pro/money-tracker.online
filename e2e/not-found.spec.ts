@@ -40,6 +40,11 @@ import type {
  * asserted at 200 here so that "unchanged" is a recorded decision rather than an accident, and so a
  * later change to that route has to come past this file.
  *
+ * Issue #21 came past it. That route's read is now classified like the other seven — a repository
+ * `NOT_FOUND` leaves as the router's sentinel — so the notice below is shown for a missing row and
+ * a retryable error panel for everything else, where before both got the same sentence. The status
+ * is untouched, because the classification happens on the server function rather than in a loader.
+ *
  * ## Why this spec owns its pages
  *
  * Almost every navigation here is meant to answer 404, and chromium writes a `console.error` —
@@ -174,7 +179,10 @@ test.describe('a missing row answers 404', () => {
     const { page, report, close } = await watchedPage(browser, contextOptions)
 
     // Out of scope for issue #16 by decision, not by omission: this screen fetches with `useQuery`,
-    // so there is no loader to classify and no status to set.
+    // so there is no loader to throw from and no status to set. Since #21 the *read* is classified
+    // — `-server/detail.ts` rethrows a repository `NOT_FOUND` as the router's sentinel, and the
+    // screen shows this notice only for that, a genuine failure now getting the retryable panel
+    // instead — but the classification happens below the document, so the 200 is unchanged.
     const response = await visit(page, '/transactions/does-not-exist')
     expect(response.status()).toBe(200)
 

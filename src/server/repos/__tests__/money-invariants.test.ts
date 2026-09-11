@@ -31,7 +31,7 @@ import path from 'node:path'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { asCurrencyCode, asMinor, asRateE10 } from '#/lib/money'
+import { asCurrencyCode, asMinor, asRateE10, subtractMinor } from '#/lib/money'
 import { projectCompletion } from '#/server/goals/project'
 import { medianOf } from '#/server/recurring/detect'
 import { matchesPeriod } from '#/server/recurring/match'
@@ -51,6 +51,9 @@ import {
   sweepBudgetThresholds,
 } from '#/server/budgets/thresholds'
 import { hasReachedThreshold } from '#/server/budgets/utilisation'
+import { goalReachedDedupeKey } from '#/server/notify/dedupe'
+import { notify } from '#/server/notify/dispatch'
+import { pageForReader } from '#/server/repos/notifications'
 
 import { budgetSpend, getBudget } from '../budgets'
 import { periodVarianceMinor } from '../recurring'
@@ -1363,5 +1366,105 @@ describe('13 — a refund is subtracted on read and never written to the origina
     expect(reread.amountMinor).toBe(12_345)
     expect(summary.refundedMinor).toBe(1_000)
     expect(summary.effectiveMinor).toBe(11_345)
+  })
+})
+
+/**
+ * A notification is a sentence about money written at a moment, and the moment is what it is for.
+ * So the row carries the figures rather than a pointer to the budget: re-reading the budget when
+ * somebody opens the list would print a different sentence about a different day. What it must
+ * never carry is those figures already turned into words — the household this product is built for
+ * has members who do not share a locale, and a stored `"1 234,56 zł"` reads wrongly to one of them
+ * forever.
+ */
+describe('14 — a notification stores figures, never a rendered amount', () => {
+  const AT = new Date('2026-03-15T10:00:00.000Z')
+
+  let notifyWorld: BudgetWorld
+
+  beforeEach(async () => {
+    notifyWorld = await createBudgetWorld()
+  })
+
+  it('writes payload_json holding integers and a currency code, and no formatted string', async () => {
+    const payload = {
+      v: 1,
+      budgetId: 'budget-1',
+      budgetName: 'Groceries',
+      periodStart: '2026-03-01',
+      threshold: 100,
+      spentMinor: 205_000,
+      availableMinor: 200_000,
+      overspentMinor: 5_000,
+      currencyCode: 'PLN',
+    } as const
+
+    const outcome = await notify(
+      notifyWorld.scope,
+      {
+        userId: 'user-a',
+        kind: 'budget.exceeded',
+        payload,
+        dedupeKey: 'budget:threshold:v1:budget-1:2026-03-01:100',
+      },
+      AT,
+    )
+    expect(outcome).toBe('written')
+
+    const rows = (await pageForReader(notifyWorld.scope)).items
+    expect(rows).toHaveLength(1)
+
+    const stored = JSON.parse(rows[0].payloadJson) as Record<string, unknown>
+    for (const field of [
+      'spentMinor',
+      'availableMinor',
+      'overspentMinor',
+    ] as const) {
+      expect(Number.isInteger(stored[field])).toBe(true)
+    }
+    expect(stored.currencyCode).toBe('PLN')
+
+    // No grouping separator, no decimal comma, no symbol anywhere in what was written.
+    expect(rows[0].payloadJson).not.toMatch(/[€$£]|zł|\d[  ]\d|\d,\d/)
+  })
+
+  it('carries overspentMinor as subtractMinor computes it, a positive magnitude', () => {
+    // The same arithmetic `#/server/budgets/utilisation` does, in the same units, with the helper
+    // that keeps it integer. A bare `-` would pass today and be the float bug the moment somebody
+    // widened one of the operands.
+    const spent = asMinor(205_000)
+    const available = asMinor(200_000)
+
+    expect(subtractMinor(spent, available)).toBe(5_000)
+    expect(subtractMinor(spent, available)).toBeGreaterThan(0)
+    expect(Number.isInteger(subtractMinor(spent, available))).toBe(true)
+  })
+
+  it('keeps a zero-decimal currency at its own scale, never a hard-coded 2', async () => {
+    // JPY has `digits: 0`, so 4 000 yen is `4000`. Writing 400000 "to be safe" would store a
+    // hundred times the amount, and every reader downstream would believe it.
+    await notify(
+      notifyWorld.scope,
+      {
+        userId: 'user-a',
+        kind: 'goal.reached',
+        payload: {
+          v: 1,
+          goalId: 'goal-1',
+          name: 'Kyoto',
+          targetMinor: 4_000,
+          contributedMinor: 4_000,
+          currencyCode: 'JPY',
+          transactionId: 'txn-1',
+        },
+        dedupeKey: goalReachedDedupeKey({ goalId: 'goal-1' }),
+      },
+      AT,
+    )
+
+    const rows = (await pageForReader(notifyWorld.scope)).items
+    const stored = JSON.parse(rows[0].payloadJson) as Record<string, unknown>
+    expect(stored.targetMinor).toBe(4_000)
+    expect(stored.currencyCode).toBe('JPY')
   })
 })
