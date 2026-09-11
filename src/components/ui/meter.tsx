@@ -196,14 +196,20 @@ export function Meter({
                   // both figures rather than trusting this comment.
                   state === 'danger' &&
                     (dangerAt >= 1 ? 'bg-negative-bold' : 'bg-negative'),
-                  // The warning band has no such choice to make: it ends where
-                  // `dangerAt` begins, so its fill can never be the whole track
-                  // and the track is always a neighbour. `warning-bold` is the
-                  // grade that adjacency is measured for — 5.28:1 in dark and
-                  // 3.43:1 in light against `border-subtle`, both asserted in
-                  // `src/styles/__tests__/tokens-contrast.test.ts` — and it is
-                  // the same grade `BudgetMeter` and `GoalMeter` paint, so one
-                  // caution verdict reads in one amber (#171).
+                  // The warning band has no such choice to make, and the reason
+                  // is that it does not need one rather than that the adjacency
+                  // is fixed. At any `dangerAt <= 1` the band stops where danger
+                  // starts, so the track survives beside it; above 1 danger is
+                  // unreachable — `percentage` is clamped to 100 — and the band
+                  // can run the full width, where the neighbour is the card
+                  // instead. `warning-bold` is measured for BOTH: 5.28:1 in dark
+                  // and 3.43:1 in light against `border-subtle`, and 8.00:1 /
+                  // 4.50:1 against the lightest and darkest ground it can land
+                  // on, all asserted in
+                  // `src/styles/__tests__/tokens-contrast.test.ts`. That is what
+                  // the danger grade could not do, and it is why this one is
+                  // unconditional. `BudgetMeter` and `GoalMeter` paint the same
+                  // grade, so one caution verdict reads in one amber (#171).
                   state === 'warning' && 'bg-warning-bold',
                   // Full is not a virtue here, so the fill is the foreground
                   // token rather than the positive one. 70% of `ink` composited

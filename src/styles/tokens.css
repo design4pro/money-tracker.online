@@ -118,13 +118,18 @@
    below 1 it can stop short on the track and keeps `negative`. One over-limit
    verdict, one red, without spending the thin margin where it is not forced.
 
-   `warning-bold` has no such split to make, because its fill is PARTIAL by
-   construction: `approaching` means the ratio has not reached 1 yet, and
-   `ui/Meter`'s warning band ends where `dangerAt` begins. So the track is
-   always one of its neighbours - 5.28:1 in dark, 3.43:1 in light - and the
-   card is the other, since the fill is the full height of an 8px track and its
-   long edges abut the surface the meter sits on. Both adjacencies are asserted
-   at 3:1, and every meter fill that reads as caution takes this one grade:
+   `warning-bold` has no such split to make, and the reason is that it does not
+   NEED one. The caution fill is partial in every case that ships -
+   `approaching` means the ratio has not reached 1 yet, `overdue` loses to
+   `reached` the moment it would, and `ui/Meter`'s band stops where `dangerAt`
+   starts at every threshold any caller passes - so the track is a neighbour,
+   at 5.28:1 in dark and 3.43:1 in light. The card is the other one regardless,
+   since the fill is the full height of an 8px track and its long edges abut
+   the surface the meter sits on; and a `dangerAt` above 1 would make danger
+   unreachable and let the band run the whole width, where the card is the ONLY
+   neighbour. Both adjacencies are asserted at 3:1, which is what the danger
+   grade could not manage on its thin side and is why this grade is
+   unconditional. Every meter fill that reads as caution takes it:
    `BudgetMeter`'s `approaching`, `ui/Meter`'s warning band, and `GoalMeter`'s
    `overdue`. Splitting them was the defect #180 had to come back for on the
    danger side, and it is not repeated here.

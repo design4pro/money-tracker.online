@@ -106,10 +106,11 @@ describe('Meter', () => {
   })
 
   it('paints the warning band in the loud caution grade, whatever the danger threshold is', () => {
-    // #171. The warning band has no adjacency question to answer: it ends where `dangerAt` begins,
-    // so its fill is partial by construction and the track is always one of its neighbours.
-    // `warning-bold` is measured for exactly that — 5.28:1 in dark, 3.43:1 in light against
-    // `border-subtle` — so the grade is unconditional here, unlike the danger one above.
+    // #171. Unlike the danger grade above, this one does not read `dangerAt`, and the reason is
+    // that it does not have to: `warning-bold` clears 1.4.11's 3:1 on BOTH adjacencies a fill can
+    // have — 5.28:1 in dark and 3.43:1 in light against `border-subtle`, 8.00:1 and 4.50:1 against
+    // the grounds — so no threshold can put it somewhere it was not measured for. The three cases
+    // below are the three the prop can produce.
     const atDefault = render(
       <Meter label="Used" value={0.85} minValue={0} maxValue={1} />,
     )
@@ -126,6 +127,22 @@ describe('Meter', () => {
       />,
     )
     expect(fillClass(belowOne.container)).toContain('bg-warning-bold')
+    belowOne.unmount()
+
+    // Above 1 the danger state is unreachable — `percentage` is clamped to 100 — so the warning
+    // band runs the full width of the track and its only neighbour is the card. Still this grade.
+    const aboveOne = render(
+      <Meter
+        label="Used"
+        value={1.3}
+        minValue={0}
+        maxValue={1}
+        dangerAt={1.2}
+      />,
+    )
+    const full = fillClass(aboveOne.container)
+    expect(full).toContain('bg-warning-bold')
+    expect(full).not.toContain('bg-negative')
   })
 
   it('leaves the warning icon on the text grade', () => {
