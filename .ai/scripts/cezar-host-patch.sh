@@ -82,6 +82,7 @@ const hits = src.split(FROM).length - 1
 if (hits !== Number(COUNT)) throw new Error(`expected ${COUNT} patch site(s) in ${file}, found ${hits}`)
 fs.writeFileSync(file, src.split(FROM).join(TO))
 JS
+  grep -qF "$marker" "$file" || { echo "marker absent after patching $file: $marker" >&2; exit 1; }
   echo "patched: $file"
 }
 
