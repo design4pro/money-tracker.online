@@ -150,6 +150,11 @@ export function Meter({
                       aria-hidden="true"
                       className={cn(
                         'size-3.5 shrink-0',
+                        // The glyph stays on the text grade whichever grade the
+                        // fill below takes: `negative-bold` is scoped to large
+                        // text and to a full-track fill, `warning-bold` to a
+                        // fill alone, and a 14px icon is none of those
+                        // (`DESIGN.md` → Tertiary).
                         state === 'danger' && 'text-negative',
                         state === 'warning' && 'text-warning',
                         state === 'ok' && 'text-positive',
@@ -173,29 +178,48 @@ export function Meter({
                 className={cn(
                   'h-full rounded-sm',
                   transitionBase,
-                  // `negative`, not `negative-bold` — and the difference from
-                  // `AmountMeter`, which took the loud grade for its own danger
-                  // fill in #151, is the track rather than the token.
+                  // Which boundary this fill has is the CALLER'S choice —
+                  // `dangerAt` is a prop — but it is a choice this component can
+                  // READ, which is what #180 settles. At `dangerAt >= 1` the
+                  // danger state needs `percentage >= 100`, which the width below
+                  // clamps to the whole track: nothing of the track survives as a
+                  // boundary, the neighbour is the card, and the loud grade costs
+                  // nothing. That is `AmountMeter`'s case (#151) and it is the
+                  // case both callers that exist are in, so one verdict now reads
+                  // in one red across the product rather than two.
                   //
-                  // Which boundary this fill has is the CALLER'S choice, not
-                  // this component's: `dangerAt` is a prop. At its default of `1`
-                  // the danger state needs `percentage >= 100`, which the width
-                  // below clamps to the whole track, so the neighbour is the card
-                  // — and that is every caller today. Set below 1, the fill is
-                  // partial and abuts `border-subtle`, where `negative` holds
-                  // 5.02:1 in dark and `negative-bold` only 3.18:1. A primitive
-                  // that cannot know which one it will get takes the value that
-                  // holds on both. `AmountMeter` can know: `over` means the ratio
-                  // passed 1, so its fill is full by construction and the loud
-                  // grade costs it nothing there.
-                  state === 'danger' && 'bg-negative',
-                  state === 'warning' && 'bg-warning',
+                  // Below 1 the fill can stop short and abut `border-subtle`,
+                  // where `negative` holds 5.02:1 in dark and `negative-bold`
+                  // only 3.18:1. Both clear 1.4.11's 3:1, and the thin margin is
+                  // not spent where the adjacency does not force it.
+                  // `src/styles/__tests__/tokens-contrast.test.ts` recomputes
+                  // both figures rather than trusting this comment.
+                  state === 'danger' &&
+                    (dangerAt >= 1 ? 'bg-negative-bold' : 'bg-negative'),
+                  // The warning band has no such choice to make, and the reason
+                  // is that it does not need one rather than that the adjacency
+                  // is fixed. At any `dangerAt <= 1` the band stops where danger
+                  // starts, so the track survives beside it; above 1 danger is
+                  // unreachable — `percentage` is clamped to 100 — and the band
+                  // can run the full width, where the neighbour is the card
+                  // instead. `warning-bold` is measured for BOTH: 5.28:1 in dark
+                  // and 3.43:1 in light against `border-subtle`, and 8.00:1 /
+                  // 4.50:1 against the lightest and darkest ground it can land
+                  // on, all asserted in
+                  // `src/styles/__tests__/tokens-contrast.test.ts`. That is what
+                  // the danger grade could not do, and it is why this one is
+                  // unconditional. `BudgetMeter` and `GoalMeter` paint the same
+                  // grade, so one caution verdict reads in one amber (#171).
+                  state === 'warning' && 'bg-warning-bold',
                   // Full is not a virtue here, so the fill is the foreground
                   // token rather than the positive one. 70% of `ink` composited
-                  // over the track measures 5.24:1 in light and 5.98:1 in dark;
-                  // `warning` is 6.16:1 / 6.22:1 and `negative` 8.25:1 / 7.05:1
-                  // on the same track — all far past the 3:1 WCAG 2.2 §1.4.11
-                  // asks of a graphical object.
+                  // over the track measures 4.57:1 in light and 4.79:1 in dark;
+                  // `positive` is 5.90:1 / 5.67:1, `warning-bold` 3.43:1 /
+                  // 5.28:1 and `negative` 5.92:1 / 5.02:1 on the same track —
+                  // all well clear of the 3:1 WCAG 2.2 §1.4.11 asks of a
+                  // graphical object.
+                  // `src/styles/__tests__/tokens-contrast.test.ts` recomputes
+                  // all four rather than quoting them from here.
                   state === 'ok' &&
                     (tone === 'neutral' ? 'bg-ink/70' : 'bg-positive'),
                 )}

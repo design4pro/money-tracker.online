@@ -15,6 +15,7 @@ import {
   DialogBody,
   DialogFooter,
   DialogHeader,
+  MoneyField,
   Radio,
   RadioGroup,
   SearchField,
@@ -25,7 +26,6 @@ import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { asCurrencyCode } from '#/lib/money'
 
-import { AmountField } from './amount-field'
 import {
   PAYMENT_METHOD_KEY,
   countActiveFilters,
@@ -577,8 +577,10 @@ export function FilterBar({
                       {t('transactions.filter.amountRange')}
                     </legend>
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <AmountField
+                      <MoneyField
+                        locale={locale}
                         label={t('transactions.filter.amountMin')}
+                        invalidMessage={t('validation.amount.invalid')}
                         currencyCode={amountCurrency}
                         value={
                           (panelDraft.amountMinMinor ?? null) as Minor | null
@@ -590,8 +592,10 @@ export function FilterBar({
                           })
                         }
                       />
-                      <AmountField
+                      <MoneyField
+                        locale={locale}
                         label={t('transactions.filter.amountMax')}
+                        invalidMessage={t('validation.amount.invalid')}
                         currencyCode={amountCurrency}
                         value={
                           (panelDraft.amountMaxMinor ?? null) as Minor | null

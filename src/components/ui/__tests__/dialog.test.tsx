@@ -79,6 +79,24 @@ function ControlledExample({
   )
 }
 
+/** The shape the issue is about: an alert dialog whose description is the consequence. */
+function AlertExample() {
+  return (
+    <Modal isOpen>
+      <Dialog role="alertdialog">
+        <DialogHeader
+          title="Discard changes?"
+          description="This form has changes that have not been saved."
+          hideClose
+        />
+        <DialogBody>
+          <button type="button">Discard</button>
+        </DialogBody>
+      </Dialog>
+    </Modal>
+  )
+}
+
 /** The three gestures that all end in the overlay state's `close()`. */
 const CLOSE_GESTURES = [
   [
@@ -156,6 +174,46 @@ describe('Modal + Dialog', () => {
     expect(
       screen.getByRole('dialog', { name: 'Delete transaction' }),
     ).toBeTruthy()
+  })
+
+  it('describes the dialog from the header description', async () => {
+    const user = userEvent.setup()
+    render(<Example />)
+
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+
+    // Resolved to its text rather than asserted as an attribute: an
+    // `aria-describedby` pointing at an id nothing carries reads as no
+    // description at all, and only following the reference catches that.
+    const describedBy = screen
+      .getByRole('dialog')
+      .getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy as string)?.textContent).toBe(
+      'This cannot be undone.',
+    )
+  })
+
+  it('describes an alertdialog from the header description', () => {
+    render(<AlertExample />)
+
+    // The case the gap actually cost something: an alert dialog exists to state
+    // a consequence, and the description is that consequence.
+    const describedBy = screen
+      .getByRole('alertdialog')
+      .getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy as string)?.textContent).toBe(
+      'This form has changes that have not been saved.',
+    )
+  })
+
+  it('emits no aria-describedby for a header without a description', () => {
+    render(<ControlledExample />)
+
+    expect(
+      screen.getByRole('dialog').getAttribute('aria-describedby'),
+    ).toBeNull()
   })
 
   it('moves focus into the dialog and keeps it there', async () => {

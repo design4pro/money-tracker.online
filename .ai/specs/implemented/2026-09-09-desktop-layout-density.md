@@ -1,5 +1,12 @@
 # Desktop layout density: every surface either earns its width or stops growing
 
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | implemented |
+| **Issue**          | #18         |
+| **Spec PR**        | #134        |
+| **Implementation** | #156        |
+
 ## 📝 TLDR
 
 Six of seven `_app` surfaces render at 1440px as a phone list handed a thousand pixels of empty rule;

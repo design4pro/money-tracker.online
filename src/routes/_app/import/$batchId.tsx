@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 
+import { ErrorPanel } from '#/components/app/accounts'
 import { Spinner } from '#/components/ui'
 import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import { getImport } from '#/server/fns/imports'
@@ -16,6 +17,7 @@ import {
   toFileView,
 } from './-lib/flow'
 import { importLinkClass } from './-lib/link-style'
+import { ImportBatchSkeleton } from './-ui/import-states'
 import { MappingStep } from './-ui/mapping-step'
 import { Notice } from './-ui/notice'
 import { PreviewStep } from './-ui/preview-step'
@@ -55,9 +57,40 @@ import type { ImportStep } from './-lib/flow'
 export const Route = createFileRoute('/_app/import/$batchId')({
   validateSearch: importStepSearchSchema,
   loader: ({ params }) => getImport({ data: { id: params.batchId } }),
+  pendingComponent: ImportBatchSkeleton,
+  errorComponent: ImportBatchError,
   head: ({ matches }) => pageHead(matches, (t) => t('import.title')),
   component: ImportBatchRoute,
 })
+
+/**
+ * The batch row itself could not be read.
+ *
+ * Distinct from `FileUnavailable` below, which is the *upload step's* answer when the stored file
+ * cannot be read back and the flow is still on screen around it. Here there is no flow yet: the
+ * loader failed, so nothing is known about the batch, not even its name.
+ *
+ * The body says the file and its rows are untouched, because they are — this route reads and the
+ * import commit happens elsewhere — and that is the reassurance a person part-way through bringing
+ * in a statement needs before they consider pressing anything again.
+ */
+function ImportBatchError({
+  error,
+  reset,
+}: {
+  readonly error: Error
+  readonly reset: () => void
+}) {
+  const t = useTranslate()
+  return (
+    <ErrorPanel
+      title={t('import.detail.error.title')}
+      body={t('import.detail.error.body')}
+      detail={error.message}
+      onRetry={reset}
+    />
+  )
+}
 
 const STEP_LABEL: Readonly<Record<ImportStep, MessageKey>> = {
   upload: 'import.step.upload',

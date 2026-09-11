@@ -31,7 +31,7 @@ import type { SplitDraft } from './split-row'
  * ## It never holds a float
  *
  * Every amount in this component is `Minor | null` — integer minor units in the parent's own
- * currency, at that currency's `digits` scale. {@link AmountField} parses and formats; the editor
+ * currency, at that currency's `digits` scale. `MoneyField` parses and formats; the editor
  * adds and subtracts integers. The one figure it does *not* compute is `ref_amount_minor`: the
  * lines are allocated from the parent's own converted figure by the repository, at the rate the
  * parent already fixed, so the parts cannot disagree with the whole by a rounding step.

@@ -144,11 +144,14 @@ describe('the credit utilisation block', () => {
     )
     expect(iconNames(approaching.container)).toContain('lucide-triangle-alert')
     expect(approaching.getByText(/Approaching limit/u)).toBeTruthy()
+    // Spelled out to the grade, for the reason the `over` case below records: `bg-warning-bold`
+    // contains `bg-warning`, so the looser assertion would pass on either token and be blind to
+    // which one #171 actually shipped.
     expect(
       approaching.container
         .querySelector('[role="meter progressbar"] > div > div')
         ?.getAttribute('class'),
-    ).toContain('bg-warning')
+    ).toContain('bg-warning-bold')
     approaching.unmount()
 
     const over = withI18n(
@@ -160,11 +163,15 @@ describe('the credit utilisation block', () => {
     )
     expect(iconNames(over.container)).toContain('lucide-trending-up')
     expect(over.getByText(/Over limit/u)).toBeTruthy()
+    // The loud grade, spelled out rather than left at `bg-negative` — which the bold class also
+    // contains, so the looser assertion passed either way and was blind to #180's whole subject.
+    // `dangerAt` is `OVER_AT` = 1 here, so the fill is the whole track and its neighbour is the
+    // card: the same adjacency `BudgetMeter` earns `negative-bold` on, and now the same red.
     expect(
       over.container
         .querySelector('[role="meter progressbar"] > div > div')
         ?.getAttribute('class'),
-    ).toContain('bg-negative')
+    ).toContain('bg-negative-bold')
   })
 })
 

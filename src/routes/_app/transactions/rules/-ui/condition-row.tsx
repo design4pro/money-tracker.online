@@ -1,10 +1,10 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 
-import { AmountField } from '#/components/app/accounts'
 import {
   Button,
   ComboBox,
   ComboBoxItem,
+  MoneyField,
   Select,
   SelectItem,
   TextAreaField,
@@ -289,7 +289,7 @@ function ConditionValue({
     case 'amount':
       return (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <AmountField
+          <MoneyField
             locale={locale}
             label={t('rules.condition.amount')}
             currencyCode={value.currencyCode}

@@ -102,6 +102,9 @@ export type { MenuProps, MenuItemProps } from './menu'
 export { Meter } from './meter'
 export type { MeterProps } from './meter'
 
+export { MoneyField } from './money-field'
+export type { MoneyFieldProps } from './money-field'
+
 export { NumberField } from './number-field'
 export type { NumberFieldProps } from './number-field'
 

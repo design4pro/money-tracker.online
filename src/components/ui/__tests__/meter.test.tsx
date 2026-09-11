@@ -4,6 +4,15 @@ import { render, screen } from '@testing-library/react'
 import { Meter } from '../meter'
 
 /**
+ * The classes on the fill — the one child of the track, addressed through the role list rather
+ * than through a colour, so a case that asserts a colour cannot select on the answer.
+ */
+const fillClass = (root: HTMLElement) =>
+  root
+    .querySelector('[role="meter progressbar"] > div > div')
+    ?.getAttribute('class') ?? ''
+
+/**
  * What a reader is told a `Meter` is, and how much of it is full.
  *
  * The first case is not a style assertion. `e2e/accessibility.spec.ts` corrects one axe-core
@@ -61,6 +70,117 @@ describe('Meter', () => {
         name: '1 692,11 zł of 10 000,00 zł used',
       }),
     ).toBe(screen.getByRole('meter'))
+  })
+
+  it('takes the loud danger grade when its threshold guarantees a full fill', () => {
+    // #180: one "over the limit" verdict was rendering in two reds — `bg-negative-bold` in
+    // `BudgetMeter`, `bg-negative` here — because this primitive took the value that holds on
+    // either adjacency. `dangerAt` decides the adjacency, so the primitive can read it: at `1`
+    // the danger state needs `percentage >= 100`, which the width clamps to the whole track, so
+    // nothing of the track survives as a boundary and the neighbour is the card. That is
+    // `BudgetMeter`'s case exactly, and it is the case both callers that exist are in.
+    const { container } = render(
+      <Meter label="Used" value={1.3} minValue={0} maxValue={1} />,
+    )
+
+    expect(fillClass(container)).toContain('bg-negative-bold')
+  })
+
+  it('keeps the text grade when its threshold lets the fill stop on the track', () => {
+    // The other half of the same decision. Below `1` the danger fill can be partial, and then its
+    // boundary is `border-subtle`: `negative` measures 5.02:1 there and `negative-bold` 3.18:1.
+    // Both clear 1.4.11's 3:1, and the thin one is not spent where it does not have to be.
+    const { container } = render(
+      <Meter
+        label="Used"
+        value={0.95}
+        minValue={0}
+        maxValue={1}
+        dangerAt={0.9}
+      />,
+    )
+
+    const painted = fillClass(container)
+    expect(painted).toContain('bg-negative')
+    expect(painted).not.toContain('bg-negative-bold')
+  })
+
+  it('paints the warning band in the loud caution grade, whatever the danger threshold is', () => {
+    // #171. Unlike the danger grade above, this one does not read `dangerAt`, and the reason is
+    // that it does not have to: `warning-bold` clears 1.4.11's 3:1 on BOTH adjacencies a fill can
+    // have — 5.28:1 in dark and 3.43:1 in light against `border-subtle`, 8.00:1 and 4.50:1 against
+    // the grounds — so no threshold can put it somewhere it was not measured for. The three cases
+    // below are the three the prop can produce.
+    const atDefault = render(
+      <Meter label="Used" value={0.85} minValue={0} maxValue={1} />,
+    )
+    expect(fillClass(atDefault.container)).toContain('bg-warning-bold')
+    atDefault.unmount()
+
+    const belowOne = render(
+      <Meter
+        label="Used"
+        value={0.85}
+        minValue={0}
+        maxValue={1}
+        dangerAt={0.9}
+      />,
+    )
+    expect(fillClass(belowOne.container)).toContain('bg-warning-bold')
+    belowOne.unmount()
+
+    // Above 1 the danger state is unreachable — `percentage` is clamped to 100 — so the warning
+    // band runs the full width of the track and its only neighbour is the card. Still this grade.
+    const aboveOne = render(
+      <Meter
+        label="Used"
+        value={1.3}
+        minValue={0}
+        maxValue={1}
+        dangerAt={1.2}
+      />,
+    )
+    const full = fillClass(aboveOne.container)
+    expect(full).toContain('bg-warning-bold')
+    expect(full).not.toContain('bg-negative')
+  })
+
+  it('leaves the warning icon on the text grade', () => {
+    // Same rule as the danger glyph below: a 14px icon is not a fill, and `warning-bold` has no
+    // text job at any size. The triangle keeps the 7:1 ink while the bar under it goes loud.
+    const { container } = render(
+      <Meter label="Used" value={0.85} minValue={0} maxValue={1} />,
+    )
+    const icon = container.querySelector('svg')?.getAttribute('class') ?? ''
+    expect(icon).toContain('text-warning')
+    expect(icon).not.toContain('text-warning-bold')
+  })
+
+  it('leaves the danger icon on the text grade in both cases', () => {
+    // The fill is a graphical object at 3:1; a 14px glyph is not the large text 4.5:1 is scored
+    // on. `DESIGN.md` scopes `negative-bold` to an over-budget headline and a full-track fill,
+    // and the icon is neither, so it stays on the 7:1 ink whichever grade the bar takes.
+    const iconClass = (root: HTMLElement) =>
+      root.querySelector('svg')?.getAttribute('class') ?? ''
+
+    const full = render(
+      <Meter label="Used" value={1.3} minValue={0} maxValue={1} />,
+    )
+    expect(iconClass(full.container)).toContain('text-negative')
+    expect(iconClass(full.container)).not.toContain('text-negative-bold')
+    full.unmount()
+
+    const partial = render(
+      <Meter
+        label="Used"
+        value={0.95}
+        minValue={0}
+        maxValue={1}
+        dangerAt={0.9}
+      />,
+    )
+    expect(iconClass(partial.container)).toContain('text-negative')
+    expect(iconClass(partial.container)).not.toContain('text-negative-bold')
   })
 
   it('does not lean on colour: each threshold carries its own icon', () => {

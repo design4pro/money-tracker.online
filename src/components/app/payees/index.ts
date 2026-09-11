@@ -14,4 +14,8 @@ export type { CategorizationModeCopy } from './categorization'
 export { PayeeList } from './payee-list'
 export type { PayeeListItem, PayeeListProps } from './payee-list'
 
-export { PayeeEmptyState, PayeeListSkeleton } from './payee-states'
+export {
+  PayeeDetailSkeleton,
+  PayeeEmptyState,
+  PayeeListSkeleton,
+} from './payee-states'

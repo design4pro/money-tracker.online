@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { Button, Card, CardBody, Link, toast } from '#/components/ui'
+import { Button, Card, CardBody, Link, Skeleton, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
@@ -52,6 +52,7 @@ export const Route = createFileRoute('/invite/$invitationId')({
       throw error
     }
   },
+  pendingComponent: InvitationSkeleton,
   errorComponent: InvitationMissing,
   head: ({ matches, loaderData }) =>
     pageHead(matches, (t) =>
@@ -75,6 +76,35 @@ function isUnauthenticated(error: unknown): boolean {
   return (
     error.name === 'AuthRequirementError' ||
     /sign in to continue/i.test(error.message)
+  )
+}
+
+/**
+ * The invitation card while the loader is in flight.
+ *
+ * This screen is reached by someone who has just followed a link out of their mail — often having
+ * signed in on the way, so the loader runs on the client and is the slowest thing between them and
+ * a decision. Until now the route declared nothing and they watched the login screen instead.
+ *
+ * It borrows {@link InvitationFrame}'s own geometry rather than restating it, so the card does not
+ * move when the workspace name lands. `Skeleton` is `aria-hidden`, and the one `role="status"`
+ * paragraph carries the announcement.
+ */
+function InvitationSkeleton() {
+  const t = useTranslate()
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-xl items-center px-4 py-10">
+      <Card padding="lg" className="w-full">
+        <CardBody className="flex flex-col items-start gap-4">
+          <p role="status" className="sr-only">
+            {t('invite.loading')}
+          </p>
+          <Skeleton shape="block" className="h-8 w-64 rounded-md" />
+          <Skeleton shape="text" lines={2} className="w-full max-w-[60ch]" />
+          <Skeleton shape="block" className="h-10 w-40 rounded-md" />
+        </CardBody>
+      </Card>
+    </main>
   )
 }
 

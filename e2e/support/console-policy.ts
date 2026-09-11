@@ -93,11 +93,76 @@ export const TOLERATED_CONSOLE_WARNINGS: readonly ToleratedConsoleWarning[] = [
   },
 ]
 
-/** Where one console message lands. `type` is Playwright's `ConsoleMessage.type()`. */
-export function classifyConsoleMessage(message: {
-  readonly type: string
-  readonly text: string
-}): ConsoleVerdict {
+/**
+ * Console output **one test causes on purpose**, declared by that test.
+ *
+ * This is not a second tolerance table and it must never become one. The difference is scope:
+ * {@link TOLERATED_CONSOLE_WARNINGS} says "this class of message is fine on every route in every
+ * spec forever", which is why its bar is so high. An expectation says "this one test asked the
+ * server to fail, and these are the messages that request produced". It is opt-in, it lives for the
+ * length of one test, and a spec that declares nothing behaves exactly as it did before this type
+ * existed.
+ *
+ * That is what lets a spec assert an error state at all. A route that answers `500` writes
+ * `console.error` — the browser's own resource report, and React's boundary notice — and every
+ * `console.error` is fatal by design. Without a per-test declaration the error half of
+ * `e2e/states.spec.ts` is red by construction, and the alternative the spec named (asserting the
+ * error branch outside the browser) would prove a component renders rather than that the real
+ * failure path does.
+ */
+export interface ExpectedConsoleMessage {
+  /** Why this test causes it, in the test author's own words. */
+  readonly why: string
+  readonly match: RegExp
+}
+
+/**
+ * What a `/_serverFn/*` request answered `500` on purpose writes to the console.
+ *
+ * Measured, not guessed: intercepting every `/_serverFn/*` on a client-side navigation to
+ * `/accounts` and fulfilling it with `500` produced exactly these three, and nothing else the
+ * application wrote. There are two of the first because `src/router.tsx` sets `retry: 1`, so one
+ * failure is two requests.
+ *
+ * Each pattern is anchored and names the failure it belongs to, so a real 500 from a route the test
+ * did not target still fails the run: the second entry matches only React's boundary notice, and
+ * the third only TanStack's route-match warning.
+ */
+export const DELIBERATE_SERVER_FAILURE: readonly ExpectedConsoleMessage[] = [
+  {
+    why: 'the browser reporting the response status the test asked for; `retry: 1` means it arrives twice',
+    match:
+      /^Failed to load resource: the server responded with a status of 500 \(Internal Server Error\)$/,
+  },
+  {
+    why: 'React announcing that the error boundary the application provides caught the failure - which is the behaviour under test',
+    match: /The above error occurred in the <\w+> component\./,
+  },
+  {
+    why: 'TanStack Router naming the match whose loader threw, which is the loader the test intercepted',
+    match: /^Warning: Error in route match: /,
+  },
+]
+
+/**
+ * Where one console message lands. `type` is Playwright's `ConsoleMessage.type()`.
+ *
+ * `expected` is the calling test's own declarations and defaults to none, so every existing caller
+ * keeps the verdicts it had. It is consulted before the type check, because the messages a test
+ * causes on purpose are errors — that is the whole reason it has to declare them.
+ */
+export function classifyConsoleMessage(
+  message: {
+    readonly type: string
+    readonly text: string
+  },
+  expected: readonly ExpectedConsoleMessage[] = [],
+): ConsoleVerdict {
+  if (message.type === 'error' || message.type === 'warning') {
+    if (expected.some((rule) => rule.match.test(message.text))) {
+      return 'tolerated'
+    }
+  }
   if (message.type === 'error' || message.type === 'assert') return 'fatal'
   if (message.type !== 'warning') return 'ignored'
   return TOLERATED_CONSOLE_WARNINGS.some((rule) =>

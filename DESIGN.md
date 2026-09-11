@@ -348,14 +348,16 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   both a caption ink and a danger colour: `negative` has to hold 7:1, and in dark that pins it to a
   pale salmon, since red is luminance-poor and no deeper red in sRGB reaches that floor. **Never
   put body-size text in it**, and never reach for it as a general "stronger red".
-  **Nor for a partial fill.** `ui/Meter`'s danger state stays on `negative`, and the two meters
-  differ because their fills can. The over-budget fill is always the whole track - `over` means the
-  ratio passed 1, which clamps it - so its neighbour is the card, and the component fixes that.
-  `ui/Meter` takes its threshold from a `dangerAt` prop, so the adjacency is the caller's: at the
-  default of `1` that fill is full too, and below 1 it is partial and abuts the track, where the
-  loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1. Both clear
-  1.4.11, but a primitive that cannot know which boundary it will get takes the value that holds on
-  either. Same criterion, two adjacencies.
+  **Nor for a partial fill.** A danger fill takes this grade when it is the whole track, and
+  `negative` when it can stop short on one. The over-budget fill is always full - `over` means the
+  ratio passed 1, which clamps it - so its neighbour is the card. `ui/Meter` takes its threshold
+  from a `dangerAt` prop and reads it: at `>= 1` the danger state needs `percentage >= 100`, so
+  that fill is full too and takes the loud grade; below 1 it is partial and abuts the track, where
+  the loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1. Both clear
+  1.4.11, and the thin margin is not spent where the adjacency does not force it. Same criterion,
+  two adjacencies - told apart by the threshold, so one over-limit verdict is one red across the
+  product. The danger **icon** is on neither grade: it is a 14px glyph, which is neither large text
+  nor a fill, so it stays on `negative`.
 - **Brown Ink** (`warning`): approaching a limit, unconfirmed, overdue soon. 7.67:1 on sunken,
   9.26:1 on raised; on `warning-soft` 7.79:1. Dark `#e9c46a`.
 - **Notice** (`info`): a system notice with no verdict - "Hidden", "Planned", "Auto", a scope. It
@@ -717,16 +719,27 @@ wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 ### Meter
 
 An 8px track at `sm` radius in `border-subtle` (so the fill's stop is readable against it), the
-fill in `positive` on track, `warning` near the limit, and red over it; past 100% the fill runs
-hatched as well as red. _Which_ red is not one answer: `ui/Meter` is the generic primitive and its
-threshold is a `dangerAt` prop, so its fill may abut the track or the card depending on the caller,
-and it keeps `negative` - the grade that clears both. The money meters know: `over` means the ratio
-passed 1, which clamps the fill to the whole track, so `AmountMeter` and `BudgetMeter` take
-`negative-bold` against the card. The two callers that reach `ui/Meter`'s danger state both pass a
-threshold of `1`, so today that split shows up as two reds for one verdict; #180 is where that is
-settled. The headline beside it is the remainder, and `negative-bold` too
+fill in `positive` on track, `warning-bold` near the limit, and red over it; past 100% the fill runs
+hatched as well as red. _Which_ red follows the adjacency, and every meter works it out the same
+way. `over` means the ratio passed 1, which clamps the fill to the whole track, so `AmountMeter`
+and `BudgetMeter` take `negative-bold` against the card. `ui/Meter` takes its threshold from a
+`dangerAt` prop and reads it: at `>= 1` its danger fill is full too and takes the same grade, which
+is the case both callers that exist are in, so one over-limit verdict reads in one red. Below 1 the
+fill can stop on the track and keeps `negative`, the grade with the margin against `border-subtle`.
+The danger icon is a 14px glyph and stays on `negative` either way. The headline beside it is the
+remainder, and `negative-bold` too
 when it is an over-by, because bold at 20px or 32px is large text and is not held to the 7:1 floor.
 The state is carried by a word and a lucide icon before colour.
+
+The caution fill has no adjacency to work out, because `warning-bold` clears 3:1 against the track
+and against the card alike. The fill usually stops short on the track, but `ui/Meter`'s warning band
+can run the whole width when `dangerAt` is above 1, since danger is then unreachable. Either way
+`BudgetMeter`'s `approaching`, `ui/Meter`'s warning band and `GoalMeter`'s `overdue` take
+`warning-bold` unconditionally, and one caution verdict reads in one amber. That grade is a fill
+and nothing else — no headline is ever a caution tone, the verdict word and the 14px triangle keep
+`warning` at 7:1, and a caller that wants loud caution TEXT has to re-measure the token at 4.5:1
+first. What the 3:1 floor bought differs by theme and is measured rather than assumed: dark gets
+full chroma at nearly the old weight, light has to lighten to get any (`src/styles/tokens.css`).
 
 ### Navigation
 

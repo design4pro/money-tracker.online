@@ -1,5 +1,12 @@
 # Foundations plan reconciliation
 
+| Field              | Value           |
+| ------------------ | --------------- |
+| **Status**         | implemented     |
+| **Issue**          | #77             |
+| **Spec PR**        | #75             |
+| **Implementation** | #98, #111, #116 |
+
 ## 📝 TLDR
 
 `docs/plans/00-foundations.md` describes a repository that no longer exists. Of its 56 `Owned paths`

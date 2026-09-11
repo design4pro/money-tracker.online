@@ -20,11 +20,12 @@ import { storageStateFor } from './support/session'
  * of the currency's own minor units and never anything else. There are exactly two places that
  * claim can be broken without a unit test noticing, and both of them are in a browser:
  *
- * 1. **The parse.** `AmountField` turns what a person typed into `Minor` through a *string* —
- *    `Intl` writes the shortest decimal that round-trips, `scaleDecimalString` moves the point and
- *    rounds half to even. The float route, `Math.round(1.015 * 100)`, answers `101` because
- *    `1.015 * 100` is `101.49999999999999`. Which route ran is invisible in jsdom, whose `Intl` is
- *    the host's; it is visible here, typing into the real control in the real locale.
+ * 1. **The parse.** `MoneyField` turns what a person typed into `Minor` through a *string* and
+ *    only a string — `parseMoney` normalises the reader's separators, `scaleDecimalString` moves
+ *    the point and rounds half to even, and no `number` exists in between. The float route,
+ *    `Math.round(1.015 * 100)`, answers `101` because `1.015 * 100` is `101.49999999999999`. Which
+ *    route ran is invisible in jsdom, whose `Intl` is the host's; it is visible here, typing into
+ *    the real control in the real locale.
  * 2. **The scale.** `minorUnitDigits` is the only source of the number of decimal places. A
  *    hard-coded 100 turns ¥5,000 into ¥50 and no PLN, EUR or USD test can tell.
  *

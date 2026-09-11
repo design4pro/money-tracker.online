@@ -26,6 +26,24 @@ describe('CandidateCard', () => {
     expect(screen.queryByText(/88/)).toBeNull()
   })
 
+  it('names the proposal at the level `SeriesCard` names a series', () => {
+    renderRecurring(
+      <CandidateCard
+        row={candidateRow()}
+        onAccept={() => undefined}
+        onDismiss={() => undefined}
+      />,
+    )
+
+    // `h2`, for the reason `series-card.tsx` records: a candidate is a top-level entry of
+    // `/recurring/candidates`, whose only other heading is the screen's `<h1>`. An `h3` announced
+    // a subsection of a section that is not there — issue #166. Two structurally identical row
+    // cards on two screens of one feature must not disagree on level, and this is the assertion
+    // that holds them together; the outline of the screen itself is guarded in
+    // `e2e/desktop-density.spec.ts`.
+    expect(screen.getByRole('heading', { name: 'Netflix' }).tagName).toBe('H2')
+  })
+
   it('says which signal held the proposal back, when this run knows', () => {
     renderRecurring(
       <CandidateCard

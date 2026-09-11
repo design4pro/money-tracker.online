@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 
+import { ErrorPanel } from '#/components/app/accounts'
+import { RuleEditorSkeleton } from '#/components/app/transactions'
 import { Button, Card, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { createRule } from '#/server/fns/rules'
@@ -30,9 +32,37 @@ import { pageHead } from '#/routes/-lib/page-title'
  */
 export const Route = createFileRoute('/_app/transactions/rules/new')({
   loader: async () => ({ reference: await loadTransactionReference() }),
+  pendingComponent: RuleEditorSkeleton,
+  errorComponent: NewRuleError,
   head: ({ matches }) => pageHead(matches, (t) => t('rules.editor.new.title')),
   component: NewRuleRoute,
 })
+
+/**
+ * The editor never opened.
+ *
+ * Deliberately not `rules.editor.error.*`, which this screen already uses for a save that failed
+ * with the person's rule still on it. That sentence — *the rule was not saved* — would be a lie
+ * here: there was no rule yet. `rules.editor.load.error.*` says the editor could not be loaded and
+ * that nothing was created, which is the pair of facts somebody about to try again needs.
+ */
+function NewRuleError({
+  error,
+  reset,
+}: {
+  readonly error: Error
+  readonly reset: () => void
+}) {
+  const t = useTranslate()
+  return (
+    <ErrorPanel
+      title={t('rules.editor.load.error.title')}
+      body={t('rules.editor.load.error.body')}
+      detail={error.message}
+      onRetry={reset}
+    />
+  )
+}
 
 function NewRuleRoute() {
   const t = useTranslate()

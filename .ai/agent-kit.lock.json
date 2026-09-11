@@ -1,5 +1,5 @@
 {
-  "kitVersion": 18,
+  "kitVersion": 24,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -55,7 +55,7 @@
       "mode": "100755"
     },
     ".ai/scripts/cezar-host-patch.sh": {
-      "sha256": "32050e6ceded0ccf80851264f97d1fee5b7e0118e97a55b1918be11122add0c3",
+      "sha256": "fea0f13c05576c69681ce5e93a8428e8b3868cedc8c7e6dc9df5329bb09f3075",
       "mode": "100755"
     },
     ".ai/scripts/housekeeping.sh": {
@@ -91,15 +91,19 @@
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {
-      "sha256": "d1abbdc354f1e6813cec1c00c1eb15168fb81a7bae7fc01539a5f853e042012a",
+      "sha256": "dcd3fadd11ff01394da33a51ddd1290b694ffb768c1cd12ed3512eecc927726c",
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
-      "sha256": "b493da21caca4f24e8b2db69fd8a7c4d0dd4420cee7e79c1fa036a49fe403bc7",
+      "sha256": "7a912f2cef335af56b09a3f138ce69db0c8ac1e6a0704b999b46d199c8738705",
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {
-      "sha256": "89de423915acae449cbaae95e042436df97482bf3d8b2cea1f11d317c576b004",
+      "sha256": "da024300418bc7369cbd592af3a092cb4958c5745c9200f70ed64480ed8287f9",
+      "mode": "100644"
+    },
+    "scripts/ci/__tests__/claude-credential-gate.test.ts": {
+      "sha256": "9599bc3944ce12e1bb5e84e918ae6552f05e7b82a9c16448d09c8b731f73722a",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-review-ran.test.mjs": {
@@ -112,6 +116,10 @@
     },
     "scripts/ci/__tests__/review-threads-label.test.mjs": {
       "sha256": "8cb372eedaf9a2e8b15fafa2c8908ca44eafe9094172e9d4e130ebabc64b42e5",
+      "mode": "100644"
+    },
+    "scripts/ci/__tests__/review-workflow-base-checkout.test.ts": {
+      "sha256": "5ca9ba9953c1ec1edda1a334f30476bc940d0afd458874c23a25757ae0838900",
       "mode": "100644"
     },
     "scripts/ci/claude-review-ran.mjs": {

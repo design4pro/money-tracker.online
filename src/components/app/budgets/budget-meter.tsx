@@ -109,16 +109,27 @@ const STATE_INK: Record<UtilisationState, string> = {
  * a bar painted in it reads as salmon rather than as a state worth acting on (#151). `positive` and
  * `warning` have no second grade yet and keep their text-grade values.
  *
- * `ui/Meter`'s danger fill stays on `negative` and that is not an oversight to be tidied up later.
  * This fill is only ever full — `over` means the ratio passed 1, which clamps it to the whole track
- * — so the colour beside it is the card, at 4.82:1. `ui/Meter` takes its threshold from a
- * `dangerAt` prop, so a caller can put its fill against the track instead, and there the loud grade
- * measures 3.18:1 against `border-subtle` where `negative` measures 5.02:1. Two meters, two reds,
- * one criterion read on two adjacencies.
+ * — so the colour beside it is the card, at 4.82:1. `ui/Meter` reaches the same conclusion from its
+ * `dangerAt` prop (#180): at `>= 1` its danger fill is full too and takes this grade, so the two
+ * meters now read one over-limit verdict in one red. Below 1 that fill can stop on the track, where
+ * the loud grade measures 3.18:1 against `border-subtle` and `negative` measures 5.02:1, so it
+ * keeps `negative`. One criterion, two adjacencies — told apart by the threshold rather than by the
+ * component.
+ *
+ * `approaching` takes the same treatment one grade over (#171). Its fill is partial by construction
+ * — the ratio has not reached 1 — so both the track and the card are neighbours, and both are
+ * asserted at 1.4.11's 3:1 rather than at the 7:1 the caption above holds. `warning-bold` paints no
+ * text anywhere, so 3:1 is the only floor it answers to; what that bought in dark was chroma rather
+ * than depth, which is why the bar is no longer a pale gold while the icon and the caption beside it
+ * stay on `warning`.
+ *
+ * `under` keeps `positive`: an on-track meter is not a state anybody has to act on, and a second
+ * grade for it would be colour spent on the absence of a problem.
  */
 const STATE_FILL: Record<UtilisationState, string> = {
   under: 'bg-positive',
-  approaching: 'bg-warning',
+  approaching: 'bg-warning-bold',
   over: 'bg-negative-bold',
 }
 
