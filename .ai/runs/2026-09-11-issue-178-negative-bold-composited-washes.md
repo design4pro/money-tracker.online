@@ -69,4 +69,9 @@ PR: #256
 - [x] 1.5 Carry the canonical statement into DESIGN.md — 2660109
 - [x] 1.6 Resolve docs/ACCESSIBILITY.md §2.1 — d6e9630
 - [x] 1.7 Record the spec lifecycle — cdb9faf
-- [ ] 1.8 Run the full validation gate and pnpm e2e
+- [x] 1.8 Run the full validation gate and pnpm e2e — gate green at 831555f; `e2e/` unchanged
+      (`git diff --exit-code -- e2e/` clean). Local `pnpm e2e` is not a usable signal on this
+      machine (load 100/16 cores, `retries` 0 locally vs 2 in CI); `money.spec.ts:48` fails even
+      isolated on a freshly seeded env, with the New Account dialog showing a server-side error
+      alert — a local dev-environment failure in a path this branch does not touch. CI on 831555f
+      is green across chromium and both mobile-safari shards, which is the evidence of record.
