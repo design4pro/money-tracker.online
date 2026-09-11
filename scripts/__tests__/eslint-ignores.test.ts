@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
@@ -33,6 +33,12 @@ const root = resolve(__dirname, '../..')
 
 const eslint = new ESLint({ cwd: root })
 
+/** A `.gitignore` entry as the repository-relative path it stands for. */
+const entryPath = (gitignore: string, entry: string) => {
+  const base = dirname(gitignore)
+  return base === '.' ? entry : `${base}/${entry}`
+}
+
 /**
  * Every directory under `.ai/` that git refuses to track, read out of the `.gitignore` files that
  * govern it: the root one, plus the per-directory files git reads on the way down.
@@ -43,6 +49,11 @@ const eslint = new ESLint({ cwd: root })
  * Only directory entries (a trailing `/`) qualify: a single ignored *file* cannot hold a stray
  * source, and `isPathIgnored` reports a `.json` or a `.log` as walked whether or not it is a file
  * eslint would ever parse.
+ *
+ * What this parse cannot see is a directory written *without* the slash. Git ignores `.ai/scratch`
+ * exactly as it ignores `.ai/scratch/`, but the text of a slashless entry does not say whether it
+ * names a file or a directory, so it is left out here rather than guessed at - and the case
+ * `ignores every existing directory under .ai/ with an entry ending in /` below rejects it instead.
  */
 const gitignoredDirectoriesUnderAi = execFileSync(
   'git',
@@ -51,24 +62,19 @@ const gitignoredDirectoriesUnderAi = execFileSync(
 )
   .split('\n')
   .filter((file) => file === '.gitignore' || file.startsWith('.ai/'))
-  .flatMap((file) => {
-    const base = dirname(file)
-    return (
-      readFileSync(resolve(root, file), 'utf8')
-        .split('\n')
-        .map((line) => line.trim())
-        // A comment is not an entry, and a negation (`!frames/`) re-includes a directory rather
-        // than ignoring it - reading either as ignored would fail this test for a path eslint is
-        // right to walk.
-        .filter(
-          (line) =>
-            line.endsWith('/') &&
-            !line.startsWith('#') &&
-            !line.startsWith('!'),
-        )
-        .map((entry) => (base === '.' ? entry : `${base}/${entry}`))
-    )
-  })
+  .flatMap((file) =>
+    readFileSync(resolve(root, file), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      // A comment is not an entry, and a negation (`!frames/`) re-includes a directory rather
+      // than ignoring it - reading either as ignored would fail this test for a path eslint is
+      // right to walk.
+      .filter(
+        (line) =>
+          line.endsWith('/') && !line.startsWith('#') && !line.startsWith('!'),
+      )
+      .map((entry) => entryPath(file, entry)),
+  )
   .filter((path) => path.startsWith('.ai/'))
 
 describe('eslint.config.js ignores', () => {
@@ -118,6 +124,59 @@ describe('eslint.config.js ignores', () => {
     expect(gitignoredDirectoriesUnderAi).toEqual(
       expect.arrayContaining(['.ai/qa/artifacts_*/', '.ai/tmp/']),
     )
+  })
+
+  // The half of `.gitignore` the derivation cannot read. A slashless entry that ignores a directory
+  // leaves the reconciliation green while `pnpm lint` goes red on the machine that made the
+  // directory - #203 and #229 again. Deriving every slashless entry would mean an eslint entry per
+  // ignored *file*, so the convention is checked instead: an entry that ignores a directory ends in
+  // `/`, which puts it in front of the reconciliation on every machine, CI included.
+  //
+  // Git answers, not the text: `ls-files --directory` names each ignored directory that exists
+  // without descending into it (the worktrees above), and `check-ignore --verbose` names the entry
+  // that ignored it, globs and nesting resolved. Only an existing directory can be told from a file
+  // - and the machine that has one is the machine writing its entry and running this gate.
+  it('ignores every existing directory under .ai/ with an entry ending in /', () => {
+    const directories = execFileSync(
+      'git',
+      [
+        'ls-files',
+        '--others',
+        '--ignored',
+        '--exclude-standard',
+        '--directory',
+        '--',
+        '.ai/',
+      ],
+      { cwd: root, encoding: 'utf8' },
+    )
+      .split('\n')
+      .filter((path) => path.endsWith('/'))
+    const checked = spawnSync('git', ['check-ignore', '--verbose', '--stdin'], {
+      cwd: root,
+      encoding: 'utf8',
+      input: directories.join('\n'),
+    })
+    // 1 means no directory matched an entry of its own (none exists, or each is ignored only for
+    // what it holds); anything else is git failing, which must not read as a clean result.
+    expect([0, 1]).toContain(checked.status)
+
+    const slashlessDirectoryEntries = checked.stdout
+      .split('\n')
+      .filter(Boolean)
+      // `<source>:<line>:<entry>\t<directory>`
+      .map((line) => /^(.+?):(\d+):(.+)\t(.+)$/.exec(line))
+      .filter((match) => match !== null)
+      .filter(
+        ([, source, , entry]) =>
+          !entry.endsWith('/') && entryPath(source, entry).startsWith('.ai/'),
+      )
+      .map(
+        ([, source, line, entry, directory]) =>
+          `${source}:${line} ignores ${directory} as \`${entry}\`; write it as \`${entry}/\``,
+      )
+
+    expect(slashlessDirectoryEntries).toEqual([])
   })
 
   // The premise the assertions above rest on. An ignore wide enough to cover `.ai/tmp/` must stay
