@@ -127,13 +127,13 @@ may be adapted to each site's voice; the five claims it makes may not change wit
 
 > `negative-bold` clears its 4.5:1 large-text floor on all five opaque planes in both themes, and on
 > every composited ground a call site can produce today — including `hover` over `surface-sunken`,
-> which an archived over-budget budget card actually renders. It does **not** clear it on either wash
-> over `surface-raised` or `surface-panel`, nor under `press` over `surface`, `canvas` or light
-> `surface-sunken`. Those grounds are recorded as failing in `tokens-contrast.test.ts` rather than
-> designed for: no call site produces them, and nothing but this note and that test stops one from
-> being written. Putting this grade on a washed raised or panel ground is a palette decision, not a
-> call-site one. Its separate 3:1 fill floor (1.4.11) is clear on every ground in the matrix, worst
-> case 3.44:1.
+> which an archived over-budget budget card actually renders. It does **not** clear it under either
+> wash over dark `surface-raised` or dark `surface-panel`, nor under `press` over dark `surface`, dark
+> `canvas`, light `surface-sunken` or light `surface-panel`. Those eight grounds are recorded as
+> failing in `tokens-contrast.test.ts` rather than designed for: no call site produces them, and
+> nothing but this note and that test stops one from being written. Putting this grade on any of them
+> is a palette decision, not a call-site one. Its separate 3:1 fill floor (1.4.11) is clear on every
+> ground in the matrix, worst case 3.44:1.
 
 ### The three pieces
 
@@ -162,7 +162,7 @@ may be adapted to each site's voice; the five claims it makes may not change wit
 
 **Move the token lighter (issue option 2).** The binding pair is dark `press` over `surface-raised`
 at 3.44:1. Reaching 4.5:1 there means raising the grade's WCAG relative luminance from 0.2976 to
-0.4045 — a **36% increase in luminance**, not a 31% one in the ratio — paid entirely out of a value
+0.4071 — a **37% increase in luminance**, not a 31.5% one in the ratio — paid entirely out of a value
 already at OKLCH C 0.1996 that #170 chose specifically to stop dark reading as salmon. It buys
 contrast on six pairs no call site reaches and two that no route renders. Rejected: the cost is the
 whole reason the grade exists and the benefit is hypothetical.
@@ -266,8 +266,11 @@ not a frame.
   narrow sense that `docs/ACCESSIBILITY.md` is a published representation (its own §2.2 explains why
   the wording is a liability question). The change narrows and specifies rather than widens, but the
   final phrasing wants a human's eye, which is why the canonical statement is written out above.
-  The choice of option 1 was confirmed by @rafalwolak on 2026-09-11; the `docs/ACCESSIBILITY.md`
-  wording is still approved separately on the implementation PR (Phase 1, step 6).
+  The choice of option 1 was given by @rafalwolak on 2026-09-11 as an answer to the Cezar
+  orchestrator session that wrote this spec, not as a comment on #252 or #178, so nothing on GitHub
+  records it yet; a confirmation posted on #252 itself is what makes it checkable. The
+  `docs/ACCESSIBILITY.md` wording is still approved separately on the implementation PR (Phase 1,
+  step 6).
 - **Rollback:** revert the PR. Nothing is persisted, generated or migrated.
 - **If a later review overrides option 1 with option 2 or option 3:** this spec is superseded, not
   amended — its Proposed Solution and Implementation Plan are entirely option-1 shaped. The correct
@@ -280,14 +283,14 @@ not a frame.
 Each row is independently overridable. Where the reasoning is longer than a line it lives in the
 section named, rather than being restated here.
 
-| #   | Question                                                                                                      | Resolution                                                                                                       | Rationale                                                                                                                                                                                                                 |
-| --- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Which of the issue's three options applies: accept the scope, move the token lighter, or split a third grade? | **Option 1 — accept the scope.** Confirmed by @rafalwolak on 2026-09-11.                                         | Lowest blast radius and the only reversible one — see _Alternatives considered_. Held for human confirmation because the issue calls all three a human trade-off and `docs/ACCESSIBILITY.md` is on `AGENTS.md` Ask First. |
-| Q2  | Is the scope "`surface` only", as the issue words option 1?                                                   | **No — the measured set of grounds**, written out under _The canonical scope statement_.                         | A shipped call site already contradicts a `surface`-only rule — see _The scope statement the issue proposes would be factually wrong_.                                                                                    |
-| Q3  | Where does the enforcing test live: arithmetic, rendered, or both?                                            | **Both, different jobs.** Arithmetic gains the full matrix; the rendered spec already covers adoption unchanged. | Each is blind to what the other catches — see _Why arithmetic and rendering both have to be in the answer_.                                                                                                               |
-| Q4  | Does this decision also cover `warning-bold`, the other loud grade?                                           | **No — out of scope**, and it stays out of `LARGE_TEXT_KEYS`.                                                    | It paints no text at any size, so 1.4.6 never reaches it and only the 3:1 fill floor applies, which it clears everywhere. #171 settled that and `tokens-contrast.test.ts` records it.                                     |
-| Q5  | One-sided floor on the passing grounds, or an equality on the partition?                                      | **Equality on the partition**, compared as a whole set.                                                          | A one-sided floor is silent when the palette moves the other way, and four pairs pass by under 3%. It is also what makes a new ground or key fail loudly.                                                                 |
-| Q6  | Does the implementation also fix the `4.57:1` comment that should read `4.56:1`?                              | **Yes**, within the comment rewrite it is already doing.                                                         | Surgical, and a recorded ratio that disagrees with the test recomputing it is the exact failure mode this spec exists to prevent.                                                                                         |
+| #   | Question                                                                                                      | Resolution                                                                                                                                              | Rationale                                                                                                                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Which of the issue's three options applies: accept the scope, move the token lighter, or split a third grade? | **Option 1 — accept the scope.** Answered by @rafalwolak on 2026-09-11 through the Cezar orchestrator, not yet on GitHub — see _Risks & Impact Review_. | Lowest blast radius and the only reversible one — see _Alternatives considered_. Held for human confirmation because the issue calls all three a human trade-off and `docs/ACCESSIBILITY.md` is on `AGENTS.md` Ask First. |
+| Q2  | Is the scope "`surface` only", as the issue words option 1?                                                   | **No — the measured set of grounds**, written out under _The canonical scope statement_.                                                                | A shipped call site already contradicts a `surface`-only rule — see _The scope statement the issue proposes would be factually wrong_.                                                                                    |
+| Q3  | Where does the enforcing test live: arithmetic, rendered, or both?                                            | **Both, different jobs.** Arithmetic gains the full matrix; the rendered spec already covers adoption unchanged.                                        | Each is blind to what the other catches — see _Why arithmetic and rendering both have to be in the answer_.                                                                                                               |
+| Q4  | Does this decision also cover `warning-bold`, the other loud grade?                                           | **No — out of scope**, and it stays out of `LARGE_TEXT_KEYS`.                                                                                           | It paints no text at any size, so 1.4.6 never reaches it and only the 3:1 fill floor applies, which it clears everywhere. #171 settled that and `tokens-contrast.test.ts` records it.                                     |
+| Q5  | One-sided floor on the passing grounds, or an equality on the partition?                                      | **Equality on the partition**, compared as a whole set.                                                                                                 | A one-sided floor is silent when the palette moves the other way, and four pairs pass by under 3%. It is also what makes a new ground or key fail loudly.                                                                 |
+| Q6  | Does the implementation also fix the `4.57:1` comment that should read `4.56:1`?                              | **Yes**, within the comment rewrite it is already doing.                                                                                                | Surgical, and a recorded ratio that disagrees with the test recomputing it is the exact failure mode this spec exists to prevent.                                                                                         |
 
 ## 📋 Phasing
 
