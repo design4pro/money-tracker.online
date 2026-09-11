@@ -1,0 +1,193 @@
+import type { Page, Route } from '@playwright/test'
+
+/**
+ * Making a loading state and an error state happen on purpose.
+ *
+ * A designed loading state that is only reachable on a slow morning is not evidence of anything,
+ * which is the whole complaint in issue #21. These two helpers make both states deterministic: one
+ * holds every server-function request open, the other answers all of them `500`.
+ *
+ * ## Why the import is type-only, and why that is load-bearing
+ *
+ * `vitest.config.ts` keeps `e2e/support/__tests__` in the `tooling` project, and says so on the
+ * grounds that the modules it matches "import no Playwright". `Page` and `Route` are erased at
+ * compile time, so that premise survives this file: nothing here reaches the Playwright runtime,
+ * and `__tests__/states.test.ts` exercises the logic against a stub page in plain Node.
+ *
+ * ## Every server function, not one
+ *
+ * {@link SERVER_FN_PATTERN} is the whole surface because a screen's loading state is a property of the
+ * screen, not of one read: `/import` waits on three server functions and holding one of them
+ * proves nothing about what the reader sees. Matching one would also mean matching a string this
+ * file cannot compute: the id in the path is the *module* under `vite dev`
+ * (`{"file":"/src/routes/_app.tsx…"}`, base64) and an opaque content hash under a production build
+ * (`/_serverFn/55a4d3d8…`, which appears nowhere but the bundle). Nothing about a server function
+ * is nameable from a test in both environments, and CI runs the second one.
+ *
+ * ## Releasing before unrouting
+ *
+ * Playwright throws `Route is already handled!` when a route is unrouted while its handler is
+ * suspended, so {@link ServerFnInterception.release} opens the gate, waits for every handler it
+ * started to settle, and only then removes itself. Calling it twice is a no-op, which matters
+ * because a test that releases in the body and again in a `finally` is the ordinary shape.
+ */
+
+/** Every TanStack Start server function, whatever it is called. */
+const SERVER_FN_PATTERN = '**/_serverFn/**'
+
+/**
+ * The application shell's own read, which a hold must let through.
+ *
+ * Measured, not assumed. `_app.beforeLoad` awaits `ensureQueryData(loadShell)`, and TanStack Router
+ * resolves `beforeLoad` before it will render any match's pending component. Holding that request
+ * therefore freezes the router one step *before* the loading state it was installed to photograph:
+ * the URL changes, the rail highlights the new tab, and the previous screen stays on the page with
+ * nothing announced — which is exactly the failure `docs/STATE-INVENTORY.md` §3 records.
+ *
+ * Letting it through and holding everything after it is the difference between a probe that proves
+ * nothing and one that renders the skeleton. Measured on a client-side navigation from `/accounts`
+ * to `/accounts/demo-acc-1` with the shell excluded: `main` holds one `role="status"` and eleven
+ * skeleton bars, and the account list is gone. With the shell held: zero `role="status"`, the list
+ * still on screen.
+ *
+ * ## Which request it is, in a way that survives a production build
+ *
+ * By **arrival order**, not by name — see the file header for why no name works in both
+ * environments. The same router rule that makes the shell dangerous to hold also makes it
+ * identifiable: no loader beneath `_app` may start until `_app.beforeLoad` has resolved, so on a
+ * client-side navigation the shell's read is necessarily the *first* `/_serverFn/*` request the
+ * browser makes, and every request after it belongs to the routes whose pending state the hold
+ * exists to photograph. Measured on that same navigation, from the request log: the shell starts
+ * at 1909 ms and finishes at 1924 ms, the account-detail read starts at 1927 ms, and the two reads
+ * the detail screen makes start at 1974 ms. The gap is causal, not incidental.
+ *
+ * The id is remembered rather than just counted, so a repeat of the same read — TanStack Query is
+ * configured with `retry: 1` — is let through as well.
+ *
+ * This costs the helper its one precondition: install it on a page whose next server-function
+ * request is a client-side navigation's. That is what {@link holdServerFns} is for, and a hold
+ * installed anywhere else fails loudly rather than quietly — the read that was meant to be held
+ * goes through, no skeleton is drawn, and the count assertion reports zero.
+ */
+function serverFnIdOf(url: string): string {
+  return new URL(url).pathname.split('/_serverFn/')[1] ?? ''
+}
+
+/** A server-side failure, in the shape TanStack Start's client fetcher will surface as an error. */
+const INTERNAL_SERVER_ERROR = {
+  status: 500,
+  contentType: 'application/json',
+  body: JSON.stringify({
+    error: 'deliberate failure from e2e/support/states.ts',
+  }),
+} as const
+
+/** An interception that is removed by calling {@link release}. */
+export interface ServerFnInterception {
+  /**
+   * Let every held request through, wait for them, and stop intercepting.
+   *
+   * Idempotent, and safe after the page has navigated away — a request whose page is gone cannot
+   * be continued, and that is not a test failure.
+   */
+  readonly release: () => Promise<void>
+}
+
+/** The part of `Page` these helpers use. Narrow on purpose, so the stub in the test is honest. */
+type Routable = Pick<Page, 'route' | 'unroute'>
+
+/**
+ * Hold every server-function request open until released, except the application shell's.
+ *
+ * The pending state is what a reader sees while a loader is in flight, so this is how a
+ * `pendingComponent` is photographed: navigate **client-side** with this installed, and the screen
+ * stays in its loading state for as long as the test needs.
+ *
+ * Two things are easy to get wrong here and both produce a green test that proves nothing. A
+ * `page.goto` will not do — it is served by SSR and produces no `/_serverFn/*` request at all. And
+ * the shell's own read must be let through: see {@link serverFnIdOf}.
+ */
+export async function holdServerFns(
+  page: Routable,
+): Promise<ServerFnInterception> {
+  // The first id this interception sees; see `serverFnIdOf` for why that is the shell's. Assigned
+  // before the handler yields, so two requests arriving in the same tick cannot both claim it.
+  let shell: string | undefined
+  return intercept(page, async (route, isReleased) => {
+    const id = serverFnIdOf(route.request().url())
+    shell ??= id
+    if (id === shell) {
+      await route.continue().catch(() => undefined)
+      return
+    }
+    await isReleased
+    await route.continue().catch(() => undefined)
+  })
+}
+
+/**
+ * Answer every server-function request with a `500`.
+ *
+ * Every one, with no exception for the shell — and that is a statement about *where this helper may
+ * be installed*, not an oversight. A failing `_app.beforeLoad` takes the whole shell to its own
+ * error boundary, so the screen under test never renders and the assertion lands on the wrong
+ * error panel. The ordering rule {@link holdServerFns} uses cannot rescue this one: a failure test
+ * installs the interception on a blank page and then does a **full document load**, where the
+ * shell's read happens during SSR and the first request the browser makes is the client read under
+ * test, not the shell's.
+ *
+ * So the precondition is the installation order `states.spec.ts` already measures and documents:
+ * install this before a `page.goto`, and reach the failing read from the screen that load renders.
+ * A client-side navigation under this helper would fail the shell, and needs its own answer before
+ * it is written.
+ *
+ * Naturally idempotent under TanStack Query's `retry: 1`: each request is fulfilled on its own, so
+ * the second attempt gets the same answer as the first rather than falling through to the server.
+ *
+ * The three console messages a deliberate 500 writes are measured and declared in
+ * `console-policy.ts` as `DELIBERATE_SERVER_FAILURE`; a test using this helper passes them to
+ * `expectConsole` or the console net fails the run, which is the intended coupling.
+ */
+export async function failServerFns(
+  page: Routable,
+): Promise<ServerFnInterception> {
+  return intercept(page, async (route) => {
+    await route.fulfill(INTERNAL_SERVER_ERROR).catch(() => undefined)
+  })
+}
+
+/**
+ * The shared half: install a handler, track what it starts, and take it off again on release.
+ *
+ * `handle` receives a promise that resolves when the test releases, which is what lets the holding
+ * helper suspend without this function knowing anything about holding.
+ */
+async function intercept(
+  page: Routable,
+  handle: (route: Route, isReleased: Promise<void>) => Promise<void>,
+): Promise<ServerFnInterception> {
+  let open = () => {}
+  const isReleased = new Promise<void>((resolve) => {
+    open = resolve
+  })
+
+  const started = new Set<Promise<void>>()
+  const handler = (route: Route) => {
+    const work = handle(route, isReleased)
+    started.add(work)
+    return work.finally(() => started.delete(work))
+  }
+
+  await page.route(SERVER_FN_PATTERN, handler)
+
+  let released = false
+  return {
+    async release() {
+      if (released) return
+      released = true
+      open()
+      await Promise.allSettled([...started])
+      await page.unroute(SERVER_FN_PATTERN, handler)
+    },
+  }
+}

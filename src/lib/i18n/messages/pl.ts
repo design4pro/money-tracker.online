@@ -616,6 +616,9 @@ const messages = {
   'transactions.detail.noTags': 'Ten wpis nie ma etykiet.',
   'transactions.detail.noAttachments': 'Nie dołączono paragonu.',
   'transactions.detail.noRefunds': 'Nie powiązano zwrotu.',
+  'transactions.detail.error.title': 'Nie udało się wczytać tej transakcji',
+  'transactions.detail.error.body':
+    'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
   'transactions.detail.notFound.title': 'Nie ma takiej transakcji',
   'transactions.detail.notFound.body':
     'Mogła zostać usunięta albo adres jest nieprawidłowy.',
@@ -864,6 +867,7 @@ const messages = {
   'payees.defaultCategory.summary': 'Podpowiada: {name}',
   'payees.detail.back': 'Wróć do odbiorców',
   'payees.detail.noCategory': 'Nie podpowiada żadnej kategorii',
+  'payees.detail.loading': 'Wczytujemy tego odbiorcę…',
   'payees.detail.error.title': 'Nie udało się wczytać tego odbiorcy',
   'payees.detail.error.body':
     'Żądanie nie wróciło. Nic nie zostało zmienione — spróbuj ponownie.',
@@ -1621,6 +1625,7 @@ const messages = {
   'invite.state.alreadyMember': 'Jesteś już w tym domu.',
   'invite.state.wrongAccount':
     'Zaproszenie wysłano na adres {email}. Wyloguj się i zaloguj tym adresem, aby je przyjąć.',
+  'invite.loading': 'Wczytujemy to zaproszenie…',
   'invite.notFound': 'Ten link z zaproszeniem donikąd nie prowadzi.',
   'invite.goToApp': 'Przejdź do domu',
 
@@ -2242,6 +2247,11 @@ const messages = {
   'rules.new': 'Nowa zasada',
   'rules.list.label': 'Zasady w kolejności działania',
   'rules.back': 'Wróć do zasad',
+  'rules.list.loading': 'Wczytujemy Twoje zasady…',
+  'rules.editor.loading': 'Wczytujemy edytor zasady…',
+  'rules.editor.load.error.title': 'Nie udało się wczytać edytora zasady',
+  'rules.editor.load.error.body':
+    'Żadna zasada nie została utworzona ani zmieniona. Spróbuj ponownie za chwilę.',
   'rules.error.title': 'Nie udało się wczytać zasad',
   'rules.error.body':
     'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli będzie się powtarzać, prześlij nam szczegóły poniżej.',
@@ -2530,6 +2540,15 @@ const messages = {
   'import.upload.error.tooLarge':
     'Plik {name} jest większy niż {size}. Wyeksportuj krótszy okres i wczytaj go w dwóch plikach.',
   'import.upload.error.failed': 'Nie udało się wczytać pliku: {reason}',
+
+  'import.list.loading': 'Wczytujemy Twoje importy…',
+  'import.load.error.title': 'Nie udało się wczytać strony importu',
+  'import.load.error.body':
+    'Nic nie zostało wysłane ani zmienione. Spróbuj ponownie za chwilę.',
+  'import.detail.loading': 'Wczytujemy ten import…',
+  'import.detail.error.title': 'Nie udało się wczytać tego importu',
+  'import.detail.error.body':
+    'Plik i jego wiersze pozostały nietknięte. Spróbuj ponownie za chwilę.',
 
   'import.history.title': 'Historia importów',
   'import.history.body': 'Każdy plik wczytany w tym domu, od najnowszego.',

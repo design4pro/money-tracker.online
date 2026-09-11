@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, isNotFound } from '@tanstack/react-router'
 import { ArrowLeft, Copy, Pencil, Trash2 } from 'lucide-react'
 import { z } from 'zod'
 
+import { ErrorPanel } from '#/components/app/accounts'
 import {
   ConfirmDeleteDialog,
   DetailSummary,
@@ -121,7 +122,41 @@ function TransactionDetailRoute() {
     return <TransactionFormSkeleton />
   }
 
+  /**
+   * Two failures, two answers.
+   *
+   * Until now every failed read of this screen said *that transaction is not here* — including a
+   * dropped connection and a 500, where the row is fine and the only true advice is to try again.
+   * `-server/detail.ts` now classifies: a repository `NOT_FOUND` leaves as the router's sentinel,
+   * so `isNotFound` is the discriminator and nothing else has to be inferred from a message that
+   * does not survive the server-function boundary anyway.
+   *
+   * The not-found half keeps its own copy and its own status rather than escalating to the root's
+   * `notFoundComponent`: this route fetches with `useQuery`, so there is no loader to throw from
+   * and no status to set — the decision `e2e/not-found.spec.ts` records for issue #16, unchanged.
+   */
   if (detailQuery.isError) {
+    if (!isNotFound(detailQuery.error)) {
+      return (
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <h1 className="text-title font-semibold text-ink">
+            {t('transactions.detail.title')}
+          </h1>
+          <ErrorPanel
+            title={t('transactions.detail.error.title')}
+            body={t('transactions.detail.error.body')}
+            detail={
+              detailQuery.error instanceof Error
+                ? detailQuery.error.message
+                : null
+            }
+            onRetry={() => void detailQuery.refetch()}
+            isRetrying={detailQuery.isFetching}
+          />
+        </div>
+      )
+    }
+
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <h1 className="text-title font-semibold text-ink">

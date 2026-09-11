@@ -28,6 +28,8 @@
  *     a surface deeper than the demo's own front door gets photographed at all, since the session
  *     the click grants exists only inside the context that clicked and does not survive to the next
  *     invocation. Without it, `--url` must itself be the page carrying the control.
+ *   - `--force-state loading|error` photographs a state that would otherwise need a slow morning or
+ *     a broken server. See {@link forceServerFns} for how, and why it needs `--force-from`.
  *
  * CLEAN ROOM. This script points a browser at a URL and photographs what it paints. That is the
  * whole of its contract with anything that is not ours: it never reads the reference product's DOM,
@@ -46,9 +48,10 @@
  *     --label A \
  *     --viewports 1440x900,360x800 \
  *     --themes light,dark \
- *     [--auth] [--state hover-row] \
+ *     [--auth] [--auth empty] [--state hover-row] \
  *     [--hover 'selector'] [--click 'selector'] [--settle 800] \
- *     [--enter 'selector'] [--enter-from https://host/] [--viewport-only]
+ *     [--enter 'selector'] [--enter-from https://host/] [--viewport-only] \
+ *     [--force-state loading|error] [--force-from http://localhost:3010/accounts]
  *
  * Prints one JSON object on stdout: `{ requestedUrl, files, console, warnings, captureValid }`. Each
  * file records the URL the browser actually landed on, so a redirect the refusal list does not know
@@ -64,7 +67,15 @@ import { chromium } from '@playwright/test'
 
 import { anonymousOnlyRefusal } from './anonymous-only.mjs'
 
-const AUTH_STATE = 'e2e/.auth/demo.json'
+/**
+ * Where the Playwright setup project caches its signed-in sessions.
+ *
+ * `--auth` replays `demo`, the seeded workspace, which is what almost every capture wants. `--auth
+ * <name>` replays a different one — `empty` is how an empty state gets photographed at all, since
+ * the screens that have one only show it to a workspace with nothing in it.
+ */
+const AUTH_DIR = 'e2e/.auth'
+const DEFAULT_SESSION = 'demo'
 const DEV_TOOLBAR = '[data-testid="tanstack_devtools"]'
 
 /**
@@ -181,6 +192,19 @@ const settleMs = Number(opt.settle ?? 600)
  */
 const viewportOnly = flag('viewport-only')
 
+/**
+ * The state to force, and the page to reach it from. Both or neither.
+ *
+ * `--force-state` composes with `--state`, and normally should: `--state loading` names what the
+ * frame is of, `--force-state loading` is how it was made to happen. They are separate flags
+ * because a frame's name is for the reader and the interception is for the browser, and a run
+ * photographing an error screen under a filename saying `hover-row` should stay possible to spot.
+ */
+const forceState =
+  typeof opt['force-state'] === 'string' ? opt['force-state'] : undefined
+const forceFrom =
+  typeof opt['force-from'] === 'string' ? opt['force-from'] : undefined
+
 if (!Number.isFinite(settleMs) || settleMs < 0) {
   console.error(
     'capture: --settle must be a non-negative number of milliseconds',
@@ -200,6 +224,32 @@ if (themes.some((t) => t !== 'light' && t !== 'dark')) {
 if (/[/\\]/.test(label) || /[/\\]/.test(statePrefix)) {
   console.error(
     'capture: --label and --state must not contain a path separator',
+  )
+  process.exit(2)
+}
+if (
+  forceState !== undefined &&
+  forceState !== 'loading' &&
+  forceState !== 'error'
+) {
+  console.error("capture: --force-state takes only 'loading' and 'error'")
+  process.exit(2)
+}
+if ((forceState === undefined) !== (forceFrom === undefined)) {
+  console.error(
+    'capture: --force-state and --force-from go together — the first says which state to force, ' +
+      'the second names a page that links to --url, because only a client-side navigation asks ' +
+      'the browser for anything an interception can hold.',
+  )
+  process.exit(2)
+}
+if (
+  forceFrom !== undefined &&
+  new URL(forceFrom).origin !== new URL(url).origin
+) {
+  console.error(
+    'capture: --force-from must be on the same origin as --url — the link is clicked inside the ' +
+      'running application, not across products.',
   )
   process.exit(2)
 }
@@ -225,6 +275,91 @@ function classify(from, text) {
   if (excused) return { verdict: 'not-the-app', why: excused.why }
 
   return { verdict: 'fatal', why: undefined }
+}
+
+/**
+ * The interception behind `--force-state`, and the three facts it is built on.
+ *
+ * These four constants are the same ones `e2e/support/states.ts` holds, and they are written twice
+ * on purpose: `tsconfig.json` compiles only `.ts`/`.tsx`, so a shared module would either be a
+ * `.mjs` this repository's typechecker cannot see or a `.ts` `node scripts/visual/capture.mjs`
+ * cannot load. The e2e file is the original — it carries the measurement and the reasoning, and it
+ * is the copy a test fails on if any of this stops being true.
+ *
+ *   1. A `page.goto` produces no `/_serverFn/*` request at all. TanStack Start resolves the loader
+ *      during SSR, so the browser is handed a finished document and there is nothing to intercept.
+ *      Every forced state therefore needs a CLIENT-SIDE navigation, which is what `--force-from`
+ *      is: land on a page that links to the target, install this, then click the link.
+ *   2. The application shell's own read must be let through. `_app.beforeLoad` awaits it, and the
+ *      router resolves `beforeLoad` before it will render any match's pending component — hold it
+ *      and the run freezes one step before the state it came to photograph, with the previous
+ *      screen still on the page.
+ *   3. The shell is readable from the URL: TanStack Start base64-encodes `{"file":…,"export":…}`
+ *      into the path.
+ */
+const SERVER_FN_PATTERN = '**/_serverFn/**'
+const APP_SHELL_MODULE = '/src/routes/_app.tsx'
+const INTERNAL_SERVER_ERROR = {
+  status: 500,
+  contentType: 'application/json',
+  body: JSON.stringify({
+    error: 'deliberate failure from --force-state error',
+  }),
+}
+
+/** The module a server-function URL names, or `''` when the path is not one this build wrote. */
+function moduleOf(target) {
+  const parts = new URL(target).pathname.split('/_serverFn/')
+  if (parts.length < 2) return ''
+  try {
+    return Buffer.from(decodeURIComponent(parts[1]), 'base64').toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Hold every server function open (`loading`) or answer them all `500` (`error`), until released.
+ *
+ * The returned `release` lets the held requests through, waits for them, and only then unroutes —
+ * Playwright throws `Route is already handled!` when a route is removed while its handler is still
+ * suspended. It is installed and released once per frame, because each frame re-navigates.
+ *
+ * A forced `error` run reports console errors in its JSON, and they are real: they are the app
+ * reacting to the failure this flag caused. Read them as part of the evidence rather than as a
+ * defect — the same messages are declared as `DELIBERATE_SERVER_FAILURE` in `e2e/support/`.
+ */
+async function forceServerFns(page, mode) {
+  let open = () => {}
+  const isReleased = new Promise((resolve) => {
+    open = resolve
+  })
+  const started = new Set()
+
+  const handler = (route) => {
+    const work = (async () => {
+      if (moduleOf(route.request().url()).includes(APP_SHELL_MODULE)) {
+        await route.continue().catch(() => {})
+        return
+      }
+      if (mode === 'error') {
+        await route.fulfill(INTERNAL_SERVER_ERROR).catch(() => {})
+        return
+      }
+      await isReleased
+      await route.continue().catch(() => {})
+    })()
+    started.add(work)
+    return work.finally(() => started.delete(work))
+  }
+
+  await page.route(SERVER_FN_PATTERN, handler)
+
+  return async () => {
+    open()
+    await Promise.allSettled([...started])
+    await page.unroute(SERVER_FN_PATTERN, handler)
+  }
 }
 
 /** Stop entrance motion, and hide tooling that is not the product. */
@@ -254,8 +389,34 @@ async function settle(page) {
   await page.evaluate(() => window.scrollTo(0, 0))
 }
 
+/**
+ * The same wait, minus the one that cannot happen while a request is being held.
+ *
+ * A forced `loading` frame is taken with a request deliberately open, so `networkidle` never
+ * arrives — `settle` would spend its full 30s timeout per frame and report nothing for it. There is
+ * no document load to wait for either: the navigation was client-side, so the document is the one
+ * already on screen. What is left is worth keeping: the fonts, the settle delay, and the scroll.
+ */
+async function settleForced(page) {
+  await page.evaluate(() => document.fonts.ready).catch(() => {})
+  await page.waitForTimeout(settleMs)
+  await page.evaluate(() => window.scrollTo(0, 0))
+}
+
 async function main() {
-  const wantsAuth = flag('auth')
+  // A bare `--auth`, `--auth true` and `--auth demo` mean the same thing; `--auth <name>` picks
+  // another cached session. `--auth false` still means no.
+  const authArg = opt.auth
+  const wantsAuth = authArg !== undefined && authArg !== 'false'
+  const session =
+    typeof authArg === 'string' && authArg !== 'true'
+      ? authArg
+      : DEFAULT_SESSION
+  if (/[/\\]/.test(session)) {
+    console.error('capture: --auth must name a session, not a path')
+    process.exit(2)
+  }
+  const authState = `${AUTH_DIR}/${session}.json`
   const enter = typeof opt.enter === 'string' ? opt.enter : undefined
   const enterFrom =
     typeof opt['enter-from'] === 'string' ? opt['enter-from'] : undefined
@@ -285,6 +446,16 @@ async function main() {
     process.exit(2)
   }
 
+  // Same reason as `--enter` + `--auth`: `--enter` photographs the other side of the pair, and
+  // there is nothing there for an interception of *our* server functions to hold.
+  if (forceState && enter) {
+    console.error(
+      'capture: --force-state and --enter cannot be combined. --force-state drives our own app; ' +
+        "--enter opens somebody else's public demo.",
+    )
+    process.exit(2)
+  }
+
   // Both refusals come before anything is created or launched: once a frame exists there is
   // nothing left downstream to tell a redirect target apart from the product. Which screens are
   // anonymous-only, and why that list is short: ./anonymous-only.mjs.
@@ -294,9 +465,9 @@ async function main() {
     process.exit(2)
   }
 
-  if (wantsAuth && !existsSync(AUTH_STATE)) {
+  if (wantsAuth && !existsSync(authState)) {
     console.error(
-      `capture: --auth was asked for but ${AUTH_STATE} does not exist. ` +
+      `capture: --auth was asked for but ${authState} does not exist. ` +
         `Run the Playwright setup project first: pnpm exec playwright test --project=setup`,
     )
     process.exit(2)
@@ -306,7 +477,7 @@ async function main() {
 
   const browser = await chromium.launch()
   const context = await browser.newContext({
-    storageState: wantsAuth ? AUTH_STATE : undefined,
+    storageState: wantsAuth ? authState : undefined,
     deviceScaleFactor: 1,
     locale: 'en-GB',
     timezoneId: 'UTC',
@@ -350,11 +521,75 @@ async function main() {
    */
   let entryMissing = false
 
+  /**
+   * The same, for a `--force-from` page that does not link to `--url`.
+   *
+   * Also a property of the run rather than of one frame: a link that is absent at 1440 light is
+   * absent at 360 dark, and the fix is a different `--force-from`, not another wait.
+   */
+  let forcedLinkMissing = false
+
+  /** Quiesce, apply the interaction flags, check the viewport, and file one frame. */
+  async function shoot(vp, theme) {
+    await quiesce(page)
+
+    if (typeof opt.hover === 'string') {
+      await page.locator(opt.hover).first().hover({ timeout: 15_000 })
+      await page.waitForTimeout(settleMs)
+    }
+    if (typeof opt.click === 'string') {
+      await page.locator(opt.click).first().click({ timeout: 15_000 })
+      await page.waitForTimeout(settleMs)
+    }
+
+    // Read the viewport back. A frame whose measured size is not the one intended sends the
+    // critic after a responsive defect that does not exist.
+    const measured = await page.evaluate(() => ({
+      w: window.innerWidth,
+      h: window.innerHeight,
+    }))
+    if (measured.w !== vp.w) {
+      warnings.push(
+        `viewport ${vp.w} measured as ${measured.w} — frame not filed`,
+      )
+      return
+    }
+
+    const name = `${statePrefix}${vp.name}-${theme}-${label}.png`
+    const path = `${outDir}/${name}`
+    await page.screenshot({
+      path,
+      fullPage: !viewportOnly,
+      animations: 'disabled',
+      caret: 'hide',
+    })
+    const { size } = await stat(path)
+
+    // A flat frame compresses to almost nothing. This is the cheap version of "did the page
+    // finish drawing", and on a product made of charts it is the failure worth catching.
+    if (size < 15_000 && vp.w >= 768) {
+      warnings.push(
+        `${name} is ${Math.round(size / 1024)}KB — ` +
+          `suspiciously flat for a ${vp.w}px frame, likely shot before the page finished painting`,
+      )
+    }
+    // Read back at the shutter rather than at the response, so a redirect the app makes after
+    // hydration, an `--enter` or `--click` that navigates, or a `--force-state` link click — is
+    // the URL reported for this frame.
+    files.push({
+      viewport: vp.name,
+      theme,
+      landedUrl: page.url(),
+      path,
+      bytes: size,
+    })
+  }
+
   for (const vp of viewports) {
     await page.setViewportSize({ width: vp.w, height: vp.h })
     for (const theme of themes) {
       await page.emulateMedia({ colorScheme: theme })
-      await page.goto(enterFrom ?? url, {
+      await page.goto(forceFrom ?? enterFrom ?? url, {
         waitUntil: 'commit',
         timeout: 45_000,
       })
@@ -365,7 +600,7 @@ async function main() {
       if (wantsAuth && new URL(page.url()).pathname.startsWith('/login')) {
         throw new Error(
           `--auth was asked for but ${url} redirected to ${page.url()}. The cached session in ` +
-            `${AUTH_STATE} is stale or the workspace is unseeded. Refresh it with: ` +
+            `${authState} is stale or the workspace is unseeded. Refresh it with: ` +
             `PLAYWRIGHT_BASE_URL=${origin} pnpm exec playwright test --project=setup`,
         )
       }
@@ -422,60 +657,40 @@ async function main() {
         }
       }
 
-      await quiesce(page)
-
-      if (typeof opt.hover === 'string') {
-        await page.locator(opt.hover).first().hover({ timeout: 15_000 })
-        await page.waitForTimeout(settleMs)
-      }
-      if (typeof opt.click === 'string') {
-        await page.locator(opt.click).first().click({ timeout: 15_000 })
-        await page.waitForTimeout(settleMs)
-      }
-
-      // Read the viewport back. A frame whose measured size is not the one intended sends the
-      // critic after a responsive defect that does not exist.
-      const measured = await page.evaluate(() => ({
-        w: window.innerWidth,
-        h: window.innerHeight,
-      }))
-      if (measured.w !== vp.w) {
-        warnings.push(
-          `viewport ${vp.w} measured as ${measured.w} — frame not filed`,
-        )
+      // `--force-state` is the whole of this branch: get to `--url` the one way that asks the
+      // browser for data, with the interception already installed. See {@link forceServerFns}.
+      if (forceState) {
+        const release = await forceServerFns(page, forceState)
+        try {
+          const wanted = new URL(url).pathname
+          // Inside `main`, because the shell's rail is not a client-side navigation: those links
+          // go through the design system's `Link`, which does a full document load and would be
+          // served by SSR with nothing left to hold.
+          const link = page.locator(`main a[href="${wanted}"]`).first()
+          const clicked = await link.click({ timeout: 15_000 }).then(
+            () => true,
+            () => false,
+          )
+          if (!clicked) {
+            warnings.push(
+              `--force-state ${forceState} found no client-side link to ${wanted} in main on ` +
+                `${forceFrom} within 15s — point --force-from at a page that links there; ` +
+                `no frame filed`,
+            )
+            forcedLinkMissing = true
+            break
+          }
+          await settleForced(page)
+          await shoot(vp, theme)
+        } finally {
+          await release()
+        }
         continue
       }
 
-      const name = `${statePrefix}${vp.name}-${theme}-${label}.png`
-      const path = `${outDir}/${name}`
-      await page.screenshot({
-        path,
-        fullPage: !viewportOnly,
-        animations: 'disabled',
-        caret: 'hide',
-      })
-      const { size } = await stat(path)
-
-      // A flat frame compresses to almost nothing. This is the cheap version of "did the page
-      // finish drawing", and on a product made of charts it is the failure worth catching.
-      if (size < 15_000 && vp.w >= 768) {
-        warnings.push(
-          `${name} is ${Math.round(size / 1024)}KB — ` +
-            `suspiciously flat for a ${vp.w}px frame, likely shot before the page finished painting`,
-        )
-      }
-      // Read back at the shutter rather than at the response, so a redirect the app makes after
-      // hydration, and an `--enter` or `--click` that navigates — is the URL reported for this
-      // frame.
-      files.push({
-        viewport: vp.name,
-        theme,
-        landedUrl: page.url(),
-        path,
-        bytes: size,
-      })
+      await shoot(vp, theme)
     }
-    if (entryMissing) break
+    if (entryMissing || forcedLinkMissing) break
   }
 
   await context.close()

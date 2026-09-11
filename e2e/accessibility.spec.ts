@@ -1,18 +1,16 @@
-import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from './support/console'
 
 // The axe-core meter defect is corrected in `support/axe-defects.ts` rather than here, because
 // `.github/a11y/axe-scan.mjs` scans the same pages and has to forgive the same node. Two copies of
 // a three-condition correction with a 2027 re-check date would drift on the first edit.
-import {
-  RAC_METER_FALLBACK_ROLE,
-  withoutKnownAxeDefects,
-} from './support/axe-defects'
+import { RAC_METER_FALLBACK_ROLE } from './support/axe-defects'
+// The scan itself — the tag list, the correction and the failure formatting — is shared with
+// `states.spec.ts`, which holds the same bar over the empty screens.
+import { expectNoWcagViolations } from './support/axe-scan'
 // The surface list and the way a surface is opened are shared with `contrast-enhanced.spec.ts`.
 import { ACCOUNTS, openSurface, SURFACES } from './support/surfaces'
 
 import type { AppLocale, AppTheme } from './support/app'
-import type { Violation } from './support/axe-defects'
 import type { Surface } from './support/surfaces'
 import type { Browser } from '@playwright/test'
 
@@ -50,52 +48,8 @@ import type { Browser } from '@playwright/test'
  * of focus after a save live in `keyboard.spec.ts`; the rest is the manual list in §5.3.
  */
 
-/** The A and AA tags of every WCAG version this product claims. No `best-practice`. */
-const WCAG_AA_TAGS = [
-  'wcag2a',
-  'wcag2aa',
-  'wcag21a',
-  'wcag21aa',
-  'wcag22a',
-  'wcag22aa',
-] as const
-
 const THEMES: readonly AppTheme[] = ['light', 'dark']
 const LOCALES: readonly AppLocale[] = ['en', 'pl']
-
-/**
- * One violation, written out so the failure names the element and the criterion.
- *
- * A bare rule id sends the next reader to the axe documentation to find out which of forty nodes
- * on the page it meant; the selector and the failure summary let them open the screen and see it.
- */
-function describeViolation(violation: Violation): string {
-  const nodes = violation.nodes
-    .slice(0, 4)
-    .map((node) => {
-      const target = node.target.join(' ')
-      const why = node.failureSummary?.replace(/\s+/g, ' ').trim() ?? ''
-      return `    - ${target}\n      ${why}`
-    })
-    .join('\n')
-
-  const more =
-    violation.nodes.length > 4
-      ? `\n    …and ${violation.nodes.length - 4} more node(s)`
-      : ''
-
-  return (
-    `  [${violation.impact ?? 'unknown'}] ${violation.id}: ${violation.help}\n` +
-    `  ${violation.helpUrl}\n${nodes}${more}`
-  )
-}
-
-function report(violations: readonly Violation[], label: string): string {
-  return (
-    `${violations.length} WCAG A/AA violation(s) on ${label}:\n` +
-    violations.map(describeViolation).join('\n')
-  )
-}
 
 async function scan(
   browser: Browser,
@@ -106,23 +60,7 @@ async function scan(
   const { context, page } = await openSurface(browser, surface, theme, locale)
 
   try {
-    const results = await new AxeBuilder({ page })
-      .withTags([...WCAG_AA_TAGS])
-      .analyze()
-
-    const violations = await withoutKnownAxeDefects(page, results.violations)
-
-    // The assertion compares a short list of `impact · rule` lines rather than the raw violation
-    // objects: a `toEqual` diff of axe's own structures buries the rule id under several screens
-    // of `relatedNodes: []`, and the reader needs the rule and the selector, which the message
-    // carries in full.
-    const summary = violations.map(
-      (violation) => `${violation.impact ?? 'unknown'} · ${violation.id}`,
-    )
-    expect(
-      summary,
-      report(violations, `${surface.name} · ${theme} · ${locale}`),
-    ).toEqual([])
+    await expectNoWcagViolations(page, `${surface.name} · ${theme} · ${locale}`)
   } finally {
     await context.close()
   }

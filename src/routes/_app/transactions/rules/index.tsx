@@ -14,6 +14,7 @@ import {
 import { useDragAndDrop } from 'react-aria-components'
 
 import { ErrorPanel } from '#/components/app/accounts'
+import { RulesListSkeleton } from '#/components/app/transactions'
 import {
   Badge,
   Button,
@@ -98,6 +99,7 @@ export const Route = createFileRoute('/_app/transactions/rules/')({
     ])
     return { rules, reference }
   },
+  pendingComponent: RulesListSkeleton,
   errorComponent: RulesListError,
   head: ({ matches }) => pageHead(matches, (t) => t('rules.title')),
   component: RulesListRoute,

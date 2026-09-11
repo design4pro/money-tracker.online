@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { getAccount } from '#/server/repos/accounts'
 import { listAttachments } from '#/server/repos/attachments'
 import { listRefundsFor } from '#/server/repos/refunds'
@@ -84,11 +85,15 @@ export const loadTransactionDetail = createServerFn({ method: 'GET' })
 
     // The transaction first and alone: an id belonging to another workspace has to fail before
     // anything else is read, so a probe cannot learn from the shape of a partial response.
+    // `rethrowAsNotFound` turns the repository's `NOT_FOUND` into the router's sentinel, which is
+    // what lets the screen tell "this row does not exist" apart from "the read failed". Without it
+    // both arrive at the client as a bare `Error` — the code does not survive the server-function
+    // boundary — and the screen has to answer one sentence for both.
     const transaction = await getTransaction({
       scope,
       policies: EVERYTHING,
       id: data.transactionId,
-    })
+    }).catch(rethrowAsNotFound)
 
     // Everything the screen prints, together rather than one after the other. They run only once
     // the transaction has been found, which is the ordering the docblock above exists to protect —

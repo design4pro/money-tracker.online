@@ -596,6 +596,9 @@ const messages = {
   'transactions.detail.noTags': 'No tags on this entry.',
   'transactions.detail.noAttachments': 'No receipt attached.',
   'transactions.detail.noRefunds': 'No refund linked.',
+  'transactions.detail.error.title': 'This transaction could not be loaded',
+  'transactions.detail.error.body':
+    'Nothing was changed. Try again in a moment.',
   'transactions.detail.notFound.title': 'That transaction is not here',
   'transactions.detail.notFound.body':
     'It may have been deleted, or the address may be wrong.',
@@ -838,6 +841,7 @@ const messages = {
   'payees.defaultCategory.summary': 'Suggests {name}',
   'payees.detail.back': 'Back to payees',
   'payees.detail.noCategory': 'Suggests no category',
+  'payees.detail.loading': 'Loading this payee…',
   'payees.detail.error.title': 'This payee could not be loaded',
   'payees.detail.error.body':
     'The request did not come back. Nothing has been changed — try again.',
@@ -1603,6 +1607,7 @@ const messages = {
   'invite.state.alreadyMember': 'You are already in this household.',
   'invite.state.wrongAccount':
     'This invitation was sent to {email}. Sign out and sign in with that address to accept it.',
+  'invite.loading': 'Loading this invitation…',
   'invite.notFound': 'This invitation link does not lead anywhere.',
   'invite.goToApp': 'Go to the household',
 
@@ -2201,6 +2206,14 @@ const messages = {
   'rules.new': 'New rule',
   'rules.list.label': 'Rules, in the order they run',
   'rules.back': 'Back to the rules',
+  'rules.list.loading': 'Loading your rules…',
+  'rules.editor.loading': 'Loading the rule editor…',
+  // `rules.editor.error.*` further down is the *save* failure. This pair is the load failure, and
+  // the two must not be merged: one says the rule you wrote is still unsaved, the other that the
+  // editor never opened.
+  'rules.editor.load.error.title': 'The rule editor could not be loaded',
+  'rules.editor.load.error.body':
+    'No rule was created or changed. Try again in a moment.',
   'rules.error.title': 'The rules could not be loaded',
   'rules.error.body':
     'Nothing was changed. Try again, and if it keeps happening the detail below is what to send us.',
@@ -2501,6 +2514,15 @@ const messages = {
   'import.upload.error.tooLarge':
     '{name} is larger than {size}. Export a shorter period and bring it in as two files.',
   'import.upload.error.failed': 'The file was not read: {reason}',
+
+  'import.list.loading': 'Loading your imports…',
+  'import.load.error.title': 'The import page could not be loaded',
+  'import.load.error.body':
+    'Nothing was uploaded and nothing was changed. Try again in a moment.',
+  'import.detail.loading': 'Loading this import…',
+  'import.detail.error.title': 'This import could not be loaded',
+  'import.detail.error.body':
+    'The file and its rows are untouched. Try again in a moment.',
 
   'import.history.title': 'Import history',
   'import.history.body':
