@@ -98,14 +98,16 @@ export default defineConfig({
   // Playwright's default (half the cores) applies.
   workers: isCI ? 1 : undefined,
   timeout: 30_000,
-  // A wall-clock ceiling on the whole run, not a per-test one, and not a tolerance: nothing that
-  // fails is accepted, the job is only allowed to take longer to find out. The history is the
-  // reason for the number: ten minutes held until `e2e/visual.spec.ts` landed, that file's 28
-  // frames per project pushed it to twenty-five, and ADR 0016 has now deleted the file. Fifteen
-  // rather than back to ten, because ten was measured against a suite this one has grown past and
-  // the post-0016 run has not been timed on the runner - so this is headroom, and the honest thing
-  // to do with it is say so rather than quote a figure nobody took. It sits inside the
-  // `timeout-minutes: 20` that ci.yml puts on the job, so this one still fires first.
+  // A wall-clock ceiling on one Playwright process, not a per-test one, and not a tolerance:
+  // nothing that fails is accepted, the job is only allowed to take longer to find out. In CI a
+  // process is one shard of one project, so the suite as a whole gets this once per leg of
+  // ci.yml's e2e matrix, and the cap promises nothing about the total. The history is the reason
+  // for the number: ten minutes held until `e2e/visual.spec.ts` landed, that file's 28 frames per
+  // project pushed it to twenty-five, and ADR 0016 has now deleted the file. Fifteen rather than
+  // back to ten, because ten was measured against a suite this one has grown past. A leg that
+  // grows towards it gets another shard in ci.yml, not a bigger number here (#239); the measured
+  // leg timings live beside that matrix. It sits inside the `timeout-minutes: 20` that ci.yml puts
+  // on the job, so this one still fires first.
   globalTimeout: isCI ? 15 * 60_000 : undefined,
   reporter: [
     ['line'],
