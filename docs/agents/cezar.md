@@ -476,9 +476,9 @@ claiming issues the new ones handle.
 
 6. `.ai/scripts/cez-automations.sh --dry-run`, then without the flag: `issue-groom`, `issue-regroom`,
    `issue-autofix`, `issue-spec`, `pr-autopilot` and `pr-review-threads` are created enabled. The
-   script also lists any definition the cockpit still holds that the file no longer names. The
-   retired `issue-opened` and `pr-opened` go with `--prune` (`--dry-run --prune` first), which
-   refuses to delete an enabled stray: disable both in the cockpit (Automations) first, then prune.
+   script also lists any definition the cockpit still holds that the file no longer names. To
+   remove the retired `issue-opened` and `pr-opened`, disable both in the cockpit (Automations),
+   then run `--dry-run --prune` and `--prune`: the script refuses to delete an enabled stray.
 7. `.ai/scripts/cez-prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
    cezar's five built-ins.
 8. Install the housekeeping plist (above) and run `bash .ai/scripts/housekeeping.sh` once by hand.
