@@ -92,7 +92,7 @@ Runtime: **TanStack Start** (React 19) on **Cloudflare Workers** via `@cloudflar
 the shadcn shape · **`@internationalized/date`** and **`@internationalized/number`** ·
 `@tanstack/react-table`, `@tanstack/react-virtual`, `@tanstack/react-form`, `@tanstack/react-query` ·
 `d3-scale` / `d3-shape` / `d3-time` · `papaparse` · **Better Auth** with KV secondary storage ·
-**Polar** through a hand-rolled REST client · `zod` v4 · Sentry · React Email · `motion` · `sonner` ·
+**Polar** through a hand-rolled REST client · `zod` v4 · Sentry · React Email · `sonner` ·
 `@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
 
 Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
@@ -117,8 +117,9 @@ whole class of failures nobody can explain.
 `pnpm-lock.yaml` is installed `--frozen-lockfile` in CI and in the agent sandbox.
 
 The set itself is changed by a human, in an ADR, with the reason attached - the freeze binds
-stages and agent runs, not the decision record. `@cloudflare/vitest-pool-workers` is the one
-addition so far (ADR 0015); a `### Blockers` row is still how a stage reports needing a package.
+stages and agent runs, not the decision record. It binds both directions: `@cloudflare/vitest-pool-workers`
+is the one addition so far (ADR 0015) and `motion` the one removal (ADR 0018), declared and imported
+by nothing. A `### Blockers` row is still how a stage reports needing a package.
 
 ---
 

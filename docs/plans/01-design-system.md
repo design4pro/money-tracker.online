@@ -185,8 +185,12 @@ None.
   `!important` `animation: none` breaks components that wait on `animationend`, which is how a
   dialog that never closes gets shipped. All of that is in the tree; the one clause that is not is
   the `[data-motion-transform]` reset, and it stays an open requirement below.
-- **Components.** `src/lib/motion.ts` exports `useReducedMotion()` and the `motion` package's shared
-  transition presets. Every animation in the product goes through one of them.
+- **Components.** `src/lib/motion.ts` exports `useReducedMotion()` and the shared transition presets,
+  whose durations resolve from the `tokens.css` scale rather than from literals. Every animation in
+  the product goes through one of them. The presets are hand-rolled: the `motion` package this clause
+  once named was removed by ADR 0018, because it was declared and imported by nothing and this stage
+  was its only justification. A preset that genuinely needs a JS animation library is a new
+  dependency decision, made in a new ADR.
 - **States.** Not applicable — no async surface.
 - **Tokens.** The duration scale and the easing set live in `tokens.css` from `00-S3`; this stage
   consumes them. The scale that shipped is **90 / 150 / 220 / 320 ms** with four easings. This
@@ -239,11 +243,13 @@ All seven §7 items and all ten §2 clauses, with the motion clause carrying thi
 
 ### Blockers
 
-- **`motion@^13.2.0` - disposition: defer (#213).** The package is declared in `package.json` and
-  imported by zero files under `src/`. This stage's `src/lib/motion.ts` is its only justification in
-  the repository, so the package and the stage are one decision: remove it, or schedule this stage.
-  `docs/SPEC.md` §3.1 freezes the dependency set and `AGENTS.md` puts the change under **Ask First**,
-  so nothing here touches `package.json`.
+- **`motion@^13.2.0` - resolved (#213, ADR 0018).** The package was declared in `package.json` and
+  imported by zero files; this stage's `src/lib/motion.ts` was its only justification, so the package
+  and the stage were one decision. A human took it and **removed the package** rather than scheduling
+  this stage to justify it. The entry is kept rather than deleted, because the record of a dependency
+  that was carried unused for the length of a plan is worth more than a clean list. This stage stays
+  open and buildable: its presets are hand-rolled against the `tokens.css` duration scale, and a
+  preset that genuinely needs a JS animation library is a new dependency decision in a new ADR.
 - **The `[data-motion-transform]` reset is unimplemented (#214).** A live accessibility gap rather
   than a documentation one; the row stays open and the defect is tracked on its own issue.
 - **The drift guard cannot see the shared-path rule (#216).** This stage is the first that could
