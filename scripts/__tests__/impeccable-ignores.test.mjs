@@ -34,31 +34,37 @@ import { loadKnownRuleIds } from '../../.claude/skills/impeccable/scripts/lib/st
  * @see .claude/skills/impeccable/scripts/lib/staleness-deep.mjs
  * @see https://github.com/design4pro/money-tracker.online/issues/165
  */
-const root = fileURLToPath(new URL('../../', import.meta.url))
+const fromRoot = (relative) =>
+  fileURLToPath(new URL(`../../${relative}`, import.meta.url))
 
 const detector =
-  JSON.parse(
-    readFileSync(
-      new URL('../../.impeccable/config.json', import.meta.url),
-      'utf8',
-    ),
-  ).detector ?? {}
+  JSON.parse(readFileSync(fromRoot('.impeccable/config.json'), 'utf8'))
+    .detector ?? {}
 
 const knownRuleIds = await loadKnownRuleIds(
-  `${root}.claude/skills/impeccable/scripts`,
+  fromRoot('.claude/skills/impeccable/scripts'),
 )
 
 // The same normalization the matcher applies before comparing, so casing or stray whitespace in
-// the config reads here exactly as it reads there.
+// the config reads here exactly as it reads there. An unloadable registry leaves every id unknown,
+// which is the loud direction to fail in.
+const known = knownRuleIds ?? new Set()
 const normalize = (rule) =>
-  String(rule || '')
+  String(rule ?? '')
     .trim()
     .toLowerCase()
 
-const unknown = (rules) =>
-  rules
-    .map(normalize)
-    .filter((rule) => rule && rule !== '*' && !knownRuleIds?.has(rule))
+// `*` is exempt here because the upstream check exempts it here too.
+const unknownIgnoreRules = (detector.ignoreRules ?? [])
+  .map(normalize)
+  .filter((rule) => rule && rule !== '*' && !known.has(rule))
+
+// Neither exemption carries over. An entry with no `rule`, or a `*` in it, is dropped or never
+// matched by `normalizeIgnoreValueEntries` and the exact `entry.rule !== rule` compare that follow
+// it - so it is as dead as a misspelling, and reported rather than filtered away.
+const unknownIgnoreValueRules = (detector.ignoreValues ?? [])
+  .map((entry) => normalize(entry?.rule))
+  .filter((rule) => !known.has(rule))
 
 describe('.impeccable/config.json detector ignores', () => {
   it('loads the rule registry from the vendored detector', () => {
@@ -77,13 +83,11 @@ describe('.impeccable/config.json detector ignores', () => {
   })
 
   it('ignores no rule id the detector does not have', () => {
-    expect(unknown(detector.ignoreRules ?? [])).toEqual([])
+    expect(unknownIgnoreRules).toEqual([])
   })
 
   // The list the upstream check skips, and the reason this file exists.
   it('ignores no value under a rule id the detector does not have', () => {
-    expect(
-      unknown((detector.ignoreValues ?? []).map((entry) => entry?.rule)),
-    ).toEqual([])
+    expect(unknownIgnoreValueRules).toEqual([])
   })
 })
