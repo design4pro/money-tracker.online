@@ -219,13 +219,79 @@ for (const theme of THEMES) {
  * `ArrowDown` then `Enter` rather than a click into a popover: the demo workspace's category names
  * are the seed's business and not this file's, so the spec must not name one, and the keyboard path
  * is the one worth exercising anyway.
+ *
+ * The scroll and the retry around those two keystrokes are the part to read before changing this.
+ * React Aria commits a selection only while the listbox is open *and* has an option focused —
+ * `commit()` wants `isOpen && focusedKey != null` — and with either missing it falls through to a
+ * commit that selects nothing, closes the popover and puts the input back to `''`, which is the
+ * empty value this helper used to fail on. An instrumented `mobile-safari` run caught the window:
+ * the popover opened and focused its first option, and five milliseconds later the input was
+ * blurred and refocused and it closed again, with the page still scrolling from the click that had
+ * to bring the field into view. So the field is scrolled into view first, which is what removes
+ * that churn, and the sequence is retried, because five milliseconds is shorter than a round trip
+ * to the browser and no amount of waiting on the open state can win the race. Measured over 40
+ * runs on a loaded machine: two retries with the scroll, seven without it. A `ComboBox` that
+ * genuinely stopped committing still fails here — it just spends the budget before saying so.
  */
 async function pickFirstOption(page: Page, name: string | RegExp) {
   const combo = page.getByRole('combobox', { name })
-  await combo.click()
-  await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('Enter')
-  await expect(combo).not.toHaveValue('')
+  await combo.scrollIntoViewIfNeeded()
+  await expect(async () => {
+    // An attempt that did not commit can leave the listbox open, and an open React Aria popover
+    // makes the rest of the page pointer-inert — the click below would land on the app shell
+    // instead of the field. `Escape` reverts to whatever is selected, which is nothing here, and
+    // closes it; on the first attempt, with nothing open, it does nothing at all.
+    await combo.press('Escape')
+    await combo.click()
+    await combo.press('ArrowDown')
+    await combo.press('Enter')
+    await expect(combo).not.toHaveValue('', { timeout: 1_000 })
+  }).toPass({ timeout: 15_000 })
+}
+
+/**
+ * Types into one of the editor's text controls, once React owns it.
+ *
+ * `gotoApp` waits for a React fiber on `main`, which is the app shell and not this route: the
+ * editor hangs under its own `pendingComponent` boundary and hydrates separately. A `fill` that
+ * lands in that gap writes the DOM value and nothing else — no `onChange` runs, React hydrates
+ * over it and puts the field back to `''`, so the draft never hears the keywords. The rule then
+ * has one half, and the preview keeps the sentence it shows for half a rule, which is the shape
+ * CI recorded: the action committed, the condition never arrived.
+ */
+async function fillField(page: Page, name: string, value: string) {
+  const field = page.getByRole('textbox', { name })
+  await expect
+    .poll(
+      () =>
+        field.evaluate((node) =>
+          Object.keys(node).some((key) => key.startsWith('__reactFiber$')),
+        ),
+      { timeout: 20_000 },
+    )
+    .toBe(true)
+  await field.fill(value)
+}
+
+/**
+ * Chooses an option in a `Select`, and confirms the trigger now reads it back.
+ *
+ * The same race as {@link pickFirstOption}, on the other popover control, and it reaches the
+ * screen in the shape #231 reported from CI rather than as a failed click: the option is pressed,
+ * the listbox closes, and the trigger still says what it said before. The rule is then left with
+ * one half, and the preview holds the sentence it shows for an incomplete rule while the test
+ * waits fifteen seconds for counts that were never going to arrive. So the choice is made until
+ * the trigger agrees it was made.
+ */
+async function chooseOption(page: Page, label: string, option: string) {
+  const trigger = page.getByRole('button', { name: label })
+  await trigger.scrollIntoViewIfNeeded()
+  await expect(async () => {
+    await trigger.press('Escape')
+    await trigger.click()
+    await page.getByRole('option', { name: option }).click()
+    await expect(trigger).toHaveText(option, { timeout: 1_000 })
+  }).toPass({ timeout: 15_000 })
 }
 
 /** The preview's own live region: the paragraph directly under its heading. */
@@ -243,8 +309,7 @@ test('the preview states both counts, never a bare number of matches', async ({
 
   // `direction` matches most of a ledger, so this is the state worth asserting on: a rule with
   // matches, and a count that says what those matches are out of.
-  await page.getByRole('button', { name: labels.field }).click()
-  await page.getByRole('option', { name: labels.directionOption }).click()
+  await chooseOption(page, labels.field, labels.directionOption)
 
   const status = previewStatus(page, labels)
   // The action has no category yet, so until it has one the panel names the missing half rather
@@ -271,9 +336,7 @@ test('a rule that matches nothing says so, in the same sentence shape', async ({
   const labels = LABELS.en
   await gotoApp(page, '/transactions/rules/new')
 
-  await page
-    .getByRole('textbox', { name: labels.keywords })
-    .fill('zzzz-nothing-matches-this-zzzz')
+  await fillField(page, labels.keywords, 'zzzz-nothing-matches-this-zzzz')
   await pickFirstOption(page, 'Category')
 
   await expect(previewStatus(page, labels)).toHaveText(labels.emptyFragment, {
@@ -294,7 +357,7 @@ test('the rule reads back as a sentence above the controls', async ({
   // A blank rule names the half that is missing rather than reading as a rule that does nothing.
   await expect(sentence).toHaveText(/add a condition/i)
 
-  await page.getByRole('textbox', { name: labels.keywords }).fill('Żabka')
+  await fillField(page, labels.keywords, 'Żabka')
   await expect(sentence).toHaveText(/add an action/i)
 
   await pickFirstOption(page, 'Category')
