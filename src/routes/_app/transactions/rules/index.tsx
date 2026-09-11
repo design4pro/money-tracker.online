@@ -296,6 +296,10 @@ function RulesListRoute() {
 
       {rules.length === 0 ? (
         <EmptyState
+          // With no rules there are no paused banners either, so this is the only thing under the
+          // screen's `<h1>` and `EmptyState`'s default of `3` announced a skipped level - the same
+          // defect issue #166 reports on `/transactions/groups`, on a screen it does not name.
+          headingLevel={2}
           title={t('rules.empty.title')}
           description={t('rules.empty.body')}
           action={

@@ -1,6 +1,7 @@
 import { expect, test } from './support/console'
 
 import { gotoApp, useLocale } from './support/app'
+import { expectOutlineWithoutSkips } from './support/headings'
 import { storageStateFor } from './support/session'
 
 import type { Locator, Page } from '@playwright/test'
@@ -132,6 +133,42 @@ for (const locale of LOCALES) {
       if (MUST_WRAP.includes(route)) {
         expect(measured.height).toBeGreaterThan(measured.lineHeight * 1.5)
       }
+    })
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase 1b — every one of those screens reads as one outline                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The screens whose heading outline is asserted, and why it is this list.
+ *
+ * {@link SUBTITLE_ROUTES} is every `_app` screen with an `<h1>` and a subtitle, so it is already
+ * the enumeration of "a top-level screen of this product" — reusing it is what keeps a screen added
+ * later from being added to one list and forgotten in the other. `/recurring/candidates` is the one
+ * addition: it has no subtitle-capped header of its own, and it is the second screen of the
+ * recurring feature, whose row cards must agree with `/recurring`'s on what level they are.
+ *
+ * This loop replaces a single `/recurring` case. That case was added with the fix it guarded and
+ * visited the one route that fix touched; issue #166 found two more screens rendering `h1` then
+ * `h3` beside it, which is what a guard scoped to one route buys. The assertion itself lives in
+ * `support/headings.ts`, together with the reason axe cannot make it.
+ */
+const OUTLINE_ROUTES: ReadonlyArray<string> = [
+  ...SUBTITLE_ROUTES,
+  '/recurring/candidates',
+]
+
+for (const locale of LOCALES) {
+  for (const route of OUTLINE_ROUTES) {
+    test(`${route} reads as one outline with no heading level skipped — ${locale}`, async ({
+      page,
+      context,
+    }) => {
+      await useLocale(context, locale)
+      await gotoApp(page, route)
+      await expectOutlineWithoutSkips(page, `${route} · ${locale}`)
     })
   }
 }
@@ -377,32 +414,6 @@ for (const locale of LOCALES) {
       element.replaceChildren()
     })
     expect(await widthOf(rail)).toBeCloseTo(RAIL_TRACK, 0)
-  })
-
-  test(`/recurring reads as one outline with no heading level skipped — ${locale}`, async ({
-    page,
-    context,
-  }) => {
-    await useLocale(context, locale)
-    await gotoApp(page, '/recurring')
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-
-    // Moving `Due soon` after the series list moved its `h2` after the cards' headings, and the
-    // outline a screen reader announces followed: `h1` then a series name, two levels down with
-    // nothing in between. The cards were never subsections of `Due soon` — they only read that
-    // way while it happened to come first — so the levels are asserted here rather than left to
-    // axe, whose `heading-order` rule is `best-practice` and excluded in `accessibility.spec.ts`.
-    const levels = await page
-      .locator('main :is(h1, h2, h3, h4, h5, h6)')
-      .evaluateAll((elements) =>
-        elements.map((element) => Number(element.tagName.slice(1))),
-      )
-
-    expect(levels.length).toBeGreaterThan(1)
-    expect(levels[0]).toBe(1)
-    for (let index = 1; index < levels.length; index += 1) {
-      expect(levels[index] - (levels[index - 1] ?? 0)).toBeLessThanOrEqual(1)
-    }
   })
 
   test(`the /recurring rail holds its own table rather than scrolling it — ${locale}`, async ({
