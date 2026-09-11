@@ -4,7 +4,7 @@
 | ------------------ | ----- |
 | **Status**         | draft |
 | **Issue**          | #230  |
-| **Spec PR**        | none  |
+| **Spec PR**        | #232  |
 | **Implementation** | none  |
 
 ## 📝 TLDR
@@ -284,22 +284,28 @@ widened), **ADR 0016** (journeys replace the visual gate — how the frames in S
 
 ## 📝 Resolved assumptions (autonomous defaults)
 
-Q1 was answered by a human before this spec was written and is listed for the record, not as a
-default. Q2 and Q3 are autonomous defaults.
+Q1 was answered by a human before this spec was written. Q2 and Q3 were drafted as autonomous
+defaults carrying `⚠ NEEDS HUMAN CONFIRMATION` and were **confirmed by a maintainer** on the spec
+PR before it left draft ([#232, the Open Questions
+comment](https://github.com/design4pro/money-tracker.online/pull/232#issuecomment-5630372296)). Nothing in this table is now
+an unconfirmed assumption; the column records how each answer was reached, per `SDLC.md` →
+Definition of Ready.
 
 | #   | Question                                                                                     | Answer                                                                                                                                                                                                                            | Rationale                                                                                                                                                                                                                                                                                                    |
 | --- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Q1  | What may render before the shell read has answered?                                          | **Nothing new. The guard stays blocking and the cache is primed instead.** Answered by a maintainer on [#230](https://github.com/design4pro/money-tracker.online/issues/230#issuecomment-5630289004) — not an autonomous default. | The alternative shape (shell read in a loader or a suspense boundary) is rejected on the record and recorded as ADR 0018.                                                                                                                                                                                    |
-| Q2  | Must the primed entry survive `gcTime`?                                                      | **Yes — `gcTime: Number.POSITIVE_INFINITY` on the shell query only.** ⚠ NEEDS HUMAN CONFIRMATION (ships with Q3)                                                                                                                  | Measured: the shell query has no observers, so it is collected five minutes after its last fetch (`query.js:28`, `removable.js:17`, default `3e5`). Without this the fix silently expires and the block returns for a reader who has been on a page for five minutes. Scope is one entry in a per-tab cache. |
-| Q3  | With the entry resident forever, how does a revoked or demoted session's shell ever refresh? | **`revalidateIfStale: true` on the `ensureQueryData` call, keeping `SHELL_STALE_TIME` at 30 s.** ⚠ NEEDS HUMAN CONFIRMATION                                                                                                       | See the argument below. It makes `_app.tsx:37-41`'s stated intent real for the first time, and it never blocks: `queryClient.js:80-81` returns the cached value and refetches in the background.                                                                                                             |
+| Q2  | Must the primed entry survive `gcTime`?                                                      | **Yes — `gcTime: Number.POSITIVE_INFINITY` on the shell query only.** Confirmed by a maintainer on #232 (ships with Q3)                                                                                                           | Measured: the shell query has no observers, so it is collected five minutes after its last fetch (`query.js:28`, `removable.js:17`, default `3e5`). Without this the fix silently expires and the block returns for a reader who has been on a page for five minutes. Scope is one entry in a per-tab cache. |
+| Q3  | With the entry resident forever, how does a revoked or demoted session's shell ever refresh? | **`revalidateIfStale: true` on the `ensureQueryData` call, keeping `SHELL_STALE_TIME` at 30 s.** Confirmed by a maintainer on #232                                                                                                | See the argument below. It makes `_app.tsx:37-41`'s stated intent real for the first time, and it never blocks: `queryClient.js:80-81` returns the cached value and refetches in the background.                                                                                                             |
 | Q4  | Does `holdServerFns`'s shell exception in `e2e/support/states.ts` stay?                      | **Stays; its docblock is rewritten.**                                                                                                                                                                                             | Smallest blast radius, and removing it would be a change to what a passing test exercises for no behavioural gain. The docblock currently documents the block as a permanent property of the app and must stop doing so.                                                                                     |
 | Q5  | Is a new ADR owed, or is a paragraph enough?                                                 | **ADR 0018, in this PR.**                                                                                                                                                                                                         | The repo-local `om-spec-writing` rule: a product decision a spec relies on that has no ADR gets one in the same PR. This decision will be re-litigated — the issue itself proposes the rejected shape — which is what an ADR is for.                                                                         |
 
 ### Why Q2 + Q3 is a tightening, not a weakening
 
-They are marked `⚠ NEEDS HUMAN CONFIRMATION` because `AGENTS.md` → Ask First names sessions
-explicitly, and a human should spend thirty seconds on the argument rather than take it on trust.
-The argument itself, from the installed source:
+They were drafted behind a `⚠ NEEDS HUMAN CONFIRMATION` marker because `AGENTS.md` → Ask First names
+sessions explicitly, and this is the argument a maintainer read before confirming them. It is kept
+here rather than deleted with the marker: the reason a session-touching change was judged safe is
+worth more to the next reader than the fact that somebody once approved it. From the installed
+source:
 
 - **Today, a motionless reader's shell never refreshes.** `ensureQueryData` is only called from
   `beforeLoad`, so with no navigation there is no call. Garbage collection _removes_ the entry; it
