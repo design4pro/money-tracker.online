@@ -150,7 +150,10 @@ export function Modal({
         docked ? 'p-0' : 'justify-center overflow-y-auto',
       )}
     >
-      <RACModal className={cn(modalVariants({ size, placement }), className)}>
+      <RACModal
+        data-motion-transform=""
+        className={cn(modalVariants({ size, placement }), className)}
+      >
         {children}
       </RACModal>
     </RACModalOverlay>

@@ -26,6 +26,7 @@ export function Spinner({ className, label = 'Loading' }: SpinnerProps) {
     <>
       <svg
         aria-hidden="true"
+        data-motion-transform=""
         viewBox="0 0 24 24"
         fill="none"
         className={cn('size-4 animate-spin-slow', className)}

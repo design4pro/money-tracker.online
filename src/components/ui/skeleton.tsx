@@ -20,6 +20,11 @@ export interface SkeletonProps extends ComponentPropsWithoutRef<'div'> {
  * The shimmer is a `translateX` on a gradient, which composites, and it stops
  * entirely under `prefers-reduced-motion`. A still grey box is a perfectly good
  * skeleton; a pulsing one is the same information with a headache attached.
+ *
+ * The sheen deliberately does not carry `data-motion-transform`. That attribute
+ * promises the element rests at the identity, and this one rests off its own
+ * left edge on `-translate-x-full` — a promise it does not keep is not one to
+ * make, even though the reset in `tokens.css` would leave that utility alone.
  */
 export function Skeleton({
   className,
