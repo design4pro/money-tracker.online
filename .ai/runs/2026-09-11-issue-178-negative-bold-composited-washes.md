@@ -60,11 +60,11 @@ twelve composited pairs pass 4.5:1 and eight do not. The dark `hover` over `surf
 
 ### Phase 1: Record the scope and pin it
 
-- [ ] 1.1 Write the failing exact-partition test for the composited matrix
-- [ ] 1.2 Fill in the partition and make it green
-- [ ] 1.3 Assert the rowWash convention
-- [ ] 1.4 Restate the negative-bold declaration comments in tokens.css
-- [ ] 1.5 Carry the canonical statement into DESIGN.md
-- [ ] 1.6 Resolve docs/ACCESSIBILITY.md §2.1
+- [x] 1.1 Write the failing exact-partition test for the composited matrix — 439b5af
+- [x] 1.2 Fill in the partition and make it green — 439b5af
+- [x] 1.3 Assert the rowWash convention — a5cf9c7
+- [x] 1.4 Restate the negative-bold declaration comments in tokens.css — 7272927
+- [x] 1.5 Carry the canonical statement into DESIGN.md — 2660109
+- [x] 1.6 Resolve docs/ACCESSIBILITY.md §2.1 — d6e9630
 - [ ] 1.7 Record the spec lifecycle
 - [ ] 1.8 Run the full validation gate and pnpm e2e
