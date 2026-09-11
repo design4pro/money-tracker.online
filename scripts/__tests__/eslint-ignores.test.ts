@@ -123,10 +123,15 @@ describe('eslint.config.js ignores', () => {
   // The premise the assertions above rest on. An ignore wide enough to cover `.ai/tmp/` must stay
   // narrow enough to leave the sources the gate exists for - and the hook tests the `.claude`
   // entries deliberately carve back in - being linted.
+  //
+  // `.ai/scripts/agent-kit-check.mjs` is the case that matters most here: it is the only tracked
+  // file eslint parses that lives under `.ai/` at all, so it is the one an entry widened by a
+  // future author could shadow without anything else noticing.
   it.each([
     'src/lib/money/format.ts',
     'scripts/__tests__/eslint-ignores.test.ts',
     '.claude/hooks/__tests__/hooks.test.ts',
+    '.ai/scripts/agent-kit-check.mjs',
   ])('still lints %s', async (path) => {
     await expect(eslint.isPathIgnored(path)).resolves.toBe(false)
   })
