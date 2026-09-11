@@ -296,12 +296,22 @@ jobs:
       # uneven. Measured on `develop` c730f99 (run 34598125641): `mobile-safari`
       # spent 868s of its 900s budget, `chromium` 648s, and the fixed cost a leg
       # pays before its first test - checkout, build, seeded D1, server, the
-      # `setup` project - is ~152s of either figure. So `mobile-safari` splits
-      # 125/125 by `--list` into two legs of about 152 + 358 = ~510s and has a
-      # real budget again, while `chromium` stays whole: 648s of 900s is not the
-      # leg running out of clock, and a second one would buy headroom it is not
-      # using for another ~152s of runner time. A leg that grows towards the cap
-      # gets a shard here; the number in playwright.config.ts does not move.
+      # `setup` project - is ~152s of either figure.
+      #
+      # `--shard` divides by test count and not by duration, so the halves are
+      # not halves and the honest numbers are not 868/2. Per-file timings from
+      # that run's blob report, mapped onto the split `--list` actually
+      # produces: shard 1/2 draws `accessibility`, `contrast-enhanced` and
+      # `desktop-density` - 386s between them - and comes to 486s of test time
+      # against shard 2/2's 402s. With setup and the fixed cost that is legs of
+      # ~638s and ~554s against the 900s cap, down from 868s.
+      #
+      # Two shards rather than three for the same reason: splitting by count
+      # does not break that cluster up, so a third leg gives 610s / 426s / 405s
+      # - the leg that matters moves 28s, for a whole extra runner. `chromium`
+      # stays whole on the same evidence: 648s of 900s is not the leg running
+      # out of clock. A leg that grows towards the cap gets a shard here; the
+      # number in playwright.config.ts does not move.
       matrix:
         include:
           - project: chromium
@@ -327,7 +337,10 @@ jobs:
         uses: ./.github/actions/e2e-env
         with:
           # Every leg seeds an identical database; auditing the seed once is
-          # proof enough, so one named leg does it rather than one per project.
+          # proof enough. The condition names a leg and not just a project
+          # because the project test alone is true on every shard of it, so the
+          # day `chromium` gets a second one the audit would start running
+          # twice.
           verify-seed: ${{ matrix.project == 'chromium' && matrix.shard == 1 }}
 
       # `PLAYWRIGHT_BASE_URL` points the suite at the server the composite action
