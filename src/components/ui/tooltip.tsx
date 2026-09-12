@@ -68,6 +68,7 @@ export function Tooltip({
     <RACTooltip
       {...props}
       offset={offset}
+      data-motion-transform=""
       className={composeTw(
         className,
         'z-tooltip max-w-64 rounded-md bg-accent px-2.5 py-1.5',

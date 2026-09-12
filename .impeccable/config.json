@@ -48,6 +48,12 @@
         ],
         "createdAt": "2026-09-09T21:10:20.257Z",
         "reason": "spec mockup fixture: a self-contained illustrative static HTML required by om-auto-write-spec references/mockups.md; it is not app code and must not import the design system"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "1px)`",
+        "createdAt": "2026-09-12T08:32:08.345Z",
+        "reason": "quoted Tailwind built-in output in a test allowlist reason, not a design decision: rounded-full compiles to border-radius: calc(infinity * 1px)"
       }
     ]
   }

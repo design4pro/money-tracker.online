@@ -4,8 +4,9 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { renderIndex } from '../index.ts'
 import { auditSpecs } from '../registry.ts'
-import type { SpecDirectory } from '../registry.ts'
+import type { Spec, SpecDirectory } from '../registry.ts'
 
 /**
  * The spec-lifecycle guard: `.ai/specs/` says what became of every decision in it, and keeps saying
@@ -106,7 +107,7 @@ describe('auditSpecs', () => {
       archived: {
         '2026-01-03-a-dropped-spec.md': spec({
           Status: 'archived',
-          Implementation: 'none',
+          'Superseded by': '#5',
         }),
       },
     })
@@ -141,6 +142,55 @@ describe('auditSpecs', () => {
 
     expect(details(root)).toEqual([
       expect.stringContaining('Implementation is empty'),
+    ])
+  })
+
+  it('rejects `archived` with nothing that replaced it', () => {
+    const root = tree({
+      archived: { '2026-01-01-a-spec.md': spec({ Status: 'archived' }) },
+    })
+
+    expect(details(root)).toEqual([
+      expect.stringContaining('Superseded by names nothing'),
+    ])
+  })
+
+  it('accepts `archived` that says nothing replaced it', () => {
+    const root = tree({
+      archived: {
+        '2026-01-01-a-spec.md': spec({
+          Status: 'archived',
+          'Superseded by': 'abandoned',
+        }),
+      },
+    })
+
+    expect(details(root)).toEqual([])
+    expect(auditSpecs(root).specs[0]?.supersededBy).toEqual([])
+  })
+
+  it('rejects `archived` that answers `none`, which is how forgetting looks', () => {
+    const root = tree({
+      archived: {
+        '2026-01-01-a-spec.md': spec({
+          Status: 'archived',
+          'Superseded by': 'none',
+        }),
+      },
+    })
+
+    expect(details(root)).toEqual([
+      expect.stringContaining('Superseded by names nothing'),
+    ])
+  })
+
+  it('rejects `Superseded by` on a spec that was not archived', () => {
+    const root = tree({
+      '': { '2026-01-01-a-spec.md': spec({ 'Superseded by': '#5' }) },
+    })
+
+    expect(details(root)).toEqual([
+      expect.stringContaining('belongs to an archived spec'),
     ])
   })
 
@@ -227,11 +277,68 @@ describe('auditSpecs', () => {
     ])
   })
 
-  it('ignores README.md and AGENTS.md, which live beside the specs', () => {
+  it('ignores the documents that live beside the specs and are not specs', () => {
     const root = tree({
-      '': { 'README.md': '# Index\n', 'AGENTS.md': '# Rules\n' },
+      '': {
+        'README.md': '# Index\n',
+        'AGENTS.md': '# Rules\n',
+        'product-brief.md': '# Product brief\n',
+      },
     })
 
     expect(auditSpecs(root)).toEqual({ specs: [], violations: [] })
+  })
+})
+
+describe('renderIndex', () => {
+  /** A spec the way {@link auditSpecs} returns one, so each case differs in exactly one field. */
+  const rendered = (fields: Partial<Spec> = {}): string =>
+    renderIndex([
+      {
+        path: '.ai/specs/2026-01-01-a-spec.md',
+        directory: '',
+        title: 'A spec',
+        date: '2026-01-01',
+        status: 'ready',
+        issue: 1,
+        specPr: 2,
+        implementation: [],
+        supersededBy: [],
+        ...fields,
+      } satisfies Spec,
+    ])
+
+  it('gives the archived section the column the reader wants there', () => {
+    const index = rendered({
+      path: '.ai/specs/archived/2026-01-01-a-spec.md',
+      directory: 'archived',
+      status: 'archived',
+      supersededBy: [5, 6],
+    })
+
+    expect(index).toContain('| Spec | Date | Issue | Spec PR | Superseded by |')
+    expect(index).toContain('/issues/5), [#6](')
+    expect(index).not.toContain(
+      '| Spec | Date | Issue | Spec PR | Implementation |',
+    )
+  })
+
+  it('says so in the archived column when nothing replaced the spec', () => {
+    const index = rendered({
+      path: '.ai/specs/archived/2026-01-01-a-spec.md',
+      directory: 'archived',
+      status: 'archived',
+    })
+
+    expect(index).toContain('| abandoned |')
+  })
+
+  it('keeps Implementation as the last column of every other section', () => {
+    const index = rendered({ status: 'implemented', implementation: [3] })
+
+    expect(index).toContain(
+      '| Spec | Date | Issue | Spec PR | Implementation |',
+    )
+    expect(index).not.toContain('Superseded by')
   })
 })

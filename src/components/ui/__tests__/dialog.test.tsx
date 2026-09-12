@@ -287,6 +287,27 @@ describe('Modal + Dialog', () => {
     expect(panel?.className).toMatch(/dvh/)
   })
 
+  it.each(['center', 'drawer', 'drawer-end'] as const)(
+    'hooks the %s panel for the reduced-motion transform reset',
+    (placement) => {
+      render(
+        <Modal isOpen placement={placement}>
+          <Dialog aria-label="Panel">Body</Dialog>
+        </Modal>,
+      )
+
+      // Every placement animates the panel's `transform` on the way in and out
+      // and rests it at the identity, which is the promise the attribute makes
+      // to the reduced-motion block in `tokens.css`. The other primitives that
+      // make it are held in `motion-transform.test.tsx`.
+      expect(
+        screen
+          .getByRole('dialog')
+          .parentElement?.hasAttribute('data-motion-transform'),
+      ).toBe(true)
+    },
+  )
+
   it('hides the rest of the document from assistive technology while open', async () => {
     const user = userEvent.setup()
     render(<Example />)

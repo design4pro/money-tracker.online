@@ -341,10 +341,19 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   the way the greys are).
 - **Loud Red** (`negative-bold`): the same ink at the grade that is not held to the text floor -
   the over-budget headline in `AmountMeter` and the over-budget meter fill, and nothing else.
-  5.09:1 on sunken, 6.15:1 on raised; dark `#ff5e4a` at 4.82:1 on raised and 4.57:1 on a hovered
-  row, which is the binding ground. The floors that apply
+  5.09:1 on sunken, 6.15:1 on raised; dark `#ff5e4a` at 4.82:1 on raised and 4.56:1 on a hovered
+  row, which is the binding ground in dark. The floors that apply
   are 4.5:1 (large text: bold at >= 18.66px, WCAG 1.4.6) and 3:1 (a fill, WCAG 1.4.11), so both
-  values sit above the stricter of the two on every ground. It exists because one token cannot be
+  values sit above the stricter of the two on all five opaque planes, and on every washed ground a
+  call site produces today: `hover` over `surface` (a hovered budget row) and `hover` over
+  `surface-sunken` (an archived over-budget budget card). **Not on every washed ground.** It misses
+  4.5:1 under either wash over dark `surface-raised` or dark `surface-panel`, and under `press` over
+  dark `surface`, dark `canvas`, light `surface-sunken` or light `surface-panel`. Those eight are
+  recorded as failing in `tokens-contrast.test.ts`, not designed for: no call site produces them,
+  because `rowWash` paints `hover` and never `press` - a convention, not a boundary, and nothing but
+  that test and this note stops one from being written. Putting the grade on any of them is a
+  palette decision, not a call-site one. Its 3:1 fill floor is clear on all eight, worst case
+  3.44:1. It exists because one token cannot be
   both a caption ink and a danger colour: `negative` has to hold 7:1, and in dark that pins it to a
   pale salmon, since red is luminance-poor and no deeper red in sRGB reaches that floor. **Never
   put body-size text in it**, and never reach for it as a general "stronger red".

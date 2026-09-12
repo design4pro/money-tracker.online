@@ -400,6 +400,67 @@ describe.each([
  */
 const WASH_KEYS = ['color-hover', 'color-press'] as const
 
+/**
+ * What the large-text grade is worth on every washed ground, as a verdict per
+ * pair rather than as a floor (#178).
+ *
+ * Twenty composited pairs: each large-text key under each wash over each of the
+ * five planes. Eight do not clear 4.5:1 — either wash over dark `surface-raised`
+ * and dark `surface-panel`, and `press` over dark `surface`, dark `canvas`,
+ * light `surface-sunken` and light `surface-panel`. They are recorded as failing
+ * rather than designed for: no call site produces them, and moving the token far
+ * enough to clear them spends the chroma the grade exists for. The measurements
+ * and the rejected alternatives are the #178 spec,
+ * `2026-09-11-negative-bold-on-composited-washes.md`.
+ *
+ * Names rather than ratios, so a rounding change cannot turn this red on its
+ * own; and the whole partition, both lists, rather than the passing pairs alone.
+ * A one-sided floor stays green when the palette moves the other way — four of
+ * the passing pairs clear 4.5:1 by under 3% — and a new ground or a new
+ * large-text key produces a pair neither list names, which fails rather than
+ * slipping through.
+ */
+const LARGE_TEXT_WASH_PARTITION: Record<
+  string,
+  {
+    readonly clears: ReadonlyArray<string>
+    readonly misses: ReadonlyArray<string>
+  }
+> = {
+  light: {
+    clears: [
+      'color-negative-bold · color-hover · color-canvas',
+      'color-negative-bold · color-hover · color-surface',
+      'color-negative-bold · color-hover · color-surface-raised',
+      'color-negative-bold · color-hover · color-surface-sunken',
+      'color-negative-bold · color-hover · color-surface-panel',
+      'color-negative-bold · color-press · color-canvas',
+      'color-negative-bold · color-press · color-surface',
+      'color-negative-bold · color-press · color-surface-raised',
+    ],
+    misses: [
+      'color-negative-bold · color-press · color-surface-sunken',
+      'color-negative-bold · color-press · color-surface-panel',
+    ],
+  },
+  dark: {
+    clears: [
+      'color-negative-bold · color-hover · color-canvas',
+      'color-negative-bold · color-hover · color-surface',
+      'color-negative-bold · color-hover · color-surface-sunken',
+      'color-negative-bold · color-press · color-surface-sunken',
+    ],
+    misses: [
+      'color-negative-bold · color-hover · color-surface-raised',
+      'color-negative-bold · color-hover · color-surface-panel',
+      'color-negative-bold · color-press · color-canvas',
+      'color-negative-bold · color-press · color-surface',
+      'color-negative-bold · color-press · color-surface-raised',
+      'color-negative-bold · color-press · color-surface-panel',
+    ],
+  },
+}
+
 describe.each([
   ['light', light, lightWashes],
   ['dark', dark, darkWashes],
@@ -502,10 +563,10 @@ describe.each([
    * it — after the token had already shipped past this file. Asserting it here
    * means the browser is no longer the only thing that knows.
    *
-   * `hover` over `surface` only, deliberately. `press` over `surface`, and
-   * either wash over `surface-raised`, are below 4.5:1 for this grade today; no
-   * call site puts it on them, and #178 is where that is decided rather than
-   * pinned here by a test the palette would have to be redesigned to satisfy.
+   * A floor on `hover` over `surface` only, deliberately: it is the ground a
+   * hovered budget row actually has. Every other washed ground is recorded by
+   * the partition below instead, which is where #178 settled what this grade
+   * is worth on the ones it does not clear.
    */
   it.each(LARGE_TEXT_KEYS)(
     '%s carries the hover wash on --color-surface at its large-text floor',
@@ -521,6 +582,34 @@ describe.each([
       ).toBeGreaterThanOrEqual(4.5)
     },
   )
+
+  /*
+   * If this goes red, the palette moved and #178's decision is back on the
+   * table: re-measure, then change `LARGE_TEXT_WASH_PARTITION` on purpose.
+   */
+  it('records exactly which washed grounds the large-text grade clears', () => {
+    const clears: Array<string> = []
+    const misses: Array<string> = []
+    for (const key of LARGE_TEXT_KEYS) {
+      for (const wash of WASH_KEYS) {
+        for (const ground of GROUND_KEYS) {
+          const washed = washOver(washes[wash], rgbOf(tokens[ground]))
+          const measured = contrastRgb(rgbOf(tokens[key]), washed)
+          ;(measured >= 4.5 ? clears : misses).push(
+            `${key} · ${wash} · ${ground}`,
+          )
+        }
+      }
+    }
+    const expected = LARGE_TEXT_WASH_PARTITION[themeName]
+    expect(
+      { clears: clears.sort(), misses: misses.sort() },
+      `${themeName}: the large-text wash partition moved`,
+    ).toEqual({
+      clears: [...expected.clears].sort(),
+      misses: [...expected.misses].sort(),
+    })
+  })
 })
 
 describe('the two themes are separately designed', () => {
