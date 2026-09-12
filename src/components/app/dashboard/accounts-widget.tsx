@@ -1,8 +1,6 @@
-import { Badge, EmptyState } from '#/components/ui'
+import { Badge, EmptyState, Link } from '#/components/ui'
 import { Amount } from '#/components/app/accounts'
 import { useLocale, useTranslate } from '#/lib/i18n'
-
-import { WidgetLink } from './widget-link'
 
 import type { CurrencyCode } from '#/lib/money'
 import type { DashboardAccount } from './types'
@@ -50,7 +48,9 @@ export function AccountsWidget({
         title={t('accounts.empty.title')}
         description={t('accounts.empty.body')}
         action={
-          <WidgetLink to="/accounts">{t('accounts.empty.action')}</WidgetLink>
+          <Link href="/accounts" size="widget">
+            {t('accounts.empty.action')}
+          </Link>
         }
       />
     )
@@ -102,9 +102,9 @@ export function AccountsWidget({
         ))}
       </ul>
       <p>
-        <WidgetLink to="/accounts">
+        <Link href="/accounts" size="widget">
           {t('dashboard.accounts.viewAll')}
-        </WidgetLink>
+        </Link>
       </p>
     </div>
   )
