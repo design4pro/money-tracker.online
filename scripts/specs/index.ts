@@ -27,7 +27,7 @@ import { pathToFileURL } from 'node:url'
 
 import { format, resolveConfig } from 'prettier'
 
-import { SPEC_ROOT, auditSpecs } from './registry.ts'
+import { ABANDONED, SPEC_ROOT, auditSpecs } from './registry.ts'
 import type { Spec, SpecStatus } from './registry.ts'
 
 const INDEX = join(SPEC_ROOT, 'README.md')
@@ -62,13 +62,19 @@ const pullLink = (reference: number): string =>
  * `issueLink` rather than `pullLink` for the archived case because a superseding reference can be
  * either, and the document does not say which. GitHub redirects `/issues/n` to `/pull/n` for the
  * same number, so one form reaches both.
+ *
+ * An archived spec with no reference is not a spec that forgot one: the guard admits it only when
+ * the row says {@link ABANDONED}, so the cell says that rather than the dash it says elsewhere.
  */
 const lastCell = (spec: Spec): string => {
-  const references =
-    spec.status === 'archived'
-      ? spec.supersededBy.map(issueLink)
-      : spec.implementation.map(pullLink)
-  return references.length === 0 ? '—' : references.join(', ')
+  if (spec.status === 'archived') {
+    return spec.supersededBy.length === 0
+      ? ABANDONED
+      : spec.supersededBy.map(issueLink).join(', ')
+  }
+  return spec.implementation.length === 0
+    ? '—'
+    : spec.implementation.map(pullLink).join(', ')
 }
 
 const row = (spec: Spec): string => {
@@ -99,8 +105,8 @@ export const renderIndex = (specs: ReadonlyArray<Spec>): string => {
     const section = specs.filter((spec) => spec.status === status)
     if (section.length === 0) continue
 
-    // An archived spec has no implementation and would show a column of dashes; what the reader
-    // wants in its place is what replaced it.
+    // An archived spec rarely has an implementation to show, so the column would be mostly dashes;
+    // what the reader wants in its place is what replaced it.
     const last = status === 'archived' ? 'Superseded by' : 'Implementation'
 
     lines.push(

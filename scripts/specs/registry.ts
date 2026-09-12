@@ -40,8 +40,9 @@ export const SPEC_ROOT = '.ai/specs'
  * it is without the reader reconstructing the path.
  *
  * `archived` covers both halves of "not going to be built as written": superseded by a later
- * decision, or abandoned. They are not split until something is in there to split; what replaced a
- * superseded spec is recorded in {@link SUPERSEDED_FIELD} instead, which is the finer fact.
+ * decision, or abandoned. They are not split until something is in there to split;
+ * {@link SUPERSEDED_FIELD} carries the finer fact instead - what replaced a superseded spec, or
+ * {@link ABANDONED} when nothing did.
  */
 export const STATUSES_BY_DIRECTORY = {
   '': ['draft', 'ready', 'in-progress'],
@@ -71,6 +72,18 @@ export const FIELDS = ['Status', 'Issue', 'Spec PR', 'Implementation'] as const
  * repositories run this convention out of the same file, so the schema is deliberately identical.
  */
 export const SUPERSEDED_FIELD = 'Superseded by'
+
+/**
+ * The one value {@link SUPERSEDED_FIELD} takes that is not a reference: nothing replaced this
+ * design, it was dropped.
+ *
+ * `archived` has two endings and only one of them names a successor, so a row that admitted `#n`
+ * alone would leave an abandoned spec no way through the gate but a fabricated reference - exactly
+ * the unverifiable claim this module exists to prevent. `none` is deliberately not that value: it is
+ * how every other row spells "empty", and reusing it here would make forgetting the answer and
+ * giving it look the same.
+ */
+export const ABANDONED = 'abandoned'
 
 export type Spec = {
   /** Repository-relative path, e.g. `.ai/specs/implemented/2026-09-09-….md`. */
@@ -187,8 +200,9 @@ const references = (value: string): Array<number> =>
  *    assertion the whole module exists for.
  * 4. `implemented` names at least one implementation pull request. "Shipped" with nothing that
  *    shipped it is the claim nobody can check later, which is what `docs/plans/` taught (#77).
- * 5. `archived` names at least one issue or pull request that replaced it. A dropped design that
- *    does not say what happened instead leaves the reader exactly where they started (#212).
+ * 5. `archived` names at least one issue or pull request that replaced it, or says
+ *    {@link ABANDONED}. A dropped design that does not say what happened instead leaves the reader
+ *    exactly where they started (#212).
  * 6. `ready` and `in-progress` name an issue. A merged spec nobody can schedule is exactly how
  *    `.ai/specs/2026-09-08-design-system-plan-reconciliation.md` sat unbuilt with no ticket until
  *    #201 was filed for it.
@@ -251,7 +265,8 @@ export const auditSpecs = (
 
     const implementation = references(values.get('Implementation') ?? 'none')
     const issue = references(values.get('Issue') ?? 'none').at(0) ?? null
-    const supersededBy = references(values.get(SUPERSEDED_FIELD) ?? 'none')
+    const superseded = values.get(SUPERSEDED_FIELD) ?? 'none'
+    const supersededBy = references(superseded)
 
     if (status === 'implemented' && implementation.length === 0) {
       violations.push({
@@ -261,10 +276,14 @@ export const auditSpecs = (
       })
     }
 
-    if (status === 'archived' && supersededBy.length === 0) {
+    if (
+      status === 'archived' &&
+      supersededBy.length === 0 &&
+      superseded !== ABANDONED
+    ) {
       violations.push({
         path,
-        detail: `Status is \`archived\` and ${SUPERSEDED_FIELD} names nothing; name the issue or pull request that replaced this design`,
+        detail: `Status is \`archived\` and ${SUPERSEDED_FIELD} names nothing; name the issue or pull request that replaced this design, or \`${ABANDONED}\` when nothing did`,
       })
     }
 

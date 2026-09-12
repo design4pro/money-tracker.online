@@ -155,6 +155,35 @@ describe('auditSpecs', () => {
     ])
   })
 
+  it('accepts `archived` that says nothing replaced it', () => {
+    const root = tree({
+      archived: {
+        '2026-01-01-a-spec.md': spec({
+          Status: 'archived',
+          'Superseded by': 'abandoned',
+        }),
+      },
+    })
+
+    expect(details(root)).toEqual([])
+    expect(auditSpecs(root).specs[0]?.supersededBy).toEqual([])
+  })
+
+  it('rejects `archived` that answers `none`, which is how forgetting looks', () => {
+    const root = tree({
+      archived: {
+        '2026-01-01-a-spec.md': spec({
+          Status: 'archived',
+          'Superseded by': 'none',
+        }),
+      },
+    })
+
+    expect(details(root)).toEqual([
+      expect.stringContaining('Superseded by names nothing'),
+    ])
+  })
+
   it('rejects `Superseded by` on a spec that was not archived', () => {
     const root = tree({
       '': { '2026-01-01-a-spec.md': spec({ 'Superseded by': '#5' }) },
@@ -292,6 +321,16 @@ describe('renderIndex', () => {
     expect(index).not.toContain(
       '| Spec | Date | Issue | Spec PR | Implementation |',
     )
+  })
+
+  it('says so in the archived column when nothing replaced the spec', () => {
+    const index = rendered({
+      path: '.ai/specs/archived/2026-01-01-a-spec.md',
+      directory: 'archived',
+      status: 'archived',
+    })
+
+    expect(index).toContain('| abandoned |')
   })
 
   it('keeps Implementation as the last column of every other section', () => {

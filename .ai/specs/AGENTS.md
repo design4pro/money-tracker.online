@@ -46,7 +46,16 @@ An **archived** spec carries a fifth row, and only an archived spec may:
 
 It is required exactly when the status is `archived` and refused otherwise, so one value still
 decides the shape of the table. The reference can be an issue or a pull request, and more than one,
-comma-separated, the way `Implementation` is. `archived` on its own says a design was dropped and
+comma-separated, the way `Implementation` is. A spec that was **abandoned** rather than superseded
+says so in the same row, and that is the only value it takes that is not a reference:
+
+```markdown
+| **Superseded by** | abandoned |
+```
+
+`none` is not that value. It is how every other row spells "empty", so reusing it here would make
+forgetting the answer and giving it look the same. `archived` on its own says a design was dropped
+and
 leaves the reader with the question they came with;
 `design4pro/planned.travel#417` is the worked example, where a spec that built nothing recommended
 closing its ticket and the ticket was then closed as superseded by another pull request. Without the
@@ -80,8 +89,9 @@ in-progress` and the built pull requests listed.
   to schedule it from, until #201 was filed.
 - A spec at `implemented` with an empty `Implementation`. "It shipped" that names nothing that
   shipped it cannot be checked by the next reader, and will not be.
-- A spec at `archived` with no `Superseded by`. A dropped design that does not say what happened
-  instead leaves the reader exactly where they started.
+- A spec at `archived` whose `Superseded by` names neither what replaced it nor `abandoned`. A
+  dropped design that does not say what happened instead leaves the reader exactly where they
+  started.
 - A `Superseded by` row on a spec that is not archived. The row is the archived status's, and a
   still-live spec that carries one is saying two things at once.
 - A hand edit to `README.md` in this directory (`pnpm generate-spec-index` owns it).
