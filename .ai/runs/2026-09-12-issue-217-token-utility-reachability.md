@@ -80,13 +80,15 @@ The spec's single Phase, on this one PR:
 
 ## Progress
 
+PR: #258
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: The converse gate
 
-- [ ] 1.1 Hoist the design-system loader
-- [ ] 1.2 Add the case, red, with an empty allowlist
-- [ ] 1.3 Add the floor assertion
-- [ ] 1.4 Fill the allowlist and go green
-- [ ] 1.5 Prove it catches the real defect
-- [ ] 1.6 Record what now holds DSY-01
+- [x] 1.1 Hoist the design-system loader — aa9fd52
+- [x] 1.2 Add the case, red, with an empty allowlist — d1f2ce3
+- [x] 1.3 Add the floor assertion — 606a2af
+- [x] 1.4 Fill the allowlist and go green — 1dcbda1
+- [x] 1.5 Prove it catches the real defect — evidence only, red output in the PR body
+- [x] 1.6 Record what now holds DSY-01 — 13214a2
