@@ -28,27 +28,31 @@ import type { ReactNode } from 'react'
  */
 
 /**
- * The click events, captured on the way down rather than observed on the way up.
+ * The click, read at the one node where React Aria has already had its say.
  *
- * React Aria's press machinery stops the click's propagation at the element it handled, so a
- * listener on the bubble path never sees the event at all. The capture phase runs before any of
- * that and hands back the very object the handlers go on to mutate, which is what lets
- * `defaultPrevented` be read afterwards.
+ * `defaultPrevented` is the whole measurement: `handleLinkClick` calls `preventDefault` when it
+ * takes the click over for the router, and returns without touching the event when no
+ * `RouterProvider` is mounted. So the observation point has to run *after* React's listeners, and
+ * the React root container is the only node where it can: React attaches its delegated listeners
+ * there when `render` creates the root, React Aria's `stopPropagation` halts the native event at
+ * that same node, and a listener added to a node later runs after the ones already on it.
+ * `document` works in neither phase - capture runs before every React handler, and the bubble
+ * never arrives.
  *
- * `suppressDefault` exists for the one case that asserts the click was *not* prevented: jsdom
- * implements no navigation, so letting that click through logs `Not implemented: navigation` over
- * the assertion it is evidence for. It is off wherever `defaultPrevented` is the measurement.
+ * Calling `preventDefault` here, *after* the value is recorded, is what keeps jsdom from logging
+ * `Not implemented: navigation to another Document` over the assertion it is evidence for. It
+ * cannot mask the regression: by the time it runs, React Aria has decided.
  */
-function captureClicks({ suppressDefault = false } = {}) {
-  const events: Array<MouseEvent> = []
+function observeClicks(container: HTMLElement) {
+  const defaultPrevented: Array<boolean> = []
   const handler = (event: MouseEvent) => {
-    events.push(event)
-    if (suppressDefault) event.preventDefault()
+    defaultPrevented.push(event.defaultPrevented)
+    event.preventDefault()
   }
-  document.addEventListener('click', handler, true)
+  container.addEventListener('click', handler)
   return {
-    events,
-    stop: () => document.removeEventListener('click', handler, true),
+    defaultPrevented,
+    stop: () => container.removeEventListener('click', handler),
   }
 }
 
@@ -70,20 +74,20 @@ async function renderInRouter(children: ReactNode) {
   })
   const navigate = vi.spyOn(router, 'navigate')
 
-  render(<RouterProvider router={router} />)
+  const { container } = render(<RouterProvider router={router} />)
   await waitFor(() => screen.getByRole('link'))
 
-  return { navigate }
+  return { navigate, container }
 }
 
 describe('AriaRouterProvider', () => {
   it('hands a design-system link click to the router instead of to the browser', async () => {
-    const { navigate } = await renderInRouter(
+    const { navigate, container } = await renderInRouter(
       <AriaRouterProvider>
         <Link href="/accounts">Accounts</Link>
       </AriaRouterProvider>,
     )
-    const clicks = captureClicks()
+    const clicks = observeClicks(container)
 
     try {
       await userEvent.click(screen.getByRole('link'))
@@ -92,14 +96,14 @@ describe('AriaRouterProvider', () => {
     }
 
     expect(navigate).toHaveBeenCalledWith({ href: '/accounts' })
-    expect(clicks.events.map((event) => event.defaultPrevented)).toEqual([true])
+    expect(clicks.defaultPrevented).toEqual([true])
   })
 
   it('leaves the click to the browser when no provider is mounted', async () => {
-    const { navigate } = await renderInRouter(
+    const { navigate, container } = await renderInRouter(
       <Link href="/accounts">Accounts</Link>,
     )
-    const clicks = captureClicks({ suppressDefault: true })
+    const clicks = observeClicks(container)
 
     try {
       await userEvent.click(screen.getByRole('link'))
@@ -107,7 +111,7 @@ describe('AriaRouterProvider', () => {
       clicks.stop()
     }
 
-    expect(clicks.events).toHaveLength(1)
+    expect(clicks.defaultPrevented).toEqual([false])
     expect(navigate).not.toHaveBeenCalled()
   })
 })
