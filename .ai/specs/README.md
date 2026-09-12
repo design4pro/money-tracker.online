@@ -6,7 +6,7 @@ One document per designed change. The directory a spec sits in is its state, the
 its `H1` names the issue and the pull requests behind it, and both are held together by
 `scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).
 
-## Draft — being written (3)
+## Draft — being written (4)
 
 | Spec                                                                                                                       | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
