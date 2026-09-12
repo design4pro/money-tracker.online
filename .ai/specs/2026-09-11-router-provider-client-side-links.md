@@ -15,9 +15,9 @@ Every link the design system draws is therefore a plain anchor and a full docume
 the shell rail and the phone bottom bar, which is why `docs/STATE-INVENTORY.md` §3 records that the
 product's primary navigation renders no route's pending state at all. This spec mounts one provider
 beside the one already mounted for React Aria's locale, wired to `router.navigate({ href })`, and
-reconciles the two workarounds the absence spawned. Eleven call sites change behaviour, not the
-twenty-six an earlier estimate named; the set is enumerated and measured in §Architecture. No new
-dependency, no schema change, no server change, no new message key.
+reconciles the two workarounds the absence spawned. Nine call sites are touched and six of them
+change behaviour, not the twenty-six an earlier estimate named; the set is enumerated and measured
+in §Architecture. No new dependency, no schema change, no server change, no new message key.
 
 ## 📝 Problem Statement
 
@@ -89,7 +89,7 @@ Every move through the rail or the bottom bar is a document load. The tab reload
 position of the screen being left is discarded, focus is reset to the start of the document, the
 JavaScript bundle re-evaluates, the query cache is thrown away, and — because the loaders run during
 SSR — nothing on screen ever enters a pending state. `e2e/states.spec.ts` cannot use the rail to
-photograph a loading state and says so in its header docblock (lines 40-43); `e2e/support/states.ts`
+photograph a loading state and says so in its header docblock (lines 41-44); `e2e/support/states.ts`
 is built around the same asymmetry.
 
 ## 📝 Proposed Solution
@@ -125,8 +125,10 @@ downloads.
 
 `src/components/app/shell/aria-router.tsx` owns "how a React Aria link reaches TanStack Router",
 and is the only module in the repository that may construct a React Aria `RouterProvider`
-(`docs/SPEC.md` §8 — one owner per concept). `src/components/ui/link.tsx` does not change: it is
-the consumer, and `components/ui` must not import from `src/routes` or know a router exists.
+(`docs/SPEC.md` §8 — one owner per concept). `src/components/ui/link.tsx` stays the consumer and
+learns nothing: it gains a `widget` pairing on `linkVariants` (Step 5) and a corrected docblock
+(Step 7), but no new import and no knowledge that a router exists — `components/ui` must not import
+from `src/routes`.
 
 ### The wiring, in full
 
@@ -150,6 +152,14 @@ export function AriaRouterProvider({ children }: { children: ReactNode }) {
 `useHref` is deliberately **not** passed. React Aria defaults it to the identity function, and this
 application is served from the origin root with no base path, so an identity `useHref` is correct
 rather than merely adequate.
+
+The callback's second parameter is deliberately absent for the same kind of reason. React Aria types
+it `navigate: (path: Href, routerOptions: RouterOptions | undefined) => void`
+(`dist/types/src/utils/openLink.d.ts`), but `RouterOptions` is derived from `RouterConfig`, which is
+`interface RouterConfig {}` in `@react-types/shared@3.36.1` and is augmented nowhere in this
+repository. No call site can therefore pass one, and forwarding an always-`undefined` argument into
+`router.navigate` would only invite a reader to wonder what it carries. Augmenting `RouterConfig` is
+the same decision §Resolved assumptions records as Q6 and defers with it.
 
 ### What the provider does not capture — from the library, not from assumption
 
@@ -177,7 +187,7 @@ non-route link in the set.
 The issue's own preparation comment estimated "roughly 26 files". That number came from counting
 files that import anything from `#/components/ui` and contain the substring `Link`, which catches
 `WidgetLink`, `NavLink`, `ExternalLink` and `Link2Off`. The measured set — files importing `Link`
-from `#/components/ui` — is **7 files and 11 call sites**:
+from `#/components/ui` — is **7 files and 9 call sites**, six of which change behaviour:
 
 | Call site                                                  | Target                        | After the change                                     |
 | ---------------------------------------------------------- | ----------------------------- | ---------------------------------------------------- |
@@ -190,8 +200,9 @@ from `#/components/ui` — is **7 files and 11 call sites**:
 | `src/routes/_app/transactions/-ui/attachment-list.tsx:177` | `/api/files/$id`, `_blank`    | **Unchanged** — `shouldClientNavigate` rejects it.   |
 | `src/routes/invite.$invitationId.tsx:115` and `:135`       | `/dashboard`                  | **Unchanged** — see below.                           |
 
-The `(auth)` screens use `linkVariants` on TanStack Router's `Link` rather than the primitive, so
-they are styling consumers only and nothing about them changes.
+Eight rows, nine call sites: the invite route's two links share a row because they are the same
+link rendered in two branches. The `(auth)` screens use `linkVariants` on TanStack Router's `Link`
+rather than the primitive, so they are styling consumers only and nothing about them changes.
 
 `src/routes/invite.$invitationId.tsx` sits outside `_app` and mounts no React Aria provider at all —
 not this one and not `AriaI18nProvider`, which is a pre-existing gap this spec notes and does not
@@ -295,7 +306,7 @@ reason it needs no key of its own and cannot drift out of parity with `pl.ts`.
 
 ## 📝 Risks & Impact Review
 
-**Blast radius: 11 call sites in 7 files, of which 9 change behaviour.** Enumerated in
+**Blast radius: 9 call sites in 7 files, of which 6 change behaviour.** Enumerated in
 §Architecture rather than estimated. The label `risk-high` on the issue is about the _category_ —
 primary navigation for every authenticated screen — rather than about the size of the diff, and it
 should stay.
@@ -320,7 +331,7 @@ non-trivial revert, which is why it is a separate Step and not folded into the m
 `src/components/app/dashboard/widget-link.tsx` (deleted),
 `src/routes/_app/import/-lib/link-style.ts` (premise corrected),
 `src/components/app/nav/destinations.ts` (the "when it is, these become typed links" paragraph),
-`e2e/states.spec.ts` header lines 40-43,
+`e2e/states.spec.ts` header lines 41-44,
 `e2e/support/states.ts` (`serverFnIdOf` and `holdServerFns` — see Phase 3),
 and `src/components/ui/link.tsx`, whose docblock becomes true for the first time.
 
@@ -344,7 +355,7 @@ merges.
 
 | #   | Question                                                                                          | Applied default                                                                                                        | Why                                                                                                                                                                                   | Confirm |
 | --- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Q1  | Is verifying the non-rail `ui` `Link` call sites in scope? (The issue's open readiness question.) | Yes — all 11, listed in §Architecture, each with a stated expected behaviour.                                          | The estimate that made this look unbounded was a substring count. The measured set is 7 files, small enough to enumerate and assert rather than accept as an untested side effect.    | ok      |
+| Q1  | Is verifying the non-rail `ui` `Link` call sites in scope? (The issue's open readiness question.) | Yes — all 9, listed in §Architecture, each with a stated expected behaviour.                                           | The estimate that made this look unbounded was a substring count. The measured set is 7 files, small enough to enumerate and assert rather than accept as an untested side effect.    | ok      |
 | Q2  | Where is the provider mounted?                                                                    | `AppShell`, `AppShellFallback` and the `(auth)` frame — exactly where `AriaI18nProvider` is mounted. Not `__root.tsx`. | Follows a precedent this repository already argued and documented, and keeps React Aria out of the marketing entry chunk.                                                             | ok      |
 | Q3  | `widget-link.tsx`: delete, or keep with a new docblock?                                           | Delete; its six call sites move to the design-system `Link` and its styling becomes a `linkVariants` pairing.          | Its only stated reason expires here, and all six call sites pass literal paths with no `params`/`search`, so the typed-`to` argument that keeps `link-style.ts` alive does not apply. | ok      |
 | Q4  | `src/routes/_app/import/-lib/link-style.ts` — in scope? (Not mentioned on the issue.)             | Keep it; correct the premise sentence in its docblock only.                                                            | Its second reason — typed `params` and `search` through `createLink` — is independent of this change and still holds. Folding it away would be a regression in type safety.           | ok      |
