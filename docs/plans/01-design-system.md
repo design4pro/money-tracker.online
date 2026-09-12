@@ -28,10 +28,12 @@ that make "every interactive element has five states" falsifiable.
 ### Reference rows
 
 `DSY-01 missing → done` — the Tailwind 4 `@theme` layer is declared in `src/styles/app.css` and maps
-the `00-S3` tokens to utilities. Held in one direction only, by
+the `00-S3` tokens to utilities. Held in both directions by
 `src/styles/__tests__/token-classes.test.ts`: every token-shaped class in `src/` resolves to a
-registered token. The converse — every registered token is reachable as a utility, which is what
-_maps every token_ claims — is asserted by nothing (#217).
+registered token, and every token registered in `src/styles/tokens.css` is read by the CSS of at
+least one compilable utility — which is what _maps every token_ claims — against the
+`UNREACHABLE_BY_DESIGN` table that names the 22 exceptions and the reason each is not a class
+(#217).
 `DSY-02 missing → missing` — the primitive gallery route renders every primitive in every state.
 `src/routes/_dev/` does not exist, so neither the route nor its two components do.
 `DSY-03 missing → missing` — the state-matrix test.

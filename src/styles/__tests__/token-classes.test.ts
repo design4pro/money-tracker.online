@@ -6,7 +6,12 @@ import { __unstable__loadDesignSystem } from 'tailwindcss'
 import { expect, it } from 'vitest'
 
 /**
- * Every token-shaped class in `src/` resolves to a registered token.
+ * Both directions of the token contract.
+ *
+ * A class names a registered token, and a registered token is read by some
+ * utility. The first case below holds the first direction, the second case the
+ * second. Everything from here to *Why the second direction asks "read by some
+ * utility"* is about the first, which is the older and the subtler of the two.
  *
  * ## The class of bug this exists for
  *
@@ -33,7 +38,7 @@ import { expect, it } from 'vitest'
  * Candidates come from `@tailwindcss/oxide`'s `Scanner`, the same scanner
  * Tailwind uses, so extraction cannot disagree with the compiler.
  *
- * ## Why no allowlist of token names
+ * ## Why the first direction has no allowlist of token names
  *
  * The scanner is deliberately over-permissive: it emits every string that
  * *could* be a candidate and relies on the resolver to discard the rest. That
@@ -55,6 +60,27 @@ import { expect, it } from 'vitest'
  * favicon), never a class. Comments are stripped first, because a token name
  * discussed in a docblock is prose.
  *
+ * ## Why the second direction asks "read by some utility"
+ *
+ * The narrower rule is membership of the `@theme inline` layer: derive the
+ * expected class from the token's namespace (`--color-x` → `bg-x`, `--shadow-x`
+ * → `shadow-x`) and assert that some candidate resolves. Both were measured
+ * over the same registered tokens. The narrow rule reports 34 unreachable to
+ * the broad rule's 22, and the 14 it disagrees on are all its own mistakes: ten
+ * tokens are read by a hand-written `@utility` rather than by `@theme inline`
+ * (`--color-highlighter` by `mark-pen`, the three `--focus-*` by the
+ * `focus-ring*` family, `--nav-h` by `h-chrome`), three are aliased into
+ * Tailwind's own namespace under a different name (`--content-max` becomes
+ * `--container-content`, so the class is `max-w-content`), and `--spacing`
+ * carries no suffix at all while thousands of utilities read it.
+ *
+ * Its one miss is the worse half. `--radius-full` *passes* the narrow rule,
+ * because `rounded-full` resolves — to Tailwind's own static value, never
+ * reading the token. A rule that asks "does a plausible class compile" cannot
+ * see a token shadowed by a built-in; a rule that asks "does any utility read
+ * this token" can. `@theme inline` and `@utility` are two spellings of the same
+ * promise, and the promise is that a class exists which reads this token.
+ *
  * ## What this cannot check
  *
  * - **Interpolated classes.** A class assembled as `` `bg-${tone}` `` is
@@ -64,8 +90,13 @@ import { expect, it } from 'vitest'
  * - **Right token, wrong token.** `bg-surface` where `bg-surface-sunken` was
  *   meant resolves fine and always will. That stays review work, on the frames
  *   `scripts/visual/capture.mjs` takes.
- * - **Tokens with no consumer.** The opposite direction — a token declared in
- *   `tokens.css` that nothing uses — is not checked here.
+ * - **Tokens with no consumer.** The second case holds token → *utility*: a
+ *   token `tokens.css` declares and no utility reads fails by name. It does not
+ *   hold token → *any consumer*. A token read by an `@utility` that nothing in
+ *   `src/` uses passes, and so does an allowlisted one read by nothing
+ *   anywhere — which twenty-one of the twenty-two `UNREACHABLE_BY_DESIGN`
+ *   entries are. Whether each of those should be surfaced or deleted is a
+ *   product call and its own issue, not a third assertion bolted onto this one.
  */
 
 const require = createRequire(import.meta.url)
