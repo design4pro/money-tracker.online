@@ -27,11 +27,14 @@ import type { MessageKey } from '#/lib/i18n'
  * that is early. The rule now is the plain one — **a row exists here when its route exists** — and
  * each later plan adds its own row in the same commit that adds its screen.
  *
- * `href` is a plain string and the navigation components render a real `<a>` rather than the
- * router's typed `Link`, which costs a document load per navigation. That is not about these rows:
- * `src/components/ui/link.tsx` routes through React Aria's `RouterProvider` and no provider is
- * mounted in the app yet (see `src/components/app/dashboard/widget-link.tsx`, which says the same
- * thing). When it is, these become typed links.
+ * `href` is a plain string rather than the router's typed `to`, and it stays one. The navigation
+ * components render `components/ui`'s `Link`, which routes through React Aria's `RouterProvider`
+ * (`src/components/app/shell/aria-router.tsx`), so following one of these rows is a client-side
+ * navigation — the document load these rows used to cost is gone. What a plain string still costs
+ * is compile-time checking of the path, which is a deliberate trade: React Aria hands its router a
+ * built href, and typing it against the route tree would have to be done for every `ui` link in the
+ * product at once, including the one that points at `/api/files/$id` and is not a route at all
+ * (#245, spec Q6).
  */
 export interface Destination {
   /** Stable key. Used for React lists and for the switcher's selection state. */
