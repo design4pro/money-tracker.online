@@ -300,7 +300,8 @@ human sets `qa-approved`: the blind pair is `node scripts/visual/capture.mjs` (A
 
 Registered with the running cockpit by `.ai/scripts/cez-automations.sh` (`--dry-run` first;
 idempotent: update in place or create enabled; it lists definitions the cockpit holds that the
-file no longer names). Six definitions: `issue-groom` on `issue.opened` with `authors` naming the
+file no longer names, and `--prune` deletes them except an enabled one, so the file is the whole
+truth). Six definitions: `issue-groom` on `issue.opened` with `authors` naming the
 human maintainers; `issue-regroom`, `issue-autofix`, `issue-spec` on `issue.labeled` with
 `changedLabels` `groom` / `autofix` / `spec`; `pr-autopilot` on `pull_request.opened`, again with
 `authors`; `pr-review-threads` on `issue.labeled` with `changedLabels` `review-threads` and
@@ -475,8 +476,9 @@ claiming issues the new ones handle.
 
 6. `.ai/scripts/cez-automations.sh --dry-run`, then without the flag: `issue-groom`, `issue-regroom`,
    `issue-autofix`, `issue-spec`, `pr-autopilot` and `pr-review-threads` are created enabled. The
-   script also lists any definition the cockpit still holds that the file no longer names — the
-   retired `issue-opened` and `pr-opened` are deleted in the cockpit (Automations), by hand.
+   script also lists any definition the cockpit still holds that the file no longer names. To
+   remove the retired `issue-opened` and `pr-opened`, disable both in the cockpit (Automations),
+   then run `--dry-run --prune` and `--prune`: the script refuses to delete an enabled stray.
 7. `.ai/scripts/cez-prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
    cezar's five built-ins.
 8. Install the housekeeping plist (above) and run `bash .ai/scripts/housekeeping.sh` once by hand.
