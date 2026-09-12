@@ -177,8 +177,8 @@ const references = (value: string): Array<number> =>
  *
  * ## The assertions
  *
- * 1. A `.md` in a spec directory is named `YYYY-MM-DD-kebab-case.md`, or is `README.md` /
- *    `AGENTS.md`. The date prefix is what orders the index and what dates a decision.
+ * 1. A `.md` in a spec directory is named `YYYY-MM-DD-kebab-case.md`, or is one of
+ *    {@link NOT_A_SPEC}. The date prefix is what orders the index and what dates a decision.
  * 2. The metadata table carries exactly {@link FIELDS}, in that order, and may end with
  *    {@link SUPERSEDED_FIELD} when and only when the status is `archived`. One shape, so a reader
  *    and a parser see the same thing - the prior art's three shapes are how its fourth document
