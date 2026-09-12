@@ -14,13 +14,18 @@ its `H1` names the issue and the pull requests behind it, and both are held toge
 | [The first client-side navigation draws its loading state](2026-09-11-first-navigation-loading-state.md)                   | 2026-09-11 | [#230](https://github.com/design4pro/money-tracker.online/issues/230) | [#232](https://github.com/design4pro/money-tracker.online/pull/232) | —              |
 | [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md)   | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | [#220](https://github.com/design4pro/money-tracker.online/pull/220) | —              |
 
-## Ready — merged, waiting for a build (3)
+## Ready — merged, waiting for a build (2)
 
 | Spec                                                                                                                            | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
 | ------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
-| [Every registered token is reachable through a utility](2026-09-10-token-utility-reachability.md)                               | 2026-09-10 | [#217](https://github.com/design4pro/money-tracker.online/issues/217) | [#223](https://github.com/design4pro/money-tracker.online/pull/223) | —              |
 | [Plan guard: assert the eight shared paths under `Owned paths`](2026-09-10-plan-guard-shared-path-assertion.md)                 | 2026-09-10 | [#216](https://github.com/design4pro/money-tracker.online/issues/216) | [#222](https://github.com/design4pro/money-tracker.online/pull/222) | —              |
 | [Designed empty, loading and error states — evidence, gaps and reachability](2026-09-09-designed-empty-loading-error-states.md) | 2026-09-09 | [#21](https://github.com/design4pro/money-tracker.online/issues/21)   | [#135](https://github.com/design4pro/money-tracker.online/pull/135) | —              |
+
+## In progress — a build is open (1)
+
+| Spec                                                                                              | Date       | Issue                                                                 | Spec PR                                                             | Implementation                                                      |
+| ------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [Every registered token is reachable through a utility](2026-09-10-token-utility-reachability.md) | 2026-09-10 | [#217](https://github.com/design4pro/money-tracker.online/issues/217) | [#223](https://github.com/design4pro/money-tracker.online/pull/223) | [#258](https://github.com/design4pro/money-tracker.online/pull/258) |
 
 ## Implemented (5)
 

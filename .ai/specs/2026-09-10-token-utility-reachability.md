@@ -1,11 +1,11 @@
 # Every registered token is reachable through a utility
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | ready |
-| **Issue**          | #217  |
-| **Spec PR**        | #223  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #217        |
+| **Spec PR**        | #223        |
+| **Implementation** | #258        |
 
 ## 📝 TLDR
 
