@@ -149,9 +149,9 @@ The spec's three phases, on this one PR.
 - [x] 1.2 Mount it in `AppShell`, `AppShellFallback` and the `(auth)` frame — a81aeb6
 - [x] 1.3 Assert the pending state is reachable from the rail — eb39fc2
 - [x] 1.4 Assert scroll and focus survive — eb39fc2
-- [ ] 1.5 Add the `widget` pairing to `linkVariants`
-- [ ] 1.6 Delete `widget-link.tsx` and migrate its call sites
-- [ ] 1.7 Correct the docblocks whose premise this phase removes
+- [x] 1.5 Add the `widget` pairing to `linkVariants` — 90ca042
+- [x] 1.6 Delete `widget-link.tsx` and migrate its call sites — 1b6637f
+- [x] 1.7 Correct the docblocks whose premise this phase removes — 76fd373
 
 ### Phase 2: the route announcer
 
