@@ -159,6 +159,19 @@ export function BottomNav({ pathname }: BottomNavProps) {
               />
               <DialogBody>
                 <nav aria-label={t('app.nav.moreLabel')}>
+                  {/*
+                    Every row closes the sheet as it navigates, and that is load-bearing rather
+                    than tidy. `AppShell` and this bar live in the `_app` layout route, so
+                    `isMoreOpen` survives a route change; once `AriaRouterProvider` made the move
+                    client-side there is no document load left to tear the sheet down. Without the
+                    close, activating a row navigates *underneath* a sheet whose overlay, focus
+                    trap and `aria-modal` are all still on — the reader lands on a screen they
+                    cannot touch until they find Escape.
+
+                    `close` rather than a `pathname` effect: it also answers the row that is
+                    already current, where the path never changes and an effect would therefore
+                    never fire.
+                  */}
                   <ul className="flex flex-col gap-0.5 pb-[var(--safe-bottom)]">
                     {BOTTOM_BAR_OVERFLOW.map((destination) => (
                       <li key={destination.id}>
@@ -167,6 +180,7 @@ export function BottomNav({ pathname }: BottomNavProps) {
                           isActive={destination.id === activeId}
                           label={t(destination.label)}
                           className="py-3"
+                          onPress={close}
                         />
                       </li>
                     ))}

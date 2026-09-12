@@ -199,3 +199,55 @@ test.describe('the primary navigation', () => {
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(SCROLL_TO)
   })
 })
+
+/**
+ * The iPhone 15's viewport, set explicitly so every project runs the sheet case.
+ *
+ * `bottom-nav.tsx` is `lg:hidden`, so the sheet exists only below 1024px and `chromium` and
+ * `webkit` would otherwise never reach it — the same reason `narrow-viewport.spec.ts` fixes its
+ * own width rather than relying on the project matrix.
+ */
+const PHONE_VIEWPORT = { width: 393, height: 852 }
+
+/**
+ * The one navigation the rail has no equivalent of: the phone's overflow sheet.
+ *
+ * It is a modal — React Aria's overlay, focus trap and `aria-modal` — and the bar that owns its
+ * open state lives in the `_app` layout route, so a route change does not unmount it. While the
+ * bar was plain anchors, the document load tore the sheet down as a side effect; the client-side
+ * move this file exists to assert removed that side effect, and with it the only thing closing
+ * the sheet. The case below is the regression guard: the destination has to arrive *and* the
+ * modal over it has to be gone.
+ */
+test.describe('the phone bar overflow sheet', () => {
+  test.use({
+    storageState: storageStateFor('demo'),
+    viewport: PHONE_VIEWPORT,
+  })
+
+  test('closes itself on the way to the destination it names', async ({
+    page,
+  }) => {
+    await gotoApp(page, '/dashboard')
+    await page
+      .getByRole('button', { name: en['app.nav.more'], exact: true })
+      .click()
+
+    const sheet = page.getByRole('dialog')
+    await expect(sheet).toBeVisible()
+
+    await sheet
+      .getByRole('link', { name: en['nav.budgets'], exact: true })
+      .click()
+
+    await expect(page).toHaveURL(/\/budgets(\?|$)/)
+    await expect(
+      page.getByRole('heading', { level: 1, name: en['budgets.title'] }),
+    ).toBeVisible()
+
+    // Gone, not merely scrolled past. A sheet left open here keeps its overlay and its focus trap
+    // over the screen that just arrived, so the reader lands somewhere they cannot act on until
+    // they find Escape.
+    await expect(sheet).toHaveCount(0)
+  })
+})
