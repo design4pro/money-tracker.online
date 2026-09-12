@@ -56,6 +56,21 @@ const issueLink = (reference: number): string =>
 const pullLink = (reference: number): string =>
   `[#${reference}](${REPOSITORY}/pull/${reference})`
 
+/**
+ * The last column: what built the spec, or - for an archived one - what replaced it.
+ *
+ * `issueLink` rather than `pullLink` for the archived case because a superseding reference can be
+ * either, and the document does not say which. GitHub redirects `/issues/n` to `/pull/n` for the
+ * same number, so one form reaches both.
+ */
+const lastCell = (spec: Spec): string => {
+  const references =
+    spec.status === 'archived'
+      ? spec.supersededBy.map(issueLink)
+      : spec.implementation.map(pullLink)
+  return references.length === 0 ? '—' : references.join(', ')
+}
+
 const row = (spec: Spec): string => {
   const href = spec.path.slice(SPEC_ROOT.length + 1)
   const cells = [
@@ -63,9 +78,7 @@ const row = (spec: Spec): string => {
     spec.date,
     spec.issue === null ? '—' : issueLink(spec.issue),
     spec.specPr === null ? '—' : pullLink(spec.specPr),
-    spec.implementation.length === 0
-      ? '—'
-      : spec.implementation.map(pullLink).join(', '),
+    lastCell(spec),
   ]
   return `| ${cells.join(' | ')} |`
 }
@@ -86,10 +99,14 @@ export const renderIndex = (specs: ReadonlyArray<Spec>): string => {
     const section = specs.filter((spec) => spec.status === status)
     if (section.length === 0) continue
 
+    // An archived spec has no implementation and would show a column of dashes; what the reader
+    // wants in its place is what replaced it.
+    const last = status === 'archived' ? 'Superseded by' : 'Implementation'
+
     lines.push(
       `## ${heading} (${section.length})`,
       '',
-      '| Spec | Date | Issue | Spec PR | Implementation |',
+      `| Spec | Date | Issue | Spec PR | ${last} |`,
       '| --- | --- | --- | --- | --- |',
       ...section.map(row),
       '',

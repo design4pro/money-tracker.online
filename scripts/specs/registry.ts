@@ -39,8 +39,9 @@ export const SPEC_ROOT = '.ai/specs'
  * so that a spec opened on its own - in a diff, in a review, in a search result - still says what
  * it is without the reader reconstructing the path.
  *
- * `archived` covers both halves of "not going to be built as written": superseded by a later spec,
- * or abandoned. They are not split until something is in there to split.
+ * `archived` covers both halves of "not going to be built as written": superseded by a later
+ * decision, or abandoned. They are not split until something is in there to split; what replaced a
+ * superseded spec is recorded in {@link SUPERSEDED_FIELD} instead, which is the finer fact.
  */
 export const STATUSES_BY_DIRECTORY = {
   '': ['draft', 'ready', 'in-progress'],
@@ -53,6 +54,23 @@ export type SpecStatus = (typeof STATUSES_BY_DIRECTORY)[SpecDirectory][number]
 
 /** The metadata rows, in the order every spec carries them. */
 export const FIELDS = ['Status', 'Issue', 'Spec PR', 'Implementation'] as const
+
+/**
+ * The fifth row, carried by an archived spec and by nothing else.
+ *
+ * `archived` on its own is a dead end: it says the design was dropped and leaves the next reader to
+ * work out what happened instead, which is the question they came with.
+ * `design4pro/planned.travel#417` ported this convention and hit the case immediately -
+ * `2026-09-09-member-population-materialization.md` is a spec that builds nothing, because it
+ * measured its ticket, found the mechanism would put a fresh D1 bound-parameter cliff into the
+ * write path it touched, and recommended closing the ticket, which was then closed as superseded by
+ * another pull request. Without this row that chain lives only in a tracker comment.
+ *
+ * It is required exactly when the status is `archived` and refused otherwise, so that the shape of
+ * the table is still decided by one value and a reader still knows what to expect from it. The two
+ * repositories run this convention out of the same file, so the schema is deliberately identical.
+ */
+export const SUPERSEDED_FIELD = 'Superseded by'
 
 export type Spec = {
   /** Repository-relative path, e.g. `.ai/specs/implemented/2026-09-09-….md`. */
@@ -70,14 +88,22 @@ export type Spec = {
   specPr: number | null
   /** The pull requests that built it, in the order they merged. */
   implementation: Array<number>
+  /** The issues and pull requests that replaced an archived spec; empty for every other status. */
+  supersededBy: Array<number>
 }
 
 /** One failed assertion. `path` is repository-relative so a failure is clickable. */
 export type Violation = { path: string; detail: string }
 
 const SPEC_FILENAME = /^(\d{4}-\d{2}-\d{2})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/
-/** Documents that live beside the specs and are not specs. */
-const NOT_A_SPEC = new Set(['README.md', 'AGENTS.md'])
+/**
+ * Documents that live beside the specs and are not specs.
+ *
+ * `product-brief.md` is `om-discover`'s output and `SDLC.md` puts it in this directory: it is
+ * product context, has no lifecycle of its own, and would otherwise fail the filename assertion the
+ * first time that skill runs.
+ */
+const NOT_A_SPEC = new Set(['README.md', 'AGENTS.md', 'product-brief.md'])
 const REFERENCE = /^#(\d+)$/
 /** A markdown link target that is not a spec-relative path: absolute, anchor, or a mail address. */
 const NOT_RELATIVE = /^(?:[a-z][a-z0-9+.-]*:|#|\/)/i
@@ -153,17 +179,20 @@ const references = (value: string): Array<number> =>
  *
  * 1. A `.md` in a spec directory is named `YYYY-MM-DD-kebab-case.md`, or is `README.md` /
  *    `AGENTS.md`. The date prefix is what orders the index and what dates a decision.
- * 2. The metadata table carries exactly {@link FIELDS}, in that order. One shape, so a reader and a
- *    parser see the same thing - the prior art's three shapes are how its fourth document came to
- *    have no block at all.
+ * 2. The metadata table carries exactly {@link FIELDS}, in that order, and may end with
+ *    {@link SUPERSEDED_FIELD} when and only when the status is `archived`. One shape, so a reader
+ *    and a parser see the same thing - the prior art's three shapes are how its fourth document
+ *    came to have no block at all.
  * 3. `Status` is one the document's directory admits ({@link STATUSES_BY_DIRECTORY}). This is the
  *    assertion the whole module exists for.
  * 4. `implemented` names at least one implementation pull request. "Shipped" with nothing that
  *    shipped it is the claim nobody can check later, which is what `docs/plans/` taught (#77).
- * 5. `ready` and `in-progress` name an issue. A merged spec nobody can schedule is exactly how
+ * 5. `archived` names at least one issue or pull request that replaced it. A dropped design that
+ *    does not say what happened instead leaves the reader exactly where they started (#212).
+ * 6. `ready` and `in-progress` name an issue. A merged spec nobody can schedule is exactly how
  *    `.ai/specs/2026-09-08-design-system-plan-reconciliation.md` sat unbuilt with no ticket until
  *    #201 was filed for it.
- * 6. Every relative markdown link resolves from the document's own directory. Moving a file between
+ * 7. Every relative markdown link resolves from the document's own directory. Moving a file between
  *    status directories is the operation this convention adds, and a silently broken link is what
  *    it costs when nobody re-checks.
  */
@@ -192,14 +221,26 @@ export const auditSpecs = (
     const rows = metadataRows(lines)
     const values = new Map(rows)
 
-    if (rows.map(([field]) => field).join('|') !== FIELDS.join('|')) {
+    const status = values.get('Status') ?? ''
+    const fields = rows.map(([field]) => field)
+    // The fifth row is optional in the shape and conditional in the meaning: dropping it before
+    // comparing keeps one message per mistake, so an archived spec that forgot it is told that and
+    // not also told its table is the wrong shape.
+    const carriesSuperseded = fields.at(-1) === SUPERSEDED_FIELD
+    const core = carriesSuperseded ? fields.slice(0, -1) : fields
+
+    if (core.join('|') !== FIELDS.join('|')) {
       violations.push({
         path,
-        detail: `metadata table under the H1 must carry exactly ${FIELDS.map((field) => `**${field}**`).join(', ')} in that order, found ${rows.length === 0 ? 'no table' : rows.map(([field]) => field).join(', ')}`,
+        detail: `metadata table under the H1 must carry exactly ${FIELDS.map((field) => `**${field}**`).join(', ')} in that order, found ${rows.length === 0 ? 'no table' : fields.join(', ')}`,
+      })
+    } else if (carriesSuperseded && status !== 'archived') {
+      violations.push({
+        path,
+        detail: `**${SUPERSEDED_FIELD}** belongs to an archived spec and to nothing else; Status is \`${status}\``,
       })
     }
 
-    const status = values.get('Status') ?? ''
     const allowed: ReadonlyArray<string> = STATUSES_BY_DIRECTORY[directory]
     if (!allowed.includes(status)) {
       violations.push({
@@ -210,12 +251,20 @@ export const auditSpecs = (
 
     const implementation = references(values.get('Implementation') ?? 'none')
     const issue = references(values.get('Issue') ?? 'none').at(0) ?? null
+    const supersededBy = references(values.get(SUPERSEDED_FIELD) ?? 'none')
 
     if (status === 'implemented' && implementation.length === 0) {
       violations.push({
         path,
         detail:
           'Status is `implemented` and Implementation is empty; name the pull requests that built it',
+      })
+    }
+
+    if (status === 'archived' && supersededBy.length === 0) {
+      violations.push({
+        path,
+        detail: `Status is \`archived\` and ${SUPERSEDED_FIELD} names nothing; name the issue or pull request that replaced this design`,
       })
     }
 
@@ -245,6 +294,7 @@ export const auditSpecs = (
       issue,
       specPr: references(values.get('Spec PR') ?? 'none').at(0) ?? null,
       implementation,
+      supersededBy,
     })
   }
 

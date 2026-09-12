@@ -16,9 +16,10 @@ The directory **is** the state. Nothing else in this repository records it.
 | ------------------------ | ------------------------------- | -------------------------------------------------------------- |
 | `.ai/specs/`             | `draft`, `ready`, `in-progress` | Being written; merged and waiting for a build; a build is open |
 | `.ai/specs/implemented/` | `implemented`                   | Every phase shipped                                            |
-| `.ai/specs/archived/`    | `archived`                      | Superseded by a later spec, or abandoned                       |
+| `.ai/specs/archived/`    | `archived`                      | Superseded by a later decision, or abandoned                   |
 
 `assets/` holds the static reproductions a spec is measured against and is not a status directory.
+`product-brief.md` is `om-discover`'s product context and is not a spec.
 
 ## The metadata table
 
@@ -36,6 +37,21 @@ Directly under the `H1`, before the first section, exactly these four rows in th
 `none` is a valid value for `Issue`, `Spec PR` and `Implementation`, and is written out rather than
 left blank so that an empty cell always means somebody forgot. `Implementation` lists the pull
 requests in the order they merged.
+
+An **archived** spec carries a fifth row, and only an archived spec may:
+
+```markdown
+| **Superseded by** | #382 |
+```
+
+It is required exactly when the status is `archived` and refused otherwise, so one value still
+decides the shape of the table. The reference can be an issue or a pull request, and more than one,
+comma-separated, the way `Implementation` is. `archived` on its own says a design was dropped and
+leaves the reader with the question they came with;
+`design4pro/planned.travel#417` is the worked example, where a spec that built nothing recommended
+closing its ticket and the ticket was then closed as superseded by another pull request. Without the
+row, that chain lives only in a tracker comment. The two repositories run this convention out of the
+same file, so the schema is deliberately identical in both.
 
 ## Always
 
@@ -64,6 +80,10 @@ in-progress` and the built pull requests listed.
   to schedule it from, until #201 was filed.
 - A spec at `implemented` with an empty `Implementation`. "It shipped" that names nothing that
   shipped it cannot be checked by the next reader, and will not be.
+- A spec at `archived` with no `Superseded by`. A dropped design that does not say what happened
+  instead leaves the reader exactly where they started.
+- A `Superseded by` row on a spec that is not archived. The row is the archived status's, and a
+  still-live spec that carries one is saying two things at once.
 - A hand edit to `README.md` in this directory (`pnpm generate-spec-index` owns it).
 - A PNG in this directory. Frames go to `.ai/qa/artifacts_*/` or a scratchpad; `assets/` takes the
   dependency-free `.html` reproductions a spec measured, and nothing else.
