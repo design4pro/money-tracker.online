@@ -145,10 +145,10 @@ The spec's three phases, on this one PR.
 
 ### Phase 1: the provider and the reconciliation
 
-- [ ] 1.1 Add `AriaRouterProvider`
-- [ ] 1.2 Mount it in `AppShell`, `AppShellFallback` and the `(auth)` frame
-- [ ] 1.3 Assert the pending state is reachable from the rail
-- [ ] 1.4 Assert scroll and focus survive
+- [x] 1.1 Add `AriaRouterProvider` — 5d5df9d
+- [x] 1.2 Mount it in `AppShell`, `AppShellFallback` and the `(auth)` frame — a81aeb6
+- [x] 1.3 Assert the pending state is reachable from the rail — eb39fc2
+- [x] 1.4 Assert scroll and focus survive — eb39fc2
 - [ ] 1.5 Add the `widget` pairing to `linkVariants`
 - [ ] 1.6 Delete `widget-link.tsx` and migrate its call sites
 - [ ] 1.7 Correct the docblocks whose premise this phase removes
