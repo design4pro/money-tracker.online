@@ -78,6 +78,44 @@ const { Scanner } = require(
 const stylesDir = fileURLToPath(new URL('..', import.meta.url))
 const srcDir = fileURLToPath(new URL('../..', import.meta.url))
 
+type DesignSystem = Awaited<ReturnType<typeof __unstable__loadDesignSystem>>
+
+let designSystemPromise: Promise<DesignSystem> | undefined
+
+/**
+ * `app.css` compiled through Tailwind's own front end, once per file.
+ *
+ * Loading it is the expensive part of this file — the reason `vitest.config.ts`
+ * names it as the `server` project's slowest case — and both directions of the
+ * contract need the same design system, so the promise is memoized rather than
+ * awaited twice.
+ */
+function designSystem(): Promise<DesignSystem> {
+  designSystemPromise ??= __unstable__loadDesignSystem(
+    readFileSync(path.join(stylesDir, 'app.css'), 'utf8'),
+    {
+      base: stylesDir,
+      loadStylesheet: async (id: string, base: string) => {
+        const file =
+          id === 'tailwindcss'
+            ? require.resolve('tailwindcss/index.css')
+            : path.resolve(base, id)
+        return {
+          path: file,
+          base: path.dirname(file),
+          content: readFileSync(file, 'utf8'),
+        }
+      },
+      loadModule: async (id: string, base: string) => ({
+        path: id,
+        base,
+        module: (await import(id)).default,
+      }),
+    },
+  )
+  return designSystemPromise
+}
+
 /** Utility prefixes whose final segment names a theme token. */
 const TOKEN_PREFIXES = [
   // Not a colour, but the same silent failure: `max-w-content` reads the
@@ -126,28 +164,7 @@ function sourceText(): string {
 }
 
 it('every token-shaped class in src/ resolves to a registered token', async () => {
-  const designSystem = await __unstable__loadDesignSystem(
-    readFileSync(path.join(stylesDir, 'app.css'), 'utf8'),
-    {
-      base: stylesDir,
-      loadStylesheet: async (id: string, base: string) => {
-        const file =
-          id === 'tailwindcss'
-            ? require.resolve('tailwindcss/index.css')
-            : path.resolve(base, id)
-        return {
-          path: file,
-          base: path.dirname(file),
-          content: readFileSync(file, 'utf8'),
-        }
-      },
-      loadModule: async (id: string, base: string) => ({
-        path: id,
-        base,
-        module: (await import(id)).default,
-      }),
-    },
-  )
+  const system = await designSystem()
 
   const text = sourceText()
   const escape = (value: string): string =>
@@ -170,7 +187,7 @@ it('every token-shaped class in src/ resolves to a registered token', async () =
     )
   })
 
-  const compiled = designSystem.candidatesToCss(candidates)
+  const compiled = system.candidatesToCss(candidates)
   const dead = [
     ...new Set(candidates.filter((_, index) => compiled[index] === null)),
   ].filter(isRealClass)
