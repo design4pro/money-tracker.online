@@ -140,6 +140,41 @@ const TOKEN_PREFIXES = [
   'placeholder-',
 ]
 
+/** Tokens no utility reads, and the reason each is not a class. */
+const UNREACHABLE_BY_DESIGN: Record<string, string> = {}
+
+/**
+ * Every custom property `tokens.css` declares, comments stripped first.
+ *
+ * De-duplicated across `:root`, the two dark blocks and the reduced-motion
+ * block — one token, one verdict. The pattern is anchored to the start of a
+ * line so a `var(--x)` inside a value cannot be mistaken for a declaration.
+ */
+function declaredTokens(): Array<string> {
+  const css = readFileSync(path.join(stylesDir, 'tokens.css'), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  )
+  return [
+    ...new Set(
+      [...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map(([, name]) => name),
+    ),
+  ].sort()
+}
+
+/** Every token read by the CSS of at least one utility the system can compile. */
+function reachableTokens(system: DesignSystem): Set<string> {
+  const reachable = new Set<string>()
+  const names = system.getClassList().map(([name]) => name)
+  for (const rule of system.candidatesToCss(names)) {
+    if (rule === null) continue
+    for (const [, token] of rule.matchAll(/var\(\s*(--[\w-]+)/g)) {
+      reachable.add(token)
+    }
+  }
+  return reachable
+}
+
 /** Every `.ts`/`.tsx` source, comments removed. */
 function sourceText(): string {
   const files: Array<string> = []
@@ -193,4 +228,21 @@ it('every token-shaped class in src/ resolves to a registered token', async () =
   ].filter(isRealClass)
 
   expect(dead).toEqual([])
+})
+
+it('every token registered in tokens.css is reachable through a utility', async () => {
+  const system = await designSystem()
+  const reachable = reachableTokens(system)
+
+  const unreachable = declaredTokens().filter(
+    (token) => !reachable.has(token) && !(token in UNREACHABLE_BY_DESIGN),
+  )
+
+  expect(
+    unreachable,
+    'Each token below is registered in src/styles/tokens.css and no utility reads it.\n' +
+      'Surface it in the `@theme inline` layer of src/styles/app.css, or write an\n' +
+      '`@utility` in that file that reads it, or add it to UNREACHABLE_BY_DESIGN\n' +
+      'with the reason it is not a class.',
+  ).toEqual([])
 })
