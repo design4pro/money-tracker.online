@@ -44,6 +44,18 @@ export const linkVariants = cva(
         sm: 'text-caption',
         md: 'text-label',
         lg: 'text-body',
+        /**
+         * The "see all of this" link in a panel's corner.
+         *
+         * A pairing rather than a plain type step, which is why it sits beside the sizes rather
+         * than beside the variants: it is `sm` with the weight and the pointer target the corner
+         * of a widget needs. `target-min` is what makes the 44px target real without inflating
+         * the text's line box — it grows a pseudo-element around the link rather than the link
+         * itself — and the tighter gap is what keeps a caption-sized glyph beside a caption-sized
+         * word. It carries no colour of its own, so it composes with any variant; the dashboard
+         * pairs it with `default`.
+         */
+        widget: 'gap-1 text-caption font-medium target-min',
       },
     },
     defaultVariants: { variant: 'default', size: 'inherit' },
