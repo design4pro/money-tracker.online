@@ -162,10 +162,33 @@ function declaredTokens(): Array<string> {
   ].sort()
 }
 
+/**
+ * The floor the utility surface has to clear before its output means anything.
+ *
+ * `getClassList()` is on the same `__unstable__` surface as the loader, so a
+ * Tailwind upgrade that renames or empties it would otherwise report every
+ * registered token as unreachable. 10,000 is an order of magnitude below the
+ * 25,856 names measured here and an order of magnitude above anything a broken
+ * loader returns, so the floor fails as itself instead of as 141 findings.
+ */
+const MIN_CLASS_LIST_SIZE = 10_000
+
 /** Every token read by the CSS of at least one utility the system can compile. */
 function reachableTokens(system: DesignSystem): Set<string> {
   const reachable = new Set<string>()
   const names = system.getClassList().map(([name]) => name)
+
+  expect(
+    names.length,
+    'Tailwind returned an implausibly small utility list — treat the run as a ' +
+      'loader failure, not as a token contract failure.',
+  ).toBeGreaterThan(MIN_CLASS_LIST_SIZE)
+  expect(
+    names,
+    'Tailwind returned a utility list without `bg-canvas`, so the list is not ' +
+      'this design system’s.',
+  ).toContain('bg-canvas')
+
   for (const rule of system.candidatesToCss(names)) {
     if (rule === null) continue
     for (const [, token] of rule.matchAll(/var\(\s*(--[\w-]+)/g)) {
