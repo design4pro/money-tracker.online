@@ -140,8 +140,73 @@ const TOKEN_PREFIXES = [
   'placeholder-',
 ]
 
-/** Tokens no utility reads, and the reason each is not a class. */
-const UNREACHABLE_BY_DESIGN: Record<string, string> = {}
+/**
+ * Tokens no utility reads, and the reason each is not a class.
+ *
+ * The reason is the reviewable part: every entry is a token the contract says
+ * is deliberately unreachable, so a line here has to say *why* rather than just
+ * silence a name. The list is kept tight from both ends by the assertions in
+ * the case below — an entry that has become reachable fails, and so does one
+ * naming a token `tokens.css` no longer declares — so it can only shrink.
+ *
+ * The reasons are string literals in a file the sibling case scans, so they
+ * avoid spelling a CSS property that reads as a utility: writing
+ * `border-radius` here makes that case report `border-radius` as a dead class.
+ * Prose that needs one belongs in a comment, which `sourceText()` strips.
+ *
+ * Twenty-one of the twenty-two are read by nothing anywhere in the repository,
+ * which is a different finding from the one this case exists for: not "a token
+ * that should be a class is not", but "a token that is documentation". Deciding
+ * per token whether to surface or delete it is a product call and its own issue
+ * (spec `.ai/specs/2026-09-10-token-utility-reachability.md`, Q3/Q4).
+ */
+const UNREACHABLE_BY_DESIGN: Record<string, string> = {
+  // The spacing ladder documents the scale; it does not implement it. Every
+  // Tailwind spacing utility reads `--spacing` instead — `p-1` compiles to
+  // `padding: var(--spacing)` — and no file outside `tokens.css` reads a rung.
+  '--space-1': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-2': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-3': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-4': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-5': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-6': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-8': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-10': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-12': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-16': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-20': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-24': 'spacing ladder: utilities read `--spacing`, not the rungs',
+
+  '--control-h-sm':
+    'a control-height scale no file reads; there is no `h-control-*` utility',
+  '--control-h-md':
+    'a control-height scale no file reads; there is no `h-control-*` utility',
+  '--control-h-lg':
+    'a control-height scale no file reads; there is no `h-control-*` utility',
+
+  '--safe-start':
+    'inline-axis safe-area inset; no utility surfaces it and no file reads it',
+  '--safe-end':
+    'inline-axis safe-area inset; no utility surfaces it and no file reads it',
+  '--safe-bottom':
+    'a block-axis safe-area inset in genuine use, but through arbitrary values ' +
+    '(`pb-[var(--safe-bottom)]` in dialog.tsx, bottom-nav.tsx twice and ' +
+    'transaction-form.tsx), because no utility surfaces an env() inset',
+
+  '--subnav-h':
+    'a sub-navigation height no file reads; `--nav-h` beside it is read, by ' +
+    '`h-chrome`, `top-chrome` and `pt-chrome`',
+  '--z-base':
+    'the ground rung of the z ladder; app.css ships an `@utility` for the other ' +
+    'seven rungs and none for this one, and no file reads it',
+  '--timeout-warning-lead':
+    'a session-timeout lead time in seconds — a number for logic, not something ' +
+    'a class sets; no file reads it',
+  '--radius-full':
+    "shadowed by a built-in: Tailwind's own `rounded-full` is a static " +
+    '`calc(infinity * 1px)` radius and never reads the token, so no class can ' +
+    'reach it',
+}
 
 /**
  * Every custom property `tokens.css` declares, comments stripped first.
@@ -256,8 +321,10 @@ it('every token-shaped class in src/ resolves to a registered token', async () =
 it('every token registered in tokens.css is reachable through a utility', async () => {
   const system = await designSystem()
   const reachable = reachableTokens(system)
+  const declared = declaredTokens()
+  const allowed = Object.keys(UNREACHABLE_BY_DESIGN)
 
-  const unreachable = declaredTokens().filter(
+  const unreachable = declared.filter(
     (token) => !reachable.has(token) && !(token in UNREACHABLE_BY_DESIGN),
   )
 
@@ -267,5 +334,17 @@ it('every token registered in tokens.css is reachable through a utility', async 
       'Surface it in the `@theme inline` layer of src/styles/app.css, or write an\n' +
       '`@utility` in that file that reads it, or add it to UNREACHABLE_BY_DESIGN\n' +
       'with the reason it is not a class.',
+  ).toEqual([])
+
+  // A suppression cannot outlive the thing it suppresses, in either direction.
+  expect(
+    allowed.filter((token) => reachable.has(token)),
+    'Each token below is on UNREACHABLE_BY_DESIGN and a utility now reads it.\n' +
+      'Drop the entry — the exception it records no longer exists.',
+  ).toEqual([])
+  expect(
+    allowed.filter((token) => !declared.includes(token)),
+    'Each token below is on UNREACHABLE_BY_DESIGN and src/styles/tokens.css no\n' +
+      'longer declares it. Drop the entry, or point it at the token it was renamed to.',
   ).toEqual([])
 })
