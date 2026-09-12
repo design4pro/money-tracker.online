@@ -64,6 +64,7 @@ export function ProgressBar({
           ) : null}
           <div className="h-1.5 w-full overflow-hidden rounded-sm bg-surface-sunken">
             <div
+              data-motion-transform=""
               className={cn(
                 'h-full rounded-sm bg-accent',
                 transitionBase,

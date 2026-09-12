@@ -53,6 +53,7 @@ export function Popover({
     <RACPopover
       {...props}
       offset={offset}
+      data-motion-transform=""
       className={composeTw(
         className,
         layerSurface,

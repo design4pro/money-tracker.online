@@ -852,4 +852,19 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* The transform reset. A sub-frame animation still runs, and one that parks
+     its `transform` (a `forwards` fill, a paused run) leaves the element where
+     it stopped, for the one reader who cannot watch it happen.
+
+     `data-motion-transform` is a promise the element makes: its `transform`
+     belongs to an animation and rests at the identity. Only that makes a flat
+     `none` safe, so the reset is opt-in rather than a `*` rule, which would
+     also collapse every SVG `transform` attribute the charts position their
+     groups with. `!important` for the sweep's reason, and it outranks the
+     animation itself: a hooked element's transform does not move at all under
+     this preference, while its opacity still runs and `animationend` fires. */
+  [data-motion-transform] {
+    transform: none !important;
+  }
 }
