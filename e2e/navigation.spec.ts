@@ -1,6 +1,7 @@
 import { expect, test } from './support/console'
 
 import { gotoApp } from './support/app'
+import { expectNoWcagViolations } from './support/axe-scan'
 import { storageStateFor } from './support/session'
 import { holdServerFns } from './support/states'
 
@@ -128,6 +129,35 @@ test.describe('the primary navigation', () => {
     // carry straight on down the navigation.
     await expect(accounts).toBeFocused()
     await expect(accounts).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('says which screen it arrived on, and stays clean while saying it', async ({
+    page,
+  }) => {
+    await gotoApp(page, '/dashboard')
+
+    // Empty on arrival: the browser announced the document it loaded, and the region exists from
+    // the first paint only so that assistive technology is already watching it.
+    const announcer = page.getByRole('status')
+    await expect(announcer).toHaveCount(1)
+    await expect(announcer).toHaveText('')
+
+    await primaryNavLink(page, en['nav.accounts']).click()
+    await expect(page).toHaveURL(/\/accounts(\?|$)/)
+    await expect(
+      page.getByRole('heading', { level: 1, name: en['accounts.title'] }),
+    ).toBeVisible()
+
+    // The destination's own title, which is what the tab now shows and what a document load would
+    // have read out - no second copy of the screen's name to translate or keep in step.
+    const title = await page.title()
+    expect(title).toContain(en['accounts.title'])
+    await expect(announcer).toHaveText(title)
+
+    // Scanned in exactly this state, because it is the only state in which the region has text:
+    // an `aria-live` region that is off-screen, inside no landmark and holding a whole sentence is
+    // the shape a rule such as `aria-hidden-focus` or `region` would object to if it objected.
+    await expectNoWcagViolations(page, '/accounts after a rail navigation')
   })
 
   test('brings a scrolled screen back to where it was left', async ({

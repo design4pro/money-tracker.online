@@ -5,6 +5,7 @@ import { AppHeader } from './app-header'
 import { AriaI18nProvider } from './aria-i18n'
 import { AriaRouterProvider } from './aria-router'
 import { Wordmark } from './brand-mark'
+import { RouteAnnouncer } from './route-announcer'
 import { WorkspaceSwitcher } from './workspace-switcher'
 import { MAIN_CONTENT_ID } from './main-content'
 
@@ -106,6 +107,10 @@ export function AppShell({ shell, pathname, children }: AppShellProps) {
             regionLabel={t('notifications.title')}
             closeLabel={t('action.close')}
           />
+
+          {/* Named once, for the same reason, and only under the authenticated shell - it is the
+              rail's navigations it exists to announce. */}
+          <RouteAnnouncer />
         </div>
       </AriaRouterProvider>
     </AriaI18nProvider>
