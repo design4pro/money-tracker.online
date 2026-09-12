@@ -138,6 +138,9 @@ test.describe('the primary navigation', () => {
 
     // Empty on arrival: the browser announced the document it loaded, and the region exists from
     // the first paint only so that assistive technology is already watching it.
+    //
+    // Unscoped, and the count is the point: a loaded dashboard draws no other live region, so this
+    // also says that the announcer did not arrive beside one of the widgets' loading states.
     const announcer = page.getByRole('status')
     await expect(announcer).toHaveCount(1)
     await expect(announcer).toHaveText('')

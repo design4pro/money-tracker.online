@@ -185,7 +185,11 @@ function AuthFrame({ children }: { children: ReactNode }) {
 
   return (
     // React Aria's locale and its router are both repeated here rather than in the document shell -
-    // see `aria-i18n.tsx` for the reason, which is the same one for both.
+    // see `aria-i18n.tsx` for the reason, which is the same one for both. The router intercepts
+    // nothing on these screens today: every link under `(auth)` is TanStack's own typed `Link`
+    // wearing `linkVariants()` classes. It is mounted so that the first `components/ui` `Link`
+    // written here is a navigation rather than a silent document load, which is the failure #245
+    // was filed for.
     <AriaI18nProvider>
       <AriaRouterProvider>
         <div className="min-h-dvh bg-canvas text-ink lg:grid lg:min-h-dvh lg:grid-cols-[58fr_42fr] lg:grid-rows-[4rem_1fr_auto_1fr_auto]">

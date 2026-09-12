@@ -24,17 +24,21 @@ describe('Link', () => {
       </Link>,
     )
 
-    const className = screen.getByRole('link').className
+    // Whole tokens rather than substrings: `'gap-1.5'.includes('gap-1')` is true, so a substring
+    // assertion would pass against the very base class the pairing exists to override.
+    const classes = screen.getByRole('link').className.split(' ')
     for (const token of [
       'text-caption',
       'font-medium',
       'target-min',
       'gap-1',
+      // The pairing carries no colour, so the default variant's brand underline still reaches it.
+      'underline',
     ]) {
-      expect(className).toContain(token)
+      expect(classes).toContain(token)
     }
-    // The pairing carries no colour, so the default variant's brand underline still reaches it.
-    expect(className).toContain('underline')
+    // And tailwind-merge really dropped the base gap rather than leaving both on the element.
+    expect(classes).not.toContain('gap-1.5')
   })
 
   it('keeps a disabled link addressable rather than dropping its href', () => {
