@@ -1,11 +1,11 @@
 # What `negative-bold` is worth on the composited washes
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #178  |
-| **Spec PR**        | #252  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | implemented |
+| **Issue**          | #178        |
+| **Spec PR**        | #252        |
+| **Implementation** | #256        |
 
 ## 📝 TLDR
 
@@ -350,3 +350,21 @@ is small enough that phasing would be ceremony.
    body to unverified rather than quietly assumed.
    → verification: every gate command exits zero; `pnpm e2e` green with `git diff --exit-code -- e2e/`
    clean.
+
+## Amendment — what shipped (2026-09-11, PR #256)
+
+Three details differ from the text above. None changes the decision, a token value or the partition.
+
+**Two `--color-negative-bold:` lines did change, in their trailing comments only.** Step 4's
+verification says no such line changes, while Q6 corrects `4.57:1` to `4.56:1`, and that figure sits
+on the two dark declaration lines themselves. Q6 was applied. The values are byte-identical, which
+`declares the same dark palette at both dark sites` and the new partition case would both catch
+otherwise.
+
+**The 1.4.6 row of the conformance table in `docs/ACCESSIBILITY.md` changed too.** It is not in §2.1,
+so the plan does not name it, but it repeated `4.57:1` and "against every ground in both themes". It
+now names the binding ground in each theme, both washed and both 4.56:1: an archived over-budget card
+under the pointer in light, a hovered row in dark.
+
+**The existing `hover`-over-`surface` floor case kept its assertion and lost its deferral.** Its
+comment pointed at #178 as undecided. It now points at the partition case beside it.

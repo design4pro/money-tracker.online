@@ -72,6 +72,21 @@
    is luminance-poor and no deeper red in sRGB reaches that floor. `negative`
    keeps every body-size job it had and stays at 7:1; nothing moved off it.
 
+   What `negative-bold` is worth on a WASHED ground is recorded rather than
+   assumed, because a translucent wash moves the ground it is painted over
+   (#178). It clears 4.5:1 on all five opaque planes in both themes and on every
+   composited ground a call site produces today - `hover` over `surface`, a
+   hovered budget row, and `hover` over `surface-sunken`, an archived
+   over-budget budget card. It does NOT clear it under either wash over dark
+   `surface-raised` or dark `surface-panel`, nor under `press` over dark
+   `surface`, dark `canvas`, light `surface-sunken` or light `surface-panel`.
+   Those eight grounds are recorded as failing in `tokens-contrast.test.ts`
+   rather than designed for: no call site produces them - `rowWash` paints
+   `hover` and never `press`, which is a convention and not a boundary - and
+   nothing but this note and that test stops one from being written. Putting
+   the grade on any of them is a palette decision, not a call-site one. Its 3:1
+   fill floor is clear on every one of those grounds, worst case 3.44:1.
+
    `warning-bold` is the caution tone at the loud grade and its exception is a
    NARROWER one: it paints no text at all - no `headlineTone` is ever set to a
    warning tone, so the only 1.4.6 grade `warning` has is the body one it keeps
@@ -211,7 +226,11 @@
   /* The same ink at the loud grade - the over-budget headline and the meter
      fill, and nothing body-size. Light has the deep red already, so what the
      headroom buys here is chroma: `negative` is an oxblood, which is the right
-     weight for a caption and the wrong one for a 32px figure or a bar. */
+     weight for a caption and the wrong one for a 32px figure or a bar.
+
+     Washed, it misses 4.5:1 only under `press` over `surface-sunken` and
+     `surface-panel`, 4.23:1 on each - recorded, not designed for; see the
+     `negative-bold` note at the top of this file. */
   --color-negative-bold: #c31300; /* 5.09:1 on sunken, 6.15:1 on raised; large-text floor 4.5:1 */
 
   --color-warning: #614106; /* 7.67:1 on sunken, 9.26:1 on raised */
@@ -340,8 +359,14 @@
        measured 4.46:1 there, over AA and under this grade's own floor, with
        `e2e/contrast-enhanced.spec.ts` the only thing in the repository that
        could see it. The value moved by five steps of green: same sRGB chroma,
-       1.3 degrees of hue. */
-    --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 5.93:1 on canvas, 4.57:1 under --color-hover; large-text floor 4.5:1 */
+       1.3 degrees of hue.
+
+       That fixed `hover` over `surface` and nothing else. Either wash over
+       `surface-raised` (3.98:1, 3.44:1) or `surface-panel` (4.21:1, 3.64:1),
+       and `press` over `surface` (3.94:1) or `canvas` (4.36:1), stay below
+       4.5:1 - recorded, not designed for; see the `negative-bold` note at the
+       top of this file. */
+    --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 5.93:1 on canvas, 4.56:1 under --color-hover; large-text floor 4.5:1 */
 
     --color-warning: #e9c46a; /* 8.71:1 on raised, 10.73:1 on canvas */
     --color-warning-soft: #332a12; /* carries --color-warning at 8.49:1 */
@@ -434,7 +459,7 @@
   --color-negative: #f6a898; /* 7.61:1 on raised, 7.20:1 under --color-hover. See the media query. */
   --color-negative-soft: #3a201b; /* 7.82:1 */
   --color-on-negative: #16171a; /* 9.37:1 */
-  --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 4.57:1 under --color-hover; large-text floor 4.5:1 */
+  --color-negative-bold: #ff5e4a; /* 4.82:1 on raised, 4.56:1 under --color-hover; large-text floor 4.5:1 */
 
   --color-warning: #e9c46a; /* 8.71:1 on raised */
   --color-warning-soft: #332a12; /* 8.49:1 */
