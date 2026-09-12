@@ -194,12 +194,12 @@ Read it as: _this plan's stages may start once every wave above it is closed._
 That number is not derivable from the tree: measured at `119242d`, `src/components/ui/` holds 40
 modules besides the barrel and `src/components/ui/index.ts` re-exports them in 80 statements, and
 nothing in the repository says which of those a "primitive" is. The counting rule is the primitive
-inventory stage `01-S3` owns, which has not shipped; the figure is re-stated from that inventory's
-own count, citing it, once the stage lands. Until then it stays approximate and is **not** to be
-replaced by another unsourced number (#218). The inventory's path, and the full measurement, are
-recorded under `01-S3`'s **Blockers** in `01-design-system.md` — named there rather than here
-because the register may not name a document the tree does not have
-(`scripts/plans/__tests__/register-references.test.ts`).
+inventory that stage `01-S3` owns; it has not been written. Once that stage lands, the figure is
+re-stated from the inventory's own count and cites it. Until then it stays approximate and is **not**
+to be replaced by another unsourced number (#218). The inventory's path and the full measurement are
+recorded under `01-S3`'s **Blockers** in `01-design-system.md`. They are named there rather than here
+because the register may not name a document the tree does not have — the rule
+`scripts/plans/__tests__/register-references.test.ts` enforces.
 
 Three placements are editorial rather than mechanical and are stated so nobody goes looking for a
 missing edge:
