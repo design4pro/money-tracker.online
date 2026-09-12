@@ -190,6 +190,17 @@ Read it as: _this plan's stages may start once every wave above it is closed._
 **Not plans:** `98-verification-protocol.md` owns the evidence format and carries no row;
 `99-boundaries-and-blockers.md` is where dropped rows go.
 
+**One figure in the scope column is not a measurement.** Plan `01` reads `~45 React Aria primitives`.
+That number is not derivable from the tree: measured at `119242d`, `src/components/ui/` holds 40
+modules besides the barrel and `src/components/ui/index.ts` re-exports them in 80 statements, and
+nothing in the repository says which of those a "primitive" is. The counting rule is the primitive
+inventory stage `01-S3` owns, which has not shipped; the figure is re-stated from that inventory's
+own count, citing it, once the stage lands. Until then it stays approximate and is **not** to be
+replaced by another unsourced number (#218). The inventory's path, and the full measurement, are
+recorded under `01-S3`'s **Blockers** in `01-design-system.md` — named there rather than here
+because the register may not name a document the tree does not have
+(`scripts/plans/__tests__/register-references.test.ts`).
+
 Three placements are editorial rather than mechanical and are stated so nobody goes looking for a
 missing edge:
 
