@@ -171,6 +171,14 @@ const TOKEN_PREFIXES = [
   'placeholder-',
 ]
 
+/** The three reasons a whole group of tokens shares, named so they are written once. */
+const SPACING_LADDER =
+  'spacing ladder: utilities read `--spacing`, not the rungs'
+const CONTROL_HEIGHT =
+  'a control-height scale no file reads; there is no `h-control-*` utility'
+const INLINE_SAFE_AREA =
+  'inline-axis safe-area inset; no utility surfaces it and no file reads it'
+
 /**
  * Tokens no utility reads, and the reason each is not a class.
  *
@@ -195,30 +203,25 @@ const UNREACHABLE_BY_DESIGN: Record<string, string> = {
   // The spacing ladder documents the scale; it does not implement it. Every
   // Tailwind spacing utility reads `--spacing` instead — `p-1` compiles to
   // `padding: var(--spacing)` — and no file outside `tokens.css` reads a rung.
-  '--space-1': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-2': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-3': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-4': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-5': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-6': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-8': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-10': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-12': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-16': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-20': 'spacing ladder: utilities read `--spacing`, not the rungs',
-  '--space-24': 'spacing ladder: utilities read `--spacing`, not the rungs',
+  '--space-1': SPACING_LADDER,
+  '--space-2': SPACING_LADDER,
+  '--space-3': SPACING_LADDER,
+  '--space-4': SPACING_LADDER,
+  '--space-5': SPACING_LADDER,
+  '--space-6': SPACING_LADDER,
+  '--space-8': SPACING_LADDER,
+  '--space-10': SPACING_LADDER,
+  '--space-12': SPACING_LADDER,
+  '--space-16': SPACING_LADDER,
+  '--space-20': SPACING_LADDER,
+  '--space-24': SPACING_LADDER,
 
-  '--control-h-sm':
-    'a control-height scale no file reads; there is no `h-control-*` utility',
-  '--control-h-md':
-    'a control-height scale no file reads; there is no `h-control-*` utility',
-  '--control-h-lg':
-    'a control-height scale no file reads; there is no `h-control-*` utility',
+  '--control-h-sm': CONTROL_HEIGHT,
+  '--control-h-md': CONTROL_HEIGHT,
+  '--control-h-lg': CONTROL_HEIGHT,
 
-  '--safe-start':
-    'inline-axis safe-area inset; no utility surfaces it and no file reads it',
-  '--safe-end':
-    'inline-axis safe-area inset; no utility surfaces it and no file reads it',
+  '--safe-start': INLINE_SAFE_AREA,
+  '--safe-end': INLINE_SAFE_AREA,
   '--safe-bottom':
     'a block-axis safe-area inset in genuine use, but through arbitrary values ' +
     '(`pb-[var(--safe-bottom)]` in dialog.tsx, bottom-nav.tsx twice and ' +
@@ -263,13 +266,19 @@ function declaredTokens(): Array<string> {
  *
  * `getClassList()` is on the same `__unstable__` surface as the loader, so a
  * Tailwind upgrade that renames or empties it would otherwise report every
- * registered token as unreachable. 10,000 is an order of magnitude below the
- * 25,856 names measured here and an order of magnitude above anything a broken
- * loader returns, so the floor fails as itself instead of as 141 findings.
+ * registered token as unreachable. 10,000 is well under the 25,856 names
+ * measured here — room for Tailwind to drop utilities without a false alarm —
+ * and far above the nought-to-a-handful a broken loader returns, so the floor
+ * fails as itself instead of as 141 findings.
  */
 const MIN_CLASS_LIST_SIZE = 10_000
 
-/** Every token read by the CSS of at least one utility the system can compile. */
+/**
+ * Every token read by the CSS of at least one utility the system can compile.
+ *
+ * Asserts the floor above before it reads anything, so an upstream shape change
+ * fails here rather than as a wall of unreachable tokens in the caller.
+ */
 function reachableTokens(system: DesignSystem): Set<string> {
   const reachable = new Set<string>()
   const names = system.getClassList().map(([name]) => name)
