@@ -160,6 +160,6 @@ The spec's three phases, on this one PR.
 
 ### Phase 3: the measurements and the docblocks
 
-- [ ] 3.1 Re-measure `docs/STATE-INVENTORY.md` §3
-- [ ] 3.2 Re-verify `e2e/support/states.ts`'s preconditions
-- [ ] 3.3 Spec lifecycle bookkeeping and the full gate
+- [x] 3.1 Re-measure `docs/STATE-INVENTORY.md` §3 — 5b9e330
+- [x] 3.2 Re-verify `e2e/support/states.ts`'s preconditions — a76b82f
+- [x] 3.3 Spec lifecycle bookkeeping and the full gate — b36652f, 481b749
