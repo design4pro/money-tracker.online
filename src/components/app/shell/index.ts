@@ -33,6 +33,8 @@ export { MAIN_CONTENT_ID } from './main-content'
 
 export { NotFound } from './not-found'
 
+export { RouteAnnouncer } from './route-announcer'
+
 export { RouteError } from './route-error'
 export type { RouteErrorProps } from './route-error'
 
