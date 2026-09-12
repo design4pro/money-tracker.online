@@ -13,6 +13,7 @@ export { AppHeader } from './app-header'
 export type { AppHeaderProps } from './app-header'
 
 export { AriaI18nProvider } from './aria-i18n'
+export { AriaRouterProvider } from './aria-router'
 
 export { BrandMark, Wordmark } from './brand-mark'
 export type { WordmarkProps } from './brand-mark'
