@@ -155,8 +155,8 @@ The spec's three phases, on this one PR.
 
 ### Phase 2: the route announcer
 
-- [ ] 2.1 Add `route-announcer.tsx`
-- [ ] 2.2 Mount it once in `AppShell`
+- [x] 2.1 Add `route-announcer.tsx` — 0d1795a
+- [x] 2.2 Mount it once in `AppShell` — 5bd162e
 
 ### Phase 3: the measurements and the docblocks
 
