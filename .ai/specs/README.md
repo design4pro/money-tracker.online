@@ -6,10 +6,11 @@ One document per designed change. The directory a spec sits in is its state, the
 its `H1` names the issue and the pull requests behind it, and both are held together by
 `scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).
 
-## Draft — being written (3)
+## Draft — being written (4)
 
 | Spec                                                                                                                       | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
+| [The design-system link navigates through the router](2026-09-11-router-provider-client-side-links.md)                     | 2026-09-11 | [#245](https://github.com/design4pro/money-tracker.online/issues/245) | [#253](https://github.com/design4pro/money-tracker.online/pull/253) | —              |
 | [Reduced motion: the `[data-motion-transform]` reset and the proof it works](2026-09-11-reduced-motion-transform-reset.md) | 2026-09-11 | [#214](https://github.com/design4pro/money-tracker.online/issues/214) | [#251](https://github.com/design4pro/money-tracker.online/pull/251) | —              |
 | [The first client-side navigation draws its loading state](2026-09-11-first-navigation-loading-state.md)                   | 2026-09-11 | [#230](https://github.com/design4pro/money-tracker.online/issues/230) | [#232](https://github.com/design4pro/money-tracker.online/pull/232) | —              |
 | [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md)   | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | [#220](https://github.com/design4pro/money-tracker.online/pull/220) | —              |
