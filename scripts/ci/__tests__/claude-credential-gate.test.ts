@@ -48,6 +48,11 @@ const GATED = [
  * Steps are split on the 6-space `- ` that opens each one, which is also how a step's own `if:` and
  * `uses:` stay attached to it - the assertions below are all of the form "this step carries that
  * condition", and a whole-job regex could not tell one step's `if` from its neighbour's.
+ *
+ * The lookahead is what keeps that sequence from matching inside a step's own `run: |` script,
+ * where a YAML list item or a markdown bullet indented to column six is perfectly legal. Splitting
+ * there would invent a phantom step, and the first assertion below - the gate comes first - would
+ * start failing over a fault in some unrelated step's body.
  */
 const stepsOf = (workflow: string, job: string, nextJob?: string): string[] => {
   const source = readFileSync(resolve(root, workflow), 'utf8')
@@ -61,7 +66,7 @@ const stepsOf = (workflow: string, job: string, nextJob?: string): string[] => {
   expect(end, `${workflow} has no ${nextJob} job`).toBeGreaterThan(start)
 
   const body = source.slice(start, end)
-  const steps = body.split(/\n {6}- /).slice(1)
+  const steps = body.split(/\n {6}- (?=name: |uses: )/).slice(1)
   expect(steps.length, `${workflow}: ${job} has no steps`).toBeGreaterThan(0)
 
   return steps
@@ -96,11 +101,17 @@ describe.each(GATED)('$workflow', ({ workflow, job, nextJob }) => {
 
     // The warning is only worth emitting if it replaces the red job rather than decorating it. A
     // gate that sets an output nobody branches on is the failure mode this guards.
-    it('spends no token and checks nothing out unless the gate passed', () => {
+    //
+    // Three kinds of step, not "everything after the gate": claude-code-review.yml deliberately
+    // keys its post-gate steps on `steps.claude.outcome` instead, so a blanket rule would be red
+    // there for no fault. The local composite action is in the list because claude.yml gates it
+    // too, and a contract that did not name it would stay green if that `if:` were dropped.
+    it('spends no token, checks nothing out and sets nothing up unless the gate passed', () => {
       const gated = steps.filter(
         (step) =>
           step.includes('uses: anthropics/claude-code-action') ||
-          step.includes('uses: actions/checkout'),
+          step.includes('uses: actions/checkout') ||
+          step.includes('uses: ./.github/actions/setup'),
       )
       expect(gated.length).toBeGreaterThan(0)
 
