@@ -7,8 +7,10 @@ import { storageStateFor } from './support/session'
  * The diagnostic that only ever runs during an outage, exercised outside one.
  *
  * `e2e/support/__tests__/reachability.test.ts` pins the wording. This pins the thing the wording
- * depends on and vitest cannot see: that `page.request` reaches the server by a path the page's own
- * navigation does not, so the two can disagree. That is the entire finding of #189 — on run
+ * depends on and vitest cannot see: that the probe's own Node `fetch` reaches the server by a path
+ * the page's navigation does not, so the two can disagree. `page.request` is not that path — the
+ * `page.route()` handler below intercepts it too, which is why `probeServer` leaves the browser out
+ * entirely (`e2e/support/app.ts`). The disagreement is the entire finding of #189 — on run
  * 34144653183 the browser stopped being able to load anything from `localhost:3010` while the
  * server went on answering every request it received — and a probe that quietly travelled with the
  * navigation would report `answered: false` for both situations and diagnose nothing.
