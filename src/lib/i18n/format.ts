@@ -93,8 +93,56 @@ export function formatCalendarDate(
 }
 
 /**
+ * The dash between the two ends of a range. U+2013, unspaced, in both locales.
+ *
+ * CLDR spaces it in some interval patterns and not in others — Polish writes
+ * `1–31 gru 2025` at `medium` and `15 listopada – 14 grudnia 2025` at `long` —
+ * and one frozen dash is one fewer thing that can vary between two runtimes.
+ */
+const RANGE_DASH = '–'
+
+/** The same field, spelled the same way, so the range prints it once. */
+function isSamePart(
+  a: Intl.DateTimeFormatPart,
+  b: Intl.DateTimeFormatPart,
+): boolean {
+  return a.type === b.type && a.value === b.value
+}
+
+/** The formatted text of `parts[start … end)`, as the formatter itself joins it. */
+function joinParts(
+  parts: ReadonlyArray<Intl.DateTimeFormatPart>,
+  start: number,
+  end: number,
+): string {
+  let text = ''
+  for (let index = start; index < end; index += 1) {
+    text += parts[index].value
+  }
+  return text
+}
+
+/**
  * A range of calendar dates — a budget period, a report window — collapsed the
  * way the locale collapses it (`1–31 Dec 2025`, not `1 Dec 2025 – 31 Dec 2025`).
+ *
+ * **Composed here, never by `Intl`'s interval formatter.** `formatRange` picks
+ * its pattern from CLDR's `intervalFormats` by skeleton rather than from the
+ * options above, and that resolution is engine data: for `pl` at `medium` the
+ * server answers with the abbreviated-month form `1–31 sie 2026` and WebKit
+ * with the all-numeric `01–31.08.2026`. Neither is wrong; they disagree, and a
+ * server string that disagrees with the client string is a hydration mismatch
+ * by definition — the same divergence the frozen table in `./locales` keeps out
+ * of the language switcher (#163). `__tests__/source-rules.test.ts` bans the API
+ * in this directory so the next date helper cannot reintroduce it.
+ *
+ * What *is* stable is `format` / `formatToParts`, whose pattern `DATE_OPTIONS`
+ * pins completely. So both ends go through the one formatter and the collapse is
+ * the elision every locale performs anyway: drop whatever the two ends spell
+ * identically at the front and at the back, keep one copy of it, and join what
+ * is left with `RANGE_DASH`. No per-locale interval table is transcribed, and
+ * for Polish the result reproduces ICU's own output character for character at
+ * every style.
  */
 export function formatCalendarDateRange(
   locale: Locale,
@@ -102,9 +150,41 @@ export function formatCalendarDateRange(
   to: CalendarDateInput,
   style: DateStyle = 'medium',
 ): string {
-  return dateFormatter(locale, DATE_OPTIONS[style], 'UTC').formatRange(
+  const formatter = dateFormatter(locale, DATE_OPTIONS[style], 'UTC')
+  const startParts = formatter.formatToParts(
     toCalendarDateValue(from).toDate('UTC'),
+  )
+  const endParts = formatter.formatToParts(
     toCalendarDateValue(to).toDate('UTC'),
+  )
+  // One skeleton, so one part structure: the ends can only differ in what a
+  // field spells, never in which fields are there or in what order.
+  const length = startParts.length
+
+  let head = 0
+  while (head < length && isSamePart(startParts[head], endParts[head])) {
+    head += 1
+  }
+  if (head === length) {
+    return joinParts(startParts, 0, length)
+  }
+
+  // One part has to stay on each side of the dash, or a range would collapse
+  // into a single date it is not.
+  let tail = 0
+  while (
+    head + tail < length - 1 &&
+    isSamePart(startParts[length - 1 - tail], endParts[length - 1 - tail])
+  ) {
+    tail += 1
+  }
+
+  return (
+    joinParts(startParts, 0, head) +
+    joinParts(startParts, head, length - tail) +
+    RANGE_DASH +
+    joinParts(endParts, head, length - tail) +
+    joinParts(startParts, length - tail, length)
   )
 }
 

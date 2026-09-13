@@ -97,6 +97,7 @@ repo) is not a gate either; keep what you touch prettier-clean.
 | Working while someone else edits the checkout  | `docs/agents/shared-checkout.md`                                                         | 3010 is the developer's port; agents take 3011-3020                                             |
 | The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md` | Labels are the state machine; `needs-qa` needs a human's `qa-approved`                          |
 | The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                               | One cockpit per host; no secrets in the service env                                             |
+| A file `design4pro/agent-kit` renders          | `docs/agents/agent-kit.md`; `.ai/agent-kit.lock.json`                                    | Outside prettier by decision; edit the kit's template, never the copy                           |
 
 ## Process and skills
 

@@ -1,12 +1,14 @@
-import { expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 import { THEME_STORAGE_KEY } from '#/lib/theme'
 
+import { describeNavigationFailure } from './reachability'
 import {
   TRANSACTION_DETAIL_URL,
   TRANSACTION_ROW_SELECTOR,
 } from './transactions'
 
+import type { ServerProbe } from './reachability'
 import type { BrowserContext, Locator, Page } from '@playwright/test'
 
 /**
@@ -186,13 +188,77 @@ export async function waitForHydration(
   )
 }
 
-/** `page.goto`, and then the wait every interaction in this suite depends on. */
+/**
+ * Ask the server for `path` directly, from outside the browser.
+ *
+ * Node's own `fetch`, and that choice is the whole diagnostic. `page.request` reads like the
+ * natural tool — it is the context's API client and it resolves `path` against the same baseURL —
+ * but it is not independent of the page: a `page.route()` handler intercepts it too, which is
+ * Playwright telling us those requests travel with the browser rather than beside it. Measured on
+ * this branch while writing `e2e/reachability.spec.ts`: with the navigation swallowed by a route
+ * handler, a `page.request.get` of the same path timed out as well, and the probe reported a
+ * healthy server unreachable. A probe that shares the failure it is meant to explain explains
+ * nothing, so this one leaves the browser out entirely.
+ *
+ * `redirect: 'manual'` because it is unauthenticated — the session lives in the browser's cookie
+ * jar, and a protected route answers it 307. That is an answer, and answering is the only thing
+ * being asked about.
+ *
+ * Three seconds, and it never throws. The caller is already inside a failed test whose own 30s
+ * budget is mostly spent, and a probe that hangs or throws would replace the real error with its
+ * own.
+ */
+async function probeServer(path: string): Promise<ServerProbe> {
+  const { baseURL } = test.info().project.use
+  const startedAt = Date.now()
+  try {
+    const response = await fetch(new URL(path, baseURL), {
+      signal: AbortSignal.timeout(3_000),
+      redirect: 'manual',
+    })
+    return {
+      answered: true,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+    }
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause)
+    return { answered: false, reason: reason.split('\n')[0] ?? 'unknown error' }
+  }
+}
+
+/**
+ * `page.goto`, and then the wait every interaction in this suite depends on.
+ *
+ * Only the navigation is wrapped, and the narrowness is the point. A `page.goto` that never
+ * finishes is the signature of #189 — on run 34144653183 every one of the 21 failures after the
+ * wedge was exactly that, one request started and never answered — and when the server turns out
+ * to be answering anyway, "the browser cannot reach it" is the only reading left.
+ *
+ * `waitForHydration` is deliberately left alone. It fails *after* a navigation the server did
+ * serve, so the probe would always find the server up and would append that verdict to a page
+ * whose client bundle is simply broken — blaming the network for a product defect, which is the
+ * mirror image of the mistake this exists to stop. A hydration timeout keeps saying what it always
+ * said.
+ *
+ * The original error is rethrown with the verdict appended, so Playwright keeps its class, its
+ * stack and its call log and only gains a sentence saying who to look at.
+ */
 export async function gotoApp(
   page: Page,
   path: string,
   hydrationTimeout?: number,
 ): Promise<void> {
-  await page.goto(path)
+  try {
+    await page.goto(path)
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    error.message = `${error.message}\n\n${describeNavigationFailure(
+      path,
+      await probeServer(path),
+    )}`
+    throw error
+  }
   await waitForHydration(page, hydrationTimeout)
 }
 

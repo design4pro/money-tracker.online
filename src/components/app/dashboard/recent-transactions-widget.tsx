@@ -1,11 +1,9 @@
-import { EmptyState } from '#/components/ui'
+import { EmptyState, Link } from '#/components/ui'
 import { DirectionalAmount } from '#/components/app/accounts'
 // The module, not the transactions barrel: the barrel reaches the filter bar, the form and the
 // drag-and-drop grid, none of which a dashboard panel has any business downloading.
 import { ConvertedAmount } from '#/components/app/transactions/amount-text'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
-
-import { WidgetLink } from './widget-link'
 
 import type { CurrencyCode } from '#/lib/money'
 import type { DashboardTransaction } from './types'
@@ -64,9 +62,9 @@ export function RecentTransactionsWidget({
         title={t('transactions.empty.title')}
         description={t('transactions.empty.body')}
         action={
-          <WidgetLink to="/transactions">
+          <Link href="/transactions" size="widget">
             {t('transactions.empty.action')}
-          </WidgetLink>
+          </Link>
         }
       />
     )
@@ -114,9 +112,9 @@ export function RecentTransactionsWidget({
         ))}
       </ul>
       <p>
-        <WidgetLink to="/transactions">
+        <Link href="/transactions" size="widget">
           {t('dashboard.recent.viewAll')}
-        </WidgetLink>
+        </Link>
       </p>
     </div>
   )

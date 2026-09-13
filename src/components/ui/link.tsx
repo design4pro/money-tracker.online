@@ -44,6 +44,18 @@ export const linkVariants = cva(
         sm: 'text-caption',
         md: 'text-label',
         lg: 'text-body',
+        /**
+         * The "see all of this" link in a panel's corner.
+         *
+         * A pairing rather than a plain type step, which is why it sits beside the sizes rather
+         * than beside the variants: it is `sm` with the weight and the pointer target the corner
+         * of a widget needs. `target-min` is what makes the 44px target real without inflating
+         * the text's line box — it grows a pseudo-element around the link rather than the link
+         * itself — and the tighter gap is what keeps a caption-sized glyph beside a caption-sized
+         * word. It carries no colour of its own, so it composes with any variant; the dashboard
+         * pairs it with `default`.
+         */
+        widget: 'gap-1 text-caption font-medium target-min',
       },
     },
     defaultVariants: { variant: 'default', size: 'inherit' },
@@ -61,8 +73,15 @@ export interface LinkProps
  * React Aria's `Link` renders a real `<a>` when it is given an `href` and a
  * `<span role="link">` when it is not, and in the second case it wires the
  * keyboard behaviour an anchor would have had. It also routes through the
- * app-level `RouterProvider`, which is what lets a client-side navigation keep
- * the focus and announcement behaviour of a document load.
+ * app-level `RouterProvider`, which is what makes a click a client-side
+ * navigation rather than a document load — so the destination's pending state
+ * renders, and the scroll offset and the focus survive the move.
+ *
+ * That provider is `components/app/shell/aria-router.tsx`, mounted in `AppShell`,
+ * `AppShellFallback` and the `(auth)` frame. Nothing is mounted above the
+ * marketing page or `invite.$invitationId.tsx`, and a link drawn there falls back
+ * to the browser's own navigation on its own — this file needs no branch for it
+ * and holds no knowledge that a router exists.
  *
  * A disabled link is `data-disabled` plus `aria-disabled` rather than a removed
  * `href`: dropping the href would take the element out of the tab order without

@@ -61,13 +61,33 @@ const SERVER_FN_PATTERN = '**/_serverFn/**'
  * at 1909 ms and finishes at 1924 ms, the account-detail read starts at 1927 ms, and the two reads
  * the detail screen makes start at 1974 ms. The gap is causal, not incidental.
  *
+ * Re-measured on the shell rail once #245 made it a client-side navigation, because the rail is a
+ * navigation this helper may now be pointed at and the old measurement could not have covered it.
+ * `/dashboard` to `/accounts`, request log, times from the click: `loadShell` at 55 ms, then
+ * `listAccountGroups` and `listAccounts` both at 72 ms. Same ordering, and the two reads after the
+ * shell arrive together — which is why the claim below is made before the handler yields.
+ *
  * The id is remembered rather than just counted, so a repeat of the same read — TanStack Query is
  * configured with `retry: 1` — is let through as well.
  *
- * This costs the helper its one precondition: install it on a page whose next server-function
- * request is a client-side navigation's. That is what {@link holdServerFns} is for, and a hold
- * installed anywhere else fails loudly rather than quietly — the read that was meant to be held
- * goes through, no skeleton is drawn, and the count assertion reports zero.
+ * ## The precondition, which #245 made narrower
+ *
+ * Install this before the **first** client-side navigation of the tab. "First `/_serverFn/*`" and
+ * "the shell" are the same request only while the shell has not already been read: `_app.beforeLoad`
+ * awaits `ensureQueryData`, and a cached shell inside its window makes no request at all. The second
+ * client-side navigation in a tab therefore opens with the *destination's* read, which this helper
+ * would let straight through.
+ *
+ * That used to be unreachable through the rail, because every rail move was a document load and a
+ * fresh document starts with an empty cache. Since #245 it is reachable, and measured: `/dashboard`
+ * to `/accounts` logs `loadShell`, `listAccountGroups`, `listAccounts`; carrying straight on to
+ * `/transactions` logs `loadTransactionReference` and `loadTransactions`, with no shell read
+ * between them.
+ *
+ * A hold installed on the wrong page does fail rather than pass — the read that was meant to be held
+ * goes through, no skeleton is drawn, and the count assertion reports zero. What it does not do is
+ * say why: it reads as a broken loading state rather than as a misplaced hold. That is the reason
+ * the precondition is written out here and pinned in `__tests__/states.test.ts`.
  */
 function serverFnIdOf(url: string): string {
   return new URL(url).pathname.split('/_serverFn/')[1] ?? ''
@@ -106,6 +126,11 @@ type Routable = Pick<Page, 'route' | 'unroute'>
  * Two things are easy to get wrong here and both produce a green test that proves nothing. A
  * `page.goto` will not do — it is served by SSR and produces no `/_serverFn/*` request at all. And
  * the shell's own read must be let through: see {@link serverFnIdOf}.
+ *
+ * The shell's own rail is a valid navigation to install this on, and since #245 it is the most
+ * useful one: it is the move every reader makes, and `e2e/navigation.spec.ts` photographs the
+ * destination's pending state through it. It must be the tab's *first* client-side move, which is
+ * the precondition {@link serverFnIdOf} measures.
  */
 export async function holdServerFns(
   page: Routable,

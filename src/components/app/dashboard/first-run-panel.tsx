@@ -1,11 +1,9 @@
 import { useId } from 'react'
 
+import { Link } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
-import { WidgetLink } from './widget-link'
-
 import type { MessageKey } from '#/lib/i18n'
-import type { WidgetLinkProps } from './widget-link'
 
 /**
  * What a brand-new workspace sees instead of five empty panels.
@@ -40,8 +38,8 @@ export interface FirstRunStep {
   readonly titleKey: MessageKey
   readonly bodyKey: MessageKey
   /** The route the step's link goes to. Omitted while the destination does not exist. */
-  readonly to?: WidgetLinkProps['to']
-  /** The label for that link. Required exactly when `to` is present. */
+  readonly href?: string
+  /** The label for that link. Required exactly when `href` is present. */
   readonly actionKey?: MessageKey
 }
 
@@ -50,14 +48,14 @@ export const FIRST_RUN_STEPS: ReadonlyArray<FirstRunStep> = [
     id: 'account',
     titleKey: 'dashboard.firstRun.step.account.title',
     bodyKey: 'dashboard.firstRun.step.account.body',
-    to: '/accounts',
+    href: '/accounts',
     actionKey: 'accounts.create',
   },
   {
     id: 'transaction',
     titleKey: 'dashboard.firstRun.step.transaction.title',
     bodyKey: 'dashboard.firstRun.step.transaction.body',
-    to: '/transactions',
+    href: '/transactions',
     actionKey: 'transactions.create',
   },
   {
@@ -105,9 +103,11 @@ export function FirstRunPanel() {
               </h3>
               <p className="text-caption text-ink-2">{t(step.bodyKey)}</p>
             </div>
-            {step.to === undefined || step.actionKey === undefined ? null : (
+            {step.href === undefined || step.actionKey === undefined ? null : (
               <p className="col-start-2 sm:col-start-3">
-                <WidgetLink to={step.to}>{t(step.actionKey)}</WidgetLink>
+                <Link href={step.href} size="widget">
+                  {t(step.actionKey)}
+                </Link>
               </p>
             )}
           </li>
@@ -131,9 +131,9 @@ export function FirstEntryPrompt() {
   return (
     <p className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-y border-border-subtle py-3 text-body text-ink">
       <span>{t('dashboard.firstEntry.lead')}</span>
-      <WidgetLink to="/transactions/new" className="text-body">
+      <Link href="/transactions/new" size="widget" className="text-body">
         {t('dashboard.firstEntry.action')}
-      </WidgetLink>
+      </Link>
     </p>
   )
 }

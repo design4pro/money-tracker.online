@@ -61,6 +61,14 @@ uses the design system's `Link`, which does a full document load
 (`src/components/app/dashboard/widget-link.tsx`), so nearly every entry into a client-side
 navigation is preceded by a document that primes.
 
+> **Amended 2026-09-13 (#245, PR #264).** The last sentence above no longer holds. The rail now
+> navigates client-side — `src/components/app/shell/aria-router.tsx` mounts React Aria's
+> `RouterProvider` — so a reader's moves through the product stop producing documents after the one
+> that loaded the tab. **The decision is unchanged; its cost is larger.** Where "nearly every entry
+> into a client-side navigation" used to arrive on a freshly primed cache, only the tab's own
+> entry document does, which makes the priming described under _Decision_ the load-bearing part of
+> the #230 answer rather than a convenience on top of it. Nothing here re-opens the guard.
+
 It also means the answer is per-cause rather than universal. The next surface that blocks a paint
 behind an unavoidable await gets its own priming, not a general relaxation. That is more work, and
 it is the work this decision chooses.

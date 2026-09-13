@@ -176,6 +176,29 @@ describe('holdServerFns', () => {
     expect(await hasSettled(screen)).toBe(false)
   })
 
+  it('lets the first request through whatever it is, which is the precondition it cannot check', async () => {
+    // The helper identifies the shell by arrival order, so "the first request" and "the shell" are
+    // the same thing only while the premise behind that holds: the shell's read has not happened
+    // yet in this tab. #245 made that premise losable. Measured on this branch: `/dashboard` →
+    // `/accounts` through the rail logs `loadShell`, `listAccountGroups`, `listAccounts`; going
+    // straight on to `/transactions` logs `loadTransactionReference` and `loadTransactions` and no
+    // shell read at all, because the query window still holds it.
+    //
+    // A hold installed at that point continues the destination's own read — the assertion below —
+    // and photographs a screen that was never loading. Nothing in the helper can tell the two
+    // cases apart, which is why the precondition is written down in `states.ts` and pinned here
+    // rather than left for someone to rediscover from a green test that proved nothing: install a
+    // hold before the **first** client-side navigation of the tab.
+    const stub = stubPage()
+    const held = await holdServerFns(stub.page)
+    const log: Array<RouteCall> = []
+
+    await stub.deliver(stubRoute(log))
+    expect(log).toEqual(['continue'])
+
+    await held.release()
+  })
+
   it('lets the shell through again on a retry, rather than only counting to one', async () => {
     // TanStack Query is configured with `retry: 1`, so a shell read that fails once arrives twice.
     // Holding the second attempt would freeze the router just as holding the first would, so the

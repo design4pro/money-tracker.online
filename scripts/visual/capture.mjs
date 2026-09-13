@@ -663,9 +663,10 @@ async function main() {
         const release = await forceServerFns(page, forceState)
         try {
           const wanted = new URL(url).pathname
-          // Inside `main`, because the shell's rail is not a client-side navigation: those links
-          // go through the design system's `Link`, which does a full document load and would be
-          // served by SSR with nothing left to hold.
+          // Inside `main`, and it stays there now that the rail is client-side too (#245). The
+          // reason changed rather than expiring: a rail row exists on every screen, so matching it
+          // would make `--force-from` meaningless and turn "point --force-from at a page that
+          // links there" below into advice for a failure that could no longer happen.
           const link = page.locator(`main a[href="${wanted}"]`).first()
           const clicked = await link.click({ timeout: 15_000 }).then(
             () => true,

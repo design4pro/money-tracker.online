@@ -37,7 +37,8 @@ read by hand and the file and line are named.
 
 The measurements in §3 came from the probe run recorded in the spec: the app booted with
 `.ai/scripts/test-env-up.sh` on `http://127.0.0.1:3012` against the seeded demo workspace, driven
-with Playwright.
+with Playwright. The "after #245" rows were taken the same way, on PR #264, so the two sets of
+numbers differ in the code under them and in nothing else.
 
 ## 2. Read: what the route modules declare
 
@@ -107,21 +108,39 @@ what an account is for, a primary "Add your first account", and three quick-star
 dark both. The round's finding against `/accounts` is therefore a **reachability** finding, and the
 same is true of `/budgets`.
 
-### The data endpoint is `/_serverFn/*`, and only a client-side navigation produces one
+### The data endpoint is `/_serverFn/*`, and only a client-side navigation produced one
 
-Navigating through the shell rail produces exactly two requests, both `document`: `GET /accounts`
-and `GET /accounts?status=active`. No data fetch at all — the loaders run server-side during SSR.
-Navigating through the dashboard's `WidgetLink` instead produces `GET /_serverFn/<base64>` fetches
+Navigating through the shell rail produced exactly two requests, both `document`: `GET /accounts`
+and `GET /accounts?status=active`. No data fetch at all — the loaders ran server-side during SSR.
+Navigating through the dashboard's `WidgetLink` instead produced `GET /_serverFn/<base64>` fetches
 and no document request.
 
-The reason is already written down in the codebase.
-`src/components/app/dashboard/widget-link.tsx` states that the design system's `Link` routes through
-React Aria's `RouterProvider`, that **no `RouterProvider` is mounted in this app**, and that a `ui`
-link therefore does a full document load. The shell rail uses the design-system `Link`; `WidgetLink`
-uses TanStack Router's.
+The reason was already written down in the codebase.
+`src/components/app/dashboard/widget-link.tsx` stated that the design system's `Link` routes through
+React Aria's `RouterProvider`, that **no `RouterProvider` was mounted in this app**, and that a `ui`
+link therefore did a full document load. The shell rail used the design-system `Link`; `WidgetLink`
+used TanStack Router's.
 
-So the product's primary navigation is a document reload, and no route's `pendingComponent` can
-render on it.
+So the product's primary navigation was a document reload, and no route's `pendingComponent` could
+render on it. That finding became issue
+[#245](https://github.com/design4pro/money-tracker.online/issues/245).
+
+**Re-measured after #245** (PR #264), the same way and in the same environment — `/dashboard` to
+`/accounts`, every request logged from the moment the dashboard's `h1` was on screen:
+
+| Navigation                   | `document` requests | `/_serverFn/*` fetches |
+| ---------------------------- | ------------------- | ---------------------- |
+| rail, before #245            | 2                   | 0                      |
+| rail, after #245             | **0**               | **3**                  |
+| dashboard widget link, after | 0                   | 3                      |
+
+`src/components/app/shell/aria-router.tsx` mounts React Aria's `RouterProvider` over TanStack's
+`router.navigate`, so the rail and the dashboard's links are now the same mechanism — which is why
+`widget-link.tsx` no longer exists and its call sites render `components/ui`'s `Link` with
+`size="widget"` instead. The rows of this table are the same numbers read two different ways: the
+document requests are what the browser was asked for, the `/_serverFn/*` fetches are the loaders
+now running on the client, which is the thing a `pendingComponent` needs in order to have something
+to wait for.
 
 ### On a genuine client-side navigation, the loading state still did not render
 
@@ -203,6 +222,30 @@ asserts, so the loading state is evidence rather than a claim.
 
 This is also why "add a `pendingComponent` to seven route modules" is, on its own, worth very little:
 nineteen surfaces already declared one and it did not render either.
+
+### After #245 the rail draws the destination's loading state
+
+The same held-navigation probe as the 1.5 s / 3 s / 5 s table above, but taken through the rail —
+which before #245 was not a navigation a test could hold at all. `/dashboard` to `/transactions`,
+every `/_serverFn/*` after the shell's own held open, measured on PR #264:
+
+| t     | URL             | `h1`             | `role="status"` in `main`               | skeleton bars |
+| ----- | --------------- | ---------------- | --------------------------------------- | ------------- |
+| 1.5 s | `/transactions` | `"Transactions"` | 2 — `""` and `"Loading your spending…"` | 60            |
+| 3 s   | `/transactions` | `"Transactions"` | 2 — the same two                        | 60            |
+| 5 s   | `/transactions` | `"Transactions"` | 2 — the same two                        | 60            |
+
+Releasing the hold landed the ledger. Every cell that mattered inverted: the heading is the
+destination's rather than the previous screen's, the loading sentence is on screen and in a live
+region rather than absent, and the reader is looking at sixty skeleton bars rather than at the last
+screen's real balances. The empty `role="status"` is the ledger's own result counter, which has
+nothing to count yet.
+
+One thing the browser used to do for free had to be rebuilt by hand: a document load announces the
+new page, and a client-side navigation announces nothing. `src/components/app/shell/route-announcer.tsx`
+is a polite visually-hidden status region that writes the destination's `document.title` into
+itself once the navigation commits. Measured on the rail move above: `document.title` and the
+region's text both read `"Accounts · Money Tracker"`.
 
 ## 4. The house style is already consistent
 

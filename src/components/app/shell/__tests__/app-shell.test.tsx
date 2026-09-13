@@ -1,3 +1,9 @@
+import {
+  RouterContextProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+} from '@tanstack/react-router'
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 
@@ -33,12 +39,29 @@ const SHELL: ShellData = {
   ],
 }
 
+/**
+ * A router in context and nothing else.
+ *
+ * The shell reads router state — `AriaRouterProvider` to turn a link into a navigation,
+ * `RouteAnnouncer` to name where one landed (#245) — so it cannot be rendered outside a router at
+ * all. `RouterContextProvider` is the low-level half of `RouterProvider`: it supplies the context
+ * without rendering any match, which is what this file wants. The cases below still drive the
+ * current destination through the `pathname` prop, because that is how `_app.tsx` supplies it.
+ */
+const router = createRouter({
+  routeTree: createRootRoute(),
+  history: createMemoryHistory({ initialEntries: ['/'] }),
+})
+
 function renderShell(pathname: string, children: ReactNode = 'Content') {
   return render(
     <I18nProvider locale="en" messages={en as Catalogue}>
-      <AppShell shell={SHELL} pathname={pathname}>
-        {children}
-      </AppShell>
+      {/* The ad-hoc tree is not the app's generated one; the cast is on this prop alone. */}
+      <RouterContextProvider router={router as never}>
+        <AppShell shell={SHELL} pathname={pathname}>
+          {children}
+        </AppShell>
+      </RouterContextProvider>
     </I18nProvider>,
   )
 }
