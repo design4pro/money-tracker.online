@@ -1,5 +1,5 @@
 {
-  "kitVersion": 28,
+  "kitVersion": 29,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -115,7 +115,7 @@
       "mode": "100644"
     },
     ".github/workflows/merge-gate.yml": {
-      "sha256": "d27af92e274e88a5365f33ca8a0209bcd9dd82058209d60b0b17a26d92f82852",
+      "sha256": "9651bac73204726e5e097b862153c98c44c0004a38b9783834df9660e3de7c4e",
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {
@@ -135,7 +135,7 @@
       "mode": "100644"
     },
     "scripts/ci/__tests__/merge-gate.test.mjs": {
-      "sha256": "c96b085ad5ff9594dca5a0d77fdf85cea9c8b2770d3b686cb8cafe1f266a9581",
+      "sha256": "48257b740c6ff0dc5eff14973c72a884cdf0fce3c47c5bfbf9f724447def951f",
       "mode": "100644"
     },
     "scripts/ci/__tests__/review-threads-label.test.mjs": {

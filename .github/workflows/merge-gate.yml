@@ -47,4 +47,21 @@ jobs:
       - name: Refuse a pull request carrying a hard-block label
         env:
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-        run: node scripts/ci/merge-gate.mjs
+          # Through the environment, never interpolated into the shell: a branch name is attacker-
+          # controlled text on a fork, and `run:` splices it in before bash ever sees a quote.
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # The deciding script comes from the base branch, so the pull request that *introduces*
+          # this check finds none there. That pull request is the one whose base cannot express a
+          # hard block at all - there is no gate on it yet - so there is nothing to enforce and
+          # this passes. Measured rather than predicted: the first adoption in both repositories
+          # failed here with MODULE_NOT_FOUND on a pull request carrying no labels whatsoever.
+          #
+          # The window closes once and cannot reopen, because a merge into the base branch is the
+          # only thing that puts the script there and the only thing that could take it away - and
+          # a pull request doing the latter is itself gated by the copy still on the base.
+          if [ ! -f scripts/ci/merge-gate.mjs ]; then
+            echo "scripts/ci/merge-gate.mjs is not on $BASE_REF yet - nothing to enforce until it lands there"
+            exit 0
+          fi
+          node scripts/ci/merge-gate.mjs
