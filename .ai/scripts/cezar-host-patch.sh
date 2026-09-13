@@ -51,7 +51,13 @@
 #    interval. It cannot step over an event: `poll()` evaluates a contiguous prefix of what it
 #    observed and takes its cursor from the last evaluated observation, so a wider budget only
 #    ever reaches further into the same ordered run. A band still saturated at 100 stays pinned;
-#    that is the search API's own ceiling, and `frozenHighWatermark` still reports it.
+#    that is the search API's own ceiling, and `frozenHighWatermark` still reports it - but it
+#    stays pinned cheaply. The ladder is paid once per pinned cursor, not once per interval: the
+#    cursor it failed at is recorded as `widenExhaustedAt`, and a band at a fixed cursor only
+#    grows, so repeating the climb cannot end differently. Without that, a permanently pinned
+#    automation costs 175-255 timeline reads per poll - 10 500/h for `issue-autofix` at its 60s
+#    interval, against the 5 000/h REST budget of a token every agent run on this host shares.
+#    Trading a silent stall for a rate-limited pipeline is not a trade worth making.
 #
 # The cockpit is one per host and shared with planned.travel. That repository's copy of
 # .ai/scripts/cezar-host-patch.sh is identical apart from this paragraph; both are idempotent and
@@ -201,9 +207,9 @@ patch "$DIST/git-worktree.js" 'host patch: retry the config-lock race' \
 # `mode === 'execute'` so a preview - which writes no state - does not either. Note that `mode` is
 # already rewritten to 'preview' above when the handle cannot launch, so detection-only polls are
 # covered by the same test.
-patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351' \
+patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351 widen' \
   '            const result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, definition, { since: overlapSince }));' \
-  "            // host patch: planned.travel#351 - a truncated poll whose observations all sit in
+  "            // host patch: planned.travel#351 widen - a truncated poll whose observations all sit in
             // the 120s overlap band returns the cursor it was handed, and the search window is a
             // fixed timestamp, so the automation re-reads one window forever. Widen the budget
             // for a poll that failed to advance, doubling to the 100-record search ceiling.
@@ -211,7 +217,17 @@ patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351' \
             // takes its cursor from the last evaluated observation, so a wider budget can only
             // reach further into that same run - it never steps over anything.
             let result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, definition, { since: overlapSince }));
-            for (let budget = definition.filters.maxRecords; mode === 'execute'
+            // The ladder already ran to the ceiling at this exact cursor and did not clear the
+            // band. A band at a fixed cursor only grows - events enter the window and none leave -
+            // so climbing it again cannot end differently, and paying for that every interval
+            // costs up to 255 timeline reads a poll against a token every agent run on this host
+            // shares. Give up until the cursor moves; the state below remembers where.
+            let widenExhausted = !!state.widenExhaustedAt
+                && !!state.cursor
+                && state.widenExhaustedAt.timestamp === state.cursor.timestamp
+                && state.widenExhaustedAt.tieBreaker === state.cursor.tieBreaker;
+            for (let budget = definition.filters.maxRecords; !widenExhausted
+                && mode === 'execute'
                 && state.cursor
                 && result.truncated
                 && laterCursor(state.cursor, result.cursor) === state.cursor;) {
@@ -220,12 +236,38 @@ patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351' \
                 // makes termination depend on two literals agreeing, and a poll loop that spins
                 // forever holds the polling lease and takes every other automation with it.
                 const next = Math.min(budget * 2, 100);
-                if (next <= budget)
+                if (next <= budget) {
+                    widenExhausted = true;
                     break;
+                }
                 budget = next;
                 const widened = { ...definition, filters: { ...definition.filters, maxRecords: budget } };
                 result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, widened, { since: overlapSince }));
             }"
+
+# The give-up marker is its own field rather than a reuse of `frozenHighWatermark`, which is
+# written on any truncated poll - including one that advanced. Reusing it would make a healthy
+# poll's own watermark equal the stored cursor on the next interval and suppress the first
+# legitimate widening, which is the one that matters. `automationRuntimeStateSchema` is
+# `.passthrough()`, so a field the contract does not name survives the state file's round trip.
+#
+# `widenExhausted` is in scope here: it is declared in the same `try` block as this `setState`,
+# by the patch above. The two hunks are one change and neither stands alone.
+patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351 give-up' \
+  '                    frozenHighWatermark: result.truncated && cursor?.tieBreaker
+                        ? { timestamp: cursor.timestamp, tieBreaker: cursor.tieBreaker }
+                        : undefined,' \
+  "                    frozenHighWatermark: result.truncated && cursor?.tieBreaker
+                        ? { timestamp: cursor.timestamp, tieBreaker: cursor.tieBreaker }
+                        : undefined,
+                    // host patch: planned.travel#351 give-up - the cursor the doubling ladder ran
+                    // to the ceiling at without clearing the band, so the next interval reads its
+                    // window once instead of climbing 5,10,20,40,80,100 again. Written only as a
+                    // copy of the cursor the ladder failed at, so any poll that advances writes
+                    // undefined here and the next pin climbs again from scratch.
+                    widenExhaustedAt: widenExhausted && cursor?.tieBreaker
+                        ? { timestamp: cursor.timestamp, tieBreaker: cursor.tieBreaker }
+                        : undefined,"
 
 if [ -f "$PLIST" ]; then
   if plutil -extract EnvironmentVariables.CEZ_SKILLS_AUTO_UPDATE raw "$PLIST" >/dev/null 2>&1; then
