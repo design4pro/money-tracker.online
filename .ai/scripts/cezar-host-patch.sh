@@ -37,6 +37,21 @@
 #    before it takes the repository-root lease - so a burst of automations loses all but one run.
 #    The patch retries, and because the branch is created before that config write fails, the
 #    retry lands on cezar's own reattach path, which writes no shared config at all.
+# 6. planned.travel#351 (not reported upstream yet): the label poll pins its cursor and the
+#    automation stops firing. `poll()` collects at most `min(maxRecords, 100)` observations, keeps
+#    the first `maxRecords` of them and returns the last one it kept; the scheduler re-reads a 120s
+#    overlap band on every poll and never moves its cursor backwards. Once that band alone holds
+#    `maxRecords` label events - `om-auto-manage-issues` writes three per issue within the same
+#    second, so two groomed issues saturate a five-record window - every poll spends its whole
+#    budget on events it has already seen, returns the cursor it was handed, and the `updated:>=`
+#    window is a fixed timestamp that never shrinks. The automation polls forever, reports
+#    `no-match`, and `frozenHighWatermark` is the only trace anywhere that something is wrong.
+#    The patch widens the budget, doubling to the 100-record search ceiling, and only for a poll
+#    that failed to advance - so a saturated band is cleared once rather than re-read every
+#    interval. It cannot step over an event: `poll()` evaluates a contiguous prefix of what it
+#    observed and takes its cursor from the last evaluated observation, so a wider budget only
+#    ever reaches further into the same ordered run. A band still saturated at 100 stays pinned;
+#    that is the search API's own ceiling, and `frozenHighWatermark` still reports it.
 #
 # The cockpit is one per host and shared with planned.travel. That repository's copy of
 # .ai/scripts/cezar-host-patch.sh is identical apart from this paragraph; both are idempotent and
@@ -175,6 +190,42 @@ patch "$DIST/git-worktree.js" 'host patch: retry the config-lock race' \
             ? await git(repoRoot, ['worktree', 'add', absolutePath, branch])
             : await git(repoRoot, ['worktree', 'add', '-b', branch, absolutePath, base]);
     }"
+
+# The widening is the scheduler's to do, not the poller's: only the scheduler holds the stored
+# cursor, so only it can tell a poll that made no progress from one that simply found nothing new.
+# `laterCursor` returns its first argument unchanged when the observation is not later, so the
+# reference comparison below is exactly "this poll did not move the cursor" - no new helper, and no
+# second way of ordering cursors that could drift from the one the state file is written with.
+#
+# Guarded by `result.truncated` so a quiet repository never pays for a second poll, and by
+# `mode === 'execute'` so a preview - which writes no state - does not either. Note that `mode` is
+# already rewritten to 'preview' above when the handle cannot launch, so detection-only polls are
+# covered by the same test.
+patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351' \
+  '            const result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, definition, { since: overlapSince }));' \
+  "            // host patch: planned.travel#351 - a truncated poll whose observations all sit in
+            // the 120s overlap band returns the cursor it was handed, and the search window is a
+            // fixed timestamp, so the automation re-reads one window forever. Widen the budget
+            // for a poll that failed to advance, doubling to the 100-record search ceiling.
+            // Safe by construction: poll() evaluates a contiguous prefix of what it observed and
+            // takes its cursor from the last evaluated observation, so a wider budget can only
+            // reach further into that same run - it never steps over anything.
+            let result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, definition, { since: overlapSince }));
+            for (let budget = definition.filters.maxRecords; mode === 'execute'
+                && state.cursor
+                && result.truncated
+                && laterCursor(state.cursor, result.cursor) === state.cursor;) {
+                // The loop ends when the budget stops growing, not when it reaches a particular
+                // number. Spelling the ceiling twice - once in the step and once in the condition -
+                // makes termination depend on two literals agreeing, and a poll loop that spins
+                // forever holds the polling lease and takes every other automation with it.
+                const next = Math.min(budget * 2, 100);
+                if (next <= budget)
+                    break;
+                budget = next;
+                const widened = { ...definition, filters: { ...definition.filters, maxRecords: budget } };
+                result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, widened, { since: overlapSince }));
+            }"
 
 if [ -f "$PLIST" ]; then
   if plutil -extract EnvironmentVariables.CEZ_SKILLS_AUTO_UPDATE raw "$PLIST" >/dev/null 2>&1; then
