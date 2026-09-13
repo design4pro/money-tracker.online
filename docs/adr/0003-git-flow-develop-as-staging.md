@@ -159,3 +159,37 @@ tooling seam alone does not close this one. What the repository has in the meant
 instruction in three places - this record, the repo-local `om-approve-merge-pr` extension, and the
 body of the promotion pull request itself - and written instruction is exactly as strong as the
 attention of whoever is merging.
+
+## Amendment 2026-09-13 (the guard is a mechanism)
+
+The amendment above closes by saying that until `allowed_merge_methods` is narrowed, the promotion
+strategy is a convention and not a mechanism. It has been narrowed, by an admin, on 2026-09-13
+(#169). The `main` ruleset - id `22037770`, target `branch`, condition `~DEFAULT_BRANCH`,
+enforcement `active` - now reports:
+
+```bash
+gh api repos/design4pro/money-tracker.online/rulesets/22037770 \
+  --jq '.rules[] | select(.type == "pull_request") | .parameters.allowed_merge_methods'
+# ["merge"]
+```
+
+A pull request whose base is `main` therefore offers one strategy, and a squash or a rebase of it is
+refused - at the button and through the API - rather than merely discouraged. `allow_squash_merge`
+is still on repository-wide, which was the point of putting the guard on the ruleset: a feature
+branch into `develop` keeps the strategy that is right for it, and only the one branch that needs the
+guard carries it.
+
+**The three written places stay.** A mechanism that refuses an action does not say why, and whoever
+next finds the squash button missing should be able to learn the reason rather than only the rule -
+so this record, the `om-approve-merge-pr` extension and the `[!IMPORTANT]` alert in the promotion
+pull request's body all keep saying "merge commit, never a squash". What changed is that they are no
+longer the only thing standing between this repository and a third ancestry gap.
+
+**The convention did hold in the interval, and the second gap closed itself.** `d284141` (#148) and
+`d2ca1c9` (#153) each have one parent; every promotion since has two - `b556536` (#188), `239cdf0`
+(#193), `2428cc5` (#255), `a736b70` (#262) and `77d6fab` (#263). #188 is what repaired the gap #153
+opened: its second parent put `develop`'s tip back into `main`'s ancestry, so no second back-merge
+was needed, and `git merge-base origin/main origin/develop` now reports the second parent of the most
+recent promotion instead of #148. The two one-parent commits stay on `main`: `AGENTS.md` forbids the
+force-push, the content there is correct, and the history is a record of what happened rather than a
+thing to tidy.

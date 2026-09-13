@@ -162,7 +162,9 @@ into a fact.
   It follows that what holds a merge here is the pipeline — the labels, the review verdict and the
   QA gate in `SDLC.md`, and the merge tooling's own refusal to merge on red — and not the ruleset,
   which enforces only that `develop` and `main` are reached through a pull request and are neither
-  deleted nor force-pushed. Prose elsewhere that credits required checks or branch protection with
+  deleted nor force-pushed, plus — on `main` since 2026-09-13 — that the pull request merges with a
+  merge commit rather than a squash (ADR 0003, amendment 2026-09-13). None of those is a status
+  check, so the rule types read above are unchanged by it. Prose elsewhere that credits required checks or branch protection with
   holding the merge predates this reading and is tracked separately. None of this generalises: the
   same read against `design4pro/planned.travel` returns a `required_status_checks` rule on its
   `develop`. Two repositories share this token and disagree about their gate, which is the argument
