@@ -1,5 +1,5 @@
 {
-  "kitVersion": 24,
+  "kitVersion": 25,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -42,8 +42,16 @@
       "sha256": "deaae522e41ee618b329a1431f21da66e5ef2b204cb6e4c53ee892f733876bae",
       "mode": "100644"
     },
+    ".ai/scripts/__tests__/backlog-status.test.mjs": {
+      "sha256": "5790852ffc14ae9cf18775de252837fc4a2f2b99d2e95234d19c7f0805d0f80e",
+      "mode": "100644"
+    },
     ".ai/scripts/agent-kit-check.mjs": {
       "sha256": "02824937c793827a7c510a1d91852d028fbcfaa822f9862421457c2fe44446ad",
+      "mode": "100755"
+    },
+    ".ai/scripts/backlog-status.mjs": {
+      "sha256": "2453df0a50e3fd5c897e0934408bb1ec642c1f20a4189c5a901040d400508e7a",
       "mode": "100755"
     },
     ".ai/scripts/cez-automations.sh": {
@@ -64,6 +72,10 @@
     },
     ".ai/trackers/github.md": {
       "sha256": "358fb8436571c504a2a9e8df07dc6ed097c239264c28e8afbc45110e3d1889df",
+      "mode": "100644"
+    },
+    ".claude/commands/backlog.md": {
+      "sha256": "fd02cb937d68dfb49740bb8469098b058386784449ac300b053070852e94c769",
       "mode": "100644"
     },
     ".claude/hooks/__tests__/hooks.test.ts": {

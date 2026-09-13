@@ -46,12 +46,15 @@ test-results
 .ai/cezar/workflows/pr-fix.yml
 .ai/cezar/workflows/pr-review.yml
 .ai/cezar/workflows/spec.yml
+.ai/scripts/__tests__/backlog-status.test.mjs
 .ai/scripts/agent-kit-check.mjs
+.ai/scripts/backlog-status.mjs
 .ai/scripts/cez-automations.sh
 .ai/scripts/cez-prompt-templates.sh
 .ai/scripts/cezar-host-patch.sh
 .ai/scripts/housekeeping.sh
 .ai/trackers/github.md
+.claude/commands/backlog.md
 .claude/hooks/__tests__/hooks.test.ts
 .claude/hooks/format-file.sh
 .claude/hooks/git-guardrails.sh
