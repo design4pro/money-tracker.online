@@ -6,11 +6,10 @@ One document per designed change. The directory a spec sits in is its state, the
 its `H1` names the issue and the pull requests behind it, and both are held together by
 `scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).
 
-## Draft — being written (4)
+## Draft — being written (3)
 
 | Spec                                                                                                                       | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
-| [The design-system link navigates through the router](2026-09-11-router-provider-client-side-links.md)                     | 2026-09-11 | [#245](https://github.com/design4pro/money-tracker.online/issues/245) | [#253](https://github.com/design4pro/money-tracker.online/pull/253) | —              |
 | [Reduced motion: the `[data-motion-transform]` reset and the proof it works](2026-09-11-reduced-motion-transform-reset.md) | 2026-09-11 | [#214](https://github.com/design4pro/money-tracker.online/issues/214) | [#251](https://github.com/design4pro/money-tracker.online/pull/251) | —              |
 | [The first client-side navigation draws its loading state](2026-09-11-first-navigation-loading-state.md)                   | 2026-09-11 | [#230](https://github.com/design4pro/money-tracker.online/issues/230) | [#232](https://github.com/design4pro/money-tracker.online/pull/232) | —              |
 | [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md)   | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | [#220](https://github.com/design4pro/money-tracker.online/pull/220) | —              |
@@ -22,11 +21,12 @@ its `H1` names the issue and the pull requests behind it, and both are held toge
 | [Plan guard: assert the eight shared paths under `Owned paths`](2026-09-10-plan-guard-shared-path-assertion.md)                 | 2026-09-10 | [#216](https://github.com/design4pro/money-tracker.online/issues/216) | [#222](https://github.com/design4pro/money-tracker.online/pull/222) | —              |
 | [Designed empty, loading and error states — evidence, gaps and reachability](2026-09-09-designed-empty-loading-error-states.md) | 2026-09-09 | [#21](https://github.com/design4pro/money-tracker.online/issues/21)   | [#135](https://github.com/design4pro/money-tracker.online/pull/135) | —              |
 
-## In progress — a build is open (1)
+## In progress — a build is open (2)
 
-| Spec                                                                                              | Date       | Issue                                                                 | Spec PR                                                             | Implementation                                                      |
-| ------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [Every registered token is reachable through a utility](2026-09-10-token-utility-reachability.md) | 2026-09-10 | [#217](https://github.com/design4pro/money-tracker.online/issues/217) | [#223](https://github.com/design4pro/money-tracker.online/pull/223) | [#258](https://github.com/design4pro/money-tracker.online/pull/258) |
+| Spec                                                                                                   | Date       | Issue                                                                 | Spec PR                                                             | Implementation                                                      |
+| ------------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [The design-system link navigates through the router](2026-09-11-router-provider-client-side-links.md) | 2026-09-11 | [#245](https://github.com/design4pro/money-tracker.online/issues/245) | [#253](https://github.com/design4pro/money-tracker.online/pull/253) | [#264](https://github.com/design4pro/money-tracker.online/pull/264) |
+| [Every registered token is reachable through a utility](2026-09-10-token-utility-reachability.md)      | 2026-09-10 | [#217](https://github.com/design4pro/money-tracker.online/issues/217) | [#223](https://github.com/design4pro/money-tracker.online/pull/223) | [#258](https://github.com/design4pro/money-tracker.online/pull/258) |
 
 ## Implemented (5)
 

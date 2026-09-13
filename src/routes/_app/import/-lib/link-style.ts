@@ -4,15 +4,17 @@ import { focusRing } from '#/components/ui'
 /**
  * How a link inside the import flow is drawn.
  *
- * The links here are TanStack Router's rather than the design system's, for the reason
- * `components/app/dashboard/widget-link.tsx` states: no React Aria `RouterProvider` is mounted in
- * this app, so a `ui` link would do a full document load. That matters more in this flow than
- * anywhere else — the stepper's back and forward **are** links, and a document load between two
- * steps would drop the parsed file this browser is holding.
+ * The links here are TanStack Router's rather than the design system's, and they stay that way.
+ * The reason this file used to give — that no React Aria `RouterProvider` was mounted, so a `ui`
+ * link meant a full document load — expired with #245; the design system's `Link` is a client-side
+ * navigation everywhere the shell is mounted, and the stepper would be safe on it.
  *
- * It is a class string rather than a wrapper component because the router's `Link` is generic over
- * the route tree, and wrapping it without `createLink` erases the typed `to`, `params` and `search`
- * that make a mistyped step a compile error.
+ * What keeps this file is the second reason, which is the stronger one. The stepper's back and
+ * forward carry typed `params` and `search`, and `components/ui`'s `Link` takes a built `href`
+ * string: moving the stepper onto it would turn a mistyped step from a compile error into a
+ * runtime 404. So these stay TanStack's typed `Link`, and this stays a class string rather than a
+ * wrapper component — wrapping a `Link` without `createLink` erases exactly the typing that is the
+ * point.
  *
  * The rules are written out rather than taken from `linkVariants`, which is keyed on React Aria's
  * `data-hovered` and would style nothing on a plain anchor. The underline is present at rest: colour

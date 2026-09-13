@@ -34,13 +34,13 @@ describe('FirstRunPanel', () => {
 
     for (const [index, step] of FIRST_RUN_STEPS.entries()) {
       const links = within(steps[index]).queryAllByRole('link')
-      if (step.to === undefined) {
+      if (step.href === undefined) {
         // Not a disabled button and not a dead link: nothing. A control that goes nowhere is
         // worse than no control, and the step still reads as a step.
         expect(links).toHaveLength(0)
       } else {
         expect(links).toHaveLength(1)
-        expect(links[0].getAttribute('href')).toBe(step.to)
+        expect(links[0].getAttribute('href')).toBe(step.href)
       }
     }
   })

@@ -39,9 +39,12 @@ import type { Browser } from '@playwright/test'
  * it is also the screen issue #21's sibling fix changed, so the case is doing double duty.
  *
  * **Loading** needs a client-side navigation, because a `page.goto` resolves its loader during SSR
- * and never asks the browser for anything a test could hold. The shell's own rail is not one — its
- * links go through the design-system `Link`, which does a full document load — so the case below
- * uses a card link, which is a TanStack `Link` and genuinely client-side.
+ * and never asks the browser for anything a test could hold. The case below uses a card link, which
+ * has always been one. It used to be the *only* kind: the shell's rail went through the
+ * design-system `Link`, which did a full document load, and could not be used for a loading case at
+ * all. #245 mounted React Aria's `RouterProvider`, so the rail is client-side too and
+ * `e2e/navigation.spec.ts` asserts the same loading state through it — this file keeps the card
+ * link because the surface it is about is the account detail, not the navigation that reaches it.
  */
 
 /**
@@ -222,8 +225,9 @@ test.describe('a read that has not come back yet', () => {
 
     const held = await holdServerFns(page)
     try {
-      // A card link, not the rail: `account-card.tsx` uses TanStack's `Link`, so this is a
-      // client-side navigation and its loader asks the browser for the data.
+      // A card link, because the account detail is not a rail destination: `account-card.tsx` uses
+      // TanStack's `Link`, so this is a client-side navigation and its loader asks the browser for
+      // the data.
       await page.locator('main a[href^="/accounts/"]').first().click()
 
       // What issue #21 says nobody could show: a designed loading state, on purpose, on demand.

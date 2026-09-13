@@ -66,6 +66,3 @@ export type { WidgetFrameProps } from './widget-frame'
 
 export { WidgetGrid } from './widget-grid'
 export type { WidgetGridProps } from './widget-grid'
-
-export { WidgetLink } from './widget-link'
-export type { WidgetLinkProps } from './widget-link'

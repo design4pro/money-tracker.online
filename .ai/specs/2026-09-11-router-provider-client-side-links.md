@@ -1,11 +1,11 @@
 # The design-system link navigates through the router
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #245  |
-| **Spec PR**        | #253  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #245        |
+| **Spec PR**        | #253        |
+| **Implementation** | #264        |
 
 ## 📝 TLDR
 

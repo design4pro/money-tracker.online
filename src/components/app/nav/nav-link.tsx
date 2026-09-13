@@ -9,6 +9,15 @@ export interface NavLinkProps {
   /** Already translated. The label is passed in so this file holds no message key. */
   label: string
   className?: string
+  /**
+   * Run when the row is activated, beside the navigation rather than instead of it.
+   *
+   * The rail has no use for it; the phone's *More* sheet does. React Aria calls this from the
+   * same click that `RouterProvider` navigates on, and React does not re-render until that
+   * dispatch is over, so a handler that unmounts this link still leaves the navigation to happen
+   * — the arrangement `MenuItem`'s `href` + `onAction` already relies on.
+   */
+  onPress?: () => void
 }
 
 /**
@@ -32,6 +41,7 @@ export function NavLink({
   isActive,
   label,
   className,
+  onPress,
 }: NavLinkProps) {
   const { href, Icon } = destination
 
@@ -39,6 +49,7 @@ export function NavLink({
     <Link
       href={href}
       variant="unstyled"
+      onPress={onPress}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
         'target-min-h flex w-full items-center gap-3 rounded-md border px-3 py-2 text-label',
