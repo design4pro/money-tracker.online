@@ -9,10 +9,10 @@ import {
   AccountListSkeleton,
   AccountOverviewCard,
   CurrencyTotalsCard,
-  ErrorPanel,
   totalsByCurrency,
 } from '#/components/app/accounts'
 import { SegmentedFilter } from '#/components/app/nav'
+import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, toast } from '#/components/ui'
 import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import {

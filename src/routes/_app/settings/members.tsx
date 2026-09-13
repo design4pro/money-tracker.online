@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { MoreHorizontal, UserPlus } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import {
   Badge,
   Button,

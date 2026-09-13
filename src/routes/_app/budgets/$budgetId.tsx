@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { AlertTriangle, ArrowLeft, Lock, Unlock } from 'lucide-react'
 
-import { Amount, ErrorPanel } from '#/components/app/accounts'
+import { Amount } from '#/components/app/accounts'
 import {
   BudgetDetailSkeleton,
   BudgetMeter,
@@ -11,6 +11,7 @@ import {
   PeriodTimeline,
   RolloverLedger,
 } from '#/components/app/budgets'
+import { ErrorPanel } from '#/components/app/shell'
 import { Badge, Button, Card, Separator, toast } from '#/components/ui'
 import { formatCalendarDateRange, useLocale, useTranslate } from '#/lib/i18n'
 import { asCurrencyCode, formatMoney, makeMoney } from '#/lib/money'

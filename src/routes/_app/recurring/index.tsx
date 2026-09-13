@@ -3,7 +3,6 @@ import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus, Search } from 'lucide-react'
 import { z } from 'zod'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   PeriodStatusBadge,
   RECURRING_PANES,
@@ -12,6 +11,7 @@ import {
   SeriesCard,
 } from '#/components/app/recurring'
 import { SegmentedFilter } from '#/components/app/nav'
+import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, toast } from '#/components/ui'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'

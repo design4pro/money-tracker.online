@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useDragAndDrop } from 'react-aria-components'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import { RulesListSkeleton } from '#/components/app/transactions'
 import {
   Badge,

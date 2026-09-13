@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft, Pencil, X } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import { PayeeAvatar, PayeeDetailSkeleton } from '#/components/app/payees'
+import { ErrorPanel } from '#/components/app/shell'
 import {
   Badge,
   Button,

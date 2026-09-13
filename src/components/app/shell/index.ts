@@ -18,6 +18,9 @@ export { AriaRouterProvider } from './aria-router'
 export { BrandMark, Wordmark } from './brand-mark'
 export type { WordmarkProps } from './brand-mark'
 
+export { ErrorPanel } from './error-panel'
+export type { ErrorPanelProps } from './error-panel'
+
 export { FormModal, useIsDirty } from './form-modal'
 export type { FormModalProps } from './form-modal'
 

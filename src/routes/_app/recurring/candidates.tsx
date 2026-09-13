@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   CandidateCard,
   CandidateListSkeleton,
 } from '#/components/app/recurring'
+import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, EmptyState, toast } from '#/components/ui'
 import { listAccounts } from '#/server/fns/accounts'
 import { listCategories } from '#/server/fns/categories'

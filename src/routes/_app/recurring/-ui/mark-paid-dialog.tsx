@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { parseDate } from '@internationalized/date'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import {
   Button,
   Dialog,

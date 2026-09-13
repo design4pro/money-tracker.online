@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import { Card, Skeleton } from '#/components/ui'
 import {
   formatCalendarDate,

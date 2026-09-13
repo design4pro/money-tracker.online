@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import { RuleEditorSkeleton } from '#/components/app/transactions'
 import { Button, Card, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'

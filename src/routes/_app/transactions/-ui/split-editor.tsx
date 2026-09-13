@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, toast } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { asMinor, formatMoney, makeMoney } from '#/lib/money'

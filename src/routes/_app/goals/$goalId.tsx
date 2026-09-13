@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft, CalendarClock, CheckCircle2, Plus } from 'lucide-react'
 
-import { Amount, ErrorPanel } from '#/components/app/accounts'
+import { Amount } from '#/components/app/accounts'
 import {
   ContributionChart,
   ContributionList,
@@ -12,6 +12,7 @@ import {
   SuggestionList,
   goalStateOf,
 } from '#/components/app/goals'
+import { ErrorPanel } from '#/components/app/shell'
 import { Badge, Button, Card, Separator, toast } from '#/components/ui'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import {
   Button,
   Card,
