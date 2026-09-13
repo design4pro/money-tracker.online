@@ -62,16 +62,65 @@ describe('calendar dates', () => {
     expect(formatCalendarDate('pl', '2025-12-31', 'full')).toContain('środa')
   })
 
+  /**
+   * Exact strings, because the defect these pin (#163) is two runtimes writing
+   * two different strings for one date range — `1–31 sie 2026` on the server,
+   * `01–31.08.2026` in WebKit — and an assertion that only says "contains gru"
+   * cannot tell the two apart.
+   */
   it('collapses a range the way the locale collapses it', () => {
-    const range = formatCalendarDateRange(
-      'en',
-      '2025-12-01',
-      '2025-12-31',
-      'medium',
+    expect(formatCalendarDateRange('en', '2025-12-01', '2025-12-31')).toBe(
+      'Dec 1–31, 2025',
     )
-    expect(range).toContain('2025')
-    expect(range).toContain('Dec')
-    expect(range.length).toBeLessThan('1 Dec 2025 - 31 Dec 2025'.length + 8)
+    expect(formatCalendarDateRange('pl', '2025-12-01', '2025-12-31')).toBe(
+      '1–31 gru 2025',
+    )
+    expect(
+      formatCalendarDateRange('pl', '2025-12-01', '2025-12-31', 'short'),
+    ).toBe('01–31.12.2025')
+    expect(
+      formatCalendarDateRange('pl', '2025-12-01', '2025-12-31', 'long'),
+    ).toBe('1–31 grudnia 2025')
+  })
+
+  it('keeps one copy of whatever the two ends spell the same way', () => {
+    // Day and month differ, the year does not, and it is written once at the end.
+    expect(formatCalendarDateRange('pl', '2025-11-15', '2025-12-14')).toBe(
+      '15 lis–14 gru 2025',
+    )
+    expect(formatCalendarDateRange('en', '2025-11-15', '2025-12-14')).toBe(
+      'Nov 15–Dec 14, 2025',
+    )
+    // Nothing is shared, so both ends are written out in full.
+    expect(formatCalendarDateRange('pl', '2024-12-20', '2025-01-05')).toBe(
+      '20 gru 2024–5 sty 2025',
+    )
+  })
+
+  it('writes a range that opens and closes on one day as that one day', () => {
+    expect(formatCalendarDateRange('pl', '2025-12-31', '2025-12-31')).toBe(
+      formatCalendarDate('pl', '2025-12-31'),
+    )
+    expect(formatCalendarDateRange('en', '2025-12-31', '2025-12-31')).toBe(
+      formatCalendarDate('en', '2025-12-31'),
+    )
+  })
+
+  /**
+   * The invariant #163 is really about. A range is built out of the two dates it
+   * was handed, each formatted by the same call every other date on the page
+   * goes through — never out of an interval pattern `Intl` picked for ranges,
+   * because which pattern it picks is engine data and the server and WebKit
+   * disagree about it for `pl`.
+   */
+  it('builds a range out of its two dates, not out of an interval pattern', () => {
+    for (const locale of ['en', 'pl'] as const) {
+      const start = formatCalendarDate(locale, '2024-12-20')
+      const end = formatCalendarDate(locale, '2025-01-05')
+      expect(formatCalendarDateRange(locale, '2024-12-20', '2025-01-05')).toBe(
+        `${start}–${end}`,
+      )
+    }
   })
 })
 

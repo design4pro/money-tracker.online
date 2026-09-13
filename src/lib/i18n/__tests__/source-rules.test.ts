@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Two platform APIs are banned in `src/lib/i18n`, and this is what keeps them
- * out once the reasoning in `../locales.ts` has scrolled out of view:
+ * Three platform APIs are banned in `src/lib/i18n`, and this is what keeps them
+ * out once the reasoning in `../locales.ts` and `../format.ts` has scrolled out
+ * of view:
  *
  * - **`Intl.DisplayNames`.** Its language names differ between the runtimes
  *   this product deploys to — workerd answers with the CLDR lower-case forms,
@@ -16,8 +17,16 @@ import { describe, expect, it } from 'vitest'
  * - **`Intl.Locale.prototype.textInfo`.** It is `undefined` in workerd, in
  *   WebKit and in Chromium, so code that asks it for a direction gets
  *   `undefined` and lays a page out backwards.
+ * - **`Intl.DateTimeFormat.prototype.formatRange`** (and `formatRangeToParts`,
+ *   which the same substring catches). It resolves its pattern from CLDR's
+ *   `intervalFormats` by skeleton rather than from the options it was given, and
+ *   the two runtimes resolve `pl` differently: the server writes
+ *   `1–31 sie 2026`, WebKit writes `01–31.08.2026`, and every Polish page
+ *   showing a budget period hydrates with a mismatch (#163). `format` and
+ *   `formatToParts` are unaffected — their pattern the pinned options do
+ *   determine — so `formatCalendarDateRange` composes the range out of those.
  *
- * Both facts live as columns in the frozen table in `../locales.ts`.
+ * The first two facts live as columns in the frozen table in `../locales.ts`.
  *
  * The scan strips comments first, because the ban is on calling these APIs and
  * both names appear in the prose explaining why. It is deliberately simple: the
@@ -36,6 +45,10 @@ const BANNED: ReadonlyArray<{ readonly api: string; readonly why: string }> = [
   {
     api: 'textInfo',
     why: 'undefined in every runtime we deploy to; direction is a column in ./locales',
+  },
+  {
+    api: 'formatRange',
+    why: 'its interval pattern differs between workerd and WebKit for pl; compose the range from formatToParts, as ./format does',
   },
 ]
 
