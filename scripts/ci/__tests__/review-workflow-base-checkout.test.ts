@@ -48,6 +48,15 @@ describe(WORKFLOW, () => {
       expect(reviewJob).toMatch(/git checkout FETCH_HEAD -- [^\n]*scripts\/ci/)
     })
 
+    // A script is only as trustworthy as what it reads. review-threads-label.mjs takes its scope -
+    // which pull requests this automation is for at all - from `baseBranch` in this file, so a
+    // pull request supplying its own copy would be deciding whether it may arm a run on itself.
+    it('re-checks out the om config the arming script reads its scope from', () => {
+      expect(reviewJob).toMatch(
+        /git checkout FETCH_HEAD -- [^\n]*\.ai\/agentic\.config\.json/,
+      )
+    })
+
     // Green the day it was written, and that is the point: it is the half of #103 that was not
     // broken, held so it cannot become the next report. A step added above the re-checkout would
     // run the pull request's own copy of the script, which is what #103 reported about the
