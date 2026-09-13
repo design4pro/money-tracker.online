@@ -109,6 +109,23 @@ export default defineConfig({
   // leg timings live beside that matrix. It sits inside the `timeout-minutes: 20` that ci.yml puts
   // on the job, so this one still fires first.
   globalTimeout: isCI ? 15 * 60_000 : undefined,
+  // The companion to `globalTimeout`, and the reason that one stopped naming anything.
+  //
+  // When the browser loses its route to the server mid-run, every remaining test raises the same
+  // navigation timeout, `retries: 2` charges each corpse three times at ~35s an attempt, and the
+  // process grinds on until the wall clock kills it with `Timed out waiting 900s` - a message that
+  // names no test and points at no cause. Measured on run 34144653183: the wedge began 2.4 minutes
+  // into the leg and the remaining 12.5 minutes produced 21 consecutive identical failures across
+  // four spec files and not one further verdict. Nothing after the first few was a measurement.
+  //
+  // Three, and not a generous number, because the budget cannot spend a generous one. A healthy
+  // chromium leg measured 524-692s of the 900s across the fourteen runs sampled on 2026-09-13
+  // (34675633494 through 34744432268), so the slack at the worst of them is ~208s - two failing
+  // tests, three if they start before the nine-minute mark. Past that the run dies on the deadline
+  // whatever this says, and a truncated report with names, traces and the `gotoApp` verdict
+  // (`e2e/support/reachability.ts`) beats a complete one nobody receives. It cannot turn a red run
+  // green: reaching it is itself a failure, and the tests it skips are reported `did not run`.
+  maxFailures: isCI ? 3 : undefined,
   reporter: [
     ['line'],
     ['json', { outputFile: 'test-results/results.json' }],
