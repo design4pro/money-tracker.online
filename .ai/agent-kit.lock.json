@@ -1,9 +1,9 @@
 {
-  "kitVersion": 25,
+  "kitVersion": 26,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
-      "sha256": "7aedd20917b1950e04f0eb895347598d4563b82ae719d963585a7eb4a7e546a4",
+      "sha256": "094b45b3aeb60d9af29213b5e29ae563c0429005948f301a54040f737ed26d33",
       "mode": "100644"
     },
     ".ai/cezar/workflows/brainstorm.yml": {
@@ -99,7 +99,7 @@
       "mode": "100755"
     },
     ".claude/settings.json": {
-      "sha256": "37b3534361bbb6cd6095234f447d952acc93f665b67fab8b18349e9b7f60dacb",
+      "sha256": "4465d1fd3d2a67c91bf29c2457dfbd7820f288e6b367377f36d06dde405de8b3",
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {

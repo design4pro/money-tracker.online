@@ -1,7 +1,25 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "description": "Project-scoped Claude Code settings for money-tracker.online. The guardrails that must apply to every checkout live in .claude/hooks, and the allow list carries only the tracker operations the om-* pipeline cannot run without. Nothing that refuses a command belongs in this file. Every other permission rule stays per-developer in the gitignored .claude/settings.local.json.",
-  "permissions": { "allow": ["Bash(gh pr review:*)", "Bash(gh pr comment:*)"] },
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(gh pr review:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh log:*)",
+      "Bash(gh issue:*)"
+    ]
+  },
+  "modelSettings": {
+    "claude-fable-5-1": {
+      "effortLevel": "medium"
+    },
+    "claude-opus-5": {
+      "effortLevel": "high"
+    }
+  },
   "hooks": {
     "PreToolUse": [
       {
