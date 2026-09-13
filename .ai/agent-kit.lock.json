@@ -1,5 +1,5 @@
 {
-  "kitVersion": 30,
+  "kitVersion": 31,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -67,7 +67,7 @@
       "mode": "100755"
     },
     ".ai/scripts/cezar-host-patch.sh": {
-      "sha256": "d0d6b5d2a562cc270f5d474784a04bef3ea8cd7113fed8dfc85a817b63c598e4",
+      "sha256": "307342bb21ccc493fd356ec9d7ad6d15063417db4094e1c61987bb6aba2a5701",
       "mode": "100755"
     },
     ".ai/scripts/housekeeping.sh": {
