@@ -65,11 +65,12 @@ describe(ADR, () => {
     expect(adr).toMatch(/gh pr merge <n> --merge/)
   })
 
-  // The mechanical guard needs repository admin, so until someone applies it the ADR has to say
-  // out loud that what the repository has is a convention. A record that implies a mechanism it
-  // does not have is worse than one that admits the gap.
+  // The record has to say out loud which of the two the repository has, and the answer changed on
+  // 2026-09-13 when an admin narrowed the `main` ruleset's `allowed_merge_methods` to `["merge"]`
+  // (#169). A record that still called this a convention would understate a guard that now exists -
+  // the same drift this file guards against, pointing the other way.
   it('says whether the guard is a mechanism or a convention', () => {
     expect(adr).toMatch(/allowed_merge_methods/)
-    expect(adr).toMatch(/this is a convention and not a mechanism/i)
+    expect(adr).toMatch(/the guard is a mechanism/i)
   })
 })
