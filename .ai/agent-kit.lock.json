@@ -1,9 +1,9 @@
 {
-  "kitVersion": 24,
+  "kitVersion": 26,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
-      "sha256": "7aedd20917b1950e04f0eb895347598d4563b82ae719d963585a7eb4a7e546a4",
+      "sha256": "094b45b3aeb60d9af29213b5e29ae563c0429005948f301a54040f737ed26d33",
       "mode": "100644"
     },
     ".ai/cezar/workflows/brainstorm.yml": {
@@ -42,8 +42,16 @@
       "sha256": "deaae522e41ee618b329a1431f21da66e5ef2b204cb6e4c53ee892f733876bae",
       "mode": "100644"
     },
+    ".ai/scripts/__tests__/backlog-status.test.mjs": {
+      "sha256": "5790852ffc14ae9cf18775de252837fc4a2f2b99d2e95234d19c7f0805d0f80e",
+      "mode": "100644"
+    },
     ".ai/scripts/agent-kit-check.mjs": {
       "sha256": "02824937c793827a7c510a1d91852d028fbcfaa822f9862421457c2fe44446ad",
+      "mode": "100755"
+    },
+    ".ai/scripts/backlog-status.mjs": {
+      "sha256": "2453df0a50e3fd5c897e0934408bb1ec642c1f20a4189c5a901040d400508e7a",
       "mode": "100755"
     },
     ".ai/scripts/cez-automations.sh": {
@@ -64,6 +72,10 @@
     },
     ".ai/trackers/github.md": {
       "sha256": "358fb8436571c504a2a9e8df07dc6ed097c239264c28e8afbc45110e3d1889df",
+      "mode": "100644"
+    },
+    ".claude/commands/backlog.md": {
+      "sha256": "fd02cb937d68dfb49740bb8469098b058386784449ac300b053070852e94c769",
       "mode": "100644"
     },
     ".claude/hooks/__tests__/hooks.test.ts": {
@@ -87,7 +99,7 @@
       "mode": "100755"
     },
     ".claude/settings.json": {
-      "sha256": "37b3534361bbb6cd6095234f447d952acc93f665b67fab8b18349e9b7f60dacb",
+      "sha256": "4465d1fd3d2a67c91bf29c2457dfbd7820f288e6b367377f36d06dde405de8b3",
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {
