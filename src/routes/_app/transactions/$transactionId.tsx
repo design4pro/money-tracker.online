@@ -4,7 +4,7 @@ import { createFileRoute, isNotFound } from '@tanstack/react-router'
 import { ArrowLeft, Copy, Pencil, Trash2 } from 'lucide-react'
 import { z } from 'zod'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import {
   ConfirmDeleteDialog,
   DetailSummary,

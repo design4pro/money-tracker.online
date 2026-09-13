@@ -10,8 +10,8 @@ import {
   AccountStateBadges,
   Amount,
   CreditUtilisation,
-  ErrorPanel,
 } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import {
   Button,
   Card,

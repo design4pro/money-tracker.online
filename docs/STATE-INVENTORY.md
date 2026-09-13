@@ -272,16 +272,20 @@ already consistent, so the rule is recorded here rather than re-derived by the n
 
 ## 5. One finding outside issue #21's scope
 
-`ErrorPanel` — the retryable failure panel every surface uses — lives at
-`src/components/app/accounts/error-panel.tsx` and is reached by **37 modules outside
+`ErrorPanel` — the retryable failure panel every surface uses — lived at
+`src/components/app/accounts/error-panel.tsx` and was reached by **37 modules outside
 `src/components/app/accounts`**, spanning budgets, categories, dashboard, goals, payees, recurring,
 settings, transactions and rules. `docs/SPEC.md` §8 gives a concept exactly one owner, and the error
-treatment issue #21 wants made consistent is owned by one product area that everyone else reaches
+treatment issue #21 wants made consistent was owned by one product area that everyone else reached
 into.
 
-It is not fixed here: it is a 37-file mechanical move with no behaviour change and no dependency on
-anything in #21, and bundling it would make that one issue two capabilities. It is filed as
-[#208](https://github.com/design4pro/money-tracker.online/issues/208).
+It was not fixed here: it is a mechanical move with no behaviour change and no dependency on
+anything in #21, and bundling it would make that one issue two capabilities. It was filed as
+[#208](https://github.com/design4pro/money-tracker.online/issues/208) and **fixed there**: the panel
+now lives at `src/components/app/shell/error-panel.tsx` beside the rest of the cross-area chrome,
+the accounts barrel imports it like everyone else, and
+`src/components/app/shell/__tests__/error-panel-ownership.test.ts` fails if a compatibility
+re-export puts it back. The count was **41** by the time the move landed, not the 37 measured here.
 
 ## 6. What the inventory decided
 

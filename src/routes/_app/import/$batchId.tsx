@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import { Spinner } from '#/components/ui'
 import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import { getImport } from '#/server/fns/imports'

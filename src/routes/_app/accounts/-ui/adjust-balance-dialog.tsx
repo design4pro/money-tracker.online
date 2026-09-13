@@ -2,12 +2,8 @@ import { useState } from 'react'
 import { today } from '@internationalized/date'
 import { Info } from 'lucide-react'
 
-import {
-  Amount,
-  DirectionalAmount,
-  ErrorPanel,
-} from '#/components/app/accounts'
-import { FormModal } from '#/components/app/shell'
+import { Amount, DirectionalAmount } from '#/components/app/accounts'
+import { ErrorPanel, FormModal } from '#/components/app/shell'
 import {
   Button,
   Card,

@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { parseDate, today } from '@internationalized/date'
 
-import { ErrorPanel } from '#/components/app/accounts'
-import { FormModal, useIsDirty } from '#/components/app/shell'
+import { ErrorPanel, FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   DatePicker,

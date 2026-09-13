@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 
-import { ErrorPanel } from '#/components/app/accounts'
+import { ErrorPanel } from '#/components/app/shell'
 import { Card } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { listAccounts } from '#/server/fns/accounts'

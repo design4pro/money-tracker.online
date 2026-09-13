@@ -3,12 +3,12 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { z } from 'zod'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   GoalCard,
   GoalEmptyState,
   GoalListSkeleton,
 } from '#/components/app/goals'
+import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, Select, SelectItem, toast } from '#/components/ui'
 import { listAccounts } from '#/server/fns/accounts'
 import { archiveGoal, loadGoals, restoreGoal } from '#/server/fns/goals'
