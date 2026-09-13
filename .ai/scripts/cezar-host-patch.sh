@@ -82,7 +82,16 @@ const hits = src.split(FROM).length - 1
 if (hits !== Number(COUNT)) throw new Error(`expected ${COUNT} patch site(s) in ${file}, found ${hits}`)
 fs.writeFileSync(file, src.split(FROM).join(TO))
 JS
-  grep -qF "$marker" "$file" || { echo "marker absent after patching $file: $marker" >&2; exit 1; }
+  # Restore before failing. The write above has already landed, so a file that is patched but
+  # unmarked sends the operator's natural next move - rerun the idempotent script - back into
+  # patch(), where FROM is gone and the count assertion dies with "expected N patch site(s) in
+  # ..., found 0". That names the patch site; the fault is the marker. Putting .orig back makes
+  # every rerun reproduce the message below instead.
+  grep -qF "$marker" "$file" || {
+    cp "$file.orig" "$file"
+    echo "marker absent after patching $file: $marker" >&2
+    exit 1
+  }
   echo "patched: $file"
 }
 

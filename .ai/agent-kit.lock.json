@@ -1,9 +1,13 @@
 {
-  "kitVersion": 26,
+  "kitVersion": 28,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
       "sha256": "094b45b3aeb60d9af29213b5e29ae563c0429005948f301a54040f737ed26d33",
+      "mode": "100644"
+    },
+    ".ai/cezar/workflows/backlog.yml": {
+      "sha256": "ebb449e95b1f71a28870b31f72c5280a1ff43c08175789ac88892da6937dbe59",
       "mode": "100644"
     },
     ".ai/cezar/workflows/brainstorm.yml": {
@@ -63,7 +67,7 @@
       "mode": "100755"
     },
     ".ai/scripts/cezar-host-patch.sh": {
-      "sha256": "fea0f13c05576c69681ce5e93a8428e8b3868cedc8c7e6dc9df5329bb09f3075",
+      "sha256": "73b0a62f9e6e8fd1f4fe9f0ce58cac858a59c9a8acf3b9f48b7acc8775a1e244",
       "mode": "100755"
     },
     ".ai/scripts/housekeeping.sh": {
@@ -71,15 +75,11 @@
       "mode": "100755"
     },
     ".ai/trackers/github.md": {
-      "sha256": "358fb8436571c504a2a9e8df07dc6ed097c239264c28e8afbc45110e3d1889df",
-      "mode": "100644"
-    },
-    ".claude/commands/backlog.md": {
-      "sha256": "fd02cb937d68dfb49740bb8469098b058386784449ac300b053070852e94c769",
+      "sha256": "400d47742a218be017ab33f28c5d338828cb7e63fd0a144b575e450198431f8a",
       "mode": "100644"
     },
     ".claude/hooks/__tests__/hooks.test.ts": {
-      "sha256": "49e1663004c1ad946af6db426643f97dadcfc6afc1726e4c63810fa04ecd862e",
+      "sha256": "489674579f778125abb3607b1300a0f0c7cabec1b210b601c16f19b892623e63",
       "mode": "100644"
     },
     ".claude/hooks/format-file.sh": {
@@ -91,7 +91,7 @@
       "mode": "100755"
     },
     ".claude/hooks/guard-generated.sh": {
-      "sha256": "1aaa84971613fc1bb12b06bd9ff2f07f45bed282f1dfbbbe5a19b85e4b401b8e",
+      "sha256": "376369484cdabb4a5f29f497f10f19b44f553a0b5afe83b172c88c32d067f24f",
       "mode": "100755"
     },
     ".claude/hooks/guard-read.sh": {
@@ -102,20 +102,28 @@
       "sha256": "4465d1fd3d2a67c91bf29c2457dfbd7820f288e6b367377f36d06dde405de8b3",
       "mode": "100644"
     },
+    ".claude/skills/backlog/SKILL.md": {
+      "sha256": "8879a6a755497247f0a60998c1b7fe1dcc132a6172e2cc324a4081b97a97f1db",
+      "mode": "100644"
+    },
     ".github/workflows/claude-code-review.yml": {
-      "sha256": "dcd3fadd11ff01394da33a51ddd1290b694ffb768c1cd12ed3512eecc927726c",
+      "sha256": "d902b440a11734f9995350c04c9c21d602a811a4b6b514fa0ee8e958224458d8",
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
       "sha256": "7a912f2cef335af56b09a3f138ce69db0c8ac1e6a0704b999b46d199c8738705",
       "mode": "100644"
     },
+    ".github/workflows/merge-gate.yml": {
+      "sha256": "d27af92e274e88a5365f33ca8a0209bcd9dd82058209d60b0b17a26d92f82852",
+      "mode": "100644"
+    },
     "docs/agents/cezar-automations.json": {
-      "sha256": "da024300418bc7369cbd592af3a092cb4958c5745c9200f70ed64480ed8287f9",
+      "sha256": "0728923001cfb035317b392ee98034640904f9d3d1b9a2197cc5daebf794c363",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-credential-gate.test.ts": {
-      "sha256": "9599bc3944ce12e1bb5e84e918ae6552f05e7b82a9c16448d09c8b731f73722a",
+      "sha256": "3195f5e788e5877c90c0a161266b0116ecbfdb87dc3c58c795461a2cc67092a2",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-review-ran.test.mjs": {
@@ -126,12 +134,16 @@
       "sha256": "9800db77d220719c1560205dcc024af87b5b64a7acfabc12fd54bb7c81444a5d",
       "mode": "100644"
     },
+    "scripts/ci/__tests__/merge-gate.test.mjs": {
+      "sha256": "c96b085ad5ff9594dca5a0d77fdf85cea9c8b2770d3b686cb8cafe1f266a9581",
+      "mode": "100644"
+    },
     "scripts/ci/__tests__/review-threads-label.test.mjs": {
-      "sha256": "8cb372eedaf9a2e8b15fafa2c8908ca44eafe9094172e9d4e130ebabc64b42e5",
+      "sha256": "578923112ec465f3302eb300055500793f5b8bc3d16f6681801d57cc2a1781e6",
       "mode": "100644"
     },
     "scripts/ci/__tests__/review-workflow-base-checkout.test.ts": {
-      "sha256": "5ca9ba9953c1ec1edda1a334f30476bc940d0afd458874c23a25757ae0838900",
+      "sha256": "0ef81a4c73a45533cd581cb3c52d26402b4212a7706208c2277e2bc990340370",
       "mode": "100644"
     },
     "scripts/ci/claude-review-ran.mjs": {
@@ -142,8 +154,12 @@
       "sha256": "769dd1eafdc70f9b38f01d7930c7fc4af9b2728d337ae0cade093441291c3709",
       "mode": "100644"
     },
+    "scripts/ci/merge-gate.mjs": {
+      "sha256": "bff15f8144f4b0b13b68caf6032cd6707efd7c469949977b363d21e249c6c6f7",
+      "mode": "100644"
+    },
     "scripts/ci/review-threads-label.mjs": {
-      "sha256": "6edb09a8220a3fe431e126bc39e4881baf46beece33d785f9132990665c49d9a",
+      "sha256": "8eab0e169054f0a8ff1f75dbcb7cd277c13a0fcd52b7004b0341de04cf504708",
       "mode": "100644"
     }
   },

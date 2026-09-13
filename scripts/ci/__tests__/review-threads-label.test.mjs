@@ -4,9 +4,10 @@
  * what can go wrong here is not an exit code but a judgement - arming a run nobody wanted, or
  * failing to arm one that would have cleared a red PR.
  *
- * The two cases worth naming: a declined thread stays open by design, so the marker keeps a PR
- * from being armed twice for the same head; and a human's thread is not the automation's business,
- * because a disagreement is settled by talking, not by a run.
+ * The three cases worth naming: a pull request that is not targeting the integration branch is
+ * not this automation's business at all; a declined thread stays open by design, so the marker
+ * keeps a PR from being armed twice for the same head; and a human's thread is not the
+ * automation's business either, because a disagreement is settled by talking, not by a run.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -25,12 +26,57 @@ const botThread = (over = {}) => ({
 const input = (over = {}) => ({
   threads: [botThread()],
   labels: [],
+  baseRef: 'develop',
+  integrationBranch: 'develop',
   headSha: HEAD,
   markerSha: null,
   ...over,
 })
 
 describe('decide', () => {
+  /**
+   * The standing promotion of the integration branch into the default branch is the pull request
+   * this automation must never touch: its *head* is the integration branch, so the run it would
+   * start would merge the default branch into it and push follow-up commits straight onto it.
+   * The base branch is what tells that pull request apart; the two rows after this one are the
+   * regression a label-based stand-down would have introduced.
+   */
+  it('stands down on a pull request that is not targeting the integration branch', () => {
+    const { act, reason } = decide(
+      input({
+        baseRef: 'main',
+        integrationBranch: 'develop',
+        labels: ['merge-queue'],
+      }),
+    )
+    expect(act).toBe('skip')
+    expect(reason).toContain('main')
+    expect(reason).toContain('develop')
+  })
+
+  // `merge-queue` is what the promotion carries, and adding it to HOLDS would have been the
+  // obvious symmetry with the `pr-autopilot` stand-down. It is also exactly what this automation
+  // is for: approved, waiting to merge, and held by an open thread. Pinned so the naive fix
+  // cannot come back.
+  it('arms an approved pull request carrying merge-queue', () => {
+    expect(decide(input({ labels: ['merge-queue'] })).act).toBe('label')
+  })
+
+  // Routing is asked before the holds, so the job log says "not this automation's pull request"
+  // rather than "held" - two different things for whoever is reading it.
+  it('reports the base branch rather than the hold when both apply', () => {
+    const { act, reason } = decide(
+      input({
+        baseRef: 'main',
+        integrationBranch: 'develop',
+        labels: ['in-progress'],
+      }),
+    )
+    expect(act).toBe('skip')
+    expect(reason).toContain('main')
+    expect(reason).not.toContain('in-progress')
+  })
+
   it('arms the automation when the review bot left a live thread', () => {
     const { act, reason } = decide(input())
     expect(act).toBe('label')
@@ -142,7 +188,11 @@ const settled = (count) =>
   Array.from({ length: count }, () => rawThread({ isResolved: true }))
 
 /** One `reviewThreads` page as GitHub returns it. `endCursor` null means this is the last one. */
-const page = (threads, { endCursor = null, labels = [] } = {}) => ({
+const page = (
+  threads,
+  { endCursor = null, labels = [], baseRef = 'develop' } = {},
+) => ({
+  baseRefName: baseRef,
   labels: { nodes: labels.map((name) => ({ name })) },
   reviewThreads: {
     pageInfo: { hasNextPage: endCursor !== null, endCursor },
@@ -171,10 +221,20 @@ describe('readReviewState', () => {
     expect(decide(input(firstPageOnly)).act).toBe('skip')
   })
 
-  it('carries the labels through, which is the other half of what decide reads', () => {
+  it('carries the labels through, which is one of the other inputs decide reads', () => {
     const state = readReviewState(() => page([rawThread()], { labels: ['in-progress'] }))
 
     expect(state.labels).toEqual(['in-progress'])
     expect(decide(input(state)).reason).toContain('in-progress')
+  })
+
+  // The read is the only place the base branch can come from, and `input` spreads the state over
+  // its own `integrationBranch: 'develop'` - so this is the whole path from a GitHub page to the
+  // stand-down, not just the field being present.
+  it('carries the base branch through, which is what routes the decision', () => {
+    const state = readReviewState(() => page([rawThread()], { baseRef: 'main' }))
+
+    expect(state.baseRef).toBe('main')
+    expect(decide(input(state)).act).toBe('skip')
   })
 })

@@ -484,6 +484,46 @@ describe('guard-generated.sh', () => {
         .status,
     ).toBe(0)
   })
+
+  // Confinement (agent-kit#2). Before it, `${file_path#"$root"/}` left a path outside the root
+  // absolute, the hook's anchored pattern cannot match an absolute path, and so every rule in the
+  // file read as "not guarded" - which is how a pr-autopilot run rewrote eight templates in a
+  // sibling agent-kit checkout, on a human's branch, with uncommitted work in the tree.
+  it.each([
+    // The incident's own shape: a sibling checkout on the same host, named absolutely...
+    '/elsewhere/agent-kit/templates/docs/agents/cezar-automations.json',
+    // ...and named the way it is actually reached, which the lexical '..' arm catches instead.
+    '../agent-kit/templates/.claude/hooks/guard-generated.sh',
+    '/repo/../agent-kit/templates/.claude/settings.json',
+    'src/../../elsewhere/x.ts',
+  ])('agent mode blocks the write outside the worktree: %s', (file_path) => {
+    const r = hook(
+      'guard-generated.sh',
+      { file_path },
+      { ...AGENT, CLAUDE_PROJECT_DIR: root },
+    )
+    expect(r.status).toBe(2)
+    // The message has to say where such a change does belong. A block that only refuses leaves
+    // the run looking for another route to the same file.
+    expect(r.stderr).toContain('pull request')
+  })
+
+  it('confines writes in agent runs only, and still takes a relative path', () => {
+    const outside = '/elsewhere/agent-kit/templates/x.json'
+    const w = (file_path: string, env: Record<string, string>) =>
+      hook('guard-generated.sh', { file_path }, { ...env, CLAUDE_PROJECT_DIR: root })
+        .status
+    // A developer at the keyboard legitimately edits a sibling checkout; a run does not, and
+    // under GitHub Actions least of all.
+    expect(w(outside, {})).toBe(0)
+    expect(w(outside, ACTIONS)).toBe(2)
+    // A relative path resolves against the root rather than reading as outside it, so the rules
+    // after the confinement check still see it - allowed or guarded on its own merits. A file in
+    // a directory that does not exist yet is the ordinary write, and stays allowed.
+    expect(w('src/x.ts', AGENT)).toBe(0)
+    expect(w('src/new/deep/x.ts', AGENT)).toBe(0)
+    expect(w('.claude/settings.json', AGENT)).toBe(2)
+  })
 })
 
 // `-C` does not win over an inherited `GIT_DIR`: run from a git hook - which is what
@@ -564,6 +604,24 @@ describe('guard-generated.sh, on a branch that already changes a guarded file', 
 
   it('lets a cezar run amend a guarded file the branch already changes', () => {
     expect(edit('.ai/trackers/github.md', AGENT).status).toBe(0)
+  })
+
+  // A real root and a real sibling, which the cases with a '/repo' root cannot be: $TMPDIR on
+  // macOS is reached through /var, a symlink to /private/var, and the tools hand back the resolved
+  // form. A root left unresolved compares unequal to every path under it, so the confinement check
+  // would refuse the whole worktree; the case above is that counter-case, and this is the other
+  // half of the pair.
+  it('refuses a sibling checkout, resolving both sides physically', () => {
+    const sibling = mkdtempSync(join(tmpdir(), 'guard-sibling-'))
+    mkdirSync(join(sibling, 'templates'), { recursive: true })
+    const r = hook(
+      'guard-generated.sh',
+      { file_path: join(sibling, 'templates/x.json') },
+      { ...AGENT, CLAUDE_PROJECT_DIR: root },
+      root,
+    )
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('outside the worktree')
   })
 
   it('still refuses a guarded file the branch does not touch', () => {

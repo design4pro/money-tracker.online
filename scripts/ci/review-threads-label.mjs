@@ -25,10 +25,19 @@
  * "Ready for review" on such a PR would start the same run to reach the same conclusion, forever.
  * The marker comment is that record: one comment per PR, rewritten in place, naming the head it
  * last armed.
+ *
+ * ## Why only the integration branch
+ *
+ * The scope is every pull request targeting the branch this pipeline integrates into, and nothing
+ * else. The standing promotion of that branch into the repository's default branch is the case
+ * that matters: its *head* is the integration branch, so `om-auto-fix-pr` - a fixing chain that
+ * merges the base and pushes follow-up commits to the head - would merge the default branch into
+ * the integration branch and push straight onto it. A branch ruleset should refuse that, but
+ * "a protection rule refuses it" is not "the run cannot be started".
  */
 
 import { execFileSync } from 'node:child_process'
-import { realpathSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 /** Logins whose threads are the automation's business. A human's thread is a human's to settle. */
@@ -52,6 +61,8 @@ const HOLDS = ['in-progress', 'blocked', 'do-not-merge']
  * @param {{
  *   threads: Array<{ isResolved: boolean, isOutdated: boolean, author: string }>,
  *   labels: string[],
+ *   baseRef: string,
+ *   integrationBranch: string,
  *   headSha: string,
  *   markerSha: string | null,
  *   reviewBots?: string[],
@@ -61,10 +72,26 @@ const HOLDS = ['in-progress', 'blocked', 'do-not-merge']
 export function decide({
   threads,
   labels,
+  baseRef,
+  integrationBranch,
   headSha,
   markerSha,
   reviewBots = DEFAULT_REVIEW_BOTS,
 }) {
+  // Routing rather than a hold, which is why it comes first: the log should read "not this
+  // automation's pull request", not "held". See "Why only the integration branch" above for what
+  // is being kept out.
+  //
+  // The base branch is the discriminator, and deliberately not a label. `merge-queue` is the
+  // obvious symmetry with the `pr-autopilot` stand-down and would be a regression here: on an
+  // ordinary pull request it means approved and waiting to merge, and a merge held by an
+  // unresolved thread is precisely the case this automation exists to clear.
+  if (baseRef !== integrationBranch)
+    return {
+      act: 'skip',
+      reason: `the PR targets ${baseRef}, not the integration branch ${integrationBranch}`,
+    }
+
   const bots = new Set(reviewBots.map((login) => login.toLowerCase()))
   const open = threads.filter(
     (thread) =>
@@ -121,6 +148,7 @@ const THREADS_QUERY = `
 query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$number){
+      baseRefName
       labels(first:100){ nodes{ name } }
       reviewThreads(first:100,after:$cursor){
         pageInfo{ hasNextPage endCursor }
@@ -144,6 +172,7 @@ query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
  * rather than something that only happens against GitHub.
  *
  * @param {(cursor: string | null) => {
+ *   baseRefName: string,
  *   labels: { nodes: Array<{ name: string }> },
  *   reviewThreads: {
  *     pageInfo: { hasNextPage: boolean, endCursor: string | null },
@@ -157,17 +186,20 @@ query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
  * @returns {{
  *   threads: Array<{ isResolved: boolean, isOutdated: boolean, author: string }>,
  *   labels: string[],
+ *   baseRef: string,
  * }}
  */
 export function readReviewState(fetchPage) {
   const threads = []
   let labels = []
+  let baseRef = ''
   let cursor = null
   for (;;) {
     const pr = fetchPage(cursor)
-    // Labels hang off the pull request, not the page, so every page repeats them; the last read
-    // wins and they are identical either way.
+    // The labels and the base branch hang off the pull request, not the page, so every page
+    // repeats them; the last read wins and they are identical either way.
     labels = pr.labels.nodes.map((label) => label.name)
+    baseRef = pr.baseRefName
     for (const thread of pr.reviewThreads.nodes)
       threads.push({
         isResolved: thread.isResolved,
@@ -175,9 +207,32 @@ export function readReviewState(fetchPage) {
         author: thread.comments.nodes[0]?.author?.login ?? '',
       })
     const { hasNextPage, endCursor } = pr.reviewThreads.pageInfo
-    if (!hasNextPage) return { threads, labels }
+    if (!hasNextPage) return { threads, labels, baseRef }
     cursor = endCursor
   }
+}
+
+/**
+ * The branch this pipeline integrates into, read from the file every `om-*` skill resolves it
+ * from. Not the repository's default branch: the two differ in both consumers, and a repository
+ * that integrates directly into its default branch would arm nothing, ever.
+ *
+ * Read from the file rather than passed in as an environment variable because this script
+ * documents a by-hand invocation, and an env var would silently change what that invocation
+ * decides. In CI the file is taken from the base branch alongside `scripts/ci` itself
+ * (.github/workflows/claude-code-review.yml) - a guard the branch under review supplies is not a
+ * guard.
+ */
+function readIntegrationBranch() {
+  const config = new URL('../../.ai/agentic.config.json', import.meta.url)
+  const base = JSON.parse(readFileSync(config, 'utf8')).baseBranch
+  if (!base) {
+    console.error(
+      '.ai/agentic.config.json states no baseBranch; refusing to guess which pull requests this automation is for.',
+    )
+    process.exit(1)
+  }
+  return base
 }
 
 function main() {
@@ -192,7 +247,9 @@ function main() {
     process.exit(1)
   }
 
-  const { threads, labels } = readReviewState((cursor) =>
+  const integrationBranch = readIntegrationBranch()
+
+  const { threads, labels, baseRef } = readReviewState((cursor) =>
     graphql(THREADS_QUERY, {
       owner,
       repo: name,
@@ -217,7 +274,14 @@ function main() {
     marker?.body?.match(new RegExp(`${MARKER}\\s*([0-9a-f]{7,40})`))?.[1] ??
     null
 
-  const { act, reason } = decide({ threads, labels, headSha, markerSha })
+  const { act, reason } = decide({
+    threads,
+    labels,
+    baseRef,
+    integrationBranch,
+    headSha,
+    markerSha,
+  })
   if (act === 'skip') {
     console.log(`review-threads: not arming - ${reason}.`)
     return

@@ -69,6 +69,13 @@ jobs:
       # place is `rearm-review-threads`, which checks the base ref out wholesale for the same
       # reason.
       #
+      # `.ai/agentic.config.json` is here because review-threads-label.mjs reads `baseBranch` out
+      # of it to decide whether the pull request is in this automation's scope at all. Left to the
+      # branch under review, that decision would be the branch's to make: a pull request into the
+      # default branch could restate `baseBranch` as the default branch in its own tree and arm a
+      # run on itself, which is the very door the guard closes. Taking the script from the base
+      # branch and its scope from the pull request would have been half a guard.
+      #
       # A path the pull request *adds* under those trees survives this checkout - it restores, it
       # does not clean. Harmless while every step names the script it runs; not harmless the moment
       # one globs.
@@ -78,7 +85,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           git fetch --depth 1 origin "$BASE"
-          git checkout FETCH_HEAD -- .claude/settings.json .claude/hooks scripts/ci
+          git checkout FETCH_HEAD -- .claude/settings.json .claude/hooks scripts/ci .ai/agentic.config.json
 
       # `continue-on-error`, because the two steps that follow decide what the outcome meant: a
       # spent usage limit reviewed nothing and is not a finding, a review that was denied its tools

@@ -37,6 +37,7 @@ test-results
 # .ai/trackers/github.md divergence, before the kit existed.
 .ai/agent-kit.lock.json
 .ai/cezar/config.json
+.ai/cezar/workflows/backlog.yml
 .ai/cezar/workflows/brainstorm.yml
 .ai/cezar/workflows/housekeeping.yml
 .ai/cezar/workflows/implement-spec.yml
@@ -54,22 +55,25 @@ test-results
 .ai/scripts/cezar-host-patch.sh
 .ai/scripts/housekeeping.sh
 .ai/trackers/github.md
-.claude/commands/backlog.md
 .claude/hooks/__tests__/hooks.test.ts
 .claude/hooks/format-file.sh
 .claude/hooks/git-guardrails.sh
 .claude/hooks/guard-generated.sh
 .claude/hooks/guard-read.sh
 .claude/settings.json
+.claude/skills/backlog/SKILL.md
 .github/workflows/claude-code-review.yml
 .github/workflows/claude.yml
+.github/workflows/merge-gate.yml
 docs/agents/cezar-automations.json
 scripts/ci/__tests__/claude-credential-gate.test.ts
 scripts/ci/__tests__/claude-review-ran.test.mjs
 scripts/ci/__tests__/claude-usage-limit.test.mjs
+scripts/ci/__tests__/merge-gate.test.mjs
 scripts/ci/__tests__/review-threads-label.test.mjs
 scripts/ci/__tests__/review-workflow-base-checkout.test.ts
 scripts/ci/claude-review-ran.mjs
 scripts/ci/claude-usage-limit.mjs
+scripts/ci/merge-gate.mjs
 scripts/ci/review-threads-label.mjs
 # agent-kit:end
