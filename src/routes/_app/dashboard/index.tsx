@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   AccountsWidget,
   CashFlowWidget,
@@ -19,6 +18,7 @@ import {
 // reference part and with it in every visitor's entry chunk. Taken from the module rather than the
 // barrel so the widgets, the charts and d3 do not follow it there. See `src/routes/__root.tsx`.
 import { DASHBOARD_PERIODS } from '#/components/app/dashboard/period'
+import { ErrorPanel } from '#/components/app/shell'
 import { Skeleton } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 

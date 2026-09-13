@@ -72,8 +72,5 @@ export type {
   CurrencyTotalsCardProps,
 } from './currency-totals'
 
-export { ErrorPanel } from './error-panel'
-export type { ErrorPanelProps } from './error-panel'
-
 export { AccountOverviewCard } from './overview-card'
 export type { AccountOverviewCardProps } from './overview-card'

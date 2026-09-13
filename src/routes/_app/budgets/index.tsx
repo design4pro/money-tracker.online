@@ -3,7 +3,6 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { z } from 'zod'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   BudgetCard,
   BudgetEmptyState,
@@ -11,6 +10,7 @@ import {
   budgetListClass,
 } from '#/components/app/budgets'
 import { SegmentedFilter } from '#/components/app/nav'
+import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { listCategories } from '#/server/fns/categories'

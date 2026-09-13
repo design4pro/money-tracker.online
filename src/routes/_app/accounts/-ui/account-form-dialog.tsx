@@ -3,11 +3,10 @@ import { today } from '@internationalized/date'
 
 import {
   ACCOUNT_CATEGORY_ORDER,
-  ErrorPanel,
   accountCategoryFacts,
   isAccountCategory,
 } from '#/components/app/accounts'
-import { FormModal, useIsDirty } from '#/components/app/shell'
+import { ErrorPanel, FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   DatePicker,

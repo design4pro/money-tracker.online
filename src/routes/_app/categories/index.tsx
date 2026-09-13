@@ -3,12 +3,12 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { z } from 'zod'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   CategoryEmptyState,
   CategoryTree,
   CategoryTreeSkeleton,
 } from '#/components/app/categories'
+import { ErrorPanel } from '#/components/app/shell'
 import { Button, Switch, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { CATEGORY_KINDS } from '#/lib/enums'

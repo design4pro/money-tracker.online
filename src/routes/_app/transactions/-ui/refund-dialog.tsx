@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/accounts'
-import { FormModal } from '#/components/app/shell'
+import { ErrorPanel, FormModal } from '#/components/app/shell'
 import {
   Button,
   Dialog,

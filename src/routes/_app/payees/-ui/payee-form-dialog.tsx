@@ -1,11 +1,10 @@
 import { useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   CATEGORIZATION_MODES,
   isCategorizationMode,
 } from '#/components/app/payees'
-import { FormModal, useIsDirty } from '#/components/app/shell'
+import { ErrorPanel, FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Dialog,

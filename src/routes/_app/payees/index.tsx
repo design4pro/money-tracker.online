@@ -3,12 +3,12 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus, X } from 'lucide-react'
 import { z } from 'zod'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import {
   PayeeEmptyState,
   PayeeList,
   PayeeListSkeleton,
 } from '#/components/app/payees'
+import { ErrorPanel } from '#/components/app/shell'
 import {
   Button,
   Disclosure,

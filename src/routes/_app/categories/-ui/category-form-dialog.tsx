@@ -1,8 +1,7 @@
 import { useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/accounts'
 import { CATEGORY_HUES, CategoryColourField } from '#/components/app/categories'
-import { FormModal, useIsDirty } from '#/components/app/shell'
+import { ErrorPanel, FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Dialog,
