@@ -230,11 +230,19 @@ async function probeServer(path: string): Promise<ServerProbe> {
 /**
  * `page.goto`, and then the wait every interaction in this suite depends on.
  *
- * Both halves are wrapped because both report the same way when the environment wedges — a bare
- * timeout naming a millisecond count and nothing else — and on the evidence of run 34144653183
- * that is the error every remaining test in the run will raise. The original error is rethrown
- * with the verdict appended, so Playwright keeps its class, its stack and its call log and only
- * gains a sentence saying who to look at.
+ * Only the navigation is wrapped, and the narrowness is the point. A `page.goto` that never
+ * finishes is the signature of #189 — on run 34144653183 every one of the 21 failures after the
+ * wedge was exactly that, one request started and never answered — and when the server turns out
+ * to be answering anyway, "the browser cannot reach it" is the only reading left.
+ *
+ * `waitForHydration` is deliberately left alone. It fails *after* a navigation the server did
+ * serve, so the probe would always find the server up and would append that verdict to a page
+ * whose client bundle is simply broken — blaming the network for a product defect, which is the
+ * mirror image of the mistake this exists to stop. A hydration timeout keeps saying what it always
+ * said.
+ *
+ * The original error is rethrown with the verdict appended, so Playwright keeps its class, its
+ * stack and its call log and only gains a sentence saying who to look at.
  */
 export async function gotoApp(
   page: Page,
@@ -243,7 +251,6 @@ export async function gotoApp(
 ): Promise<void> {
   try {
     await page.goto(path)
-    await waitForHydration(page, hydrationTimeout)
   } catch (error) {
     if (!(error instanceof Error)) throw error
     error.message = `${error.message}\n\n${describeNavigationFailure(
@@ -252,6 +259,7 @@ export async function gotoApp(
     )}`
     throw error
   }
+  await waitForHydration(page, hydrationTimeout)
 }
 
 /**
