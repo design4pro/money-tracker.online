@@ -173,17 +173,17 @@ gh api repos/design4pro/money-tracker.online/rulesets/22037770 \
 # ["merge"]
 ```
 
-A pull request whose base is `main` therefore offers one strategy, and a squash or a rebase of it is
-refused - at the button and through the API - rather than merely discouraged. `allow_squash_merge`
-is still on repository-wide, which was the point of putting the guard on the ruleset: a feature
-branch into `develop` keeps the strategy that is right for it, and only the one branch that needs the
-guard carries it.
+What the parameter does is refuse every strategy it does not list, so a squash of a pull request
+based on `main` is no longer something a reader of this record has to remember not to do.
+`allow_squash_merge` is still on repository-wide, which was the point of putting the guard on the
+ruleset rather than on the repository: a feature branch into `develop` keeps the strategy that is
+right for it, and only the one branch that needs the guard carries it.
 
 **The three written places stay.** A mechanism that refuses an action does not say why, and whoever
-next finds the squash button missing should be able to learn the reason rather than only the rule -
-so this record, the `om-approve-merge-pr` extension and the `[!IMPORTANT]` alert in the promotion
-pull request's body all keep saying "merge commit, never a squash". What changed is that they are no
-longer the only thing standing between this repository and a third ancestry gap.
+next has a squash of the promotion refused should be able to learn the reason rather than only the
+rule - so this record, the `om-approve-merge-pr` extension and the `[!IMPORTANT]` alert in the
+promotion pull request's body all keep saying "merge commit, never a squash". What changed is that
+they are no longer the only thing standing between this repository and a third ancestry gap.
 
 **The convention did hold in the interval, and the second gap closed itself.** `d284141` (#148) and
 `d2ca1c9` (#153) each have one parent; every promotion since has two - `b556536` (#188), `239cdf0`
