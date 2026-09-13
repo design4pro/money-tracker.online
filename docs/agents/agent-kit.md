@@ -33,11 +33,12 @@ The alternative was for the kit to emit text that is already Prettier-clean in e
 block could shrink to the paths that genuinely conflict. Two independent reasons it does not work.
 
 **One template, two renders.** The kit renders the same template into this repository and into
-`planned.travel`, and the lock compares bytes. Per-repository substitutions change line width:
-`money-tracker-online-db` is nine characters longer than `planned-travel-db`, which is what pushed
-three assertions in `.claude/hooks/__tests__/hooks.test.ts` past 80 columns and got them reflowed by
-the pre-commit hook while #120 was being written. A single template cannot be Prettier-clean on both
-sides of a substitution that changes the width.
+`planned.travel`, and the lock compares bytes - so a render has to be byte-exact against the kit, not
+merely well formatted. Per-repository substitutions change line width, so one template line can sit
+inside 80 columns on one side and past them on the other, and Prettier then wraps it on one side
+only. That is not hypothetical: #120 reports the pre-commit hook reflowing assertions in
+`.claude/hooks/__tests__/hooks.test.ts` before the ignore block was in place, which is why the block
+had to land in the same commit as the first rendered file.
 
 **The kit is its own formatting authority.** This repository's `prettier.config.js` is `semi: false`,
 `singleQuote: true` and the default `printWidth` of 80. The kit renders `.ai/scripts/agent-kit-check.mjs`
@@ -76,12 +77,12 @@ goes red on its first command - before typecheck, before the tests.
 
 - **Do not hand-edit a rendered file, formatting included.** Change the template in
   `design4pro/agent-kit`, re-render, and let the sync move the file and the lock in one commit. This
-  is true of `.claude/hooks/__tests__/hooks.test.ts` - 700-odd lines that people do edit here -
-  exactly as it is of the rest.
+  is true of `.claude/hooks/__tests__/hooks.test.ts` - 767 lines that people do edit here - exactly
+  as it is of the rest.
 - **A rendered file's house style is the kit's, not this repository's.** Do not align its quotes or
   its wrapping with the files around it; the next render undoes the change and the lock reports it.
-- `node .ai/scripts/agent-kit-check.mjs` answers "did I touch something managed?" offline, in
-  under a second, before CI has to.
+- `node .ai/scripts/agent-kit-check.mjs` answers "did I touch something managed?" offline and in
+  about 40 ms, before CI has to.
 
 ## When the block shrinks
 
