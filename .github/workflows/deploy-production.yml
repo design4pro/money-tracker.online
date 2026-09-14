@@ -37,10 +37,21 @@ concurrency:
 permissions:
   contents: read
 
+# `runs-on` below reads through `vars.RUNNER_CI`, an organisation variable that is
+# deliberately unset: unset, the default here selects the self-hosted pool. Setting it
+# to `["ubuntu-latest"]` moves every job in every repository back to GitHub-hosted
+# runners without a pull request.
+#
+# In a test workflow that is a convenience. Here it is the recovery path for shipping:
+# production now deploys from one local machine, and the switch has to work when that
+# machine does not. That is why it is an organisation variable and not a literal label
+# array - reverting by pull request would need the merge gate, which needs the same
+# runners that are missing. See agent-kit's README, "The runner pool".
+
 jobs:
   deploy:
     name: Migrate and deploy to production
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 25
     # The approval gate. Nothing in the job runs until the environment's reviewers approve, so
     # the credentials below are never handed to a run nobody looked at.
