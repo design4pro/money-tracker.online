@@ -1,5 +1,5 @@
 {
-  "kitVersion": 35,
+  "kitVersion": 36,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -107,7 +107,7 @@
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {
-      "sha256": "9ba430dbbf4d4e2b106829af29427c6e7357a3ae227caef2c2af65efe293eda6",
+      "sha256": "7758f64754a7b78ba562a000cdf55ed8029b806acfbc931ec04f9fca930145d0",
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
