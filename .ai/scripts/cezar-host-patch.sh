@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Host workarounds for the pinned @open-mercato/cezar@0.10.1, applied to the copy the cockpit
 # service runs (a `.orig` is kept beside each patched file). Idempotent; rerun after an upgrade.
-# Drop each patch when the pinned version carries the fix.
+# A rerun that changes nothing leaves the cockpit alone - restarting it is not free, and the note
+# above the restart says what it costs. Drop each patch when the pinned version carries the fix.
 #
 # The global install is preferred over the npx cache, and that preference is the point rather than
 # a detail: `npx` resolves from a content-hashed cache npm may collect at any time, and a collected
@@ -93,6 +94,10 @@ done
 }
 echo "patching $DIST"
 
+# Raised by every branch below that writes to the host - a patch, a revert, a plist key. Read once,
+# at the restart, which is the only thing in this script that depends on whether the run did work.
+CHANGED=0
+
 # patch FILE MARKER FROM TO [COUNT]: replace exactly COUNT (default 1) occurrences unless MARKER is present.
 patch() {
   local file="$1" marker="$2" from="$3" to="$4" count="${5:-1}"
@@ -117,6 +122,7 @@ JS
     echo "marker absent after patching $file: $marker" >&2
     exit 1
   }
+  CHANGED=1
   echo "patched: $file"
 }
 
@@ -126,6 +132,7 @@ JS
 # checks its own marker and re-applies.
 if grep -qF "includePullRequests ? 'mixed' : 'issues'" "$DIST/automations/github-poller.js"; then
   cp "$DIST/automations/github-poller.js.orig" "$DIST/automations/github-poller.js"
+  CHANGED=1
   echo "reverted the superseded 'mixed' label source"
 fi
 
@@ -139,6 +146,7 @@ fi
 if grep -qF "sources.push({ family: 'prs', activity: 'updated', opened: false, labels: true });" \
   "$DIST/automations/github-poller.js"; then
   cp "$DIST/automations/github-poller.js.orig" "$DIST/automations/github-poller.js"
+  CHANGED=1
   echo "reverted the superseded patch 4 key order"
 fi
 
@@ -231,6 +239,7 @@ patch "$DIST/git-worktree.js" 'host patch: retry the config-lock race' \
 if grep -qF 'host patch: planned.travel#351 - a truncated poll' "$DIST/automations/scheduler.js" \
   || grep -qF 'widenExhaustedAt: widenExhausted && cursor?.tieBreaker' "$DIST/automations/scheduler.js"; then
   cp "$DIST/automations/scheduler.js.orig" "$DIST/automations/scheduler.js"
+  CHANGED=1
   echo "reverted a superseded patch 6 form"
 fi
 
@@ -311,22 +320,55 @@ if [ -f "$PLIST" ]; then
   if plutil -extract EnvironmentVariables.CEZ_SKILLS_AUTO_UPDATE raw "$PLIST" >/dev/null 2>&1; then
     echo "plist already carries CEZ_SKILLS_AUTO_UPDATE"
   else
-    plutil -insert EnvironmentVariables.CEZ_SKILLS_AUTO_UPDATE -string 0 "$PLIST" && echo "plist: CEZ_SKILLS_AUTO_UPDATE=0"
+    plutil -insert EnvironmentVariables.CEZ_SKILLS_AUTO_UPDATE -string 0 "$PLIST" \
+      && { CHANGED=1; echo "plist: CEZ_SKILLS_AUTO_UPDATE=0"; }
   fi
   if plutil -extract EnvironmentVariables.GH_CONFIG_DIR raw "$PLIST" >/dev/null 2>&1; then
     echo "plist already carries GH_CONFIG_DIR"
   else
     # The gh config directory holding the design4pro-agent login (a path, not a token; docs/agents/cezar.md,
     # Host identity). Cezar forwards it, so gh and git push in a run act as the bot.
-    plutil -insert EnvironmentVariables.GH_CONFIG_DIR -string "$HOME/.config/gh-agent" "$PLIST" && echo "plist: GH_CONFIG_DIR"
+    plutil -insert EnvironmentVariables.GH_CONFIG_DIR -string "$HOME/.config/gh-agent" "$PLIST" \
+      && { CHANGED=1; echo "plist: GH_CONFIG_DIR"; }
   fi
-  # bootout + bootstrap so the new environment is read; kickstart alone keeps the old one.
-  launchctl bootout "gui/$(id -u)/dev.cezar.cockpit" 2>/dev/null || true
-  # bootstrap right after bootout can fail with "Input/output error" while the old job unloads.
-  for attempt in 1 2 3 4 5; do
-    launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null && { echo "cockpit restarted"; break; }
-    [ "$attempt" -lt 5 ] && sleep 2 || { echo "bootstrap failed 5 times: launchctl bootstrap gui/$(id -u) $PLIST" >&2; exit 1; }
-  done
+  # Patching is idempotent; restarting is not, so it happens only when this run changed something -
+  # or when the cockpit is not running, which no amount of patching would fix on its own.
+  #
+  # `bootout` kills the service wherever it happens to be, and if that is inside a poll the store's
+  # `automation-poll.lock` is left holding a pid that no longer exists. `acquireLease` reclaims a
+  # lock only once it is `staleAfterMs` old - ten minutes - and until then `check()` throws
+  # "automation polling lease is held by another process" *before* its own `try`, so the throw
+  # reaches neither `recordFailure` nor the `finally` that appends the log record. Nothing is
+  # written anywhere. The scheduler picks the globally earliest due automation across every
+  # project, so one project's stale lock starves all of them, and the swallowed rejection
+  # reschedules with a delay of zero: a spin loop whose only symptom is CPU.
+  #
+  # Ten minutes of dead scheduler, no diagnostics, for a run that had nothing to do. That is what
+  # the header means by leaving the cockpit alone, and it was paid once - verifying idempotency by
+  # running this script twice.
+  #
+  # The one case this deliberately stops covering: a plist edited by hand. Both `plutil -extract`
+  # probes then succeed, nothing here writes, `CHANGED` stays 0, and the cockpit keeps the
+  # environment it started with. The run says `nothing changed; cockpit left running`, so it is
+  # visible rather than silent - but if you edited the plist yourself, restart it yourself.
+  if [ "$CHANGED" = 1 ]; then
+    restart='a patch or a plist key changed'
+  elif ! launchctl print "gui/$(id -u)/dev.cezar.cockpit" >/dev/null 2>&1; then
+    restart='the cockpit is not running'
+  else
+    restart=''
+    echo "nothing changed; cockpit left running"
+  fi
+  if [ -n "$restart" ]; then
+    echo "restarting the cockpit: $restart"
+    # bootout + bootstrap so the new environment is read; kickstart alone keeps the old one.
+    launchctl bootout "gui/$(id -u)/dev.cezar.cockpit" 2>/dev/null || true
+    # bootstrap right after bootout can fail with "Input/output error" while the old job unloads.
+    for attempt in 1 2 3 4 5; do
+      launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null && { echo "cockpit restarted"; break; }
+      [ "$attempt" -lt 5 ] && sleep 2 || { echo "bootstrap failed 5 times: launchctl bootstrap gui/$(id -u) $PLIST" >&2; exit 1; }
+    done
+  fi
 else
   echo "no $PLIST; export CEZ_SKILLS_AUTO_UPDATE=0 wherever the cockpit is started" >&2
 fi

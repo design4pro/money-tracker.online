@@ -23,7 +23,9 @@ jobs:
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
-    runs-on: ubuntu-latest
+    # The agent pool, for the reason spelled out at "Run Claude Code Review" below: this job is
+    # only safe to run with `bypassPermissions` because the runner does not outlive it.
+    runs-on: ${{ fromJSON(vars.RUNNER_AGENT || '["self-hosted","linux","ARM64","agent"]') }}
     permissions:
       contents: read
       # The action authenticates as this job's GITHUB_TOKEN, so `read` here made both channels the
@@ -101,6 +103,14 @@ jobs:
       # foreseen, and still blocks with exit 2 in this mode. The runner is disposable, and the only
       # surface the token can write to is the pull request the hook narrows to a single comment.
       #
+      # "Disposable" stopped being a property of the platform when this moved to the host pool, so
+      # it is now a property of two lines in host/runner: the runner registers with `--ephemeral`,
+      # so GitHub hands it one job and deregisters it, and the container is recreated from an
+      # unmodified image before the next. The agent pool mounts no shared volume, so unlike the ci
+      # pool there is not even a package store for a run to leave something in. If this job is ever
+      # pointed at a runner that outlives it, the argument above has to be made again from the
+      # start - it is the only thing standing between `bypassPermissions` and a persistent host.
+      #
       # `--allowedTools` survives for one unrelated job: in agent mode the action installs an MCP
       # server only when a matching tool name appears there (src/mcp/install-mcp-server.ts), so
       # dropping the flag would take the inline-comment tool away entirely.
@@ -151,10 +161,22 @@ jobs:
       # The other half of the same job: the step above catches a review that failed, this one
       # catches a review that succeeded without reviewing. Only one of the two ever runs.
       #
-      # A pull request that edits this file never reaches either. The action's OIDC exchange
-      # refuses a workflow that differs from the copy on the default branch and skips itself with
-      # no execution output, which the gate reports as a warning rather than a failure - so any
-      # change here is first exercised once it reaches `main`, never on the branch proposing it.
+      # Neither is a formality on a pull request that edits this file. This comment used to say
+      # such a pull request "never reaches either", because the action's OIDC exchange refuses a
+      # workflow differing from the default-branch copy and the gate then reports "a warning rather
+      # than a failure". Both halves are wrong, and each was disproved separately:
+      #
+      #   - planned.travel run 34860285502 reviewed a branch whose copy of this file differed from
+      #     `main` by 24 lines. The review ran, read the pull request, and passed this step.
+      #   - `claude-usage-limit.mjs` sends a missing or unreadable execution file through `fail()`,
+      #     never `pass()`. An absent review is a red job on purpose - its header says why: "A wrong
+      #     green here is far more expensive than a wrong red".
+      #
+      # So a red `claude-review` on a workflow-editing pull request is a result, not an artefact of
+      # editing the workflow. Nor does `runs-on` wait for `main`: GitHub evaluates it when the job
+      # is scheduled, long before any action runs, so a change of runner target is exercised in full
+      # on the branch proposing it - which is how kit 35 found the tooling its new self-hosted agent
+      # pool was missing.
       - name: Fail a review that never read the pull request
         if: steps.claude-review.outcome == 'success'
         env:
@@ -198,7 +220,8 @@ jobs:
   # only the moment is new, and it is the first moment the answer can be anything but "held".
   rearm-review-threads:
     if: github.event.action == 'unlabeled' && github.event.label.name == 'in-progress'
-    runs-on: ubuntu-latest
+    # The ci pool, not the agent pool: this job runs one repository script and spends no tokens.
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     permissions:
       contents: read
       pull-requests: write

@@ -1,5 +1,5 @@
 {
-  "kitVersion": 33,
+  "kitVersion": 36,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -67,7 +67,7 @@
       "mode": "100755"
     },
     ".ai/scripts/cezar-host-patch.sh": {
-      "sha256": "aa493ce21fc5420d2804b75825a2c62aa3a87e88820e86bb2db01cc1296d206e",
+      "sha256": "3b15bae297c7187e2a8e8e4d1534ab63a105dac124e977668eb4f508a6a43f25",
       "mode": "100755"
     },
     ".ai/scripts/housekeeping.sh": {
@@ -107,15 +107,15 @@
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {
-      "sha256": "d902b440a11734f9995350c04c9c21d602a811a4b6b514fa0ee8e958224458d8",
+      "sha256": "7758f64754a7b78ba562a000cdf55ed8029b806acfbc931ec04f9fca930145d0",
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
-      "sha256": "7a912f2cef335af56b09a3f138ce69db0c8ac1e6a0704b999b46d199c8738705",
+      "sha256": "081f4b8f7de39bc8dd80c23dfddf9972ff7dc12f210a20c7654e78818c15419a",
       "mode": "100644"
     },
     ".github/workflows/merge-gate.yml": {
-      "sha256": "9651bac73204726e5e097b862153c98c44c0004a38b9783834df9660e3de7c4e",
+      "sha256": "c5d5432e15388ab45b526c838b08972cc360b756cc653fe584cc9b36190fd292",
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {

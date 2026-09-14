@@ -5,7 +5,7 @@ name: Claude
 # in a pull request review and it picks the work up from there, pushes to a
 # `claude/`-prefixed branch and opens a pull request against it.
 #
-# This runs on a GitHub-hosted runner, not on the Anthropic cloud VM that
+# This runs on the host runner pool, not on the Anthropic cloud VM that
 # `claude --cloud` uses. The practical difference is that everything the job
 # needs has to be installed here, and that CI on the resulting branch is the
 # same CI as for any other branch.
@@ -35,7 +35,12 @@ jobs:
       contains(github.event.review.body, '@claude') ||
       contains(github.event.issue.body, '@claude') ||
       contains(github.event.issue.title, '@claude')
-    runs-on: ubuntu-latest
+    # The agent pool: a container that takes this one job and is then destroyed, mounting
+    # none of the caches the ci pool carries. This job holds `contents: write` for forty
+    # turns, so nothing it leaves behind should be able to reach the next job. Setting the
+    # `RUNNER_AGENT` organisation variable to `["ubuntu-latest"]` moves it back to
+    # GitHub-hosted runners without a pull request.
+    runs-on: ${{ fromJSON(vars.RUNNER_AGENT || '["self-hosted","linux","ARM64","agent"]') }}
     timeout-minutes: 45
 
     permissions:
