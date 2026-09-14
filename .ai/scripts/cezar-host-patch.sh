@@ -346,6 +346,11 @@ if [ -f "$PLIST" ]; then
   # Ten minutes of dead scheduler, no diagnostics, for a run that had nothing to do. That is what
   # the header means by leaving the cockpit alone, and it was paid once - verifying idempotency by
   # running this script twice.
+  #
+  # The one case this deliberately stops covering: a plist edited by hand. Both `plutil -extract`
+  # probes then succeed, nothing here writes, `CHANGED` stays 0, and the cockpit keeps the
+  # environment it started with. The run says `nothing changed; cockpit left running`, so it is
+  # visible rather than silent - but if you edited the plist yourself, restart it yourself.
   if [ "$CHANGED" = 1 ]; then
     restart='a patch or a plist key changed'
   elif ! launchctl print "gui/$(id -u)/dev.cezar.cockpit" >/dev/null 2>&1; then
