@@ -53,11 +53,15 @@
 #    ever reaches further into the same ordered run. A band still saturated at 100 stays pinned;
 #    that is the search API's own ceiling, and `frozenHighWatermark` still reports it - but it
 #    stays pinned cheaply. The ladder is paid once per pinned cursor, not once per interval: the
-#    cursor it failed at is recorded as `widenExhaustedAt`, and a band at a fixed cursor only
-#    grows, so repeating the climb cannot end differently. Without that, a permanently pinned
-#    automation costs 175-255 timeline reads per poll - 10 500/h for `issue-autofix` at its 60s
-#    interval, against the 5 000/h REST budget of a token every agent run on this host shares.
-#    Trading a silent stall for a rate-limited pipeline is not a trade worth making.
+#    cursor it failed at is recorded as `widenExhaustedAt`, and a poll whose stored cursor still
+#    matches reads its window once instead of climbing. That is a cost decision, not a proof - the
+#    search window never shrinks, but `poll()` keeps the first `maxRecords` observations of a
+#    `sort=updated&order=asc` search, so an item inside that prefix leaves it when touched again
+#    and a later climb can land differently. Repeating it is simply not worth what it costs: a
+#    permanently pinned automation spends 175-255 timeline reads per poll - 10 500/h for
+#    `issue-autofix` at its 60s interval, against the 5 000/h REST budget of a token every agent
+#    run on this host shares. Trading a silent stall for a rate-limited pipeline is not a trade
+#    worth making. The cursor moving is the recovery path, and it clears the marker.
 #
 # The cockpit is one per host and shared with planned.travel. That repository's copy of
 # .ai/scripts/cezar-host-patch.sh is identical apart from this paragraph; both are idempotent and
@@ -207,16 +211,27 @@ patch "$DIST/git-worktree.js" 'host patch: retry the config-lock race' \
 # `mode === 'execute'` so a preview - which writes no state - does not either. Note that `mode` is
 # already rewritten to 'preview' above when the handle cannot launch, so detection-only polls are
 # covered by the same test.
-# Supersedes the first form of patch 6, whose marker this one renames - `patch` keys idempotency on
-# the marker, so a host carrying that form is not skipped by the guard. It reaches FROM, which that
-# form has already rewritten from `const result` to `let result`, and dies on the count assertion
-# with `set -e` taking every later patch down with it - including the give-up patch below, which is
-# the half that makes this one affordable. It names the kit-30 comment exactly rather than the
-# shared `planned.travel#351` prefix, which both forms carry. `.orig` is guaranteed to exist
-# because that form created it, the same guarantee the patch-4 block above relies on.
-if grep -qF 'host patch: planned.travel#351 - a truncated poll' "$DIST/automations/scheduler.js"; then
+# Supersedes both earlier forms of patch 6, which fail in opposite directions:
+#
+#   - kit 30 named its marker `planned.travel#351` with no suffix, so this version's guard does not
+#     recognise it. The call is not skipped, reaches a FROM that form already rewrote from
+#     `const result` to `let result`, and dies on the count assertion with `set -e` taking every
+#     later patch down with it - the give-up patch included.
+#   - kit 31 already used *these* markers, so a host carrying it is skipped before FROM is ever
+#     looked at and silently keeps kit 31's give-up line, which stamps the marker onto a cursor the
+#     ladder never climbed. That state is terminal: every rerun skips it again, so the documented
+#     "rerun after an upgrade" cannot clear it.
+#
+# Each form is named by its own exact text, the way the patch-2 and patch-4 blocks above are. The
+# tempting shortcut - grepping the bare `planned.travel#351` prefix - would match this version's
+# own output too, so every rerun would revert and re-apply instead of reporting `already patched`,
+# trading the script's idempotency and the signal an operator reads for a shorter condition.
+# `.orig` is guaranteed to exist because whichever form is present created it, the same guarantee
+# the patch-4 block relies on.
+if grep -qF 'host patch: planned.travel#351 - a truncated poll' "$DIST/automations/scheduler.js" \
+  || grep -qF 'widenExhaustedAt: widenExhausted && cursor?.tieBreaker' "$DIST/automations/scheduler.js"; then
   cp "$DIST/automations/scheduler.js.orig" "$DIST/automations/scheduler.js"
-  echo "reverted the superseded patch 6 form"
+  echo "reverted a superseded patch 6 form"
 fi
 
 patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351 widen' \
