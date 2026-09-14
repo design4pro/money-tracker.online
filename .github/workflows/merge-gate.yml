@@ -30,7 +30,7 @@ jobs:
   # ruleset entry matching no check is not an error, it is simply never waited for.
   merge-gate:
     name: merge-gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     permissions:
       contents: read
     steps:

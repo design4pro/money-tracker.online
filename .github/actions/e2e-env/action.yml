@@ -9,9 +9,10 @@ description: >
   accessibility gate in a11y.yml - and a drift between them would show up as a
   suite that only fails in one of the two. So it lives here once.
 
-  Assumes a runner that already carries the browsers, i.e. a job running in
-  `mcr.microsoft.com/playwright:v<version>-noble`. Installing them per run costs
-  a couple of minutes and pins nothing extra.
+  Assumes a runner that already carries the browsers. That used to mean a job
+  running in `mcr.microsoft.com/playwright:v<version>-noble`; it now means the
+  self-hosted pool, whose image is built FROM exactly that. Installing them per
+  run costs a couple of minutes and pins nothing extra.
 
   There is no R2 fetch and no asset cache here. This product has no basemap and
   no large binary fixture: the seed is pure SQL through the Worker, so the whole

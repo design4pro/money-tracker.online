@@ -44,13 +44,15 @@ jobs:
     # A develop→main pull request duplicates the push-triggered run on the same commits; the push
     # run is canonical for the shared branches.
     if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 30
-    # Same image as the e2e gate, and for the same reason: the browsers are already in it, and
-    # font rasterisation - which is what axe's contrast rule samples - is a property of the
-    # platform. A scan on a different base would disagree about borderline ratios.
-    container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
+    # The same pool as the e2e gate, and no `container:` on either: the runner image is built
+    # FROM `mcr.microsoft.com/playwright:v1.62.1-noble`, so the browsers are already here.
+    # What did change with the pool is the architecture - arm64, where the hosted runners were
+    # amd64 - while the image, its fonts and its freetype are the same. Font rasterisation is
+    # what axe's contrast rule samples on text over a background it cannot compute, so a new
+    # borderline violation here is worth reading as an arm64 finding before it is read as a
+    # product regression.
 
     env:
       CI: 'true'
