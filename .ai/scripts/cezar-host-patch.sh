@@ -53,11 +53,15 @@
 #    ever reaches further into the same ordered run. A band still saturated at 100 stays pinned;
 #    that is the search API's own ceiling, and `frozenHighWatermark` still reports it - but it
 #    stays pinned cheaply. The ladder is paid once per pinned cursor, not once per interval: the
-#    cursor it failed at is recorded as `widenExhaustedAt`, and a band at a fixed cursor only
-#    grows, so repeating the climb cannot end differently. Without that, a permanently pinned
-#    automation costs 175-255 timeline reads per poll - 10 500/h for `issue-autofix` at its 60s
-#    interval, against the 5 000/h REST budget of a token every agent run on this host shares.
-#    Trading a silent stall for a rate-limited pipeline is not a trade worth making.
+#    cursor it failed at is recorded as `widenExhaustedAt`, and a poll whose stored cursor still
+#    matches reads its window once instead of climbing. That is a cost decision, not a proof - the
+#    search window never shrinks, but `poll()` keeps the first `maxRecords` observations of a
+#    `sort=updated&order=asc` search, so an item inside that prefix leaves it when touched again
+#    and a later climb can land differently. Repeating it is simply not worth what it costs: a
+#    permanently pinned automation spends 175-255 timeline reads per poll - 10 500/h for
+#    `issue-autofix` at its 60s interval, against the 5 000/h REST budget of a token every agent
+#    run on this host shares. Trading a silent stall for a rate-limited pipeline is not a trade
+#    worth making. The cursor moving is the recovery path, and it clears the marker.
 #
 # The cockpit is one per host and shared with planned.travel. That repository's copy of
 # .ai/scripts/cezar-host-patch.sh is identical apart from this paragraph; both are idempotent and
@@ -207,6 +211,29 @@ patch "$DIST/git-worktree.js" 'host patch: retry the config-lock race' \
 # `mode === 'execute'` so a preview - which writes no state - does not either. Note that `mode` is
 # already rewritten to 'preview' above when the handle cannot launch, so detection-only polls are
 # covered by the same test.
+# Supersedes both earlier forms of patch 6, which fail in opposite directions:
+#
+#   - kit 30 named its marker `planned.travel#351` with no suffix, so this version's guard does not
+#     recognise it. The call is not skipped, reaches a FROM that form already rewrote from
+#     `const result` to `let result`, and dies on the count assertion with `set -e` taking every
+#     later patch down with it - the give-up patch included.
+#   - kit 31 already used *these* markers, so a host carrying it is skipped before FROM is ever
+#     looked at and silently keeps kit 31's give-up line, which stamps the marker onto a cursor the
+#     ladder never climbed. That state is terminal: every rerun skips it again, so the documented
+#     "rerun after an upgrade" cannot clear it.
+#
+# Each form is named by its own exact text, the way the patch-2 and patch-4 blocks above are. The
+# tempting shortcut - grepping the bare `planned.travel#351` prefix - would match this version's
+# own output too, so every rerun would revert and re-apply instead of reporting `already patched`,
+# trading the script's idempotency and the signal an operator reads for a shorter condition.
+# `.orig` is guaranteed to exist because whichever form is present created it, the same guarantee
+# the patch-4 block relies on.
+if grep -qF 'host patch: planned.travel#351 - a truncated poll' "$DIST/automations/scheduler.js" \
+  || grep -qF 'widenExhaustedAt: widenExhausted && cursor?.tieBreaker' "$DIST/automations/scheduler.js"; then
+  cp "$DIST/automations/scheduler.js.orig" "$DIST/automations/scheduler.js"
+  echo "reverted a superseded patch 6 form"
+fi
+
 patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351 widen' \
   '            const result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, definition, { since: overlapSince }));' \
   "            // host patch: planned.travel#351 widen - a truncated poll whose observations all sit in
@@ -218,10 +245,16 @@ patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351 widen' \
             // reach further into that same run - it never steps over anything.
             let result = await githubRequests.run(() => this.handle.poller.poll(this.handle.owner, this.handle.repo, definition, { since: overlapSince }));
             // The ladder already ran to the ceiling at this exact cursor and did not clear the
-            // band. A band at a fixed cursor only grows - events enter the window and none leave -
-            // so climbing it again cannot end differently, and paying for that every interval
-            // costs up to 255 timeline reads a poll against a token every agent run on this host
-            // shares. Give up until the cursor moves; the state below remembers where.
+            // band. Nothing that leaves the window can make it clearable - an item's updated only
+            // moves forward, so the search window never shrinks - but a retry is not provably
+            // pointless either: the search is sort=updated&order=asc and poll() keeps the first
+            // maxRecords observations, so an item inside that prefix leaves it when it is touched
+            // again, and a later climb can land differently. This is a cost decision, not a proof.
+            // Repeating the climb costs up to 255 timeline reads a poll - 10 500/h for a 60s
+            // automation, against the 5 000/h budget of a token every agent run on this host
+            // shares - and that is not worth paying on the chance that a prefix reshuffled. Give
+            // up until the cursor moves; the cursor moving is the recovery path, and the marker
+            // written below is cleared the moment it does.
             let widenExhausted = !!state.widenExhaustedAt
                 && !!state.cursor
                 && state.widenExhaustedAt.timestamp === state.cursor.timestamp
@@ -262,10 +295,15 @@ patch "$DIST/automations/scheduler.js" 'host patch: planned.travel#351 give-up' 
                         : undefined,
                     // host patch: planned.travel#351 give-up - the cursor the doubling ladder ran
                     // to the ceiling at without clearing the band, so the next interval reads its
-                    // window once instead of climbing 5,10,20,40,80,100 again. Written only as a
-                    // copy of the cursor the ladder failed at, so any poll that advances writes
-                    // undefined here and the next pin climbs again from scratch.
-                    widenExhaustedAt: widenExhausted && cursor?.tieBreaker
+                    // window once instead of climbing 5,10,20,40,80,100 again.
+                    //
+                    // \`cursor === state.cursor\` is not redundant with \`widenExhausted\`. The flag is
+                    // initialised from the stored marker and never reset, so on the poll that finally
+                    // escapes a pin it is still true while the cursor has moved - and writing the
+                    // marker onto the cursor just reached would disable the ladder at a cursor it
+                    // never climbed, permanently, since every later advance re-poisons the new one.
+                    // The cursor moving is this marker's only escape hatch; this is what keeps it open.
+                    widenExhaustedAt: widenExhausted && cursor === state.cursor && cursor?.tieBreaker
                         ? { timestamp: cursor.timestamp, tieBreaker: cursor.tieBreaker }
                         : undefined,"
 
