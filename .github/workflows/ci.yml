@@ -20,6 +20,12 @@ name: CI
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
+#            RUNNER_CI - organisation-level, and deliberately unset. Every job
+#            below runs on the self-hosted pool; setting it to
+#            `["ubuntu-latest"]` moves them all back to GitHub-hosted runners
+#            without a pull request, which is the only recovery path that does
+#            not need the host to be up. See agent-kit's README, "The runner
+#            pool".
 # ──────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -60,7 +66,7 @@ jobs:
     # A develop→main (or main→develop) pull request duplicates the push-triggered
     # run on the same commits; the push run is canonical for the shared branches.
     if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 20
 
     steps:
@@ -230,7 +236,7 @@ jobs:
   test:
     name: unit tests · coverage
     if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 20
 
     steps:
@@ -285,7 +291,7 @@ jobs:
   # rationed - there is no label to add, because there is nothing to opt into.
   e2e:
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
     # so the run's own clock is the one that fires first and names the test it
     # died on; this only catches a job wedged before or after the suite.
@@ -326,11 +332,13 @@ jobs:
           - project: mobile-safari
             shard: 2
             shards: 2
-    # Keep in step with the `@playwright/test` devDependency in package.json:
-    # the image carries the browsers that version expects, and a mismatch is
-    # reported as a missing executable rather than as a wrong one.
-    container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
+    # No `container:`. The runner image is itself built FROM
+    # `mcr.microsoft.com/playwright:v1.62.1-noble`, so the browsers are already
+    # on the runner and pulling the same image again per job would buy nothing.
+    # The version coupling did not go away, it moved: keep
+    # `host/runner/Dockerfile` in agent-kit in step with the `@playwright/test`
+    # devDependency in package.json, or a mismatch is reported as a missing
+    # executable rather than as a wrong one.
 
     steps:
       - name: Check out
@@ -394,7 +402,7 @@ jobs:
     # `skipped` result left to guard against, and a failing e2e job still owes
     # the reader its report.
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 10
 
     steps:
