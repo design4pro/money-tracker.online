@@ -28,7 +28,12 @@ again. Facts this record relies on, checked against docs.github.com, the REST an
 the `gh` v2.101.0 source on 2026-09-15:
 
 - The queue is available to private repositories of an organisation on GitHub Enterprise Cloud, and
-  only as a rule of a **repository** ruleset on a branch name without wildcards.
+  only as a rule of a **repository** ruleset on a branch name without wildcards. Nothing in this
+  repository records that `design4pro` is on that plan: on 2026-09-15
+  `gh api repos/design4pro/money-tracker.online` reads `"private": true`, and `gh api orgs/design4pro`
+  returns `"plan": null` to the pipeline's token. An organisation owner reads the plan (Settings →
+  Billing and plans) before any rollout change lands; a "no" closes this record rather than
+  reverting a kit release and a `ci.yml` change that took the journeys off pull requests.
 - Every required check must report on the `merge_group` commit. A workflow without a `merge_group`
   trigger never reports, and the queue removes the entry when `check_response_timeout_minutes`
   expires. A job skipped by its `if` reports success, as it already does on a pull request.
@@ -47,15 +52,15 @@ the `gh` v2.101.0 source on 2026-09-15:
 
 **`develop` gets a merge queue; `main` does not.** The rule on the `develop` ruleset:
 
-| Parameter                           | Value      | Why                                                                                                                                                                                  |
-| ----------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `merge_method`                      | `SQUASH`   | What feature pull requests into `develop` use today.                                                                                                                                 |
-| `max_entries_to_merge`              | `1`        | One pull request per group: every change gets its own push run and staging deploy, a red group names one culprit, and the multi-PR squash defect above cannot occur.                 |
-| `min_entries_to_merge`              | `1`        | Nothing waits for company.                                                                                                                                                           |
-| `min_entries_to_merge_wait_minutes` | `0`        | Follows from the line above.                                                                                                                                                         |
-| `max_entries_to_build`              | `1`        | A group run takes five `ci` runners' worth of jobs; building a second group in parallel would starve pull request runs on a pool of four and is rebuilt anyway when the first fails. |
-| `grouping_strategy`                 | `ALLGREEN` | With one entry per group the two strategies coincide; `ALLGREEN` stays correct if the size is raised.                                                                                |
-| `check_response_timeout_minutes`    | `60`       | A green push run takes 16 to 25 minutes on the pool today, before any wait for a free runner.                                                                                        |
+| Parameter                           | Value      | Why                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `merge_method`                      | `SQUASH`   | What feature pull requests into `develop` use today.                                                                                                                                                                                                                                                                                               |
+| `max_entries_to_merge`              | `1`        | One pull request per group: every change normally gets its own push run and staging deploy, a red group names one culprit, and the multi-PR squash defect above cannot occur. Two queue merges landing while a push run is still busy share the one pending run `ci.yml`'s concurrency keeps; the newer deploy then carries the change in between. |
+| `min_entries_to_merge`              | `1`        | Nothing waits for company.                                                                                                                                                                                                                                                                                                                         |
+| `min_entries_to_merge_wait_minutes` | `0`        | Follows from the line above.                                                                                                                                                                                                                                                                                                                       |
+| `max_entries_to_build`              | `1`        | A group run takes five `ci` runners' worth of jobs; building a second group in parallel would starve pull request runs on a pool of four and is rebuilt anyway when the first fails.                                                                                                                                                               |
+| `grouping_strategy`                 | `ALLGREEN` | With one entry per group the two strategies coincide; `ALLGREEN` stays correct if the size is raised.                                                                                                                                                                                                                                              |
+| `check_response_timeout_minutes`    | `60`       | The last ten green push runs on `develop` took 15 to 25 minutes from creation to completion, runner waits and deploy included (`gh run list --workflow ci.yml --branch develop --event push --status success -L 10`, runs 34752958943 to 35021244788, read 2026-09-15).                                                                            |
 
 The required checks stay as they are. What changes is where each one does its work:
 
@@ -68,13 +73,17 @@ The required checks stay as they are. What changes is where each one does its wo
 | `claude-review`                            | runs                          | skipped (passes) | -                                        |
 | `merge-gate`                               | runs                          | skipped (passes) | -                                        |
 | `deploy · staging` / `deploy · production` | -                             | -                | after a verdict, found or produced       |
+| `queue removal`                            | -                             | on failure only  | -                                        |
 
 1. **A pull request runs the fast checks, the review and the gate; the queue runs the whole suite on
    the commit that will ship.** The `e2e` legs are skipped on `pull_request`, so a green pull request
    means "reviewed, labelled, builds and passes unit tests", and the journeys judge the exact commit
    `develop` will point at. A promotion pull request (`develop` → `main`) keeps skipping `verify`,
    `test` and `e2e`, and leaves the verdict to the push run (#299, ADR 0016's amendment of
-   2026-09-15).
+   2026-09-15). ADR 0016 kept the legs on every pull request because a regression found on the pull
+   request that caused it is worth more than the runner minutes. The queue keeps that attribution,
+   since a group holds one pull request and a red group names it; what it gives up is the moment the
+   signal arrives, which the first cost below prices.
 2. **`claude-review` and `merge-gate` listen for `merge_group` and skip it.** Both judge the pull
    request - its diff, its labels, its number - and none of that exists in a `merge_group` payload,
    so each job gets `if: github.event_name == 'pull_request'` and reports skipped, which the queue
@@ -111,6 +120,17 @@ The required checks stay as they are. What changes is where each one does its wo
    with a merge commit, so a queue would serialise nothing. It would also make the promotion a `MERGE`
    group, and that a merge group lands as the SHA it tested is observed only for squash groups so far.
    Decision 3 already makes the promotion free without it.
+7. **A pull request the queue removes leaves `merge-queue`.** The labels are the state machine
+   (`SDLC.md`). A pull request whose group failed still carries `merge-queue`, its own green checks
+   and a green `merge-gate`, so every reader of labels and checks would call it mergeable and the
+   next merge would enqueue the same tree again. A last job in `ci.yml` (`queue removal`) runs only
+   on `merge_group`, needs every suite job and runs `if: failure()`. It reads `<N>` from
+   `merge_group.head_ref` (`gh-readonly-queue/develop/pr-<N>-<sha>`), moves the pull request from
+   `merge-queue` to `changes-requested`, and comments with the failed job and the run link. It needs
+   `issues: write` on that job alone. An entry removed without a failed run (a required check that
+   never reported before `check_response_timeout_minutes`, or a dequeue by hand) has no run to host
+   the job. `SDLC.md`'s merge section says a person moves that pull request, and that
+   `om-merge-buddy` cannot see a removal.
 
 ## Consequences
 
@@ -128,10 +148,11 @@ The costs:
 
 - **Journeys report later.** An agent driving a pull request green (`om-auto-fix-pr`) no longer sees
   the `e2e` legs, and `validation.commands` does not run them either, so a journey failure surfaces
-  only after a human enqueues: the queue removes the entry and the pull request timeline names the
-  failed check. Someone has to notice and run the fix on that pull request. The alternative, keeping
-  the legs on the pull request and skipping them in the queue, keeps the early signal but verifies a
-  base that may have moved and runs the legs on every push; reversing to it is one `if` per job.
+  only after a human enqueues: the queue removes the entry, and decision 7 moves the pull request to
+  `changes-requested` with the failed check named, so the fix runs on that pull request like any
+  other change request. The alternative, keeping the legs on the pull request and skipping them in
+  the queue, keeps the early signal but verifies a base that may have moved and runs the legs on
+  every push; reversing to it is one `if` per job.
 - **Merges are serial.** With one build at a time, a merge waits for the group ahead of it: about
   twenty minutes each, plus runner waits. At this repository's merge rate that is minutes a day, and
   `max_entries_to_build` is the dial if it stops being.
@@ -148,5 +169,9 @@ The costs:
   request.
 - The `Accessibility` workflow is not a required check and still runs on the pull request and on the
   push, as ADR 0003's amendment of 2026-09-15 left it.
+- **The amendments land with acceptance.** While this record is `proposed` it amends nothing. The
+  change that sets it to `accepted` appends an amendment pointing here to ADR 0003 and ADR 0016, as
+  ADR 0001 requires; appending them earlier would record in two accepted ADRs a decision nobody has
+  taken.
 - planned.travel runs the same pipeline (its ADR 0021) and adopts this after money-tracker has run
   it; its `change scope` job, which diffs `refs/pull/N/merge`, needs a `merge_group` form first.
