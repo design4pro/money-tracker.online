@@ -11,10 +11,10 @@
  * a maintainer running `om-auto-fix-pr` by hand. This script applies the `review-threads` label, and
  * the cezar automation of the same name turns that label into the run (docs/agents/cezar.md).
  *
- * A label rather than a webhook because cezar 0.10.1 has four automation events - `issue.opened`,
+ * A label rather than a webhook because cezar 0.11.0 has four automation events - `issue.opened`,
  * `issue.labeled`, `issue.unlabeled`, `pull_request.opened` - and none of them is a review. The
- * label is the only signal a poller can see, and `.ai/scripts/cezar-host-patch.sh` is what lets it
- * see one on a pull request at all.
+ * label is the only signal a poller can see, and the design4pro/cezar fork's
+ * `filters.includePullRequests` is what lets it see one on a pull request at all.
  *
  * ## Why the marker comment exists
  *

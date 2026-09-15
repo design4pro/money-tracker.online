@@ -186,7 +186,7 @@ jobs:
       # The threads this job leaves are what the `develop` ruleset holds the merge on, and nothing
       # resolves them by itself - until now a maintainer cleared them by running `om-auto-fix-pr` by
       # hand. This step applies `review-threads`, and the cezar automation of that name turns the
-      # label into the run (docs/agents/cezar.md). The label is the signal because cezar 0.10.1 has
+      # label into the run (docs/agents/cezar.md). The label is the signal because cezar 0.11.0 has
       # no automation event for a review.
       #
       # `always()`: a review that tripped either guard above may still have left threads behind, and

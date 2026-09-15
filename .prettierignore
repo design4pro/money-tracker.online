@@ -52,7 +52,6 @@ test-results
 .ai/scripts/backlog-status.mjs
 .ai/scripts/cez-automations.sh
 .ai/scripts/cez-prompt-templates.sh
-.ai/scripts/cezar-host-patch.sh
 .ai/scripts/housekeeping.sh
 .ai/trackers/github.md
 .claude/hooks/__tests__/hooks.test.ts

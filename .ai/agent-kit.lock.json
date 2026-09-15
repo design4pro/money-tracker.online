@@ -1,5 +1,5 @@
 {
-  "kitVersion": 38,
+  "kitVersion": 39,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -66,12 +66,8 @@
       "sha256": "ae53166aad8790ac2047c33ae1e22fde6af40763c0fd6af48e5b301b0c0be107",
       "mode": "100755"
     },
-    ".ai/scripts/cezar-host-patch.sh": {
-      "sha256": "3b15bae297c7187e2a8e8e4d1534ab63a105dac124e977668eb4f508a6a43f25",
-      "mode": "100755"
-    },
     ".ai/scripts/housekeeping.sh": {
-      "sha256": "523f948faa8127d19d3fdf994abf11a26c288caa3b2166a05959f6993b33a9e4",
+      "sha256": "bad6f800721a202605b0fe3fbaa8ccd2740e09cd2a70b0b7fcee77988b337a98",
       "mode": "100755"
     },
     ".ai/trackers/github.md": {
@@ -107,7 +103,7 @@
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {
-      "sha256": "7758f64754a7b78ba562a000cdf55ed8029b806acfbc931ec04f9fca930145d0",
+      "sha256": "ee5559e6dd01a06f9e54680dea9bce32d38427bfb710a0a17bc7773c52090e5c",
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
@@ -119,7 +115,7 @@
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {
-      "sha256": "0728923001cfb035317b392ee98034640904f9d3d1b9a2197cc5daebf794c363",
+      "sha256": "60b32a8f6ac9e6fdf7db097a358ba2de23c12160b6262eb26cfe867463b3f167",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-credential-gate.test.ts": {
@@ -159,7 +155,7 @@
       "mode": "100644"
     },
     "scripts/ci/review-threads-label.mjs": {
-      "sha256": "8eab0e169054f0a8ff1f75dbcb7cd277c13a0fcd52b7004b0341de04cf504708",
+      "sha256": "1ea598360e9fc720c9fa3a59ededf4cac1e85728a46dacba9ccf7d69f2a3d337",
       "mode": "100644"
     }
   },
