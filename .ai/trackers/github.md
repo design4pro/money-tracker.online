@@ -352,9 +352,49 @@ gh pr ready {prNumber}
 ```bash
 gh pr checks {prNumber} --json name,state,link
 ```
+Unreadable to a fine-grained PAT: the rollup expands to `CheckRun` nodes, fine-grained tokens have
+no `Checks` permission to grant, and `gh` exits non-zero with `Resource not accessible by personal
+access token`. The REST `commits/{ref}/check-runs` endpoint answers 403 for the same reason. Fall
+back to the Actions API, which asks only for `Actions: Read`:
+```bash
+sha=$(gh pr view {prNumber} --json headRefOid --jq .headRefOid)
+gh api --paginate --slurp "repos/{owner}/{repo}/actions/runs?head_sha=$sha&event=pull_request" \
+  | jq -r '[.[].workflow_runs[]] | group_by(.name) | map(max_by(.run_started_at))
+           | .[] | "\(.id) \(.name)"' \
+  | while read -r run workflow; do
+      gh api --paginate "repos/{owner}/{repo}/actions/runs/$run/jobs" \
+        | jq -c --arg w "$workflow" '.jobs[]
+            | {name: "\($w) · \(.name)", state: ((.conclusion // .status) | ascii_upcase), link: .html_url}'
+    done
+```
+Three details are load-bearing, because the rows feed consumers written against `gh pr checks`:
+
+- **`state` is the verdict, not the lifecycle.** The Jobs API keeps pass/fail in `.conclusion` and
+  only `queued` / `in_progress` / `completed` in `.status`. `(.conclusion // .status) | ascii_upcase`
+  maps `failure → FAILURE`, `timed_out → TIMED_OUT`, `success → SUCCESS`, `skipped → SKIPPED` onto
+  the upper-cased vocabulary this operation publishes, and leaves an unfinished job as
+  `IN_PROGRESS`, which falls through to non-failing the way `PENDING` does. Reading `.status`
+  alone reports a hard-failed job as `completed` — a value no failure list contains, so a red PR
+  reads green.
+- **The row set is per *job* across *workflows*, not the PR's check rollup.** `head_sha` alone
+  returns every run recorded against the commit: the deploy workflows that ran on `push` once the
+  SHA also landed on the base branch, and one bot run per review comment. `event=pull_request`
+  drops those, and `group_by(.name) | max_by(.run_started_at)` keeps the newest run per workflow so
+  a superseded attempt cannot outlive the one that replaced it. Job names repeat across workflows,
+  so the workflow name is prefixed and every row stays self-describing.
+- **Both calls paginate.** A sharded matrix already puts ten jobs in a single run. `--slurp` is
+  what lets the dedup see all pages at once, and `gh api` refuses it together with `--jq` — hence
+  the pipe into `jq`.
+
+The fallback sees GitHub Actions jobs only — check runs published by other GitHub Apps
+(GitGuardian, Sentry, and the like) are invisible to it. Report what it returns as the Actions
+jobs it is, and say that the App-published checks were out of reach, the same way
+**list-review-comments** states its own gap.
 
 #### get-required-checks
-Base branch → the set of required status checks. A 404 means branch protection is not readable — treat all reported checks as required.
+Base branch → the set of required status checks. A 404 **or a 403** means branch protection is not
+readable — treat all reported checks as required. A fine-grained PAT gets the 403 even with
+`Administration: Read` granted; `2>/dev/null` swallows either, so only the diagnosis differs.
 ```bash
 gh api repos/{owner}/{repo}/branches/{baseRefName}/protection/required_status_checks --jq '.contexts[]' 2>/dev/null
 ```

@@ -1,5 +1,5 @@
 {
-  "kitVersion": 36,
+  "kitVersion": 38,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -75,11 +75,11 @@
       "mode": "100755"
     },
     ".ai/trackers/github.md": {
-      "sha256": "400d47742a218be017ab33f28c5d338828cb7e63fd0a144b575e450198431f8a",
+      "sha256": "3031c4146487f8154d2fc2f23c21e6ac7ba3fa5b1dc66c000110a3b07e53902b",
       "mode": "100644"
     },
     ".claude/hooks/__tests__/hooks.test.ts": {
-      "sha256": "489674579f778125abb3607b1300a0f0c7cabec1b210b601c16f19b892623e63",
+      "sha256": "f9ad7df1246d7788b1aba22abc9afceafd0212eb410d363a569b107c2db3ac55",
       "mode": "100644"
     },
     ".claude/hooks/format-file.sh": {
