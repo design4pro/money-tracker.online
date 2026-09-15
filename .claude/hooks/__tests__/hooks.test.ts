@@ -237,6 +237,20 @@ describe('git-guardrails.sh', () => {
     ).toBe(0)
   })
 
+  // The cost of the rule above, pinned so the next reader meets it as a decision and not as a
+  // regression to be "fixed". Once the command is multi-line nothing is discarded at all, so a
+  // prose head word no longer shelters a matching token further down - whether it sits in quotes
+  // or in a heredoc body, because the awk pass leaves a command standing after the closing tag.
+  // Both shapes were allowed before and are refused now; re-issue such a command as one line.
+  it('shelters nothing on a later line, at the cost of two shapes', () => {
+    expect(bash('echo hi\ngit commit -m "git reset --hard"').status).toBe(2)
+    expect(
+      bash(
+        "cat > docs/DEPLOY.md <<'EOF'\nnever run wrangler secret put\nEOF\necho written",
+      ).status,
+    ).toBe(2)
+  })
+
   // ...and the over-broad half of the same substring match: an unrelated flag, or a word in a
   // message, disabled the stripping and made the whole message match as a command.
   it('does not read an unrelated flag as a shell invocation', () => {
