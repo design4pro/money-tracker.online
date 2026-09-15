@@ -352,8 +352,8 @@ fires minutes before the review job posts anything. So the chain is:
 1. `.github/workflows/claude-code-review.yml` ends with `scripts/ci/review-threads-label.mjs`,
    which applies `review-threads` when the PR has live threads opened by the review bot.
 2. The `design4pro/cezar` fork teaches the poller to honour
-   `filters.includePullRequests` on both gates. It is opt-in per automation - the cockpit's filter
-   schema passes unknown keys through untouched - which is what keeps `issue-regroom`,
+   `filters.includePullRequests` on both gates. It is opt-in per automation - the fork declares the
+   key in the filter schema and it defaults to false - which is what keeps `issue-regroom`,
    `issue-autofix` and `issue-spec` from starting to fire on PRs that happen to carry their label.
    **Without the fork this automation never fires and says nothing**: a cockpit started from
    upstream cezar, through `npx` or `npm i -g`, is exactly that.
