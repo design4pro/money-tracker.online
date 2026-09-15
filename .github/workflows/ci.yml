@@ -442,14 +442,24 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # A required check (the `develop` and `main` rulesets), so it has to be red whenever a leg
+      # is. The result comes from `needs.e2e.result`, the aggregate over the matrix, which is not
+      # `success` when any leg failed, was cancelled or never ran. Last, so the report above is
+      # uploaded either way.
+      - name: Fail unless every leg passed
+        if: ${{ !cancelled() && needs.e2e.result != 'success' }}
+        run: |
+          echo "::error title=e2e::the journeys did not pass on every leg (result: ${{ needs.e2e.result }}); the report above names the failures."
+          exit 1
+
   # The deploys, as the last jobs of a push run and only behind a green one. They used to be
   # workflows of their own, started by the same push as this run and reading nothing from it, so a
   # red commit shipped exactly like a green one: `develop` push b5598ca failed
   # `e2e · mobile-safari 2/2` in run 35008403366 while `Deploy staging` run 35008403446 shipped it.
   #
-  # `needs` names `e2e` and not `e2e-report`. The report merges whatever the legs recorded and went
-  # green over that failed leg; `needs.e2e.result` is the aggregate over the matrix, `success` only
-  # when every leg passed.
+  # `needs` names `e2e` and not `e2e-report`: `needs.e2e.result` is the aggregate over the matrix,
+  # `success` only when every leg passed. The report went green over that failed leg until it
+  # learned to check the same result, and gating on the source beats gating on its echo.
   #
   # The `if` checks each result itself rather than leaving it to the implicit `success()` a job
   # gets when its `if` has no status function: at job level that reads every ancestor in the needs
