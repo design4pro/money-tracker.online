@@ -403,10 +403,12 @@ jobs:
   e2e-report:
     name: e2e · merged report
     needs: e2e
-    # `!cancelled()` alone: the gate runs on every event now, so there is no
-    # `skipped` result left to guard against, and a failing e2e job still owes
-    # the reader its report.
-    if: ${{ !cancelled() }}
+    # `always()`, not `!cancelled()`: this is a required check, and a job a
+    # cancelled run skips reports `skipped`, which a ruleset counts as passing.
+    # On a cancelled run only the `always()` steps below run: the upload finds
+    # nothing, and the last step turns the check red. A failing e2e job still
+    # owes the reader its report.
+    if: ${{ always() }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 10
 
@@ -444,10 +446,10 @@ jobs:
 
       # A required check (the `develop` and `main` rulesets), so it has to be red whenever a leg
       # is. The result comes from `needs.e2e.result`, the aggregate over the matrix, which is not
-      # `success` when any leg failed, was cancelled or never ran. Last, so the report above is
-      # uploaded either way.
+      # `success` when any leg failed, was cancelled or never ran. `always()`, so a cancelled run
+      # turns it red too. Last, so the report above is uploaded either way.
       - name: Fail unless every leg passed
-        if: ${{ !cancelled() && needs.e2e.result != 'success' }}
+        if: ${{ always() && needs.e2e.result != 'success' }}
         run: |
           echo "::error title=e2e::the journeys did not pass on every leg (result: ${{ needs.e2e.result }}); the report above names the failures."
           exit 1
