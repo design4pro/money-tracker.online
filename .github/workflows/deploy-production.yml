@@ -1,6 +1,10 @@
 name: Deploy production
 
-# Git Flow's release leg: a push to `main` migrates and deploys the production Worker.
+# Git Flow's release leg: a push to `main` - the merged promotion pull request - migrates and
+# deploys the production Worker once CI has passed on that commit. ci.yml calls this workflow as its
+# last job, `deploy · production`, behind `verify`, the unit suite and every e2e leg, so a red
+# commit never reaches production (ADR 0003, amendment 2026-09-15). `workflow_dispatch` waits on
+# nothing: it is for redeploying a commit by hand, or for shipping while CI itself is down.
 #
 # The job is bound to the GitHub Environment named `production`, which is where the manual
 # approval lives: configure that environment with required reviewers and this workflow parks at
@@ -24,15 +28,8 @@ name: Deploy production
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 
 on:
-  push:
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
-
-# Never run two deploys at once, and never cancel one half-way: an interrupted
-# `d1 migrations apply` would leave the schema between two versions.
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -53,6 +50,12 @@ jobs:
     name: Migrate and deploy to production
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 25
+    # Never run two deploys at once, and never cancel one half-way: an interrupted
+    # `d1 migrations apply` would leave the schema between two versions. On the job, so it holds
+    # the same way whether ci.yml calls this or a human dispatches it.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     # The approval gate. Nothing in the job runs until the environment's reviewers approve, so
     # the credentials below are never handed to a run nobody looked at.
     environment:

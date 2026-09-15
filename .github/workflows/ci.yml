@@ -16,7 +16,8 @@ name: CI
 # merges what CI then rejects.
 #
 # ── GitHub configuration this workflow needs ──────────────────────────────────
-# secrets    (none are required for CI itself; the deploy workflows own those)
+# secrets    (none are required by the gate itself; `secrets: inherit` hands the two deploy jobs
+#            at the end what deploy-staging.yml and deploy-production.yml list)
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
@@ -35,10 +36,14 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
-# One run per branch: a force-push supersedes the run it interrupted.
+# One run per branch. On a pull request a push supersedes the run it interrupted. A push to
+# `develop` or `main` is never cancelled, because that run ends by deploying (`deploy-staging` /
+# `deploy-production` below) and an interrupted `d1 migrations apply` would leave the schema between
+# two versions. Those runs queue instead: GitHub keeps one pending run per group and replaces it
+# with the newest, so a burst of merges costs two runs, not one each.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -436,3 +441,32 @@ jobs:
           path: playwright-report
           retention-days: 7
           if-no-files-found: ignore
+
+  # The deploys, as the last jobs of a push run and only behind a green one. They used to be
+  # workflows of their own, started by the same push as this run and reading nothing from it, so a
+  # red commit shipped exactly like a green one: `develop` push b5598ca failed
+  # `e2e · mobile-safari 2/2` in run 35008403366 while `Deploy staging` run 35008403446 shipped it.
+  #
+  # `needs` names `e2e` and not `e2e-report`. The report merges whatever the legs recorded and went
+  # green over that failed leg; `needs.e2e.result` is the aggregate over the matrix, `success` only
+  # when every leg passed.
+  #
+  # The `if` checks each result itself rather than leaving it to the implicit `success()` a job
+  # gets when its `if` has no status function: at job level that reads every ancestor in the needs
+  # graph, so a job a later change makes skip on a push would skip every deploy while the run stays
+  # green (design4pro/planned.travel#531). A failed, cancelled or skipped gate job is not `success`,
+  # so it still blocks. The token is the workflow's `contents: read`, which is all either deploy
+  # workflow asks for; a called workflow can narrow it and never widen it.
+  deploy-staging:
+    name: deploy · staging
+    needs: [verify, test, e2e]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.test.result == 'success' && needs.e2e.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+    uses: ./.github/workflows/deploy-staging.yml
+    secrets: inherit
+
+  deploy-production:
+    name: deploy · production
+    needs: [verify, test, e2e]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.test.result == 'success' && needs.e2e.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    uses: ./.github/workflows/deploy-production.yml
+    secrets: inherit

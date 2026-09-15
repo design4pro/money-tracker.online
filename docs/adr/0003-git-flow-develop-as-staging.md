@@ -193,3 +193,30 @@ was needed, and `git merge-base origin/main origin/develop` now reports the seco
 recent promotion instead of #148. The two one-parent commits stay on `main`: `AGENTS.md` forbids the
 force-push, the content there is correct, and the history is a record of what happened rather than a
 thing to tidy.
+
+## Amendment 2026-09-15 (a deploy waits for a green CI run)
+
+**"Merging `develop` auto-deploys staging" now means once CI has passed on that commit**, and the
+same holds for `main` and production. `deploy-staging.yml` and `deploy-production.yml` ran
+`on: push` as workflows of their own, started by the same push as `ci.yml` and reading nothing from
+it, so a red commit deployed exactly like a green one: the `develop` push `b5598ca` failed
+`e2e · mobile-safari 2/2` in CI run 35008403366, and `Deploy staging` run 35008403446 shipped it.
+
+Both are now `workflow_call` plus `workflow_dispatch`, and `ci.yml` calls them as its last jobs -
+`deploy · staging` on a push to `develop`, `deploy · production` on a push to `main` - behind
+`verify`, `test` and the `e2e` matrix, each result checked in the job's `if`. `workflow_dispatch`
+waits on nothing: it is the manual redeploy, and the way to ship while CI is down. Prior art is
+[planned.travel's ADR 0021](https://github.com/design4pro/planned.travel/blob/develop/docs/adr/0021-ci-is-the-merge-authority.md),
+decision 5 (design4pro/planned.travel#529, and #531 for the skipped ancestor that silently skipped
+every deploy).
+
+The costs:
+
+- CI no longer cancels a push run on `develop` or `main`, because that run can be in the middle of
+  `d1 migrations apply`. Push runs queue - one running and one pending per branch, the newest
+  pending run replacing the older.
+- A flaky e2e leg on `develop` holds that commit's staging deploy until a rerun or the next merge,
+  and production ships one CI run after the promotion merge rather than at the push.
+- The `Accessibility` workflow does not gate a deploy. It is a workflow of its own, and a job cannot
+  `needs` a job in another workflow; making it gate means moving `axe` into `ci.yml`, which is a
+  decision of its own.
