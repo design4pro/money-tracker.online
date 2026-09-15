@@ -57,10 +57,12 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
 
 - Feature branches (`feat/*`, `fix/*`, `spec/*`, `claude/*`) open a pull request to
   **`develop`**.
-- Merging `develop` deploys **staging**: https://staging.money-tracker.online
-  (`deploy-staging.yml`).
-- Promotion is a pull request `develop` → **`main`**; merging deploys **production**:
-  https://money-tracker.online (`deploy.yml`).
+- Merging `develop` deploys **staging** once CI has passed on that commit:
+  https://staging.money-tracker.online (`deploy · staging`, the last job of `ci.yml`, calling
+  `deploy-staging.yml`).
+- Promotion is a pull request `develop` → **`main`**; merging deploys **production** once CI has
+  passed on that commit: https://money-tracker.online (`deploy · production`, calling
+  `deploy-production.yml`).
 - `ci.yml` runs lint · typecheck · unit tests · build · the route-tree and migration drift checks
   and the browser suite on every pull request.
 - No screenshot is compared anywhere: `docs/adr/0016-journeys-replace-the-visual-gate.md` retired
