@@ -99,6 +99,22 @@ When signals conflict, pick the higher label and say why in the label comment. A
 
 One label lives outside this taxonomy: `do-not-close`, applied by humans to issues that housekeeping skills must never auto-close. Skills only ever read it.
 
+## Intake labels
+
+Intake labels go on issues only, one at a time, and say who acts on the issue next. They come before the PR pipeline above. The list lives in `.ai/agentic.config.json` as `labels.intake`.
+
+| Label             | Meaning                                                                                                 | Set by                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `needs-triage`    | Not evaluated yet                                                                                       | Humans; `afk-architecture-review` for its `Strong` candidates     |
+| `needs-info`      | Waiting on the reporter                                                                                 | `afk-triage`, humans                                              |
+| `ready-for-agent` | Briefed and safe to implement unattended. Adding it launches the `implement-ticket` automation.         | `afk-triage`, `afk-to-tickets` (frontier tickets only), humans    |
+| `ready-for-human` | Briefed, but needs a person: security, `risk-high`, a spec, a duplicate, a decline, or a judgement call | `afk-triage`, `afk-to-tickets`, `afk-architecture-review`, humans |
+
+- **Transitions:** an issue labeled `needs-triage` moves to exactly one of `needs-info`, `ready-for-agent` or `ready-for-human`. When the reporter answers a `needs-info` issue, a human moves it back to `needs-triage`, and triage runs again.
+- **Grooming comes first.** `om-auto-manage-issues` owns `issue.opened` here and adds the SDLC labels and the Definition of Ready check. `afk-triage` answers the `needs-triage` label instead, so the two never groom one issue at the same time.
+- **Limits on skills:** automated skills never add `ready-for-agent` to `risk-high` or `security` work, never remove an intake label a human set, and never close an issue.
+- **Human override:** a human may move any issue to any intake label at any time.
+
 ## The QA gate
 
 The one hard rule of this process: **a PR carrying `needs-qa` must not merge until it also carries `qa-approved`, even when every other check is green.** `om-merge-buddy` classifies such a PR as blocked; `om-approve-merge-pr` refuses to merge it.
