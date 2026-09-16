@@ -7,10 +7,18 @@ name: Merge gate
 # `labeled` and `unlabeled` are what make it a gate rather than a snapshot taken when the pull
 # request opened: adding `blocked` has to turn the check red without a push, and removing it has to
 # turn it green again.
+#
+# `merge_group` is here so the check reports where a merge queue requires it. A queue builds its own
+# commit and waits for every required check on it; a workflow with no trigger for that event never
+# reports one, so the entry waits out `check_response_timeout_minutes` and is dropped. The job below
+# then skips itself, and a skipped job reports success - which is the honest answer, because what
+# this gate reads (the labels, on the pull request) is not in a merge group payload.
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
     branches: [develop, main]
+  merge_group:
+    types: [checks_requested]
 
 # Nothing here writes, and the labels arrive in the event payload, so the workflow needs no token
 # at all. The one job below takes back the single scope a private repository needs to check itself
@@ -20,8 +28,12 @@ permissions: {}
 # A label flip fires this while the previous run is still starting, and without cancellation the
 # older of the two can report last - leaving a green check on a pull request somebody just marked
 # `blocked`. Cancelling means the newest label state is always the one that reports.
+#
+# A merge group carries no pull request number, so without the fallback every queue run would share
+# the group `merge-gate-` and cancel the one before it - and a cancelled required check is how the
+# queue learns to drop an entry. `run_id` is unique per run, so those runs cancel nothing.
 concurrency:
-  group: merge-gate-${{ github.event.pull_request.number }}
+  group: merge-gate-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -30,6 +42,11 @@ jobs:
   # ruleset entry matching no check is not an error, it is simply never waited for.
   merge-gate:
     name: merge-gate
+    # Only a pull request has labels to read. In a merge group this skips, and a skipped job is a
+    # passing required check - the gate already had its say when the pull request was enqueued.
+    # What that costs: a hard-block label added while the pull request sits in the queue is not
+    # read. Taking it out of the queue is what stops it then, not the label.
+    if: github.event_name == 'pull_request'
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     permissions:
       contents: read

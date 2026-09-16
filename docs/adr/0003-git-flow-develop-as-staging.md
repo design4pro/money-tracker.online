@@ -230,3 +230,18 @@ purpose: the approval is a human merging the `develop` → `main` promotion pull
 list to mean anything, `e2e · merged report` now fails when any leg did. A second approval after the
 merge would park a commit already reviewed and tested. `workflow_dispatch` stays the one path past
 the gate, and starting it is the human decision.
+
+## Amendment 2026-09-16 (pull requests reach `develop` through a merge queue)
+
+**A deploy now reads a verdict before producing one.** What merges into `develop` goes through a
+merge queue, which runs the suite on the commit it builds and then moves `develop` to that same
+commit, so the push run that follows would otherwise re-run the gate over a commit already judged.
+It looks the earlier run up instead, and deploys on it (ADR 0020).
+
+The promotion is unchanged in shape: `main` has no queue, and the `develop` → `main` pull request
+still merges with a merge commit rather than a squash, for the reason recorded above. It gets
+cheaper, though — that merge commit carries the tree of the `develop` tip it merged, which the queue
+already ran, so production ships the tree staging shipped without a second full suite.
+
+Anything with no verdict — a direct push, an admin bypass merge, a hotfix on `main` whose tree
+matches no parent — runs the suite and waits for it, exactly as the amendment above describes.

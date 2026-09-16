@@ -339,6 +339,8 @@ GitHub rejects self-approval (reviewing your own PR); surface that instead of wo
 ```bash
 gh pr merge {prNumber} --squash
 ```
+**When the base branch has a merge queue** — `gh api "repos/{owner}/{repo}/rules/branches/{baseBranch}" --jq '.[].type'` lists `merge_queue` — drop the strategy and run `gh pr merge {prNumber}`. That enqueues the PR (enabling auto-merge while checks are still pending); the queue's own method decides, so `--squash` / `--merge` / `--rebase` are ignored with a warning and `--delete-branch` is refused outright. The command means **queued**, not merged: report it that way, and expect the merge minutes later, once the queue has run the suite on the commit it built. Removing an entry is `gh api graphql -f query='mutation { dequeuePullRequest(input: {id: "<node id>"}) { clientMutationId } }'` — `gh pr merge --disable-auto` does not do it.
+
 The hard blocks `SDLC.md` declares — `do-not-merge`, `blocked`, `qa-failed`, and `needs-qa` without `qa-approved` — are enforced by the **`merge-gate`** check (`.github/workflows/merge-gate.yml`, deciding in `scripts/ci/merge-gate.mjs`), not by this command and not by the skill that calls it. Read the check, not the labels: it re-runs on every label change, so a red `merge-gate` is the current answer. Never reach for `--admin` to get past it — that bypass is a human's deliberate act, never a skill's.
 
 #### mark-pr-ready

@@ -298,8 +298,9 @@ PR) are the only things that start code-writing work, and no skill adds them (th
 overrides say so), so no run can start another.
 
 **Merge and after.** `om-merge-buddy` reports what is mergeable; a human runs
-`/om-approve-merge-pr <n>` (squash to `develop`), then `/om-close-fixed-issues` closes what the
-merge did not — Cezar has no `pull_request.merged` event, and `develop` is not the default branch,
+`/om-approve-merge-pr <n>`, which adds the PR to `develop`'s merge queue — the queue runs the suite
+on the commit it builds and squashes it in minutes later (ADR 0020) — then `/om-close-fixed-issues`,
+once that merge has landed, closes what the merge did not — Cezar has no `pull_request.merged` event, and `develop` is not the default branch,
 so nothing closes natively. Housekeeping runs both three times a day, so this is the merger's step
 only between those runs (`SDLC.md`). `needs-qa` without `qa-approved` never merges, and only a
 human sets `qa-approved`: the blind pair is `node scripts/visual/capture.mjs` (ADR 0016).

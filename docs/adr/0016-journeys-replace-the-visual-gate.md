@@ -143,3 +143,23 @@ held the pool's four CI runners through every promotion.
 check, so the promotion stays mergeable on the push run's result. The push to `main` that the merge
 creates still runs the whole suite, and `deploy · production` waits for it (amendment 2026-09-15 to
 ADR 0003).
+
+## Amendment 2026-09-16 (the legs run in the merge queue)
+
+**Decision 4's "on every pull request" is now "once, in the merge queue".** A pull request runs
+`verify` and `test`; the queue runs the legs on the commit it builds and then moves `develop` to,
+and the push that follows finds that verdict instead of producing a second one (ADR 0020). What the
+legs are, what they cover and the promotion exception above are unchanged - only the event they run
+on is.
+
+The reason is the one this record already counted in runner minutes: the same suite ran on the pull
+request's merge preview and again on the push its merge created, on four CI runners, and the second
+run judged a commit the first could not have tested, because `develop` may have moved in between.
+The queue's commit is the one that ships.
+
+What it costs: the journeys report after a human enqueues the pull request, not while it is under
+review, and a failure arrives as a dropped queue entry rather than as a red check on the branch.
+`validation.commands` does not run them either, so an agent iterating on a pull request never sees
+them - `pnpm e2e` locally is the only earlier signal. The alternative, keeping the legs on the pull
+request and skipping them in the queue, buys that signal back at the price of verifying a base that
+may have moved, and is one `if` per job away.

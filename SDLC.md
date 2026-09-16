@@ -68,7 +68,7 @@ Pipeline labels are mutually exclusive: a PR carries at most one, and it names w
 
 - A ready, non-draft PR carries `review`.
 - The reviewer moves it: request changes → `changes-requested`; after fixes it returns to `review`; approval → `merge-queue`.
-- `merge-queue` is routing, not proof of QA: a `needs-qa` PR legitimately sits there until QA signs off.
+- `merge-queue` is routing, not proof of QA: a `needs-qa` PR legitimately sits there until QA signs off. The label is this state machine's, and is not GitHub's merge queue (ADR 0020): a PR carrying it is waiting for a human to merge, and only that merge puts it in the queue GitHub runs.
 - Only a QA reviewer sets the `qa` pipeline label. They move a queued `needs-qa` PR from `merge-queue` to `qa` while testing, then back to `merge-queue` with `qa-approved` on pass, or to `qa-failed` on failure. Automated skills request QA with `needs-qa`; they never set `qa`.
 - `blocked` and `do-not-merge` are set and cleared by humans and stop the flow wherever it is.
 
@@ -162,8 +162,11 @@ This document and `.ai/agentic.config.json` describe the same process: change th
   dependency bumps carry `skip-qa`. The QA reviewer takes the blind pair with
   `node scripts/visual/capture.mjs` at 360x800 and 1280x900 in both themes (ADR 0016);
   `om-auto-qa-pr` evidence complements it and never replaces it.
-- **The merger's last step.** `om-approve-merge-pr <n>` squash-merges into `develop`; a merge into
-  `develop` does not close an issue natively, so the merger then runs `om-close-fixed-issues`,
-  which honours the PR's `Closes #n`. Promotion `develop → main` is a separate PR (ADR 0003).
+- **The merger's last step.** `om-approve-merge-pr <n>` adds the PR to `develop`'s merge queue
+  (ADR 0020), which runs the suite on the commit it builds and merges it minutes later; a merge
+  into `develop` does not close an issue natively, so the merger then runs `om-close-fixed-issues`
+  — once the merge has landed, not while the PR is still queued — and it honours the PR's
+  `Closes #n`. Promotion `develop → main` is a separate PR, merged directly with a merge commit and
+  no queue (ADR 0003).
 - **What a ticket contains** beyond the Definition of Ready: `docs/agents/issue-tracker.md` (tenant
   isolation test, money invariant, visual change expected).

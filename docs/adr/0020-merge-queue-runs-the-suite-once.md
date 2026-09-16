@@ -1,6 +1,6 @@
 # 0020. Pull requests reach `develop` through a merge queue, and the full suite runs once on the commit that ships
 
-Status: proposed
+Status: accepted
 Date: 2026-09-15
 Amends: 0003, 0016
 
