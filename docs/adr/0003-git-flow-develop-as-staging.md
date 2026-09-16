@@ -231,6 +231,21 @@ list to mean anything, `e2e · merged report` now fails when any leg did. A seco
 merge would park a commit already reviewed and tested. `workflow_dispatch` stays the one path past
 the gate, and starting it is the human decision.
 
+**Those names do not all run on the promotion pull request itself.** `verify` and `test` carry an
+`if` in `.github/workflows/ci.yml` that skips them when the head ref is `develop` or `main`, so on a
+promotion `generated · typecheck · lint · build` and `unit tests · coverage` are skipped jobs, and a
+skipped job passes as a required check. The results those names stand for come from the run that
+judged the same commit: the `develop` push run when this was written, the merge-queue run since
+(amendment below). On promotion #297, head `54edb0d`, `pull_request` run 35021611989 reports both
+jobs `skipped` and `push` run 35021244788 on that same SHA reports both `success`.
+
+The third name joined them an hour later. `e2e` still ran on #297 - all four legs and
+`e2e · merged report` are `success` in that same run 35021611989 - and stopped running on a
+promotion when #299 merged at 07:01 UTC that morning, 68 minutes after #297 did, for the reason ADR
+0016's 2026-09-15 amendment records. So the list above now has three skipped names on a promotion
+rather than two. What holds production is none of them: `deploy · production` has its own `needs`
+and `if`, evaluated in the `main` push run, and no green verdict on the tree means no deploy.
+
 ## Amendment 2026-09-16 (pull requests reach `develop` through a merge queue)
 
 **A deploy now reads a verdict before producing one.** What merges into `develop` goes through a
