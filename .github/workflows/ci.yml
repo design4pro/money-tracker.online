@@ -32,6 +32,12 @@ name: CI
 on:
   pull_request:
     branches: [main, develop]
+  # The merge queue builds the commit that will become `develop` and waits for this workflow's
+  # required checks on it. That is where the suite runs once per change (ADR 0020): a pull request
+  # gets the fast rungs, this event gets everything including the journeys, and the push the queue's
+  # merge causes finds the verdict on its own SHA and only deploys.
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -41,6 +47,11 @@ on:
 # `deploy-production` below) and an interrupted `d1 migrations apply` would leave the schema between
 # two versions. Those runs queue instead: GitHub keeps one pending run per group and replaces it
 # with the newest, so a burst of merges costs two runs, not one each.
+#
+# A merge group is never cancelled either, and needs no rule of its own: `github.ref` is that
+# group's own `gh-readonly-queue/...` branch, unique per entry, so queue runs share no group. That
+# matters more here than it reads - a cancelled required check is how the queue decides to drop a
+# pull request.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -65,12 +76,56 @@ env:
   VITE_ENVIRONMENT: ci
 
 jobs:
+  # Has this tree already passed? Only a push can have an earlier verdict, and after a queue merge
+  # it always does: the queue ran these same checks on the commit it then moved `develop` to, so the
+  # suite below would be judging a commit it has already judged. A promotion into `main` carries the
+  # verdict of the `develop` tip it has the tree of. Anything else - a direct push, an admin bypass,
+  # a hotfix - finds nothing, and the suite runs exactly as it did before (ADR 0020).
+  #
+  # Not finding a verdict is the safe direction and costs a full run; the script explains what it
+  # takes to find one, and `scripts/ci/__tests__/verified-tree.test.mjs` pins the decision.
+  verdict:
+    name: verdict
+    if: github.event_name == 'push'
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # The one scope this adds to the whole workflow, and the only thing it is for: reading this
+      # repository's own workflow runs.
+      actions: read
+    outputs:
+      verified: ${{ steps.lookup.outputs.verified }}
+
+    steps:
+      # Depth 2 is the pushed commit and its parents, which is all the script compares: a merge
+      # commit has the tree of the side it merged whenever it adds nothing of its own.
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Look for a run that already judged this tree
+        id: lookup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: node scripts/ci/verified-tree.mjs
+
   # Rungs 1-5 plus the build, in ladder order.
   verify:
+    needs: verdict
     name: generated · typecheck · lint · build
     # A develop→main (or main→develop) pull request duplicates the push-triggered
     # run on the same commits; the push run is canonical for the shared branches.
-    if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
+    #
+    # `verdict` is skipped on every event but a push, and a skipped job's output is empty, so the
+    # first clause only ever stands down when a real earlier run said this tree passed. `!cancelled()`
+    # rather than the implicit `success()`, which would read the skipped `verdict` as a reason to skip
+    # this too (design4pro/planned.travel#531).
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 20
 
@@ -239,8 +294,10 @@ jobs:
   # suite is CPU-bound and independent of the build, so running the two in
   # parallel is the whole gate's critical path minus whichever is shorter.
   test:
+    needs: verdict
     name: unit tests · coverage
-    if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
+    # Same two clauses as `verify` above, for the same two reasons.
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 20
 
@@ -288,14 +345,24 @@ jobs:
   # momentum scrolling behave differently there than anywhere else, and mobile
   # transaction entry is the product's most-used screen.
   #
-  # It runs on **every** pull request, with no label and no condition (ADR 0016).
-  # It was a post-merge net gated behind `needs-e2e` while it carried 56
-  # screenshot comparisons; without them there is nothing left that is expensive
-  # enough to ration, and a regression found on the pull request that caused it
-  # is worth more than the runner minutes. `needs-e2e` is gone with the gate it
-  # rationed - there is no label to add, because there is nothing to opt into.
+  # It runs with no label (ADR 0016). It was a post-merge net gated behind
+  # `needs-e2e` while it carried 56 screenshot comparisons; without them there is
+  # nothing left that is expensive enough to ration. `needs-e2e` is gone with the
+  # gate it rationed - there is no label to add, because there is nothing to opt
+  # into.
+  #
+  # Where it runs moved once more, to the merge queue (ADR 0020): the legs judge the commit that
+  # will become `develop`, once, instead of judging a pull request's merge preview and then the
+  # push that merge causes. So not on a `pull_request` at all - and on a `push` only when `verdict`
+  # found no earlier run for this tree, which is the fallback for a direct push, an admin bypass
+  # merge, or a hotfix on `main`.
+  #
+  # What that costs is in ADR 0016's amendment: the journeys report after a human enqueues rather
+  # than during review, and a failure arrives as a dropped queue entry.
   e2e:
+    needs: verdict
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && github.event_name != 'pull_request' }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
     # so the run's own clock is the one that fires first and names the test it
@@ -403,10 +470,9 @@ jobs:
   e2e-report:
     name: e2e · merged report
     needs: e2e
-    # `!cancelled()` alone: the gate runs on every event now, so there is no
-    # `skipped` result left to guard against, and a failing e2e job still owes
-    # the reader its report.
-    if: ${{ !cancelled() }}
+    # Not behind legs that were skipped - on a `develop` → `main` promotion pull request - since
+    # there is nothing to merge; `!cancelled()` so a failing leg still owes the reader its report.
+    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 10
 
@@ -442,14 +508,24 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # A required check (the `develop` and `main` rulesets), so it has to be red whenever a leg
+      # is. The result comes from `needs.e2e.result`, the aggregate over the matrix, which is not
+      # `success` when any leg failed, was cancelled or never ran. `always()`, so a cancelled run
+      # turns it red too. Last, so the report above is uploaded either way.
+      - name: Fail unless every leg passed
+        if: ${{ always() && needs.e2e.result != 'success' }}
+        run: |
+          echo "::error title=e2e::the journeys did not pass on every leg (result: ${{ needs.e2e.result }}); the report above names the failures."
+          exit 1
+
   # The deploys, as the last jobs of a push run and only behind a green one. They used to be
   # workflows of their own, started by the same push as this run and reading nothing from it, so a
   # red commit shipped exactly like a green one: `develop` push b5598ca failed
   # `e2e · mobile-safari 2/2` in run 35008403366 while `Deploy staging` run 35008403446 shipped it.
   #
-  # `needs` names `e2e` and not `e2e-report`. The report merges whatever the legs recorded and went
-  # green over that failed leg; `needs.e2e.result` is the aggregate over the matrix, `success` only
-  # when every leg passed.
+  # `needs` names `e2e` and not `e2e-report`: `needs.e2e.result` is the aggregate over the matrix,
+  # `success` only when every leg passed. The report went green over that failed leg until it
+  # learned to check the same result, and gating on the source beats gating on its echo.
   #
   # The `if` checks each result itself rather than leaving it to the implicit `success()` a job
   # gets when its `if` has no status function: at job level that reads every ancestor in the needs
@@ -457,16 +533,20 @@ jobs:
   # green (design4pro/planned.travel#531). A failed, cancelled or skipped gate job is not `success`,
   # so it still blocks. The token is the workflow's `contents: read`, which is all either deploy
   # workflow asks for; a called workflow can narrow it and never widen it.
+  # Two ways to be green, and the deploys accept either: this run passed the gate jobs, or `verdict`
+  # found a run that already passed it on this tree (ADR 0020). The second is what a queue merge and
+  # a promotion take - the gate jobs are skipped there, and a skipped job is not `success`, so
+  # without the first clause nothing would ever deploy again.
   deploy-staging:
     name: deploy · staging
-    needs: [verify, test, e2e]
-    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.test.result == 'success' && needs.e2e.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+    needs: [verdict, verify, test, e2e]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/develop' && (needs.verdict.outputs.verified == 'true' || (needs.verify.result == 'success' && needs.test.result == 'success' && needs.e2e.result == 'success')) }}
     uses: ./.github/workflows/deploy-staging.yml
     secrets: inherit
 
   deploy-production:
     name: deploy · production
-    needs: [verify, test, e2e]
-    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.test.result == 'success' && needs.e2e.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [verdict, verify, test, e2e]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.verdict.outputs.verified == 'true' || (needs.verify.result == 'success' && needs.test.result == 'success' && needs.e2e.result == 'success')) }}
     uses: ./.github/workflows/deploy-production.yml
     secrets: inherit

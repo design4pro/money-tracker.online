@@ -130,3 +130,36 @@ first fully green run of this branch: Playwright reported **134 passed in 5.8 mi
 chromium and **122 passed in 10.2 minutes** for mobile-safari, inside the 15-minute `globalTimeout`
 in both cases. The jobs' wall clocks were 10m29s and 12m03s, inside `timeout-minutes: 20`. The
 margin on mobile-safari is the thinner of the two and is the one to watch.
+
+## Amendment 2026-09-15 (a promotion pull request defers to the push run)
+
+Decision 4 has one exception: a `develop` → `main` promotion pull request skips the `e2e` legs, as
+it already skipped `verify` and `test`. Its head is the tip of `develop`, `ci.yml` checks out the
+head rather than the merge commit, and the push to `develop` has already run every leg on that
+commit, so the second run of the same suite on the same code found nothing the first had not. It
+held the pool's four CI runners through every promotion.
+
+`e2e · merged report` does not run behind the skipped legs, and a skipped job passes as a required
+check, so the promotion stays mergeable on the push run's result. The push to `main` that the merge
+creates still runs the whole suite, and `deploy · production` waits for it (amendment 2026-09-15 to
+ADR 0003).
+
+## Amendment 2026-09-16 (the legs run in the merge queue)
+
+**Decision 4's "on every pull request" is now "once, in the merge queue".** A pull request runs
+`verify` and `test`; the queue runs the legs on the commit it builds and then moves `develop` to,
+and the push that follows finds that verdict instead of producing a second one (ADR 0020). What the
+legs are, what they cover and the promotion exception above are unchanged - only the event they run
+on is.
+
+The reason is the one this record already counted in runner minutes: the same suite ran on the pull
+request's merge preview and again on the push its merge created, on four CI runners, and the second
+run judged a commit the first could not have tested, because `develop` may have moved in between.
+The queue's commit is the one that ships.
+
+What it costs: the journeys report after a human enqueues the pull request, not while it is under
+review, and a failure arrives as a dropped queue entry rather than as a red check on the branch.
+`validation.commands` does not run them either, so an agent iterating on a pull request never sees
+them - `pnpm e2e` locally is the only earlier signal. The alternative, keeping the legs on the pull
+request and skipping them in the queue, buys that signal back at the price of verifying a base that
+may have moved, and is one `if` per job away.

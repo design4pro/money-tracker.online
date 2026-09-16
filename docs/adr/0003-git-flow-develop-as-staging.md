@@ -220,3 +220,43 @@ The costs:
 - The `Accessibility` workflow does not gate a deploy. It is a workflow of its own, and a job cannot
   `needs` a job in another workflow; making it gate means moving `axe` into `ci.yml`, which is a
   decision of its own.
+
+**The production approval is the promotion merge**, as in planned.travel. The header of
+`deploy-production.yml` put a manual approval on the `production` environment's required reviewers,
+but none were ever configured, so production deployed without one. There are still none, now on
+purpose: the approval is a human merging the `develop` → `main` promotion pull request, and the
+`develop` and `main` rulesets refuse a merge until `generated · typecheck · lint · build`,
+`unit tests · coverage`, `e2e · merged report`, `claude-review` and `merge-gate` pass. For that
+list to mean anything, `e2e · merged report` now fails when any leg did. A second approval after the
+merge would park a commit already reviewed and tested. `workflow_dispatch` stays the one path past
+the gate, and starting it is the human decision.
+
+**Those names do not all run on the promotion pull request itself.** `verify` and `test` carry an
+`if` in `.github/workflows/ci.yml` that skips them when the head ref is `develop` or `main`, so on a
+promotion `generated · typecheck · lint · build` and `unit tests · coverage` are skipped jobs, and a
+skipped job passes as a required check. The results those names stand for come from the run that
+judged the same commit: the `develop` push run when this was written, the merge-queue run since
+(amendment below). On promotion #297, head `54edb0d`, `pull_request` run 35021611989 reports both
+jobs `skipped` and `push` run 35021244788 on that same SHA reports both `success`.
+
+The third name joined them an hour later. `e2e` still ran on #297 - all four legs and
+`e2e · merged report` are `success` in that same run 35021611989 - and stopped running on a
+promotion when #299 merged at 07:01 UTC that morning, 68 minutes after #297 did, for the reason ADR
+0016's 2026-09-15 amendment records. So the list above now has three skipped names on a promotion
+rather than two. What holds production is none of them: `deploy · production` has its own `needs`
+and `if`, evaluated in the `main` push run, and no green verdict on the tree means no deploy.
+
+## Amendment 2026-09-16 (pull requests reach `develop` through a merge queue)
+
+**A deploy now reads a verdict before producing one.** What merges into `develop` goes through a
+merge queue, which runs the suite on the commit it builds and then moves `develop` to that same
+commit, so the push run that follows would otherwise re-run the gate over a commit already judged.
+It looks the earlier run up instead, and deploys on it (ADR 0020).
+
+The promotion is unchanged in shape: `main` has no queue, and the `develop` → `main` pull request
+still merges with a merge commit rather than a squash, for the reason recorded above. It gets
+cheaper, though — that merge commit carries the tree of the `develop` tip it merged, which the queue
+already ran, so production ships the tree staging shipped without a second full suite.
+
+Anything with no verdict — a direct push, an admin bypass merge, a hotfix on `main` whose tree
+matches no parent — runs the suite and waits for it, exactly as the amendment above describes.
