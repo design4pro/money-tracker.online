@@ -79,6 +79,10 @@ Pipeline labels are mutually exclusive: a PR carries at most one, and it names w
 | Meta     | `needs-qa`, `skip-qa`, `qa-approved`, `qa-self-verified`, `in-progress`, `ci-monitoring`   | additive                      | Process signals            |
 | Priority | `priority-low`, `priority-medium`, `priority-high`, `priority-extreme`                     | one at a time; unset = medium | Urgency of the work        |
 | Risk     | `risk-low`, `risk-medium`, `risk-high`                                                     | one at a time; unset = medium | Blast radius of the change |
+| Intake   | `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`                         | one at a time; issues only    | Who acts on the issue next |
+
+The first five groups are a PR's; **Intake** is an issue's, and its detail lives in its own section
+below rather than here.
 
 Priority is how urgent the work is; risk is how dangerous the change is to ship. A one-line fix for an outage can be `priority-extreme` and `risk-low`; a large auth refactor that can wait can be `priority-low` and `risk-high`. A PR inherits both from its source issue unless the scope clearly changed. When an automated skill adds or changes a pipeline or meta label, it leaves a short comment explaining why.
 
@@ -107,12 +111,13 @@ Intake labels go on issues only, one at a time, and say who acts on the issue ne
 | ----------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `needs-triage`    | Not evaluated yet                                                                                       | Humans; `afk-architecture-review` for its `Strong` candidates     |
 | `needs-info`      | Waiting on the reporter                                                                                 | `afk-triage`, humans                                              |
-| `ready-for-agent` | Briefed and safe to implement unattended. Adding it launches the `implement-ticket` automation.         | `afk-triage`, `afk-to-tickets` (frontier tickets only), humans    |
+| `ready-for-agent` | Briefed and safe to implement unattended; a human still starts the run                                  | `afk-triage`, `afk-to-tickets` (frontier tickets only), humans    |
 | `ready-for-human` | Briefed, but needs a person: security, `risk-high`, a spec, a duplicate, a decline, or a judgement call | `afk-triage`, `afk-to-tickets`, `afk-architecture-review`, humans |
 
+- **No intake label starts a run.** Intake says who acts next; it never launches anything. Which labels start work is answered once, in `## This repository` below, and this section does not repeat or extend that list. `ready-for-agent` is the readiness marker a human reads before adding the label that does start a run — which is why ADR 0017 leaves "whether an `issue.labeled` automation should start implementation without a person in the cockpit" to the first retro rather than to this table.
 - **Transitions:** an issue labeled `needs-triage` moves to exactly one of `needs-info`, `ready-for-agent` or `ready-for-human`. When the reporter answers a `needs-info` issue, a human moves it back to `needs-triage`, and triage runs again.
 - **Grooming comes first.** `om-auto-manage-issues` owns `issue.opened` here and adds the SDLC labels and the Definition of Ready check. `afk-triage` answers the `needs-triage` label instead, so the two never groom one issue at the same time.
-- **Limits on skills:** automated skills never add `ready-for-agent` to `risk-high` or `security` work, never remove an intake label a human set, and never close an issue.
+- **Limits on skills:** automated skills never add `ready-for-agent` to `risk-high` or `security` work, and never close an issue. Consuming `needs-triage` is exactly what `afk-triage` is for, so that one label it may remove; `ready-for-agent` and `ready-for-human` are terminal, and a skill never removes either once a human set it.
 - **Human override:** a human may move any issue to any intake label at any time.
 
 ## The QA gate
