@@ -288,14 +288,19 @@ jobs:
   # momentum scrolling behave differently there than anywhere else, and mobile
   # transaction entry is the product's most-used screen.
   #
-  # It runs on **every** pull request, with no label and no condition (ADR 0016).
+  # It runs on every pull request, with no label (ADR 0016).
   # It was a post-merge net gated behind `needs-e2e` while it carried 56
   # screenshot comparisons; without them there is nothing left that is expensive
   # enough to ration, and a regression found on the pull request that caused it
   # is worth more than the runner minutes. `needs-e2e` is gone with the gate it
   # rationed - there is no label to add, because there is nothing to opt into.
+  #
+  # The one exception is a `develop` → `main` promotion pull request, which defers to the push run
+  # as `verify` and `test` do. Its head is the tip of `develop`, the job checks out the head and
+  # not the merge commit, and the push to `develop` has already run these legs on that commit.
   e2e:
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
     # so the run's own clock is the one that fires first and names the test it
@@ -403,12 +408,9 @@ jobs:
   e2e-report:
     name: e2e · merged report
     needs: e2e
-    # `always()`, not `!cancelled()`: this is a required check, and a job a
-    # cancelled run skips reports `skipped`, which a ruleset counts as passing.
-    # On a cancelled run only the `always()` steps below run: the upload finds
-    # nothing, and the last step turns the check red. A failing e2e job still
-    # owes the reader its report.
-    if: ${{ always() }}
+    # Not behind legs that were skipped - on a `develop` → `main` promotion pull request - since
+    # there is nothing to merge; `!cancelled()` so a failing leg still owes the reader its report.
+    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 10
 
