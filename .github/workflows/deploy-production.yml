@@ -6,11 +6,11 @@ name: Deploy production
 # commit never reaches production (ADR 0003, amendment 2026-09-15). `workflow_dispatch` waits on
 # nothing: it is for redeploying a commit by hand, or for shipping while CI itself is down.
 #
-# The job is bound to the GitHub Environment named `production`, which is where the manual
-# approval lives: configure that environment with required reviewers and this workflow parks at
-# "Waiting for review" until a human approves it. Without reviewers configured the environment is
-# a no-op and pushes deploy straight through - so setting them is part of the first-provision
-# runbook, not an optional hardening step.
+# The approval is the promotion itself, as in planned.travel: a human merges the `develop` → `main`
+# pull request, and the `main` ruleset refuses that merge until the required checks are green. The
+# `production` environment has no required reviewers on purpose: a second approval after that merge
+# would only park a commit already reviewed and tested, and the environment is here to record where
+# each deploy went (ADR 0003, amendment 2026-09-15).
 #
 # ── GitHub configuration this workflow needs ──────────────────────────────────────────────────
 # secrets    CLOUDFLARE_API_TOKEN   Workers Scripts:Edit + D1:Edit on account 6cfdf3b5143cddc631383a4c14736c3a
@@ -56,8 +56,9 @@ jobs:
     concurrency:
       group: deploy-production
       cancel-in-progress: false
-    # The approval gate. Nothing in the job runs until the environment's reviewers approve, so
-    # the credentials below are never handed to a run nobody looked at.
+    # No reviewers on this environment: the approval is the promotion merge, behind the `main`
+    # ruleset's required checks, and ci.yml runs this job only at the end of that green run. A
+    # `workflow_dispatch` skips both, so starting one is itself the human decision.
     environment:
       name: production
       url: https://money-tracker.online

@@ -220,3 +220,13 @@ The costs:
 - The `Accessibility` workflow does not gate a deploy. It is a workflow of its own, and a job cannot
   `needs` a job in another workflow; making it gate means moving `axe` into `ci.yml`, which is a
   decision of its own.
+
+**The production approval is the promotion merge**, as in planned.travel. The header of
+`deploy-production.yml` put a manual approval on the `production` environment's required reviewers,
+but none were ever configured, so production deployed without one. There are still none, now on
+purpose: the approval is a human merging the `develop` → `main` promotion pull request, and the
+`develop` and `main` rulesets refuse a merge until `generated · typecheck · lint · build`,
+`unit tests · coverage`, `e2e · merged report`, `claude-review` and `merge-gate` pass. For that
+list to mean anything, `e2e · merged report` now fails when any leg did. A second approval after the
+merge would park a commit already reviewed and tested. `workflow_dispatch` stays the one path past
+the gate, and starting it is the human decision.
