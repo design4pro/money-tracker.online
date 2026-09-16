@@ -3,7 +3,8 @@ name: Promote develop
 # Git Flow's promotion leg, kept open automatically: after every push to `develop` - which is
 # every merge into staging - this opens the `develop` → `main` pull request if one is not already
 # open, and otherwise leaves the existing one alone. It never merges anything; a human still
-# reviews and merges, and merging is what deploys production (deploy-production.yml).
+# reviews and merges, and merging is what deploys production (ci.yml's `deploy · production`, behind
+# a green CI run on `main`).
 #
 # ADR 0003 names the drift between the two long-lived branches as the cost of this flow, and
 # cadence as the only mitigation. A promotion pull request that always exists is what makes the

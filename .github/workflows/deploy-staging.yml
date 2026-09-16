@@ -1,7 +1,11 @@
 name: Deploy staging
 
-# Git Flow's preview leg: every push to `develop` migrates and deploys the `staging` environment
-# from wrangler.jsonc. Production stays in deploy-production.yml, on `main`.
+# Git Flow's preview leg: a push to `develop` migrates and deploys the `staging` environment
+# from wrangler.jsonc once CI has passed on that commit. ci.yml calls this workflow as its last job,
+# `deploy · staging`, behind `verify`, the unit suite and every e2e leg, so a red commit never
+# reaches staging (ADR 0003, amendment 2026-09-15). Production stays in deploy-production.yml, on
+# `main`. `workflow_dispatch` waits on nothing: it is for redeploying a commit by hand, or for
+# shipping while CI itself is down.
 #
 # ── GitHub configuration this workflow needs ──────────────────────────────────────────────────
 # secrets    CLOUDFLARE_API_TOKEN   Workers Scripts:Edit + D1:Edit on account 6cfdf3b5143cddc631383a4c14736c3a
@@ -17,15 +21,8 @@ name: Deploy staging
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 
 on:
-  push:
-    branches: [develop]
+  workflow_call:
   workflow_dispatch:
-
-# Never run two deploys at once, and never cancel one half-way: an interrupted
-# `d1 migrations apply` would leave the schema between two versions.
-concurrency:
-  group: deploy-staging
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -46,6 +43,12 @@ jobs:
     name: Migrate and deploy to staging
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 25
+    # Never run two deploys at once, and never cancel one half-way: an interrupted
+    # `d1 migrations apply` would leave the schema between two versions. On the job, so it holds
+    # the same way whether ci.yml calls this or a human dispatches it.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     environment:
       name: staging
       url: https://staging.money-tracker.online
