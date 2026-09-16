@@ -5,7 +5,7 @@ description: Shared vocabulary and rules for designing deep modules in money-tra
 
 # AFK codebase design
 
-**These instructions are already in your system prompt.** Never call the `Skill` tool for an `afk-*` skill - a repo-local skill is not in the agent's registry, so the call fails with `Unknown skill`.
+**Read this file directly; nothing loads it for you yet.** No `afk-*` skill is installed - `.claude/skills/` has none and `skills-lock.json` carries none - so this file is reached by opening it at the path `AGENTS.md` names under **Process and skills**, and by nothing else. Never call the `Skill` tool for an `afk-*` skill either: a repo-local skill is not in the agent's registry, so the call fails with `Unknown skill`. Once the generic `afk-*` skills land from `agent-kit` they load this file as their repo-local extension, and this paragraph is what changes in that PR.
 
 Adapted from mattpocock/skills `codebase-design` for unattended runs. Use these words exactly in designs, briefs, review findings and PR bodies. Do not substitute "component", "service", "API" or "boundary".
 
@@ -26,7 +26,7 @@ Adapted from mattpocock/skills `codebase-design` for unattended runs. Use these 
 - **The interface is the test surface.** Tests cross the same seam callers do. Needing to test past the interface means the module is the wrong shape.
 - **One adapter is a hypothetical seam; two adapters are a real one.** Do not add a seam until something actually varies across it.
 - **Accept dependencies, return results.** Pass collaborators in and return values rather than mutating shared state, so the seam is testable.
-- **Replace, don't layer.** When you deepen a module, delete the shallow tests it makes redundant instead of keeping both.
+- **Replace, don't layer.** When you deepen a module, the shallow tests it makes redundant should go rather than sit beside the new ones - but you do not delete them. Deleting a test, or narrowing what one asserts, is **Ask First** in `AGENTS.md`: list the redundant tests in the PR body, say which new test covers each, and let a human approve the deletion.
 
 ## The house idiom: ports passed in, never looked up
 

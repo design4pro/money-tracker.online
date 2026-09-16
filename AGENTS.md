@@ -108,5 +108,8 @@ repo) is not a gate either; keep what you touch prettier-clean.
 - Repo-specific rules for a skill live in `.ai/skills/om-<name>/SKILL.md` and extend the installed
   skill; they never relax its safety rules.
 - Repo-local skills: `verifying-changes`, `i18n-messages`, `tdd` (`.claude/skills/`).
+- `.ai/skills/afk-codebase-design/SKILL.md` is the design vocabulary — module, interface, depth,
+  seam, adapter, the deletion test — written against this repository's own seams. No `afk-*` skill
+  is installed, so read the file at that path; the `Skill` tool cannot reach it.
 - `SDLC.md` is the ticket flow, `CODE_REVIEW.md` the review rules, `BACKWARD_COMPATIBILITY.md` the
   protected surfaces, `.ai/review-checklist.md` the per-PR list.
