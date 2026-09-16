@@ -1,5 +1,8 @@
 name: Claude Code Review
 
+# `merge_group` is here for the same reason as in merge-gate.yml: `claude-review` is a required
+# check, and a queue waits for it on the merge group commit. Both jobs below skip that event - the
+# pull request they read is not in its payload - and a skipped job reports success.
 on:
   pull_request:
     # `unlabeled` is here only for the re-arm job at the bottom; the review itself skips it.
@@ -10,12 +13,18 @@ on:
     #   - "src/**/*.tsx"
     #   - "src/**/*.js"
     #   - "src/**/*.jsx"
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   claude-review:
     # A label change is not a code change, and re-reviewing on one would spend a full run to reach
     # the same conclusion. Only the re-arm job below cares about `unlabeled`.
-    if: github.event.action != 'unlabeled'
+    #
+    # The event test is what makes the `merge_group` trigger above safe: without a pull request
+    # there is no diff to review, no number to comment on and no head to key the thread marker to,
+    # so a review started there would spend a full agent run to reach nothing.
+    if: github.event_name == 'pull_request' && github.event.action != 'unlabeled'
 
     # Optional: Filter by PR author
     # if: |

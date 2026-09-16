@@ -28,7 +28,8 @@ ad-hoc `gh` calls, so every label lands through a guard and every comment carrie
 - **An existing issue** is brought up to standard by `om-auto-manage-issues <n>` (labels, the
   Definition of Ready, a read-only implementation analysis). The issue forms under
   `.github/ISSUE_TEMPLATE/` file with the category label only; the rest is added on triage.
-- **Closing** is `om-close-fixed-issues`, run after a merge into `develop`: a merge into a
+- **Closing** is `om-close-fixed-issues`, run once a merge into `develop` has landed — with the
+  merge queue that is minutes after a human merges, not at the click (ADR 0020): a merge into a
   non-default branch does not close an issue natively, so the PR body's `Closes #n` is a promise the
   skill keeps. `do-not-close` on an issue makes housekeeping leave it alone.
 
