@@ -55,7 +55,7 @@ describe('decide', () => {
   })
 
   // `merge-queue` is what the promotion carries, and adding it to HOLDS would have been the
-  // obvious symmetry with the `pr-autopilot` stand-down. It is also exactly what this automation
+  // obvious symmetry with the "Autopilot new pull requests" stand-down. It is also exactly what this automation
   // is for: approved, waiting to merge, and held by an open thread. Pinned so the naive fix
   // cannot come back.
   it('arms an approved pull request carrying merge-queue', () => {
@@ -117,7 +117,7 @@ describe('decide', () => {
     },
   )
 
-  // The hold above is why nothing was ever armed. `pr-autopilot` fires on `pull_request.opened`
+  // The hold above is why nothing was ever armed. "Autopilot new pull requests" fires on `pull_request.opened`
   // and claims within a minute; the review job needs five to eight, so its arming step has never
   // once been asked at a moment when `in-progress` was absent - three for three on #320, #321 and
   // #322, and zero `pr-fix` runs in the cockpit's whole history. The claim coming off is the

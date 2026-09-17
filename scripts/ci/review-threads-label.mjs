@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Arms the `pr-review-threads` cezar automation when the review job leaves threads a human would
+ * Arms the "Resolve blocking review threads" cezar automation when the review job leaves threads a human would
  * otherwise have to clear by hand.
  *
  *   GH_TOKEN=... GH_REPO=owner/name PR_NUMBER=310 HEAD_SHA=<sha> node scripts/ci/review-threads-label.mjs
@@ -83,7 +83,7 @@ export function decide({
   // is being kept out.
   //
   // The base branch is the discriminator, and deliberately not a label. `merge-queue` is the
-  // obvious symmetry with the `pr-autopilot` stand-down and would be a regression here: on an
+  // obvious symmetry with the "Autopilot new pull requests" stand-down and would be a regression here: on an
   // ordinary pull request it means approved and waiting to merge, and a merge held by an
   // unresolved thread is precisely the case this automation exists to clear.
   if (baseRef !== integrationBranch)
@@ -304,7 +304,7 @@ function main() {
 
   const body = [
     `${MARKER} ${headSha} -->`,
-    `🤖 The review job left review threads open on \`${headSha.slice(0, 8)}\`, so \`${LABEL}\` is applied and the \`pr-review-threads\` automation will run \`om-auto-fix-pr\` on this PR.`,
+    `🤖 The review job left review threads open on \`${headSha.slice(0, 8)}\`, so \`${LABEL}\` is applied and the **Resolve blocking review threads** automation will run \`om-auto-fix-pr\` on this PR.`,
     '',
     'It replies in every thread and resolves the ones it settles; a thread it declines stays open on purpose, for a human to settle. This comment is rewritten rather than repeated, and it is what stops the same head being armed twice.',
   ].join('\n')

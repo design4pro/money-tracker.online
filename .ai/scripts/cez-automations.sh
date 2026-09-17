@@ -59,7 +59,11 @@ done
 
 # Definitions the cockpit still holds that the file no longer names.
 known=$(jq -r '.[].name' "$FILE")
-jq -r '.automations[]? | "\(.name) \(.enabled) \(.id)"' <<<"$LIST" | while read -r name enabled id; do
+# Tab-delimited, with the name LAST: a display name has spaces ("Spec to tickets"), and a
+# space-separated `read -r name enabled id` shreds it across all three variables - which made
+# every automation look like a stray AND corrupted the `enabled` guard below, so --prune would
+# have offered to delete live automations.
+jq -r '.automations[]? | [.id, .enabled, .name] | @tsv' <<<"$LIST" | while IFS=$'\t' read -r id enabled name; do
   grep -qx "$name" <<<"$known" && continue
   if [ "$PRUNE" -eq 0 ]; then
     say "not in file: $name ($id, enabled: $enabled) - rerun with --prune to delete it"
