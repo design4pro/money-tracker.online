@@ -130,5 +130,86 @@
       "variants": 1,
       "generateFollowups": false
     }
+  },
+  {
+    "name": "Triage new issues",
+    "description": "A human adds `needs-triage`; afk-triage verifies the report, writes an Agent Brief comment and sets exactly one intake label. The label is the gate - only a collaborator can set one - which is also why this does not fire on `issue.opened` the way it does in cezar: om-auto-manage-issues already owns that event here, and two autonomous runs grooming the same fresh issue would race on its labels. Groom first, then ask for a brief.",
+    "events": ["issue.labeled"],
+    "intervalSeconds": 600,
+    "filters": {
+      "changedLabels": ["needs-triage"],
+      "excludeLabels": ["in-progress", "do-not-close", "blocked", "needs-info", "ready-for-agent", "ready-for-human"],
+      "maxRecords": 25,
+      "lookbackDays": 7
+    },
+    "task": {
+      "prompt": "Triage issue #{{github.number}} ({{github.url}}).",
+      "workflow": "triage",
+      "worktree": true,
+      "autonomous": true,
+      "generateFollowups": false
+    }
+  },
+  {
+    "name": "Implement ready-for-agent issues",
+    "description": "An issue labeled `ready-for-agent` is implemented test-first in a worktree from its Agent Brief, gated, opened as a PR and reviewed. Never merges. Distinct from `issue-autofix`, which answers the `autofix` label and drives an ungroomed issue end to end - these two never contend for the same issue because they watch different labels. `risk-high` and `security` are excluded: afk-triage never promotes those to `ready-for-agent` in the first place, and this is the second lock on the same door.",
+    "events": ["issue.labeled"],
+    "intervalSeconds": 600,
+    "filters": {
+      "changedLabels": ["ready-for-agent"],
+      "excludeLabels": ["in-progress", "ready-for-human", "needs-info", "blocked", "do-not-merge", "risk-high", "security"],
+      "maxRecords": 25,
+      "lookbackDays": 7
+    },
+    "task": {
+      "prompt": "Implement issue #{{github.number}} ({{github.url}}).",
+      "workflow": "implement-ticket",
+      "worktree": true,
+      "autonomous": true,
+      "generateFollowups": false
+    }
+  },
+  {
+    "name": "Spec to tickets",
+    "description": "Weekday mornings: afk-to-tickets promotes the ticket frontier, then slices at most one newly merged spec into vertical tickets. Schedule rather than an event, so it never races the issue pipeline above: it reads `.ai/specs/` and the open tree, and only the frontier gets `ready-for-agent`. Idempotent - a spec that already has a parent issue is skipped.",
+    "kind": "schedule",
+    "schedule": { "type": "weekdays", "hour": 7, "minute": 0 },
+    "task": {
+      "prompt": "Run the afk-to-tickets skill for {{project}} on {{date}}: promote the frontier, then slice at most one unsliced spec.",
+      "workflow": "spec-to-tickets",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1,
+      "generateFollowups": false
+    }
+  },
+  {
+    "name": "Weekly architecture review",
+    "description": "Mondays: afk-architecture-review reads the last 30 days of hot spots and files at most three refactor issues, each with a recommendation strength. Read-only on code - the only writes are issues, and it never applies `ready-for-agent` itself: `Strong` gets `needs-triage` so triage writes the brief, `Worth exploring` gets `ready-for-human`. It reads `.ai/skills/afk-codebase-design/SKILL.md` for its vocabulary, so that repo-owned skill must exist here or the run has no shared terms to reason in.",
+    "kind": "schedule",
+    "schedule": { "type": "weekly", "day": 1, "hour": 6, "minute": 0 },
+    "task": {
+      "prompt": "Run the afk-architecture-review skill for {{project}} on {{date}}.",
+      "workflow": "architecture-review",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1,
+      "generateFollowups": false,
+      "dispatch": { "maxSubtasks": 3, "reviewChild": false }
+    }
+  },
+  {
+    "name": "Weekly lessons",
+    "description": "Fridays: afk-lessons turns mistakes repeated across the last 14 days of pull requests into enforced rules - mechanical ones into a lint rule, judgement into CODE_REVIEW.md, operational into AGENTS.md. A lesson seen only once is not a rule, so a quiet fortnight is a no-op, and it opens at most one pull request per run.",
+    "kind": "schedule",
+    "schedule": { "type": "weekly", "day": 5, "hour": 16, "minute": 0 },
+    "task": {
+      "prompt": "Run the afk-lessons skill for {{project}} on {{date}}.",
+      "workflow": "lessons",
+      "autonomous": true,
+      "worktree": true,
+      "variants": 1,
+      "generateFollowups": false
+    }
   }
 ]
