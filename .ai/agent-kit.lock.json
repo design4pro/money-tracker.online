@@ -79,7 +79,7 @@
       "mode": "100755"
     },
     ".ai/scripts/cez-automations.sh": {
-      "sha256": "76e90719262e115426af0ec9ed3108675b62943c2a2a0b26dcec0e20fc96ce55",
+      "sha256": "e05312f0c849f05adff72cad4a08de5d0c9f5c191b1c854ef654d4ced9fcf7d2",
       "mode": "100755"
     },
     ".ai/scripts/cez-prompt-templates.sh": {
