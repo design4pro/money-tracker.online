@@ -27,21 +27,37 @@ on:
 permissions:
   contents: read
 
-# `runs-on` below reads through `vars.RUNNER_CI`, an organisation variable that is
-# deliberately unset: unset, the default here selects the self-hosted pool. Setting it
-# to `["ubuntu-latest"]` moves every job in every repository back to GitHub-hosted
-# runners without a pull request.
+# `runs-on` below reads through `vars.RUNNER_DEPLOY`, an organisation variable that
+# is deliberately unset: unset, the default here selects GitHub-hosted runners, and
+# deploying is the one thing in this repository that does.
 #
-# In a test workflow that is a convenience. Here it is the recovery path for shipping:
-# production now deploys from one local machine, and the switch has to work when that
-# machine does not. That is why it is an organisation variable and not a literal label
-# array - reverting by pull request would need the merge gate, which needs the same
-# runners that are missing. See agent-kit's README, "The runner pool".
+# Everything else runs on the self-hosted pool, which is four CI slots on one local
+# machine shared with the other repository. Two reasons put shipping on the other side
+# of that line, and both are about the deploy rather than about the budget. A deploy
+# must not queue behind an agent's twenty-minute browser suite, because the slot it is
+# waiting for is the slot that decides how long production stays on the old bundle.
+# And a deploy has to work when the local machine does not - the note this replaces
+# said as much about `vars.RUNNER_CI` being the recovery path for shipping, which made
+# recovery a variable somebody has to remember to set, under exactly the conditions
+# that make it hard to remember. Running there by default retires that lever.
+#
+# It fits, and the premise is written down because it is plan-dependent and has already
+# been wrong once. Verified 2026-09-17 in the organisation's billing page: GitHub Team,
+# 3,000 Actions minutes included, 0 used. Measured over the 30 days to the same date the
+# deploy jobs across both repositories cost ~850 min of pool time, which is ~1,900
+# GitHub-hosted minutes at the ~2.2x a 2-core hosted runner costs against these
+# containers - inside the 3,000, with room left for a failover. On GitHub Free the
+# allowance is 2,000 and this no longer fits; if the organisation is ever downgraded,
+# set `RUNNER_DEPLOY` back to the pool before the next deploy.
+#
+# `RUNNER_DEPLOY` set to `["self-hosted","linux","ARM64","ci"]` puts shipping back on
+# the pool without a pull request, which is the same escape hatch in the other
+# direction. See agent-kit's README, "The runner pool".
 
 jobs:
   deploy:
     name: Migrate and deploy to staging
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_DEPLOY || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     # Never run two deploys at once, and never cancel one half-way: an interrupted
     # `d1 migrations apply` would leave the schema between two versions. On the job, so it holds
