@@ -55,49 +55,56 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
 
 ## Validation Commands
 
-The gate every PR passes, in this order (`validation.commands` in `.ai/agentic.config.json`):
+**The gate is `validation.commands` in `.ai/agentic.config.json`, in the order written there.** Read
+it and run it; this file deliberately does not copy the list, because the copy that used to live
+here had already lost its first command — `node .ai/scripts/agent-kit-check.mjs` — and an agent that
+skipped it failed the gate in CI on a file it never edited.
 
-- `pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts`
-- `pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/`
-- `pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md`
-- `pnpm typecheck`
-- `pnpm lint`
-- `pnpm test`
-- `pnpm build`
+```bash
+node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>console.log(c))"
+```
 
 `pnpm e2e` is not in the gate because it needs a running environment: CI runs it on every pull
 request, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
 repo) is not a gate either; keep what you touch prettier-clean.
 
+`node .ai/scripts/agent-kit-check.mjs` being first is not incidental: it verifies that no file the
+agent kit renders has been edited by hand. Those files are listed in `.ai/agent-kit.lock.json` and
+include every `.ai/cezar/workflows/*.yml`, every `.ai/skills/afk-*/SKILL.md`, `.ai/scripts/*`,
+`.claude/hooks/*` and `docs/agents/cezar-automations.json`. Editing one directly fails the first
+command of the gate and therefore fails the PR: change the template in the agent-kit repository and
+re-sync instead.
+
 ## Task Router
 
-| When the task involves…                        | Read first                                                                               | Key rules                                                                                       |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| A word you are not sure of                     | `CONTEXT.md`                                                                             | A glossary and nothing else; the `_Avoid_` clause is the load-bearing part                      |
-| An amount, a rate, a currency or a date bucket | `docs/MONEY.md` in full                                                                  | Cite section numbers; never restate the arithmetic                                              |
-| A query, a repository, a migration             | `docs/SPEC.md` §5.2, §6.1; ADR 0002; `src/server/repos/scope.ts`                         | `TenantScope` first parameter; additive migrations; tenant-isolation case                       |
-| Balances, transfers, the ledger                | `docs/MONEY.md` §4; ADR 0010; `src/server/ledger/`                                       | Rebuilt wholesale through `LEDGER`, never accumulated                                           |
-| A server function or an API route              | `docs/SPEC.md` §5.1, §6.1; `src/server/fns/`                                             | Zod twice; permission server-side; slow work on `TASKS`                                         |
-| Auth, sessions, invitations, roles             | ADR 0011; `docs/SPEC.md` §5.3; `src/server/auth/`                                        | Two role dictionaries; `beforeLoad` is UX                                                       |
-| Billing, plans, quotas                         | ADR 0012; `docs/SPEC.md` §5.4; `docs/plans/22-billing.md`; `src/lib/plans.ts`            | One catalogue, one resolver (SPEC §8); webhook work runs on the queue                           |
-| A component or a screen                        | `DESIGN.md`; `docs/SPEC.md` §2, §4; `src/components/ui/`                                 | React Aria primitives; states; keyboard path; text table beside every chart                     |
-| User-facing copy                               | skill `i18n-messages`; `docs/I18N.md`                                                    | EN + PL in the same change; plural machinery; keys in stored rows                               |
-| Accessibility                                  | `docs/ACCESSIBILITY.md`; `docs/SPEC.md` §10                                              | AA is the gate; five named AAA criteria; never a wider claim                                    |
-| A chart                                        | ADR 0007; `DESIGN.md` → Charts                                                           | Hand-rolled; visually-hidden data table; non-colour encoding                                    |
-| CSV, OFX, QIF import                           | `src/server/import/`; `docs/plans/`                                                      | Widen before narrowing; presets are stored rows                                                 |
-| Tests                                          | skill `tdd`; skill `verifying-changes`; `vitest.config.ts`; `e2e/support/`               | Failing test first; workerd project for Worker code (ADR 0015); console red fails a browser run |
-| Verifying a change, a confusing failure        | skill `verifying-changes`                                                                | Re-run failed files alone; a timeout is a claim about the machine until the text says otherwise |
-| Visual verification                            | ADR 0016; `scripts/visual/capture.mjs`                                                   | Light + dark, 360 + 1280, the interaction state; frames outside the repository                  |
-| Background work, cron, email                   | `src/server/queue/`, `src/server/cron/`, `src/server/email/`; `wrangler.jsonc`           | Idempotent handlers; one `kind` per job; keys not sentences in envelopes                        |
-| Bindings, secrets, deploys                     | `wrangler.jsonc`; `docs/DEPLOY.md`; `docs/SECURITY.md`; `.dev.vars.example`              | Append-only DO migrations; never a secret in a log or a PR                                      |
-| A new feature or area                          | `docs/plans/README.md` and the area's plan; `docs/agents/out-of-scope.md`                | Plans are the backlog source; a rejected request is not re-litigated                            |
-| A specification: writing, finding or retiring  | `.ai/specs/AGENTS.md`; `.ai/specs/README.md`                                             | The directory is the status; the table names issue and PRs; the index is generated              |
-| A product decision                             | `docs/adr/`                                                                              | One ADR per decision; amend rather than rewrite                                                 |
-| Comparing against the reference product        | `docs/agents/reference.md`                                                               | Rendered pixels only; nothing else crosses                                                      |
-| Working while someone else edits the checkout  | `docs/agents/shared-checkout.md`                                                         | 3010 is the developer's port; agents take 3011-3020                                             |
-| The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md` | Labels are the state machine; `needs-qa` needs a human's `qa-approved`                          |
-| The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                               | One cockpit per host; no secrets in the service env                                             |
-| A file `design4pro/agent-kit` renders          | `docs/agents/agent-kit.md`; `.ai/agent-kit.lock.json`                                    | Outside prettier by decision; edit the kit's template, never the copy                           |
+| When the task involves…                        | Read first                                                                                                                             | Key rules                                                                                                                                                                                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A word you are not sure of                     | `CONTEXT.md`                                                                                                                           | A glossary and nothing else; the `_Avoid_` clause is the load-bearing part                                                                                                                                                  |
+| An amount, a rate, a currency or a date bucket | `docs/MONEY.md` in full                                                                                                                | Cite section numbers; never restate the arithmetic                                                                                                                                                                          |
+| A query, a repository, a migration             | `docs/SPEC.md` §5.2, §6.1; ADR 0002; `src/server/repos/scope.ts`                                                                       | `TenantScope` first parameter; additive migrations; tenant-isolation case                                                                                                                                                   |
+| Balances, transfers, the ledger                | `docs/MONEY.md` §4; ADR 0010; `src/server/ledger/`                                                                                     | Rebuilt wholesale through `LEDGER`, never accumulated                                                                                                                                                                       |
+| A server function or an API route              | `docs/SPEC.md` §5.1, §6.1; `src/server/fns/`                                                                                           | Zod twice; permission server-side; slow work on `TASKS`                                                                                                                                                                     |
+| Auth, sessions, invitations, roles             | ADR 0011; `docs/SPEC.md` §5.3; `src/server/auth/`                                                                                      | Two role dictionaries; `beforeLoad` is UX                                                                                                                                                                                   |
+| Billing, plans, quotas                         | ADR 0012; `docs/SPEC.md` §5.4; `docs/plans/22-billing.md`; `src/lib/plans.ts`                                                          | One catalogue, one resolver (SPEC §8); webhook work runs on the queue                                                                                                                                                       |
+| A component or a screen                        | `DESIGN.md`; `docs/SPEC.md` §2, §4; `src/components/ui/`                                                                               | React Aria primitives; states; keyboard path; text table beside every chart                                                                                                                                                 |
+| User-facing copy                               | skill `i18n-messages`; `docs/I18N.md`                                                                                                  | EN + PL in the same change; plural machinery; keys in stored rows                                                                                                                                                           |
+| Accessibility                                  | `docs/ACCESSIBILITY.md`; `docs/SPEC.md` §10                                                                                            | AA is the gate; five named AAA criteria; never a wider claim                                                                                                                                                                |
+| A chart                                        | ADR 0007; `DESIGN.md` → Charts                                                                                                         | Hand-rolled; visually-hidden data table; non-colour encoding                                                                                                                                                                |
+| CSV, OFX, QIF import                           | `src/server/import/`; `docs/plans/`                                                                                                    | Widen before narrowing; presets are stored rows                                                                                                                                                                             |
+| Tests                                          | skill `tdd`; skill `verifying-changes`; `vitest.config.ts`; `e2e/support/`                                                             | Failing test first; workerd project for Worker code (ADR 0015); console red fails a browser run                                                                                                                             |
+| Verifying a change, a confusing failure        | skill `verifying-changes`                                                                                                              | Re-run failed files alone; a timeout is a claim about the machine until the text says otherwise                                                                                                                             |
+| Visual verification                            | ADR 0016; `scripts/visual/capture.mjs`                                                                                                 | Light + dark, 360 + 1280, the interaction state; frames outside the repository                                                                                                                                              |
+| Background work, cron, email                   | `src/server/queue/`, `src/server/cron/`, `src/server/email/`; `wrangler.jsonc`                                                         | Idempotent handlers; one `kind` per job; keys not sentences in envelopes                                                                                                                                                    |
+| Bindings, secrets, deploys                     | `wrangler.jsonc`; `docs/DEPLOY.md`; `docs/SECURITY.md`; `.dev.vars.example`                                                            | Append-only DO migrations; never a secret in a log or a PR                                                                                                                                                                  |
+| A new feature or area                          | `docs/plans/README.md` and the area's plan; `docs/agents/out-of-scope.md`                                                              | Plans are the backlog source; a rejected request is not re-litigated                                                                                                                                                        |
+| A specification: writing, finding or retiring  | `.ai/specs/AGENTS.md`; `.ai/specs/README.md`                                                                                           | The directory is the status; the table names issue and PRs; the index is generated                                                                                                                                          |
+| A product decision                             | `docs/adr/`                                                                                                                            | One ADR per decision; amend rather than rewrite                                                                                                                                                                             |
+| Comparing against the reference product        | `docs/agents/reference.md`                                                                                                             | Rendered pixels only; nothing else crosses                                                                                                                                                                                  |
+| Working while someone else edits the checkout  | `docs/agents/shared-checkout.md`                                                                                                       | 3010 is the developer's port; agents take 3011-3020                                                                                                                                                                         |
+| The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md`                                               | Labels are the state machine; `needs-qa` needs a human's `qa-approved`                                                                                                                                                      |
+| Unattended intake: triage, tickets, lessons    | `SDLC.md` § Intake labels, § Trigger labels, § Unattended decisions; `.ai/skills/afk-*/SKILL.md`; `docs/agents/cezar-automations.json` | Two ladders: `autofix` is a human's lever, `needs-triage` → `ready-for-agent` is the pipeline's own. Every decision goes in a Resolved assumptions table. Nothing merges; `risk-high` and `security` are excluded by filter |
+| The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                                                                             | One cockpit per host; no secrets in the service env                                                                                                                                                                         |
+| A file `design4pro/agent-kit` renders          | `docs/agents/agent-kit.md`; `.ai/agent-kit.lock.json`                                                                                  | Outside prettier by decision; edit the kit's template, never the copy                                                                                                                                                       |
 
 ## Process and skills
 
@@ -108,8 +115,13 @@ repo) is not a gate either; keep what you touch prettier-clean.
 - Repo-specific rules for a skill live in `.ai/skills/om-<name>/SKILL.md` and extend the installed
   skill; they never relax its safety rules.
 - Repo-local skills: `verifying-changes`, `i18n-messages`, `tdd` (`.claude/skills/`).
-- `.ai/skills/afk-codebase-design/SKILL.md` is the design vocabulary — module, interface, depth,
-  seam, adapter, the deletion test — written against this repository's own seams. No `afk-*` skill
-  is installed, so read the file at that path; the `Skill` tool cannot reach it.
+- The `afk-*` skills under `.ai/skills/` run the unattended intake ladder: `afk-triage` (one issue
+  to an Agent Brief and one intake label), `afk-to-tickets` (a merged spec to tracer-bullet
+  tickets), `afk-architecture-review` (weekly), `afk-lessons` (weekly), `afk-domain-modeling`
+  (`CONTEXT.md` and ADR discipline) and `afk-codebase-design` (the design vocabulary — module,
+  interface, depth, seam, adapter, the deletion test — written against this repository's own
+  seams). **None of them is installed as a skill**, so read the file at `.ai/skills/<name>/SKILL.md`;
+  the `Skill` tool cannot reach it and answers `Unknown skill`. They are rendered by the agent kit
+  and hashed in `.ai/agent-kit.lock.json` — edit the kit's template, never the copy.
 - `SDLC.md` is the ticket flow, `CODE_REVIEW.md` the review rules, `BACKWARD_COMPATIBILITY.md` the
   protected surfaces, `.ai/review-checklist.md` the per-PR list.
