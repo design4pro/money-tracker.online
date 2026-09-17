@@ -1,9 +1,13 @@
 {
-  "kitVersion": 40,
+  "kitVersion": 41,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
       "sha256": "094b45b3aeb60d9af29213b5e29ae563c0429005948f301a54040f737ed26d33",
+      "mode": "100644"
+    },
+    ".ai/cezar/workflows/architecture-review.yml": {
+      "sha256": "f07b1124204be8d54ae49605cbb21d49614580d5e82de0f6fcbb556505eec2c9",
       "mode": "100644"
     },
     ".ai/cezar/workflows/backlog.yml": {
@@ -22,12 +26,20 @@
       "sha256": "9e984dd701b407409b0b52cb5796c54341dbefb0a37209b2e940855dee751902",
       "mode": "100644"
     },
+    ".ai/cezar/workflows/implement-ticket.yml": {
+      "sha256": "8bbe9fd36c54170358b10e8503d5669f8653f27934ca6c1faa6e979bedc682b9",
+      "mode": "100644"
+    },
     ".ai/cezar/workflows/issue-autofix.yml": {
       "sha256": "1f8f91daaca872b5d22ba256d77ec07fc9a762bb49842ebc41d99a09cb989826",
       "mode": "100644"
     },
     ".ai/cezar/workflows/issue-groom.yml": {
       "sha256": "b3eebbbb7c2f0a70ad44c47f3619a2c1cebb5609b03905757c37eff65f3f57ca",
+      "mode": "100644"
+    },
+    ".ai/cezar/workflows/lessons.yml": {
+      "sha256": "015044969057f16dfb955230c91d9b91bd06c0eb839914a40ea482cb856fbac2",
       "mode": "100644"
     },
     ".ai/cezar/workflows/pr-autopilot.yml": {
@@ -42,8 +54,16 @@
       "sha256": "253bc049b6bb4734d80f6d99edba9f2a5402be606aac71e2eab57b9917b24d2b",
       "mode": "100644"
     },
+    ".ai/cezar/workflows/spec-to-tickets.yml": {
+      "sha256": "f5b7d6be493100c316dee8227d91941c307962c18cf3a2d6bc81dbdfed64782d",
+      "mode": "100644"
+    },
     ".ai/cezar/workflows/spec.yml": {
       "sha256": "deaae522e41ee618b329a1431f21da66e5ef2b204cb6e4c53ee892f733876bae",
+      "mode": "100644"
+    },
+    ".ai/cezar/workflows/triage.yml": {
+      "sha256": "c6fa5e5752c032f55963c77891da492727a1ad4e2a700949674c6a36ed89b72d",
       "mode": "100644"
     },
     ".ai/scripts/__tests__/backlog-status.test.mjs": {
@@ -69,6 +89,26 @@
     ".ai/scripts/housekeeping.sh": {
       "sha256": "bad6f800721a202605b0fe3fbaa8ccd2740e09cd2a70b0b7fcee77988b337a98",
       "mode": "100755"
+    },
+    ".ai/skills/afk-architecture-review/SKILL.md": {
+      "sha256": "7a6c600c6031d6c84d2183a212748d62b767ebcbf922601dfbab2569debb4eea",
+      "mode": "100644"
+    },
+    ".ai/skills/afk-domain-modeling/SKILL.md": {
+      "sha256": "2278977ea10f2caf8d743f0dce801cca59dd41d3babfe8a683ef7d863d29c3a6",
+      "mode": "100644"
+    },
+    ".ai/skills/afk-lessons/SKILL.md": {
+      "sha256": "f7122ce759a01adf8245cad715c7584ac81bb981d338c4db5618d3c4756ef2ea",
+      "mode": "100644"
+    },
+    ".ai/skills/afk-to-tickets/SKILL.md": {
+      "sha256": "bb29088f1ad5580fab5358169cdbb4d9a2a2af753510fb643ec767420fa4ddfb",
+      "mode": "100644"
+    },
+    ".ai/skills/afk-triage/SKILL.md": {
+      "sha256": "f633e16eb9c85634177c3a5c875e00e03a3bbb7ca77e6c63979c34072d7ccc3b",
+      "mode": "100644"
     },
     ".ai/trackers/github.md": {
       "sha256": "a98dfb3634bfdfcc5b621752755858a0ab70f7359054e2c3f104c282204260d6",
@@ -115,7 +155,7 @@
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {
-      "sha256": "60b32a8f6ac9e6fdf7db097a358ba2de23c12160b6262eb26cfe867463b3f167",
+      "sha256": "b0c2b0cdd28685818e99e9b15070dcbcd78dcbc283d7b02ba16b1c944691d9b7",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-credential-gate.test.ts": {
