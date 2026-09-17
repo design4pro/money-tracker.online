@@ -50,7 +50,13 @@
       "priority-high",
       "priority-extreme"
     ],
-    "risk": ["risk-low", "risk-medium", "risk-high"]
+    "risk": ["risk-low", "risk-medium", "risk-high"],
+    "intake": [
+      "needs-triage",
+      "needs-info",
+      "ready-for-agent",
+      "ready-for-human"
+    ]
   },
   "qaGate": true,
   "ci": {

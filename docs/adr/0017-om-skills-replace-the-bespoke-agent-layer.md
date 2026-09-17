@@ -210,3 +210,36 @@ Two things follow that are not yet done. This repository's `develop` ruleset doe
 here - the chain runs, but the hard stop behind it is a repository setting nobody has turned on.
 And `sentry-triage.yml`, the third Action `planned.travel` runs, is still absent: it needs
 `scripts/sentry-triage/**`, which this repository does not have.
+
+## Amendment, 2026-09-17: intake is a sixth label group, and it starts nothing
+
+Decision 2 closed the taxonomy at "five groups from the config (pipeline, category, meta, priority,
+risk) plus `do-not-close`: 27 labels". A sixth group is added: **intake** — `needs-triage`,
+`needs-info`, `ready-for-agent`, `ready-for-human` — declared as `labels.intake` in
+`.ai/agentic.config.json` and documented in `SDLC.md` under `## Intake labels`.
+
+The five groups of decision 2 are a **pull request's**: they say where a PR sits, what kind of
+change it is, what the process still owes it, and how urgent and how dangerous it is. None of them
+describes an issue before a PR exists, and the collection has no group that does — which is why the
+gap was filled here rather than upstream. Intake answers one question the other five cannot: who
+acts on this issue next. It lives on issues only, one label at a time, and it sits outside the
+collection's taxonomy on purpose: `om-*` skills read `labels.pipeline`, `labels.category`,
+`labels.meta`, `labels.priority` and `labels.risk` and are unaffected by a key they do not read.
+
+**Intake starts no run.** The invariant of the `## This repository` section of `SDLC.md` is
+untouched: `groom`, `autofix`, `spec` and `review-threads` remain the only labels that start work,
+and no skill adds one. `ready-for-agent` is a readiness marker a human reads before adding `autofix`
+— it is deliberately not a trigger, because whether an `issue.labeled` automation should start
+implementation without a person in the cockpit is one of the two operator decisions this ADR defers
+to the first retro, and a table in `SDLC.md` is not where that gets settled.
+
+`om-setup-agent-pipeline` was not re-run. Its job on a taxonomy change is to create the labels, and
+all four already exist in the repository — `needs-triage` and `ready-for-agent` survive from the
+0014 vocabulary this ADR superseded, and the other two were created beside them. Nothing else in the
+generated setup reads `labels.intake`.
+
+The live label list had already drifted past decision 2's count of 27 before this amendment:
+`autofix`, `groom`, `spec` and `review-threads` are all real and none is in it. That drift is
+recorded here rather than repaired, because each of those four is a trigger documented in
+`SDLC.md`'s `## This repository` section and in `docs/agents/cezar-automations.json`, and giving
+them a group in the config would make them look like state.
