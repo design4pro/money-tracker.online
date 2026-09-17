@@ -17,3 +17,6 @@ automation-receipts.ndjson.tmp
 automation-log.ndjson
 automation-log.ndjson.tmp
 automation-poll.lock
+dispatch/
+attachments/
+drafts/
