@@ -61,7 +61,10 @@ function labelsAppliedAtCreation(workflow) {
   return [...create[0].matchAll(/--label[ =]([\w-]+)/g)].map((m) => m[1])
 }
 
-const prAutopilot = AUTOMATIONS.find((a) => a.name === 'pr-autopilot')
+// Matched on the workflow id, not the display name: `name` is human-readable prose
+// that gets reworded (kit 42 renamed it to "Autopilot new pull requests"), while the
+// workflow id is the stable identifier and exactly one automation runs this one.
+const prAutopilot = AUTOMATIONS.find((a) => a.task?.workflow === 'pr-autopilot')
 
 describe('promote-develop stand-down', () => {
   it('opens the promotion pull request carrying at least one label', () => {

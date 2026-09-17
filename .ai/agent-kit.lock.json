@@ -1,5 +1,5 @@
 {
-  "kitVersion": 41,
+  "kitVersion": 42,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -43,7 +43,7 @@
       "mode": "100644"
     },
     ".ai/cezar/workflows/pr-autopilot.yml": {
-      "sha256": "75e0175e15e2fb21097b86631558b9debb8204648c552d9b5a79272cf5b34b5a",
+      "sha256": "e53dac108c628394d6c36e5603d705e10855b68a09b602b6556a4b13b31274bb",
       "mode": "100644"
     },
     ".ai/cezar/workflows/pr-fix.yml": {
@@ -111,11 +111,11 @@
       "mode": "100644"
     },
     ".ai/trackers/github.md": {
-      "sha256": "a98dfb3634bfdfcc5b621752755858a0ab70f7359054e2c3f104c282204260d6",
+      "sha256": "f317e02bf943c659f20d1a0bac0afe5d61db32422c413e7d741919d1ad0959d4",
       "mode": "100644"
     },
     ".claude/hooks/__tests__/hooks.test.ts": {
-      "sha256": "f9ad7df1246d7788b1aba22abc9afceafd0212eb410d363a569b107c2db3ac55",
+      "sha256": "738368bdcd58b8edca86f01287ff3f65d8d1aebcb533bcdbc4606a16ff846af6",
       "mode": "100644"
     },
     ".claude/hooks/format-file.sh": {
@@ -127,7 +127,7 @@
       "mode": "100755"
     },
     ".claude/hooks/guard-generated.sh": {
-      "sha256": "376369484cdabb4a5f29f497f10f19b44f553a0b5afe83b172c88c32d067f24f",
+      "sha256": "3f1965717ca879620c3792df3e2b8a03e6f6600f19391063e5ca6243f0b9e830",
       "mode": "100755"
     },
     ".claude/hooks/guard-read.sh": {
@@ -143,7 +143,7 @@
       "mode": "100644"
     },
     ".github/workflows/claude-code-review.yml": {
-      "sha256": "5f5ef44458b8103fca8bb32dfe8c194f5e15da25fd80f89402aa9ecbc0301657",
+      "sha256": "d75fa2b51cd4e560a6d85e16411476649b3e640a91dd53d019b91518d2d718bd",
       "mode": "100644"
     },
     ".github/workflows/claude.yml": {
@@ -155,7 +155,7 @@
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {
-      "sha256": "b0c2b0cdd28685818e99e9b15070dcbcd78dcbc283d7b02ba16b1c944691d9b7",
+      "sha256": "f9246923d4847bb296ca04472adcfacf79a98ee1f748e5508ac3ec35777aa30e",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-credential-gate.test.ts": {
@@ -175,7 +175,7 @@
       "mode": "100644"
     },
     "scripts/ci/__tests__/review-threads-label.test.mjs": {
-      "sha256": "578923112ec465f3302eb300055500793f5b8bc3d16f6681801d57cc2a1781e6",
+      "sha256": "7881f885b3d59d4f2a4f2be3a98e8fa18b13318588bcdbe5d8d8bab8c7afc7b5",
       "mode": "100644"
     },
     "scripts/ci/__tests__/review-workflow-base-checkout.test.ts": {
@@ -195,7 +195,7 @@
       "mode": "100644"
     },
     "scripts/ci/review-threads-label.mjs": {
-      "sha256": "1ea598360e9fc720c9fa3a59ededf4cac1e85728a46dacba9ccf7d69f2a3d337",
+      "sha256": "c738275418b3328b6a29817ae9ba7b744537b76f1e94388dd10b53fdffaf219f",
       "mode": "100644"
     }
   },

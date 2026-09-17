@@ -448,7 +448,7 @@ describe('guard-generated.sh', () => {
     // hash equals the hash the lock states. A run able to edit both edits a rendered file and
     // restates its hash in the same breath, and the gate still exits 0.
     '.ai/agent-kit.lock.json',
-    // Kit-rendered, and review-threads-label.mjs is the single thing that arms pr-review-threads.
+    // Kit-rendered, and review-threads-label.mjs is the single thing that arms "Resolve blocking review threads".
     'scripts/ci/review-threads-label.mjs',
     'scripts/ci/__tests__/review-threads-label.test.mjs',
     // What the cockpit installs as this repository's automations and prompts. Only the first is

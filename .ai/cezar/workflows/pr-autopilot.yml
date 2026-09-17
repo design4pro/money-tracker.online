@@ -1,4 +1,4 @@
-# A human opened a pull request (the pr-autopilot automation filters on authors). om-pr-autopilot
+# A human opened a pull request (the "Autopilot new pull requests" automation filters on authors). om-pr-autopilot
 # diagnoses it and runs the right chain: continue, fix, review, QA. `--allow-merge` is absent on
 # purpose: nothing autonomous merges here; a human runs om-approve-merge-pr from the cockpit
 # (ADR 0017).
