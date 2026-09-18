@@ -13,6 +13,7 @@ import {
   RouteError,
   RoutePending,
 } from '#/components/app/shell'
+import { shellQueryOptions } from '#/components/app/shell/shell-query'
 
 import type {
   ShellData,
@@ -41,12 +42,6 @@ import type {
  * about to fail, and the reader should find that out from the sign-in screen rather than from a
  * page of error panels.
  */
-
-/** The seconds a resolved shell may be reused across navigations. See the note above. */
-const SHELL_STALE_TIME = 30_000
-
-/** The key the shell is cached under. One entry — there is one session per document. */
-const SHELL_QUERY_KEY = ['app-shell'] as const
 
 /**
  * Better Auth's organization endpoints, as the one call this route makes to them.
@@ -150,11 +145,9 @@ const loadShell = createServerFn({ method: 'GET' }).handler(
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ context, location }) => {
-    const shell = await context.queryClient.ensureQueryData({
-      queryKey: SHELL_QUERY_KEY,
-      queryFn: () => loadShell(),
-      staleTime: SHELL_STALE_TIME,
-    })
+    const shell = await context.queryClient.ensureQueryData(
+      shellQueryOptions({ queryFn: () => loadShell() }),
+    )
 
     if (!shell) {
       // `location.href` is path + search + hash, which is exactly what the sign-in screen's
