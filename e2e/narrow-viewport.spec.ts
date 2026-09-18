@@ -28,8 +28,9 @@ import type { Locator } from '@playwright/test'
  *
  * ## 360, not 393
  *
- * `playwright.config.ts` runs `mobile-safari` at the iPhone 15's 393px. 360px is the narrow end of
- * the Android field and the width the round of 2026-09-03 was judged at, and the 33px between them
+ * `playwright.config.ts` runs `mobile-safari` at the iPhone 15's 393px and `mobile-chromium` at the
+ * Pixel 7's 412px. 360px is the narrow end of the Android field and the width the round of
+ * 2026-09-03 was judged at, and the 33px below the narrower of them
  * is exactly the margin these faults live in. So this file sets its own viewport.
  *
  * ## Polish, because it is the longer catalogue

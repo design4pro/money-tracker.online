@@ -23,7 +23,7 @@ import type { Locator, Page } from '@playwright/test'
  * The rail and the bottom bar are one composition at two widths: `app-shell.tsx` draws the rail
  * `hidden … lg:flex` and the bar `lg:hidden`, and both label their `<nav>` with the same
  * `nav.primary`. So {@link primaryNavLink} resolves to whichever one the project's viewport is
- * showing, and the same four cases run against `bottom-nav.tsx` under `mobile-safari` and against
+ * showing, and the same four cases run against `bottom-nav.tsx` under `mobile-chromium` and `mobile-safari` and against
  * `sidebar-nav.tsx` under `chromium` and `webkit` — the phone bar had the identical defect and
  * would otherwise have no case at all.
  */

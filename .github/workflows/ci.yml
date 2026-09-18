@@ -340,10 +340,12 @@ jobs:
   # The browser gate: the same suite, in the same container image, on two
   # projects.
   #
-  # `chromium` is the desktop layout at 1440x900. `mobile-safari` is an
-  # iPhone 15, and it is not a smaller chromium: safe-area insets, `100dvh` and
-  # momentum scrolling behave differently there than anywhere else, and mobile
-  # transaction entry is the product's most-used screen.
+  # `chromium` is the desktop layout at 1440x900. `mobile-chromium` is a Pixel 7:
+  # the phone layout - bottom navigation, drawers, the `*.visual.spec.ts` axe
+  # scans at phone width - on the engine that was already the cheap leg. `mobile-safari` (an iPhone 15)
+  # is not run here any more (#317): it took two of three legs, so WebKit at
+  # phone width is checked on demand with `pnpm e2e --project=mobile-safari` by
+  # the change that touches it.
   #
   # It runs with no label (ADR 0016). It was a post-merge net gated behind
   # `needs-e2e` while it carried 56 screenshot comparisons; without them there is
@@ -370,40 +372,37 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      # `include:` rather than two axes, because the legs are deliberately
-      # uneven. Two clocks, and they measure different things: `globalTimeout`
-      # caps the Playwright process at 900s, while `timeout-minutes` below caps
-      # the whole job - so the ~152s a leg spends before that process starts
-      # (checkout, build, seeded D1, server) is charged to the second clock and
-      # not the first. Measured on `develop` c730f99 (run 34598125641): the
-      # `mobile-safari` suite spent 868s of the 900s, `chromium` 648s.
+      # `include:` rather than two axes, so a leg that grows towards the cap can
+      # take a shard of its own without multiplying the others. Two clocks, and
+      # they measure different things: `globalTimeout` caps the Playwright
+      # process at 900s, while `timeout-minutes` below caps the whole job - so
+      # the ~152s a leg spends before that process starts (checkout, build,
+      # seeded D1, server) is charged to the second clock and not the first.
       #
-      # `--shard` divides by test count and not by duration, so the halves are
-      # not halves and the honest numbers are not 868/2: `accessibility`,
-      # `contrast-enhanced` and `desktop-density` are 386s of the 858s between
-      # them and land in one leg. Per-file timings from that run's blob report,
-      # mapped onto the split `--list` produces, predicted 486s and 402s of
-      # suite time. Measured after the split (run 34616634305): 7.8m and 6.8m
-      # of suite, 595s and 524s of job, 123 + 115 passed, `0 did not run`.
+      # Both legs are whole, and the numbers say they can be. On `develop`
+      # 00dd135 (run 35374143036) and 641b3c8 (run 35384026214) the `chromium`
+      # suite step took 288s and 324s of the 900s, and the two `mobile-safari`
+      # shards 220s + 191s and 245s + 200s. `mobile-chromium` is the chromium
+      # engine over the same files at a phone width; the specs that exist to run
+      # once (`core-flow`, `money`, `tenant-isolation`, `not-found`) skip it.
+      # Against one freshly seeded preview on a workstation it ran 261 tests in
+      # 272s where `chromium` ran 277 in 212s, so read it as ~1.3x the `chromium`
+      # leg - roughly 420s here, half the cap - on one runner instead of the two
+      # `mobile-safari` needed (#317).
       #
-      # Two shards rather than three on the same timings: splitting by count
-      # does not break that cluster up, so a third leg predicts 458s / 274s /
-      # 253s of suite time - the leg that matters moves 28s, for a whole extra
-      # runner. `chromium` stays whole on the same evidence: it runs its 252 in
-      # 10.6m, which is not the leg running out of clock. A leg that grows
-      # towards the cap gets a shard here; the number in playwright.config.ts
-      # does not move.
+      # `--shard` divides by test count and not by duration, so if a leg does
+      # need splitting, check the split against the blob report's per-file
+      # timings first: `accessibility`, `contrast-enhanced` and
+      # `desktop-density` are the slow cluster and a count split does not break
+      # it up. The number in playwright.config.ts does not move.
       matrix:
         include:
           - project: chromium
             shard: 1
             shards: 1
-          - project: mobile-safari
+          - project: mobile-chromium
             shard: 1
-            shards: 2
-          - project: mobile-safari
-            shard: 2
-            shards: 2
+            shards: 1
     # No `container:`. The runner image is itself built FROM
     # `mcr.microsoft.com/playwright:v1.62.1-noble`, so the browsers are already
     # on the runner and pulling the same image again per job would buy nothing.
@@ -520,8 +519,9 @@ jobs:
 
   # The deploys, as the last jobs of a push run and only behind a green one. They used to be
   # workflows of their own, started by the same push as this run and reading nothing from it, so a
-  # red commit shipped exactly like a green one: `develop` push b5598ca failed
-  # `e2e · mobile-safari 2/2` in run 35008403366 while `Deploy staging` run 35008403446 shipped it.
+  # red commit shipped exactly like a green one: `develop` push b5598ca failed an e2e leg in run
+  # 35008403366 (the `mobile-safari` shard the matrix has since dropped) while `Deploy staging` run
+  # 35008403446 shipped it.
   #
   # `needs` names `e2e` and not `e2e-report`: `needs.e2e.result` is the aggregate over the matrix,
   # `success` only when every leg passed. The report went green over that failed leg until it
