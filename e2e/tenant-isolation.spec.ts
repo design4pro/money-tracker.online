@@ -7,6 +7,7 @@ import {
   uniqueToken,
   waitForHydration,
 } from './support/app'
+import { deleteAccountNamed } from './support/fixtures'
 import { storageStateFor } from './support/session'
 
 /**
@@ -52,11 +53,19 @@ test.describe('tenant isolation', () => {
       'spend the sign-in budget doing it.',
   )
 
+  /** The account this attempt creates in tenant A, removed after it: `deleteAccountNamed` says why. */
+  let accountName: string | undefined
+
+  test.afterEach(async () => {
+    if (accountName !== undefined) await deleteAccountNamed(accountName)
+    accountName = undefined
+  })
+
   test('workspace B is refused workspace A’s account and transaction by URL', async ({
     browser,
   }) => {
     const token = uniqueToken('iso')
-    const accountName = `Tenant A account ${token}`
+    accountName = `Tenant A account ${token}`
     const note = `Tenant A note ${token}`
 
     /* ---- Tenant A writes two rows a reader could link to -------------------- */
