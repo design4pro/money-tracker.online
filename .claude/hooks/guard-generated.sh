@@ -108,7 +108,7 @@ esac
 # lock is now what reports it when something else does.
 #
 # scripts/ci/ and the two docs/agents/cezar-*.json are the same argument one step out:
-# review-threads-label.mjs is the single thing that arms pr-review-threads, and the two JSON files
+# review-threads-label.mjs is the single thing that arms "Resolve blocking review threads", and the two JSON files
 # are what the cockpit installs as this repository's automations and prompts - a run rewriting the
 # prompt it is about to be handed is the same act as a run rewriting .ai/cezar/.
 rel="${abs#"$root"/}"

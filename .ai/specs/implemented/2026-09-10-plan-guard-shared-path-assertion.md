@@ -1,11 +1,11 @@
 # Plan guard: assert the eight shared paths under `Owned paths`
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | ready |
-| **Issue**          | #216  |
-| **Spec PR**        | #222  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | implemented |
+| **Issue**          | #216        |
+| **Spec PR**        | #222        |
+| **Implementation** | #322        |
 
 ## 📝 TLDR
 

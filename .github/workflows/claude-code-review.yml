@@ -217,7 +217,7 @@ jobs:
 
   # The step above always ran while a claim was held, and so never armed anything.
   #
-  # `pr-autopilot` fires on `pull_request.opened` and takes `in-progress` within a minute; the
+  # "Autopilot new pull requests" fires on `pull_request.opened` and takes `in-progress` within a minute; the
   # review job needs five to eight. So by the time it asks, `in-progress` is there - and the script
   # treats it as "a run already owns this PR and will handle its threads". It does not: that run
   # can leave a thread open and then drop the claim, and nothing re-asks, because the review job

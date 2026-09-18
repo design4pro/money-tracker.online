@@ -22,7 +22,7 @@
  * it imports {@link auditPlan} from here, so the two can never disagree about what an assertion
  * means.
  *
- * ## The four assertions
+ * ## The five assertions
  *
  * 1. Every `— edit` entry names a path that exists, **unless** the same document declares that
  *    path `— new` under another stage that has not closed. A forward reference to a file a
@@ -34,6 +34,14 @@
  * 3. Every stage carries the twelve `###` headings `docs/plans/TEMPLATE.md` requires, in order.
  * 4. Every reference row whose target status is `done` carries at least one path-shaped citation
  *    that resolves on disk.
+ * 5. No `Owned paths` entry outside `00-foundations.md` names one of the eight shared paths
+ *    `docs/plans/README.md` reserves for it - `— new` or `— edit`, the glob by separator prefix.
+ *    It reads `Owned paths` only: a shared path requisitioned in prose or cited in a reference row
+ *    is the README's documented route, not a violation. It does not claim that a subject which
+ *    avoided a shared path belongs where it landed instead; that is a review judgement.
+ *
+ * Assertion 5 is the one `plan-paths.test.ts` also runs over every plan document, not only the
+ * guarded ones: it was measured green on all of them, which none of the four drift assertions is.
  *
  * Assertion 4 ships here, in Phase 1, rather than only in the Phase 3 guard. The specification's
  * Step 2.3 named it as its own verification while it did not yet exist; the audit already holds
@@ -46,9 +54,11 @@
  * @see scripts/plans/parse-plan.ts - the grammar
  * @see scripts/plans/drift-classes.ts - the class each absent entry belongs to
  * @see .ai/specs/2026-09-07-foundations-plan-reconciliation.md
+ * @see .ai/specs/implemented/2026-09-10-plan-guard-shared-path-assertion.md - assertion 5
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
+import { basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { citations, isOpen, parsePlan, resolveOwnedPath } from './parse-plan.ts'
@@ -76,6 +86,25 @@ export const REQUIRED_HEADINGS = [
   'Blockers',
 ] as const
 
+/**
+ * The eight paths `docs/plans/README.md` reserves for {@link SHARED_PATH_OWNER}, exactly as its
+ * _The eight shared paths_ table writes them, glob included. `plan-paths.test.ts` holds this list
+ * equal to that table's first column.
+ */
+export const SHARED_PATHS = [
+  'src/server/db/schema.ts',
+  'src/server/worker.ts',
+  'wrangler.jsonc',
+  'src/styles/tokens.css',
+  'src/components/ui/**',
+  'src/routeTree.gen.ts',
+  'src/lib/plans.ts',
+  'src/lib/money.ts',
+] as const
+
+/** The document allowed to declare all eight. Matched by basename, so any path shape is exempt. */
+export const SHARED_PATH_OWNER = '00-foundations.md'
+
 export type Violation = {
   /** The stage the failure belongs to, so a reader can go straight to it. */
   readonly stage: string
@@ -85,7 +114,7 @@ export type Violation = {
 }
 
 export type Assertion = {
-  readonly id: 1 | 2 | 3 | 4
+  readonly id: 1 | 2 | 3 | 4 | 5
   readonly title: string
   readonly violations: ReadonlyArray<Violation>
 }
@@ -195,6 +224,51 @@ export const mentionsPath = (markdown: string, path: string): boolean =>
   new RegExp(
     `(?<![A-Za-z0-9._/-])${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9._-])`,
   ).test(markdown)
+
+/**
+ * The shared path an `Owned paths` entry falls under, or undefined.
+ *
+ * Seven of the eight are files and match exactly: `src/lib/money-format.ts` is not
+ * `src/lib/money.ts`. The glob matches itself, its bare directory and anything beneath it, by the
+ * directory **plus a separator**, so `src/components/ui-kit/x.tsx` stays out. The comparison is on
+ * the path as written, before {@link resolveOwnedPath} strips a trailing `/**`.
+ */
+const sharedPathOf = (path: string): string | undefined =>
+  SHARED_PATHS.find((shared) => {
+    if (!shared.endsWith('/**')) return path === shared
+    const directory = shared.slice(0, -'/**'.length)
+    return path === directory || path.startsWith(`${directory}/`)
+  })
+
+/**
+ * Assertion 5: `Owned paths` entries that name a shared path in a document that is not
+ * {@link SHARED_PATH_OWNER}. Empty for the owner itself. Both `— new` and `— edit` count, because
+ * `Owned paths` is an ownership declaration whatever the kind; reference rows and prose are never
+ * read, which keeps the README's requisition route usable.
+ */
+export const sharedPathViolations = (
+  plan: PlanFile,
+  planPath: string,
+): Array<Violation> => {
+  if (basename(planPath) === SHARED_PATH_OWNER) return []
+
+  return allEntries(plan).flatMap(({ stage, entry }) => {
+    const shared = sharedPathOf(entry.path)
+    if (shared === undefined) return []
+
+    const collision =
+      shared === entry.path
+        ? 'a shared path'
+        : `under the shared path \`${shared}\``
+    return [
+      {
+        stage: stage.id,
+        line: entry.line,
+        detail: `\`${entry.path}\` — ${collision}; \`docs/plans/${SHARED_PATH_OWNER}\` owns it and no other stage may declare it (docs/plans/README.md, "The eight shared paths")`,
+      },
+    ]
+  })
+}
 
 /**
  * Run the audit over one plan document.
@@ -343,6 +417,12 @@ export const auditPlan = (planPath: string): AuditReport => {
         id: 4,
         title: 'every `→ done` row cites a path that resolves on disk',
         violations: citationViolations,
+      },
+      {
+        id: 5,
+        title:
+          'no stage outside `00-foundations.md` declares one of the eight shared paths',
+        violations: sharedPathViolations(plan, planPath),
       },
     ],
     classes: {

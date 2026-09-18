@@ -23,9 +23,14 @@ pnpm dev
 pnpm lint && pnpm typecheck && pnpm test
 ```
 
-Those three commands are the gate. `pnpm build` is the fourth rung and CI runs it on every pull
-request; run it locally before opening one if you touched the Worker entry, the route tree, Vite
-config or anything under `src/server/`.
+Those three are the _fast loop_, not the gate. **The gate is `validation.commands` in
+`.ai/agentic.config.json`, in the order written there**, and every PR passes it in full before
+review. This file does not repeat the list: a gate written down twice is a gate that disagrees with
+itself. Run the fast loop while you work; print the gate and run it before you open the PR:
+
+```bash
+node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>console.log(c))"
+```
 
 ## Branches and commits
 

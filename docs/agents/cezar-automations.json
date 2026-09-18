@@ -1,6 +1,6 @@
 [
   {
-    "name": "issue-groom",
+    "name": "Groom new issues",
     "description": "A maintainer opens an issue; om-auto-manage-issues adds SDLC labels, a Definition of Ready check and implementation notes (ADR 0017). `authors` is the gate: the run holds Bash with no allowlist, so an issue from anyone else is groomed only when a maintainer adds `groom`. Issues a run holds or a human put on hold never match.",
     "events": ["issue.opened"],
     "intervalSeconds": 120,
@@ -20,7 +20,7 @@
     }
   },
   {
-    "name": "issue-regroom",
+    "name": "Re-groom on request",
     "description": "A label only a collaborator can set: `groom` re-runs om-auto-manage-issues on one issue (an external report a maintainer vouches for, an edit, a reply). The override removes the label first.",
     "events": ["issue.labeled"],
     "intervalSeconds": 120,
@@ -40,7 +40,7 @@
     }
   },
   {
-    "name": "issue-autofix",
+    "name": "Fix issues on the autofix label",
     "description": "A human adds `autofix`; om-auto-fix-issue drives the issue to a reviewed PR on develop (ADR 0017). Held, blocked, do-not-merge or spec-pending issues never match.",
     "events": ["issue.labeled"],
     "intervalSeconds": 60,
@@ -60,7 +60,7 @@
     }
   },
   {
-    "name": "issue-spec",
+    "name": "Write a spec for feature issues",
     "description": "A human adds `spec` to a `feature` issue; om-auto-write-spec lands .ai/specs/<date>-<slug>.md on a design-only PR (ADR 0017).",
     "events": ["issue.labeled"],
     "intervalSeconds": 60,
@@ -81,7 +81,7 @@
     }
   },
   {
-    "name": "pr-autopilot",
+    "name": "Autopilot new pull requests",
     "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - which is what makes `pull_request` workflows run on it at all, claude-code-review.yml among them - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml therefore opens it carrying `merge-queue`, which `excludeLabels` already stands down on.",
     "events": ["pull_request.opened"],
     "intervalSeconds": 300,
@@ -111,7 +111,7 @@
     }
   },
   {
-    "name": "pr-review-threads",
+    "name": "Resolve blocking review threads",
     "description": "The `claude-review` job left unresolved review threads on a PR and applied `review-threads`; om-auto-fix-pr drives the PR to merge-ready and resolves them (ADR 0017). Without this the PR waits for a human to run the same skill by hand. `includePullRequests` is read by the design4pro/cezar fork the cockpit runs - stock cezar 0.11.0 drops every label event on a PR, so this automation does not fire without it. The gate is the label: only a collaborator or the Actions bot can set one, and the review job applies it once per head SHA. The run removes it as its first mutation, so a label still present is a run nobody took. The automation is only ever armed for pull requests targeting the integration branch: review-threads-label.mjs reads `baseBranch` from .ai/agentic.config.json and stands down on anything else, so the standing promotion - whose *head* is the integration branch, and which this run would therefore push follow-up commits straight onto - never arms one.",
     "events": ["issue.labeled"],
     "intervalSeconds": 120,
@@ -152,7 +152,7 @@
   },
   {
     "name": "Implement ready-for-agent issues",
-    "description": "An issue labeled `ready-for-agent` is implemented test-first in a worktree from its Agent Brief, gated, opened as a PR and reviewed. Never merges. Distinct from `issue-autofix`, which answers the `autofix` label and drives an ungroomed issue end to end - these two never contend for the same issue because they watch different labels. `risk-high` and `security` are excluded: afk-triage never promotes those to `ready-for-agent` in the first place, and this is the second lock on the same door.",
+    "description": "An issue labeled `ready-for-agent` is implemented test-first in a worktree from its Agent Brief, gated, opened as a PR and reviewed. Never merges. Distinct from \"Fix issues on the autofix label\", which drives an ungroomed issue end to end - these two never contend for the same issue because they watch different labels. `risk-high` and `security` are excluded: afk-triage never promotes those to `ready-for-agent` in the first place, and this is the second lock on the same door.",
     "events": ["issue.labeled"],
     "intervalSeconds": 600,
     "filters": {

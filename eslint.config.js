@@ -134,6 +134,12 @@ export default [
       '.ai/cezar/worktrees/**',
       '.ai/cezar/runs/**',
       '.ai/cezar/tmp/**',
+      // The dispatch channel a dispatched task tree writes through, plus the composer's
+      // attachments and unsent drafts. Cezar's own ensureDataGitignore refuses to track all
+      // three, which is what puts them in front of the reconciliation above.
+      '.ai/cezar/dispatch/**',
+      '.ai/cezar/attachments/**',
+      '.ai/cezar/drafts/**',
       // Where a pipeline run parks a scratch checkout. Same failure as the worktrees above, but
       // it was reached from the other direction: a run that left one behind made `pnpm lint` red
       // on a file nobody wrote and pointed the reader at `parserOptions.project` rather than at

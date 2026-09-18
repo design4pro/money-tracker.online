@@ -33,7 +33,7 @@ the rules of `SDLC.md`.
   plist template.
   - `issue.labeled` polls fail as soon as one recently updated issue has a comment or a
     cross-reference (open-mercato/cezar#914, fix in upstream PR #916, not in 0.11.0), so
-    `issue-regroom`, `issue-autofix` and `issue-spec` never fire. The fork cherry-picks #916.
+    **Re-groom on request**, **Fix issues on the autofix label** and **Write a spec for feature issues** never fire. The fork cherry-picks #916.
   - On every cockpit start the skills coordinator runs `npx skills check <om-*> -p` in each project
     root, and that command re-adds the skills from upstream HEAD: the vendored
     `.claude/skills/om-*` directories become symlinks into an untracked `.agents/skills/`, which
@@ -48,7 +48,7 @@ add -b` writes the new branch's upstream into the shared config, git's config lo
   - A label event on a pull request never reaches an automation: the poller asks for `is:issue` and
     then drops any hit carrying `pull_request`, so `pull_request.opened` is the only PR trigger
     stock cezar has. The fork teaches both gates a `filters.includePullRequests` flag, opt-in per
-    automation, which `pr-review-threads` sets and nothing else does.
+    automation, which **Resolve blocking review threads** sets and nothing else does.
   - A truncated label poll whose observations all sit in the overlap band returns the cursor it
     was handed, so the automation re-reads one window forever (planned.travel#351). The fork
     widens the budget of a poll that did not move its cursor and records the cursor it gave up at
@@ -275,13 +275,13 @@ where that repository provisions D1 and a basemap it needs and this one does not
 
 | Workflow         | Agent step                                                               | Model                | Started by                                                                                                                               |
 | ---------------- | ------------------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `issue-groom`    | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation `issue-groom` (`issue.opened`), `issue-regroom` (label `groom`)                                                               |
-| `issue-autofix`  | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation `issue-autofix` (label `autofix`)                                                                                             |
-| `spec`           | `/om-auto-write-spec {{task}}`                                           | opus                 | automation `issue-spec` (label `spec` on a `feature`)                                                                                    |
+| `issue-groom`    | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                |
+| `issue-autofix`  | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation **Fix issues on the autofix label** (label `autofix`)                                                                         |
+| `spec`           | `/om-auto-write-spec {{task}}`                                           | opus                 | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                             |
 | `implement-spec` | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
-| `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation `pr-autopilot` (`pull_request.opened` by a human maintainer)                                                                  |
+| `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer)                                                 |
 | `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                                                                                |
-| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation `pr-review-threads` (label `review-threads` on a PR)                                                                          |
+| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation **Resolve blocking review threads** (label `review-threads` on a PR)                                                          |
 | `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `.ai/scripts/housekeeping.sh`, or a human                                                                                    |
 | `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                                                                                     |
 
@@ -292,7 +292,7 @@ text naming exactly one issue of this repository as an issue reference. From the
 same: a number, a spec path, or for `brainstorm` the idea.
 
 **Starting a run.** GitHub tab → issue → "Hand this to the agent" → workflow → the task box.
-Implementation also has a label trigger: `autofix` on an issue starts `issue-autofix` without the
+Implementation also has a label trigger: `autofix` on an issue starts **Fix issues on the autofix label** without the
 cockpit. The four command labels (`groom`, `autofix`, `spec` on an issue, `review-threads` on a
 PR) are the only things that start code-writing work, and no skill adds them (the `.ai/skills/`
 overrides say so), so no run can start another.
@@ -310,10 +310,10 @@ human sets `qa-approved`: the blind pair is `node scripts/visual/capture.mjs` (A
 Registered with the running cockpit by `.ai/scripts/cez-automations.sh` (`--dry-run` first;
 idempotent: update in place or create enabled; it lists definitions the cockpit holds that the
 file no longer names, and `--prune` deletes them except an enabled one, so the file is the whole
-truth). Six definitions: `issue-groom` on `issue.opened` with `authors` naming the
-human maintainers; `issue-regroom`, `issue-autofix`, `issue-spec` on `issue.labeled` with
-`changedLabels` `groom` / `autofix` / `spec`; `pr-autopilot` on `pull_request.opened`, again with
-`authors`; `pr-review-threads` on `issue.labeled` with `changedLabels` `review-threads` and
+truth). Six definitions: **Groom new issues** on `issue.opened` with `authors` naming the
+human maintainers; **Re-groom on request**, **Fix issues on the autofix label**, **Write a spec for feature issues** on `issue.labeled` with
+`changedLabels` `groom` / `autofix` / `spec`; **Autopilot new pull requests** on `pull_request.opened`, again with
+`authors`; **Resolve blocking review threads** on `issue.labeled` with `changedLabels` `review-threads` and
 `includePullRequests`, the only one that fires on a PR.
 
 Every trigger is gated on who can produce it: the open events by author, the label events because
@@ -323,7 +323,7 @@ by itself, so an external report is groomed when a maintainer adds `groom`. The 
 removes its own command label as its first tracker mutation, so a label still present means nobody
 picked the issue up.
 
-`pr-review-threads` is the one automation whose trigger stock cezar cannot deliver, and the one
+**Resolve blocking review threads** is the one automation whose trigger stock cezar cannot deliver, and the one
 that reaches a pull request; it has a section of its own below.
 
 Agent PRs (authored by `design4pro-agent`, already reviewed inside their own chain) and Dependabot
@@ -339,7 +339,7 @@ cutover (`f2a258e`) carries the old `git-guardrails.sh`, which blocks every GitH
 mode, and the run ends in a question nobody answers (PR #67, 2026-09-07). Merge `develop` into such
 a branch before opening the PR.
 
-## Review threads that block a merge (`pr-review-threads`)
+## Review threads that block a merge (Resolve blocking review threads)
 
 Nothing resolves the threads the `claude-review` job opens, and until this automation a maintainer
 cleared them by running `om-auto-fix-pr` by hand on every PR the review job had commented on.
@@ -354,11 +354,11 @@ fires minutes before the review job posts anything. So the chain is:
    which applies `review-threads` when the PR has live threads opened by the review bot.
 2. The `design4pro/cezar` fork teaches the poller to honour
    `filters.includePullRequests` on both gates. It is opt-in per automation - the fork declares the
-   key in the filter schema and it defaults to false - which is what keeps `issue-regroom`,
-   `issue-autofix` and `issue-spec` from starting to fire on PRs that happen to carry their label.
+   key in the filter schema and it defaults to false - which is what keeps **Re-groom on request**,
+   **Fix issues on the autofix label** and **Write a spec for feature issues** from starting to fire on PRs that happen to carry their label.
    **Without the fork this automation never fires and says nothing**: a cockpit started from
    upstream cezar, through `npx` or `npm i -g`, is exactly that.
-3. `pr-review-threads` runs the `pr-fix` workflow, and `om-auto-fix-pr` replies in every thread and
+3. **Resolve blocking review threads** runs the `pr-fix` workflow, and `om-auto-fix-pr` replies in every thread and
    resolves the ones it settles. A finding it agrees with but cannot act on - a guarded file it is
    still refused, a change that belongs upstream - is **not** a decline: it replies with the exact
    edit as a diff block, leaves `changes-requested`, and resolves the thread anyway
@@ -372,7 +372,7 @@ marker the `reopened` and `ready_for_review` triggers would restart the same run
 conclusion forever. `in-progress`, `blocked` and `do-not-merge` stand the script down, and the
 automation excludes them again.
 
-**The `in-progress` stand-down is why this chain has to ask twice.** `pr-autopilot` fires on
+**The `in-progress` stand-down is why this chain has to ask twice.** **Autopilot new pull requests** fires on
 `pull_request.opened` and takes `in-progress` within a minute; the review job needs five to eight,
 so step 1 is never once asked at a moment when the claim is absent. In `planned.travel`, where this
 chain ran first, that was three arming attempts out of three refused with `not arming - the PR
@@ -484,21 +484,21 @@ claiming issues the new ones handle.
    gh label list --limit 100 | wc -l   # 31
    ```
 
-6. `.ai/scripts/cez-automations.sh --dry-run`, then without the flag: `issue-groom`, `issue-regroom`,
-   `issue-autofix`, `issue-spec`, `pr-autopilot` and `pr-review-threads` are created enabled. The
+6. `.ai/scripts/cez-automations.sh --dry-run`, then without the flag: **Groom new issues**, **Re-groom on request**,
+   **Fix issues on the autofix label**, **Write a spec for feature issues**, **Autopilot new pull requests** and **Resolve blocking review threads** are created enabled. The
    script also lists any definition the cockpit still holds that the file no longer names. To
-   remove the retired `issue-opened` and `pr-opened`, disable both in the cockpit (Automations),
-   then run `--dry-run --prune` and `--prune`: the script refuses to delete an enabled stray.
+   remove one, disable it in the cockpit (Automations), then run `--dry-run --prune` and
+   `--prune`: the script refuses to delete an enabled stray.
 7. `.ai/scripts/cez-prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
    cezar's five built-ins.
 8. Install the housekeeping plist (above) and run `bash .ai/scripts/housekeeping.sh` once by hand.
 9. Verify end to end: open a test issue with the Bug form (as a maintainer) → within two minutes an
-   `issue-groom` run adds priority and risk and posts the Definition of Ready and implementation
+   **Groom new issues** run adds priority and risk and posts the Definition of Ready and implementation
    notes → add `autofix` → the run removes the label, claims with `in-progress`, opens a PR on
    `develop` with `Closes #n`, `bug`, `review` or `merge-queue`, `needs-qa` or `skip-qa`, priority
    and risk, a review from `om-auto-review-pr`, and ends with the `PR: #n` line in the cezar run.
    Nothing in its log mentions husky or lint-staged, and no duplicate issue appeared. Then open a
-   PR by hand: `pr-autopilot` reviews it and does not merge.
+   PR by hand: **Autopilot new pull requests** reviews it and does not merge.
 
 ## Local use
 
