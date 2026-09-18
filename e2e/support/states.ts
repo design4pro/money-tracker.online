@@ -151,6 +151,25 @@ export async function holdServerFns(
 }
 
 /**
+ * Hold every server-function request open until released, the application shell's included.
+ *
+ * The inverse of {@link holdServerFns}, and the probe for issue #230: on the **first** client-side
+ * navigation of a tab, holding the shell's read is exactly what used to freeze the router before
+ * any pending component could render. Since the shell the SSR pass resolved is dehydrated into the
+ * browser's cache (`src/router.tsx`), that navigation makes no shell request at all, so this hold
+ * lands on the destination's reads and the loading state appears regardless. A skeleton under this
+ * helper is the proof that the first navigation no longer waits on the network for the guard.
+ */
+export async function holdEveryServerFn(
+  page: Routable,
+): Promise<ServerFnInterception> {
+  return intercept(page, async (route, isReleased) => {
+    await isReleased
+    await route.continue().catch(() => undefined)
+  })
+}
+
+/**
  * Answer every server-function request with a `500`.
  *
  * Every one, with no exception for the shell — and that is a statement about *where this helper may

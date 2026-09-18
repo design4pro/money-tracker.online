@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { failServerFns, holdServerFns } from '../states'
+import { failServerFns, holdEveryServerFn, holdServerFns } from '../states'
 
 import type { Page, Route } from '@playwright/test'
 
@@ -240,6 +240,27 @@ describe('holdServerFns', () => {
 
     await held.release()
     await held.release()
+    expect(stub.unrouted).toEqual(['**/_serverFn/**'])
+  })
+})
+
+describe('holdEveryServerFn', () => {
+  it('holds the shell too, which is the whole difference from holdServerFns', async () => {
+    // Issue #230's probe: on a first navigation the shell's read is the one request that must not
+    // be let through, because a warm cache means the navigation never asks for it.
+    const stub = stubPage()
+    const held = await holdEveryServerFn(stub.page)
+    const log: Array<RouteCall> = []
+
+    const shell = stub.deliver(stubRoute(log, SHELL_URL))
+    const screen = stub.deliver(stubRoute(log))
+    expect(await hasSettled(shell)).toBe(false)
+    expect(await hasSettled(screen)).toBe(false)
+    expect(log).toEqual([])
+
+    await held.release()
+    await Promise.all([shell, screen])
+    expect(log).toEqual(['continue', 'continue'])
     expect(stub.unrouted).toEqual(['**/_serverFn/**'])
   })
 })

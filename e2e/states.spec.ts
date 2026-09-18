@@ -4,7 +4,11 @@ import { gotoApp } from './support/app'
 import { expectNoWcagViolations } from './support/axe-scan'
 import { expectOutlineWithoutSkips } from './support/headings'
 import { storageStateFor } from './support/session'
-import { failServerFns, holdServerFns } from './support/states'
+import {
+  failServerFns,
+  holdEveryServerFn,
+  holdServerFns,
+} from './support/states'
 import { openSurface } from './support/surfaces'
 
 import en from '#/lib/i18n/messages/en'
@@ -246,6 +250,45 @@ test.describe('a read that has not come back yet', () => {
 
     // And it does land. A skeleton that never resolves is a different bug wearing this one's face.
     // Only the loading sentence has to go: a loaded screen keeps live regions of its own.
+    await expect(
+      page
+        .locator('main [role="status"]')
+        .filter({ hasText: en['accounts.list.loading'] }),
+    ).toHaveCount(0)
+  })
+
+  /**
+   * Issue #230: the first client-side navigation of a tab used to draw nothing at all.
+   *
+   * `_app.beforeLoad` awaits the shell, and a fresh document's cache used to be empty, so the first
+   * navigation made a real shell request before the router would render any pending component.
+   * This case holds **every** server function, the shell's included — the move that used to freeze
+   * the router with the list still on screen (`docs/STATE-INVENTORY.md` §3). The shell the SSR pass
+   * resolved now reaches the browser's cache through `src/router.tsx`, so the guard answers from
+   * cache and the skeleton appears. Red on the commit before that channel existed.
+   */
+  test('the first navigation in a tab draws its skeleton even with the shell held', async ({
+    page,
+  }) => {
+    await gotoApp(page, '/accounts')
+    await expect(
+      page.getByRole('heading', { name: en['accounts.title'] }),
+    ).toBeVisible()
+
+    const held = await holdEveryServerFn(page)
+    try {
+      await page.locator('main a[href^="/accounts/"]').first().click()
+
+      const loading = page.locator('main [role="status"]')
+      await expect(loading).toHaveCount(1)
+      await expect(loading).toHaveText(en['accounts.list.loading'])
+      await expect(
+        page.getByRole('heading', { name: en['accounts.title'] }),
+      ).toBeHidden()
+    } finally {
+      await held.release()
+    }
+
     await expect(
       page
         .locator('main [role="status"]')
