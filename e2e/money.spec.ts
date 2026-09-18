@@ -10,7 +10,11 @@ import {
   uniqueToken,
 } from './support/app'
 import { storedTransaction } from './support/d1'
-import { YEN_ACCOUNT_NAME, YEN_RATE_E10 } from './support/fixtures'
+import {
+  YEN_ACCOUNT_NAME,
+  YEN_RATE_E10,
+  deleteAccountNamed,
+} from './support/fixtures'
 import { storageStateFor } from './support/session'
 
 /**
@@ -45,6 +49,14 @@ test.describe('money, end to end', () => {
     'The parse and the scale are the product`s, not the engine`s; one browser proves them once.',
   )
 
+  /** The account an attempt creates, removed after it: `deleteAccountNamed` says why. */
+  let accountName: string | undefined
+
+  test.afterEach(async () => {
+    if (accountName !== undefined) await deleteAccountNamed(accountName)
+    accountName = undefined
+  })
+
   test('a Polish decimal comma is stored as the integer it names, and shown back', async ({
     page,
     context,
@@ -52,7 +64,7 @@ test.describe('money, end to end', () => {
     await useLocale(context, 'pl')
 
     const token = uniqueToken('pln')
-    const accountName = `Konto ${token}`
+    accountName = `Konto ${token}`
     const note = `Zakup ${token}`
 
     await gotoApp(page, '/transactions')
