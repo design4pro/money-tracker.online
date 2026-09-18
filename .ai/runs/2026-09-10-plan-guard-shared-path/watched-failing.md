@@ -1,6 +1,6 @@
 # Watched failing — assertion 5, the shared-path rule (#321)
 
-Every case added for `.ai/specs/2026-09-10-plan-guard-shared-path-assertion.md`, watched failing
+Every case added for `.ai/specs/implemented/2026-09-10-plan-guard-shared-path-assertion.md`, watched failing
 before it was watched passing. Command in each case:
 `pnpm exec vitest run --project=tooling scripts/plans/__tests__/plan-paths.test.ts`, with
 `TMPDIR=/tmp` for `tsx` (#221). Every break was restored immediately afterwards (`git checkout` on

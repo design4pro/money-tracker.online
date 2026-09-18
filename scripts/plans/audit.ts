@@ -54,7 +54,7 @@
  * @see scripts/plans/parse-plan.ts - the grammar
  * @see scripts/plans/drift-classes.ts - the class each absent entry belongs to
  * @see .ai/specs/2026-09-07-foundations-plan-reconciliation.md
- * @see .ai/specs/2026-09-10-plan-guard-shared-path-assertion.md - assertion 5
+ * @see .ai/specs/implemented/2026-09-10-plan-guard-shared-path-assertion.md - assertion 5
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
