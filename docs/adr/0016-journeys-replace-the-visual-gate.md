@@ -163,3 +163,20 @@ review, and a failure arrives as a dropped queue entry rather than as a red chec
 them - `pnpm e2e` locally is the only earlier signal. The alternative, keeping the legs on the pull
 request and skipping them in the queue, buys that signal back at the price of verifying a base that
 may have moved, and is one `if` per job away.
+
+## Amendment 2026-09-18 (the phone leg runs on chromium)
+
+**The legs are `chromium` and `mobile-chromium`; `mobile-safari` leaves CI (#317).** It was two of
+the three legs, sharded because it was the slow one, and the failures it produced were mostly its
+own timing: #236 and #295 were `mobile-safari`-only. The project stays in `playwright.config.ts`,
+so a change that touches WebKit at phone width runs `pnpm e2e --project=mobile-safari` itself.
+
+`mobile-chromium` (a Pixel 7) is there because the phone width was not the WebKit engine's to keep.
+`accessibility.spec.ts` does not multiply itself across widths and `navigation.spec.ts` reaches the
+bottom bar only on a phone viewport, so a matrix of `chromium` alone would have dropped the axe
+scans at phone width and every case against `bottom-nav.tsx`. The specs that exist to run once
+skip it by `isMobile`, as they skip the other engines.
+
+What this costs is WebKit at phone width in the gate: safe-area insets, `100dvh` and momentum
+scrolling are now checked when a change asks for them, not on every merge. The measurements behind
+one unsharded leg are in the comment above the `e2e` matrix in `ci.yml`.

@@ -29,7 +29,7 @@ import type { Browser } from '@playwright/test'
  * Polish. Scanning one theme in one language is scanning a quarter of the product.
  *
  * Width is deliberately *not* a third axis here: `playwright.config.ts` owns the viewports and
- * already runs this file at a phone width under `mobile-safari`. Multiplying it here would run the
+ * already runs this file at a phone width under `mobile-chromium`. Multiplying it here would run the
  * same scans twice under two different owners.
  *
  * ## What counts as a failure

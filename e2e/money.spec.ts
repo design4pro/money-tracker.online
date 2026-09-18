@@ -41,7 +41,7 @@ test.describe('money, end to end', () => {
   test.use({ storageState: storageStateFor('tenant-a') })
 
   test.skip(
-    ({ browserName }) => browserName !== 'chromium',
+    ({ browserName, isMobile }) => browserName !== 'chromium' || isMobile,
     'The parse and the scale are the product`s, not the engine`s; one browser proves them once.',
   )
 
