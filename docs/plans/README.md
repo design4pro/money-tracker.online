@@ -250,6 +250,11 @@ migration**, **UI** or **Quota** heading and stops. The requirement is then mint
 `00-foundations.md`. A stage whose Owned paths list contains one of these eight is malformed and is
 rejected before it is scheduled.
 
+The rejection is asserted, not left to a reader: assertion 5 of `scripts/plans/audit.ts` fails any
+stage outside `00-foundations.md` whose Owned paths names one of the eight, and
+`scripts/plans/__tests__/plan-paths.test.ts` runs it over every plan document and holds the table
+above equal to the list the assertion encodes.
+
 ---
 
 ## Label vocabulary
