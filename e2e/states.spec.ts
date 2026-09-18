@@ -263,6 +263,33 @@ test.describe('a read that has not come back yet', () => {
         .filter({ hasText: en['accounts.list.loading'] }),
     ).toHaveCount(0)
   })
+
+  /**
+   * Past the shell's thirty-second stale mark the guard still answers from cache: the refresh runs
+   * behind the navigation (`revalidateIfStale`), never in front of it. Were it blocking, the held
+   * refresh would freeze the router exactly as an empty cache used to, and no skeleton would draw.
+   */
+  test('a stale shell is refreshed behind the navigation, not in front of it', async ({
+    page,
+  }) => {
+    await page.clock.install()
+    await gotoApp(page, '/accounts')
+    await expect(
+      page.getByRole('heading', { name: en['accounts.title'] }),
+    ).toBeVisible()
+    await page.clock.fastForward('00:31')
+
+    const held = await holdEveryServerFn(page)
+    try {
+      await page.locator('main a[href^="/accounts/"]').first().click()
+
+      const loading = page.locator('main [role="status"]')
+      await expect(loading).toHaveCount(1)
+      await expect(loading).toHaveText(en['accounts.list.loading'])
+    } finally {
+      await held.release()
+    }
+  })
 })
 
 /**
