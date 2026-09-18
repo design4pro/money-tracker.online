@@ -24,9 +24,9 @@ pnpm lint && pnpm typecheck && pnpm test
 ```
 
 Those three are the _fast loop_, not the gate. **The gate is `validation.commands` in
-`.ai/agentic.config.json`** — it starts with `node .ai/scripts/agent-kit-check.mjs` and the
-generated-file checks, and ends with `pnpm build` — and every PR passes it in full before review.
-Run the fast loop while you work; run the gate before you open the PR:
+`.ai/agentic.config.json`, in the order written there**, and every PR passes it in full before
+review. This file does not repeat the list: a gate written down twice is a gate that disagrees with
+itself. Run the fast loop while you work; print the gate and run it before you open the PR:
 
 ```bash
 node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>console.log(c))"

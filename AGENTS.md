@@ -69,11 +69,14 @@ request, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prett
 repo) is not a gate either; keep what you touch prettier-clean.
 
 `node .ai/scripts/agent-kit-check.mjs` being first is not incidental: it verifies that no file the
-agent kit renders has been edited by hand. Those files are listed in `.ai/agent-kit.lock.json` and
-include every `.ai/cezar/workflows/*.yml`, every `.ai/skills/afk-*/SKILL.md`, `.ai/scripts/*`,
-`.claude/hooks/*` and `docs/agents/cezar-automations.json`. Editing one directly fails the first
-command of the gate and therefore fails the PR: change the template in the agent-kit repository and
-re-sync instead.
+agent kit renders has been edited by hand. `.ai/agent-kit.lock.json` hashes them, and that lock file
+— not a list in prose — is the answer to "is this file mine to edit": the check walks its explicit
+keys, not a directory glob. It covers `.ai/cezar/workflows/`, `.ai/cezar/config.json`,
+`.ai/skills/afk-*/`, `.claude/hooks/`, `.claude/settings.json`, `.claude/skills/backlog/SKILL.md`,
+`.ai/trackers/github.md`, `scripts/ci/`, three `.github/workflows/` and
+`docs/agents/cezar-automations.json`, and only part of `.ai/scripts/`. Editing one directly fails the
+first command of the gate and therefore fails the PR: change the template in the agent-kit repository
+and re-sync instead.
 
 ## Task Router
 
@@ -121,7 +124,8 @@ re-sync instead.
   (`CONTEXT.md` and ADR discipline) and `afk-codebase-design` (the design vocabulary — module,
   interface, depth, seam, adapter, the deletion test — written against this repository's own
   seams). **None of them is installed as a skill**, so read the file at `.ai/skills/<name>/SKILL.md`;
-  the `Skill` tool cannot reach it and answers `Unknown skill`. They are rendered by the agent kit
-  and hashed in `.ai/agent-kit.lock.json` — edit the kit's template, never the copy.
+  the `Skill` tool cannot reach it and answers `Unknown skill`. The first five are rendered by the
+  agent kit and hashed in `.ai/agent-kit.lock.json` — edit the kit's template, never the copy;
+  `afk-codebase-design` is repo-local and is edited here.
 - `SDLC.md` is the ticket flow, `CODE_REVIEW.md` the review rules, `BACKWARD_COMPATIBILITY.md` the
   protected surfaces, `.ai/review-checklist.md` the per-PR list.
