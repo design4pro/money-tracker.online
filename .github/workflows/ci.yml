@@ -341,8 +341,8 @@ jobs:
   # projects.
   #
   # `chromium` is the desktop layout at 1440x900. `mobile-chromium` is a Pixel 7:
-  # the phone layout - bottom navigation, drawers, the axe scans at phone width -
-  # on the engine that was already the cheap leg. `mobile-safari` (an iPhone 15)
+  # the phone layout - bottom navigation, drawers, the `*.visual.spec.ts` axe
+  # scans at phone width - on the engine that was already the cheap leg. `mobile-safari` (an iPhone 15)
   # is not run here any more (#317): it took two of three legs, so WebKit at
   # phone width is checked on demand with `pnpm e2e --project=mobile-safari` by
   # the change that touches it.

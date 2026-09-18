@@ -28,9 +28,11 @@ import type { Browser } from '@playwright/test'
  * the accessible name of every control, so a name that was correct in English can be missing in
  * Polish. Scanning one theme in one language is scanning a quarter of the product.
  *
- * Width is deliberately *not* a third axis here: `playwright.config.ts` owns the viewports and
- * already runs this file at a phone width under `mobile-chromium`. Multiplying it here would run the
- * same scans twice under two different owners.
+ * Width is *not* a third axis here, and nor does the project's viewport reach these scans:
+ * `openSurface` builds its own context with `browser.newContext()`, which inherits none of the
+ * project's `use` options, so every project scans these routes at Playwright's default 1280x720.
+ * The axe scans at phone width are the `*.visual.spec.ts` panel scans, which run on the `page`
+ * fixture under `mobile-chromium`.
  *
  * ## What counts as a failure
  *

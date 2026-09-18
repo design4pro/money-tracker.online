@@ -67,8 +67,9 @@ const clockPin = { [SERVER_TODAY_HEADER]: BASELINE_DAY }
  * Four browser projects, of which CI runs two (`chromium` and `mobile-chromium`, issue #317):
  *
  * - `chromium` at 1440x900, the desktop layout, and where the axe-core scans run.
- * - `mobile-chromium` on a Pixel 7: the phone layout (bottom navigation, drawers, the axe scans at
- *   phone width) on the engine that is already the cheap leg.
+ * - `mobile-chromium` on a Pixel 7: the phone layout (bottom navigation, drawers, and the axe scans
+ *   the `*.visual.spec.ts` files run on the `page` fixture) on the engine that is already the cheap
+ *   leg.
  * - `mobile-safari` on an iPhone 15, because safe-area insets, `100dvh` and momentum scrolling
  *   behave differently there than anywhere else, and transaction entry is the mobile use case.
  *   Not in CI: it took two of three e2e legs, so it runs on demand

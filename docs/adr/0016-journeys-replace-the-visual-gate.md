@@ -172,9 +172,11 @@ own timing: #236 and #295 were `mobile-safari`-only. The project stays in `playw
 so a change that touches WebKit at phone width runs `pnpm e2e --project=mobile-safari` itself.
 
 `mobile-chromium` (a Pixel 7) is there because the phone width was not the WebKit engine's to keep.
-`accessibility.spec.ts` does not multiply itself across widths and `navigation.spec.ts` reaches the
-bottom bar only on a phone viewport, so a matrix of `chromium` alone would have dropped the axe
-scans at phone width and every case against `bottom-nav.tsx`. The specs that exist to run once
+`navigation.spec.ts` reaches the bottom bar only on a phone viewport, and the `*.visual.spec.ts`
+panel scans run axe on the project's own `page`, so a matrix of `chromium` alone would have dropped
+every case against `bottom-nav.tsx` and every axe scan at phone width. The route scans in
+`accessibility.spec.ts` are not among them: `openSurface` opens its own context at Playwright's
+default 1280x720 under every project, `mobile-safari` included. The specs that exist to run once
 skip it by `isMobile`, as they skip the other engines.
 
 What this costs is WebKit at phone width in the gate: safe-area insets, `100dvh` and momentum
