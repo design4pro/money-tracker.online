@@ -26,16 +26,49 @@ runs:
       with:
         version: 10.15.0
 
+    # The self-hosted CI pool mounts a persistent pnpm store at this path
+    # (agent-kit host/runner/pool.sh, volume `gha-pnpm-store`), and pnpm never
+    # used it: action-setup exports PNPM_HOME, pnpm's default store is
+    # $PNPM_HOME/store, and that lives in the disposable container. Measured in
+    # job 105157932544: `pnpm store path` printed
+    # /home/runner/setup-pnpm/node_modules/.bin/store/v10 - inside the container -
+    # so every job refilled a store that was thrown away at the end of it.
+    #
+    # The check is for a writable mount rather than for `self-hosted`, because
+    # the agent pool carries no volume on purpose, and a volume Docker created
+    # root-owned is not writable by the `runner` user - either way the install
+    # falls back to a store inside the container, filled from the registry.
+    - name: Use the runner's persistent pnpm store
+      if: runner.environment == 'self-hosted'
+      shell: bash
+      run: |
+        store="$HOME/.local/share/pnpm/store"
+        if mountpoint -q "$store" && [ -w "$store" ]; then
+          echo "npm_config_store_dir=$store" >> "$GITHUB_ENV"
+          echo "pnpm store: the runner's persistent volume at $store"
+        else
+          echo "pnpm store: none persistent here ($store is not a writable mount), filling one from the registry"
+        fi
+
     # `cache: pnpm` caches pnpm's content-addressable store (the directory
     # `pnpm store path` prints), keyed on pnpm-lock.yaml. That is the expensive
     # half of an install; node_modules itself is relinked from the store in
     # seconds and is deliberately not cached, so a corrupted tree can never be
     # restored from a previous run.
+    #
+    # GitHub-hosted runners only, and that restriction is measured rather than
+    # stylistic. Unconditional, this restored a 330 MB tarball at ~7 MB/s into
+    # the self-hosted pool on *every* job - 198 s of a 134 s-average
+    # `Set up the toolchain`, against 26-35 s for the same action in
+    # planned.travel, which has carried this guard since its pool was built.
+    # Node itself is already in the image's tool cache ("Found in cache @
+    # /opt/hostedtoolcache/node/24.21.0/arm64", 0.4 s), so nothing else in this
+    # step needs the network there.
     - name: Set up Node
       uses: actions/setup-node@v7
       with:
         node-version: 24.x
-        cache: pnpm
+        cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
 
     - name: Install dependencies
       if: inputs.install == 'true'
