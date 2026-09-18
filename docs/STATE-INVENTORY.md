@@ -212,13 +212,20 @@ That first-navigation block is **not** fixed here. `_app.beforeLoad` is the sess
 and `AGENTS.md` → Ask First covers it. It is recorded here so the next reader does not re-derive it,
 and filed as [#230](https://github.com/design4pro/money-tracker.online/issues/230).
 
-It does, however, decide the shape of the test helper. `e2e/support/states.ts` lets the shell's own
-request through and holds everything after it, because a hold that includes the shell freezes the
+It was **fixed there**, on PR #338, without moving the guard (ADR 0018): `beforeLoad` still awaits
+the shell, but the shell the SSR pass already resolved is now dehydrated into the browser's cache
+through the router's own `dehydrate`/`hydrate` options (`src/router.tsx`), so the first client-side
+navigation answers the guard from cache and draws its loading state like every later one.
+
+It used to decide the shape of the test helper as well. `e2e/support/states.ts` let the shell's own
+request through and held everything after it, because a hold that included the shell froze the
 router one step before the loading state it was installed to photograph. Measured on a client-side
 navigation from `/accounts` to `/accounts/demo-acc-1`: with the shell held, zero `role="status"`
 regions and the account list still on screen; with it let through, one `role="status"` and eleven
-skeleton bars inside `main`, and the list gone. That measurement is what `e2e/states.spec.ts`
-asserts, so the loading state is evidence rather than a claim.
+skeleton bars inside `main`, and the list gone. Since #230 the first navigation makes no shell
+request at all, so `e2e/states.spec.ts` holds **every** server function, the shell's included, and
+asserts the same one `role="status"`: the loading state is evidence rather than a claim, and the
+first-navigation block is a regression that test would catch.
 
 This is also why "add a `pendingComponent` to seven route modules" is, on its own, worth very little:
 nineteen surfaces already declared one and it did not render either.
@@ -295,7 +302,8 @@ re-export puts it back. The count was **41** by the time the move landed, not th
 - The **loading** state was a missing router-level default first and a per-route gap second.
   `src/router.tsx` now sets a `defaultPendingComponent`, which is what lets a route that draws no
   shape of its own announce its load at all, and the seven bare modules got a shape each. The
-  first-navigation block in `_app.beforeLoad` is named above, left alone, and filed as #230.
+  first-navigation block in `_app.beforeLoad` is named above, left alone here, filed as #230 and
+  fixed there by priming the shell's cache rather than by relaxing the guard.
 - The **error** state was designed almost everywhere. The two gaps were the three modules declaring
   none, and `/transactions/$transactionId` conflating a broken read with a missing row — reconciled
   with what #16 landed rather than given a second error treatment beside it.
