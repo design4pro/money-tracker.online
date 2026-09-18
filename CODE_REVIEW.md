@@ -49,15 +49,20 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 - **Clean room.** Nothing is copied from the reference product (`docs/agents/reference.md`): not a
   string, a name, a number or a layout.
 - **Numbers.** Every count in the PR body and the review came from a command whose output was read
-  (`docs/SPEC.md` §7.7).
+  (`docs/SPEC.md` §7.7). The same holds for a figure written into a spec, a plan, an ADR or a code
+  comment: it is re-derived on the head under review, and a headline total agrees with the table it
+  summarises (#170, #191, #222, #250, #252, #253).
+- **Documents name what exists.** A spec, ADR, `SDLC.md`, skill or comment that names a file, job,
+  test, label, automation or mechanism names one that exists on the branch and does what the text
+  says; the reviewer opens each one (#159, #191, #304, #308, #310, #319).
 
 ## Severity
 
 | Severity | What lands here                                                                                                                                                                                                                                                                                                                                                                                          |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | blocker  | Any money or tenancy rule above; a missing Zod parse; a client-side-only permission check; a missing tenant-isolation or money-invariant case; a key in one locale only; a hand-edited generated file; a non-additive migration; an added suppression, skip or deleted test; a clean-room violation; a bank connector (ADR 0008); a new dependency; a broken protected surface without its required path |
-| major    | An AA accessibility regression; a blanket AAA claim; slow work run inline; a second implementation of an owned concept (SPEC §8); a missing loading, empty or error state; a behaviour change without a failing-first test                                                                                                                                                                               |
-| minor    | `TODO`, `console.log`, commented-out code, placeholder copy; a scope or naming convention missed; a docblock that no longer matches the code                                                                                                                                                                                                                                                             |
+| major    | An AA accessibility regression; a blanket AAA claim; slow work run inline; a second implementation of an owned concept (SPEC §8); a missing loading, empty or error state; a behaviour change without a failing-first test; a written figure that no command reproduces; a document naming something that does not exist or does not do what it says                                                     |
+| minor    | `TODO`, `console.log`, commented-out code, placeholder copy; a scope or naming convention missed; a docblock whose wording has drifted from the code while everything it names still exists and does what it says (a false claim is major)                                                                                                                                                               |
 | nit      | Style the linter does not enforce                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Verdict
