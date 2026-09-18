@@ -55,9 +55,9 @@ weakening the guard (ADR 0018).
 
 ### Phase 1: The shell crosses the wire, and the first navigation draws its skeleton
 
-- [ ] 1.1 Give the shell's cache contract one owner
-- [ ] 1.2 Write the failing browser test
-- [ ] 1.3 Open the channel
-- [ ] 1.4 Make the priming outlive five minutes, and make the refresh real
+- [x] 1.1 Give the shell's cache contract one owner — 5cccb94
+- [x] 1.2 Write the failing browser test — 47f0563
+- [x] 1.3 Open the channel — 3c25f30
+- [x] 1.4 Make the priming outlive five minutes, and make the refresh real — 2e6c2d1
 - [ ] 1.5 Assert the guard's answer is unchanged, and that nothing leaks into a signed-out document
 - [ ] 1.6 Reconcile the documents that record the block as permanent, and capture the frames
