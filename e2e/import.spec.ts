@@ -36,8 +36,10 @@ import type { Page } from '@playwright/test'
  * is on a plan with `importsPerMonth: 2`, and the seed's own completed batch already counts in the
  * current month, so a second batch left behind by a failed attempt made every retry fail on the
  * quota rather than on anything it was testing (#295), and a persistent local database hit the same
- * wall one run later (#228). Nothing references the row except `import_row_errors`, which cascades,
- * and the test writes no transactions.
+ * wall one run later (#228). `import_row_errors` cascades on delete, and `transactions.import_batch_id`
+ * only sets null on delete - safe here because the test writes no transactions. The batch is found by
+ * its file name, which carries the attempt's token and ends the stored `file_r2_key`, so the cleanup
+ * does not depend on the upload's navigation having finished.
  *
  * The labels are quoted rather than imported for the reason `support/app.ts` gives: the catalogue
  * loader is built on `import.meta.glob`, which Playwright's module runner does not have. The
@@ -126,17 +128,25 @@ async function choose(page: Page, label: string, option?: string | RegExp) {
 }
 
 test.describe('import: map a statement and preview it', () => {
-  /** The batch this attempt's upload created, if it got that far. */
-  let batchId: string | undefined
+  /** The file this attempt uploads; its batch, if the upload got that far, is found by it. */
+  let fileName: string | undefined
 
   test.beforeEach(async ({ context }) => {
     await useLocale(context, 'en')
   })
 
   test.afterEach(async () => {
-    if (batchId === undefined) return
-    await d1Query(`delete from import_batches where id = ${sqlText(batchId)}`)
-    batchId = undefined
+    const name = fileName
+    fileName = undefined
+    if (name === undefined) return
+    // A cleanup failure is reported, not raised: it must not fail an attempt whose body passed.
+    try {
+      await d1Query(
+        `delete from import_batches where file_r2_key like ${sqlText(`imports/%/${name}`)}`,
+      )
+    } catch (error) {
+      console.warn(`import batch for ${name} was not cleaned up`, error)
+    }
   })
 
   test('reads a windows-1250 file, blocks on DMY/MDY, and previews without writing', async ({
@@ -144,6 +154,7 @@ test.describe('import: map a statement and preview it', () => {
   }) => {
     const token = uniqueToken('kol')
     const columns = [`Data ${token}`, `Opis ${token}`, `Kwota ${token}`]
+    fileName = `wyciag-${token}.csv`
 
     await gotoApp(page, '/import')
 
@@ -159,14 +170,13 @@ test.describe('import: map a statement and preview it', () => {
       .locator('input[type="file"]')
       .first()
       .setInputFiles({
-        name: 'wyciag.csv',
+        name: fileName,
         mimeType: 'text/csv',
         buffer: windows1250(statement(columns)),
       })
 
     await page.getByRole('button', { name: 'Read this file' }).click()
     await expect(page).toHaveURL(/\/import\/[^/?]+/u)
-    batchId = new URL(page.url()).pathname.split('/').at(-1)
 
     // Step one of four, and the stepper says how long the flow is before anybody is inside it.
     await expect(
