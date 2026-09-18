@@ -243,3 +243,38 @@ The live label list had already drifted past decision 2's count of 27 before thi
 recorded here rather than repaired, because each of those four is a trigger documented in
 `SDLC.md`'s `## This repository` section and in `docs/agents/cezar-automations.json`, and giving
 them a group in the config would make them look like state.
+
+## Amendment, 2026-09-17: the deferred question is answered — `ready-for-agent` does start a run
+
+The amendment immediately above states that intake starts nothing, and defers "whether an
+`issue.labeled` automation should start implementation without a person in the cockpit" to the first
+retro. That is no longer what the repository does, and it was already untrue when the sentence was
+written: `docs/agents/cezar-automations.json` defines **Implement ready-for-agent issues** —
+`issue.labeled`, `changedLabels: ["ready-for-agent"]`, workflow `implement-ticket` — and it is
+enabled in the cockpit. This amendment answers the deferred question rather than repairing the
+prose: **yes**, adding `ready-for-agent` starts an implementation run with no person in the cockpit.
+
+What makes that safe is the filter set, not a human at the label:
+
+- `excludeLabels` on the automation stands down on `risk-high`, `security`, `blocked`, `do-not-merge`,
+  `needs-info`, `ready-for-human` and `in-progress`. The two categories the process reserves for a
+  person are therefore unreachable from this trigger, not merely discouraged by a skill's own rules.
+- Only `afk-triage`, `afk-to-tickets` and a human apply the label, and `afk-triage` applies it only
+  after an Agent Brief, the Definition of Ready and the SLC scoping rule all pass.
+- `implement-ticket` stops when three or more agent PRs already wait in `review`, and nothing merges:
+  the run's output is a reviewed PR. The cap is on unreviewed inventory, so a burst of intake cannot
+  outrun review capacity.
+
+The invariant the earlier amendment was protecting — that a _trigger_ label is a human's lever and no
+skill adds one to its own input — is unchanged. `groom`, `autofix`, `spec` and `review-threads` are
+still the trigger labels, still human-applied (except `review-threads`), and still removed by the run
+that consumes them. What changes is the claim that intake is inert: intake is the pipeline's own
+ladder, and it is allowed to hand work on. `SDLC.md` § Intake labels and § Trigger labels now state
+the two mechanisms separately for that reason, and `## This repository` names which of each is wired.
+
+This also records the consequence for decision 2's label count: `labels.intake` is joined in
+`.ai/agentic.config.json` by `labels.command` (`groom`, `autofix`, `spec`, `review-threads`) and
+`labels.outside` (`do-not-close`). The drift recorded at the end of the previous amendment is
+repaired rather than left standing — a label that four live automations read is part of the
+taxonomy whether or not it looks like state, and leaving it out of the config is what let the
+documentation and the running system disagree.
