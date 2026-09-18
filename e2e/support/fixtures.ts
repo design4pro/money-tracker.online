@@ -70,3 +70,41 @@ export async function installYenFixture(organizationId: string): Promise<void> {
       `0, 0, 0, 0, 'active', 0, 90, ${now}, ${now})`,
   ])
 }
+
+/**
+ * Deletes an account a test created in a fixture workspace, with every transaction written to it.
+ *
+ * ## Why each test cleans up rather than setup resetting the workspace
+ *
+ * `E2E Tenant A` lives for as long as the local database does (`support/session.ts`), and it is on
+ * the free plan, which allows three accounts. The yen account above is one of them, and
+ * `tenant-isolation.spec.ts` and `money.spec.ts` create one each, so a single run that leaves them
+ * behind fills the quota: on the next run both create dialogs are refused and stay open - a failure
+ * about a dialog that points at nothing broken (#228). CI seeds a fresh database every run, so
+ * there it is a retry of either test that can hit the same wall. Archiving would not help: the quota
+ * counts every row.
+ *
+ * Each test therefore removes what it named, which is the convention `support/session.ts` already
+ * states for the fixture tenants. Resetting the workspaces in the setup project was the other
+ * option; it would make setup do teardown's job and could not tell a leftover from a row a
+ * parallel file is using.
+ *
+ * The account is found by its name, which carries the test's token, so the cleanup does not depend
+ * on the test having got as far as reading the id out of the URL. The transactions go first because
+ * `transactions.account_id` restricts the delete, and they are every transaction on the account
+ * rather than the ones the test typed: a keyboard spec saving into the same workspace in parallel
+ * may have landed one there. Everything else referencing either row cascades or sets null, the
+ * balance rows included. A failure is reported rather than raised, so it never fails a test whose
+ * body passed.
+ */
+export async function deleteAccountNamed(name: string): Promise<void> {
+  const accounts = `select id from accounts where name = ${sqlText(name)}`
+  try {
+    await d1Exec([
+      `delete from transactions where account_id in (${accounts})`,
+      `delete from accounts where id in (${accounts})`,
+    ])
+  } catch (error) {
+    console.warn(`account ${name} was not cleaned up`, error)
+  }
+}

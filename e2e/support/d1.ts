@@ -44,7 +44,7 @@ export type D1Row = Record<string, unknown>
 const CONTENTION =
   /internal error|SQLITE_BUSY|database is locked|Failed to parse body as JSON/i
 
-/** Retrying is safe: every statement this suite writes is an idempotent `insert or ignore`. */
+/** Retrying is safe: every statement this suite writes is an idempotent `insert or ignore` or `delete`. */
 const ATTEMPTS = 3
 
 async function execute(args: ReadonlyArray<string>): Promise<Array<D1Row>> {
