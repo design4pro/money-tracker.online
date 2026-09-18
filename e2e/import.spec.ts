@@ -2,6 +2,7 @@ import { expect, test } from './support/console'
 
 import { gotoApp, uniqueToken, useLocale } from './support/app'
 import { expectNoSeriousViolations } from './support/budgets'
+import { d1Query, sqlText } from './support/d1'
 import { storageStateFor } from './support/session'
 
 import type { Page } from '@playwright/test'
@@ -24,12 +25,21 @@ import type { Page } from '@playwright/test'
  *   and its test is `19-S3`'s to write - which is also what makes this spec safe to run against the
  *   shared demo workspace every other suite reads.
  *
- * ## Two things this test has to do to stay honest
+ * ## Three things this test has to do to stay honest
  *
  * The column names carry a per-run token, because confirming a mapping **saves it as a preset** and
  * a preset matching the header row pre-fills the next file - date format included. That is the
  * product working as designed, and it would quietly delete the blocking question this test exists
  * to prove, on every run after the first.
+ *
+ * Each attempt deletes the batch it created, because reading a file is metered. The demo workspace
+ * is on a plan with `importsPerMonth: 2`, and the seed's own completed batch already counts in the
+ * current month, so a second batch left behind by a failed attempt made every retry fail on the
+ * quota rather than on anything it was testing (#295), and a persistent local database hit the same
+ * wall one run later (#228). `import_row_errors` cascades on delete, and `transactions.import_batch_id`
+ * only sets null on delete - safe here because the test writes no transactions. The batch is found by
+ * its file name, which carries the attempt's token and ends the stored `file_r2_key`, so the cleanup
+ * does not depend on the upload's navigation having finished.
  *
  * The labels are quoted rather than imported for the reason `support/app.ts` gives: the catalogue
  * loader is built on `import.meta.glob`, which Playwright's module runner does not have. The
@@ -89,15 +99,54 @@ function picker(page: Page, label: string) {
   return page.getByRole('button', { name: new RegExp(label, 'u') })
 }
 
-/** Chooses `option` in the Select named `label`. */
-async function choose(page: Page, label: string, option: string | RegExp) {
+/**
+ * Chooses `option` in the Select named `label`, or its first option when none is named, and waits
+ * until the choice has landed.
+ *
+ * Both waits are load-bearing on mobile WebKit (#295). A tap on an option while the popover is
+ * still running its `pop-in` animation does not commit: the listbox stays open over the page, and
+ * the *next* picker's click is the one that fails, intercepted by it for the whole action timeout.
+ * So the option is clicked only once React Aria has dropped `data-entering`, and the helper
+ * returns only once the listbox is gone and the button reads the chosen value.
+ */
+async function choose(page: Page, label: string, option?: string | RegExp) {
   await picker(page, label).click()
-  await page.getByRole('option', { name: option, exact: false }).first().click()
+  // Visible first: until the popover has mounted, "no `data-entering`" is trivially true.
+  await expect(page.getByRole('listbox')).toBeVisible()
+  await expect(page.locator('[data-entering]')).toHaveCount(0)
+  await (
+    option === undefined
+      ? page.getByRole('option')
+      : page.getByRole('option', { name: option, exact: false })
+  )
+    .first()
+    .click()
+  await expect(page.getByRole('listbox')).toBeHidden()
+  if (option !== undefined) {
+    await expect(picker(page, label)).toContainText(option)
+  }
 }
 
 test.describe('import: map a statement and preview it', () => {
+  /** The file this attempt uploads; its batch, if the upload got that far, is found by it. */
+  let fileName: string | undefined
+
   test.beforeEach(async ({ context }) => {
     await useLocale(context, 'en')
+  })
+
+  test.afterEach(async () => {
+    const name = fileName
+    fileName = undefined
+    if (name === undefined) return
+    // A cleanup failure is reported, not raised: it must not fail an attempt whose body passed.
+    try {
+      await d1Query(
+        `delete from import_batches where file_r2_key like ${sqlText(`imports/%/${name}`)}`,
+      )
+    } catch (error) {
+      console.warn(`import batch for ${name} was not cleaned up`, error)
+    }
   })
 
   test('reads a windows-1250 file, blocks on DMY/MDY, and previews without writing', async ({
@@ -105,6 +154,7 @@ test.describe('import: map a statement and preview it', () => {
   }) => {
     const token = uniqueToken('kol')
     const columns = [`Data ${token}`, `Opis ${token}`, `Kwota ${token}`]
+    fileName = `wyciag-${token}.csv`
 
     await gotoApp(page, '/import')
 
@@ -114,19 +164,19 @@ test.describe('import: map a statement and preview it', () => {
 
     // The account the rows would land in. Any account of the demo workspace will do: this test
     // asserts nothing about balances, because nothing is written.
-    await picker(page, 'Import into').click()
-    await page.getByRole('option').first().click()
+    await choose(page, 'Import into')
 
     await page
       .locator('input[type="file"]')
       .first()
       .setInputFiles({
-        name: 'wyciag.csv',
+        name: fileName,
         mimeType: 'text/csv',
         buffer: windows1250(statement(columns)),
       })
 
     await page.getByRole('button', { name: 'Read this file' }).click()
+    await expect(page).toHaveURL(/\/import\/[^/?]+/u)
 
     // Step one of four, and the stepper says how long the flow is before anybody is inside it.
     await expect(
@@ -157,8 +207,7 @@ test.describe('import: map a statement and preview it', () => {
     await expect(page.getByText('Żabka nano 4471')).toBeVisible({
       timeout: 12_000,
     })
-    await picker(page, 'Import into').click()
-    await page.getByRole('option').first().click()
+    await choose(page, 'Import into')
 
     await choose(page, `What the column .${columns[0]}. holds`, 'Date')
     await choose(page, `What the column .${columns[1]}. holds`, 'Description')
