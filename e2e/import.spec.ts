@@ -109,6 +109,8 @@ function picker(page: Page, label: string) {
  */
 async function choose(page: Page, label: string, option?: string | RegExp) {
   await picker(page, label).click()
+  // Visible first: until the popover has mounted, "no `data-entering`" is trivially true.
+  await expect(page.getByRole('listbox')).toBeVisible()
   await expect(page.locator('[data-entering]')).toHaveCount(0)
   await (
     option === undefined
