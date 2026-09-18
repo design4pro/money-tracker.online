@@ -51,6 +51,8 @@ weakening the guard (ADR 0018).
 
 ## Progress
 
+PR: #338
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: The shell crosses the wire, and the first navigation draws its skeleton
