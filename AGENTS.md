@@ -122,10 +122,15 @@ and re-sync instead.
   to an Agent Brief and one intake label), `afk-to-tickets` (a merged spec to tracer-bullet
   tickets), `afk-architecture-review` (weekly), `afk-lessons` (weekly), `afk-domain-modeling`
   (`CONTEXT.md` and ADR discipline) and `afk-codebase-design` (the design vocabulary — module,
-  interface, depth, seam, adapter, the deletion test — written against this repository's own
-  seams). **None of them is installed as a skill**, so read the file at `.ai/skills/<name>/SKILL.md`;
-  the `Skill` tool cannot reach it and answers `Unknown skill`. The first five are rendered by the
-  agent kit and hashed in `.ai/agent-kit.lock.json` — edit the kit's template, never the copy;
-  `afk-codebase-design` is repo-local and is edited here.
+  interface, depth, seam, adapter, the deletion test). **None of them is installed as a skill**, so
+  read the file at `.ai/skills/<name>/SKILL.md`; the `Skill` tool cannot reach it and answers
+  `Unknown skill`. All six are rendered by the agent kit and hashed in `.ai/agent-kit.lock.json` —
+  edit the kit's template, never the copy.
+- `afk-codebase-design` comes in two halves. The kit renders the shared one: the vocabulary and the
+  rules, which `afk-triage`, `afk-to-tickets` and `afk-architecture-review` all read by that literal
+  path. This repository's own house idiom, seam table, dependency examples, test layout and
+  risk-high interfaces are the other half, at `.ai/cezar/skills/afk-codebase-design/SKILL.md`, which
+  shadows the rendered file by name because `.ai/cezar/skills` is scanned first. That override is
+  repo-owned and edited here; the shared half is edited in the kit. Read both.
 - `SDLC.md` is the ticket flow, `CODE_REVIEW.md` the review rules, `BACKWARD_COMPATIBILITY.md` the
   protected surfaces, `.ai/review-checklist.md` the per-PR list.
