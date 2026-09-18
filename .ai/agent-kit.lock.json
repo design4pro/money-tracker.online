@@ -1,5 +1,5 @@
 {
-  "kitVersion": 42,
+  "kitVersion": 43,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -94,6 +94,10 @@
       "sha256": "7a6c600c6031d6c84d2183a212748d62b767ebcbf922601dfbab2569debb4eea",
       "mode": "100644"
     },
+    ".ai/skills/afk-codebase-design/SKILL.md": {
+      "sha256": "bb34aa86592fe6f5fc4ca2992d54fd28d985f0f9cd08236eba5b1ba3a077a9cd",
+      "mode": "100644"
+    },
     ".ai/skills/afk-domain-modeling/SKILL.md": {
       "sha256": "2278977ea10f2caf8d743f0dce801cca59dd41d3babfe8a683ef7d863d29c3a6",
       "mode": "100644"
@@ -155,7 +159,7 @@
       "mode": "100644"
     },
     "docs/agents/cezar-automations.json": {
-      "sha256": "f9246923d4847bb296ca04472adcfacf79a98ee1f748e5508ac3ec35777aa30e",
+      "sha256": "db593c26e8e3c21a3ec5d422c86b211a0028b28c8c44b99e267435d123c38958",
       "mode": "100644"
     },
     "scripts/ci/__tests__/claude-credential-gate.test.ts": {

@@ -185,7 +185,7 @@
   },
   {
     "name": "Weekly architecture review",
-    "description": "Mondays: afk-architecture-review reads the last 30 days of hot spots and files at most three refactor issues, each with a recommendation strength. Read-only on code - the only writes are issues, and it never applies `ready-for-agent` itself: `Strong` gets `needs-triage` so triage writes the brief, `Worth exploring` gets `ready-for-human`. It reads `.ai/skills/afk-codebase-design/SKILL.md` for its vocabulary, so that repo-owned skill must exist here or the run has no shared terms to reason in.",
+    "description": "Mondays: afk-architecture-review reads the last 30 days of hot spots and files at most three refactor issues, each with a recommendation strength. Read-only on code - the only writes are issues, and it never applies `ready-for-agent` itself: `Strong` gets `needs-triage` so triage writes the brief, `Worth exploring` gets `ready-for-human`. It reads `.ai/skills/afk-codebase-design/SKILL.md` for its vocabulary; the kit renders that file, so the shared terms are guaranteed, and this repository's own seams are in the override beside it.",
     "kind": "schedule",
     "schedule": { "type": "weekly", "day": 1, "hour": 6, "minute": 0 },
     "task": {
