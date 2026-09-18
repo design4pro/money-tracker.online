@@ -2,7 +2,7 @@
 
 | Field              | Value |
 | ------------------ | ----- |
-| **Status**         | draft |
+| **Status**         | ready |
 | **Issue**          | #230  |
 | **Spec PR**        | #232  |
 | **Implementation** | none  |
