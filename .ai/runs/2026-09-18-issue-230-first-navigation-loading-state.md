@@ -60,4 +60,4 @@ weakening the guard (ADR 0018).
 - [x] 1.3 Open the channel — 3c25f30
 - [x] 1.4 Make the priming outlive five minutes, and make the refresh real — 2e6c2d1
 - [x] 1.5 Assert the guard's answer is unchanged, and that nothing leaks into a signed-out document — 307adf3
-- [ ] 1.6 Reconcile the documents that record the block as permanent, and capture the frames
+- [x] 1.6 Reconcile the documents that record the block as permanent, and capture the frames — 10c5963
