@@ -1,0 +1,152 @@
+<!doctype html>
+<!--
+  Illustrative static mockup for .ai/specs/2026-09-19-transactional-email-resend.md
+  No app code, no build step, no external requests. Placeholder data only.
+
+  The public /unsubscribe page in its three states (confirm, done, invalid), light and dark.
+  Copy is the `en` catalogue text proposed in the spec's Copy section.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unsubscribe page, three states</title>
+    <style>
+      :root {
+        --canvas: #f5f4ee;
+        --surface-raised: #ffffff;
+        --ink: #262420;
+        --ink-2: #4b4941;
+        --border-subtle: #c3d1c4;
+        --accent: #4a2a82;
+        --on-accent: #ffffff;
+      }
+      .dark {
+        --canvas: #16171a;
+        --surface-raised: #262930;
+        --ink: #ebe8df;
+        --ink-2: #b9b5aa;
+        --border-subtle: #42454c;
+        --accent: #c5aef2;
+        --on-accent: #16171a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #dedbd2;
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        color: #262420;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .label {
+        font-size: 12px;
+        margin: 0 0 6px;
+        color: #4b4941;
+      }
+      .frame {
+        background: var(--canvas);
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 32px 20px;
+        min-height: 320px;
+      }
+      .wordmark {
+        font-weight: 700;
+        margin: 0 0 40px;
+      }
+      .card {
+        background: var(--surface-raised);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 420px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 16px;
+        color: var(--ink-2);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--on-accent);
+        font-weight: 600;
+        border: 0;
+      }
+      .focus {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+      }
+      a {
+        color: var(--accent);
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <p class="label">Confirm (light, button focused)</p>
+        <div class="frame">
+          <p class="wordmark">Money Tracker</p>
+          <div class="card">
+            <h1>Stop these emails?</h1>
+            <p>
+              You will stop getting emails about Spent budgets from Kowalski
+              household.
+            </p>
+            <button class="btn focus">Unsubscribe</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="label">Done (dark)</p>
+        <div class="frame dark">
+          <p class="wordmark">Money Tracker</p>
+          <div class="card" role="status">
+            <h1>You are unsubscribed</h1>
+            <p>
+              You will no longer get emails about Spent budgets from Kowalski
+              household. Notifications inside the app are not affected.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="label">Invalid (light)</p>
+        <div class="frame">
+          <p class="wordmark">Money Tracker</p>
+          <div class="card">
+            <h1>This link does not work</h1>
+            <p>
+              It may have expired or been copied incompletely. Sign in to change
+              which emails you get.
+            </p>
+            <a href="#">Sign in</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
