@@ -1,12 +1,15 @@
 name: Claude Code Review
 
 # `merge_group` is here for the same reason as in merge-gate.yml: `claude-review` is a required
-# check, and a queue waits for it on the merge group commit. Both jobs below skip that event - the
-# pull request they read is not in its payload - and a skipped job reports success.
+# check, and a queue waits for it on the merge group commit. The job below skips that event - the
+# pull request it reads is not in its payload - and a skipped job reports success.
 on:
   pull_request:
-    # `unlabeled` is here only for the re-arm job at the bottom; the review itself skips it.
-    types: [opened, synchronize, ready_for_review, reopened, unlabeled]
+    # No label event, ever. A job its own `if` skips reports success, so a label change that
+    # started this workflow added a second, always-green `claude-review` check run to a head whose
+    # real review had ended red - and the ruleset requires that name (#300). The re-arm job that
+    # needed `unlabeled` lives in rearm-review-threads.yml for exactly that reason.
+    types: [opened, synchronize, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"
@@ -18,13 +21,10 @@ on:
 
 jobs:
   claude-review:
-    # A label change is not a code change, and re-reviewing on one would spend a full run to reach
-    # the same conclusion. Only the re-arm job below cares about `unlabeled`.
-    #
     # The event test is what makes the `merge_group` trigger above safe: without a pull request
     # there is no diff to review, no number to comment on and no head to key the thread marker to,
     # so a review started there would spend a full agent run to reach nothing.
-    if: github.event_name == 'pull_request' && github.event.action != 'unlabeled'
+    if: github.event_name == 'pull_request'
 
     # Optional: Filter by PR author
     # if: |
@@ -77,7 +77,7 @@ jobs:
       # `.claude/hooks` and the `.claude/settings.json` that registers them, which are the gate the
       # step below hands the review to, and `scripts/ci`, whose scripts three later steps run, the
       # last of them on `github.token` under this job's `pull-requests: write` (#103). The third
-      # place is `rearm-review-threads`, which checks the base ref out wholesale for the same
+      # place is rearm-review-threads.yml, which checks the base ref out wholesale for the same
       # reason.
       #
       # `.ai/agentic.config.json` is here because review-threads-label.mjs reads `baseBranch` out
@@ -208,42 +208,6 @@ jobs:
       # reasoning as the Sentry sweep in sentry-triage.yml.
       - name: Arm the review-thread autofix when threads are left open
         if: always() && steps.gate.outputs.configured == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/ci/review-threads-label.mjs
-
-  # The step above always ran while a claim was held, and so never armed anything.
-  #
-  # "Autopilot new pull requests" fires on `pull_request.opened` and takes `in-progress` within a minute; the
-  # review job needs five to eight. So by the time it asks, `in-progress` is there - and the script
-  # treats it as "a run already owns this PR and will handle its threads". It does not: that run
-  # can leave a thread open and then drop the claim, and nothing re-asks, because the review job
-  # only runs on a code event and a finished pull request gets no further push. Measured on
-  # #320, #321 and #322: three for three, `not arming - the PR carries in-progress`, and zero
-  # `pr-fix` runs in the whole recorded history of the cockpit.
-  #
-  # So ask again when the claim comes off. Same script, same head-keyed marker, same decision -
-  # only the moment is new, and it is the first moment the answer can be anything but "held".
-  rearm-review-threads:
-    if: github.event.action == 'unlabeled' && github.event.label.name == 'in-progress'
-    # The ci pool, not the agent pool: this job runs one repository script and spends no tokens.
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      # The base branch, never the pull request's own tree: this job runs a repository script with
-      # a write token, and the branch under review must not be the one that supplies it. Same
-      # reasoning as "Take the agent hooks and the CI scripts from the base branch" above.
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.base.ref }}
-          fetch-depth: 1
-
-      - name: Re-arm the review-thread autofix now the claim is released
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

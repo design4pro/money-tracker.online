@@ -1,0 +1,169 @@
+<!doctype html>
+<!--
+  Illustrative static mockup for .ai/specs/2026-09-19-transactional-email-resend.md
+  No app code, no build step, no external requests. Placeholder data only.
+
+  The `budget.exceeded` notification email rendered by the shared layout, as a light and a dark
+  mail client would show it, plus the plain-text part produced from the same element.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notification email, light, dark and plain text</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #dedbd2;
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .label {
+        font-size: 12px;
+        margin: 0 0 6px;
+        color: #4b4941;
+      }
+      .client {
+        padding: 24px 12px;
+        border-radius: 8px;
+      }
+      .light {
+        background: #f5f4ee;
+        color: #262420;
+        --muted: #4b4941;
+        --card: #fff;
+        --line: #c3d1c4;
+        --cta: #4a2a82;
+        --on-cta: #fff;
+      }
+      .dark {
+        background: #16171a;
+        color: #ebe8df;
+        --muted: #b9b5aa;
+        --card: #262930;
+        --line: #42454c;
+        --cta: #c5aef2;
+        --on-cta: #16171a;
+      }
+      .mail {
+        max-width: 600px;
+        margin: 0 auto;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 24px;
+      }
+      .wordmark {
+        font-weight: 700;
+        margin: 0 0 24px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 16px;
+      }
+      .cta {
+        display: inline-block;
+        line-height: 44px;
+        padding: 0 18px;
+        border-radius: 8px;
+        background: var(--cta);
+        color: var(--on-cta);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .footer {
+        border-top: 1px solid var(--line);
+        margin-top: 24px;
+        padding-top: 16px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .footer a {
+        color: inherit;
+      }
+      pre {
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 0;
+        white-space: pre-wrap;
+        font:
+          12px/1.5 ui-monospace,
+          monospace;
+        color: #262420;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <p class="label">HTML part, light client (en)</p>
+        <div class="client light">
+          <div class="mail">
+            <p class="wordmark">Money Tracker</p>
+            <h1>Groceries is spent</h1>
+            <p>You are $42.10 over the $600.00 you set for Groceries.</p>
+            <a class="cta" href="#">Open in Money Tracker</a>
+            <div class="footer">
+              <p>
+                You are getting this because you are a member of Kowalski
+                household on Money Tracker.
+              </p>
+              <a href="#">Stop these emails</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="label">HTML part, dark client (pl)</p>
+        <div class="client dark">
+          <div class="mail" lang="pl">
+            <p class="wordmark">Money Tracker</p>
+            <h1>[pl] Groceries is spent</h1>
+            <p>
+              [pl] 42,10&nbsp;$ / 600,00&nbsp;$ (Polish copy from pl.ts; amounts
+              formatted in the pl locale, currency from payload)
+            </p>
+            <a class="cta" href="#">[pl] Open in Money Tracker</a>
+            <div class="footer">
+              <p>[pl] footer reason</p>
+              <a href="#">[pl] Stop these emails</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="label">Plain-text part (same element, en)</p>
+        <pre>
+Money Tracker
+
+Groceries is spent
+
+You are $42.10 over the $600.00 you set for Groceries.
+
+Open in Money Tracker: https://money-tracker.online/budgets/bud_123
+
+--
+You are getting this because you are a member of Kowalski household on Money Tracker.
+Stop these emails: https://money-tracker.online/unsubscribe?t=v1.…</pre>
+      </div>
+    </div>
+  </body>
+</html>
