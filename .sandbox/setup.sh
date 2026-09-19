@@ -11,6 +11,8 @@ if [ ! -f .dev.vars ]; then
   echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .dev.vars
   echo "APP_URL=${APP_URL}" >> .dev.vars
 fi
-[ -f .env.local ] || { [ -f .env.local.example ] && cp .env.local.example .env.local; } || true
+if [ ! -f .env.local ] && [ -f .env.local.example ]; then
+  cp .env.local.example .env.local
+fi
 
 pnpm db:migrate:local
