@@ -1,0 +1,49 @@
+name: Re-arm review threads
+
+# A workflow of its own, not a second job in claude-code-review.yml, because of the event it needs.
+# `claude-review` is a required check, and a job its own `if` skips reports success: while this job
+# lived beside it, every label removal on a pull request added a skipped - and therefore green -
+# `claude-review` check run to a head whose real review might have ended red (#300). Here a label
+# change starts nothing but this job, whose name no ruleset requires.
+on:
+  pull_request:
+    types: [unlabeled]
+
+jobs:
+  # The arming step at the end of claude-code-review.yml always ran while a claim was held, and so
+  # never armed anything.
+  #
+  # "Autopilot new pull requests" fires on `pull_request.opened` and takes `in-progress` within a minute; the
+  # review job needs five to eight. So by the time it asks, `in-progress` is there - and the script
+  # treats it as "a run already owns this PR and will handle its threads". It does not: that run
+  # can leave a thread open and then drop the claim, and nothing re-asks, because the review job
+  # only runs on a code event and a finished pull request gets no further push. Measured on
+  # #320, #321 and #322: three for three, `not arming - the PR carries in-progress`, and zero
+  # `pr-fix` runs in the whole recorded history of the cockpit.
+  #
+  # So ask again when the claim comes off. Same script, same head-keyed marker, same decision -
+  # only the moment is new, and it is the first moment the answer can be anything but "held".
+  rearm-review-threads:
+    if: github.event.action == 'unlabeled' && github.event.label.name == 'in-progress'
+    # The ci pool, not the agent pool: this job runs one repository script and spends no tokens.
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # The base branch, never the pull request's own tree: this job runs a repository script with
+      # a write token, and the branch under review must not be the one that supplies it. Same
+      # reasoning as "Take the agent hooks and the CI scripts from the base branch" in
+      # claude-code-review.yml.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 1
+
+      - name: Re-arm the review-thread autofix now the claim is released
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci/review-threads-label.mjs
