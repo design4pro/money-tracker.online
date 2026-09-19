@@ -17,9 +17,14 @@ import {
 } from '@tanstack/react-router'
 
 import { RoutePending } from '#/components/app/shell/route-pending'
+import {
+  dehydrateShell,
+  hydrateShell,
+} from '#/components/app/shell/shell-query'
 
 import { routeTree } from './routeTree.gen'
 
+import type { DehydratedShell } from '#/components/app/shell/shell-query'
 import type { ReactNode } from 'react'
 
 /**
@@ -102,6 +107,27 @@ export function getRouter() {
       () => import('#/components/app/shell/default-error'),
       'DefaultRouteError',
     ),
+    /**
+     * The shell the SSR pass resolved, carried into the browser's cache before the first client
+     * render.
+     *
+     * `_app.beforeLoad` awaits the shell, and TanStack Router renders no pending component until a
+     * match's `beforeLoad` has resolved. On a fresh document the browser's cache used to be empty,
+     * so the first client-side navigation of every tab spent a shell round trip showing the
+     * previous screen with nothing announced (#230). The guard does not move for this (ADR 0018):
+     * it still awaits, it just awaits a cached answer.
+     *
+     * Sound because of ordering, not luck: the client awaits `hydrate` before it hydrates any match
+     * and before its first render (`@tanstack/router-core`, `load-client.js`), so the cache is warm
+     * before the tab can navigate at all. `beforeLoad`'s return value is router context, which is
+     * not dehydrated — this is the channel the framework offers for exactly that gap.
+     *
+     * The server's `dataUpdatedAt` travels beside the data so the thirty-second window is measured
+     * from when the shell was resolved, not from when the browser got round to hydrating it.
+     */
+    dehydrate: () => dehydrateShell(queryClient),
+    hydrate: (dehydrated: DehydratedShell) =>
+      hydrateShell(queryClient, dehydrated),
     Wrap: ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     ),

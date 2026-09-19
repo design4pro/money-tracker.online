@@ -290,10 +290,12 @@ function classify(from, text) {
  *      during SSR, so the browser is handed a finished document and there is nothing to intercept.
  *      Every forced state therefore needs a CLIENT-SIDE navigation, which is what `--force-from`
  *      is: land on a page that links to the target, install this, then click the link.
- *   2. The application shell's own read must be let through. `_app.beforeLoad` awaits it, and the
- *      router resolves `beforeLoad` before it will render any match's pending component — hold it
- *      and the run freezes one step before the state it came to photograph, with the previous
- *      screen still on the page.
+ *   2. The application shell's own read is let through. `_app.beforeLoad` awaits the shell, and the
+ *      router resolves `beforeLoad` before it will render any match's pending component. Since #230
+ *      a client-side navigation answers it from the cache the SSR pass primed, so there is usually
+ *      no shell request to see; a stale shell is refreshed behind the navigation, and letting that
+ *      refresh through is harmless. Before #230 holding it froze the run one step before the state
+ *      it came to photograph, with the previous screen still on the page.
  *   3. The shell is readable from the URL: TanStack Start base64-encodes `{"file":…,"export":…}`
  *      into the path.
  */

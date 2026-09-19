@@ -4,7 +4,7 @@ import { gotoApp } from './support/app'
 import { expectNoWcagViolations } from './support/axe-scan'
 import { expectOutlineWithoutSkips } from './support/headings'
 import { storageStateFor } from './support/session'
-import { failServerFns, holdServerFns } from './support/states'
+import { failServerFns, holdEveryServerFn } from './support/states'
 import { openSurface } from './support/surfaces'
 
 import en from '#/lib/i18n/messages/en'
@@ -215,6 +215,17 @@ async function scanEmpty(
 test.describe('a read that has not come back yet', () => {
   test.use({ storageState: storageStateFor('demo') })
 
+  /**
+   * Also issue #230's regression case: this is the **first** client-side navigation of the tab, and
+   * the hold covers every server function, the shell's included.
+   *
+   * `_app.beforeLoad` awaits the shell, and a fresh document's cache used to be empty, so this
+   * navigation made a real shell request before the router would render any pending component —
+   * holding it froze the router with the list still on screen (`docs/STATE-INVENTORY.md` §3). The
+   * shell the SSR pass resolved now reaches the browser's cache through `src/router.tsx`, so the
+   * guard answers from cache and the skeleton appears. Measured red before that channel existed:
+   * zero `role="status"` regions for the whole five-second wait.
+   */
   test('an account detail draws its skeleton instead of leaving the list on screen', async ({
     page,
   }) => {
@@ -223,7 +234,7 @@ test.describe('a read that has not come back yet', () => {
       page.getByRole('heading', { name: en['accounts.title'] }),
     ).toBeVisible()
 
-    const held = await holdServerFns(page)
+    const held = await holdEveryServerFn(page)
     try {
       // A card link, because the account detail is not a rail destination: `account-card.tsx` uses
       // TanStack's `Link`, so this is a client-side navigation and its loader asks the browser for
@@ -251,6 +262,33 @@ test.describe('a read that has not come back yet', () => {
         .locator('main [role="status"]')
         .filter({ hasText: en['accounts.list.loading'] }),
     ).toHaveCount(0)
+  })
+
+  /**
+   * Past the shell's thirty-second stale mark the guard still answers from cache: the refresh runs
+   * behind the navigation (`revalidateIfStale`), never in front of it. Were it blocking, the held
+   * refresh would freeze the router exactly as an empty cache used to, and no skeleton would draw.
+   */
+  test('a stale shell is refreshed behind the navigation, not in front of it', async ({
+    page,
+  }) => {
+    await page.clock.install()
+    await gotoApp(page, '/accounts')
+    await expect(
+      page.getByRole('heading', { name: en['accounts.title'] }),
+    ).toBeVisible()
+    await page.clock.fastForward('00:31')
+
+    const held = await holdEveryServerFn(page)
+    try {
+      await page.locator('main a[href^="/accounts/"]').first().click()
+
+      const loading = page.locator('main [role="status"]')
+      await expect(loading).toHaveCount(1)
+      await expect(loading).toHaveText(en['accounts.list.loading'])
+    } finally {
+      await held.release()
+    }
   })
 })
 

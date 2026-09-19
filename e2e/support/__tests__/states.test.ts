@@ -245,9 +245,9 @@ describe('holdServerFns', () => {
 })
 
 describe('holdEveryServerFn', () => {
-  it('holds the application shell too, which is the whole difference from holdServerFns', async () => {
-    // The guard's own pending state is what this exists to reach: `_app.beforeLoad` awaits the
-    // shell read, so the shell's pending fallback is on screen only while that read is held.
+  it('holds the shell too, which is the whole difference from holdServerFns', async () => {
+    // Issue #230's probe: on a first navigation the shell's read is the one request that must not
+    // be let through, because a warm cache means the navigation never asks for it.
     const stub = stubPage()
     const held = await holdEveryServerFn(stub.page)
     const log: Array<RouteCall> = []

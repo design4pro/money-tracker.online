@@ -1,11 +1,11 @@
 # The first client-side navigation draws its loading state
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | ready |
-| **Issue**          | #230  |
-| **Spec PR**        | #232  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #230        |
+| **Spec PR**        | #232        |
+| **Implementation** | #338        |
 
 ## 📝 TLDR
 
@@ -511,3 +511,25 @@ gate in `AGENTS.md` → Validation Commands, then `pnpm e2e`.
   entry into a client-side navigation, but mounting a `RouterProvider` is a separate capability with
   its own blast radius. It is not filed; filing it is a follow-up this PR should raise.
 - Weakening the guard, in any form. ADR 0018 is the record.
+
+## Amendment — PR #338
+
+What shipped differs from the design above in four places, each measured on that PR.
+
+1. **`hydrate` registers the key's `gcTime` before it writes.** `setQueryData` builds the query
+   from the client's defaults, not from `shellQueryOptions`, so Q2's `gcTime` on the
+   `ensureQueryData` call never reached the primed entry: a unit test with fake timers watched it
+   collected on the default five-minute schedule. `hydrateShell` therefore calls
+   `setQueryDefaults(SHELL_QUERY_KEY, { gcTime })` first, and that test fails without the line.
+2. **The channel's two halves live in `shell-query.ts`** as `dehydrateShell` and `hydrateShell`,
+   and `src/router.tsx` wires them. Same two fields, same `updatedAt`, but unit-testable without
+   importing the route tree.
+3. **Q4 did not survive measurement.** With the shell primed, a first navigation's first
+   `/_serverFn/*` request is the destination's own read, which `holdServerFns` lets through: the
+   account-detail case drew two inner loading regions instead of the route's one. Both call sites
+   now use a new `holdEveryServerFn`, which is also the step-2 regression helper. `holdServerFns`
+   and its unit cases are kept, unused, for review to decide.
+4. **`e2e/navigation.spec.ts`'s scroll case now waits for `/accounts` to arrive before going back.**
+   It used to go back mid-navigation, which cancelled the destination's smooth scroll to the top;
+   once the first navigation stopped waiting on the shell, that scroll started first and WebKit let
+   it finish over the restore (3 of 4 `mobile-safari` runs back at 0, 0 of 3 without the change).
