@@ -272,9 +272,33 @@ function readRuns() {
   return byIssue;
 }
 
+/**
+ * Reads `--stale-hours` only when the flag is present, and throws on a malformed value or an
+ * argument it does not know: a typo must be as red as a real failure, never a silent default.
+ */
+export function parseArgs(argv) {
+  const options = { asJson: false, staleHours: 24 };
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--json") options.asJson = true;
+    else if (argv[i] === "--stale-hours") {
+      const value = argv[++i];
+      if (!/^\d+$/.test(value ?? "") || Number(value) === 0)
+        throw new Error(`--stale-hours needs a positive whole number of hours, got ${value ?? "nothing"}`);
+      options.staleHours = Number(value);
+    } else throw new Error(`unknown argument ${argv[i]} - usage: [--json] [--stale-hours N]`);
+  }
+  return options;
+}
+
 function main(argv) {
-  const asJson = argv.includes("--json");
-  const staleHours = Number(argv[argv.indexOf("--stale-hours") + 1]) || 24;
+  let options;
+  try {
+    options = parseArgs(argv);
+  } catch (error) {
+    console.error(`backlog-status: ${error.message}`);
+    process.exit(2);
+  }
+  const { asJson, staleHours } = options;
 
   const context = {
     triggers: readTriggers(JSON.parse(readFileSync(AUTOMATIONS, "utf8"))),

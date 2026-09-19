@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# PostToolUse hook (Edit|Write): auto-formats the edited file so formatting never consumes an
-# agent turn or a CI run - `pnpm check` is a rung in the gate, and losing a whole round trip to a
-# missing trailing comma is a waste of both.
+# PostToolUse hook (Edit|Write): auto-formats the edited file so formatting is fixed on the way
+# in - a stray reformat never shows up as diff noise in review, and never costs a round trip of
+# its own.
 #
 # Always exits 0. The edit has already happened; a formatter that cannot run must not turn a good
 # edit into a failed tool call.

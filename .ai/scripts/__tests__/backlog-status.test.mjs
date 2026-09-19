@@ -17,6 +17,7 @@ import {
   classify,
   closeKeywordTargets,
   linkOpenPrs,
+  parseArgs,
   readTriggers,
   sortIssues,
 } from "../backlog-status.mjs";
@@ -233,4 +234,25 @@ describe("sortIssues", () => {
     ];
     expect(sortIssues(rows).map((row) => row.number)).toEqual([3, 1, 4, 2]);
   });
+});
+
+describe("parseArgs", () => {
+  it("defaults to text output and a 24-hour threshold", () => {
+    expect(parseArgs([])).toEqual({ asJson: false, staleHours: 24 });
+  });
+
+  it("reads --json and --stale-hours in either order", () => {
+    expect(parseArgs(["--stale-hours", "6", "--json"])).toEqual({ asJson: true, staleHours: 6 });
+  });
+
+  it("rejects a stray positional instead of taking it as the threshold", () => {
+    expect(() => parseArgs(["6"])).toThrow(/unknown argument 6/);
+  });
+
+  it.each([[[]], [["abc"]], [["0"]], [["-3"]], [["1.5"]], [["--json"]]])(
+    "rejects a malformed --stale-hours value %j",
+    (rest) => {
+      expect(() => parseArgs(["--stale-hours", ...rest])).toThrow(/--stale-hours/);
+    },
+  );
 });
