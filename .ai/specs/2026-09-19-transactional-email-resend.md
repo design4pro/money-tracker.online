@@ -242,8 +242,9 @@ in A (tenant isolation case). **The `v1` prefix is permanent.** If the shape eve
 Cloudflare's request logs. That is accepted, and what a captured token gives away is bounded: it can
 turn one kind of email off for the person it names, and its `GET` page shows the topic and the
 workspace name and, by rendering **invalid** once the person has left, whether they are still a
-member. It exposes no address, no amount and no other member. Rotating the key through
-`UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS` revokes every outstanding token at once. Our own logger never records the query string of either unsubscribe route.
+member. It exposes no address, no amount and no other member. Replacing
+`UNSUBSCRIBE_TOKEN_SECRET` without carrying the old key into `UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS`
+revokes every outstanding token at once. Our own logger never records the query string of either unsubscribe route.
 
 Effect: `s = kind` sets `email = false` for that kind. `s = digest` sets `digest = false` for every
 digestible kind. `in_app` is never touched. The write is an upsert through the notifications
