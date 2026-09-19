@@ -151,6 +151,24 @@ export async function holdServerFns(
 }
 
 /**
+ * Hold every server-function request open until released, the application shell's included.
+ *
+ * The one pending state {@link holdServerFns} cannot reach is the guard's own: `_app.beforeLoad`
+ * awaits the shell read, so the guarded shell's pending fallback is on screen exactly while that
+ * read is in flight. Holding it is what freezes the router one step early for a screen's loading
+ * state, and it is what this helper is for. Same precondition as its sibling: install it before a
+ * **client-side** navigation, because a `page.goto` resolves the shell during SSR.
+ */
+export async function holdEveryServerFn(
+  page: Routable,
+): Promise<ServerFnInterception> {
+  return intercept(page, async (route, isReleased) => {
+    await isReleased
+    await route.continue().catch(() => undefined)
+  })
+}
+
+/**
  * Answer every server-function request with a `500`.
  *
  * Every one, with no exception for the shell — and that is a statement about *where this helper may
