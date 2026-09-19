@@ -38,7 +38,8 @@ const GATED = [
   {
     workflow: '.github/workflows/claude-code-review.yml',
     job: 'claude-review',
-    nextJob: 'rearm-review-threads',
+    /** The re-arm job moved to rearm-review-threads.yml (#300), so this one also runs to the end. */
+    nextJob: undefined,
   },
 ] as const
 
