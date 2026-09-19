@@ -48,7 +48,7 @@ const TENANT_B_STATE = storageStateFor('tenant-b')
 
 test.describe('tenant isolation', () => {
   test.skip(
-    ({ browserName }) => browserName !== 'chromium',
+    ({ browserName, isMobile }) => browserName !== 'chromium' || isMobile,
     'The boundary is server-side. Three engines would assert the same server three times and ' +
       'spend the sign-in budget doing it.',
   )

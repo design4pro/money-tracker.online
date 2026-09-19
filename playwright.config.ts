@@ -64,11 +64,16 @@ const clockPin = { [SERVER_TODAY_HEADER]: BASELINE_DAY }
 /**
  * End-to-end and accessibility suite.
  *
- * Three browser projects:
+ * Four browser projects, of which CI runs two (`chromium` and `mobile-chromium`, issue #317):
  *
  * - `chromium` at 1440x900, the desktop layout, and where the axe-core scans run.
+ * - `mobile-chromium` on a Pixel 7: the phone layout (bottom navigation, drawers, and the axe scans
+ *   the `*.visual.spec.ts` files run on the `page` fixture) on the engine that is already the cheap
+ *   leg.
  * - `mobile-safari` on an iPhone 15, because safe-area insets, `100dvh` and momentum scrolling
  *   behave differently there than anywhere else, and transaction entry is the mobile use case.
+ *   Not in CI: it took two of three e2e legs, so it runs on demand
+ *   (`pnpm e2e --project=mobile-safari`) when a change touches WebKit at phone width.
  * - `webkit` at desktop width, which is not the same surface as mobile WebKit: it is where
  *   desktop Safari's own layout and focus-ring behaviour is checked, and Safari is the browser
  *   most likely to disagree about `:focus-visible` — the criterion the whole keyboard story
@@ -176,6 +181,12 @@ export default defineConfig({
       dependencies: ['setup'],
       // Includes `defaultBrowserType: 'webkit'`, a 393x852 viewport and touch.
       use: { ...devices['iPhone 15'], extraHTTPHeaders: clockPin },
+    },
+    {
+      name: 'mobile-chromium',
+      dependencies: ['setup'],
+      // Includes `defaultBrowserType: 'chromium'`, a 412x915 viewport, `isMobile` and touch.
+      use: { ...devices['Pixel 7'], extraHTTPHeaders: clockPin },
     },
     {
       name: 'webkit',

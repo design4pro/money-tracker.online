@@ -40,7 +40,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 
 test.describe('the core flow', () => {
   test.skip(
-    ({ browserName }) => browserName !== 'chromium',
+    ({ browserName, isMobile }) => browserName !== 'chromium' || isMobile,
     'One sign-up per run. Repeating it in three browsers walks into the sign-up rate limit and ' +
       'reports it as a product failure; the flow is engine-independent and the axe and keyboard ' +
       'specs cover the other engines.',
