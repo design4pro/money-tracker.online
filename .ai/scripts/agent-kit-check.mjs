@@ -7,10 +7,9 @@
 // hand-edited a file the kit generated? It re-hashes every path recorded in the lock.
 //
 // It deliberately cannot answer "is this repository behind the kit?". That question needs the kit,
-// and CI cannot reach it: the bot PAT is fine-grained and scoped to the two application
-// repositories, and agent-kit is deliberately not one of them. Being unable to widen that scope is
-// the point, not a limitation to work around. "Behind the kit" is answered by a developer running
-// the kit's sync on the host and opening an ordinary pull request.
+// and this repository's CI never fetches it: the gate must hold with no token beyond its own and no
+// network. "Behind the kit" is answered from the kit's side - its sync-consumers workflow renders
+// the kit into this repository and opens an ordinary pull request, which a human merges.
 //
 // With `--base <ref>` it answers one more, and this one it can: is this branch behind the base's
 // pipeline layer? That needs no network either - the answer is in the base commit's own lock, and
