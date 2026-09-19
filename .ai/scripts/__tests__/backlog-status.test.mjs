@@ -26,17 +26,17 @@ const NOW = Date.parse("2026-09-13T12:00:00Z");
 
 const AUTOMATIONS = [
   {
-    name: "issue-autofix",
+    name: "Fix issues on the autofix label",
     filters: { changedLabels: ["autofix"], excludeLabels: ["in-progress", "blocked"] },
     task: { workflow: "issue-autofix" },
   },
   {
-    name: "issue-spec",
+    name: "Write a spec for feature issues",
     filters: { changedLabels: ["spec"], allLabels: ["feature"], excludeLabels: [] },
     task: { workflow: "spec" },
   },
   {
-    name: "pr-review-threads",
+    name: "Resolve blocking review threads",
     filters: { includePullRequests: true, changedLabels: ["review-threads"] },
     task: { workflow: "pr-fix" },
   },
