@@ -43,7 +43,7 @@ Upstream references: cli/cli#11983 (`gh pr edit` aborts without any project flag
 - PRs open as **drafts** when a skill says so; a human (or **mark-pr-ready**) promotes them.
 - Claim/lock signals on an issue or PR are: assignee set to the automation user, the `in-progress` label, and a `🤖`-prefixed claim comment. All three are set on claim; the label is guarded (below). The `ci-monitoring` label is **not** a claim signal — it marks work that is finished and reported while its CI-result follow-up is still owed, and never makes another skill back off.
 - Long, multi-line comment bodies are posted with `--body-file` (or a heredoc via process substitution) so formatting is preserved.
-- CI status truth comes from **get-pr-checks**; the set of *required* checks comes from **get-required-checks** (branch protection). When branch protection is not readable (404), treat every reported check as required.
+- CI status truth comes from **get-pr-checks**; the set of *required* checks comes from **get-required-checks** (the branch's ruleset rules, plus classic branch protection where it is readable). Only when neither is readable does it fall back to treating every reported check as required — a guess, and reported as one.
 
 ## Label guards
 
@@ -394,11 +394,28 @@ jobs it is, and say that the App-published checks were out of reach, the same wa
 **list-review-comments** states its own gap.
 
 #### get-required-checks
-Base branch → the set of required status checks. A 404 **or a 403** means branch protection is not
-readable — treat all reported checks as required. A fine-grained PAT gets the 403 even with
-`Administration: Read` granted; `2>/dev/null` swallows either, so only the diagnosis differs.
+Base branch → the set of required status checks, one context per line. Two sources, in order:
+
+1. **The branch's effective ruleset rules.** `rules/branches/{branch}` needs only `Metadata: read`,
+   which every token has. When it answers, the `required_status_checks` rules it lists are
+   authoritative: a ruleset with no such rule means *no* ruleset requires a check, not "unknown".
+2. **Classic branch protection**, read as well, because the rules endpoint does not see it: a
+   repository protected only the classic way answers step 1 with an empty list. A fine-grained PAT
+   gets a 403 here even with `Administration: Read` granted; alongside a readable step 1 that is
+   ignored.
+
+The set is the union of whichever reads succeeded. Only when **both** fail (the command exits
+non-zero) fall back to treating every reported check as required, and say in the report that the
+required set was a guess. `gh api` prints an error's body on stdout, so each read is captured and
+discarded on failure — piping it straight through would put `{"message":…}` into the set.
 ```bash
-gh api repos/{owner}/{repo}/branches/{baseRefName}/protection/required_status_checks --jq '.contexts[]' 2>/dev/null
+rules=$(gh api --paginate "repos/{owner}/{repo}/rules/branches/{baseRefName}" \
+  --jq '.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context' 2>/dev/null) \
+  && rules_ok=1 || rules=
+classic=$(gh api "repos/{owner}/{repo}/branches/{baseRefName}/protection/required_status_checks" \
+  --jq '.contexts[]' 2>/dev/null) && classic_ok=1 || classic=
+if [ -n "$rules_ok$classic_ok" ]; then printf '%s\n%s\n' "$rules" "$classic" | sed '/^$/d' | sort -u
+else echo "required checks unreadable: treat every reported check as required" >&2; false; fi
 ```
 
 #### get-pr-comment / get-review-comment
