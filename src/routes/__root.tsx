@@ -11,9 +11,11 @@
  */
 import {
   HeadContent,
+  Outlet,
   Scripts,
   createRootRouteWithContext,
   lazyRouteComponent,
+  useChildMatches,
 } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 
@@ -292,6 +294,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     }
   },
   shellComponent: RootDocument,
+  component: RootLayout,
   /**
    * What an unknown address renders - `NotFound` in `src/components/app/shell/not-found.tsx`,
    * which is where the reasoning for it lives. It sits on the root so a mistyped marketing or
@@ -304,6 +307,28 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     'NotFound',
   ),
 })
+
+/**
+ * The root's outlet, remounted whenever the top-level layout under it changes.
+ *
+ * TanStack Router renders every child of the root through one `Match` at one position, and each
+ * layout with a `pendingComponent` puts its `Suspense` boundary in the same place, so moving from
+ * `(auth)` to `_app` *reuses* that boundary rather than replacing it. While `_app.beforeLoad` is in
+ * flight the boundary shows the guard's fallback and React keeps the sign-in layout mounted but
+ * hidden; when the guard redirects back to sign-in, that hidden tree is revealed instead of mounted.
+ * React detaches refs while a tree is hidden, and React Aria's `TextField` takes the detached
+ * label ref to mean it has no label, so each field renders once without an accessible name on the
+ * way back - four console warnings in #339.
+ *
+ * Keying the outlet on the child layout's route id makes a layout change a fresh mount, which is
+ * what a reader who went to another part of the product and was sent back expects anyway. The
+ * id comes from the same store the outlet reads, so the key changes in the render that switches
+ * layouts. Moves inside one layout keep the key and keep their state.
+ */
+function RootLayout() {
+  const layout = useChildMatches({ select: (matches) => matches[0]?.routeId })
+  return <Outlet key={layout} />
+}
 
 function RootDocument({ children }: { children: ReactNode }) {
   // The shell renders outside `matchContext`, so the route-relative `useLoaderData()` has no

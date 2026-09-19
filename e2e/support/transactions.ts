@@ -17,8 +17,8 @@
  * depends on whether the ledger has finished loading: while it is still a skeleton, the stamp is
  * the only match there is.
  *
- * That is why #82 fired on `mobile-safari` and on no other project — no other project renders a
- * bottom bar — and why it came and went with how fast the runner served the ledger, which is what
+ * That is why #82 fired on `mobile-safari` and on no other project — no other project then rendered
+ * a bottom bar — and why it came and went with how fast the runner served the ledger, which is what
  * made a wrong turn look like a timeout.
  */
 export const TRANSACTION_ROW_SELECTOR =

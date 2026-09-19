@@ -263,6 +263,15 @@ describe('holdEveryServerFn', () => {
     expect(log).toEqual(['continue', 'continue'])
     expect(stub.unrouted).toEqual(['**/_serverFn/**'])
   })
+
+  it('can be released twice, because a test with a finally will', async () => {
+    const stub = stubPage()
+    const held = await holdEveryServerFn(stub.page)
+
+    await held.release()
+    await held.release()
+    expect(stub.unrouted).toEqual(['**/_serverFn/**'])
+  })
 })
 
 describe('failServerFns', () => {
