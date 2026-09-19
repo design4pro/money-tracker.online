@@ -323,7 +323,7 @@ gh api "repos/{owner}/{repo}/pulls/{prNumber}/files" --paginate --jq '.[] | {pat
 #### checkout-pr
 `{prNumber}` → the PR's head available locally (needed for cross-repository fork PRs where the head branch cannot be fetched from `origin`).
 ```bash
-gh pr checkout {prNumber} --recurse-submodules=no
+gh pr checkout {prNumber}
 ```
 
 #### review-pr

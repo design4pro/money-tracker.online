@@ -8,7 +8,7 @@
     "allow": [
       "Bash(gh pr review:*)",
       "Bash(gh pr comment:*)",
-      "Bash(gh log:*)",
+      "Bash(gh run view:*)",
       "Bash(gh issue:*)"
     ]
   },
