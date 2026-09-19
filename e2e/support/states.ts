@@ -36,11 +36,29 @@ import type { Page, Route } from '@playwright/test'
 const SERVER_FN_PATTERN = '**/_serverFn/**'
 
 /**
- * The application shell's own read, which a hold must let through.
+ * The application shell's own read, which a hold used to have to let through.
+ *
+ * ## Since #230 there is no such read to let through
+ *
+ * The shell the SSR pass resolved is dehydrated into the browser's cache (`src/router.tsx`), so the
+ * first client-side navigation of a tab answers `_app.beforeLoad` from cache and makes no shell
+ * request at all; a shell older than thirty seconds is refreshed *behind* the navigation, never in
+ * front of it. Everything below describes the application before that change. It is kept because it
+ * is the reason {@link holdServerFns} exists, and because it is the measurement
+ * {@link holdEveryServerFn} now inverts: that helper holds the shell too, and a skeleton under it is
+ * the regression test for #230.
+ *
+ * It also means the arrival-order rule below no longer finds the shell. On a first navigation the
+ * first `/_serverFn/*` request is now the *destination's* read, which {@link holdServerFns} lets
+ * through: measured on `/accounts` to an account detail, the detail's own loader resolved and the
+ * screen drew its two inner loading regions instead of the route's one. So no spec calls it any
+ * more — `e2e/states.spec.ts` and `e2e/navigation.spec.ts` use {@link holdEveryServerFn}.
+ *
+ * ## Before #230
  *
  * Measured, not assumed. `_app.beforeLoad` awaits `ensureQueryData(loadShell)`, and TanStack Router
  * resolves `beforeLoad` before it will render any match's pending component. Holding that request
- * therefore freezes the router one step *before* the loading state it was installed to photograph:
+ * therefore froze the router one step *before* the loading state it was installed to photograph:
  * the URL changes, the rail highlights the new tab, and the previous screen stays on the page with
  * nothing announced — which is exactly the failure `docs/STATE-INVENTORY.md` §3 records.
  *
@@ -117,7 +135,13 @@ export interface ServerFnInterception {
 type Routable = Pick<Page, 'route' | 'unroute'>
 
 /**
- * Hold every server-function request open until released, except the application shell's.
+ * Hold every server-function request open until released, except the first one, which it takes to
+ * be the application shell's.
+ *
+ * **Since #230 that premise no longer holds on any navigation** — see {@link serverFnIdOf} — and no
+ * spec calls this helper; {@link holdEveryServerFn} replaced it at both call sites. It is left in
+ * place, with the cases in `__tests__/states.test.ts` that pin its ordering, because deleting a
+ * helper and its tests is a decision for review rather than for the change that made it unused.
  *
  * The pending state is what a reader sees while a loader is in flight, so this is how a
  * `pendingComponent` is photographed: navigate **client-side** with this installed, and the screen
@@ -145,6 +169,25 @@ export async function holdServerFns(
       await route.continue().catch(() => undefined)
       return
     }
+    await isReleased
+    await route.continue().catch(() => undefined)
+  })
+}
+
+/**
+ * Hold every server-function request open until released, the application shell's included.
+ *
+ * The inverse of {@link holdServerFns}, and the probe for issue #230: on the **first** client-side
+ * navigation of a tab, holding the shell's read is exactly what used to freeze the router before
+ * any pending component could render. Since the shell the SSR pass resolved is dehydrated into the
+ * browser's cache (`src/router.tsx`), that navigation makes no shell request at all, so this hold
+ * lands on the destination's reads and the loading state appears regardless. A skeleton under this
+ * helper is the proof that the first navigation no longer waits on the network for the guard.
+ */
+export async function holdEveryServerFn(
+  page: Routable,
+): Promise<ServerFnInterception> {
+  return intercept(page, async (route, isReleased) => {
     await isReleased
     await route.continue().catch(() => undefined)
   })

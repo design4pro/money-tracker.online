@@ -13,6 +13,7 @@ import {
   RouteError,
   RoutePending,
 } from '#/components/app/shell'
+import { shellQueryOptions } from '#/components/app/shell/shell-query'
 
 import type {
   ShellData,
@@ -35,18 +36,17 @@ import type {
  *
  * `loadShell` answers the four questions every guarded screen asks — who, which workspace, what
  * role, which other workspaces — in one request, and the result is put on the router context so no
- * screen below refetches it. It is cached through the router's own query client so a burst of
- * navigations costs one round trip rather than one each; the window is deliberately short, because
- * a shell built from a session that has since been revoked is a shell whose every data call is
- * about to fail, and the reader should find that out from the sign-in screen rather than from a
- * page of error panels.
+ * screen below refetches it. It is cached through the router's own query client, and the shell the
+ * SSR pass resolved is carried into the browser's copy of that cache (`src/router.tsx`), so even a
+ * tab's first client-side navigation answers this guard without a round trip and can draw its
+ * loading state (#230, ADR 0018: the guard still awaits; it awaits a cached answer).
+ *
+ * The cached answer is refreshed in the background once it is thirty seconds old, measured from
+ * when the server resolved it (`shellQueryOptions`). The window is deliberately short, because a
+ * shell built from a session that has since been revoked is a shell whose every data call is about
+ * to fail, and the reader should find that out from the sign-in screen rather than from a page of
+ * error panels.
  */
-
-/** The seconds a resolved shell may be reused across navigations. See the note above. */
-const SHELL_STALE_TIME = 30_000
-
-/** The key the shell is cached under. One entry — there is one session per document. */
-const SHELL_QUERY_KEY = ['app-shell'] as const
 
 /**
  * Better Auth's organization endpoints, as the one call this route makes to them.
@@ -150,11 +150,9 @@ const loadShell = createServerFn({ method: 'GET' }).handler(
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ context, location }) => {
-    const shell = await context.queryClient.ensureQueryData({
-      queryKey: SHELL_QUERY_KEY,
-      queryFn: () => loadShell(),
-      staleTime: SHELL_STALE_TIME,
-    })
+    const shell = await context.queryClient.ensureQueryData(
+      shellQueryOptions({ queryFn: () => loadShell() }),
+    )
 
     if (!shell) {
       // `location.href` is path + search + hash, which is exactly what the sign-in screen's

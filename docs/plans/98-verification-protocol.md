@@ -54,13 +54,14 @@ seed then fails with a connection refused that looks like a server that did not 
 
 ### 2.3 The Playwright projects
 
-| Project         | What it is                     | Notes                                             |
-| --------------- | ------------------------------ | ------------------------------------------------- |
-| `setup`         | signs the demo account in once | caches storage state to `e2e/.auth/demo.json`     |
-| `chromium`      | 1440×900                       | the loop's project; every fix iteration runs this |
-| `mobile-safari` | iPhone 15                      | the gate; runs **once**, after chromium is green  |
+| Project           | What it is                     | Notes                                                        |
+| ----------------- | ------------------------------ | ------------------------------------------------------------ |
+| `setup`           | signs the demo account in once | caches storage state to `e2e/.auth/demo.json`                |
+| `chromium`        | 1440×900                       | the loop's project; every fix iteration runs this            |
+| `mobile-chromium` | Pixel 7                        | the phone layout in CI; runs **once**, after chromium passes |
+| `mobile-safari`   | iPhone 15                      | not in CI (#317); run it when a change touches WebKit        |
 
-Both browser projects send the header **`x-mt-server-today: 2026-08-20`**.
+Every browser project sends the header **`x-mt-server-today: 2026-08-20`**.
 
 ### 2.4 The clock pin is not optional
 

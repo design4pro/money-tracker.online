@@ -419,7 +419,7 @@ export async function createTransactionThroughUi(
  * `expect.timeout` of five seconds in `playwright.config.ts` is untouched, so every assertion
  * about what the product *drew* still fails as fast as it ever did.
  *
- * The number is measured rather than picked. Run the way CI runs these — `mobile-safari`,
+ * The number is measured rather than picked. Run the way CI ran these when it was measured — `mobile-safari`,
  * `workers: 1`, against `pnpm dev` — the whole of the slowest refund test takes 10.7 s, navigation,
  * hydration, the panel, a dialog and two axe scans included; the wait below is a small part of
  * that. Ten seconds is an order of magnitude more than it needs and still leaves two thirds of the

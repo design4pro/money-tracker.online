@@ -1,5 +1,5 @@
 {
-  "kitVersion": 43,
+  "kitVersion": 47,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -67,19 +67,19 @@
       "mode": "100644"
     },
     ".ai/scripts/__tests__/backlog-status.test.mjs": {
-      "sha256": "5790852ffc14ae9cf18775de252837fc4a2f2b99d2e95234d19c7f0805d0f80e",
+      "sha256": "a4e790d5189367d220c9046c9e6b9a2fda1472ffe88219c43c9837434cbb5232",
       "mode": "100644"
     },
     ".ai/scripts/agent-kit-check.mjs": {
-      "sha256": "02824937c793827a7c510a1d91852d028fbcfaa822f9862421457c2fe44446ad",
+      "sha256": "dfdf1a507d154884ad177873a25dcb314c274f8d030f55f7023f2124adb3c1d8",
       "mode": "100755"
     },
     ".ai/scripts/backlog-status.mjs": {
-      "sha256": "2453df0a50e3fd5c897e0934408bb1ec642c1f20a4189c5a901040d400508e7a",
+      "sha256": "6e6ba66a3b880fce756ba5929c3069aaa8535fd264b6fe778f55b416e9597b96",
       "mode": "100755"
     },
     ".ai/scripts/cez-automations.sh": {
-      "sha256": "e05312f0c849f05adff72cad4a08de5d0c9f5c191b1c854ef654d4ced9fcf7d2",
+      "sha256": "96444910f88b9d1a66996c70f38a0b124849cacd388c3d8466b47b27678f9bd2",
       "mode": "100755"
     },
     ".ai/scripts/cez-prompt-templates.sh": {
@@ -115,7 +115,7 @@
       "mode": "100644"
     },
     ".ai/trackers/github.md": {
-      "sha256": "f317e02bf943c659f20d1a0bac0afe5d61db32422c413e7d741919d1ad0959d4",
+      "sha256": "57273b0f034c4d7f1aad2a25dc5c08b4b05e957652b51ab88c96f844f987409a",
       "mode": "100644"
     },
     ".claude/hooks/__tests__/hooks.test.ts": {
@@ -123,7 +123,7 @@
       "mode": "100644"
     },
     ".claude/hooks/format-file.sh": {
-      "sha256": "720e9eda702807eb9bb90bcbbd5568ce3f102be72e84edcf23dc3bd99b68e058",
+      "sha256": "163d68b6278d37bd7b047956cac18f4064dfcca1f60e6b95a67f9e4a4d5fd009",
       "mode": "100755"
     },
     ".claude/hooks/git-guardrails.sh": {
@@ -139,7 +139,7 @@
       "mode": "100755"
     },
     ".claude/settings.json": {
-      "sha256": "4465d1fd3d2a67c91bf29c2457dfbd7820f288e6b367377f36d06dde405de8b3",
+      "sha256": "06d8bbc3cf8b088c8962d9c9dcaf379496e0255b6290d793e1a9456b98e5c084",
       "mode": "100644"
     },
     ".claude/skills/backlog/SKILL.md": {

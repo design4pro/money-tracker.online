@@ -120,7 +120,7 @@ test.describe('a missing row answers 404', () => {
   test.use({ storageState: storageStateFor('demo') })
 
   test.skip(
-    ({ browserName }) => browserName !== 'chromium',
+    ({ browserName, isMobile }) => browserName !== 'chromium' || isMobile,
     'A status code is decided by the Worker. Three engines would ask the same server the same ' +
       'questions and spend the run’s budget doing it.',
   )

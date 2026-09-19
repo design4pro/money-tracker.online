@@ -3,7 +3,7 @@ import { expect, test } from './support/console'
 import { gotoApp } from './support/app'
 import { expectNoWcagViolations } from './support/axe-scan'
 import { storageStateFor } from './support/session'
-import { holdServerFns } from './support/states'
+import { holdEveryServerFn } from './support/states'
 
 import en from '#/lib/i18n/messages/en'
 
@@ -23,7 +23,7 @@ import type { Locator, Page } from '@playwright/test'
  * The rail and the bottom bar are one composition at two widths: `app-shell.tsx` draws the rail
  * `hidden … lg:flex` and the bar `lg:hidden`, and both label their `<nav>` with the same
  * `nav.primary`. So {@link primaryNavLink} resolves to whichever one the project's viewport is
- * showing, and the same four cases run against `bottom-nav.tsx` under `mobile-safari` and against
+ * showing, and the same four cases run against `bottom-nav.tsx` under `mobile-chromium` and `mobile-safari` and against
  * `sidebar-nav.tsx` under `chromium` and `webkit` — the phone bar had the identical defect and
  * would otherwise have no case at all.
  */
@@ -93,7 +93,7 @@ test.describe('the primary navigation', () => {
       page.getByRole('heading', { level: 1, name: en['dashboard.title'] }),
     ).toBeVisible()
 
-    const held = await holdServerFns(page)
+    const held = await holdEveryServerFn(page)
     try {
       await primaryNavLink(page, en['nav.accounts']).click()
 
@@ -190,6 +190,17 @@ test.describe('the primary navigation', () => {
 
     await primaryNavLink(page, en['nav.accounts']).click()
     await expect(page).toHaveURL(/\/accounts(\?|$)/)
+    // Arrived, not merely addressed: the URL changes before the destination renders. Going back
+    // mid-navigation cancels it, and with it the scroll-to-top it would have made — which is what
+    // this case used to exercise while the tab's first navigation waited on a shell round trip
+    // (#230). Once it no longer waits, `/accounts` renders first and starts a smooth scroll to the
+    // top (`app.css`), and WebKit lets that animation finish over the restore issued by `goBack`:
+    // measured on `mobile-safari`, 3 of 4 runs back at 0. Every later navigation in a tab has always
+    // been that fast, so this is the move a reader actually makes, and the case now makes it.
+    await expect(
+      page.getByRole('heading', { level: 1, name: en['accounts.title'] }),
+    ).toBeVisible()
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
 
     // Back, because that is the entry the offset was recorded against: TanStack keys its scroll
     // cache on the history entry (`scroll-restoration.ts`), and a second forward navigation to the
