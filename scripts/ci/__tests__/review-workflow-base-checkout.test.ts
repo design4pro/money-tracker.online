@@ -4,10 +4,10 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * One rule, asserted in every place the review workflow has to follow it: nothing the branch under
+ * One rule, asserted in every place the review workflows have to follow it: nothing the branch under
  * review supplies may judge that branch or run with a write token.
  *
- * The workflow stated the rule twice in prose - at the hooks re-checkout and at
+ * The workflows stated the rule twice in prose - at the hooks re-checkout and at
  * `rearm-review-threads` - and #103 found the third instance unguarded: `claude-review` checks out
  * the pull request's own merge commit and then runs `scripts/ci/review-threads-label.mjs` from it,
  * on `github.token`, under `pull-requests: write`. Prose does not hold a rule that three separate
@@ -16,28 +16,44 @@ import { describe, expect, it } from 'vitest'
  * particular wording, because the wording is the part that is meant to keep changing.
  *
  * @see .github/workflows/claude-code-review.yml
+ * @see .github/workflows/rearm-review-threads.yml
  * @see https://github.com/design4pro/money-tracker.online/issues/103
  */
 const root = resolve(__dirname, '../../..')
 
 const WORKFLOW = '.github/workflows/claude-code-review.yml'
+const REARM_WORKFLOW = '.github/workflows/rearm-review-threads.yml'
 
 const workflow = readFileSync(resolve(root, WORKFLOW), 'utf8')
+const rearmWorkflow = readFileSync(resolve(root, REARM_WORKFLOW), 'utf8')
 
-/** The `claude-review` job: from its own key to the next top-level job key. */
-const reviewJob = workflow.slice(
-  workflow.indexOf('\n  claude-review:'),
-  workflow.indexOf('\n  rearm-review-threads:'),
-)
+/** The `types:` list under `on.pull_request`, as written on its one line. */
+const pullRequestTypes = (source: string): string[] => {
+  const match = source.match(/\n {2}pull_request:\n(?: {4}#[^\n]*\n)* {4}types: \[([^\]]*)\]/)
+  expect(match, 'no pull_request.types list').not.toBeNull()
+  return match![1].split(',').map((type) => type.trim())
+}
+
+/** The `claude-review` job: from its own key to the end of the file, the only job in it. */
+const reviewJob = workflow.slice(workflow.indexOf('\n  claude-review:'))
 
 describe(WORKFLOW, () => {
-  // Both slices below are taken by `indexOf`, and `indexOf` answers -1 rather than throwing: a
-  // renamed job would quietly turn `reviewJob` into a prefix of the file, or into the whole of it,
-  // and every `not.toMatch` in here would still pass. This is what makes the negative assertions
-  // mean something.
-  it('splits into the two jobs this file reasons about', () => {
-    expect(reviewJob).not.toBe('')
-    expect(workflow).toContain('\n  rearm-review-threads:')
+  // The slice above is taken by `indexOf`, and `indexOf` answers -1 rather than throwing: a renamed
+  // job would quietly turn `reviewJob` into the last character of the file, and every
+  // `not.toMatch` in here would still pass. This is what makes the negative assertions mean
+  // something.
+  it('holds the claude-review job and no other', () => {
+    expect(reviewJob.length).toBeGreaterThan(1)
+    const jobs = workflow.slice(workflow.indexOf('\njobs:\n'))
+    expect(jobs.match(/^ {2}[\w-]+:$/gm)).toEqual(['  claude-review:'])
+  })
+
+  // `claude-review` is a required check, and a job its own `if` skips reports success. A label
+  // event here therefore produced a second, always-green `claude-review` check run on a head whose
+  // real review had ended red (#300). A label change must not start this workflow at all.
+  it('starts on no label event', () => {
+    expect(pullRequestTypes(workflow)).not.toContain('labeled')
+    expect(pullRequestTypes(workflow)).not.toContain('unlabeled')
   })
 
   describe('claude-review', () => {
@@ -85,17 +101,29 @@ describe(WORKFLOW, () => {
     })
   })
 
-  describe('rearm-review-threads', () => {
-    const rearmJob = workflow.slice(workflow.indexOf('\n  rearm-review-threads:'))
+  describe(REARM_WORKFLOW, () => {
+    // Its own file, so that the `unlabeled` it needs never starts claude-code-review.yml (#300).
+    it('starts only when a label comes off, and only for in-progress', () => {
+      expect(pullRequestTypes(rearmWorkflow)).toEqual(['unlabeled'])
+      expect(rearmWorkflow).toMatch(
+        /if: github\.event\.action == 'unlabeled' && github\.event\.label\.name == 'in-progress'/,
+      )
+    })
 
     it('checks out the base branch rather than the pull request', () => {
-      expect(rearmJob).toMatch(/ref: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/)
+      expect(rearmWorkflow).toMatch(/ref: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/)
+    })
+
+    it('runs the arming script', () => {
+      expect(rearmWorkflow).toContain('node scripts/ci/review-threads-label.mjs')
     })
   })
 
   // The permission #103 asked not to be widened as part of its own fix.
-  it('keeps both jobs off contents: write', () => {
+  it('keeps both workflows off contents: write', () => {
     expect(reviewJob).toContain('contents: read')
+    expect(rearmWorkflow).toContain('contents: read')
     expect(workflow.match(/contents: write/g)).toBeNull()
+    expect(rearmWorkflow.match(/contents: write/g)).toBeNull()
   })
 })
