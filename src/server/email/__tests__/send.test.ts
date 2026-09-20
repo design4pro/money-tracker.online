@@ -255,6 +255,53 @@ describe('how the provider answer is classified', () => {
       }),
     ).resolves.toEqual({ ok: false, kind: 'retryable' })
   })
+
+  /**
+   * The trade this module makes is "the error's class, never the error's message". The class is
+   * what separates a DNS failure from a TLS failure from an aborted request; the message is what
+   * names the endpoint. Recording neither — which is where this started — leaves an operator with
+   * "something went wrong" and no next step.
+   */
+  it('records what kind of network failure it was, without the message that names the endpoint', async () => {
+    const log = sink()
+    const throwing = (async () => {
+      throw new TypeError(
+        `fetch failed: connect ECONNREFUSED ${DELIVERY.apiUrl}`,
+      )
+    }) as unknown as typeof fetch
+
+    await sendEmail(MESSAGE, {
+      delivery: DELIVERY,
+      logger: log.logger,
+      fetch: throwing,
+      kind: 'reset-password',
+    })
+
+    expect(log.text()).toContain('TypeError')
+    expect(log.text()).not.toContain(DELIVERY.apiUrl)
+    expect(log.text()).not.toContain('ECONNREFUSED')
+  })
+
+  it('still says something when what was thrown is not an Error at all', async () => {
+    const log = sink()
+    // A runtime may reject with anything, and this path must not itself throw while reporting that
+    // something did. Routed through an `unknown` so the test states that, rather than stating that
+    // a string literal was thrown on purpose.
+    const notAnError: unknown = 'a runtime is allowed to reject with this'
+    const throwing = (() =>
+      Promise.reject(notAnError)) as unknown as typeof fetch
+
+    await expect(
+      sendEmail(MESSAGE, {
+        delivery: DELIVERY,
+        logger: log.logger,
+        fetch: throwing,
+        kind: 'reset-password',
+      }),
+    ).resolves.toEqual({ ok: false, kind: 'retryable' })
+
+    expect(log.text()).toContain('unknown')
+  })
 })
 
 describe('what may never reach a log line', () => {

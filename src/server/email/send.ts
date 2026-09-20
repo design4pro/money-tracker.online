@@ -197,10 +197,17 @@ export async function sendEmail(
       status: response.status,
     })
     return { ok: false, kind: 'rejected', status: response.status }
-  } catch {
-    // The error itself is deliberately not passed to `logger.error`: `serializeError` records its
-    // message, and a `fetch` failure names the endpoint it could not reach.
-    logger.warn('email transport failed', fields)
+  } catch (error) {
+    // The error *object* is deliberately not handed to the logger: `serializeError` records its
+    // message, and a `fetch` failure's message names the endpoint it could not reach along with
+    // whatever else the runtime decided to put in it. The class name cannot carry a URL, and it is
+    // what separates a DNS failure from a TLS failure from an aborted request — without it this
+    // line says only that something went wrong, which is not enough to act on at three in the
+    // morning.
+    logger.warn('email transport failed', {
+      ...fields,
+      cause: error instanceof Error ? error.name : 'unknown',
+    })
     return { ok: false, kind: 'retryable' }
   }
 }

@@ -14,7 +14,7 @@ import { admin, organization, twoFactor } from 'better-auth/plugins'
 import { nanoid } from 'nanoid'
 
 import { authSchema } from '#/server/db/auth-schema'
-import { negotiateLocaleFrom } from '#/server/fns/locale'
+import { negotiateEmailLocale } from '#/server/fns/locale'
 import { loggerFromEnv } from '#/server/observability/logger'
 import { getDb } from './db'
 import { createAuthEmailer } from './email'
@@ -43,19 +43,16 @@ export const AUTH_BASE_PATH = '/api/auth'
 /**
  * Which language to write an auth email in.
  *
- * Better Auth hands each email hook the `Request` that triggered it, which is the only thing that
- * knows anything about the recipient's language here: these flows run for people with no stored
- * preference, and two of the three run for people with no account yet. `negotiateLocaleFrom` is the
- * same chain the document uses, with its stored steps absent — so the day `user_preferences.locale`
- * exists it is passed in here and nothing else changes.
- *
- * A hook invoked without a request (Better Auth marks it optional) falls through to `en`, exactly
- * as a request with no `Accept-Language` does.
+ * Better Auth hands each email hook the `Request` that triggered it, and that request carries both
+ * signals the product has: the language picker's cookie and `Accept-Language`, weighed in that
+ * order by {@link negotiateEmailLocale}. A hook invoked without a request (Better Auth marks it
+ * optional) falls through to `en`, exactly as a request carrying neither does.
  */
 function recipientLocale(request: Request | undefined): Locale {
-  return negotiateLocaleFrom({
-    acceptLanguage: () => request?.headers.get('accept-language') ?? null,
-  }).locale
+  return negotiateEmailLocale({
+    cookieHeader: request?.headers.get('cookie') ?? null,
+    acceptLanguage: request?.headers.get('accept-language') ?? null,
+  })
 }
 
 const DAY_SECONDS = 60 * 60 * 24
