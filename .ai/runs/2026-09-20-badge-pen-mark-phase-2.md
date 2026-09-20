@@ -76,8 +76,8 @@ is the red-green loop's.
 
 ### Phase 1: Settle Q8 in a browser (spec Step 4)
 
-- [ ] 1.1 Build a Chromium harness that renders a `settled` badge at both sizes from the real compiled CSS, and measure the last glyph's right edge against the pooled region the inset shadows paint
-- [ ] 1.2 Record the answer, the frames and the floor it settles as an `## Amendment` in the spec naming this PR
+- [x] 1.1 Build a Chromium harness that renders a `settled` badge at both sizes from the real compiled CSS, and measure the last glyph's right edge against the pooled region the inset shadows paint — c51e755
+- [x] 1.2 Record the answer, the frames and the floor it settles as an `## Amendment` in the spec naming this PR — c51e755
 
 ### Phase 2: The pen palette (spec Steps 5 and 6)
 
