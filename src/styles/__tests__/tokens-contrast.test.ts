@@ -667,8 +667,15 @@ const PEN_PAIRS: Array<[string, string]> = [
   ['color-pen-brand', 'color-brand'],
 ]
 
-/** The inverse of `channel`: one linear channel back to an sRGB 0-255 byte. */
-function toByte(value: number): number {
+/**
+ * The inverse of `channel`: one linear channel back to the sRGB 0-255 scale.
+ *
+ * Deliberately unrounded. A browser quantises the mix to eight bits before it
+ * paints, so its ratios sit within 0.02 of these — keeping the fraction here
+ * means the floors are checked against the colour that was asked for rather
+ * than against one engine's rounding of it.
+ */
+function toSrgb(value: number): number {
   const encoded =
     value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055
   return Math.min(255, Math.max(0, encoded * 255))
@@ -715,9 +722,9 @@ function mixOklab(
   const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3
   const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3
   return [
-    toByte(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
-    toByte(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
-    toByte(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+    toSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    toSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    toSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
   ]
 }
 
@@ -788,7 +795,10 @@ describe.each([
   it.each(PEN_PAIRS)(
     '%s keeps its deepened regions above the 3:1 decoration floor',
     (wash, deepen) => {
-      for (const region of regionsOf(wash, deepen).slice(1)) {
+      const deepened = regionsOf(wash, deepen).filter(
+        (region) => region.name !== 'wash',
+      )
+      for (const region of deepened) {
         for (const ground of PEN_GROUNDS) {
           const composite = washOver(
             { rgb: region.rgb, alpha: region.alpha },

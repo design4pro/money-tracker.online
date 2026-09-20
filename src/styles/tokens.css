@@ -271,7 +271,13 @@
      and `settled` declare nothing — `accent` reuses `brand`'s pen because
      `--color-accent` is `--color-brand`, and `settled` is `mark-pen`'s own
      default, `--color-highlighter`. The pooled edge is a graphical object at
-     3:1 rather than text at 7:1, measured in a browser: Q8 in the spec. */
+     3:1 rather than text at 7:1, measured in a browser: Q8 in the spec.
+
+     Every ratio below comes from the oklab arithmetic in
+     `__tests__/tokens-contrast.test.ts`, which is what holds them. Those mixes
+     were read back out of Chromium's painted pixel as well: each wash figure
+     agrees exactly and no pooled figure moves by more than 0.02, which is the
+     engine quantising the mix to eight bits where the test does not round. */
   --color-pen-neutral: #cfcec5; /* ink 10.51:1 washed, pooled edge 7.55:1 */
   --color-pen-info: #cfcec5; /* = pen-neutral, because --color-info is --color-ink-2 */
   --color-pen-positive: #bbd7c6; /* ink 10.71:1 washed, pooled edge 7.59:1 */
