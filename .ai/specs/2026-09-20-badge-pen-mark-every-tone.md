@@ -25,8 +25,8 @@ Stamp Rule now governs _hue_ rather than _marking_.
 (`marketing.ledger.settled`) — wears `tone="settled"`, the pen mark defined by the `mark-pen`
 utility in `src/styles/app.css` and roughened by `#mark-pen-rough`, the single SVG displacement
 filter in the product. The other 41 are rectangles: a `border-strong` rule on `surface` for
-`neutral` (17 literal call sites), a `-soft` fill for `warning` (7) and `positive` (1), a
-`border-panel` rule for `info` (6), `brand` (1), and nine tones computed from state.
+`neutral` (17 literal call sites), a `-soft` fill for `warning` (7), `positive` (1), and `brand` (1), a
+`border-panel` rule for `info` (6), and nine tones computed from state.
 
 A reader who arrives from the landing meets `Po terminie` and `Nadchodzi` sitting side by side on
 `/recurring` in two chromes, neither of which is the one they just saw. The same word class —
@@ -189,9 +189,11 @@ during this spec (`oklab` mixing and sRGB alpha compositing reproduced from `app
 So the mark's structure requires the ink and the hue to be different axes, which means the hue
 belongs to the wash. This is also what `badge.tsx` already says about `settled` — "the typed word
 stays in `ink`, and a run of `highlighter` is drawn behind it" — generalised from one tone to all of
-them. Under that model every tone clears 7:1 with room: at the candidate saturation this spec
-proposes (a 34% hue mix in light, 38% in dark), the worst composite measures **8.69:1** (light,
-`brand`) and **7.13:1** (dark, `brand`), against a floor of 7.
+them. Under that model every tone clears 7:1: at the candidate saturation this spec proposes (a 34%
+hue mix in light, 38% in dark), the worst composite measures **10.51:1** (light, `neutral` and
+`info`) and **7.15:1** (dark, `warning`), against a floor of 7 — wide headroom in light, and
+deliberately close to the floor in dark, where the palette is tightest. Both figures are the worst
+rows of the Phase 2 Step 5 token table, measured the same way.
 
 A second consequence, and a good one: the tone's hue stops being text at all. `docs/ACCESSIBILITY.md`
 §1's Colour-Is-Never-Alone Rule is satisfied structurally rather than by convention — the word is the
@@ -436,7 +438,11 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
    | `--color-pen-warning`  | `#decdb2` (10.59:1) | `#635840` (7.15:1) |
    | `--color-pen-brand`    | `#d8cfea` (10.96:1) | `#57516a` (7.53:1) |
 
-   Ratios are `--color-ink` on the wash composited at 0.75, worst of `surface` and `surface-sunken`.
+   Ratios are `--color-ink` on the wash composited at 0.75 over `--color-surface` — the one ground
+   the mockup renders, so the two columns are the same measurement. `surface-sunken` is the tighter
+   ground in light and the looser one in dark (measured on `--color-highlighter`: 13.14:1 against
+   12.66:1 in light, 8.69:1 against 9.11:1 in dark), which is why Step 6 asserts both grounds rather
+   than trusting this column.
    The **light** column is derived from the existing `-soft` tints with the chroma pushed back up,
    and clears **7.5:1 even on the pooled edge** — it stands whichever way Step 4 answers Q8. The
    **dark** column assumes the decorative reading; if a glyph overlaps the pooled edge, dark drops to
