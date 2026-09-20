@@ -21,6 +21,9 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   change (skill `i18n-messages`).
 - Named exports only, route modules excepted. `components/ui` never fetches and never imports from
   `server/`.
+- A component that renders in more than one place ships with its guideline in `DESIGN.md` in
+  the same change that makes it shared - the second call site is what triggers it, never a
+  later cleanup (`DESIGN.md` -> Component guidelines).
 - Regenerate, never edit: `src/routeTree.gen.ts` (`pnpm generate-routes`), `drizzle/`
   (`pnpm db:generate`) and `.ai/specs/README.md` (`pnpm generate-spec-index`). Migrations are
   additive.
