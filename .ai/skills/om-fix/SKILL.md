@@ -14,8 +14,9 @@ the rules below layered on top.
 - Write the failing test first, at the seam the analyzer named (skill `tdd`,
   `.claude/skills/tdd/SKILL.md`). A repository change gets its tenant-isolation case; an amount-touching
   change gets its money-invariant case.
-- Copy goes through the catalogue (skill `i18n-messages`): the key lands in `en.ts` and `pl.ts` in
-  the same change, and a count goes through the plural machinery.
+- Copy goes through the catalogue (skill `i18n-messages`, `.claude/skills/i18n-messages/SKILL.md`):
+  the key lands in `en.ts` and `pl.ts` in the same change, and a count goes through the plural
+  machinery.
 - After touching `src/routes/**` run `pnpm generate-routes`; after touching
   `src/server/db/schema.ts` run `pnpm db:generate` and keep the migration under `drizzle/`. Never
   hand-edit either output.
@@ -31,4 +32,4 @@ the rules below layered on top.
 The gate is `validation.commands` from `.ai/agentic.config.json`, in order. The two drift commands
 run first; when either leaves a diff, that diff is part of the fix. Pipe the test run to a file
 before quoting any count from it, and re-run failed files alone before calling a failure a flake
-(`docs/SPEC.md` §7.7, skill `verifying-changes`).
+(`docs/SPEC.md` §7.7, skill `verifying-changes`, `.claude/skills/verifying-changes/SKILL.md`).
