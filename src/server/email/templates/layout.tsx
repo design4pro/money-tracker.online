@@ -139,10 +139,10 @@ const DARK_MODE_CSS = `
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 @media (prefers-color-scheme: dark) {
   .email-canvas { background-color: ${DARK.canvas} !important; }
-  .email-surface { background-color: ${DARK.surface} !important; border-color: ${DARK.borderSubtle} !important; }
+  .email-surface { background-color: ${DARK.surface} !important; border: 1px solid ${DARK.borderSubtle} !important; }
   .email-ink { color: ${DARK.ink} !important; }
   .email-ink-2 { color: ${DARK.ink2} !important; }
-  .email-rule { border-color: ${DARK.borderSubtle} !important; }
+  .email-rule { background-color: ${DARK.borderSubtle} !important; }
   .email-action { background-color: ${DARK.accent} !important; color: ${DARK.onAccent} !important; }
   .email-link { color: ${DARK.accent} !important; }
 }
@@ -181,8 +181,18 @@ const wordmark: CSSProperties = {
   margin: '0 0 24px',
 }
 
+/**
+ * A painted 1 px band rather than a border on an `<hr>`.
+ *
+ * Outlook's word engine renders `border-top` on a rule at its own thickness and in its own colour,
+ * and the element keeps its user-agent margins on top; a filled box of a stated height is the one
+ * form every client draws identically. The element stays an `<hr>`, so a screen reader still hears
+ * a thematic break.
+ */
 const rule: CSSProperties = {
-  borderColor: LIGHT.borderSubtle,
+  backgroundColor: LIGHT.borderSubtle,
+  border: 'none',
+  height: '1px',
   margin: '32px 0 16px',
 }
 
