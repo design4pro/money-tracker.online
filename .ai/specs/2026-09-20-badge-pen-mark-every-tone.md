@@ -1,11 +1,11 @@
 # The badge wears the pen mark, in every tone
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #366  |
-| **Spec PR**        | #367  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #366        |
+| **Spec PR**        | #367        |
+| **Implementation** | #370, #373  |
 
 ## 📝 TLDR
 
@@ -526,3 +526,97 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
 14. **Close the loop.** Move this spec to `implemented/` with `git mv`, set `Status: implemented`,
     list every implementation PR in `Implementation` in merge order, and run `pnpm generate-spec-index`.
     _Verify:_ the full gate in `.ai/agentic.config.json`, in order.
+
+## Amendment — Phase 1 Step 3: the filter measurement, and the fallback it triggered (2026-09-20, PR #370)
+
+Step 3 asked for a number and a verdict rather than an assumption. The number was taken during
+Phase 1 and posted on PR #367, because the spec was still on its own branch and could not be
+amended from the implementation branch; it is carried in here, unchanged, by PR #373.
+
+**Method.** A static harness reproducing `@utility mark-pen` after parameterisation, with the real
+token values and the `#mark-pen-rough` filter transcribed verbatim from `__root.tsx`, at
+`/transactions`'s own density — `PAGE_SIZE` is 50 and a row carries two badges, so 100 marks — at
+1280x900. Raster time read from CDP tracing (`Tracing.start` over
+`disabled-by-default-devtools.timeline` + `cc`, summing `RasterTask`), median of five runs of 200
+forced re-rasters, in both themes.
+
+| theme | no mark | mark, filter off | mark, filter on |
+| ----- | ------- | ---------------- | --------------- |
+| light | 2.01 ms | 4.72 ms          | **17.28 ms**    |
+| dark  | 2.72 ms | 6.41 ms          | **22.23 ms**    |
+
+Sparse cases on the same instrument: one mark costs **0.12 ms** (light) and **0.23 ms** (dark) per
+frame, ten cost 1.42 ms and 1.82 ms. The cost scales with the number of marks.
+
+**Verdict: the budget fails, and Q1's named fallback was applied.** A screenful of badges spends a
+whole 60 Hz frame on the roughened outline alone. `--mark-pen-filter` joined the two properties and
+`@utility mark-pen-flat` sets it to `none`, keeping the wash, the bleed, the pooled trailing edge
+and the paused blob; it recovers roughly 73% (light) and 71% (dark) of the filter's cost.
+
+**Two caveats, so the number is not read as more than it is.** `RasterTask` is aggregated across
+raster threads, so these are totals of raster work rather than per-frame wall clock on one thread;
+and this is headless software rasterisation, not a GPU-accelerated browser — though `feTurbulence`
+feeding `feDisplacementMap` is not GPU-accelerated in Chromium either way, which is why the effect
+is this large.
+
+**Where the fallback actually sits, which is not what #370 says.** PR #370's description and the
+measurement comment on #367 both state that the `sm` size recipe carries `mark-pen-flat`. The code
+that merged does not: `badgeVariants`' `sm` recipe is unchanged, no recipe in the product wears the
+utility, and `badge.tsx` carries a comment explaining the reversal — `sm` is not a synonym for
+"repeats", and today's only `sm` mark is the landing's lone `settled` stamp, which would have been
+flattened by it. So Phase 1 **armed** the fallback and did not apply it. Phase 3 is what puts marks
+on the rows and therefore what reaches for `mark-pen-flat`; until it does, every mark in the product
+keeps its roughened outline. The two descriptions are left as they were written and corrected here,
+because the spec is what somebody opens first.
+
+**One observation this document does not act on.** The expense is `numOctaves="4"` on
+`feTurbulence`. Lowering it is a third option this spec never named and it would change how the one
+shipped mark looks, so it belongs to ADR 0022 (Phase 4) rather than to a phase that was supposed to
+be invisible.
+
+## Amendment — Q8 settled: no glyph overlaps the pooled edge (2026-09-20, PR #373)
+
+Phase 2 Step 4 asked the geometry question this document deferred, in a browser, and the answer
+**confirms the decorative reading**: the pooled trailing edge falls entirely in the bleed past the
+last letter, at both sizes, in both themes. The floor Step 6 asserts against `--mark-pen-pooled` and
+`--mark-pen-paused` is therefore **3:1** (1.4.11, a graphical object), and the palette keeps the
+saturation this document proposed rather than dropping to the pooled-safe ceiling.
+
+**Method.** The shipped landing mark (`marketing.ledger.settled`, `Badge` `tone="settled"`) driven
+in headless Chromium against `pnpm dev`, so the font, the compiled CSS and the `#mark-pen-rough`
+filter are the shipped ones — `0.75ch` is a font metric, and a harness with a different font answers
+a different question. The last glyph's right edge is a `Range` rect over the text node; the
+pseudo-elements' edges are their used `right` values, resolved against the badge's **padding** box,
+which is their containing block. The `md` row is the same badge cloned with the `md` size recipe, so
+every class but the size is the rendered one. Frames were captured at `deviceScaleFactor: 4` in both
+themes and are attached to PR #373; per `AGENTS.md` they are not committed.
+
+| size | font-size | `1ch`   | pooled edge past last glyph | paused blob past last glyph |
+| ---- | --------- | ------- | --------------------------- | --------------------------- |
+| `sm` | 11px      | 6.594px | **10.95px**                 | 5.45px                      |
+| `md` | 12px      | 7.188px | **13.40px**                 | 7.41px                      |
+
+The geometry is identical in both themes, because nothing in it is a colour.
+
+**What it is measured against.** The two inset shadows are `inset -2px 0 1px` and `inset -4px 0 5px`,
+so the outermost distance from the `::before` right edge at which the pooled colour has any alpha at
+all is **9px** — and at exactly 9px that alpha is nil, which makes 9px already the conservative
+bound rather than the effective one. Courier Prime is monospace, so the `Range` rect reports the
+advance and not the ink; the worst glyph in the EN + PL alphabet is `W`, whose ink overhangs its
+advance by 0.11px at `sm` and 0.12px at `md`. Taking that against the bleed leaves **10.84px** at
+`sm` and **13.28px** at `md` against a 9px reach: clear by 1.84px and 4.28px.
+
+**The one residual, named rather than rounded away.** `feDisplacementMap scale="5"` moves a pixel by
+at most 2.5px, which lifts the conservative bound to 11.5px. `md` still clears it. `sm` does not:
+10.84px against 11.5px leaves a worst case of **0.66px** — sub-pixel, at the extreme ink of the
+widest glyph, in the region where the shadow's own alpha has already decayed to nothing, and only
+while the roughened outline is on. `mark-pen-flat` (PR #370) removes the displacement entirely, and
+Phase 3 is what puts it on the marks that repeat. This is recorded as the boundary of the claim, not
+as a defect: the decorative reading is confirmed, and what confirms it is 9px of undisplaced
+clearance, not the 2.5px of noise on top of it.
+
+**What this does not settle.** The shipped dark `settled` pooled edge still measures **5.97:1** on
+`surface` (this run's arithmetic; _Risks_ above records 5.98:1 from the spec's), which is under the
+7:1 this palette is designed to and above the 3:1 this amendment establishes as its floor. Q8 makes
+that a passing measurement rather than a failing one; it does not make it a comfortable one, and
+#366 carries it as its own observation.

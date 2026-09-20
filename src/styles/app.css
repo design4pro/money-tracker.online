@@ -622,6 +622,70 @@
   }
 }
 
+/* One pen per tone: the wash and the shade it pools into, and nothing else.
+
+   `mark-pen` owns the geometry, the bleed, the pooled edge and the filter; a
+   `pen-*` utility owns only which ink is in the pen. That is the whole contract
+   between them, and it is why a new tone costs two declarations rather than a
+   second copy of the mark.
+
+   `deepen` is the tone's own ink rather than a darker step of the wash, because
+   the pool is where the pen pressed and a pen pools more of what it is full of.
+   `neutral` and `info` share both values (`--color-info` **is**
+   `--color-ink-2`), and `accent` has no utility of its own because
+   `--color-accent` **is** `--color-brand`, so `pen-brand` is already its pen -
+   Q10 and Q11 of `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`. `settled`
+   has none either: it is `mark-pen`'s defaults, and spelling them a second time
+   is how they drift.
+
+   Compound for the same reason `mark-pen-flat` is, and it matters more here.
+   These set `--mark-pen-wash` and `--mark-pen-deepen`, which `mark-pen` also
+   sets: at equal specificity the winner is whichever rule Tailwind emitted last,
+   so a plain `.pen-positive` would silently lose to `.mark-pen`'s defaults and
+   every tone would render as the settled violet with nothing failing.
+   `.pen-positive.mark-pen` is 0-2-0 against 0-1-0 and wins wherever it lands. */
+@utility pen-neutral {
+  &.mark-pen {
+    --mark-pen-wash: var(--color-pen-neutral);
+    --mark-pen-deepen: var(--color-ink-2);
+  }
+}
+
+@utility pen-info {
+  &.mark-pen {
+    --mark-pen-wash: var(--color-pen-info);
+    --mark-pen-deepen: var(--color-ink-2);
+  }
+}
+
+@utility pen-brand {
+  &.mark-pen {
+    --mark-pen-wash: var(--color-pen-brand);
+    --mark-pen-deepen: var(--color-brand);
+  }
+}
+
+@utility pen-positive {
+  &.mark-pen {
+    --mark-pen-wash: var(--color-pen-positive);
+    --mark-pen-deepen: var(--color-positive);
+  }
+}
+
+@utility pen-negative {
+  &.mark-pen {
+    --mark-pen-wash: var(--color-pen-negative);
+    --mark-pen-deepen: var(--color-negative);
+  }
+}
+
+@utility pen-warning {
+  &.mark-pen {
+    --mark-pen-wash: var(--color-pen-warning);
+    --mark-pen-deepen: var(--color-warning);
+  }
+}
+
 /* Visible only to assistive technology. Used by every chart's data table and
    by the live regions the toast host and the field errors write into. */
 @utility sr-only-focusable {

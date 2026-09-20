@@ -612,6 +612,232 @@ describe.each([
   })
 })
 
+/* --------------------------------------------------------------------------
+   THE PEN PALETTE — asserted on the composite, not on the token.
+
+   `SOFT_PAIRS` above measures `--color-highlighter` against `--color-ink` as
+   two opaque values. The mark never paints that pair: `mark-pen` paints the
+   wash at `opacity: 0.75`, deepens its trailing edge with an inset shadow in
+   `--mark-pen-pooled` and drops a blob of `--mark-pen-paused` at `opacity: 0.4`
+   — three composites, none of which is the token. That gap is what let the
+   shipped dark `settled` pooled edge sit at 5.97:1 against a palette designed
+   to 7:1 with nothing failing (`2026-09-20-badge-pen-mark-every-tone.md`,
+   Risks). So the pen family is asserted where the reader meets it.
+
+   Two floors, and which applies to what is a measurement rather than a
+   preference. The **wash** is the ground a typed word sits on, so it carries
+   `--color-ink` at 7:1. The **pooled edge** and the **paused blob** are
+   graphical objects at 3:1 under 1.4.11, because Phase 2 Step 4 measured the
+   geometry in a browser and found the pooled region falls 10.95px (`sm`) and
+   13.40px (`md`) past the last glyph, against a 9px reach — the spec's
+   `## Amendment — Q8 settled` carries the method and the one sub-pixel
+   residual it names.
+
+   `surface` and `surface-sunken` are the two planes, and which of them is the
+   worst case flips by theme: `surface-sunken` is the darker plane in light, so
+   it binds there, and it is the darker plane in dark too, which makes `surface`
+   bind instead. Both are asserted, so the flip needs no maintenance.
+   -------------------------------------------------------------------------- */
+
+/** The opacities `mark-pen` paints its two pseudo-elements at. */
+const PEN_WASH_ALPHA = 0.75
+const PEN_PAUSED_ALPHA = 0.4
+
+/** How far `--mark-pen-pooled` and `--mark-pen-paused` mix toward the deepen. */
+const POOLED_MIX = 0.3
+const PAUSED_MIX = 0.45
+
+/** The two planes a badge lands on. */
+const PEN_GROUNDS = ['color-surface', 'color-surface-sunken'] as const
+
+/**
+ * Each pen wash → the shade it pools into, which is the tone's own ink.
+ *
+ * `neutral` and `info` share a wash because `--color-info` **is** `--color-ink-2`
+ * (Q10), and `accent` is absent because it shares `brand`'s (Q11): neither is a
+ * token, so neither is a row here. `settled` is absent for the third reason —
+ * it names no new token at all and is asserted below as the control.
+ */
+const PEN_PAIRS: Array<[string, string]> = [
+  ['color-pen-neutral', 'color-ink-2'],
+  ['color-pen-info', 'color-ink-2'],
+  ['color-pen-positive', 'color-positive'],
+  ['color-pen-negative', 'color-negative'],
+  ['color-pen-warning', 'color-warning'],
+  ['color-pen-brand', 'color-brand'],
+]
+
+/**
+ * The inverse of `channel`: one linear channel back to the sRGB 0-255 scale.
+ *
+ * Deliberately unrounded. A browser quantises the mix to eight bits before it
+ * paints, so its ratios sit within 0.02 of these — keeping the fraction here
+ * means the floors are checked against the colour that was asked for rather
+ * than against one engine's rounding of it.
+ */
+function toSrgb(value: number): number {
+  const encoded =
+    value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055
+  return Math.min(255, Math.max(0, encoded * 255))
+}
+
+/**
+ * `color-mix(in oklab, a, b <amount>)` — the function `mark-pen` derives both
+ * of its deepened shades with.
+ *
+ * Reproduced rather than approximated by a channel-wise blend, because oklab is
+ * perceptually uniform and sRGB is not: a 30% mix in one is a different colour
+ * from a 30% mix in the other, and the difference lands exactly where the pooled
+ * edge is measured. The matrices are Ottosson's, the same ones the CSS
+ * specification defines the space by.
+ */
+function mixOklab(
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+  amount: number,
+): [number, number, number] {
+  const toLab = (
+    rgb: readonly [number, number, number],
+  ): [number, number, number] => {
+    const [r, g, bl] = rgb.map((value) => channel(value / 255))
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl)
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl)
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl)
+    return [
+      0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+      1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+      0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+    ]
+  }
+
+  const [la, aa, ba] = toLab(a)
+  const [lb, ab, bb] = toLab(b)
+  const [L, A, B] = [
+    la + (lb - la) * amount,
+    aa + (ab - aa) * amount,
+    ba + (bb - ba) * amount,
+  ]
+
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3
+  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3
+  const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3
+  return [
+    toSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    toSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    toSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  ]
+}
+
+describe.each([
+  ['light', light],
+  ['dark', dark],
+])('%s pen palette', (themeName, tokens) => {
+  /** The three regions `mark-pen` paints, for one wash/deepen pair. */
+  const regionsOf = (
+    wash: string,
+    deepen: string,
+  ): Array<{
+    readonly name: string
+    readonly rgb: readonly [number, number, number]
+    readonly alpha: number
+  }> => {
+    const washRgb = rgbOf(tokens[wash])
+    const deepenRgb = rgbOf(tokens[deepen])
+    return [
+      { name: 'wash', rgb: washRgb, alpha: PEN_WASH_ALPHA },
+      {
+        name: 'pooled edge',
+        rgb: mixOklab(washRgb, deepenRgb, POOLED_MIX),
+        alpha: PEN_WASH_ALPHA,
+      },
+      {
+        name: 'paused blob',
+        rgb: mixOklab(washRgb, deepenRgb, PAUSED_MIX),
+        alpha: PEN_PAUSED_ALPHA,
+      },
+    ]
+  }
+
+  it('declares every pen token the mark reads', () => {
+    const missing = PEN_PAIRS.flat().filter((key) => !(key in tokens))
+    expect(missing, `${themeName}: undeclared pen tokens`).toEqual([])
+  })
+
+  /*
+   * The binding case for the word itself. Dark is the tight column on purpose
+   * (`Architecture` → *The arithmetic that decided the text colour*): the
+   * palette is designed to sit just above the floor there, so this is the
+   * assertion a nudged token fails first.
+   */
+  it.each(PEN_PAIRS)(
+    '%s carries --color-ink at 7:1 on both grounds',
+    (wash, deepen) => {
+      const [washRegion] = regionsOf(wash, deepen)
+      for (const ground of PEN_GROUNDS) {
+        const composite = washOver(
+          { rgb: washRegion.rgb, alpha: washRegion.alpha },
+          rgbOf(tokens[ground]),
+        )
+        const measured = contrastRgb(rgbOf(tokens['color-ink']), composite)
+        expect(
+          measured,
+          `${themeName}: --color-ink on --${wash} at ${washRegion.alpha} over --${ground} is ${measured.toFixed(2)}:1`,
+        ).toBeGreaterThanOrEqual(7)
+      }
+    },
+  )
+
+  /*
+   * The two deepened regions, at the non-text floor Q8 settled. They are held
+   * at 3:1 rather than 7:1 because no glyph reaches them — change that geometry
+   * and this floor is what has to move first.
+   */
+  it.each(PEN_PAIRS)(
+    '%s keeps its deepened regions above the 3:1 decoration floor',
+    (wash, deepen) => {
+      const deepened = regionsOf(wash, deepen).filter(
+        (region) => region.name !== 'wash',
+      )
+      for (const region of deepened) {
+        for (const ground of PEN_GROUNDS) {
+          const composite = washOver(
+            { rgb: region.rgb, alpha: region.alpha },
+            rgbOf(tokens[ground]),
+          )
+          const measured = contrastRgb(rgbOf(tokens['color-ink']), composite)
+          expect(
+            measured,
+            `${themeName}: --${wash}'s ${region.name} over --${ground} is ${measured.toFixed(2)}:1`,
+          ).toBeGreaterThanOrEqual(3)
+        }
+      }
+    },
+  )
+
+  /*
+   * The control. `settled` names no pen token — it is `mark-pen`'s defaults,
+   * `--color-highlighter` over `--color-brand` — so running it through the same
+   * machinery is what proves the machinery describes the mark that already
+   * ships rather than only the six that do not yet.
+   */
+  it('holds the shipped settled mark to the same floors', () => {
+    for (const region of regionsOf('color-highlighter', 'color-brand')) {
+      const floor = region.name === 'wash' ? 7 : 3
+      for (const ground of PEN_GROUNDS) {
+        const composite = washOver(
+          { rgb: region.rgb, alpha: region.alpha },
+          rgbOf(tokens[ground]),
+        )
+        const measured = contrastRgb(rgbOf(tokens['color-ink']), composite)
+        expect(
+          measured,
+          `${themeName}: settled's ${region.name} over --${ground} is ${measured.toFixed(2)}:1, floor ${floor}`,
+        ).toBeGreaterThanOrEqual(floor)
+      }
+    }
+  })
+})
+
 describe('the two themes are separately designed', () => {
   /*
    * The panel plane is the one ground whose direction flips: light recesses it

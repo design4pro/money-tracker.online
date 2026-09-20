@@ -101,3 +101,53 @@ it('wins over the pen it flattens without depending on sort order', async () => 
   // compound selector is what removes the question.
   expect(css).toContain('.mark-pen-flat.mark-pen')
 })
+
+/**
+ * The pens themselves (Phase 2 Step 7).
+ *
+ * `mark-pen` is now a pen with no ink named at the call site; a `pen-*` utility
+ * is the ink. The pairing is the design decision — the pool is the tone's own
+ * ink, not a darker step of the wash — so it is asserted per tone rather than
+ * as "six utilities exist".
+ */
+const PENS: Array<[string, string, string]> = [
+  ['pen-neutral', '--color-pen-neutral', '--color-ink-2'],
+  // `--color-info` *is* `--color-ink-2`, so `info` and `neutral` are one pen
+  // under two names (Q10) rather than two values that happen to agree today.
+  ['pen-info', '--color-pen-info', '--color-ink-2'],
+  ['pen-brand', '--color-pen-brand', '--color-brand'],
+  ['pen-positive', '--color-pen-positive', '--color-positive'],
+  ['pen-negative', '--color-pen-negative', '--color-negative'],
+  ['pen-warning', '--color-pen-warning', '--color-warning'],
+]
+
+it.each(PENS)(
+  '%s fills the pen with its own ink',
+  async (utility, wash, deepen) => {
+    const css = await compile(utility)
+
+    expect(css).toContain(`--mark-pen-wash: var(${wash})`)
+    expect(css).toContain(`--mark-pen-deepen: var(${deepen})`)
+
+    // A pen is ink and nothing else. Geometry, opacity and the filter belong to
+    // `mark-pen`, and a `pen-*` that carried any of them would be a second mark
+    // that only looks like a colour.
+    expect(css).not.toContain('inset:')
+    expect(css).not.toContain('opacity:')
+    expect(css).not.toContain('--mark-pen-filter')
+  },
+)
+
+it.each(PENS)(
+  '%s wins over the pen it fills without depending on sort order',
+  async (utility) => {
+    const css = await compile(utility)
+
+    // The same hazard `mark-pen-flat` is compound for, and a louder one: these
+    // set the two properties `mark-pen` declares its own defaults for, so a plain
+    // `.pen-positive` losing the tie would render every tone as the settled
+    // violet — the one failure mode this whole phase exists to make impossible —
+    // and no assertion above would move.
+    expect(css).toContain(`.${utility}.mark-pen`)
+  },
+)
