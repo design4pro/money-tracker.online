@@ -69,12 +69,14 @@ it, and a test over it would break on every future nudge without ever catching t
 
 ## Progress
 
+PR: #370
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: parameterise the mark
 
-- [ ] 1.1 Pin the control with failing tests
-- [ ] 1.2 Introduce the two properties and make every consumer read them
+- [x] 1.1 Pin the control with failing tests - 97a0573
+- [x] 1.2 Introduce the two properties and make every consumer read them - 5dcb5f8
 
 ### Phase 2: measure the filter
 
