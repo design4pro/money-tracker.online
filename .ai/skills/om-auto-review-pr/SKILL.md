@@ -28,6 +28,17 @@ node scripts/visual/capture.mjs --url http://127.0.0.1:3010/<route> --out <scrat
 Frames belong outside the repository. Evidence from `om-auto-qa-pr` complements the pair; it never
 replaces it, and only a person applies `qa-approved`.
 
+## Review personas
+
+On a `needs-qa` PR, dispatch the personas the diff matches before writing the verdict; on any PR
+reaching `src/server/repos/**`, `src/server/auth/**`, `src/server/ledger/**`, billing or a
+migration, dispatch `security-tenancy-reviewer`. The table and the boundary are in `CODE_REVIEW.md`
+-> **Review personas**, and `om-code-review` is where their findings are re-ranked and merged into
+the report. A persona that could not run is named as not run.
+
+This needs the `Task` tool. The `pr-review` workflow grants it; where it is absent the review runs
+without personas and the report says so, in one line.
+
 ## Review threads are answered, then resolved
 
 The threads other reviewers leave (a human, an earlier agent pass) are resolved by nobody unless

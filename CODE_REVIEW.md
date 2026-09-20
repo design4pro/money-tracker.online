@@ -56,6 +56,32 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
   test, label, automation or mechanism names one that exists on the branch and does what the text
   says; the reviewer opens each one (#159, #191, #304, #308, #310, #319).
 
+## Review personas
+
+The checks above are one lens: the code, judged against the rules. Four subagents in
+`.claude/agents/` read the same diff from somewhere else, and each cites this repository's own
+documents rather than general advice. They are dispatched by the reviewer - a person, or
+`om-auto-review-pr` - on the diff they match:
+
+| Persona                     | Dispatch it when the diff reaches                                                         | What it answers                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `manual-tester`             | `src/routes/**`, `src/components/**`, `src/styles/**`, `src/lib/i18n/messages/*`          | What a person hits off the happy path: the states, the keyboard path, both locales, both themes, the console  |
+| `accessibility-specialist`  | the same user-facing set                                                                  | WCAG 2.2 AA by criterion number, and the five named AAA criteria - never a wider claim                        |
+| `security-tenancy-reviewer` | `src/server/repos/**`, `src/server/auth/**`, `src/server/ledger/**`, billing, a migration | Whether a query can see another tenant's rows, and whether a permission is checked where a client can skip it |
+| `product-owner`             | a plan area in `docs/plans/`, or acceptance criteria on the issue                         | Whether the change does what was asked, what it did beyond that, and what it decided quietly                  |
+
+A persona **reports**. None of them edits source, applies a label - `qa-approved` least of all - or
+merges; the reviewer weighs what comes back and owns the verdict. A finding a persona raises enters
+the report at the severity this file's table gives it, not at the severity the persona felt.
+
+They are not `om-synthetic-users`, which builds a panel from research material and outputs
+`[SYNTHETIC]` hypotheses about people. These four read a diff and the rules in this repository, and
+what they produce is a review finding.
+
+Dispatching needs the `Task` tool. The cockpit's `pr-review` workflow grants it; the unattended
+`implement-ticket` review step does not yet, so a run started from `ready-for-agent` reviews
+without personas until that grant lands.
+
 ## Severity
 
 | Severity | What lands here                                                                                                                                                                                                                                                                                                                                                                                          |
