@@ -44,10 +44,23 @@ ordinary file of this repository.**
 - `node .ai/scripts/agent-kit-check.mjs` is removed from `validation.commands`, from the inlined
   gate in `.ai/cezar/workflows/implement-ticket.yml`, and from `ci.yml`'s `verify` job.
 - `.claude/hooks/guard-generated.sh` is deleted, with the `PreToolUse` `Edit|Write` matcher that
-  ran it. Its remaining coverage either duplicates the first two commands of the gate
-  (`src/routeTree.gen.ts`, `drizzle/`) or was wrong — it told a run to regenerate
-  `worker-configuration.d.ts`, which in this repository is hand-authored and which
-  `wrangler types` refuses to overwrite. `git-guardrails.sh` and `guard-read.sh` stay.
+  ran it. `src/routeTree.gen.ts` and `drizzle/` are already covered by the first two commands of
+  the gate, which regenerate and diff them. `git-guardrails.sh` and `guard-read.sh` stay.
+- **`worker-configuration.d.ts` loses its protection, and nothing replaces it.** Stated plainly
+  because the obvious replacement does not work here. The hook blocked edits to that file and told
+  the reader to run `pnpm exec wrangler types`; that instruction was wrong — the file is
+  hand-authored to mirror `wrangler.jsonc` (its own header says so, and explains why: `wrangler
+types` emits an `Env` derived from whichever environment was selected, so a binding declared in
+  `env.staging` alone silently becomes required everywhere or vanishes), and `wrangler types`
+  refuses to touch it at all: `A non-Wrangler worker-configuration.d.ts already exists`. A
+  `wrangler types && git diff --exit-code` gate entry is therefore impossible, not merely
+  undesirable: there is no generated form to compare against. `planned.travel` reached the same
+  dead end from the other side — there the command does write, and its output fails `tsc` on a
+  circular self-reference (its ADR 0025, decision 2). What is genuinely lost is the block: an agent
+  may now edit this file, and drift from `wrangler.jsonc` is caught by review alone. A check that
+  would work asserts that every `binding`/`name` in `wrangler.jsonc` and every `vars` key appears
+  in the interface, without demanding byte equality. It is not written, and this record does not
+  pretend otherwise. As of this change the two agree: all 20 declared bindings are present.
 - The `.prettierignore` block keeps all 49 surviving paths and is relabelled. They stay out of
   Prettier because reflowing them is a large mechanical diff for no gain, not because a kit owns
   them; deleting a line there is now all it takes to hand a file to Prettier.
