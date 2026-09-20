@@ -9,9 +9,10 @@
 
   Every colour is a real token value read from src/styles/tokens.css. The
   --pen-* values are the candidates measured in the spec: in light the existing
-  -soft tint with about 11% more of its own hue mixed back in, in dark a 38% mix
-  of the hue into surface. The ratio beside each row is --color-ink on that wash
-  composited at 0.75, worst of --color-surface and --color-surface-sunken -
+  -soft tint with more of its own hue mixed back in (11% for brand, 14% for
+  negative, 16% for the other four), in dark a 38% mix of the hue into surface.
+  The ratio beside each row is --color-ink on that wash composited at 0.75,
+  worst of --color-surface and --color-surface-sunken -
   which is surface-sunken in light and surface in dark, because the darker plane
   changes sides between the themes - computed the same way
   src/styles/__tests__/tokens-contrast.test.ts computes a wash.

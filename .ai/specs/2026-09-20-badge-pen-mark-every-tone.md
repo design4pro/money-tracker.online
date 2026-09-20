@@ -190,13 +190,13 @@ So the mark's structure requires the ink and the hue to be different axes, which
 belongs to the wash. This is also what `badge.tsx` already says about `settled` — "the typed word
 stays in `ink`, and a run of `highlighter` is drawn behind it" — generalised from one tone to all of
 them. Under that model every tone clears 7:1: at the candidate saturation this spec proposes — in
-light the existing `-soft` tint with roughly 11% more of its own hue mixed back in, in dark a 38% mix
-of the hue into `surface` — the worst composite measures **10.51:1** (light, `neutral` and `info`)
-and **7.15:1** (dark, `warning`), against a floor of 7 — wide headroom in light, and deliberately
-close to the floor in dark, where the palette is tightest. Both figures are the worst rows of the
-Phase 2 Step 5 token table, measured the same way. The two themes are built from different starting
-points on purpose, for the reason Q3 gives: in dark every `-soft` token is a panel tint, so a pen
-mixed from one would read as a panel.
+light the existing `-soft` tint with more of its own hue mixed back in (11% for `brand`, 14% for
+`negative`, 16% for the other four), in dark a 38% mix of the hue into `surface` — the worst
+composite measures **10.51:1** (light, `neutral` and `info`) and **7.15:1** (dark, `warning`),
+against a floor of 7 — wide headroom in light, and deliberately close to the floor in dark, where the
+palette is tightest. Both figures are the worst rows of the Phase 2 Step 5 token table, measured the
+same way. The two themes are built from different starting points on purpose, for the reason Q3
+gives: in dark every `-soft` token is a panel tint, so a pen mixed from one would read as a panel.
 
 A second consequence, and a good one: the tone's hue stops being text at all. `docs/ACCESSIBILITY.md`
 §1's Colour-Is-Never-Alone Rule is satisfied structurally rather than by convention — the word is the
