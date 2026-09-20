@@ -121,6 +121,18 @@ stages and agent runs, not the decision record. It binds both directions: `@clou
 is the one addition so far (ADR 0015) and `motion` the one removal (ADR 0019), declared and imported
 by nothing. A `### Blockers` row is still how a stage reports needing a package.
 
+What the freeze does not do is notice when a reason **expires** — a package declared ahead of a
+stage that then slips, or ships another way, keeps its line for as long as nobody re-reads the
+promise. `motion` survived the length of a plan that way (#213), and #234 found thirteen more rows
+in the same shape — twelve of which still held when they were dispositioned, the thirteenth having
+left under its own power once a stage imported it. A fourteenth, `@tanstack/react-table`, #234's own
+scan could not see: it counted a package as imported whenever its name appeared in quotes, and an
+unrelated test fixture quotes that one. So every runtime dependency that no file imports
+is dispositioned in
+`scripts/__tests__/dependency-imports.test.ts` — **keep** with the open stage that will import it,
+or **pending** a human's `package.json` decision — and the gate fails on an undispositioned one.
+That table may only shrink: a row leaves when its package is first imported, or when it is removed.
+
 ---
 
 ## 4. Design language
