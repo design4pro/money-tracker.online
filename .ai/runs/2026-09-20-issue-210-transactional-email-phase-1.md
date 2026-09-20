@@ -112,21 +112,21 @@ handlers and a template bug must return `'failed'` rather than turn a completed 
 
 ### Phase 1: Reconcile the design documents
 
-- [ ] 1.1 Correct `docs/plans/21-notifications.md` → 21-S2 and record the `renderCopyParams` amendment in the spec
+- [x] 1.1 Correct `docs/plans/21-notifications.md` → 21-S2 and record the `renderCopyParams` amendment in the spec — 86494bb
 
 ### Phase 2: The transport
 
-- [ ] 2.1 `src/server/email/send.ts` and its test
+- [x] 2.1 `src/server/email/send.ts` and its test — 2f0f42f
 
 ### Phase 3: Render, and the shared layout, inside workerd
 
-- [ ] 3.1 `src/server/email/render.ts`, `templates/layout.tsx`, the workerd test and `pnpm build`
+- [x] 3.1 `src/server/email/render.ts`, `templates/layout.tsx`, the workerd test and `pnpm build` — cacceb6
 
 ### Phase 4: Copy parameters into display strings
 
-- [ ] 4.1 `src/lib/notifications/render-copy.ts` and its money-invariant cases
+- [x] 4.1 `src/lib/notifications/render-copy.ts` and its money-invariant cases — 43971ae
 
 ### Phase 5: The auth templates and the migration onto them
 
-- [ ] 5.1 `templates/auth.tsx` and the `email.auth.*` catalogue keys in EN + PL
-- [ ] 5.2 Re-point `createAuthEmailer` at the templates and pass the request's locale in
+- [x] 5.1 `templates/auth.tsx` and the `email.auth.*` catalogue keys in EN + PL — 4bce113
+- [x] 5.2 Re-point `createAuthEmailer` at the templates and pass the request's locale in — 2c36bc0
