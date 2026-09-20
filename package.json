@@ -33,7 +33,7 @@
     "db:migrate:local": "wrangler d1 migrations apply money-tracker-db --local",
     "db:migrate:staging": "wrangler d1 migrations apply money-tracker-db-staging --remote --env staging",
     "db:migrate:prod": "wrangler d1 migrations apply money-tracker-db --remote",
-    "install-skills": "npx -y skills@latest add open-mercato/skills --skill \"*\" -a claude-code -y && npx -y skills@latest update --project -y",
+    "install-skills": "npx -y skills@latest add open-mercato/skills --skill \"*\" -a claude-code -y --copy",
     "prepare": "husky"
   },
   "lint-staged": {
