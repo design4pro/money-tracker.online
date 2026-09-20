@@ -2,8 +2,11 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { __unstable__loadDesignSystem } from 'tailwindcss'
 import { expect, it } from 'vitest'
+
+import { designSystem } from './support/design-system'
+
+import type { DesignSystem } from './support/design-system'
 
 /**
  * Both directions of the token contract.
@@ -108,44 +111,6 @@ const { Scanner } = require(
 
 const stylesDir = fileURLToPath(new URL('..', import.meta.url))
 const srcDir = fileURLToPath(new URL('../..', import.meta.url))
-
-type DesignSystem = Awaited<ReturnType<typeof __unstable__loadDesignSystem>>
-
-let designSystemPromise: Promise<DesignSystem> | undefined
-
-/**
- * `app.css` compiled through Tailwind's own front end, once per file.
- *
- * Loading it is the expensive part of this file — the reason `vitest.config.ts`
- * names it as the `server` project's slowest case — and both directions of the
- * contract need the same design system, so the promise is memoized rather than
- * awaited twice.
- */
-function designSystem(): Promise<DesignSystem> {
-  designSystemPromise ??= __unstable__loadDesignSystem(
-    readFileSync(path.join(stylesDir, 'app.css'), 'utf8'),
-    {
-      base: stylesDir,
-      loadStylesheet: async (id: string, base: string) => {
-        const file =
-          id === 'tailwindcss'
-            ? require.resolve('tailwindcss/index.css')
-            : path.resolve(base, id)
-        return {
-          path: file,
-          base: path.dirname(file),
-          content: readFileSync(file, 'utf8'),
-        }
-      },
-      loadModule: async (id: string, base: string) => ({
-        path: id,
-        base,
-        module: (await import(id)).default,
-      }),
-    },
-  )
-  return designSystemPromise
-}
 
 /** Utility prefixes whose final segment names a theme token. */
 const TOKEN_PREFIXES = [

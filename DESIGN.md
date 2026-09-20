@@ -641,6 +641,26 @@ radius or hand-written shadow. Interaction state arrives as data attributes (`da
 lucide only. Every pointer target answers 44x44px through the `target-min` utility, which grows the
 hit area with a pseudo-element while the visual box stays on the 32 / 40 / 48px size scale.
 
+### Component guidelines
+
+Every component that renders in more than one place has a section here, written in the change that
+makes it shared. A section is prose, not a prop table - the props are in the source, and what the
+source cannot say is why one variant and not the next. It names:
+
+- **The shape.** Radius, height, type size and weight, in tokens.
+- **The tones, and what each one means.** A tone is picked by meaning, never by colour. A reader
+  must be able to answer "which one do I use here?" from the text alone, and the text says what the
+  answer is when in doubt.
+- **The states** that change the rendering - hover, press, focus, selected, disabled, invalid - and
+  which of them the component deliberately does not have.
+- **What carries the meaning when the colour does not**, and what survives forced colours.
+- **The one thing it is not**: the neighbouring component it would otherwise be mistaken for, and
+  the rule that keeps them apart.
+
+**The Second Call Site Rule.** A component used twice is a decision two screens depend on. Writing
+it down is part of making it shared, not a follow-up - an undocumented shared component drifts, and
+the drift is then defended as deliberate.
+
 ### Buttons
 
 Stamps. Square-cornered, typed, pressed one pixel into the page.
