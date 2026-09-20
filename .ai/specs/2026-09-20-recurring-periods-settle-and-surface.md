@@ -126,7 +126,7 @@ and no reference amount — and never invents the missing three fields.
 | Composing ledger page + expectations      | `src/routes/_app/transactions/-server/planned.ts` (new)          |
 | Settling a period from any surface        | `src/components/app/recurring/period-actions.tsx` (new)          |
 
-**What is reused, unchanged:** `getUpcoming`, `markPaid`, `markSkipped` and `revertPeriod` in
+**What is reused, unchanged:** `markPaid`, `markSkipped` and `revertPeriod` in
 `src/server/repos/recurring.ts`; the server functions in `src/server/fns/recurring.ts`
 (`markPeriodPaid` and its siblings); `pageTransactions`, `countTransactions` and `sumTransactions`
 in `src/server/repos/transaction-queries.ts`; the whole filter bar, virtualiser and keyboard map in
@@ -137,10 +137,16 @@ in `src/server/repos/transaction-queries.ts`; the whole filter bar, virtualiser 
 - `src/components/app/transactions/types.ts` gains `ExpectationRow` and
   `type LedgerEntry = LedgerRow | ExpectationRow`, discriminated on a `kind` field. `LedgerRow` gains
   `kind: 'transaction'`; existing call sites set it in `toLedgerRow`.
+- `getUpcoming` in `src/server/repos/recurring.ts` widens its projection: `UpcomingPeriod` gains the
+  series' `accountId`, `categoryId` and `payeeId`, all three read from the `recurring_series` row the
+  query already joins, and all three **nullable** — because the columns in `src/server/db/schema.ts`
+  are (`onDelete: 'set null'`, no `.notNull()`), so a series whose linked account was deleted has
+  none. The signature, the filter and the order are untouched; this is three more fields in an existing
+  `select`, and they are what the route out of the empty picker prefills from. `/recurring`, the
+  other caller, ignores them.
 - `src/routes/_app/transactions/-server/planned.ts` is new and composes `loadTransactions` with
-  `getUpcoming`, merging the two lists by `bookedOn` / `dueOn` under the screen's current sort. It
-  owns no SQL, which is what `docs/SPEC.md` §6.1 puts in `-server/` — the same justification the
-  existing `-server/list.ts` docblock already gives for itself.
+  `getUpcoming`. It owns no SQL, which is what `docs/SPEC.md` §6.1 puts in `-server/` — the same
+  justification the existing `-server/list.ts` docblock already gives for itself.
 - `src/routes/_app/transactions/planned.tsx` reads from it instead of `loadTransactions` directly.
 - The ledger list component renders an expectation row with the period's status word beside its
   colour, exactly as `period-grid.tsx` does, and the same mark-paid / skip actions.
@@ -149,12 +155,28 @@ in `src/server/repos/transaction-queries.ts`; the whole filter bar, virtualiser 
 Nothing reaches `recurring_periods` outside `src/server/repos/recurring.ts`, and nothing reaches
 `transactions` outside `src/server/repos/`.
 
-**Paging is the one real seam.** `pageTransactions` is cursor-paged; `getUpcoming` takes a
-`{ within }` horizon and is not paged. Rather than invent a merged cursor, the expectations for the
-window covered by the current page are fetched whole and merged into it, and the horizon is bounded
-by the page's last `bookedOn`. A workspace with more expectations than fit one page sees the rest as
-it scrolls, because the next page's horizon extends. This keeps `pageTransactions` untouched, which
-is the property worth protecting.
+**Paging: the expectations are not paged, and are not interleaved.** `pageTransactions` is
+cursor-paged; `getUpcoming` takes a `{ today, within }` horizon and a `limit`, and is not paged.
+Interleaving the two by date was considered and does not work: `getUpcoming` has no lower date bound
+— it returns every unsettled period up to the horizon, overdue rows included "whatever their age"
+per its own docblock — so widening the horizon for page 2 re-fetches a superset of page 1 rather
+than a new slice. Worse, the screen's `DEFAULT_LEDGER_SORT` is `{ bookedOn, desc }`, under which a
+page's **last** row is its **earliest**, so a horizon derived from it walks backwards as pages
+advance; and three of the four `LEDGER_SORT_FIELDS` (`payee`, `category`, `account`) carry no date
+to derive a horizon from at all.
+
+So the expectations are read **once per screen load**, for a fixed horizon from `today`
+(`{ within: 30, limit: 50 }`, the same window `loadRecurring` already uses for `/recurring`), and
+render as **one group pinned above** the paged ledger rows — in the same table, ordered by `dueOn`
+ascending, under a row-group header. The group does not change as pages advance, which is what makes
+`expectedByCurrency` a figure that stays correct while somebody scrolls instead of growing with every
+page. It is also well-defined under all four sort orders, because it does not depend on the ledger's
+sort at all: what is expected is ordered by when it is due, and nothing else is a meaningful order
+for it.
+
+A workspace with more than 50 unsettled periods inside the horizon sees the 50 nearest — the cap
+`getUpcoming` already enforces — and the group header says so, pointing at `/recurring` for the full
+list. This keeps `pageTransactions` untouched, which is the property worth protecting.
 
 ## 📝 Data Model
 
@@ -174,11 +196,20 @@ export interface ExpectationRow {
   readonly direction: LedgerDirection
   /** Strictly positive, integer minor units at `currencyCode`'s scale (`docs/MONEY.md` §1.1, §1.2). */
   readonly expectedAmountMinor: Minor
+  /** `UpcomingPeriod.expectedCurrencyCode`, branded on the way out as `toLedgerRow` brands its own. */
   readonly currencyCode: CurrencyCode
   /** `YYYY-MM-DD`. The due date, a calendar date (`docs/MONEY.md` §1.5, §6.1). */
   readonly dueOn: string
-  readonly status: 'upcoming' | 'paid' | 'overdue' | 'skipped'
-  readonly accountId: string
+  /**
+   * `PeriodView.derivedStatus` — what today says, which is the one a screen renders.
+   *
+   * Two values, not four, and that is a fact about `getUpcoming` rather than a simplification:
+   * it filters to the unsettled statuses (`upcoming`, `overdue`), so a settled or skipped period
+   * is not in the result set to be rendered in the first place.
+   */
+  readonly status: 'upcoming' | 'overdue'
+  /** All three from the series, all three nullable — see the projection note in Architecture. */
+  readonly accountId: string | null
   readonly categoryId: string | null
   readonly payeeId: string | null
 }
@@ -187,6 +218,12 @@ export interface ExpectationRow {
 There is deliberately no `refAmountMinor`, no `refCurrencyCode` and no `rateE10`. Their absence is
 the type telling every downstream reader that this row cannot be summed with the others, and it is
 what makes the totals rule below enforceable by the compiler rather than by review.
+
+`accountId` being nullable is not a defensive `null`: `recurring_series.account_id` is
+`onDelete: 'set null'`, so deleting an account really does leave its series without one. The route
+out of the empty picker prefills what it has and leaves the account picker empty in that case, where
+`/transactions/new` already requires a choice — the same state a person typing a transaction from
+scratch is in.
 
 ## 📝 API Contracts
 
@@ -197,23 +234,46 @@ loadPlannedScreen({
   policies: TransactionPolicies,   // parsed by the existing transactionPoliciesSchema
   filters: TransactionFilters,     // the existing filter shape, unchanged
   sort, cursor, limit,             // as loadTransactions
-  today: string,                   // ISO date, so the derived-overdue rule is testable
 }) => {
   ...TransactionListPage,          // rows, cursor, total, totals — unchanged shape
+  /** The day the read was taken on, as `loadRecurring` and `loadSeriesDetail` already return it. */
+  today: string,
   expectations: ReadonlyArray<ExpectationRow>,
-  /** Sum of expectations in view, per currency. Never folded into `totals`. */
-  expectedByCurrency: ReadonlyArray<{ currencyCode: CurrencyCode; amountMinor: Minor }>,
+  /**
+   * The expected group's figures, per currency and split by direction. Never folded into `totals`,
+   * never netted, never converted.
+   */
+  expectedByCurrency: ReadonlyArray<{
+    currencyCode: CurrencyCode
+    incomeMinor: Minor
+    expenseMinor: Minor
+  }>,
 }
 ```
+
+**`today` is read, not accepted.** It does not appear in the input: `loadPlannedScreen` calls
+`serverToday()` itself and returns the day it read, exactly as every sibling in
+`src/server/fns/recurring.ts` does — that file's docblock states the rule, "`today` enters here, once
+per call, from `#/server/clock`". The `today` parameter on `upcomingSchema` is the layer below: it
+exists so the _repository_ takes the day as a parameter and reads no clock ("a parameter, never a
+clock read in a repository"), and the server function is what supplies it. Accepting it from a caller
+would let a client pick which of its periods count as overdue, which is a permission question dressed
+as a shape.
 
 Validation is Zod at the server-function boundary and again in the repository, per `AGENTS.md`;
 `policies` reuses `transactionPoliciesSchema` verbatim rather than a parallel shape, and `getUpcoming`
 already parses its own input through `upcomingSchema`. Authorisation is `requireOrg()` in the server
 function, and every read below it takes the `TenantScope` first parameter (ADR 0002).
 
-`expectedByCurrency` is a list rather than one figure because expectations are not converted. A
-workspace with a EUR subscription and a PLN bill in view gets two figures and no arithmetic between
-them.
+**Why two figures per currency and not one.** `expectedByCurrency` is a list rather than one figure
+because expectations are not converted — a workspace with a EUR subscription and a PLN bill in view
+gets two rows and no arithmetic between them. Each row then carries income and expense separately,
+because a recurring series can run in either direction and `expectedAmountMinor` is strictly positive
+with the sign living in `direction`, exactly as `LedgerRow` holds it. `LedgerTotals` never collapses
+that split either — it keeps `incomeMinor`, `expenseMinor` and `netMinor` apart — and adding an
+expected salary to an expected rent would produce a figure that is neither, just a mixed magnitude.
+No `netMinor` here, though: netting is a question the ledger's totals answer about money that moved,
+and it is not one worth asking about money that has not.
 
 ## 📝 UI/UX
 
@@ -230,24 +290,32 @@ The paragraph stays and gains a button. Pressing it navigates to `/transactions/
 period's account, direction, expected amount, currency, due date, category and payee as search
 params, plus a return target naming the series and period. Saving the transaction returns to
 `/recurring/$seriesId` with the picker reopened for that period, where the new row is now inside the
-existing `±14` day window and selectable.
+existing `±14` day window and selectable. A series whose account, category or payee is `null` — the
+columns are `onDelete: 'set null'` — prefills the rest and leaves that field for the person to pick,
+which is the state the form is in for any transaction typed from scratch.
 
 The dialog still never writes a transaction. That refusal is the module's documented reason to exist
 and this spec does not touch it; what changes is that declining to create one is no longer the same
 as refusing to help.
 
-### `/transactions/planned` — expectation rows
+### `/transactions/planned` — the expected group
 
+- The expectations render as **one group at the top of the list**, above the paged planned
+  transactions, under a row-group header that names it and says how far ahead it looks. The group is
+  ordered by due date, ascending — soonest first — and keeps that order whichever way the ledger
+  below it is sorted, because the ledger's sort is a question about what was booked and this group
+  holds nothing that has been.
 - An expectation row is visually and semantically distinct: the series name where a payee would be,
   the amount in the series' own currency, the due date, and the period status as a **word** beside
-  its colour (`Upcoming`, `Paid`, `Overdue`, `Skipped`) — the non-colour encoding `docs/plans/13-recurring.md`
-  (`13-S1`) already requires of `period-grid.tsx`, held to here as well.
+  its colour (`Upcoming`, `Overdue`) — the non-colour encoding `docs/plans/13-recurring.md`
+  (`13-S1`) already requires of `period-grid.tsx`, held to here as well. Those are the only two
+  statuses the group can hold, because a settled or skipped period is not in `getUpcoming`'s result.
 - Each carries the mark-paid and skip actions as real buttons, keyboard-reachable without hover.
 - The row is not selectable for the ledger's bulk actions, because none of them mean anything applied
   to something that has not happened.
 - `ListSummary` continues to total `transactions` only, and renders the expected figures beside the
-  totals under their own label, one per currency, with copy that names them as expectations rather
-  than as money.
+  totals under their own label — one line per currency, expected-in and expected-out each named —
+  with copy that names them as expectations rather than as money.
 
 ### Reaching the screen
 
@@ -259,10 +327,11 @@ second transactions entry would re-widen it for a mode rather than for an area.
 ### Accessibility
 
 AA is the gate (`docs/ACCESSIBILITY.md`); nothing here widens the claim. Concretely: the expectation
-row is a real table row in the same table, its status is text as well as colour, its actions are
-buttons in the row rather than hover affordances, and the segmented control is a real radio group
-with its current value announced. `pnpm e2e` runs axe over both routes at zero `serious` and zero
-`critical`, as the existing `e2e/recurring.visual.spec.ts` does for `/recurring`.
+row is a real table row in the same table, the expected group is a real row group with a header row
+rather than a styled gap, its status is text as well as colour, its actions are buttons in the row
+rather than hover affordances, and the segmented control is a real radio group with its current value
+announced. `pnpm e2e` runs axe over both routes at zero `serious` and zero `critical`, as the
+existing `e2e/recurring.visual.spec.ts` does for `/recurring`.
 
 ## 📝 Edge Cases & Failure Scenarios
 
@@ -272,14 +341,24 @@ with its current value announced. `pnpm e2e` runs axe over both routes at zero `
 - **An expectation in a currency the workspace has no rate for.** It renders in its own currency and
   contributes to its own line in `expectedByCurrency`. Nothing is converted, so there is nothing to
   fail (`docs/MONEY.md` §2.3 is not reached on this path at all).
-- **A period settled in another tab.** The next read returns it as `paid`; `markPaid` on an already-paid
-  period is the repository's existing error, surfaced as a toast, and the list refreshes.
+- **A period settled in another tab.** `markPaid` on an already-paid period is the repository's
+  existing error, surfaced as a toast, and the list refreshes. On that refresh the row **disappears**
+  rather than turning `paid`: `getUpcoming` filters to the unsettled statuses, so a settled period
+  leaves the expected group entirely. That is the right reading — the group's subject is what is
+  still outstanding — but it means the screen must not promise a `paid` state it can never render,
+  which is why `ExpectationRow.status` has two values and not four. The settled transaction itself
+  appears on `/transactions` under the ordinary ledger rules.
 - **A filter that only `transactions` understands** — payment method, attachment count, split state.
   Expectations are suppressed whenever such a filter is active, with a line saying so, rather than
   silently ignoring the narrowing and showing rows that do not match it.
 - **The `auto_record` race.** A series with `auto_record` posts its transaction after the due date; for
   the hours between the due date and the cron pass, the period shows as `overdue` and no transaction
   exists. This is the correct reading of the state and no special case is added for it.
+- **More unsettled periods than the group's cap.** `getUpcoming`'s `limit` is 50 and the group is read
+  once, so a workspace with more shows the 50 nearest by due date. The group header says it is
+  showing the nearest 50 and links to `/recurring`; `expectedByCurrency` sums exactly the rows shown,
+  so the figure and the list never disagree. A paged expected group was rejected in Architecture
+  above, and this cap is the price of that.
 - **Mark paid from the list with no linkable transaction.** Same empty state, same route out; the
   return target names the list rather than the series detail.
 - **An empty `/transactions/planned`.** The existing empty state gains a line pointing at `/recurring`
@@ -289,8 +368,11 @@ with its current value announced. `pnpm e2e` runs axe over both routes at zero `
 ## 📝 Risks & Impact Review
 
 **Blast radius.** One new route-local server module, one widened view type, two touched routes, one
-extracted component. No schema change, no new write path, no change to any repository function's
-signature, and no change to what `pageTransactions`, `countTransactions` or `sumTransactions` return.
+extracted component, and one widened repository projection. No schema change, no new write path, no
+change to any repository function's **signature**, and no change to what `pageTransactions`,
+`countTransactions` or `sumTransactions` return. `getUpcoming` is the one repository function whose
+**return shape** grows — three nullable ids added to `UpcomingPeriod` — which is additive, and
+`/recurring`, its only other caller, ignores them.
 
 **Protected surfaces** (`BACKWARD_COMPATIBILITY.md`):
 
@@ -311,20 +393,22 @@ data is written, so there is no backfill to undo and no state to migrate back. T
 a property of the read-time design and would not survive the materialised alternative.
 
 **Tenant isolation.** No new repository function, so `tenant-isolation.test.ts` gains no case by the
-`AGENTS.md` rule as written. A case is added anyway for `loadPlannedScreen`: it is a new composition
-of two scoped reads, and the cheap assertion that A's planned screen never returns B's expectations
-is exactly the one a future refactor would break silently.
+`AGENTS.md` rule as written. Two are added anyway: one for `loadPlannedScreen`, which is a new
+composition of two scoped reads and where the cheap assertion that A's planned screen never returns
+B's expectations is exactly the one a future refactor would break silently; and one for
+`getUpcoming`'s widened projection, because three new ids leaving a repository is three new ways to
+leak a row id across tenants if the join ever loses its `tenantFilter`.
 
 ## 📝 Visual change expected
 
-| Route                   | State                                                    | Themes      | Widths          |
-| ----------------------- | -------------------------------------------------------- | ----------- | --------------- |
-| `/recurring`            | Upcoming panel with actions, one row overdue             | light, dark | 360, 1280, 2560 |
-| `/recurring/$seriesId`  | Mark-paid dialog, empty picker with the route out        | light, dark | 360, 1280       |
-| `/transactions/planned` | Mixed list: planned transactions and expectation rows    | light, dark | 360, 1280, 2560 |
-| `/transactions/planned` | Totals with a separate expected figure in two currencies | light, dark | 1280            |
-| `/transactions/planned` | Empty, with the pointer to `/recurring`                  | light, dark | 360, 1280       |
-| `/transactions`         | Segmented control in its ledger position                 | light, dark | 360, 1280       |
+| Route                   | State                                              | Themes      | Widths          |
+| ----------------------- | -------------------------------------------------- | ----------- | --------------- |
+| `/recurring`            | Upcoming panel with actions, one row overdue       | light, dark | 360, 1280, 2560 |
+| `/recurring/$seriesId`  | Mark-paid dialog, empty picker with the route out  | light, dark | 360, 1280       |
+| `/transactions/planned` | Expected group above the paged planned rows        | light, dark | 360, 1280, 2560 |
+| `/transactions/planned` | Totals with expected in and out, in two currencies | light, dark | 1280            |
+| `/transactions/planned` | Empty, with the pointer to `/recurring`            | light, dark | 360, 1280       |
+| `/transactions`         | Segmented control in its ledger position           | light, dark | 360, 1280       |
 
 Frames go to `.ai/qa/artifacts_*/`, never into the repository (`AGENTS.md`).
 
@@ -338,7 +422,11 @@ change (skill `i18n-messages`). EN text below; PL is the implementer's, written 
 | `recurring.markPaid.record`                | `Record the payment`                                                    |
 | `recurring.markPaid.recordHint`            | `We will bring you back here to link it.`                               |
 | `transactions.planned.expected`            | `Expected`                                                              |
+| `transactions.planned.expected.group`      | `Expected in the next {days} days`                                      |
+| `transactions.planned.expected.capped`     | `Showing the {count} soonest. See all on the recurring screen.`         |
 | `transactions.planned.expected.hint`       | `Not yet money. Expected payments are never added to the totals.`       |
+| `transactions.planned.expected.in`         | `Expected in`                                                           |
+| `transactions.planned.expected.out`        | `Expected out`                                                          |
 | `transactions.planned.expected.suppressed` | `Expected payments are hidden while this filter is active.`             |
 | `transactions.planned.expected.failed`     | `Expected payments could not be loaded.`                                |
 | `transactions.planned.empty.recurring`     | `Nothing planned. Your recurring payments are on the recurring screen.` |
@@ -347,8 +435,12 @@ change (skill `i18n-messages`). EN text below; PL is the implementer's, written 
 | `transactions.mode.planned`                | `Planned`                                                               |
 | `transactions.mode.label`                  | `Which entries to show`                                                 |
 
-No plural machinery is needed: no key above counts anything. `transactions.planned.fromRecurring`
-takes the series name as a parameter rather than concatenating, per `docs/I18N.md`.
+`transactions.planned.fromRecurring` takes the series name as a parameter rather than concatenating,
+per `docs/I18N.md`. Two keys count and therefore carry plural machinery rather than an `if (n === 1)`:
+`transactions.planned.expected.group` over `{days}` and `transactions.planned.expected.capped` over
+`{count}`, both authored with the catalogue's plural form in EN and PL (PL has more categories than
+EN, which is the whole reason the machinery exists — skill `i18n-messages`). No other key above
+counts anything.
 
 ## 📝 Resolved assumptions (autonomous defaults)
 
@@ -357,7 +449,7 @@ saying so on the spec PR.
 
 | #   | Question                                                   | Decision                                                                                                                                                                         | Why                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | One spec, or split the settling UX from the planned merge? | **One spec, two phases; Phase 1 is severable and may merge without Q2 being answered.**                                                                                          | A fresh-context scope review returned `SPLIT` against this; the dissent is recorded above, with the two findings it produced that were applied. The document stays whole because `.ai/specs/AGENTS.md` expects one spec to span several implementation pull requests, one per phase.                                                                                                                                                    |
+| Q1  | One spec, or split the settling UX from the planned merge? | **One spec, two phases; Phase 1 is severable and may merge without Q2 being answered.**                                                                                          | A fresh-context scope review returned `SPLIT` against this; the dissent is recorded below, in Scope dissent, with the two findings it produced that were applied. The document stays whole because `.ai/specs/AGENTS.md` expects one spec to span several implementation pull requests, one per phase.                                                                                                                                  |
 | Q2  | Which bridge — materialise, merge at read, or no merge?    | **Merge at read time.** ⚠ NEEDS HUMAN CONFIRMATION                                                                                                                               | It adds no writer, no migration and no stored money, and it is the only option that upholds `13-S1`'s rule that an expectation has no reference amount. But it forecloses the materialised option, under which the planned screen's filters, paging and bulk actions would work with no new code — and reversing this choice after Phase 2 is a rewrite of Phase 2, not an edit. On a `risk-high` money surface that is a human's call. |
 | Q3  | Totals when an expectation row is in view?                 | **Totals stay over `transactions` only**; expectations shown separately, one figure per currency.                                                                                | `docs/plans/13-recurring.md` (`13-S1`) states that `expected_amount_minor` is never summed into a report. A combined figure would be money that has not moved, under a heading that says it has.                                                                                                                                                                                                                                        |
 | Q4  | Does `/transactions` show expectations too?                | **No expectation rows and no change to its totals.** `LEDGER_POLICIES` keeps `planned: 'exclude'`. The ledger does gain the mode switch of Q7, which is navigation, not content. | Smallest scope that ships something working. The forecast case already has a designed shape (`{ visibleTo }`) and deserves its own decision rather than arriving as a side effect of this one.                                                                                                                                                                                                                                          |
@@ -401,6 +493,11 @@ extracted action component. Gated on Q2 being confirmed.
 
 ## 📋 Implementation Plan
 
+**Copy lands in the step that renders it, never in a later one.** `MessageKey` is derived from
+`en.ts`'s own keys (`src/lib/i18n/types.ts`), so a component referencing a key that has not been
+added yet is a typecheck failure, and `pnpm typecheck` is in the gate. A step that draws a label
+therefore lands that label's EN and PL entry in the same commit; there is no separate "copy" step.
+
 ### Phase 1
 
 1. **Extract the period row actions.** Create `src/components/app/recurring/period-actions.tsx` from
@@ -412,43 +509,62 @@ extracted action component. Gated on Q2 being confirmed.
    callbacks to the existing `markPeriodPaid` and its siblings in `src/server/fns/recurring.ts`, and
    to `MarkPaidDialog`. _Test:_ a Playwright case marks a period paid from `/recurring` without
    visiting the detail route; axe stays at zero `serious` / zero `critical`.
-3. **Route out of the empty picker.** In `src/routes/_app/recurring/-ui/mark-paid-dialog.tsx`, add the
-   button beside `recurring.markPaid.empty`, navigating to `/transactions/new` with the prefill and
-   return target. Extend the new-transaction route's `validateSearch` to accept them. _Test:_ a unit
-   test on the period → prefill mapping (amount stays integer minor units in the series' currency, the
-   due date is passed as a calendar date); a Playwright case walks empty picker → form → save → picker
-   reopened with the new row selectable.
-4. **Copy.** Land `recurring.markPaid.record`, `recurring.markPaid.recordHint`,
-   `transactions.mode.*` in EN and PL. _Test:_ the i18n parity test is green.
-5. **Reach the screen.** Add the segmented control to
+3. **Route out of the empty picker, with its copy.** In
+   `src/routes/_app/recurring/-ui/mark-paid-dialog.tsx`, add the button beside
+   `recurring.markPaid.empty`, navigating to `/transactions/new` with the prefill and return target.
+   Extend the new-transaction route's `validateSearch` to accept them. Land
+   `recurring.markPaid.record` and `recurring.markPaid.recordHint` in EN **and** PL in this same
+   step, because the button that reads them ships here. _Test:_ a unit test on the period → prefill
+   mapping (amount stays integer minor units in the series' currency, the due date is passed as a
+   calendar date, a `null` account leaves the field unset rather than inventing one); the i18n parity
+   test is green; a Playwright case walks empty picker → form → save → picker reopened with the new
+   row selectable.
+4. **Reach the screen.** Add the segmented control to
    `src/routes/_app/transactions/-ui/transactions-screen.tsx`, switching `/transactions` and
-   `/transactions/planned` while preserving the current filter search params. _Test:_ a Playwright
-   case switches modes and asserts the filters survive; axe on both routes.
+   `/transactions/planned` while preserving the current filter search params, landing
+   `transactions.mode.*` in EN and PL in the same step. _Test:_ a Playwright case switches modes and
+   asserts the filters survive; i18n parity; axe on both routes.
 
 ### Phase 2 — gated on Q2
 
+5. **Widen `getUpcoming`'s projection.** Add the series' `accountId`, `categoryId` and `payeeId` —
+   nullable — to the `select` and to `UpcomingPeriod` in `src/server/repos/recurring.ts`. No change
+   to the signature, the filter, the order or the limit. _Test:_ a case in
+   `src/server/repos/__tests__/tenant-isolation.test.ts` asserting the three new ids never cross a
+   tenant boundary; the existing `/recurring` tests pass unchanged.
 6. **Widen the row model.** Add `kind` to `LedgerRow`, add `ExpectationRow` and `LedgerEntry` to
    `src/components/app/transactions/types.ts`, and `toExpectationRow` to
    `src/routes/_app/transactions/-lib/rows.ts`. _Test:_ a unit test asserts `toExpectationRow` produces
-   no reference amount and no rate, and preserves the series' own currency.
+   no reference amount and no rate, preserves the series' own currency, and maps `derivedStatus` to
+   the two-value `status`.
 7. **Compose the screen's read.** Add `src/routes/_app/transactions/-server/planned.ts` with
-   `loadPlannedScreen`, composing `loadTransactions` and `getUpcoming`, merging by date under the
-   current sort, and returning `expectations` and `expectedByCurrency`. Zod on the input; `requireOrg()`
-   at the boundary; no SQL. _Test:_ a unit test on the merge order with interleaved dates; a case in
-   `src/server/repos/__tests__/tenant-isolation.test.ts` that A's planned screen returns none of B's
-   expectations.
-8. **Render the expectation rows.** Point `src/routes/_app/transactions/planned.tsx` at
-   `loadPlannedScreen`, render the union in the ledger list with the status word and the row actions,
-   exclude expectations from bulk selection, and suppress them under a transaction-only filter with
-   the explanatory line. _Test:_ a Playwright case asserting a recurring period appears on
-   `/transactions/planned` and is absent from `/transactions`; axe on the mixed list.
-9. **Totals.** Render the expected figures beside `ListSummary` under their own label, one per
-   currency. _Test:_ a case in `src/server/repos/__tests__/money-invariants.test.ts` asserting that a
-   planned screen holding expectations returns byte-identical `totals` to the same screen without them,
-   and that a two-currency expectation set produces two figures and no conversion.
-10. **Copy and empty states.** Land the remaining `transactions.planned.*` keys in EN and PL, and the
-    empty state pointing at `/recurring`. _Test:_ i18n parity; a Playwright case on the empty planned
-    screen with series present.
+   `loadPlannedScreen`: `loadTransactions` for the paged rows, one unpaged `getUpcoming`
+   (`{ today: serverToday(), within: 30, limit: 50 }`) for the expected group, returning `today`,
+   `expectations` and `expectedByCurrency`. Zod on the input; `requireOrg()` at the boundary; no SQL;
+   no `today` in the input. _Test:_ unit tests that the expected group is ordered by `dueOn` ascending
+   and is byte-identical across all four `LEDGER_SORT_FIELDS` and both directions, that advancing the
+   cursor to page 2 returns the same `expectedByCurrency` as page 1 (the regression the paging design
+   exists to prevent), and that `expectedByCurrency` splits income from expense per currency; a case
+   in `src/server/repos/__tests__/tenant-isolation.test.ts` that A's planned screen returns none of
+   B's expectations.
+8. **Render the expected group.** Point `src/routes/_app/transactions/planned.tsx` at
+   `loadPlannedScreen`, render the group above the paged rows with its header, the status word and the
+   row actions, exclude expectations from bulk selection, and suppress them under a transaction-only
+   filter with the explanatory line. Land `transactions.planned.expected.group`, `.capped`, `.hint`,
+   `.suppressed`, `.failed` and `transactions.planned.fromRecurring` in EN and PL here, with the
+   plural forms for `{days}` and `{count}`. _Test:_ a Playwright case asserting a recurring period
+   appears on `/transactions/planned` and is absent from `/transactions`; i18n parity; axe on the
+   mixed list.
+9. **Totals.** Render the expected figures beside `ListSummary`, one line per currency with
+   `transactions.planned.expected.in` and `.out` — landed in EN and PL in this step. _Test:_ a case in
+   `src/server/repos/__tests__/money-invariants.test.ts` asserting that a planned screen holding
+   expectations returns byte-identical `totals` to the same screen without them, that a two-currency
+   expectation set produces two lines and no conversion, and that an expected income and an expected
+   expense in one currency stay two figures and are never netted.
+10. **Empty states.** Land `transactions.planned.empty.recurring` in EN and PL with the empty state
+    that reads it, pointing at `/recurring`. _Test:_ i18n parity; a Playwright case on the empty
+    planned screen with series present.
 
-Every step leaves the application working: steps 1-5 are additive to a screen that already renders,
-and steps 6-10 add a row kind the list ignores until step 8 draws it.
+Every step leaves the application working and typechecking: steps 1-4 are additive to a screen that
+already renders, step 5 widens a projection nobody reads yet, steps 6-7 add a row kind and a read the
+list ignores until step 8 draws it, and every step that renders a key lands that key.
