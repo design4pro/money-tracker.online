@@ -64,11 +64,22 @@ known=$(jq -r '.[].name' "$FILE")
 # every automation look like a stray AND corrupted the `enabled` guard below, so --prune would
 # have offered to delete live automations.
 jq -r '.automations[]? | [.id, .enabled, .name] | @tsv' <<<"$LIST" | while IFS=$'\t' read -r id enabled name; do
-  grep -qxF "$name" <<<"$known" && continue
+  # -F compares literally: without it the name is a basic regular expression, so a `.` in a
+  # display name matches any character in that position. `--` is the other half - a name
+  # beginning with `-` is otherwise read as an option (`-foo` parses as `-f oo`, the
+  # pattern-file flag), and grep errors out instead of comparing.
+  grep -qxF -- "$name" <<<"$known" && continue
   if [ "$PRUNE" -eq 0 ]; then
     say "not in file: $name ($id, enabled: $enabled) - rerun with --prune to delete it"
   elif [ "$enabled" != "false" ]; then
-    say "kept $name ($id): still enabled - disable it in the cockpit, then prune"
+    # This check sits above the --dry-run one on purpose: refusing to delete an enabled stray
+    # is a decision, not a mutation, so a dry run must not preview it differently. Only the
+    # wording changes, so no --dry-run line reads as though the run had acted.
+    if [ "$DRY" -eq 1 ]; then
+      say "would keep $name ($id): still enabled - disable it in the cockpit, then prune"
+    else
+      say "kept $name ($id): still enabled - disable it in the cockpit, then prune"
+    fi
   elif [ "$DRY" -eq 1 ]; then
     say "would delete $name ($id)"
   else

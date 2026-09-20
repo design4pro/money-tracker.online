@@ -166,10 +166,9 @@ export default defineConfig({
           // in the browser gate.
           include: [
             'scripts/**/__tests__/*.test.{ts,mjs}',
-            // `.ai/scripts` is the kit's second home for a script, chosen because
-            // `guard-generated.sh` refuses edits there in agent mode - a cezar run cannot
-            // rewrite a guard that judges it. Its test companions are kit-managed the same
-            // way `scripts/ci/__tests__` are, so they run in the same project.
+            // `.ai/scripts` is the second home for a pipeline script. Its test companions
+            // run in this project for the same reason `scripts/ci/__tests__` do: they are
+            // policy that lives outside `src/**` and nothing else gates them.
             '.ai/scripts/**/__tests__/*.test.mjs',
             '.claude/hooks/__tests__/*.test.ts',
             'e2e/support/__tests__/*.test.ts',

@@ -59,7 +59,7 @@ permissions:
 #
 # `RUNNER_DEPLOY` set to `["self-hosted","linux","ARM64","ci"]` puts shipping back on
 # the pool without a pull request, which is the same escape hatch in the other
-# direction. See agent-kit's README, "The runner pool".
+# direction. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
 
 jobs:
   deploy:

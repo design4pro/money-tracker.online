@@ -52,9 +52,7 @@ additions to step 2 and step 11:
   terminal: an open thread blocks the merge and nothing but a human clicking will ever clear it,
   so a run that agrees and walks away has converted a one-line correction into a permanent stall.
   `changes-requested` is what says a human still owes something; the resolved thread carries what
-  they owe. Before you use this outcome on a guarded path, try the edit: `guard-generated.sh` lets
-  a run amend a guarded file **this branch already changes**, which is most review findings on a
-  pipeline PR. The outcome is for what is still refused after that.
+  they owe. Try the edit before you use this outcome: it is for what is still refused after that.
 - On a pass without autofix (another author's PR, no `--autofix`) the threads are left as found;
   the report lists them by path so the autopilot's next chain can pick them up.
 

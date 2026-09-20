@@ -414,16 +414,28 @@ describe('guard-generated.sh', () => {
   const edit = (file_path: string, env = {}) =>
     hook('guard-generated.sh', { file_path }, env, undefined)
 
+  // Layer 1: generated files, every mode, no exception anywhere.
   it('blocks generated files for everyone', () => {
     expect(edit(`${root}/src/routeTree.gen.ts`).status).toBe(2)
     expect(edit(`${root}/drizzle/0001_x.sql`).status).toBe(2)
     // The journal, not only the SQL: a hand-edited snapshot is invisible to the drift check.
     expect(edit(`${root}/drizzle/meta/0001_snapshot.json`).status).toBe(2)
-    // Generated from wrangler.jsonc by `pnpm cf-typegen`.
     expect(edit(`${root}/worker-configuration.d.ts`).status).toBe(2)
     expect(edit(`${root}/src/x.ts`).status).toBe(0)
   })
 
+  // The message on that last one used to say "run `pnpm exec wrangler types`", which is advice
+  // this repository cannot take: the file is hand-authored and wrangler refuses to write it
+  // ("A non-Wrangler worker-configuration.d.ts already exists"). A block whose instruction cannot
+  // be followed sends a run looking for a way around the block.
+  it('does not tell anyone to regenerate worker-configuration.d.ts', () => {
+    const r = edit(`${root}/worker-configuration.d.ts`)
+    expect(r.stderr).toContain('wrangler.jsonc')
+    expect(r.stderr).toContain("do NOT run 'wrangler types'")
+  })
+
+  // Layer 3, and only under GitHub Actions. ADR 0021 removed the same block for cezar runs: the
+  // case below this one is the other half of that pair and the two must be read together.
   it.each([
     '.github/workflows/ci.yml',
     '.claude/settings.json',
@@ -444,38 +456,73 @@ describe('guard-generated.sh', () => {
     'docs/agents/out-of-scope.md',
     '.ai/scripts/test-env-up.sh',
     '.ai/scripts/__tests__/cezar-config.test.ts',
-    // The lock is the root of trust for agent-kit-check.mjs, which proves only that each file's
-    // hash equals the hash the lock states. A run able to edit both edits a rendered file and
-    // restates its hash in the same breath, and the gate still exits 0.
-    '.ai/agent-kit.lock.json',
-    // Kit-rendered, and review-threads-label.mjs is the single thing that arms "Resolve blocking review threads".
+    // review-threads-label.mjs is the single thing that arms "Resolve blocking review threads",
+    // and merge-gate.mjs is the check that stands between a pull request and `develop`.
     'scripts/ci/review-threads-label.mjs',
     'scripts/ci/__tests__/review-threads-label.test.mjs',
-    // What the cockpit installs as this repository's automations and prompts. Only the first is
-    // kit-rendered; both are configuration a run is handed and must not rewrite.
+    // What the cockpit installs as this repository's automations and prompts: configuration a run
+    // is handed and must not rewrite.
     'docs/agents/cezar-automations.json',
     'docs/agents/cezar-prompt-templates.json',
     '.npmrc',
     'pnpm-workspace.yaml',
-  ])('agent mode blocks %s', (rel) => {
+  ])('GitHub Actions blocks %s', (rel) => {
     const r = hook(
       'guard-generated.sh',
       { file_path: `${root}/${rel}` },
-      { ...AGENT, CLAUDE_PROJECT_DIR: root },
+      { ...ACTIONS, CLAUDE_PROJECT_DIR: root },
     )
     expect(r.status).toBe(2)
     expect(r.stderr).toContain('configures the agent')
   })
 
-  it('agent mode allows ordinary paths and does not confuse look-alikes', () => {
+  // The behaviour ADR 0021 changed, stated as one case because it is one decision. A cezar run
+  // works on a branch whose diff a human reads before anything merges, so it edits its own
+  // skills, workflows and gate in the ordinary way. Under GitHub Actions the diff being read is
+  // the pull request author's, so the same edit is the attacker's edit and stays refused.
+  it('lets a cezar run edit what configures it, and never lets GitHub Actions', () => {
+    for (const rel of [
+      '.claude/settings.json',
+      '.claude/hooks/git-guardrails.sh',
+      '.ai/cezar/config.json',
+      '.ai/agentic.config.json',
+      '.github/workflows/ci.yml',
+      'scripts/ci/merge-gate.mjs',
+    ]) {
+      const file_path = `${root}/${rel}`
+      expect(
+        hook(
+          'guard-generated.sh',
+          { file_path },
+          { ...AGENT, CLAUDE_PROJECT_DIR: root },
+        ).status,
+      ).toBe(0)
+      const blocked = hook(
+        'guard-generated.sh',
+        { file_path },
+        { ...ACTIONS, CLAUDE_PROJECT_DIR: root },
+      )
+      expect(blocked.status).toBe(2)
+      expect(blocked.stderr).toContain('configures the agent')
+    }
+  })
+
+  // Layer 1 outranks both: no mode edits a generated file, cezar included.
+  it('still blocks a generated file in a cezar run', () => {
+    expect(
+      edit(`${root}/src/routeTree.gen.ts`, {
+        ...AGENT,
+        CLAUDE_PROJECT_DIR: root,
+      }).status,
+    ).toBe(2)
+  })
+
+  it('leaves ordinary paths alone and does not confuse look-alikes', () => {
     for (const rel of [
       'src/x.ts',
       'scripts/seed/seed.mjs',
-      // scripts/ci/ is guarded; the rest of scripts/ is not, and must stay that way.
+      // scripts/ci/ is guarded under Actions; the rest of scripts/ is not, in any mode.
       'scripts/visual/capture.mjs',
-      // skills-lock.json stays editable so om-apply-upgrade-notes can still move it. Protecting
-      // the lock is what makes the `watched` entry for it meaningful: a run may write this file,
-      // and can no longer rewrite the hash that reports it.
       'skills-lock.json',
       'docs/agents/cezar.md',
       'src/.npmrc-ish.ts',
@@ -485,24 +532,28 @@ describe('guard-generated.sh', () => {
       '.ai/qa/test-env.json',
       '.ai/agentic.config.json.bak',
     ]) {
-      expect(
-        hook(
-          'guard-generated.sh',
-          { file_path: `${root}/${rel}` },
-          { ...AGENT, CLAUDE_PROJECT_DIR: root },
-        ).status,
-      ).toBe(0)
+      for (const env of [AGENT, ACTIONS]) {
+        expect(
+          hook(
+            'guard-generated.sh',
+            { file_path: `${root}/${rel}` },
+            { ...env, CLAUDE_PROJECT_DIR: root },
+          ).status,
+        ).toBe(0)
+      }
     }
+    // A developer at the keyboard is in no mode at all and is guarded by layer 1 only.
     expect(
       hook('guard-generated.sh', { file_path: `${root}/.claude/settings.json` })
         .status,
     ).toBe(0)
   })
 
-  // Confinement (agent-kit#2). Before it, `${file_path#"$root"/}` left a path outside the root
+  // Layer 2 (agent-kit#2). Before it, `${file_path#"$root"/}` left a path outside the root
   // absolute, the hook's anchored pattern cannot match an absolute path, and so every rule in the
   // file read as "not guarded" - which is how a pr-autopilot run rewrote eight templates in a
-  // sibling agent-kit checkout, on a human's branch, with uncommitted work in the tree.
+  // sibling agent-kit checkout, on a human's branch, with uncommitted work in the tree. That
+  // repository is archived; this route is not, and nothing else in the toolchain closes it.
   it.each([
     // The incident's own shape: a sibling checkout on the same host, named absolutely...
     '/elsewhere/agent-kit/templates/docs/agents/cezar-automations.json',
@@ -525,169 +576,53 @@ describe('guard-generated.sh', () => {
   it('confines writes in agent runs only, and still takes a relative path', () => {
     const outside = '/elsewhere/agent-kit/templates/x.json'
     const w = (file_path: string, env: Record<string, string>) =>
-      hook('guard-generated.sh', { file_path }, { ...env, CLAUDE_PROJECT_DIR: root })
-        .status
+      hook(
+        'guard-generated.sh',
+        { file_path },
+        { ...env, CLAUDE_PROJECT_DIR: root },
+      ).status
     // A developer at the keyboard legitimately edits a sibling checkout; a run does not, and
     // under GitHub Actions least of all.
     expect(w(outside, {})).toBe(0)
+    expect(w(outside, AGENT)).toBe(2)
     expect(w(outside, ACTIONS)).toBe(2)
     // A relative path resolves against the root rather than reading as outside it, so the rules
     // after the confinement check still see it - allowed or guarded on its own merits. A file in
     // a directory that does not exist yet is the ordinary write, and stays allowed.
     expect(w('src/x.ts', AGENT)).toBe(0)
     expect(w('src/new/deep/x.ts', AGENT)).toBe(0)
-    expect(w('.claude/settings.json', AGENT)).toBe(2)
-  })
-})
-
-// `-C` does not win over an inherited `GIT_DIR`: run from a git hook - which is what
-// `.husky/pre-commit` does - these calls would re-initialise the real repository and overwrite
-// its identity instead of touching the temporary one. Both fixtures in the block below build a
-// repository, so the scrub lives here rather than being restated - restating it is how one of
-// them would end up without it.
-const gitIn = (dir: string, ...args: string[]) =>
-  spawnSync('git', ['-C', dir, ...args], {
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      GIT_DIR: undefined,
-      GIT_WORK_TREE: undefined,
-      GIT_INDEX_FILE: undefined,
-    },
-  })
-
-// The one exception to the block above, and the reason it exists: the review job comments on a
-// pull request whose whole diff is guarded paths, and until now a run could not act on a single
-// one of those threads. The `develop` ruleset merges nothing with an unresolved thread, so a
-// correction the run agreed with turned into a permanent stall (PR #320).
-describe('guard-generated.sh, on a branch that already changes a guarded file', () => {
-  // A real repository, because the rule is a question about `git diff` and nothing else can
-  // answer it. `origin/develop` is a local ref: the hook never reaches the network.
-  const root = mkdtempSync(join(tmpdir(), 'guard-diff-'))
-  const git = (...args: string[]) => gitIn(root, ...args)
-  const write = (rel: string, body: string) => {
-    mkdirSync(join(root, rel, '..'), { recursive: true })
-    writeFileSync(join(root, rel), body)
-  }
-
-  git('init', '--initial-branch=develop')
-  git('config', 'user.email', 'test@example.com')
-  git('config', 'user.name', 'test')
-  write('.ai/agentic.config.json', JSON.stringify({ baseBranch: 'develop' }))
-  write('.ai/trackers/github.md', 'before\n')
-  write('.ai/cezar/config.json', '{}\n')
-  git('add', '-A')
-  git('commit', '-m', 'base')
-  git('update-ref', 'refs/remotes/origin/develop', 'develop')
-  git('checkout', '-b', 'fix/tracker')
-  write('.ai/trackers/github.md', 'after\n')
-  git('commit', '-am', 'change the tracker descriptor')
-
-  const edit = (rel: string, env: Record<string, string>) =>
-    hook(
-      'guard-generated.sh',
-      { file_path: `${root}/${rel}` },
-      { ...env, CLAUDE_PROJECT_DIR: root },
-      root,
-    )
-
-  // The scrub above, asserted rather than trusted. `.husky/pre-commit` runs this suite from a git
-  // hook, and git exports `GIT_DIR` into every hook process; `-C` does not override it. Before the
-  // scrub, every call in this fixture addressed the repository being committed to rather than
-  // `root`, so `git init` re-initialised it - as bare, since `GIT_DIR` came without
-  // `GIT_WORK_TREE` - and the two `git config` calls overwrote its identity. Nothing went red: the
-  // fixture's later steps failed against the wrong repository, these cases still passed, and the
-  // damage was in the developer's own `.git/config`. This is what would go red.
-  it('addresses the temporary repository even with GIT_DIR inherited', () => {
-    const previous = process.env.GIT_DIR
-    process.env.GIT_DIR = join(root, 'inherited.git')
-    try {
-      const resolved = git('rev-parse', '--absolute-git-dir')
-      expect(resolved.status, resolved.stderr).toBe(0)
-      expect(realpathSync(resolved.stdout.trim())).toBe(
-        realpathSync(join(root, '.git')),
-      )
-    } finally {
-      if (previous === undefined) {
-        delete process.env.GIT_DIR
-      } else {
-        process.env.GIT_DIR = previous
-      }
-    }
-  })
-
-  it('lets a cezar run amend a guarded file the branch already changes', () => {
-    expect(edit('.ai/trackers/github.md', AGENT).status).toBe(0)
+    expect(w('.claude/settings.json', ACTIONS)).toBe(2)
   })
 
   // A real root and a real sibling, which the cases with a '/repo' root cannot be: $TMPDIR on
   // macOS is reached through /var, a symlink to /private/var, and the tools hand back the resolved
   // form. A root left unresolved compares unequal to every path under it, so the confinement check
-  // would refuse the whole worktree; the case above is that counter-case, and this is the other
-  // half of the pair.
+  // would refuse the whole worktree; the relative-path case above is that counter-case, and this
+  // is the other half of the pair.
   it('refuses a sibling checkout, resolving both sides physically', () => {
+    const real = mkdtempSync(join(tmpdir(), 'guard-root-'))
     const sibling = mkdtempSync(join(tmpdir(), 'guard-sibling-'))
     mkdirSync(join(sibling, 'templates'), { recursive: true })
+    // On macOS the two spellings differ (/var vs /private/var) and that is the case this pins; on
+    // Linux they are the same and it degrades to an ordinary sibling check, which is still true.
+    expect(realpathSync(sibling).startsWith(realpathSync(real))).toBe(false)
     const r = hook(
       'guard-generated.sh',
       { file_path: join(sibling, 'templates/x.json') },
-      { ...AGENT, CLAUDE_PROJECT_DIR: root },
-      root,
+      { ...AGENT, CLAUDE_PROJECT_DIR: real },
+      real,
     )
     expect(r.status).toBe(2)
     expect(r.stderr).toContain('outside the worktree')
-  })
-
-  it('still refuses a guarded file the branch does not touch', () => {
-    // The case the rule exists for: introducing a change to the run's own configuration, rather
-    // than correcting one a human already proposed and a reviewer already flagged.
-    const r = edit('.ai/cezar/config.json', AGENT)
-    expect(r.status).toBe(2)
-    expect(r.stderr).toContain('configures the agent')
-  })
-
-  it('refuses both under GitHub Actions, whatever the branch changes', () => {
-    // There the diff is the attacker's, so "the branch already changes it" is the attacker's
-    // claim about the attacker's own file.
-    expect(edit('.ai/trackers/github.md', ACTIONS).status).toBe(2)
-    expect(edit('.ai/cezar/config.json', ACTIONS).status).toBe(2)
-  })
-
-  it('fails closed when the base ref is missing', () => {
-    // No `origin/develop` means no answer, and an unanswerable question is not a permission.
-    const orphan = mkdtempSync(join(tmpdir(), 'guard-diff-orphan-'))
-    mkdirSync(join(orphan, '.ai'), { recursive: true })
-    writeFileSync(
-      join(orphan, '.ai/agentic.config.json'),
-      JSON.stringify({ baseBranch: 'develop' }),
-    )
-    // The directory needs a repository of its own, not the absence of one. `tmpdir()` is wherever
-    // `TMPDIR` points, and a cezar run points it at `.ai/cezar/tmp/<task-id>` - inside the
-    // checkout - so a bare `mkdtemp` leaves git free to walk up into the enclosing repository and
-    // answer `origin/develop...HEAD` out of *its* diff. When that diff happens to carry the path
-    // the case asks about, `in_branch_diff` matches and the hook exits 0 with nothing wrong with
-    // it. `git init` stops the walk here and the commit gives the fixture a HEAD, so the base ref
-    // is the only thing still missing - which is the one thing this case is about.
-    gitIn(orphan, 'init', '--initial-branch=develop')
-    gitIn(orphan, 'config', 'user.email', 'test@example.com')
-    gitIn(orphan, 'config', 'user.name', 'test')
-    gitIn(orphan, 'add', '-A')
-    gitIn(orphan, 'commit', '-m', 'base')
-    // Asserted rather than assumed, because both of these used to be `TMPDIR`'s to decide.
-    expect(
-      realpathSync(gitIn(orphan, 'rev-parse', '--show-toplevel').stdout.trim()),
-    ).toBe(realpathSync(orphan))
-    expect(
-      gitIn(orphan, 'rev-parse', '--verify', 'origin/develop').status,
-    ).not.toBe(0)
+    // ...and a file inside it is not refused, which is what an unresolved root would get wrong.
     expect(
       hook(
         'guard-generated.sh',
-        { file_path: `${orphan}/.ai/trackers/github.md` },
-        { ...AGENT, CLAUDE_PROJECT_DIR: orphan },
-        orphan,
+        { file_path: join(real, 'src/new/x.ts') },
+        { ...AGENT, CLAUDE_PROJECT_DIR: real },
+        real,
       ).status,
-    ).toBe(2)
+    ).toBe(0)
   })
 })
 
