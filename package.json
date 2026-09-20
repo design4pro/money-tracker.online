@@ -28,6 +28,7 @@
     "e2e:ui": "playwright test --ui",
     "generate-routes": "tsr generate",
     "generate-spec-index": "node --import tsx scripts/specs/index.ts",
+    "sdlc:parity": "node scripts/docs/sdlc-shared-region.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply money-tracker-db --local",
     "db:migrate:staging": "wrangler d1 migrations apply money-tracker-db-staging --remote --env staging",
