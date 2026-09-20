@@ -136,4 +136,10 @@ handlers and a template bug must return `'failed'` rather than turn a completed 
 - [x] R.1 The email locale chain reads the language picker's cookie, as the document's chain does — b1fd3e5
 - [x] R.2 A transport failure records the error's class — b1fd3e5
 
+### UI verification fixes (`om-auto-qa-pr`)
+
+- [x] Q.1 The auth emails are readable in a dark client: paired style with class, moved the ground off
+      the `<td>` `Body` generates, silenced `Hr`'s own border, spaced the call to action — af6bce2
+- [x] Q.2 Two invariants over the rendered document so none of it recurs — af6bce2
+
 PR: #349
