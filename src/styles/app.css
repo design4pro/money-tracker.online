@@ -607,7 +607,15 @@
    roughness goes. One mark standing alone - the landing's `settled` stamp -
    keeps it. */
 @utility mark-pen-flat {
-  --mark-pen-filter: none;
+  /* Compound on purpose. Both utilities set the same custom property on the
+     same element, so at equal specificity the winner would be whichever rule
+     Tailwind happened to emit last - a silent dependency on sort order that no
+     test can see and that would drop the fallback without failing anything.
+     `.mark-pen-flat.mark-pen` is 0-2-0 against `.mark-pen`'s 0-1-0, so it wins
+     wherever it lands. It also says what is true: a flat pen is a pen. */
+  &.mark-pen {
+    --mark-pen-filter: none;
+  }
 }
 
 /* Visible only to assistive technology. Used by every chart's data table and

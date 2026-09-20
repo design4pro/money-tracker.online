@@ -21,12 +21,22 @@ import { designSystem } from './support/design-system'
  * The seam is the compiled utility, not the source text: Tailwind's own front
  * end resolves `@utility`, so what is asserted is what ships.
  */
-async function markPenCss(): Promise<string> {
+/**
+ * One candidate, compiled and collapsed to single spaces.
+ *
+ * The assertions below are about which declarations exist and what they read,
+ * never about how the compiler pretty-prints them. Matching the raw output
+ * would make a `prettier` run over `app.css` or a Tailwind upgrade fail a green
+ * test for a reason that has nothing to do with the mark.
+ */
+async function compile(candidate: string): Promise<string> {
   const system = await designSystem()
-  const [css] = system.candidatesToCss(['mark-pen'])
-  expect(css, 'mark-pen does not compile').not.toBeNull()
-  return css as string
+  const [css] = system.candidatesToCss([candidate])
+  expect(css, `${candidate} does not compile`).not.toBeNull()
+  return (css as string).replace(/\s+/g, ' ')
 }
+
+const markPenCss = () => compile('mark-pen')
 
 function occurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1
@@ -48,8 +58,8 @@ it('routes every consumer of the pen through the two properties', async () => {
   const css = await markPenCss()
 
   // The pooled trailing edge and the paused blob are mixes of the two.
-  expect(css).toContain('var(--mark-pen-wash),\n    var(--mark-pen-deepen) 30%')
-  expect(css).toContain('var(--mark-pen-wash),\n    var(--mark-pen-deepen) 45%')
+  expect(css).toContain('var(--mark-pen-wash), var(--mark-pen-deepen) 30%')
+  expect(css).toContain('var(--mark-pen-wash), var(--mark-pen-deepen) 45%')
 
   // The run itself, and the blob's gradient, which fades back into the run.
   expect(css).toContain('background-color: var(--mark-pen-wash)')
@@ -71,8 +81,7 @@ it('leaves the geometry and the one filter alone', async () => {
 })
 
 it('lets a repeating mark drop the roughness and keep the pen', async () => {
-  const system = await designSystem()
-  const [css] = system.candidatesToCss(['mark-pen-flat'])
+  const css = await compile('mark-pen-flat')
 
   // Q1's named fallback: the outline yields, the mark does not. Nothing else
   // may be in it - a `mark-pen-flat` that also moved the wash would be a second
@@ -80,4 +89,15 @@ it('lets a repeating mark drop the roughness and keep the pen', async () => {
   expect(css).toContain('--mark-pen-filter: none')
   expect(css).not.toContain('--mark-pen-wash')
   expect(css).not.toContain('background')
+})
+
+it('wins over the pen it flattens without depending on sort order', async () => {
+  const css = await compile('mark-pen-flat')
+
+  // Both utilities set `--mark-pen-filter` on the same element. At equal
+  // specificity the winner is whichever rule the compiler emitted last, which
+  // nothing in this repository fixes and nothing would notice changing: the
+  // fallback would stop applying and every test here would still pass. The
+  // compound selector is what removes the question.
+  expect(css).toContain('.mark-pen-flat.mark-pen')
 })
