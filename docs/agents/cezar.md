@@ -188,8 +188,19 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   stands today. That is a property to re-probe, not to assume — an App-published _check run_ added
   to the required set would be both required and invisible, and nothing in the repository would say
   so. An App that posts a _commit status_ rather than a check run stays readable, because Commit
-  statuses: read is held; it is only the check-run half that no fine-grained PAT reaches. The
-  pipeline still holds a merge as well — the labels, the review verdict and the
+  statuses: read is held; it is only the check-run half that no fine-grained PAT reaches.
+
+  **One of the five never runs on a pull request, and a run must not read that as a failure.**
+  `ci.yml` gates its `e2e` matrix on `github.event_name != 'pull_request'` (line 367), and
+  `e2e · merged report` in turn runs only when that matrix did, so on every pull request the
+  required context `e2e · merged report` reports **skipped**. GitHub counts a skipped required
+  check as satisfied: observed on #348 on 2026-09-20, where `mergeStateStatus` went `BLOCKED` →
+  `CLEAN` with that context skipped and the other four green. So a run looking for five green
+  contexts on a pull request will never find them, and must treat `skipped` as satisfied rather
+  than wait for a job that is not coming. The browser journeys are gated on the push to `develop`
+  instead, which is where that job does run.
+
+  The pipeline still holds a merge as well — the labels, the review verdict and the
   QA gate in `SDLC.md` — but it is no longer the only thing holding one, and prose elsewhere
   (this section included, before this revision) that credits the ruleset with enforcing nothing but
   pull-request-and-no-force-push predates the reading above. The `pull_request` rule still sets
