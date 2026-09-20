@@ -298,18 +298,6 @@ and the hooks in `.claude/hooks/` tighten:
 - `guard-read.sh` (Read, Glob, Grep) confines reads to the worktree and denies `.dev.vars`,
   `.env*`, cezar run state and `.ai/qa/test-env.env`. `.ai/runs`, `.ai/analysis`, `.ai/qa` and
   `.ai/tmp` stay readable: the skills write their artefacts there.
-- `guard-generated.sh` also refuses edits under `.github/`, `.claude/`, `.husky/`, `.ai/cezar/`,
-  `.ai/agentic.config.json`, `.ai/trackers/`, `.ai/browsers/`, `.ai/skills/`, `.ai/scripts/` (a
-  run must not rewrite its own validation gate), `.npmrc`,
-  `pnpm-workspace.yaml`, `docs/agents/reference.md` and `docs/agents/out-of-scope.md`, on top of
-  the generated files it refuses for everyone.
-
-  One exception, and only in a cezar run: a guarded file **this branch already changes**. A
-  reviewer asking for a correction to a change a human proposed is not a run rewriting its own
-  rules, and refusing it is how a review thread stays open forever - the `develop` ruleset merges
-  nothing with one. Introducing a change to a guarded file the branch does not already carry is
-  still refused, and under `GITHUB_ACTIONS` the block is absolute, because there the diff is the
-  attacker's and "the branch already changes it" is the attacker's own claim.
 
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
 `jq`, and a prefix allowlist would drop label mutations silently. The hooks in `.claude/hooks/`,
