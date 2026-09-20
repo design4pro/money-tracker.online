@@ -30,6 +30,32 @@ no request is the whole backlog.
 | `NEEDS_GROOM` | Never groomed, so the Definition of Ready is unverified           | `groom`                                             |
 | `READY`       | Groomed, ready, unclaimed                                         | `autofix`                                           |
 
+## Flow health
+
+`node .ai/scripts/backlog-status.mjs --flow` answers the other question: not where each issue sits,
+but whether the ladder is moving. Four numbers, all from files and commands whose output it reads:
+
+| Number                | From                                                           | What a bad value means                                           |
+| --------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Launches per workflow | Runs in `.ai/cezar/runs.json` that carry an `automation` block | A zero row is an automation the cockpit has never actually fired |
+| Intake latency        | Issue opened → the first `needs-triage`                        | A rising median is the groom→triage bridge falling behind        |
+| Time to first PR      | The first `ready-for-agent` → the pull request opening         | A long tail is the implement automation not picking work up      |
+| Gate retries          | `steps[id=gate].iterations` across retained runs               | A rising share is the gate catching what the agent ships         |
+
+Reading it:
+
+- **Launch counts are "since the oldest retained run", never "ever".** `runs.json` is a window the
+  service rewrites; a count can go *down* between two invocations as old runs age out.
+- **"never labelled" is not "the bridge failed" for an old issue.** The groom→`needs-triage` edge
+  is event-driven with no backlog catch-up, so every issue filed before it was wired shows there by
+  design. Read the count as a backlog of un-triaged work for a human, and read the *recent* numbers
+  as the bridge's health.
+- **Poll counts are absent on purpose.** The cockpit holds them in memory and commits them nowhere,
+  so the report names the gap instead of printing a zero it did not measure. If someone needs
+  polls, that is the live cockpit, not this script.
+- `--flow` and `--stale-hours` are mutually exclusive and the script says so rather than ignoring
+  the one it cannot use.
+
 ## Rules for the report
 
 - `groom`, `autofix` and `spec` are the only labels that start a run, and only a human applies one

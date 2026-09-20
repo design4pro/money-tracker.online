@@ -17,8 +17,17 @@ import {
   branchIssue,
   classify,
   closeKeywordTargets,
+  automationLaunches,
+  firstLabelledAt,
+  firstPrSpans,
+  flowReport,
+  gateRetries,
+  humanHours,
+  intakeSpans,
   linkOpenPrs,
   parseArgs,
+  sample,
+  spanSummary,
   readTriggers,
   sortIssues,
 } from "../backlog-status.mjs";
@@ -239,11 +248,15 @@ describe("sortIssues", () => {
 
 describe("parseArgs", () => {
   it("defaults to text output and a 24-hour threshold", () => {
-    expect(parseArgs([])).toEqual({ asJson: false, staleHours: 24 });
+    expect(parseArgs([])).toEqual({ asJson: false, staleHours: 24, flow: false });
   });
 
   it("reads --json and --stale-hours in either order", () => {
-    expect(parseArgs(["--stale-hours", "6", "--json"])).toEqual({ asJson: true, staleHours: 6 });
+    expect(parseArgs(["--stale-hours", "6", "--json"])).toEqual({
+      asJson: true,
+      staleHours: 6,
+      flow: false,
+    });
   });
 
   it("rejects a stray positional instead of taking it as the threshold", () => {
@@ -256,4 +269,292 @@ describe("parseArgs", () => {
       expect(() => parseArgs(["--stale-hours", ...rest])).toThrow(/--stale-hours/);
     },
   );
+});
+
+describe("parseArgs --flow", () => {
+  it("turns the flow report on", () => {
+    expect(parseArgs(["--flow"]).flow).toBe(true);
+  });
+
+  it("carries --json into the flow report", () => {
+    expect(parseArgs(["--flow", "--json"])).toEqual({
+      asJson: true,
+      staleHours: 24,
+      flow: true,
+    });
+  });
+
+  it("refuses --stale-hours with --flow rather than ignoring it", () => {
+    expect(() => parseArgs(["--flow", "--stale-hours", "6"])).toThrow(/belongs to the issue report/);
+  });
+
+  it("leaves --stale-hours alone when --flow is absent", () => {
+    expect(parseArgs(["--stale-hours", "6"]).staleHours).toBe(6);
+  });
+});
+
+const AUTOMATION_DEFS = [
+  { name: "Groom new issues", task: { workflow: "issue-groom" } },
+  { name: "Re-groom on request", task: { workflow: "issue-groom" } },
+  { name: "Weekly architecture review", task: { workflow: "architecture-review" } },
+];
+
+describe("automationLaunches", () => {
+  it("reports a committed automation that has never launched as zero, first", () => {
+    const rows = automationLaunches(
+      [{ workflow: "issue-groom", automation: { automationId: "a" }, startedAt: "2026-09-20T10:00:00Z" }],
+      AUTOMATION_DEFS,
+    );
+    expect(rows[0]).toEqual({
+      workflow: "architecture-review",
+      names: ["Weekly architecture review"],
+      launches: 0,
+      lastAt: null,
+    });
+  });
+
+  it("counts two automations sharing one workflow on a single row, under both names", () => {
+    const rows = automationLaunches(
+      [
+        { workflow: "issue-groom", automation: {}, startedAt: "2026-09-18T10:00:00Z" },
+        { workflow: "issue-groom", automation: {}, startedAt: "2026-09-20T10:00:00Z" },
+      ],
+      AUTOMATION_DEFS,
+    );
+    const groom = rows.find((row) => row.workflow === "issue-groom");
+    expect(groom).toEqual({
+      workflow: "issue-groom",
+      names: ["Groom new issues", "Re-groom on request"],
+      launches: 2,
+      lastAt: "2026-09-20T10:00:00Z",
+    });
+  });
+
+  it("ignores a run nobody automated: a hand-started workflow is a person, not a poller", () => {
+    const rows = automationLaunches(
+      [{ workflow: "architecture-review", startedAt: "2026-09-20T10:00:00Z" }],
+      AUTOMATION_DEFS,
+    );
+    expect(rows.find((row) => row.workflow === "architecture-review").launches).toBe(0);
+  });
+
+  it("reports every automation as zero when nothing has run at all", () => {
+    expect(automationLaunches([], AUTOMATION_DEFS).map((row) => row.launches)).toEqual([0, 0]);
+  });
+});
+
+describe("gateRetries", () => {
+  it("counts a gate step that needed a second attempt", () => {
+    expect(
+      gateRetries([
+        { steps: [{ id: "implement" }, { id: "gate", iterations: 1 }] },
+        { steps: [{ id: "gate", iterations: 3 }] },
+      ]),
+    ).toEqual({ steps: 2, retried: 1, attempts: 4 });
+  });
+
+  it("treats a gate step with no iterations field as one attempt", () => {
+    expect(gateRetries([{ steps: [{ id: "gate" }] }])).toEqual({
+      steps: 1,
+      retried: 0,
+      attempts: 1,
+    });
+  });
+
+  it("returns zeroes, not a division, when no gate step has run", () => {
+    expect(gateRetries([{ steps: [] }, {}])).toEqual({ steps: 0, retried: 0, attempts: 0 });
+  });
+});
+
+describe("spanSummary", () => {
+  const at = (hours) => new Date(Date.parse("2026-09-13T00:00:00Z") + hours * 3_600_000).toISOString();
+
+  it("takes the lower middle as the median of an even count, and names the slowest", () => {
+    const summary = spanSummary([
+      { number: 1, from: at(0), to: at(1) },
+      { number: 2, from: at(0), to: at(2) },
+      { number: 3, from: at(0), to: at(3) },
+      { number: 4, from: at(0), to: at(10) },
+    ]);
+    expect(summary).toEqual({
+      measured: 4,
+      pending: [],
+      medianHours: 2,
+      slowest: { number: 4, hours: 10 },
+    });
+  });
+
+  it("keeps sub-minute precision rather than rounding a working bridge to zero", () => {
+    const summary = spanSummary([
+      { number: 7, from: "2026-09-17T12:24:23Z", to: "2026-09-17T12:24:25Z" },
+    ]);
+    expect(summary.medianHours).toBeGreaterThan(0);
+    expect(humanHours(summary.medianHours)).toBe("2 s");
+  });
+
+  it("reports a span that never ended as pending instead of dropping it", () => {
+    expect(spanSummary([{ number: 9, from: at(0), to: null }])).toEqual({
+      measured: 0,
+      pending: [9],
+      medianHours: null,
+      slowest: null,
+    });
+  });
+
+  it("counts a `to` older than its `from` as pending rather than averaging a negative", () => {
+    expect(spanSummary([{ number: 9, from: at(5), to: at(1) }]).pending).toEqual([9]);
+  });
+
+  it("skips a span with no start at all: there is nothing to measure from", () => {
+    expect(spanSummary([{ number: 9, from: null, to: at(1) }])).toEqual({
+      measured: 0,
+      pending: [],
+      medianHours: null,
+      slowest: null,
+    });
+  });
+
+  it("measures nothing and claims nothing on an empty set", () => {
+    expect(spanSummary([])).toEqual({
+      measured: 0,
+      pending: [],
+      medianHours: null,
+      slowest: null,
+    });
+  });
+});
+
+const labelled = (number, createdAt, events) => ({
+  number,
+  createdAt,
+  timeline: events.map(([at, label]) => ({ at, label })),
+});
+
+describe("firstLabelledAt", () => {
+  it("takes the earliest application when a label was removed and re-applied", () => {
+    const issue = labelled(1, "2026-09-13T00:00:00Z", [
+      ["2026-09-13T05:00:00Z", "needs-triage"],
+      ["2026-09-13T01:00:00Z", "needs-triage"],
+    ]);
+    expect(firstLabelledAt(issue, "needs-triage")).toBe("2026-09-13T01:00:00Z");
+  });
+
+  it("answers null for a label the issue never carried", () => {
+    expect(firstLabelledAt(labelled(1, "2026-09-13T00:00:00Z", []), "needs-triage")).toBeNull();
+  });
+});
+
+describe("intakeSpans", () => {
+  it("measures from the issue opening to the first needs-triage", () => {
+    expect(
+      intakeSpans([
+        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T00:00:02Z", "needs-triage"]]),
+      ]),
+    ).toEqual([{ number: 1, from: "2026-09-13T00:00:00Z", to: "2026-09-13T00:00:02Z" }]);
+  });
+
+  it("leaves out an issue a human routed straight past triage", () => {
+    expect(
+      intakeSpans([
+        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "ready-for-agent"]]),
+        labelled(2, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "ready-for-human"]]),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("keeps an unlabelled issue as pending: that is the bridge not firing", () => {
+    expect(intakeSpans([labelled(3, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "bug"]])])).toEqual(
+      [{ number: 3, from: "2026-09-13T00:00:00Z", to: null }],
+    );
+  });
+});
+
+describe("firstPrSpans", () => {
+  const issues = [
+    labelled(339, "2026-09-19T00:00:00Z", [["2026-09-19T00:43:34Z", "ready-for-agent"]]),
+    labelled(400, "2026-09-19T00:00:00Z", [["2026-09-19T00:00:00Z", "ready-for-agent"]]),
+    labelled(500, "2026-09-19T00:00:00Z", [["2026-09-19T00:00:00Z", "needs-triage"]]),
+  ];
+
+  it("measures to the earliest linked pull request, whatever branch it was cut on", () => {
+    const prs = [
+      { number: 340, title: "fix(shell): remount (#339)", body: "Closes #339", headRefName: "cez/781957ae", createdAt: "2026-09-19T01:15:30Z" },
+      { number: 341, title: "later", body: "Closes #339", headRefName: "cez/other", createdAt: "2026-09-19T09:00:00Z" },
+    ];
+    const spans = firstPrSpans(issues, linkOpenPrs(prs), new Map(prs.map((pr) => [pr.number, pr.createdAt])));
+    expect(spans.find((span) => span.number === 339).to).toBe("2026-09-19T01:15:30Z");
+  });
+
+  it("skips an issue that never reached ready-for-agent", () => {
+    expect(firstPrSpans(issues, new Map(), new Map()).map((span) => span.number)).toEqual([339, 400]);
+  });
+
+  it("leaves a ready issue with no pull request open-ended", () => {
+    expect(firstPrSpans(issues, new Map(), new Map()).every((span) => span.to === null)).toBe(true);
+  });
+});
+
+describe("humanHours", () => {
+  it.each([
+    [null, "not measured"],
+    [2 / 3600, "2 s"],
+    [0.5322, "32 min"],
+    [5.25, "5.3 h"],
+    [72, "3.0 d"],
+  ])("renders %j as %s", (hours, text) => {
+    expect(humanHours(hours)).toBe(text);
+  });
+});
+
+describe("sample", () => {
+  it("shows the most recent and says how many it left out", () => {
+    expect(sample([1, 2, 3, 4], 2)).toBe("#3, #4 and 2 more");
+  });
+
+  it("shows everything when the list fits", () => {
+    expect(sample([1, 2], 2)).toBe("#1, #2");
+  });
+
+  it("says nothing at all for an empty list", () => {
+    expect(sample([])).toBe("");
+  });
+});
+
+describe("flowReport", () => {
+  it("reports a retry rate only once a gate step has run", () => {
+    const empty = flowReport({
+      runs: [],
+      automations: AUTOMATION_DEFS,
+      issues: [],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+    });
+    expect(empty.gate).toEqual({ steps: 0, retried: 0, attempts: 0, retryRate: null });
+    expect(empty.intake.medianHours).toBeNull();
+    expect(empty.firstPr.medianHours).toBeNull();
+    expect(empty.sources).toEqual({ runs: 0, automations: 3, issues: 0 });
+  });
+
+  it("names the poll count as unmeasured rather than printing a zero for it", () => {
+    const report = flowReport({
+      runs: [],
+      automations: AUTOMATION_DEFS,
+      issues: [],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+    });
+    expect(report.notMeasured.join(" ")).toMatch(/poll counts/);
+    expect(report).not.toHaveProperty("polls");
+  });
+
+  it("carries the gate retry rate through as a share of gate steps", () => {
+    const report = flowReport({
+      runs: [{ steps: [{ id: "gate", iterations: 2 }] }, { steps: [{ id: "gate", iterations: 1 }] }],
+      automations: AUTOMATION_DEFS,
+      issues: [],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+    });
+    expect(report.gate.retryRate).toBe(0.5);
+  });
 });
