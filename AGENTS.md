@@ -68,9 +68,14 @@ node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>con
 request, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
 repo) is not a gate either; keep what you touch prettier-clean.
 
-The gate starts with the two generated-file checks for a reason: `src/routeTree.gen.ts` and
-`drizzle/` are regenerated and diffed, so a hand edit to either is caught in the first seconds of a
-run rather than in review.
+The gate's first two commands regenerate and diff, but they do not both catch a hand edit.
+`pnpm generate-routes` rewrites `src/routeTree.gen.ts` whole, so any edit to it shows in the diff.
+`pnpm db:generate` does **not** re-derive existing migration SQL — drizzle-kit compares the schema
+against the last snapshot and only appends when the schema moved, so a hand-edited
+`drizzle/*.sql`, a hand-added migration with a matching `_journal.json` entry, or a tampered
+`drizzle/meta/*_snapshot.json` all leave that diff clean. `drizzle/0002_seed_currency_catalogue.sql`
+is a `--custom` migration with a hand-authored body, so the tree is not fully derived to begin
+with. What keeps `drizzle/` honest is the hook below, not the gate.
 
 The agent layer is yours to edit. `.ai/cezar/workflows/`, `.ai/cezar/config.json`,
 `.ai/skills/afk-*/`, `.claude/hooks/`, `.claude/settings.json`, `.claude/skills/backlog/SKILL.md`,

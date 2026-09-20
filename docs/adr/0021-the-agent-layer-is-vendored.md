@@ -121,8 +121,17 @@ here that said "agent-kit's README" now says that.
   `binding`/`name` in `wrangler.jsonc` and every `vars` key appears in the interface, without
   demanding byte equality. It is not written. Checked while writing this: all 20 declared bindings
   are present, so the two agree today.
-- The validation gate loses its first command and starts at the generated-file checks, which are
-  the two that would actually catch a hand-edited generated file. `ci.yml`'s `Check the agent layer`
+- The validation gate loses its first command and starts at the two generate-and-diff commands.
+  Only one of them is a check: `pnpm generate-routes` rewrites `src/routeTree.gen.ts` whole, so a
+  hand edit always shows. `pnpm db:generate` never re-derives existing migration SQL — drizzle-kit
+  diffs the schema against the last snapshot and appends only when the schema moved — so a
+  hand-edited `drizzle/*.sql`, a hand-added migration plus `_journal.json` entry, or a tampered
+  `drizzle/meta/*_snapshot.json` all leave `git diff --exit-code -- drizzle/` clean.
+  `drizzle/0002_seed_currency_catalogue.sql` is a `--custom` migration with a hand-authored body,
+  so the tree was never fully derived. The first draft of this record called the two commands
+  equivalent to the hook's generated-file block and used that to justify deleting it; they are
+  not, and layer 1 of the hook is what actually covers `drizzle/`. Recorded because the
+  equivalence was wrong, not merely imprecise. `ci.yml`'s `Check the agent layer`
   step goes with it, and that step did one thing the gate command did not: run with `--base`/`--head`
   it compared the two tips' locks and failed a branch whose agent layer was **stale** relative to
   its base, on the grounds that `pr-autopilot` checks out the head and would run the old hooks and
