@@ -27,7 +27,8 @@ Four separate defects were confirmed against `origin/develop`, and together they
 reports:
 
 1. **Settling a period requires navigating into the series.** `src/components/app/recurring/period-grid.tsx`
-   renders **Mark paid**, **Skip** and **Revert** as real buttons per row (lines 209-240), but the
+   renders real buttons per row (lines 209-240) — **Revert** for a settled period, **Mark paid** and
+   **Skip** for one that is not, never all three at once — but the
    grid is imported only by `src/routes/_app/recurring/$seriesId.tsx`. The `UpcomingPanel` on
    `/recurring` (`src/routes/_app/recurring/index.tsx`, from line 341) draws due date, series name,
    expected amount and a conditional status badge, and offers no action at all. The person looking
@@ -141,9 +142,16 @@ in `src/server/repos/transaction-queries.ts`; the whole filter bar, virtualiser 
   series' `accountId`, `categoryId` and `payeeId`, all three read from the `recurring_series` row the
   query already joins, and all three **nullable** — because the columns in `src/server/db/schema.ts`
   are (`onDelete: 'set null'`, no `.notNull()`), so a series whose linked account was deleted has
-  none. The signature, the filter and the order are untouched; this is three more fields in an existing
-  `select`, and they are what the route out of the empty picker prefills from. `/recurring`, the
-  other caller, ignores them.
+  none. The signature, the filter and the order are untouched; this is three more fields in an
+  existing `select`.
+
+  **This is Phase 2's need, not Phase 1's**, which is what keeps Phase 1 severable. On `/recurring`
+  the prefill has the ids already: `loadRecurring` returns `rows: SeriesListRow[]` carrying the whole
+  `series` beside `upcoming`, so the panel joins by `seriesId` against data the screen has loaded
+  anyway, and `/recurring/$seriesId` has its one series outright. The planned screen is the caller
+  with no series list in view, and widening the projection is cheaper for it than a second read.
+  `/recurring` ignores the three new fields, because it already has better ones.
+
 - `src/routes/_app/transactions/-server/planned.ts` is new and composes `loadTransactions` with
   `getUpcoming`. It owns no SQL, which is what `docs/SPEC.md` §6.1 puts in `-server/` — the same
   justification the existing `-server/list.ts` docblock already gives for itself.
@@ -232,7 +240,7 @@ One new server function, in `src/routes/_app/transactions/-server/planned.ts`:
 ```ts
 loadPlannedScreen({
   policies: TransactionPolicies,   // parsed by the existing transactionPoliciesSchema
-  filters: TransactionFilters,     // the existing filter shape, unchanged
+  filters: TransactionFilters,     // the existing shape; narrows the rows, and the group where it can
   sort, cursor, limit,             // as loadTransactions
 }) => {
   ...TransactionListPage,          // rows, cursor, total, totals — unchanged shape
@@ -279,10 +287,17 @@ and it is not one worth asking about money that has not.
 
 ### `/recurring` — the upcoming panel gains actions
 
-The `UpcomingPanel` table gains a final cell holding the same three buttons `period-grid.tsx` has
-today, from the shared `period-actions.tsx`. The status column becomes unconditional rather than
-appearing only when some row is not `upcoming`: with actions present, a row whose action set differs
-must say why, and a column that appears and disappears is worse than one that is always there.
+The `UpcomingPanel` table gains a final cell holding the shared `period-actions.tsx`, which renders
+**Mark paid** and **Skip** here and nothing else. Not three buttons: `period-grid.tsx` renders
+**Revert** _or_ the other two and never both, because Revert only means anything on a settled period
+— and the panel is fed by `getUpcoming`, which returns only unsettled ones, so a Revert button on it
+could never be reached. `period-actions.tsx` keeps all three cases; which it draws is a function of
+the period it is given, and on this surface that function has one branch. `/transactions/planned`
+carries the same two for the same reason, so the two unsettled-only surfaces agree.
+
+The status column becomes unconditional rather than appearing only when some row is not `upcoming`:
+`upcoming` and `overdue` are both reachable here and they carry different urgency, so a column that
+appears and disappears is worse than one that is always there.
 
 ### The mark-paid picker's empty state
 
@@ -348,9 +363,25 @@ existing `e2e/recurring.visual.spec.ts` does for `/recurring`.
   still outstanding — but it means the screen must not promise a `paid` state it can never render,
   which is why `ExpectationRow.status` has two values and not four. The settled transaction itself
   appears on `/transactions` under the ordinary ledger rules.
-- **A filter that only `transactions` understands** — payment method, attachment count, split state.
-  Expectations are suppressed whenever such a filter is active, with a line saying so, rather than
-  silently ignoring the narrowing and showing rows that do not match it.
+- **A filter the expected group can honour.** Most of `LedgerFilters` has a counterpart on
+  `ExpectationRow`, and those narrow the group rather than hiding it: `text` over `seriesName`,
+  `from` / `to` over **`dueOn`** (not `bookedOn` — the group has no booking date), `accountIds`,
+  `categoryIds` against the same resolved descendant set the ledger read uses, `payeeIds`,
+  `direction`, and the amount window over `expectedAmountMinor` when `amountCurrency` matches the
+  row's own currency. The narrowing happens in memory in `-server/planned.ts`, over the ≤50 rows
+  already fetched — no SQL, no change to `getUpcoming`'s signature. A row whose `accountId`,
+  `categoryId` or `payeeId` is `null` does not match a filter naming ids: absence is not a match.
+- **A filter the expected group cannot honour** — `accountGroupIds`, `tagIds`, `paymentMethods`,
+  `hasAttachment`. There is no counterpart to narrow by, so the whole group is **suppressed** with
+  the explanatory line, rather than silently ignoring the narrowing and showing rows that do not
+  match it.
+- **A narrow filter against a capped group.** The cap is applied by `getUpcoming` and the narrowing
+  after it, so a workspace holding more than 50 unsettled periods can filter to a match that sits
+  outside the 50 nearest and see an empty group. The capped line stays visible whenever the group was
+  capped, which is what stops that reading as "nothing matches" rather than "nothing matches here,
+  yet". Pushing the filters into SQL would fix it and costs `getUpcoming` its signature and a filter
+  translation layer; at 50 rows against a workspace's active series that is not a trade worth making
+  now, and this edge case is the record of the choice.
 - **The `auto_record` race.** A series with `auto_record` posts its transaction after the due date; for
   the hours between the due date and the cron pass, the period shows as `overdue` and no transaction
   exists. This is the correct reading of the state and no special case is added for it.
@@ -417,6 +448,12 @@ Frames go to `.ai/qa/artifacts_*/`, never into the repository (`AGENTS.md`).
 Every key lands in `src/lib/i18n/messages/en.ts` **and** `src/lib/i18n/messages/pl.ts` in the same
 change (skill `i18n-messages`). EN text below; PL is the implementer's, written not translated.
 
+The catalogue's own household-words rule governs the **displayed** text, not the key: `en.ts` states
+the surface says `expense` or `entry` rather than `transaction`, and **never `ledger`**. So the two
+modes read `Recorded` and `Planned`; the keys stay `transactions.mode.*`, because the rule is about
+what a person reads. This document uses "ledger" freely in its own prose — that is the codebase's
+word for the surface, and none of it is shown to anybody.
+
 | Key                                        | EN text                                                                 |
 | ------------------------------------------ | ----------------------------------------------------------------------- |
 | `recurring.markPaid.record`                | `Record the payment`                                                    |
@@ -431,7 +468,7 @@ change (skill `i18n-messages`). EN text below; PL is the implementer's, written 
 | `transactions.planned.expected.failed`     | `Expected payments could not be loaded.`                                |
 | `transactions.planned.empty.recurring`     | `Nothing planned. Your recurring payments are on the recurring screen.` |
 | `transactions.planned.fromRecurring`       | `From {series}`                                                         |
-| `transactions.mode.actual`                 | `Ledger`                                                                |
+| `transactions.mode.actual`                 | `Recorded`                                                              |
 | `transactions.mode.planned`                | `Planned`                                                               |
 | `transactions.mode.label`                  | `Which entries to show`                                                 |
 
@@ -539,9 +576,14 @@ therefore lands that label's EN and PL entry in the same commit; there is no sep
    the two-value `status`.
 7. **Compose the screen's read.** Add `src/routes/_app/transactions/-server/planned.ts` with
    `loadPlannedScreen`: `loadTransactions` for the paged rows, one unpaged `getUpcoming`
-   (`{ today: serverToday(), within: 30, limit: 50 }`) for the expected group, returning `today`,
-   `expectations` and `expectedByCurrency`. Zod on the input; `requireOrg()` at the boundary; no SQL;
-   no `today` in the input. _Test:_ unit tests that the expected group is ordered by `dueOn` ascending
+   (`{ today: serverToday(), within: 30, limit: 50 }`) for the expected group, then narrowing that
+   group in memory by the filters it has a counterpart for and suppressing it entirely under the ones
+   it does not (Edge Cases above lists both sets). Returns `today`, `expectations` and
+   `expectedByCurrency`. Zod on the input; `requireOrg()` at the boundary; no SQL;
+   no `today` in the input. _Test:_ unit tests that each shared filter narrows the group and each
+   transaction-only filter suppresses it, that a `null` `accountId` does not match an `accountIds`
+   filter, that `from` / `to` are read against `dueOn` and not `bookedOn`, that the expected group is
+   ordered by `dueOn` ascending
    and is byte-identical across all four `LEDGER_SORT_FIELDS` and both directions, that advancing the
    cursor to page 2 returns the same `expectedByCurrency` as page 1 (the regression the paging design
    exists to prevent), and that `expectedByCurrency` splits income from expense per currency; a case
@@ -549,7 +591,8 @@ therefore lands that label's EN and PL entry in the same commit; there is no sep
    B's expectations.
 8. **Render the expected group.** Point `src/routes/_app/transactions/planned.tsx` at
    `loadPlannedScreen`, render the group above the paged rows with its header, the status word and the
-   row actions, exclude expectations from bulk selection, and suppress them under a transaction-only
+   row actions (mark paid and skip — never revert, which unsettled data cannot reach), exclude
+   expectations from bulk selection, and suppress them under a transaction-only
    filter with the explanatory line. Land `transactions.planned.expected.group`, `.capped`, `.hint`,
    `.suppressed`, `.failed` and `transactions.planned.fromRecurring` in EN and PL here, with the
    plural forms for `{days}` and `{count}`. _Test:_ a Playwright case asserting a recurring period
