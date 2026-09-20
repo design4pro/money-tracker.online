@@ -72,6 +72,8 @@ is the red-green loop's.
 
 ## Progress
 
+PR: #373
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Settle Q8 in a browser (spec Step 4)
@@ -81,14 +83,14 @@ is the red-green loop's.
 
 ### Phase 2: The pen palette (spec Steps 5 and 6)
 
-- [ ] 2.1 Extend `tokens-contrast.test.ts` with `PEN_PAIRS` over the 0.75 composite, reusing `parseWashes`/`washOver`, and watch it fail red
-- [ ] 2.2 Declare the six `--color-pen-*` tokens at all three sites with recomputed ratios beside each declaration, and take the suite green
+- [x] 2.1 Extend `tokens-contrast.test.ts` with `PEN_PAIRS` over the 0.75 composite, reusing `parseWashes`/`washOver`, and watch it fail red — bd99857
+- [x] 2.2 Declare the six `--color-pen-*` tokens at all three sites with recomputed ratios beside each declaration, and take the suite green — bd99857
 
 ### Phase 3: Reachability (spec Step 7)
 
-- [ ] 3.1 Add the `pen-*` utilities that set `--mark-pen-wash` and `--mark-pen-deepen`, with `UNREACHABLE_BY_DESIGN` unchanged
+- [x] 3.1 Add the `pen-*` utilities that set `--mark-pen-wash` and `--mark-pen-deepen`, with `UNREACHABLE_BY_DESIGN` unchanged — bd99857
 
 ### Phase 4: The spec's own bookkeeping
 
-- [ ] 4.1 Carry #370's filter measurement into the spec as the `## Amendment` Phase 1 Step 3 owes
-- [ ] 4.2 Set `Status: in-progress` and `Implementation` to the merged and open phase PRs, and regenerate `.ai/specs/README.md`
+- [x] 4.1 Carry #370's filter measurement into the spec as the `## Amendment` Phase 1 Step 3 owes — aa0476e
+- [x] 4.2 Set `Status: in-progress` and `Implementation` to the merged and open phase PRs, and regenerate `.ai/specs/README.md` — aa0476e
