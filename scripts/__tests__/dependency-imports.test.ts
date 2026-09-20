@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -179,7 +179,7 @@ const DISPOSITIONS: Readonly<Record<string, DependencyDisposition>> = {
     disposition: 'pending-removal',
     justification: 'docs/plans/19-import.md',
     issue: 353,
-    why: 'Stage `19-S1` shipped the CSV parser hand-rolled: `src/server/import/csv/scan.ts` and `parse.ts` exist and import nothing.',
+    why: 'Stage `19-S1` owns `src/server/import/csv/scan.ts` and `parse.ts`; both landed, hand-rolled, importing no parsing library.',
   },
 }
 
@@ -196,12 +196,28 @@ const runtimeDependencies = Object.keys(packageJson.dependencies ?? {})
  * `dist/`, `.output/`, `.wrangler/` and `coverage/` are excluded because they are untracked,
  * rather than because this file remembers to list them.
  */
-const codeFiles = execFileSync('git', ['ls-files'], {
+const trackedCodeFiles = execFileSync('git', ['ls-files'], {
   cwd: root,
   encoding: 'utf8',
 })
   .split('\n')
   .filter((file) => /\.(ts|tsx|js|jsx|mjs|cjs|css)$/.test(file))
+
+/**
+ * This file, as git names it - and the one file the scan must not read.
+ *
+ * The table above spells all twelve package names as quoted object keys, which is exactly the shape
+ * {@link isImported} looks for. Scanning itself, this file would report every dispositioned package
+ * as imported and the "now imported" assertion would fail on all twelve, so the guard would go red
+ * the moment it was committed and stay red for the one reason that means nothing.
+ *
+ * The bug hides in a nasty place: `git ls-files` lists only **tracked** files, so the whole suite is
+ * green while the file is still untracked and turns red on `git add`. The assertion below is what
+ * keeps the exclusion honest if the file is ever renamed or the transform changes `__filename`.
+ */
+const self = relative(root, __filename)
+
+const codeFiles = trackedCodeFiles.filter((file) => file !== self)
 
 const sources = codeFiles.map((file) =>
   readFileSync(resolve(root, file), 'utf8'),
@@ -232,9 +248,18 @@ const unimported = runtimeDependencies.filter(
 const dispositioned = Object.keys(DISPOSITIONS)
 
 describe('runtime dependency imports', () => {
+  // The exclusion above is load-bearing and silent when it stops working: a renamed file, or a
+  // transform that hands `__filename` back as something other than a tracked repository path,
+  // leaves `self` matching nothing and quietly puts the disposition table back into its own scan.
+  // Then every `pending-*` row reads as imported and the guard is red for no reason at all.
+  it('finds itself in the tracked files it excludes from the scan', () => {
+    expect(trackedCodeFiles).toContain(self)
+    expect(codeFiles).not.toContain(self)
+  })
+
   // The premise every assertion below rests on. A scan that matched nothing would report every
   // dependency as unimported; one that matched everything would report none - and either failure
-  // leaves the table looking correct. `react` is imported by 163 files and `zod` by 70, so a
+  // leaves the table looking correct. `react` is imported by 163 files and `zod` by 69, so a
   // scanner that cannot see them is broken rather than strict.
   it.each(['react', 'zod', 'drizzle-orm', '@tanstack/react-router'])(
     'sees %s as imported',
