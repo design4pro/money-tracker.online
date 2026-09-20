@@ -80,5 +80,5 @@ PR: #370
 
 ### Phase 2: measure the filter
 
-- [ ] 2.1 Measure the filter at realistic density
-- [ ] 2.2 Record the number and take the Q1 verdict
+- [x] 2.1 Measure the filter at realistic density - f5d1b42
+- [x] 2.2 Record the number and take the Q1 verdict - f5d1b42
