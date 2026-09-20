@@ -6,10 +6,11 @@ One document per designed change. The directory a spec sits in is its state, the
 its `H1` names the issue and the pull requests behind it, and both are held together by
 `scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).
 
-## Draft — being written (2)
+## Draft — being written (3)
 
 | Spec                                                                                                                       | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
+| [Settle and surface recurring periods](2026-09-20-recurring-periods-settle-and-surface.md)                                 | 2026-09-20 | [#363](https://github.com/design4pro/money-tracker.online/issues/363) | —                                                                   | —              |
 | [Reduced motion: the `[data-motion-transform]` reset and the proof it works](2026-09-11-reduced-motion-transform-reset.md) | 2026-09-11 | [#214](https://github.com/design4pro/money-tracker.online/issues/214) | [#251](https://github.com/design4pro/money-tracker.online/pull/251) | —              |
 | [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md)   | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | [#220](https://github.com/design4pro/money-tracker.online/pull/220) | —              |
 
