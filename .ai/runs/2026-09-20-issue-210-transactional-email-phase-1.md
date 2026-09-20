@@ -130,3 +130,10 @@ handlers and a template bug must return `'failed'` rather than turn a completed 
 
 - [x] 5.1 `templates/auth.tsx` and the `email.auth.*` catalogue keys in EN + PL — 4bce113
 - [x] 5.2 Re-point `createAuthEmailer` at the templates and pass the request's locale in — 2c36bc0
+
+### Review fixes (`om-auto-review-pr 349 --autofix`)
+
+- [x] R.1 The email locale chain reads the language picker's cookie, as the document's chain does — b1fd3e5
+- [x] R.2 A transport failure records the error's class — b1fd3e5
+
+PR: #349
