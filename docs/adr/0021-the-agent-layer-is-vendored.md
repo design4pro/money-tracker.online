@@ -46,6 +46,10 @@ ordinary file of this repository.**
 - `.claude/hooks/guard-generated.sh` is deleted, with the `PreToolUse` `Edit|Write` matcher that
   ran it. `src/routeTree.gen.ts` and `drizzle/` are already covered by the first two commands of
   the gate, which regenerate and diff them. `git-guardrails.sh` and `guard-read.sh` stay.
+  **The hook enforced four rules, not two, and the other two go with it** — worktree confinement
+  and the agent-configuration write block, both described under Consequences below. Neither had
+  any dependency on the kit; they are dropped here because the file that carried them is, and that
+  is a cost of this change rather than a tidy-up it earns.
 - **`worker-configuration.d.ts` loses its protection, and nothing replaces it.** Stated plainly
   because the obvious replacement does not work here. The hook blocked edits to that file and told
   the reader to run `pnpm exec wrangler types`; that instruction was wrong — the file is
@@ -95,6 +99,32 @@ here that said "agent-kit's README" now says that.
   person it affects.** This is the whole point of the change.
 - The validation gate loses its first command and starts at the generated-file checks, which are
   the two that would actually catch a hand-edited generated file.
+- **Worktree confinement is gone, and nothing replaces it.** Under `CEZ_TASK_ID` or
+  `GITHUB_ACTIONS` the hook refused any `Edit`/`Write` whose path walked through `..` or resolved
+  outside the current worktree. Its header records the incident that produced the rule: a
+  pr-autopilot run reached `../agent-kit/templates/...` and rewrote eight files in a sibling
+  checkout a human had uncommitted work in. That particular sibling is being archived, but the
+  rule was never about `agent-kit` — it is about a run staying inside the tree it was handed, and
+  this repository runs several cezar worktrees at once. `git-guardrails.sh` does not cover it: it
+  inspects the Bash command string and has nothing to say about the file-writing tools.
+- **The agent-configuration write block is gone, and its loss is largest exactly where it mattered
+  most.** Under an agent run the hook refused writes to `.github/`, `.claude/`, `.husky/`,
+  `.ai/cezar/`, `.ai/agentic.config.json`, `.ai/trackers/`, `.ai/browsers/`, `.ai/skills/`,
+  `.ai/scripts/`, `scripts/ci/`, the two `docs/agents/cezar-*.json`, `.npmrc`,
+  `pnpm-workspace.yaml`, `docs/agents/reference.md` and `docs/agents/out-of-scope.md` — absolutely
+  under `GITHUB_ACTIONS`, and under cezar with one exception for a path the branch already
+  changed. After this change the `PreToolUse` hooks are `Bash → git-guardrails.sh` and
+  `Read|Glob|Grep → guard-read.sh`, and neither one looks at a write's path.
+  `claude-code-review.yml` restores `.claude/`, `scripts/ci/` and `.ai/agentic.config.json` from
+  the base branch before the agent starts, so the branch under review cannot supply its own judge
+  — but that restore is a one-time copy, the job runs under `--permission-mode bypassPermissions`,
+  and `git-guardrails.sh` is re-read on every `PreToolUse`. A review run can now `Write` over the
+  hook that is gating it, or over a `scripts/ci/` script three later steps execute on
+  `github.token` with `pull-requests: write`. `git-guardrails.sh` calls itself "the only thing
+  between a crafted PR and `gh pr review --approve`"; until this change it was one of two, and the
+  block that made the restore stick was the other. Restoring the two rules as a hook named for
+  what they do — they need no kit and no lock — is issue #361, kept out of this change so that
+  retiring the kit stays revertible on its own.
 - `docs/agents/agent-kit.md` is deleted. The router row that pointed at it is gone, and
   `.ai/specs/2026-09-18-agent-kit-check-test-companion.md` — a spec asking the kit to render a test
   for a checker that no longer exists — is archived unimplemented.
