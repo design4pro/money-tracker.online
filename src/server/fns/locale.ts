@@ -22,6 +22,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader } from '@tanstack/react-start/server'
 
+import { readLocaleCookieFrom } from '#/components/app/shell/locale-cookie'
 import { directionOf, negotiate } from '#/lib/i18n'
 
 import type { Direction, Locale } from '#/lib/i18n'
@@ -60,6 +61,40 @@ export function negotiateLocaleFrom(
     acceptLanguage: source.acceptLanguage(),
   })
   return { locale, dir: directionOf(locale) }
+}
+
+/** One request's language inputs, as an email's sender can see them. */
+export interface EmailLocaleSource {
+  /** The raw `Cookie` header. The language picker's choice lives in it. */
+  readonly cookieHeader: string | null
+  /** The `Accept-Language` header, verbatim. */
+  readonly acceptLanguage: string | null
+}
+
+/**
+ * The language to write an email in, decided from the request that asked for it.
+ *
+ * It exists as one function rather than a line at each send site because the failure it prevents is
+ * exactly a second opinion: a reader whose browser says `en-US` and who picked Polish from the
+ * language menu gets Polish screens, because {@link negotiateLocaleFrom} is given the cookie in
+ * `src/routes/__root.tsx`. An email path that consulted only `Accept-Language` would send that same
+ * person English — the one message that reaches them outside the app, in the language they
+ * explicitly did not choose.
+ *
+ * So the cookie is the chain's `storedLocale` step here for the same reason it is there: until
+ * `user_preferences.locale` is a column, it *is* the stored preference
+ * (`src/components/app/shell/locale-cookie.ts`). The day the column exists it is passed in ahead of
+ * the cookie and nothing at the call sites changes.
+ *
+ * **An invitation is the inviter's language, not the invitee's.** Nothing is known about somebody
+ * who has no account, and the household that typed their address is the closest signal there is;
+ * the spec accepts that explicitly (A1).
+ */
+export function negotiateEmailLocale(source: EmailLocaleSource): Locale {
+  return negotiateLocaleFrom({
+    storedLocale: () => readLocaleCookieFrom(source.cookieHeader),
+    acceptLanguage: () => source.acceptLanguage,
+  }).locale
 }
 
 /**

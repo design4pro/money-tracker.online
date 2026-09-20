@@ -38,6 +38,32 @@ export function readLocaleCookieValue(
 }
 
 /**
+ * The same answer, from a raw `Cookie` header.
+ *
+ * The root loader reads the cookie through the framework's `getCookie`, but a Better Auth email
+ * hook is handed the `Request` itself and has no such helper. Both need the reader's choice, so the
+ * header is parsed here — beside the cookie's name and its validation — rather than in two places
+ * that would drift from each other and from this file.
+ *
+ * The value is not URL-decoded: a shipped tag is two ASCII letters, `decodeURIComponent` throws on a
+ * malformed escape, and this is client-written input on the path that decides a whole document's
+ * language. Anything that is not a tag is `null`, as everywhere else.
+ */
+export function readLocaleCookieFrom(
+  header: string | null | undefined,
+): Locale | null {
+  if (!header) return null
+
+  for (const pair of header.split(';')) {
+    const separator = pair.indexOf('=')
+    if (separator < 0) continue
+    if (pair.slice(0, separator).trim() !== LOCALE_COOKIE) continue
+    return readLocaleCookieValue(pair.slice(separator + 1).trim())
+  }
+  return null
+}
+
+/**
  * Persists the choice from the browser.
  *
  * `Secure` is added only on HTTPS: a cookie marked `Secure` is silently dropped on

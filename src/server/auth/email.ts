@@ -1,6 +1,12 @@
 /**
  * Transactional email for the auth flows: verify your address, reset your password, join a
- * workspace.
+ * household.
+ *
+ * This module is now the **seam** between Better Auth and the product's one email path. It owns the
+ * three guarantees below and nothing else: the copy lives in the catalogue, the frame in
+ * `#/server/email/templates`, the rendering in `#/server/email/render` and the wire in
+ * `#/server/email/send`. It used to own all four, which is why a Polish household received English
+ * mail — there was nowhere else for the sentences to live.
  *
  * Three deliberate decisions live here.
  *
@@ -8,7 +14,9 @@
  * `.dev.vars.example`), so a local or preview deployment has no way to send. Rather than pretend,
  * every skipped send emits a `warn` line naming the flow and the masked recipient, and the caller
  * gets `'skipped-no-provider'` back. A password reset that quietly evaporates is the kind of failure
- * that is discovered by a locked-out user weeks later.
+ * that is discovered by a locked-out user weeks later. The check happens **here**, before rendering,
+ * rather than being left to the transport: this is the only layer that knows which flow is asking
+ * and holds the dev-only URL that makes the flow completable without a provider.
  *
  * **2. Nothing here ever logs a token.** The reset and verification URLs *are* bearer credentials:
  * anyone holding one can take the account over. Workers Observability retains log lines and more
@@ -19,26 +27,35 @@
  *
  * **3. Sending never throws.** These calls sit inside Better Auth request handlers: a rejected send
  * would turn a successful sign-up into a 500 *after* the user row was written, leaving an account
- * whose owner saw an error. A failed send is logged at `error` and reported in the return value.
+ * whose owner saw an error. That now covers **rendering** as well as the network — a template that
+ * throws on a malformed argument must produce a reported `'failed'`, not a 500 on a sign-up that
+ * already succeeded.
  *
- * The copy below is intentionally minimal and English-only. It is **transport**, not content:
- * `docs/plans/21-*` owns the real templates and their `en`/`pl` catalogue keys, and these strings
- * exist so the flows work before that lands. They are deliberately not routed through
- * `src/i18n/messages/*` — a second catalogue that only email reads would drift from the first.
+ * ## Which language it is written in
+ *
+ * The caller passes the locale, because only the caller has the request. Today the negotiation chain
+ * has exactly one live input — the `Accept-Language` header — since `user_preferences.locale` does
+ * not exist yet (`#/server/fns/locale`); when it does, the two call sites pass it and nothing here
+ * changes.
  */
 
+import { createTranslator, loadCatalogue } from '#/lib/i18n'
+import { renderEmail } from '#/server/email/render'
+import { maskEmail, sendEmail } from '#/server/email/send'
+import { authEmail } from '#/server/email/templates/auth'
+
+import type { Locale } from '#/lib/i18n'
+import type { EmailDelivery } from '#/server/email/send'
+import type { AuthEmailKind } from '#/server/email/templates/auth'
 import type { Logger } from '#/server/observability/logger'
 
-/** Which auth flow is asking for an email. Also the log discriminator. */
-export type AuthEmailKind =
-  'verify-email' | 'reset-password' | 'organization-invitation'
-
-/** Provider configuration, as `./env` → `emailDelivery()` reports it. */
-export interface EmailDelivery {
-  readonly apiKey: string
-  readonly apiUrl: string
-  readonly from: string
-}
+/**
+ * The flow vocabulary and the provider shape are defined where they are used — the kinds beside the
+ * template that draws them, the delivery config beside the transport that reads it — and re-exported
+ * here so this module stays the one import for "auth email".
+ */
+export type { AuthEmailKind, EmailDelivery }
+export { maskEmail }
 
 export interface AuthEmailRequest {
   readonly kind: AuthEmailKind
@@ -49,6 +66,12 @@ export interface AuthEmailRequest {
   readonly url: string
   /** Only for `organization-invitation`. */
   readonly organizationName?: string
+  /**
+   * The language to write in. Required rather than defaulted: a call site that has a request has a
+   * header, and a default would let the next one silently send English to a Polish household — the
+   * exact regression this phase closes.
+   */
+  readonly locale: Locale
 }
 
 /**
@@ -56,27 +79,11 @@ export interface AuthEmailRequest {
  */
 export type AuthEmailOutcome = 'sent' | 'skipped-no-provider' | 'failed'
 
-export interface RenderedEmail {
+/** Both parts plus the envelope's subject, which is not part of the document. */
+export interface RenderedAuthEmail {
   readonly subject: string
   readonly text: string
   readonly html: string
-}
-
-const APP_NAME = 'money-tracker.online'
-
-/**
- * `anna@example.com` → `a***@example.com`.
- *
- * Enough to recognise the account you are debugging, not enough to be a mailing list if the logs
- * ever leak. An address with a one-character local part masks to `***@…` rather than exposing it.
- */
-export function maskEmail(address: string): string {
-  const at = address.lastIndexOf('@')
-  if (at <= 0) return '***'
-  const local = address.slice(0, at)
-  const domain = address.slice(at)
-  if (local.length < 2) return `***${domain}`
-  return `${local[0]}***${domain}`
 }
 
 function greetingName(request: AuthEmailRequest): string {
@@ -85,65 +92,31 @@ function greetingName(request: AuthEmailRequest): string {
   return request.to.split('@')[0] ?? 'there'
 }
 
-/** Minimal HTML escaping. The only untrusted values are a display name and a workspace name. */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-function body(request: AuthEmailRequest): { subject: string; lead: string } {
-  switch (request.kind) {
-    case 'verify-email':
-      return {
-        subject: `Confirm your ${APP_NAME} address`,
-        lead: `Confirm this address to finish setting up your ${APP_NAME} account.`,
-      }
-    case 'reset-password':
-      return {
-        subject: `Reset your ${APP_NAME} password`,
-        lead: `Use the link below to choose a new password. If you did not ask for this, you can ignore this message and your password stays as it is.`,
-      }
-    case 'organization-invitation':
-      return {
-        subject: `You have been invited to a workspace on ${APP_NAME}`,
-        lead: `${request.organizationName ?? 'A workspace'} has invited you to join them on ${APP_NAME}.`,
-      }
-  }
-}
-
 /**
- * Renders one auth email. Pure, so the copy and the escaping are testable without a provider.
+ * Renders one auth email in one language. No provider, no binding, no request — so the copy, the
+ * escaping and the locale are all testable on their own.
  *
  * Both parts are always sent: a text alternative is what stops a plain-text client — and a spam
  * filter that distrusts HTML-only mail — from receiving an empty message.
  */
-export function renderAuthEmail(request: AuthEmailRequest): RenderedEmail {
-  const { subject, lead } = body(request)
-  const name = greetingName(request)
+export async function renderAuthEmail(
+  request: AuthEmailRequest,
+): Promise<RenderedAuthEmail> {
+  const catalogue = await loadCatalogue(request.locale)
+  const t = createTranslator(request.locale, catalogue)
 
-  const text = [
-    `Hi ${name},`,
-    '',
-    lead,
-    '',
-    request.url,
-    '',
-    'This link can only be used once and expires shortly.',
-    '',
-    APP_NAME,
-  ].join('\n')
+  const { subject, element } = authEmail(
+    {
+      kind: request.kind,
+      locale: request.locale,
+      recipientName: greetingName(request),
+      url: request.url,
+      organizationName: request.organizationName,
+    },
+    t,
+  )
 
-  const html = [
-    `<p>Hi ${escapeHtml(name)},</p>`,
-    `<p>${escapeHtml(lead)}</p>`,
-    `<p><a href="${escapeHtml(request.url)}">${escapeHtml(subject)}</a></p>`,
-    `<p>This link can only be used once and expires shortly.</p>`,
-    `<p>${APP_NAME}</p>`,
-  ].join('\n')
-
+  const { html, text } = await renderEmail(element)
   return { subject, text, html }
 }
 
@@ -162,13 +135,9 @@ export interface AuthEmailerOptions {
 /**
  * Builds the sender. Takes its provider config and its logger as arguments — no binding is read
  * here, so every branch below is exercised in a plain Node test.
- *
- * The wire format is Resend's `POST /emails`, which is what `EMAIL_API_URL` points at; it is also
- * what several drop-in providers accept, so swapping one is a var change rather than a code change.
  */
 export function createAuthEmailer(options: AuthEmailerOptions): AuthEmailer {
   const { delivery, logger } = options
-  const doFetch = options.fetch ?? fetch
 
   return {
     async send(request) {
@@ -186,38 +155,29 @@ export function createAuthEmailer(options: AuthEmailerOptions): AuthEmailer {
         return 'skipped-no-provider'
       }
 
-      const rendered = renderAuthEmail(request)
-
+      let rendered: RenderedAuthEmail
       try {
-        const response = await doFetch(delivery.apiUrl, {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${delivery.apiKey}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: delivery.from,
-            to: [request.to],
-            subject: rendered.subject,
-            text: rendered.text,
-            html: rendered.html,
-          }),
-        })
-
-        if (!response.ok) {
-          logger.error('auth email rejected by provider', undefined, {
-            ...fields,
-            status: response.status,
-          })
-          return 'failed'
-        }
-
-        logger.info('auth email sent', fields)
-        return 'sent'
+        rendered = await renderAuthEmail(request)
       } catch (error) {
-        logger.error('auth email transport failed', error, fields)
+        // Guarantee 3 covers the template too. `makeMoney` and the catalogue both throw on input a
+        // row should never hold, and this is a sign-up handler: the account already exists.
+        logger.error('auth email could not be rendered', error, fields)
         return 'failed'
       }
+
+      const result = await sendEmail(
+        {
+          to: request.to,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+        },
+        { delivery, logger, fetch: options.fetch, kind: request.kind },
+      )
+
+      // A retryable failure is still a failure *to this caller*: Better Auth has no queue to hand
+      // it back to, and the person is waiting. `21-S2` Phase 2 is where retries acquire a home.
+      return result.ok ? 'sent' : 'failed'
     },
   }
 }

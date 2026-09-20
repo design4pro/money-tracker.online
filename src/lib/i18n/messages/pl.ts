@@ -1301,6 +1301,30 @@ const messages = {
   'notifications.kind.goalReached.body':
     'Cel {goal} jest zrealizowany — odłożono {contributed} z {target}.',
 
+  /*
+    Email (21-S2).
+
+    Every line is addressed to one person and phrased so it carries no grammatical gender: a
+    catalogue that cannot ask who is reading must not guess. That is why the reset line reads
+    "Jeśli to nie Ty prosisz" rather than the past tense, which would have to pick one form.
+  */
+  'email.layout.footer.reasonAccount':
+    'Dostajesz tę wiadomość, bo na Twoim koncie {app} coś się wydarzyło.',
+  'email.auth.greeting': 'Cześć {name},',
+  'email.auth.singleUse': 'Ten link zadziała tylko raz i wkrótce wygaśnie.',
+  'email.auth.verifyEmail.subject': 'Potwierdź swój adres w {app}',
+  'email.auth.verifyEmail.lead':
+    'Potwierdź ten adres, aby dokończyć zakładanie konta {app}.',
+  'email.auth.verifyEmail.action': 'Potwierdź adres',
+  'email.auth.resetPassword.subject': 'Zresetuj hasło do {app}',
+  'email.auth.resetPassword.lead':
+    'Użyj przycisku poniżej, aby wybrać nowe hasło. Jeśli to nie Ty prosisz o zmianę, zignoruj tę wiadomość — hasło pozostanie bez zmian.',
+  'email.auth.resetPassword.action': 'Wybierz nowe hasło',
+  'email.auth.invitation.subject': 'Zaproszenie do domu {workspace} w {app}',
+  'email.auth.invitation.lead':
+    'Dom {workspace} zaprasza Cię do wspólnego korzystania z {app}.',
+  'email.auth.invitation.action': 'Przyjmij zaproszenie',
+
   /* -- Accessibility ------------------------------------------------------ */
   'a11y.skipToContent': 'Przejdź do treści głównej',
   'a11y.showSuggestions': 'Pokaż podpowiedzi',

@@ -18,22 +18,16 @@
 import { NOTIFICATION_KINDS } from './kinds'
 
 import type { NotificationKind } from '#/lib/enums'
+import type { CopyParam, MoneyParam } from '#/lib/notifications/params'
 import type { NotificationPayload } from './kinds'
 
 /**
- * An amount on its way to a placeholder: still an integer, still carrying its own scale.
- *
- * The currency travels with the number because `currencies.digits` is what turns one into the
- * other, and it is not always 2 (`docs/MONEY.md`). A bare `spentMinor` would be a number the reader
- * cannot render without guessing.
+ * The parameter types are defined in `#/lib/notifications/params` and re-exported here, so this
+ * module stays the one import for "what a notification's copy looks like" while the readers that
+ * render the bag — `21-S2`'s email templates, `21-S3`'s notification item — can take the shape
+ * without taking a dependency on `server/`.
  */
-export interface MoneyParam {
-  readonly minor: number
-  readonly currencyCode: string
-}
-
-/** A string is a name or an ISO date; a number is a count or a percentage; money is money. */
-export type CopyParam = string | number | MoneyParam
+export type { CopyParam, MoneyParam }
 
 export interface NotificationCopy {
   readonly titleKey: string
