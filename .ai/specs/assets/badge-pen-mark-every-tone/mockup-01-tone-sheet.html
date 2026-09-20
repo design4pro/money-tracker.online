@@ -1,0 +1,515 @@
+<!doctype html>
+<!--
+  Illustrative static mockup for .ai/specs/2026-09-20-badge-pen-mark-every-tone.md
+  No app code, no build step, no external requests. Placeholder data only.
+
+  LEFT column reproduces today's boxed badge, transcribed from the cva recipe in
+  src/components/ui/badge.tsx. RIGHT column is the proposal: the mark-pen utility
+  from src/styles/app.css with its wash taken as a property.
+
+  Every colour is a real token value read from src/styles/tokens.css. The
+  --pen-* values are the candidates measured in the spec (a 34% hue mix toward
+  surface in light, 38% in dark); the ratio beside each row is --color-ink on
+  that wash composited at 0.75 over --color-surface, computed the same way
+  src/styles/__tests__/tokens-contrast.test.ts computes a wash.
+
+  The #mark-pen-rough filter is inlined below because __root.tsx mounts it once
+  in the real product and a standalone file has no root to borrow it from.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Badge tones - boxed today vs the pen mark proposed</title>
+    <style>
+      :root {
+        --canvas: #f5f4ee;
+        --surface: #fbfaf6;
+        --surface-sunken: #ebeae1;
+        --ink: #262420;
+        --ink-2: #4b4941;
+        --border-subtle: #c3d1c4;
+        --border-panel: #a8b5a9;
+        --border-strong: #8a9a8b;
+        --brand: #4a2a82;
+        --brand-soft: #ece4f7;
+        --highlighter: #ece4f7;
+        --positive: #0b5136;
+        --positive-soft: #dcf2e4;
+        --negative: #8a1a0d;
+        --negative-soft: #f8e3df;
+        --warning: #614106;
+        --warning-soft: #f7ead3;
+        --info: #4b4941;
+
+        --pen-neutral: #bbbab4;
+        --pen-brand: #b9b1d0;
+        --pen-positive: #aabeb0;
+        --pen-negative: #daafa5;
+        --pen-warning: #c5b7a4;
+        --pen-info: #bbbab4;
+      }
+      .dark {
+        --canvas: #16171a;
+        --surface: #1d1f23;
+        --surface-sunken: #111214;
+        --ink: #ebe8df;
+        --ink-2: #b9b5aa;
+        --border-subtle: #42454c;
+        --border-panel: #5a5d64;
+        --border-strong: #7f8a80;
+        --brand: #c5aef2;
+        --brand-soft: #2b2438;
+        --highlighter: #523e7c;
+        --positive: #7fd9a8;
+        --positive-soft: #17302a;
+        --negative: #f6a898;
+        --negative-soft: #3a201b;
+        --warning: #e9c46a;
+        --warning-soft: #332a12;
+        --info: #b9b5aa;
+
+        --pen-neutral: #535352;
+        --pen-brand: #57516a;
+        --pen-positive: #415f52;
+        --pen-negative: #684f4d;
+        --pen-warning: #635840;
+        --pen-info: #535352;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #dedbd2;
+        color: #262420;
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      .lede {
+        margin: 0 0 20px;
+        max-width: 78ch;
+        color: #4b4941;
+      }
+      .sheets {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .sheet {
+        flex: 1 1 460px;
+        background: var(--canvas);
+        color: var(--ink);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .sheet h2 {
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin: 0 0 16px;
+        color: var(--ink-2);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        font-weight: 600;
+        padding: 0 0 10px;
+      }
+      td {
+        padding: 11px 0;
+        border-top: 1px solid var(--border-subtle);
+        vertical-align: middle;
+      }
+      td.name {
+        width: 88px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      td.ratio {
+        width: 86px;
+        text-align: right;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: var(--ink-2);
+      }
+      td.mark {
+        padding-inline-end: 18px;
+      }
+
+      /* ---- today: the boxed badge (cva recipe in badge.tsx) ---- */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 24px;
+        padding: 0 8px;
+        border-radius: 2px;
+        border: 1px solid transparent;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .badge.neutral {
+        border-color: var(--border-strong);
+        background: var(--surface);
+        color: var(--ink);
+      }
+      .badge.brand {
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+      .badge.positive {
+        background: var(--positive-soft);
+        color: var(--positive);
+      }
+      .badge.negative {
+        background: var(--negative-soft);
+        color: var(--negative);
+      }
+      .badge.warning {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+      .badge.info {
+        border-color: var(--border-panel);
+        color: var(--info);
+      }
+      .badge.settled {
+        color: var(--ink);
+      }
+
+      /* ---- proposed: mark-pen, transcribed from app.css with the wash as a property ---- */
+      .pen {
+        --mark-pen-wash: var(--highlighter);
+        --mark-pen-deepen: var(--brand);
+        --mark-pen-pooled: color-mix(
+          in oklab,
+          var(--mark-pen-wash),
+          var(--mark-pen-deepen) 30%
+        );
+        --mark-pen-paused: color-mix(
+          in oklab,
+          var(--mark-pen-wash),
+          var(--mark-pen-deepen) 45%
+        );
+        position: relative;
+        isolation: isolate;
+        display: inline-block;
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pen::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        inset: -5% -0.75ch -5% -0.25ch;
+        border-end-end-radius: 20px 30px;
+        background-color: var(--mark-pen-wash);
+        opacity: 0.75;
+        box-shadow:
+          inset -2px 0 1px var(--mark-pen-pooled),
+          inset -4px 0 5px var(--mark-pen-pooled);
+        filter: url('#mark-pen-rough');
+      }
+      .pen::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        top: 2px;
+        right: -0.25em;
+        width: 0.5ch;
+        height: 1ch;
+        background: radial-gradient(
+          var(--mark-pen-paused),
+          var(--mark-pen-wash)
+        );
+        opacity: 0.4;
+        border-radius: 10px 0 50px / 200px 0;
+        rotate: 15deg;
+        filter: url('#mark-pen-rough');
+      }
+      .pen.neutral {
+        --mark-pen-wash: var(--pen-neutral);
+        --mark-pen-deepen: var(--ink-2);
+      }
+      .pen.brand {
+        --mark-pen-wash: var(--pen-brand);
+        --mark-pen-deepen: var(--brand);
+      }
+      .pen.positive {
+        --mark-pen-wash: var(--pen-positive);
+        --mark-pen-deepen: var(--positive);
+      }
+      .pen.negative {
+        --mark-pen-wash: var(--pen-negative);
+        --mark-pen-deepen: var(--negative);
+      }
+      .pen.warning {
+        --mark-pen-wash: var(--pen-warning);
+        --mark-pen-deepen: var(--warning);
+      }
+      .pen.info {
+        --mark-pen-wash: var(--pen-info);
+        --mark-pen-deepen: var(--ink-2);
+      }
+      .pen.sm {
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .note {
+        margin: 18px 0 0;
+        font-size: 12px;
+        color: var(--ink-2);
+        max-width: 70ch;
+      }
+      .row-demo {
+        margin-top: 18px;
+        background: var(--surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .row-demo div {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 14px;
+        border-top: 1px solid var(--border-subtle);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12.5px;
+        color: var(--ink);
+      }
+      .row-demo div:first-child {
+        border-top: 0;
+      }
+      .row-demo .when {
+        width: 96px;
+        color: var(--ink-2);
+      }
+      .row-demo .what {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <filter id="mark-pen-rough">
+        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="4" />
+        <feDisplacementMap in="SourceGraphic" scale="5" />
+      </filter>
+    </svg>
+
+    <h1>Badge tones - boxed today vs the pen mark proposed</h1>
+    <p class="lede">
+      Left of each pair is what ships: a rectangle, ruled or filled, with the
+      tone's hue in the text. Right is the proposal: one mark, the hue in the
+      run of pen, the word always in <code>ink</code>. The ratio column is
+      <code>--color-ink</code> on that wash composited at 0.75 over
+      <code>--color-surface</code>, the floor being 7:1. Placeholder words only.
+    </p>
+
+    <div class="sheets">
+      <section class="sheet">
+        <h2>Light</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Tone</th>
+              <th>Today</th>
+              <th>Proposed</th>
+              <th style="text-align: right">Ink on wash</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="name">neutral</td>
+              <td class="mark"><span class="badge neutral">Personal</span></td>
+              <td class="mark"><span class="pen neutral">Personal</span></td>
+              <td class="ratio">9.04:1</td>
+            </tr>
+            <tr>
+              <td class="name">info</td>
+              <td class="mark"><span class="badge info">Hidden</span></td>
+              <td class="mark"><span class="pen info">Hidden</span></td>
+              <td class="ratio">9.04:1</td>
+            </tr>
+            <tr>
+              <td class="name">positive</td>
+              <td class="mark"><span class="badge positive">Paid</span></td>
+              <td class="mark"><span class="pen positive">Paid</span></td>
+              <td class="ratio">8.98:1</td>
+            </tr>
+            <tr>
+              <td class="name">negative</td>
+              <td class="mark"><span class="badge negative">Overdue</span></td>
+              <td class="mark"><span class="pen negative">Overdue</span></td>
+              <td class="ratio">8.95:1</td>
+            </tr>
+            <tr>
+              <td class="name">warning</td>
+              <td class="mark"><span class="badge warning">Archived</span></td>
+              <td class="mark"><span class="pen warning">Archived</span></td>
+              <td class="ratio">9.00:1</td>
+            </tr>
+            <tr>
+              <td class="name">brand</td>
+              <td class="mark"><span class="badge brand">Pro</span></td>
+              <td class="mark"><span class="pen brand">Pro</span></td>
+              <td class="ratio">8.69:1</td>
+            </tr>
+            <tr>
+              <td class="name">settled</td>
+              <td class="mark"><span class="pen settled sm">Settled</span></td>
+              <td class="mark"><span class="pen settled sm">Settled</span></td>
+              <td class="ratio">13.14:1</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="row-demo">
+          <div>
+            <span class="when">1 Mar 2026</span>
+            <span class="what"
+              >Carried from February
+              <span class="pen settled sm">Settled</span></span
+            >
+          </div>
+          <div>
+            <span class="when">7 Sep 2026</span>
+            <span class="what"
+              >Netflix <span class="pen negative">Overdue</span></span
+            >
+          </div>
+          <div>
+            <span class="when">7 Oct 2026</span>
+            <span class="what"
+              >Netflix <span class="pen neutral">Upcoming</span></span
+            >
+          </div>
+        </div>
+        <p class="note">
+          The three rows are the comparison that started this: today the first
+          is a mark, the second a filled box and the third a ruled box. One
+          gesture now, three colours.
+        </p>
+      </section>
+
+      <section class="sheet dark">
+        <h2>Dark</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Tone</th>
+              <th>Today</th>
+              <th>Proposed</th>
+              <th style="text-align: right">Ink on wash</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="name">neutral</td>
+              <td class="mark"><span class="badge neutral">Personal</span></td>
+              <td class="mark"><span class="pen neutral">Personal</span></td>
+              <td class="ratio">7.70:1</td>
+            </tr>
+            <tr>
+              <td class="name">info</td>
+              <td class="mark"><span class="badge info">Hidden</span></td>
+              <td class="mark"><span class="pen info">Hidden</span></td>
+              <td class="ratio">7.70:1</td>
+            </tr>
+            <tr>
+              <td class="name">positive</td>
+              <td class="mark"><span class="badge positive">Paid</span></td>
+              <td class="mark"><span class="pen positive">Paid</span></td>
+              <td class="ratio">7.22:1</td>
+            </tr>
+            <tr>
+              <td class="name">negative</td>
+              <td class="mark"><span class="badge negative">Overdue</span></td>
+              <td class="mark"><span class="pen negative">Overdue</span></td>
+              <td class="ratio">7.56:1</td>
+            </tr>
+            <tr>
+              <td class="name">warning</td>
+              <td class="mark"><span class="badge warning">Archived</span></td>
+              <td class="mark"><span class="pen warning">Archived</span></td>
+              <td class="ratio">7.15:1</td>
+            </tr>
+            <tr>
+              <td class="name">brand</td>
+              <td class="mark"><span class="badge brand">Pro</span></td>
+              <td class="mark"><span class="pen brand">Pro</span></td>
+              <td class="ratio">7.53:1</td>
+            </tr>
+            <tr>
+              <td class="name">settled</td>
+              <td class="mark"><span class="pen settled sm">Settled</span></td>
+              <td class="mark"><span class="pen settled sm">Settled</span></td>
+              <td class="ratio">8.69:1</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="row-demo">
+          <div>
+            <span class="when">1 Mar 2026</span>
+            <span class="what"
+              >Carried from February
+              <span class="pen settled sm">Settled</span></span
+            >
+          </div>
+          <div>
+            <span class="when">7 Sep 2026</span>
+            <span class="what"
+              >Netflix <span class="pen negative">Overdue</span></span
+            >
+          </div>
+          <div>
+            <span class="when">7 Oct 2026</span>
+            <span class="what"
+              >Netflix <span class="pen neutral">Upcoming</span></span
+            >
+          </div>
+        </div>
+        <p class="note">
+          Dark is where the pen palette is tightest: every wash sits within 0.2
+          of the 7:1 floor, which is why the spec measures the composite rather
+          than the token. The <code>settled</code> row is today's
+          <code>#523e7c</code>, unchanged - and the one whose pooled trailing
+          edge measures 5.99:1 against that floor.
+        </p>
+      </section>
+    </div>
+
+    <p class="note" style="color: #4b4941; max-width: 78ch">
+      Not in this sheet, deliberately: <code>accent</code>, which keeps its
+      filled-chip rendering and has no call site today; and the
+      <code>forced-colors: active</code> rule, which restores a one-pixel
+      boundary when the wash is dropped by the UA.
+    </p>
+  </body>
+</html>
