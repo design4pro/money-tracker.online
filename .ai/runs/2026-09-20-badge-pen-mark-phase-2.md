@@ -94,3 +94,13 @@ PR: #373
 
 - [x] 4.1 Carry #370's filter measurement into the spec as the `## Amendment` Phase 1 Step 3 owes — aa0476e
 - [x] 4.2 Set `Status: in-progress` and `Implementation` to the merged and open phase PRs, and regenerate `.ai/specs/README.md` — aa0476e
+
+### Review pass (`om-auto-review-pr 373 --autofix`)
+
+- [x] R.1 Read Chromium's painted pixel back for every `color-mix`, and record the provenance and
+      the 0.02 quantisation tolerance beside the tokens — 06b0ad3
+- [x] R.2 Rename `toByte` to `toSrgb`, which is what it returns, and replace the deepened
+      regions' `slice(1)` with a named filter so the 3:1 floor is not coupled to array order — 06b0ad3
+- [x] R.3 Correct two claims in the PR body: `ci.yml` does not run `e2e` on a pull request (it
+      runs in the merge queue, ADR 0020), and the `pen-*` utilities do reach the bundle because
+      Tailwind's scan sees their names in the test file
