@@ -299,6 +299,9 @@ anything from anyone else waits for a maintainer to add a trigger label.
 **The agent layer is this repository's.** `.ai/cezar/workflows/`, `.ai/scripts/`,
 `.ai/skills/afk-*/`, `.claude/hooks/`, `docs/agents/cezar-automations.json` and the Claude
 `.github/workflows/` were rendered from `design4pro/agent-kit` until it was retired (ADR 0021).
-They are ordinary files now: edit them here, in the pull request that needs the change. They stay
-listed in `.prettierignore` so a change to one is readable as a diff, not as a reflow.
+They are ordinary files now: edit them here, in the pull request that needs the change — a cezar
+run included, since a branch's diff is read before anything merges. The one exception is a run
+under `GITHUB_ACTIONS`, where `guard-generated.sh` still refuses them outright, because there the
+diff being read belongs to whoever opened the pull request. They stay listed in `.prettierignore`
+so a change to one is readable as a diff, not as a reflow.
 <!-- END per-repo -->

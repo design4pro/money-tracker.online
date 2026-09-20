@@ -66,6 +66,7 @@ test-results
 .claude/hooks/__tests__/hooks.test.ts
 .claude/hooks/format-file.sh
 .claude/hooks/git-guardrails.sh
+.claude/hooks/guard-generated.sh
 .claude/hooks/guard-read.sh
 .claude/settings.json
 .claude/skills/backlog/SKILL.md

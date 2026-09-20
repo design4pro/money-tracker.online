@@ -300,6 +300,23 @@ and the hooks in `.claude/hooks/` tighten:
 - `guard-read.sh` (Read, Glob, Grep) confines reads to the worktree and denies `.dev.vars`,
   `.env*`, cezar run state and `.ai/qa/test-env.env`. `.ai/runs`, `.ai/analysis`, `.ai/qa` and
   `.ai/tmp` stay readable: the skills write their artefacts there.
+- `guard-generated.sh` (Edit, Write) refuses the generated files — `src/routeTree.gen.ts`,
+  `drizzle/`, `worker-configuration.d.ts` — for everyone, in every mode, and in an agent run also
+  refuses any write that walks through `..` or lands outside the worktree. That confinement has a
+  real incident behind it: a pr-autopilot run once rewrote eight files in a sibling checkout a
+  human was working in, and nothing downstream could tell.
+
+  It used to refuse a third set — `.github/`, `.claude/`, `.husky/`, `.ai/cezar/`,
+  `.ai/agentic.config.json`, `.ai/trackers/`, `.ai/browsers/`, `.ai/skills/`, `.ai/scripts/`,
+  `scripts/ci/`, `.npmrc`, `pnpm-workspace.yaml`, `docs/agents/reference.md` and
+  `docs/agents/out-of-scope.md` — in a cezar run too, with an exception for a file the branch
+  already changed. **Not any more** (ADR 0021): a cezar run edits its own skills, workflows and
+  gate like any other change here, and the review of its branch is what judges that. The
+  `in_branch_diff` exception went with it, having existed only to soften that block.
+
+  Under `GITHUB_ACTIONS` that third set is still refused, without exception. There the diff being
+  read is the pull request author's, so "this branch already changes it" is the author's own claim,
+  and the review job holds a write token while reading it.
 
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
 `jq`, and a prefix allowlist would drop label mutations silently. The hooks in `.claude/hooks/`,

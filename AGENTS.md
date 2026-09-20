@@ -72,11 +72,17 @@ The gate starts with the two generated-file checks for a reason: `src/routeTree.
 `drizzle/` are regenerated and diffed, so a hand edit to either is caught in the first seconds of a
 run rather than in review.
 
-Every file in this repository is yours to edit. `.ai/cezar/workflows/`, `.ai/cezar/config.json`,
+The agent layer is yours to edit. `.ai/cezar/workflows/`, `.ai/cezar/config.json`,
 `.ai/skills/afk-*/`, `.claude/hooks/`, `.claude/settings.json`, `.claude/skills/backlog/SKILL.md`,
-`.ai/trackers/github.md`, `scripts/ci/` and the Claude `.github/workflows/` used to be rendered from
-`design4pro/agent-kit` and could not be; that repository is retired and they are ordinary files
-(ADR 0021). They are still in `.prettierignore`, so keep the formatting you find.
+`.ai/trackers/github.md`, `scripts/ci/` and the Claude `.github/workflows/` were rendered from
+`design4pro/agent-kit`, which refused hand edits; that repository is retired and they are ordinary
+files (ADR 0021). They are still in `.prettierignore`, so keep the formatting you find.
+
+Two things still refuse an edit, both through `.claude/hooks/guard-generated.sh`:
+`src/routeTree.gen.ts`, `drizzle/` and `worker-configuration.d.ts` in every mode, and — under
+`GITHUB_ACTIONS` only — that whole agent layer, because there the diff being read belongs to
+whoever opened the pull request. A cezar run is not restricted: it edits its own skills, workflows
+and gate on a branch, and the review is what judges that.
 
 ## Task Router
 

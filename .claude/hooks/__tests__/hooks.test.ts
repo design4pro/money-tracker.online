@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process'
 import {
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -405,6 +406,223 @@ describe('git-guardrails.sh', () => {
         expect(bash(command, REVIEW).status).toBe(2)
       })
     })
+  })
+})
+
+describe('guard-generated.sh', () => {
+  const root = '/repo'
+  const edit = (file_path: string, env = {}) =>
+    hook('guard-generated.sh', { file_path }, env, undefined)
+
+  // Layer 1: generated files, every mode, no exception anywhere.
+  it('blocks generated files for everyone', () => {
+    expect(edit(`${root}/src/routeTree.gen.ts`).status).toBe(2)
+    expect(edit(`${root}/drizzle/0001_x.sql`).status).toBe(2)
+    // The journal, not only the SQL: a hand-edited snapshot is invisible to the drift check.
+    expect(edit(`${root}/drizzle/meta/0001_snapshot.json`).status).toBe(2)
+    expect(edit(`${root}/worker-configuration.d.ts`).status).toBe(2)
+    expect(edit(`${root}/src/x.ts`).status).toBe(0)
+  })
+
+  // The message on that last one used to say "run `pnpm exec wrangler types`", which is advice
+  // this repository cannot take: the file is hand-authored and wrangler refuses to write it
+  // ("A non-Wrangler worker-configuration.d.ts already exists"). A block whose instruction cannot
+  // be followed sends a run looking for a way around the block.
+  it('does not tell anyone to regenerate worker-configuration.d.ts', () => {
+    const r = edit(`${root}/worker-configuration.d.ts`)
+    expect(r.stderr).toContain('wrangler.jsonc')
+    expect(r.stderr).toContain("do NOT run 'wrangler types'")
+  })
+
+  // Layer 3, and only under GitHub Actions. ADR 0021 removed the same block for cezar runs: the
+  // case below this one is the other half of that pair and the two must be read together.
+  it.each([
+    '.github/workflows/ci.yml',
+    '.claude/settings.json',
+    // The hooks and their tests. The tests live here rather than under scripts/ precisely so
+    // this rule covers them: a run that cannot edit a guard but can delete the case that pins
+    // its behaviour has only been slowed down, not stopped.
+    '.claude/hooks/git-guardrails.sh',
+    '.claude/hooks/__tests__/hooks.test.ts',
+    '.husky/pre-commit',
+    '.ai/cezar/config.json',
+    '.ai/cezar/workflows/issue-autofix.yml',
+    '.ai/agentic.config.json',
+    '.ai/trackers/github.md',
+    '.ai/browsers/playwright.md',
+    '.ai/skills/om-fix/SKILL.md',
+    '.ai/scripts/e2e.sh',
+    'docs/agents/reference.md',
+    'docs/agents/out-of-scope.md',
+    '.ai/scripts/test-env-up.sh',
+    '.ai/scripts/__tests__/cezar-config.test.ts',
+    // review-threads-label.mjs is the single thing that arms "Resolve blocking review threads",
+    // and merge-gate.mjs is the check that stands between a pull request and `develop`.
+    'scripts/ci/review-threads-label.mjs',
+    'scripts/ci/__tests__/review-threads-label.test.mjs',
+    // What the cockpit installs as this repository's automations and prompts: configuration a run
+    // is handed and must not rewrite.
+    'docs/agents/cezar-automations.json',
+    'docs/agents/cezar-prompt-templates.json',
+    '.npmrc',
+    'pnpm-workspace.yaml',
+  ])('GitHub Actions blocks %s', (rel) => {
+    const r = hook(
+      'guard-generated.sh',
+      { file_path: `${root}/${rel}` },
+      { ...ACTIONS, CLAUDE_PROJECT_DIR: root },
+    )
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('configures the agent')
+  })
+
+  // The behaviour ADR 0021 changed, stated as one case because it is one decision. A cezar run
+  // works on a branch whose diff a human reads before anything merges, so it edits its own
+  // skills, workflows and gate in the ordinary way. Under GitHub Actions the diff being read is
+  // the pull request author's, so the same edit is the attacker's edit and stays refused.
+  it('lets a cezar run edit what configures it, and never lets GitHub Actions', () => {
+    for (const rel of [
+      '.claude/settings.json',
+      '.claude/hooks/git-guardrails.sh',
+      '.ai/cezar/config.json',
+      '.ai/agentic.config.json',
+      '.github/workflows/ci.yml',
+      'scripts/ci/merge-gate.mjs',
+    ]) {
+      const file_path = `${root}/${rel}`
+      expect(
+        hook(
+          'guard-generated.sh',
+          { file_path },
+          { ...AGENT, CLAUDE_PROJECT_DIR: root },
+        ).status,
+      ).toBe(0)
+      const blocked = hook(
+        'guard-generated.sh',
+        { file_path },
+        { ...ACTIONS, CLAUDE_PROJECT_DIR: root },
+      )
+      expect(blocked.status).toBe(2)
+      expect(blocked.stderr).toContain('configures the agent')
+    }
+  })
+
+  // Layer 1 outranks both: no mode edits a generated file, cezar included.
+  it('still blocks a generated file in a cezar run', () => {
+    expect(
+      edit(`${root}/src/routeTree.gen.ts`, {
+        ...AGENT,
+        CLAUDE_PROJECT_DIR: root,
+      }).status,
+    ).toBe(2)
+  })
+
+  it('leaves ordinary paths alone and does not confuse look-alikes', () => {
+    for (const rel of [
+      'src/x.ts',
+      'scripts/seed/seed.mjs',
+      // scripts/ci/ is guarded under Actions; the rest of scripts/ is not, in any mode.
+      'scripts/visual/capture.mjs',
+      'skills-lock.json',
+      'docs/agents/cezar.md',
+      'src/.npmrc-ish.ts',
+      '.ai/runs/2026-09-06-rounding/PLAN.md',
+      '.ai/specs/2026-09-06-rounding.md',
+      '.ai/analysis/12.md',
+      '.ai/qa/test-env.json',
+      '.ai/agentic.config.json.bak',
+    ]) {
+      for (const env of [AGENT, ACTIONS]) {
+        expect(
+          hook(
+            'guard-generated.sh',
+            { file_path: `${root}/${rel}` },
+            { ...env, CLAUDE_PROJECT_DIR: root },
+          ).status,
+        ).toBe(0)
+      }
+    }
+    // A developer at the keyboard is in no mode at all and is guarded by layer 1 only.
+    expect(
+      hook('guard-generated.sh', { file_path: `${root}/.claude/settings.json` })
+        .status,
+    ).toBe(0)
+  })
+
+  // Layer 2 (agent-kit#2). Before it, `${file_path#"$root"/}` left a path outside the root
+  // absolute, the hook's anchored pattern cannot match an absolute path, and so every rule in the
+  // file read as "not guarded" - which is how a pr-autopilot run rewrote eight templates in a
+  // sibling agent-kit checkout, on a human's branch, with uncommitted work in the tree. That
+  // repository is archived; this route is not, and nothing else in the toolchain closes it.
+  it.each([
+    // The incident's own shape: a sibling checkout on the same host, named absolutely...
+    '/elsewhere/agent-kit/templates/docs/agents/cezar-automations.json',
+    // ...and named the way it is actually reached, which the lexical '..' arm catches instead.
+    '../agent-kit/templates/.claude/hooks/guard-generated.sh',
+    '/repo/../agent-kit/templates/.claude/settings.json',
+    'src/../../elsewhere/x.ts',
+  ])('agent mode blocks the write outside the worktree: %s', (file_path) => {
+    const r = hook(
+      'guard-generated.sh',
+      { file_path },
+      { ...AGENT, CLAUDE_PROJECT_DIR: root },
+    )
+    expect(r.status).toBe(2)
+    // The message has to say where such a change does belong. A block that only refuses leaves
+    // the run looking for another route to the same file.
+    expect(r.stderr).toContain('pull request')
+  })
+
+  it('confines writes in agent runs only, and still takes a relative path', () => {
+    const outside = '/elsewhere/agent-kit/templates/x.json'
+    const w = (file_path: string, env: Record<string, string>) =>
+      hook(
+        'guard-generated.sh',
+        { file_path },
+        { ...env, CLAUDE_PROJECT_DIR: root },
+      ).status
+    // A developer at the keyboard legitimately edits a sibling checkout; a run does not, and
+    // under GitHub Actions least of all.
+    expect(w(outside, {})).toBe(0)
+    expect(w(outside, AGENT)).toBe(2)
+    expect(w(outside, ACTIONS)).toBe(2)
+    // A relative path resolves against the root rather than reading as outside it, so the rules
+    // after the confinement check still see it - allowed or guarded on its own merits. A file in
+    // a directory that does not exist yet is the ordinary write, and stays allowed.
+    expect(w('src/x.ts', AGENT)).toBe(0)
+    expect(w('src/new/deep/x.ts', AGENT)).toBe(0)
+    expect(w('.claude/settings.json', ACTIONS)).toBe(2)
+  })
+
+  // A real root and a real sibling, which the cases with a '/repo' root cannot be: $TMPDIR on
+  // macOS is reached through /var, a symlink to /private/var, and the tools hand back the resolved
+  // form. A root left unresolved compares unequal to every path under it, so the confinement check
+  // would refuse the whole worktree; the relative-path case above is that counter-case, and this
+  // is the other half of the pair.
+  it('refuses a sibling checkout, resolving both sides physically', () => {
+    const real = mkdtempSync(join(tmpdir(), 'guard-root-'))
+    const sibling = mkdtempSync(join(tmpdir(), 'guard-sibling-'))
+    mkdirSync(join(sibling, 'templates'), { recursive: true })
+    // On macOS the two spellings differ (/var vs /private/var) and that is the case this pins; on
+    // Linux they are the same and it degrades to an ordinary sibling check, which is still true.
+    expect(realpathSync(sibling).startsWith(realpathSync(real))).toBe(false)
+    const r = hook(
+      'guard-generated.sh',
+      { file_path: join(sibling, 'templates/x.json') },
+      { ...AGENT, CLAUDE_PROJECT_DIR: real },
+      real,
+    )
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('outside the worktree')
+    // ...and a file inside it is not refused, which is what an unresolved root would get wrong.
+    expect(
+      hook(
+        'guard-generated.sh',
+        { file_path: join(real, 'src/new/x.ts') },
+        { ...AGENT, CLAUDE_PROJECT_DIR: real },
+        real,
+      ).status,
+    ).toBe(0)
   })
 })
 
