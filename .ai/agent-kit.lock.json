@@ -1,5 +1,5 @@
 {
-  "kitVersion": 48,
+  "kitVersion": 49,
   "projectId": "money-tracker-online",
   "rendered": {
     ".ai/cezar/config.json": {
@@ -66,6 +66,10 @@
       "sha256": "c6fa5e5752c032f55963c77891da492727a1ad4e2a700949674c6a36ed89b72d",
       "mode": "100644"
     },
+    ".ai/scripts/__tests__/agent-kit-check.test.mjs": {
+      "sha256": "8a5eddf30001edbea9f9960d4ef228247eb7aacbc5f11a0e1b40539a3fea9618",
+      "mode": "100644"
+    },
     ".ai/scripts/__tests__/backlog-status.test.mjs": {
       "sha256": "a4e790d5189367d220c9046c9e6b9a2fda1472ffe88219c43c9837434cbb5232",
       "mode": "100644"
@@ -79,7 +83,7 @@
       "mode": "100755"
     },
     ".ai/scripts/cez-automations.sh": {
-      "sha256": "96444910f88b9d1a66996c70f38a0b124849cacd388c3d8466b47b27678f9bd2",
+      "sha256": "2c0f8f814f86558533dcc40a215b105d820773691606de367ca19bc41c2b3db1",
       "mode": "100755"
     },
     ".ai/scripts/cez-prompt-templates.sh": {
