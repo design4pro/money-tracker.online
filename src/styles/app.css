@@ -605,7 +605,11 @@
    `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md` named it: the wash, the
    bleed, the pooled trailing edge and the paused blob all stay, and only the
    roughness goes. One mark standing alone - the landing's `settled` stamp -
-   keeps it. */
+   keeps it, which is why no recipe in `badgeVariants` wears this yet: Q1 names
+   `sm` as where the fallback lands, but `sm` is where the marks that repeat
+   will be, not a synonym for repetition, and today the only `sm` mark in the
+   app is that single stamp. Phase 3 is what puts marks on the rows, and it is
+   what reaches for this. */
 @utility mark-pen-flat {
   /* Compound on purpose. Both utilities set the same custom property on the
      same element, so at equal specificity the winner would be whichever rule

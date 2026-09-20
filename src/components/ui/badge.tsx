@@ -40,15 +40,18 @@ export const badgeVariants = cva(
       },
       size: {
         /**
-         * The dense size, and the one that repeats: a table cell, a tree row.
-         * `mark-pen-flat` drops the roughened outline here and keeps the rest
-         * of the pen, because `#mark-pen-rough` is re-rastered per mark and a
-         * screenful of them costs a whole frame budget - the measurement and
-         * the decision are Q1 of
-         * `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`. It is inert
-         * until a `sm` badge wears the mark.
+         * The dense size, and the one that will repeat: a table cell, a tree
+         * row. `mark-pen-flat` - Q1's measured fallback in
+         * `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`, and a utility
+         * this phase ships - belongs on the marks that repeat, and it is
+         * Phase 3 that puts marks on them. It is deliberately **not** on this
+         * recipe: `sm` is not a synonym for "repeats", and the one `settled`
+         * badge in the app today is the landing's stamp at `sm`
+         * (`src/routes/-ui/ledger-preview.tsx`), a single mark standing alone
+         * that keeps its roughened outline. Flattening here would have made
+         * this phase visible on the one screen it promised not to touch.
          */
-        sm: 'mark-pen-flat h-5 px-1.5 text-micro tracking-label uppercase',
+        sm: 'h-5 px-1.5 text-micro tracking-label uppercase',
         md: 'h-6 px-2 text-caption',
       },
     },

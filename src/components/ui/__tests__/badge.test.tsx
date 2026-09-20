@@ -18,9 +18,20 @@ import { Badge, badgeVariants } from '../badge'
  */
 describe('Badge', () => {
   it('paints the settled badge with the mark and keeps its word in ink', () => {
-    const className = badgeVariants({ tone: 'settled' })
+    // `size: 'sm'` is not decoration on this call: it is the size the landing
+    // stamp actually ships at (`src/routes/-ui/ledger-preview.tsx`), while the
+    // variant's default is `md`. A control that took the default would pin a
+    // combination no screen renders, and would not see a size recipe reach the
+    // one badge that wears the mark.
+    const className = badgeVariants({ tone: 'settled', size: 'sm' })
 
     expect(className).toContain('mark-pen')
+    // `mark-pen-flat` - Q1's perf fallback, which drops the roughened outline -
+    // has `mark-pen` inside its own name, so the line above passes just as
+    // happily on the flattened mark. The landing's stamp stands alone and keeps
+    // its roughness; only a mark that repeats gives it up, and this is what
+    // says so.
+    expect(className).not.toContain('mark-pen-flat')
     expect(className).toContain('text-ink')
     // The mark is the chrome, so the box that would fight it is transparent.
     expect(className).toContain('border-transparent')
