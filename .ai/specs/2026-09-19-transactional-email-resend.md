@@ -1,11 +1,11 @@
 # Transactional email on Resend: React Email templates, the digest and unsubscribe
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #210  |
-| **Spec PR**        | #344  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #210        |
+| **Spec PR**        | #344        |
+| **Implementation** | none        |
 
 ## 📝 TLDR
 
@@ -555,3 +555,21 @@ build` passes. **Stop the phase if either fails.** _Check:_ `render.test.ts` in 
 3. **Cap to `deferred`, and `deferred` expiry.** The enqueuer's over-cap branch writes `deferred`
    instead of `failed`/`capped`, and `runEmailRecovery` expires `deferred` rows older than 48 hours to
    `failed` (`expired`). _Check:_ the enqueuer test and `email-recovery.test.ts` extended.
+
+## Amendment — `renderCopyParams` takes no `digitsOf` (#349, Phase 1)
+
+The module table designs `renderCopyParams(locale, params, digitsOf)`, with the third argument
+injecting `currencies.digits` from `src/server/catalog` so the pure module stays free of server
+imports. It shipped as `renderCopyParams(locale, params)`.
+
+There is nothing to inject. `src/server/catalog` holds `account-types.ts` and a `data/` directory
+and no currency scale at all; the single catalogue of `digits` in this repository is
+`src/lib/money/currencies.ts`, which `formatMoney` already reads through `minorUnitDigits` — and
+`formatMoney` is the function `docs/MONEY.md` §7.2 names as the one formatter. A `digitsOf`
+parameter could therefore only be either ignored or fed to `formatMoney`'s `fractionDigits`, which
+changes what is **drawn** without changing the arithmetic and which the option's own docblock
+forbids for anything showing a real balance.
+
+`render-copy.ts` is still pure and still imports nothing from `server/`, which is the property the
+third argument existed to protect, so `21-S3` can reuse it unchanged. The money invariants the spec
+names are unaffected: the scale still comes from the currency, and zero-decimal JPY is still a case.

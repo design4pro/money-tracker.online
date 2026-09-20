@@ -163,24 +163,56 @@ None.
 
 ### Owned paths
 
-- `src/server/notify/email/send.ts` — new
-- `src/server/notify/email/render.ts` — new
-- `src/server/notify/email/templates.ts` — new
-- `src/server/notify/email/__tests__/render.test.ts` — new
+The directory is `src/server/email/`, not `src/server/notify/email/` — the maintainer settled that
+on #210 (decision 4), because `src/server/notify/email.ts` already exists as 21-S1's seam and a
+sibling directory of the same name would be two things with one name. `src/server/email/**` imports
+from `#/server/notify` and never the other way round; `install.ts` is the only place the two meet.
+
+- `src/server/email/send.ts` — new; `sendEmail({ to, subject, html, text, headers, idempotencyKey, tags })`
+- `src/server/email/render.ts` — new; `renderEmail(element)` → `{ html, text }`
+- `src/server/email/templates/layout.tsx` — new; the shared frame, footer included
+- `src/server/email/templates/{notification,digest,auth}.tsx` — new; one per message family
+- `src/server/email/locale.ts` — new; `resolveRecipientLocale`
+- `src/server/email/unsubscribe-token.ts` — new; signing and verifying
+- `src/server/email/recipient-hash.ts` — new; `hashRecipient`
+- `src/server/email/enqueue.ts` + `src/server/email/install.ts` — new; the real enqueuer and its installer
+- `src/server/email/__tests__/render.test.ts` — new
+- `src/lib/notifications/render-copy.ts` — new; `CopyParam` → display string, pure, reused by 21-S3
+- `src/server/repos/email-deliveries.ts`, `src/server/repos/email-suppressions.ts` — new
 - `src/server/queue/handlers/notify-email.ts` — new
 - `src/server/queue/handlers/__tests__/notify-email.test.ts` — new
 - `src/server/cron/digest.ts` — new
-- `src/routes/api/unsubscribe.ts` — new
+- `src/server/cron/email-recovery.ts` — new; the quarter-hourly recovery sweep
+- `src/routes/api/unsubscribe.ts`, `src/routes/unsubscribe.tsx` — new
+- `src/routes/api/webhooks/resend.ts` — new
 
 ### Data and migration
 
-Requisitions into `00-S9`: `email_deliveries` (`id`, `organization_id`, `user_id`, `kind`, `to_hash`,
-`provider_message_id`, `status` in `queued|sent|bounced|complained|suppressed`, `error_code`,
+Requisitions into `00-S9`: `email_deliveries` (`id`, `organization_id`, `user_id`, `kind`,
+`notification_id`, `dedupe_key`, `to_hash`, `provider_message_id`, `status`, `error_code`,
 `created_at`, `sent_at`) and `email_suppressions` (`email_hash`, `reason`, `created_at`).
 
+`notification_id`, `dedupe_key` and the wider status set widen this stage's original column list
+(spec A5): the tenant check needs the notification id, the digest and the re-enqueue need the
+dedupe key, and the statuses the sweep and the cap write need names. `status` is
+`queued | sending | sent | failed | deferred | digested | suppressed | bounced | complained` — the
+five above plus `failed` (which this plan already used without listing it), `sending` (the claim),
+`deferred` (the cap) and `digested` (a deferred row a digest has since carried). It is still one
+additive migration.
+
+Indexes: unique `(organization_id, user_id, dedupe_key)`, so a second enqueue of one notification or
+a second digest on the same day conflicts and is dropped, and `(organization_id, created_at)` for
+the daily cap count.
+
+**`email_suppressions` has no `organization_id`** (spec A2, confirmed by the maintainer on PR #344).
+A hard bounce or a complaint is a fact about an address, not about a workspace, and per-workspace
+suppression would keep emailing a complained address from a second workspace. It is platform data,
+modelled on `src/server/repos/billing-events.ts`'s documented carve-out.
+
 **`to_hash`, not the address.** The delivery log is queried during support and read in aggregate;
-storing a SHA-256 of the lowercased address with a per-environment salt gives us bounce correlation
-without a second copy of everyone's email. `docs/SECURITY.md` §4 records the choice.
+storing an HMAC-SHA-256 of the lowercased address keyed by a per-environment salt gives us bounce
+correlation without a second copy of everyone's email. The salt is never rotated, because rotating
+it breaks that correlation. `docs/SECURITY.md` §4 records the choice.
 
 ### Server (repo, server function, Zod)
 
@@ -190,26 +222,49 @@ without a second copy of everyone's email. `docs/SECURITY.md` §4 records the ch
 - **Every email is HTML and plain text.** Text is not a fallback afterthought; it is generated from
   the same template data, and `render.test.ts` asserts both contain the same amounts and the same
   link.
-- **Templates** are functions of typed data returning both parts, with the i18n layer (plan 02)
-  resolving strings in the **recipient's** locale — the workspace's locale is a default, the person's
-  preference wins.
-- **Queue handler.** `notify.email` messages are processed with at-most-once semantics enforced by a
-  conditional update on `email_deliveries.status` (`queued → sent` only from `queued`), so a
-  redelivery cannot double-send. A provider 5xx retries with backoff; a 4xx is terminal and marks
-  `failed` with the code — retrying a rejected address forever is how a sender reputation dies.
+- **Templates** are **React Email components** (`@react-email/components`, pinned in `docs/SPEC.md`
+  §3). `render()` runs twice on the same element — once for HTML, once with `{ plainText: true }` —
+  so both parts come from the same typed data by construction, which is what this stage originally
+  asked "functions of typed data" for. The i18n layer resolves strings in the **recipient's** locale:
+  the workspace's locale is a default and the person's preference wins. **Until `user_preferences`
+  (plan 23) or `organization_settings` (plan 02) exists there is no stored locale to read**, so
+  `resolveRecipientLocale` runs the negotiation chain over a seam that returns `null` and notification
+  and digest email goes out in `en` (spec A1, accepted by the maintainer). Auth emails run inside a
+  request and use that request's negotiated locale.
+- **Queue handler.** `notify.email` messages are **at-least-once to the transport and deduplicated at
+  the provider**. A conditional update `queued → sending` claims the row, so a concurrent redelivery
+  finds nothing to claim and sends nothing; each send carries Resend's `Idempotency-Key` (the
+  delivery id), so a resend after a crash is accepted without a second copy being delivered. This
+  replaces the "at-most-once via a conditional update" wording above, which could not hold together
+  with "a 5xx retries" once a worker dies between the claim and the status update. A provider 5xx or
+  429 retries with backoff; a 4xx is terminal and marks `failed` with the code — retrying a rejected
+  address forever is how a sender reputation dies.
+- **Recovery sweep.** `runEmailRecovery` on the quarter-hourly cron puts rows left in `sending` or
+  `queued` for more than 15 minutes back to `queued` and enqueues them again, only while a provider
+  is configured. Rows older than 23 hours are marked `failed` (`expired`) rather than resent, because
+  Resend's idempotency window is 24 hours and a message that arrives a day late is worse than one
+  that does not arrive. `deferred` rows no digest has carried within 48 hours expire the same way.
 - **Digest.** `digest.ts` runs in the nightly cron after the backup step, gathers each user's
   digestible notifications from the last 24 hours, and sends one email per user with a non-zero set.
   **No notifications, no email** — a daily "you have nothing" message trains people to filter the
   sender.
-- **Unsubscribe.** Every email carries `List-Unsubscribe` and `List-Unsubscribe-Post` headers plus a
-  visible footer link to `/api/unsubscribe?t=...`, where `t` is a **signed, expiring token** naming
-  the user, workspace and kind. The route flips the matching preference and renders a confirmation
-  page with a link back to full preferences. It requires **no session** — an unsubscribe link that
-  demands a login is a spam complaint.
+- **Unsubscribe.** Every **notification and digest** email carries `List-Unsubscribe` and
+  `List-Unsubscribe-Post` headers plus a visible footer link, where `t` is a **signed, expiring
+  token** (180 days) naming the user, workspace and kind. **Auth emails carry neither header** (spec
+  A4): nobody can opt out of a password reset, and a header that pretends otherwise is misleading.
+  The `POST /api/unsubscribe?t=` endpoint is RFC 8058 one-click; the footer link goes to the
+  `/unsubscribe?t=` page, whose `GET` renders a confirmation and **changes nothing**, because mail
+  scanners prefetch links and a `GET` that unsubscribes turns every security gateway into an
+  unsubscribe. Both require **no session** — an unsubscribe link that demands a login is a spam
+  complaint. The page's link back to full preferences is left out until `21-S3` ships
+  `/settings/notifications` (spec A7); the invalid state links to sign-in instead.
 - **Bounces.** The provider's webhook (verified by signature, the same Standard Webhooks verifier
-  `22-S1` owns) marks deliveries and adds hard bounces and complaints to `email_suppressions`. A
-  suppressed address is skipped **before** the provider call, and the in-app notification is still
-  written — losing the email must not lose the notification.
+  `22-S1` owns) is handled **inline** rather than store-then-enqueue like Polar (spec A6): processing
+  is two idempotent indexed writes, neither slow nor order-dependent. It marks deliveries and adds
+  hard bounces and complaints to `email_suppressions`. A suppressed address is skipped **before** the
+  provider call, and the in-app notification is still written — losing the email must not lose the
+  notification. **There is no way to remove a suppression in this stage** (spec A12): that is an
+  operator action with abuse potential and it belongs with the admin console (plan 25).
 
 ### UI (route, components)
 
@@ -219,9 +274,13 @@ clean.
 
 ### Quota
 
-No plan-limited row. A **per-workspace daily email cap** (a named constant, generous) exists purely as
-an abuse brake; hitting it logs loudly and switches the workspace to digest-only for the day rather
-than dropping notifications silently.
+No plan-limited row. A **per-workspace daily email cap** (`WORKSPACE_DAILY_EMAIL_CAP`, generous)
+exists purely as an abuse brake; hitting it logs loudly at `error`, once per workspace per day, and
+switches the workspace to digest-only for the day rather than dropping notifications silently. Over
+the cap the enqueuer writes the row `deferred` and the next digest carries it, whatever the person's
+`digest` preference is — they asked for these by email — and marks it `digested`. The digest re-reads
+the kind's `email` preference first, so somebody who used the unsubscribe link since does not get
+them. The in-app row is written either way, because `notify()` writes it before the email leg runs.
 
 ### Tenant isolation test
 
@@ -238,11 +297,18 @@ _An email states the same number the app states._ Cases in `render.test.ts`:
   payload — two renderings of one number that disagree is the bug this catches.
 - _amounts are formatted from the payload's integers in the recipient's locale_, asserted with an
   `en` and a `pl` recipient receiving the same `budget.exceeded` payload.
-- _the digest's per-kind totals equal the sum of the underlying notifications' amounts_, recomputed
-  rather than accumulated.
+- _each digest line's amount equals the same notification rendered on its own_. **The digest sums
+  nothing** (spec A3): the per-kind totals this plan originally asked for would add the spend of
+  different budgets, and amounts in different currencies, which is not a meaningful quantity and
+  breaks `docs/MONEY.md` §2 the moment two currencies meet. The digest lists each notification with
+  its own amount instead, and the invariant is that the list and the standalone rendering agree.
 - _no template interpolates a raw `amountMinor` into user-facing text_ — a test scans the rendered
   output for the integer's raw form and fails on a match, which is how `123456` reaching someone's
   inbox as "123456" gets caught.
+
+The formatting itself lives in `src/lib/notifications/render-copy.ts`, which is pure and imports
+nothing from `server/`, so `21-S3`'s in-app notification item renders the same payload through the
+same function: one payload, two surfaces, one number.
 
 ### Verification
 
