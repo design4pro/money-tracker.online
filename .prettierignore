@@ -52,6 +52,7 @@ test-results
 .ai/cezar/workflows/spec-to-tickets.yml
 .ai/cezar/workflows/spec.yml
 .ai/cezar/workflows/triage.yml
+.ai/scripts/__tests__/agent-kit-check.test.mjs
 .ai/scripts/__tests__/backlog-status.test.mjs
 .ai/scripts/agent-kit-check.mjs
 .ai/scripts/backlog-status.mjs
