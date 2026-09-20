@@ -278,3 +278,24 @@ This also records the consequence for decision 2's label count: `labels.intake` 
 repaired rather than left standing — a label that four live automations read is part of the
 taxonomy whether or not it looks like state, and leaving it out of the config is what let the
 documentation and the running system disagree.
+
+## Amendment, 2026-09-20: `guard-generated.sh` no longer refuses `.claude/` in a cezar run
+
+The amendment of 2026-09-07, under **Skill versions are pinned, not floating**, gives as one reason
+for vendoring the collection that a gitignored `.agents/skills/` "put the collection outside
+`guard-generated.sh`, which refuses edits under `.claude/`". The relative clause has stopped being
+true in general. ADR 0021 narrowed that hook: the block on `.claude/`, `.github/`, `.ai/cezar/`,
+`.ai/skills/`, `.ai/scripts/`, `scripts/ci/` and the rest of the governance set now applies under
+`GITHUB_ACTIONS` only. A cezar run may edit those paths, and the review of its branch is what
+judges the edit.
+
+Read that sentence as the record of a 2026-09-07 decision, which is what it is. The argument it
+was making survives the narrowing intact and is worth restating in current terms: vendoring is
+what makes a skill version **reviewable and reproducible** — a file in the checkout, at a SHA
+`.ai/cezar/config.json` names, whose change is a diff a human reads. That was always the load-
+bearing half. The hook was the belt-and-braces half, and it is now belt only, and only under
+GitHub Actions.
+
+Decision 2's own text is unaffected: `.claude/skills/om-*` and `skills-lock.json` are still
+committed, the pin still moves in the same commit, and an upgrade is still a pull request read
+with `om-apply-upgrade-notes`.
