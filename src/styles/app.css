@@ -522,10 +522,15 @@
 /* --------------------------------------------------------------------------
    HIGHLIGHTER — the settled mark.
 
-   A run of highlighter over a typed word. The wash is `highlighter` - the
-   stamp wash in light, a lilac pen in dark, because `brand-soft` there is the
-   selection tint and a highlighter has to read as a pen run over the line,
-   not as a selected row. It is drawn behind the text so the ink stays ink,
+   A run of highlighter over a typed word. The wash is `--mark-pen-wash` and
+   the shade it pools into is `--mark-pen-deepen`; both default to the stamp
+   pair, so a caller that sets neither gets the settled mark exactly as it has
+   always looked. Two properties rather than two tokens is what lets a second
+   tone have a pen of its own instead of a second copy of this rule
+   (`.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`). The default wash is
+   `highlighter` - the stamp wash in light, a lilac pen in dark, because
+   `brand-soft` there is the selection tint and a highlighter has to read as a
+   pen run over the line, not as a selected row. It is drawn behind the text so the ink stays ink,
    and it runs past both ends of the word the way a pen does: further where
    it lifted. Its trailing edge is darker where the pen pressed, its outline
    is roughened by the `#mark-pen-rough` displacement filter that
@@ -533,22 +538,26 @@
    sits where the pen paused before lifting. Nothing here is a raster and
    every colour is a token, so the same rule inverts for dark.
 
-   Contrast: the text is `ink` on `highlighter` (12.55:1 light, 7.33:1 dark
+   Contrast, for the default wash: the text is `ink` on `highlighter`
+   (12.55:1 light, 7.33:1 dark
    at full strength, measured beside the token); the 75% wash only moves the
    ground toward the page, so the pair never falls below that. In forced
    colours the pseudo-elements lose their paint and the typed word stands
    alone, which is what the badge means anyway.
    -------------------------------------------------------------------------- */
 @utility mark-pen {
+  --mark-pen-wash: var(--color-highlighter);
+  --mark-pen-deepen: var(--color-brand);
+  --mark-pen-filter: url('#mark-pen-rough');
   --mark-pen-pooled: color-mix(
     in oklab,
-    var(--color-highlighter),
-    var(--color-brand) 30%
+    var(--mark-pen-wash),
+    var(--mark-pen-deepen) 30%
   );
   --mark-pen-paused: color-mix(
     in oklab,
-    var(--color-highlighter),
-    var(--color-brand) 45%
+    var(--mark-pen-wash),
+    var(--mark-pen-deepen) 45%
   );
   position: relative;
   isolation: isolate;
@@ -559,12 +568,12 @@
     z-index: -1;
     inset: -5% -0.75ch -5% -0.25ch;
     border-end-end-radius: 20px 30px;
-    background-color: var(--color-highlighter);
+    background-color: var(--mark-pen-wash);
     opacity: 0.75;
     box-shadow:
       inset -2px 0 1px var(--mark-pen-pooled),
       inset -4px 0 5px var(--mark-pen-pooled);
-    filter: url('#mark-pen-rough');
+    filter: var(--mark-pen-filter);
   }
 
   &::after {
@@ -575,14 +584,41 @@
     right: -0.25em;
     width: 0.5ch;
     height: 1ch;
-    background: radial-gradient(
-      var(--mark-pen-paused),
-      var(--color-highlighter)
-    );
+    background: radial-gradient(var(--mark-pen-paused), var(--mark-pen-wash));
     opacity: 0.4;
     border-radius: 10px 0 50px / 200px 0;
     rotate: 15deg;
-    filter: url('#mark-pen-rough');
+    filter: var(--mark-pen-filter);
+  }
+}
+
+/* The same pen with its roughened outline dropped, for a mark that repeats.
+
+   `#mark-pen-rough` is `feTurbulence` at four octaves feeding a displacement
+   map, and it is re-rastered per pseudo-element: measured in headless Chromium
+   over a 50-row transactions table with two badges a row, it costs 12.6 ms
+   (light) and 15.8 ms (dark) of raster per frame on top of the mark itself,
+   against roughly 0.12-0.23 ms for a single mark. Scaled linearly, and a whole
+   60 Hz frame budget spent on one screenful of badges.
+
+   So the mark is kept and the outline is what yields, exactly as Q1 of
+   `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md` named it: the wash, the
+   bleed, the pooled trailing edge and the paused blob all stay, and only the
+   roughness goes. One mark standing alone - the landing's `settled` stamp -
+   keeps it, which is why no recipe in `badgeVariants` wears this yet: Q1 names
+   `sm` as where the fallback lands, but `sm` is where the marks that repeat
+   will be, not a synonym for repetition, and today the only `sm` mark in the
+   app is that single stamp. Phase 3 is what puts marks on the rows, and it is
+   what reaches for this. */
+@utility mark-pen-flat {
+  /* Compound on purpose. Both utilities set the same custom property on the
+     same element, so at equal specificity the winner would be whichever rule
+     Tailwind happened to emit last - a silent dependency on sort order that no
+     test can see and that would drop the fallback without failing anything.
+     `.mark-pen-flat.mark-pen` is 0-2-0 against `.mark-pen`'s 0-1-0, so it wins
+     wherever it lands. It also says what is true: a flat pen is a pen. */
+  &.mark-pen {
+    --mark-pen-filter: none;
   }
 }
 
