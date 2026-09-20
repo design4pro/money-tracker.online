@@ -421,13 +421,28 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
 5. **Declare the tokens.** `--color-pen-neutral`, `-brand`, `-positive`, `-negative`, `-warning`,
    `-info` at all three sites (`:root`, the `prefers-color-scheme: dark` block, `[data-theme='dark']`),
    each with its measured ratio in a comment beside the declaration — the convention the palette
-   already runs on. Starting point, if Step 4 says the pooled edge is decoration: a **34%** hue mix
-   toward `surface` in light and **38%** in dark, which measures 8.69:1 or better in light and
-   7.13:1 or better in dark. If Step 4 says it carries text, the ceilings drop to roughly a 28% mix
-   in light and 15% in dark, and the palette is visibly quieter — take that, and say so.
-   `--color-highlighter` is not touched.
+   already runs on. Starting point, measured during this spec and rendered in
+   `assets/badge-pen-mark-every-tone/mockup-01-tone-sheet.html`:
+
+   | token                  | light               | dark               |
+   | ---------------------- | ------------------- | ------------------ |
+   | `--color-pen-neutral`  | `#cfcec5` (10.51:1) | `#535352` (7.70:1) |
+   | `--color-pen-info`     | `#cfcec5` (10.51:1) | `#535352` (7.70:1) |
+   | `--color-pen-positive` | `#bbd7c6` (10.73:1) | `#415f52` (7.22:1) |
+   | `--color-pen-negative` | `#ebc7c1` (10.62:1) | `#684f4d` (7.56:1) |
+   | `--color-pen-warning`  | `#decdb2` (10.59:1) | `#635840` (7.15:1) |
+   | `--color-pen-brand`    | `#d8cfea` (10.96:1) | `#57516a` (7.53:1) |
+
+   Ratios are `--color-ink` on the wash composited at 0.75, worst of `surface` and `surface-sunken`.
+   The **light** column is derived from the existing `-soft` tints with the chroma pushed back up,
+   and clears **7.5:1 even on the pooled edge** — it stands whichever way Step 4 answers Q8. The
+   **dark** column assumes the decorative reading; if a glyph overlaps the pooled edge, dark drops to
+   roughly a 15% hue mix and gets quieter still. `--color-highlighter` is not touched, and
+   `--color-pen-neutral` and `--color-pen-info` are one value because `--color-info` **is**
+   `--color-ink-2` (Q10).
    _Verify:_ `tokens-contrast.test.ts`'s "declares every token the contract checks" and "the two dark
    sites agree" both pass.
+
 6. **Assert the composite, not the token.** Extend `tokens-contrast.test.ts` with a `PEN_PAIRS` list
    and assert `--color-ink` at 7:1 against each wash composited at 0.75 over `surface` and over
    `surface-sunken`, in both themes, and against `--mark-pen-pooled` and `--mark-pen-paused` at the
