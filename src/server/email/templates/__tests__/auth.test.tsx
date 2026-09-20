@@ -16,6 +16,7 @@ import { createTranslator, loadCatalogue } from '#/lib/i18n'
 
 import { renderEmail } from '../../render'
 import { authEmail } from '../auth'
+import { emailStyles } from '../layout'
 
 import type { Locale, Translate } from '#/lib/i18n'
 import type { AuthEmailProps } from '../auth'
@@ -175,4 +176,96 @@ describe('what an auth email must not do', () => {
 
     expect(html).toContain('You are getting this because of activity on your')
   })
+})
+
+/**
+ * Every light-theme colour in the document is reachable by the dark block.
+ *
+ * The defect this exists for was invisible to every other case in this file and plainly visible in
+ * an inbox: the template took the paragraph *style* from the layout and left behind the *class* that
+ * `@media (prefers-color-scheme: dark)` needs to reach it, so the greeting and the lead rendered
+ * near-black on a near-black ground. No assertion about copy could have caught it — every word was
+ * there, in the right language, with the link intact.
+ *
+ * So the invariant is structural rather than textual, and it is checked over the whole rendered
+ * document: an element that paints a light value inline must also carry the class that repaints it.
+ */
+describe('readability in a dark client', () => {
+  /** Each light value, and the classes the dark block uses to override it. */
+  const REPAINTED_BY = [
+    // `.email-canvas` restates both the ground and the inherited ink, so it answers for either.
+    { value: emailStyles.light.ink, classes: ['email-ink', 'email-canvas'] },
+    { value: emailStyles.light.ink2, classes: ['email-ink-2'] },
+    { value: emailStyles.light.canvas, classes: ['email-canvas'] },
+    { value: emailStyles.light.surface, classes: ['email-surface'] },
+    {
+      value: emailStyles.light.accent,
+      classes: ['email-action', 'email-link'],
+    },
+    {
+      value: emailStyles.light.borderSubtle,
+      classes: ['email-surface', 'email-rule'],
+    },
+  ] as const
+
+  /** Opening tags, with the two attributes this cares about. A rendered email has no `<` in text. */
+  function elementsOf(html: string) {
+    return [...html.matchAll(/<(\w+)([^>]*)>/g)].map(
+      ([, tag = '', attrs = '']) => ({
+        tag,
+        style: /style="([^"]*)"/.exec(attrs)?.[1] ?? '',
+        classes: (/class="([^"]*)"/.exec(attrs)?.[1] ?? '').split(/\s+/),
+      }),
+    )
+  }
+
+  /**
+   * A colour from neither palette is a colour the dark block does not restate, and it arrives
+   * without anybody typing it: `Hr` merges its own `border-top: 1px solid #eaeaea` underneath
+   * whatever it is handed, which drew the brightest line on the page in a dark client. Pinning the
+   * document to the two transcribed palettes catches the next component default the same way.
+   */
+  it('paints nothing from outside the two palettes', async () => {
+    const { html } = await render()
+    const known = new Set<string>([
+      ...Object.values(emailStyles.light),
+      ...Object.values(emailStyles.dark),
+    ])
+
+    // `(?<!&)` keeps a numeric character entity such as `&#8202;` out of the match.
+    for (const [colour] of html.matchAll(/(?<!&)#[0-9a-fA-F]{3,8}\b/g)) {
+      expect(
+        known,
+        `${colour} belongs to no palette this product has`,
+      ).toContain(colour.toLowerCase())
+    }
+  })
+
+  it.each(['en', 'pl'] as const)(
+    'leaves no element painted light-only in %s',
+    async (locale) => {
+      for (const kind of [
+        'verify-email',
+        'reset-password',
+        'organization-invitation',
+      ] as const) {
+        const { html } = await render({
+          kind,
+          locale,
+          organizationName: 'Kowalscy',
+        })
+
+        for (const element of elementsOf(html)) {
+          for (const { value, classes } of REPAINTED_BY) {
+            if (!element.style.includes(value)) continue
+
+            expect(
+              classes.some((name) => element.classes.includes(name)),
+              `<${element.tag}> in ${kind}.${locale} paints ${value} inline but carries none of ${classes.join(', ')}, so a dark client cannot repaint it`,
+            ).toBe(true)
+          }
+        }
+      }
+    },
+  )
 })

@@ -43,6 +43,7 @@
 
 import {
   Body,
+  Button,
   Container,
   Head,
   Heading,
@@ -137,8 +138,10 @@ const TYPE = {
  */
 const DARK_MODE_CSS = `
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
+html, body { background-color: ${LIGHT.canvas}; }
 @media (prefers-color-scheme: dark) {
-  .email-canvas { background-color: ${DARK.canvas} !important; }
+  html, body { background-color: ${DARK.canvas} !important; }
+  .email-canvas { background-color: ${DARK.canvas} !important; color: ${DARK.ink} !important; }
   .email-surface { background-color: ${DARK.surface} !important; border: 1px solid ${DARK.borderSubtle} !important; }
   .email-ink { color: ${DARK.ink} !important; }
   .email-ink-2 { color: ${DARK.ink2} !important; }
@@ -148,13 +151,26 @@ const DARK_MODE_CSS = `
 }
 `
 
+/**
+ * `<body>` itself carries nothing but a reset.
+ *
+ * `Body` keeps only `background`, `background-color` and zeroed spacing on the `<body>` element and
+ * moves everything else onto a `<td>` it generates — a `<td>` that takes no `className`, because the
+ * component does not forward one that deep. Painting the ground through `Body` therefore produced a
+ * light band no dark rule could reach, the card floating on `#f5f4ee` in an otherwise dark client.
+ * So the ground is painted one level in, on a table this file classes itself.
+ */
+const bodyReset: CSSProperties = {
+  margin: 0,
+  padding: 0,
+}
+
 const canvas: CSSProperties = {
   backgroundColor: LIGHT.canvas,
   color: LIGHT.ink,
   fontFamily: FONT_STACK,
   fontSize: TYPE.body,
   lineHeight: TYPE.bodyLine,
-  margin: 0,
   padding: '24px 12px',
 }
 
@@ -192,6 +208,11 @@ const wordmark: CSSProperties = {
 const rule: CSSProperties = {
   backgroundColor: LIGHT.borderSubtle,
   border: 'none',
+  // `Hr` merges its own `border-top: 1px solid #eaeaea` after whatever it is handed, and a longhand
+  // beats the shorthand above it whatever the order — so the default has to be named to be silenced.
+  // Left standing it draws a near-white line, which in a dark client is the brightest thing on the
+  // page and in a light one is a colour from no palette this product has.
+  borderTop: 'none',
   height: '1px',
   margin: '32px 0 16px',
 }
@@ -228,32 +249,34 @@ export function EmailLayout({
         <style>{DARK_MODE_CSS}</style>
       </Head>
       <Preview>{preview}</Preview>
-      <Body className="email-canvas" style={canvas}>
-        <Container className="email-surface" style={container}>
-          {/* A heading rather than a styled paragraph: the wordmark is the document's name, and a
-              screen reader reading the message aloud should say so first. */}
-          <Heading as="h1" className="email-ink" style={wordmark}>
-            {appName}
-          </Heading>
-          {children}
-          <Hr className="email-rule" style={rule} />
-          <Section>
-            <Text className="email-ink-2" style={footerText}>
-              {footerReason}
-            </Text>
-            {unsubscribe === undefined ? null : (
+      <Body className="email-canvas" style={bodyReset}>
+        <Section className="email-canvas" style={canvas}>
+          <Container className="email-surface" style={container}>
+            {/* A heading rather than a styled paragraph: the wordmark is the document's name, and a
+                screen reader reading the message aloud should say so first. */}
+            <Heading as="h1" className="email-ink" style={wordmark}>
+              {appName}
+            </Heading>
+            {children}
+            <Hr className="email-rule" style={rule} />
+            <Section>
               <Text className="email-ink-2" style={footerText}>
-                <Link
-                  className="email-link"
-                  href={unsubscribe.href}
-                  style={footerLink}
-                >
-                  {unsubscribe.label}
-                </Link>
+                {footerReason}
               </Text>
-            )}
-          </Section>
-        </Container>
+              {unsubscribe === undefined ? null : (
+                <Text className="email-ink-2" style={footerText}>
+                  <Link
+                    className="email-link"
+                    href={unsubscribe.href}
+                    style={footerLink}
+                  >
+                    {unsubscribe.label}
+                  </Link>
+                </Text>
+              )}
+            </Section>
+          </Container>
+        </Section>
       </Body>
     </Html>
   )
@@ -290,6 +313,16 @@ export const emailStyles = {
     margin: '0 0 16px',
   } satisfies CSSProperties,
   /**
+   * The band a call to action sits in.
+   *
+   * `padding` rather than `margin`, because the element is a table and Outlook's word engine
+   * discards margins on one. Without it the caption below the button touches its bottom edge, which
+   * reads as a rendering fault rather than as a caption.
+   */
+  actionBlock: {
+    padding: '4px 0 20px',
+  } satisfies CSSProperties,
+  /**
    * 14 px of padding either side of a 23 px line box is 51 px, past the 44 px the spec asks for and
    * past WCAG 2.2 §2.5.8's 24×24 minimum with room for a thumb.
    */
@@ -306,3 +339,50 @@ export const emailStyles = {
     textDecoration: 'none',
   } satisfies CSSProperties,
 } as const
+
+/**
+ * The body of a message: a paragraph, a caption, a call to action.
+ *
+ * They are components rather than three more entries in {@link emailStyles} because a style object
+ * alone is only half of what a piece of email copy needs. The other half is the class that lets the
+ * dark block reach it, and a template that takes the style and forgets the class renders near-black
+ * text on a near-black ground — readable in every test, unreadable in an inbox. Pairing the two here
+ * makes that mistake unavailable rather than merely documented.
+ */
+export function EmailText({ children }: { children: ReactNode }): ReactElement {
+  return (
+    <Text className="email-ink" style={emailStyles.paragraph}>
+      {children}
+    </Text>
+  )
+}
+
+/** Secondary copy: smaller, quieter, and still legible in both themes. */
+export function EmailMuted({
+  children,
+}: {
+  children: ReactNode
+}): ReactElement {
+  return (
+    <Text className="email-ink-2" style={emailStyles.muted}>
+      {children}
+    </Text>
+  )
+}
+
+/** The one thing to click, with the space beneath it that keeps the caption off its edge. */
+export function EmailAction({
+  href,
+  children,
+}: {
+  href: string
+  children: ReactNode
+}): ReactElement {
+  return (
+    <Section style={emailStyles.actionBlock}>
+      <Button className="email-action" href={href} style={emailStyles.action}>
+        {children}
+      </Button>
+    </Section>
+  )
+}

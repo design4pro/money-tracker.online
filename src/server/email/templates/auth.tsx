@@ -23,11 +23,9 @@
  * clicking it next week.
  */
 
-import { Button, Section, Text } from '@react-email/components'
-
 import { directionOf } from '#/lib/i18n'
 
-import { EmailLayout, emailStyles } from './layout'
+import { EmailAction, EmailLayout, EmailMuted, EmailText } from './layout'
 
 import type { Locale, Translate } from '#/lib/i18n'
 import type { ReactElement } from 'react'
@@ -124,16 +122,12 @@ export function authEmail(
         preview={lead}
         footerReason={t('email.layout.footer.reasonAccount', { app })}
       >
-        <Text style={emailStyles.paragraph}>
+        <EmailText>
           {t('email.auth.greeting', { name: props.recipientName })}
-        </Text>
-        <Text style={emailStyles.paragraph}>{lead}</Text>
-        <Section>
-          <Button href={props.url} style={emailStyles.action}>
-            {action}
-          </Button>
-        </Section>
-        <Text style={emailStyles.muted}>{t('email.auth.singleUse')}</Text>
+        </EmailText>
+        <EmailText>{lead}</EmailText>
+        <EmailAction href={props.url}>{action}</EmailAction>
+        <EmailMuted>{t('email.auth.singleUse')}</EmailMuted>
       </EmailLayout>
     ),
   }
