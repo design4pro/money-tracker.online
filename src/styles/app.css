@@ -522,10 +522,15 @@
 /* --------------------------------------------------------------------------
    HIGHLIGHTER — the settled mark.
 
-   A run of highlighter over a typed word. The wash is `highlighter` - the
-   stamp wash in light, a lilac pen in dark, because `brand-soft` there is the
-   selection tint and a highlighter has to read as a pen run over the line,
-   not as a selected row. It is drawn behind the text so the ink stays ink,
+   A run of highlighter over a typed word. The wash is `--mark-pen-wash` and
+   the shade it pools into is `--mark-pen-deepen`; both default to the stamp
+   pair, so a caller that sets neither gets the settled mark exactly as it has
+   always looked. Two properties rather than two tokens is what lets a second
+   tone have a pen of its own instead of a second copy of this rule
+   (`.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`). The default wash is
+   `highlighter` - the stamp wash in light, a lilac pen in dark, because
+   `brand-soft` there is the selection tint and a highlighter has to read as a
+   pen run over the line, not as a selected row. It is drawn behind the text so the ink stays ink,
    and it runs past both ends of the word the way a pen does: further where
    it lifted. Its trailing edge is darker where the pen pressed, its outline
    is roughened by the `#mark-pen-rough` displacement filter that
@@ -533,22 +538,25 @@
    sits where the pen paused before lifting. Nothing here is a raster and
    every colour is a token, so the same rule inverts for dark.
 
-   Contrast: the text is `ink` on `highlighter` (12.55:1 light, 7.33:1 dark
+   Contrast, for the default wash: the text is `ink` on `highlighter`
+   (12.55:1 light, 7.33:1 dark
    at full strength, measured beside the token); the 75% wash only moves the
    ground toward the page, so the pair never falls below that. In forced
    colours the pseudo-elements lose their paint and the typed word stands
    alone, which is what the badge means anyway.
    -------------------------------------------------------------------------- */
 @utility mark-pen {
+  --mark-pen-wash: var(--color-highlighter);
+  --mark-pen-deepen: var(--color-brand);
   --mark-pen-pooled: color-mix(
     in oklab,
-    var(--color-highlighter),
-    var(--color-brand) 30%
+    var(--mark-pen-wash),
+    var(--mark-pen-deepen) 30%
   );
   --mark-pen-paused: color-mix(
     in oklab,
-    var(--color-highlighter),
-    var(--color-brand) 45%
+    var(--mark-pen-wash),
+    var(--mark-pen-deepen) 45%
   );
   position: relative;
   isolation: isolate;
@@ -559,7 +567,7 @@
     z-index: -1;
     inset: -5% -0.75ch -5% -0.25ch;
     border-end-end-radius: 20px 30px;
-    background-color: var(--color-highlighter);
+    background-color: var(--mark-pen-wash);
     opacity: 0.75;
     box-shadow:
       inset -2px 0 1px var(--mark-pen-pooled),
@@ -575,10 +583,7 @@
     right: -0.25em;
     width: 0.5ch;
     height: 1ch;
-    background: radial-gradient(
-      var(--mark-pen-paused),
-      var(--color-highlighter)
-    );
+    background: radial-gradient(var(--mark-pen-paused), var(--mark-pen-wash));
     opacity: 0.4;
     border-radius: 10px 0 50px / 200px 0;
     rotate: 15deg;
