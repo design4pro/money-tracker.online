@@ -57,8 +57,8 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
 
 **The gate is `validation.commands` in `.ai/agentic.config.json`, in the order written there.** Read
 it and run it; this file deliberately does not copy the list, because the copy that used to live
-here had already lost its first command — `node .ai/scripts/agent-kit-check.mjs` — and an agent that
-skipped it failed the gate in CI on a file it never edited.
+here had already fallen out of step with it once, and an agent that ran the stale copy failed the
+gate in CI on a command it never ran.
 
 ```bash
 node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>console.log(c))"
@@ -68,15 +68,15 @@ node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>con
 request, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
 repo) is not a gate either; keep what you touch prettier-clean.
 
-`node .ai/scripts/agent-kit-check.mjs` being first is not incidental: it verifies that no file the
-agent kit renders has been edited by hand. `.ai/agent-kit.lock.json` hashes them, and that lock file
-— not a list in prose — is the answer to "is this file mine to edit": the check walks its explicit
-keys, not a directory glob. It covers `.ai/cezar/workflows/`, `.ai/cezar/config.json`,
+The gate starts with the two generated-file checks for a reason: `src/routeTree.gen.ts` and
+`drizzle/` are regenerated and diffed, so a hand edit to either is caught in the first seconds of a
+run rather than in review.
+
+Every file in this repository is yours to edit. `.ai/cezar/workflows/`, `.ai/cezar/config.json`,
 `.ai/skills/afk-*/`, `.claude/hooks/`, `.claude/settings.json`, `.claude/skills/backlog/SKILL.md`,
-`.ai/trackers/github.md`, `scripts/ci/`, three `.github/workflows/` and
-`docs/agents/cezar-automations.json`, and only part of `.ai/scripts/`. Editing one directly fails the
-first command of the gate and therefore fails the PR: change the template in the agent-kit repository
-and re-sync instead.
+`.ai/trackers/github.md`, `scripts/ci/` and the Claude `.github/workflows/` used to be rendered from
+`design4pro/agent-kit` and could not be; that repository is retired and they are ordinary files
+(ADR 0021). They are still in `.prettierignore`, so keep the formatting you find.
 
 ## Task Router
 
@@ -107,7 +107,6 @@ and re-sync instead.
 | The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md`                                               | Labels are the state machine; `needs-qa` needs a human's `qa-approved`                                                                                                                                                      |
 | Unattended intake: triage, tickets, lessons    | `SDLC.md` § Intake labels, § Trigger labels, § Unattended decisions; `.ai/skills/afk-*/SKILL.md`; `docs/agents/cezar-automations.json` | Two ladders: `autofix` is a human's lever, `needs-triage` → `ready-for-agent` is the pipeline's own. Every decision goes in a Resolved assumptions table. Nothing merges; `risk-high` and `security` are excluded by filter |
 | The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                                                                             | One cockpit per host; no secrets in the service env                                                                                                                                                                         |
-| A file `design4pro/agent-kit` renders          | `docs/agents/agent-kit.md`; `.ai/agent-kit.lock.json`                                                                                  | Outside prettier by decision; edit the kit's template, never the copy                                                                                                                                                       |
 
 ## Process and skills
 
@@ -124,13 +123,13 @@ and re-sync instead.
   (`CONTEXT.md` and ADR discipline) and `afk-codebase-design` (the design vocabulary — module,
   interface, depth, seam, adapter, the deletion test). **None of them is installed as a skill**, so
   read the file at `.ai/skills/<name>/SKILL.md`; the `Skill` tool cannot reach it and answers
-  `Unknown skill`. All six are rendered by the agent kit and hashed in `.ai/agent-kit.lock.json` —
-  edit the kit's template, never the copy.
-- `afk-codebase-design` comes in two halves. The kit renders the shared one: the vocabulary and the
-  rules, which `afk-triage`, `afk-to-tickets` and `afk-architecture-review` all read by that literal
-  path. This repository's own house idiom, seam table, dependency examples, test layout and
-  risk-high interfaces are the other half, at `.ai/cezar/skills/afk-codebase-design/SKILL.md`, which
-  shadows the rendered file by name because `.ai/cezar/skills` is scanned first. That override is
-  repo-owned and edited here; the shared half is edited in the kit. Read both.
+  `Unknown skill`. All six were rendered by `design4pro/agent-kit`; since ADR 0021 they are
+  ordinary files, edited here.
+- `afk-codebase-design` comes in two halves. `.ai/skills/afk-codebase-design/SKILL.md` is the shared
+  one: the vocabulary and the rules, which `afk-triage`, `afk-to-tickets` and
+  `afk-architecture-review` all read by that literal path. This repository's house idiom, seam
+  table, dependency examples, test layout and risk-high interfaces are the other half, at
+  `.ai/cezar/skills/afk-codebase-design/SKILL.md`, which shadows the first by name because
+  `.ai/cezar/skills` is scanned first. Read both.
 - `SDLC.md` is the ticket flow, `CODE_REVIEW.md` the review rules, `BACKWARD_COMPATIBILITY.md` the
   protected surfaces, `.ai/review-checklist.md` the per-PR list.

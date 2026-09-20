@@ -39,7 +39,7 @@ cd "$ROOT"
 # which lacks the fork's fixes and says nothing about it, and this line runs precisely when the
 # cockpit is already unreachable - the worst moment to start a run on a different cezar.
 if ! command -v cezar >/dev/null 2>&1; then
-  echo 'cezar is not on PATH; install the design4pro/cezar fork (agent-kit README, "Host layer")' >&2
+  echo 'cezar is not on PATH; install the design4pro/cezar fork (its docs/host/README.md)' >&2
   exit 1
 fi
 exec cezar run "housekeeping" --workflow housekeeping

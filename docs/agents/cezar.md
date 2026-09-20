@@ -26,8 +26,9 @@ the rules of `SDLC.md`.
   `config.json` and `workflows/` are tracked.
 - Fork commits: one per fix this pipeline needs and upstream has not shipped, each dropped once an
   upstream release carries it. The cockpit is one per host and shared with `planned.travel`, so the
-  fork's checkout is the one copy both repositories run; the agent-kit README sections "The
-  cockpit runs a fork, not npx" and "Taking an upstream release" are the runbook. Until kit 39
+  fork's checkout is the one copy both repositories run; `design4pro/cezar`'s
+  `docs/host/README.md`, sections "The cockpit runs a fork, not npx" and "Taking an upstream
+  release", is the runbook. Until kit 39
   these fixes were string patches on an npm install's `dist/`, applied by
   `.ai/scripts/cezar-host-patch.sh`, now deleted; `CEZ_SKILLS_AUTO_UPDATE=0` lives in the kit's
   plist template.
@@ -129,8 +130,8 @@ statuses, and metadata / Read and Write access to actions, code, issues, pull re
 workflows". Workflows: write lets a run push changes to the workflows that judge it, which is the
 one thing this section exists to prevent. Administration: read buys nothing here, for the reason
 under "Required checks" below. Both should come off at the next regeneration. Stated here, not
-enforced: the skills read `.ai/trackers/github.md`, and teaching them this belongs to
-`design4pro/agent-kit`, which renders that file.
+enforced: the skills read `.ai/trackers/github.md`, which is an ordinary file of this repository
+since ADR 0021 - teaching them this is a pull request here.
 
 Treat the last column as a reading, not a setting. It has now been wrong in both directions. While
 #133 was being written, `commits/{sha}/status` answered 403 at 07:40Z and 200 at 07:57Z for the same
@@ -259,10 +260,10 @@ a scope it does not have.
 Nothing is left to grant on this token. There is no `Checks` permission to add, and Actions: write
 is already held; the one edit still owed under Settings → Personal access tokens on the
 `design4pro-agent` account is a **removal** — Workflows and Administration off, re-approved once by
-the organisation. The descriptor half has landed: `design4pro/agent-kit` renders
-`.ai/trackers/github.md`, and teaching **get-required-checks** the rulesets endpoint arrived here
-with kit 47 (`4b78a1c`, agent-kit#53), so nothing on the CI half of the pipeline is waiting on a
-scope grant or on a kit sync any more. What remains is upkeep rather than a gap: the reading in this
+the organisation. The descriptor half has landed: teaching **get-required-checks** the rulesets
+endpoint arrived here with kit 47 (`4b78a1c`, agent-kit#53), and `.ai/trackers/github.md` is this
+repository's own file now, so nothing on the CI half of the pipeline is waiting on a scope grant or
+on a kit sync any more. What remains is upkeep rather than a gap: the reading in this
 section is a snapshot, and the ruleset has already changed under it once.
 
 ### The cockpit process
@@ -275,10 +276,11 @@ checkout's directory basename. Every script here defaults to it and takes `CEZ_P
 override; `GET /api/v1/projects` is the authority when a host disagrees.
 
 The cockpit is host-wide state, so its plist is not this repository's to own: the template and the
-cutover runbook live in `design4pro/agent-kit` (`host/launchd/dev.cezar.cockpit.plist`, README
-section "The host layer"). This repository keeps only its own housekeeping plist, below. The copy
-that used to sit here was invisible to `planned.travel`, which had none at all, and that split is
-exactly what the kit exists to end.
+cutover runbook live in `design4pro/cezar` (`host/launchd/dev.cezar.cockpit.plist`,
+`docs/host/README.md`). This repository keeps only its own housekeeping plist, below. The copy that
+used to sit here was invisible to `planned.travel`, which had none at all, and one copy for the host
+is still the answer - it moved with the rest of the host layer when agent-kit was retired
+(ADR 0021).
 
 `KeepAlive` means `bootout` is how you stop the service; `kickstart -k
 gui/$(id -u)/dev.cezar.cockpit` is the restart after a version bump or an edit to the plist. Once

@@ -81,3 +81,11 @@ and `scripts/cezar/` was removed; then out of this repository altogether, becaus
 service per host and its plist was never this repository's property. The template and its cutover
 runbook live in `design4pro/agent-kit` (`host/launchd/dev.cezar.cockpit.plist`), and
 `docs/agents/cezar.md` is the pointer that follows them.
+
+## Amendment 2026-09-20
+
+**The host layer moved again, and this time the repository holding it is one this pipeline already
+runs.** `design4pro/agent-kit` was retired (ADR 0021). `host/launchd/dev.cezar.cockpit.plist` and
+its cutover runbook live in `design4pro/cezar` — the same fork the cockpit boots — under `host/`
+and `docs/host/README.md`, recorded there as its ADR 0007. `docs/agents/cezar.md` remains the
+pointer that follows them; nothing about one cockpit per host changes.

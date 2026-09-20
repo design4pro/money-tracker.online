@@ -296,9 +296,9 @@ anything from anyone else waits for a maintainer to add a trigger label.
 - Neither triage nor implementation touches `risk-high` or `security` work.
 - To stop it all, `cez automation pause <id>`, or start the cockpit with `CEZ_AUTOMATIONS=0`.
 
-**Files the kit owns.** `.ai/agent-kit.lock.json` hashes the rendered files — `.ai/cezar/workflows/`,
-`.ai/scripts/`, `.ai/skills/afk-*/`, `.claude/hooks/`, `docs/agents/cezar-automations.json`, several
-`.github/workflows/` — and `node .ai/scripts/agent-kit-check.mjs` is the **first** command of the
-validation gate. Editing one of them directly fails that command and therefore fails every PR in the
-repository: change the template in the agent-kit repository and re-sync instead.
+**The agent layer is this repository's.** `.ai/cezar/workflows/`, `.ai/scripts/`,
+`.ai/skills/afk-*/`, `.claude/hooks/`, `docs/agents/cezar-automations.json` and the Claude
+`.github/workflows/` were rendered from `design4pro/agent-kit` until it was retired (ADR 0021).
+They are ordinary files now: edit them here, in the pull request that needs the change. They stay
+listed in `.prettierignore` so a change to one is readable as a diff, not as a reflow.
 <!-- END per-repo -->

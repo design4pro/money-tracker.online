@@ -25,8 +25,8 @@ name: CI
 #            below runs on the self-hosted pool; setting it to
 #            `["ubuntu-latest"]` moves them all back to GitHub-hosted runners
 #            without a pull request, which is the only recovery path that does
-#            not need the host to be up. See agent-kit's README, "The runner
-#            pool".
+#            not need the host to be up. See design4pro/cezar,
+#            `docs/host/README.md`, "The runner pool".
 # ──────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -380,7 +380,7 @@ jobs:
     # `mcr.microsoft.com/playwright:v1.62.1-noble`, so the browsers are already
     # on the runner and pulling the same image again per job would buy nothing.
     # The version coupling did not go away, it moved: keep
-    # `host/runner/Dockerfile` in agent-kit in step with the `@playwright/test`
+    # `host/runner/Dockerfile` in design4pro/cezar in step with the `@playwright/test`
     # devDependency in package.json, or a mismatch is reported as a missing
     # executable rather than as a wrong one.
 
