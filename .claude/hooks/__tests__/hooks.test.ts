@@ -82,6 +82,134 @@ describe('git-guardrails.sh', () => {
     ).toBe(0)
   })
 
+  // `rm -r` is judged by where it points, not by the flags: the target has to match whole, so the
+  // roots below go and every ordinary cleanup stays. Every mode, like the rest of tier one.
+  it.each([
+    'rm -rf /',
+    'rm -rf /*',
+    'rm -rf ~',
+    'rm -rf ~/',
+    'rm -rf $HOME',
+    'rm -rf ${HOME}',
+    'rm -rf .',
+    'rm -rf ..',
+    'rm -rf *',
+    'rm -rf .git',
+    'rm -fr /',
+    'rm --recursive --force /',
+    'rm -r -f ~',
+    'cd /tmp && rm -rf /',
+  ])('blocks the recursive delete %s', (command) => {
+    for (const env of [{}, AGENT, ACTIONS]) {
+      expect(bash(command, env).status).toBe(2)
+    }
+  })
+
+  it.each([
+    'rm -rf node_modules',
+    'rm -rf dist',
+    'rm -rf ./dist',
+    'rm -rf .ai/qa/artifacts_123',
+    'rm -rf /tmp/claude-501/x',
+    'rm package-lock.json',
+  ])('leaves the ordinary cleanup %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // The worktree root by its absolute path, which no pattern of roots can cover. A path *under*
+  // the root stays open: `rm -rf <root>/node_modules` is how a bootstrap step recovers from a
+  // half-written install.
+  it('blocks a recursive delete of the project root, not of a path inside it', () => {
+    const root = process.cwd()
+    expect(bash(`rm -rf ${root}`).status).toBe(2)
+    expect(bash(`rm -rf ${root}/`).status).toBe(2)
+    expect(bash(`rm -rf ${root}/node_modules`).status).toBe(0)
+  })
+
+  // A rename breaks the remote of every open worktree and a transfer moves the repository out of
+  // reach, so these are refused in every session - tier three's `gh repo` rule is Actions-only.
+  it.each([
+    'gh repo delete design4pro/money-tracker.online',
+    'gh repo archive',
+    'gh repo rename newname',
+    'gh repo transfer someone',
+  ])('blocks %s everywhere', (command) => {
+    expect(bash(command).status).toBe(2)
+    expect(bash(command, AGENT).status).toBe(2)
+  })
+
+  it('leaves reading the repository alone', () => {
+    expect(bash('gh repo view --json name', AGENT).status).toBe(0)
+  })
+
+  // AGENTS.md requires `HEAD:refs/heads/<branch>` because a bare branch name lets push.default
+  // choose the destination, so the colon is the ordinary spelling here and keeps working. What
+  // goes is the colon with an empty source, `--delete`, and the `+` that forces the update.
+  it.each([
+    'git push origin --delete develop',
+    'git push origin :develop',
+    'git push -d origin feature/x',
+    'git push origin +refs/heads/x:refs/heads/develop',
+  ])('blocks the destructive refspec %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
+
+  it.each([
+    'git push origin HEAD:refs/heads/fix/issue-1-x',
+    'git push origin HEAD',
+  ])('leaves the ordinary push %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // The reflog is what makes a hard reset recoverable by someone who knows to look, so expiring
+  // it removes the recovery the rest of tier one assumes.
+  it.each([
+    'git filter-branch --tree-filter true HEAD',
+    'git filter-repo --path src',
+    'git reflog expire --expire=now --all',
+    'git gc --prune=now',
+  ])('blocks the history rewrite %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
+
+  it.each(['git gc', 'git reflog'])('leaves %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // guard-read.sh guards Read, Glob and Grep; `cat .dev.vars` is a Bash call that never reaches
+  // it. The quoted spelling is the case that matters: `cat` is on the prose list, so a rule
+  // reading $scan instead of $raw would see `cat` alone and let the quoted path through.
+  it.each([
+    'cat .dev.vars',
+    'cat ".dev.vars"',
+    'head -1 .dev.vars',
+    'grep APP_URL .dev.vars',
+    'tail -n 5 .env.local',
+    'cat .ai/qa/test-env.env',
+    'xxd .dev.vars',
+    // The `.example` exemption is per token, not per command, so the first argument still counts.
+    'cat .dev.vars .dev.vars.example',
+  ])('blocks the secret read %s', (command) => {
+    for (const env of [{}, AGENT, ACTIONS]) {
+      expect(bash(command, env).status).toBe(2)
+    }
+  })
+
+  // The limits, stated as tests so they are not mistaken for oversights. A copy is not a read -
+  // `cp .dev.vars.example .dev.vars` is how the file is created - and test-env-up.sh reads
+  // .dev.vars by design, which survives because the hook sees the `sh` invocation, not the
+  // `head` inside it.
+  it.each([
+    'cat .dev.vars.example',
+    'cat .env.example',
+    'cp .dev.vars.example .dev.vars',
+    'sh .ai/scripts/test-env-up.sh',
+    'cat package.json',
+    'grep -rn APP_URL src',
+  ])('leaves %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
   it('leaves pnpm and env alone outside agent runs', () => {
     for (const c of ['pnpm add left-pad', 'printenv', 'env']) {
       expect(bash(c).status).toBe(0)

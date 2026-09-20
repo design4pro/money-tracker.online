@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # PreToolUse hook (Bash). Three tiers, by who is at the other end of the command.
 #
-# Tier one - everyone, in every session: destructive git, `--no-verify`, and the two Cloudflare
+# Tier one - everyone, in every session: destructive git, `--no-verify`, the two Cloudflare
 # operations nothing recovers from - writing a secret and deleting a D1/R2/KV store or the Worker
-# itself. Everything here destroys work that is not recoverable from the reflog by someone who
+# itself - and, further down, the four that do not go through git at all: `rm -r` at a dangerous
+# root, `gh repo delete` and its siblings, a push that deletes or forces a refspec, and history
+# rewriting. Everything here destroys work that is not recoverable from the reflog by someone who
 # does not already know to look. `develop` and `main` are the shared branches - staging and
 # production respectively - so a force-push to either rewrites what somebody else has pulled.
+# Tier one closes with the one read that is not a write: the secret files, which guard-read.sh
+# cannot reach because `cat .dev.vars` arrives here as a Bash call instead.
 #
 # Tier two - agent runs (CEZ_TASK_ID or GITHUB_ACTIONS): the things an om-* run never needs.
 # Dumping the environment (the worktree holds live secrets in .dev.vars), changing the pinned
@@ -18,8 +22,11 @@
 # The Cloudflare rules are split by what a mistake costs. A deploy is undone by deploying again,
 # so a developer at the keyboard keeps the ordinary approval prompt for it; a written secret is
 # already in the transcript and a deleted database is gone, so those are refused in every session.
-# Nothing that refuses a command belongs in `.claude/settings.json` - its allow list is only for
-# the tracker operations the om-* pipeline cannot run without.
+# Almost nothing that refuses a command belongs in `.claude/settings.json`. The reasoning lives
+# here, where it can be written down and tested; the deny list there carries only the handful of
+# rules that must survive this file being edited, broken or never invoked, and it is deliberately
+# too short to reason with. The two layers are not redundant: a hook can fail, and `deny` cannot
+# explain itself.
 #
 # Contract: exit 2 blocks the tool call and feeds stderr back to the model; exit 0 allows.
 set -euo pipefail
@@ -58,10 +65,16 @@ prose_command='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(
 # it. Only the quoting characters go, which is what makes `gh pr "review" 12 --approve` still
 # match the rule for `gh pr review` - the raw string does not, because the quotes sit exactly
 # where the verb is expected.
+# $raw is the command with only its quoting characters gone - no prose stripping, ever. Most rules
+# read $scan, because a commit message that merely names a dangerous command is not that command.
+# The secret-file rule reads $raw instead: `cat` is on the prose list above, so for `cat ".dev.vars"`
+# the quoted span would be deleted before $scan is built and quoting the path would be the bypass.
+raw=$(unquote "$command")
+
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
-  scan=$(unquote "$command")
+  scan="$raw"
 else
-  scan=$(unquote "$command")
+  scan="$raw"
   # Here-strings, not pipes: `grep -q` closes early, and under `pipefail` that turns a match into
   # a non-zero pipeline - the one failure shape that would silently re-open the stripping.
   if grep -Eq "$prose_command" <<< "${command%%$'\n'*}"; then
@@ -121,6 +134,86 @@ echo "$scan" | grep -Eq 'git\s+commit\b.*\s-n(\s|$)' && block 'git --no-verify'
 # in any session.
 echo "$scan" | grep -Eq 'wrangler\s+secret\b' && block 'wrangler secret'
 echo "$scan" | grep -Eq 'wrangler\s+((d1|r2\s+bucket|kv\s+namespace)\s+)?delete\b' && block 'wrangler delete'
+
+# The rules above all take git as their subject, and a repository is not the only thing a run can
+# destroy. These four do not go through git at all, or go through it sideways: `rm -r` at a
+# dangerous root, deleting the repository on GitHub, pushing a deletion or a forced refspec, and
+# rewriting history. None is recoverable from this checkout and none has a caller in any session.
+
+# `rm -r` is dangerous only where it points, so the target has to match whole: `rm -rf dist`,
+# `rm -rf node_modules` and `rm -rf /tmp/x` stay open while `rm -rf .`, `rm -rf /`, `rm -rf ~`,
+# `rm -rf *` and `rm -rf .git` do not. The flag group repeats on both sides of the recursive flag,
+# which is what makes `rm --recursive --force /` and `rm -r -f /` read the same as `rm -rf /`.
+rm_flags='(-[[:alnum:]-]+[[:space:]]+)*'
+rm_recursive="(^|[^[:alnum:]_/-])rm[[:space:]]+${rm_flags}-[[:alnum:]-]*[rR][[:alnum:]-]*[[:space:]]+${rm_flags}"
+rm_end='([[:space:]]|;|&|\||\)|$)'
+echo "$scan" | grep -Eq "${rm_recursive}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/?\*?${rm_end}" \
+  && block 'rm -r of a dangerous root'
+
+# The worktree root spelled out, which the pattern above cannot cover because it is a path like any
+# other. CLAUDE_PROJECT_DIR is what the harness sets; $PWD is the fallback, and under cezar that is
+# the worktree the task was given rather than the developer's checkout. Only the root itself, so
+# `rm -rf $root/node_modules` - how a bootstrap step recovers from a half-written install - stays
+# open.
+# `[` comes last in the set on purpose: `[.`, `[=` and `[:` open a collating symbol, an equivalence
+# class and a character class, so a `[` sitting before the `.` makes BSD sed reject the whole
+# expression - and under `set -e` that ends the hook with exit 1, which the harness reads as
+# "allowed". A guard that fails open is worse than no guard, and this one did until it was run.
+project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
+echo "$scan" | grep -Eq "${rm_recursive}${project_root}/?\*?${rm_end}" \
+  && block 'rm -r of the project root'
+
+# The repository itself. Tier three refuses the whole `gh repo` surface under Actions; these four
+# verbs are refused in every session, because none of them is undone by running something again: a
+# rename breaks the remote of every open worktree, a transfer moves the repository out of reach,
+# archiving makes it read-only, and a delete ends it.
+echo "$scan" | grep -Eq 'gh\s+repo\s+(delete|archive|rename|transfer)\b' \
+  && block 'gh repo delete/archive/rename/transfer'
+
+# Refspecs. AGENTS.md requires `git push origin HEAD:refs/heads/<branch>` precisely because a bare
+# branch name lets push.default choose the destination, so the colon is this repository's ordinary
+# spelling and stays open. What is refused is the colon with an empty source - `git push origin
+# :develop` deletes the remote branch - the explicit `--delete`, and a `+` prefix, which forces the
+# update whatever the remote holds and is a force-push wearing a refspec.
+echo "$scan" | grep -Eq 'git\s+push\b[^;&|]*(--delete|[[:space:]]-d)([[:space:]]|$)' \
+  && block 'git push --delete'
+echo "$scan" | grep -Eq 'git\s+push\b[^;&|]*[[:space:]]:[^[:space:]]+' \
+  && block 'git push :branch (deletes the remote branch)'
+echo "$scan" | grep -Eq 'git\s+push\b[^;&|]*[[:space:]]\+[^[:space:]]*:' \
+  && block 'git push +refspec (forced)'
+
+# History rewriting. The reflog is what makes a hard reset recoverable by someone who knows to look,
+# so expiring it removes the recovery every rule above quietly assumes; filter-branch and
+# filter-repo rewrite every commit in place.
+echo "$scan" | grep -Eq 'git\s+(filter-branch|filter-repo)\b' && block 'git filter-branch/filter-repo'
+echo "$scan" | grep -Eq 'git\s+reflog\s+(expire|delete)\b' && block 'git reflog expire'
+echo "$scan" | grep -Eq 'git\s+gc\b[^;&|]*--prune=(now|all)' && block 'git gc --prune=now'
+
+# The hole guard-read.sh names in its own header: it guards Read, Glob and Grep, and `cat .dev.vars`
+# is a Bash call that never reaches it. Three deliberate limits.
+#
+# Readers only - a command that opens the file and prints it. `cp` and `mv` are absent because
+# `cp .dev.vars.example .dev.vars` is how the file is created, and a rule that could not tell those
+# two apart would refuse the setup step it is meant to protect.
+#
+# It reads $raw, not $scan. `cat` is on the prose list, so for `cat ".dev.vars"` the quoted span is
+# deleted before $scan is built and the rule would see `cat` alone - quoting the path would be the
+# whole bypass. $raw has only the quote characters removed.
+#
+# A path ending `.example` is dropped first, per token rather than by testing the whole command for
+# the word, so `cat .dev.vars .dev.vars.example` is still refused on its first argument.
+#
+# .ai/scripts/test-env-up.sh reads .dev.vars by design and keeps working: it is invoked as one
+# command, so this hook sees `sh .ai/scripts/test-env-up.sh` and the `head` and `grep` inside it are
+# the script's own business. That is the shape of the guarantee here - an obvious read is refused, a
+# determined one is not. The deny list in .claude/settings.json is the layer that does not depend on
+# enumerating readers.
+secret_reader='(^|[^[:alnum:]_/-])(cat|bat|less|more|head|tail|grep|egrep|fgrep|rg|ag|strings|xxd|od|base64|nl|tac|awk|sed|cut|sort|uniq|dd)([[:space:]]|$)'
+secret_file='(^|[[:space:]]|=|/)(\.dev\.vars|\.env|test-env\.env)'
+if echo "$raw" | grep -Eq "$secret_reader" \
+  && printf '%s' "$raw" | sed -E 's/[^[:space:]]*\.example([[:space:]]|$)/ /g' | grep -Eq "$secret_file"; then
+  block 'reading .dev.vars, .env or the QA test-env file'
+fi
 
 # Everything below applies to agent runs only; a developer at the keyboard keeps pnpm and env.
 [ -n "${CEZ_TASK_ID:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ] || exit 0

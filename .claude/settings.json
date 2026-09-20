@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "description": "Project-scoped Claude Code settings for money-tracker.online. The guardrails that must apply to every checkout live in .claude/hooks, and the allow list carries only the tracker operations the om-* pipeline cannot run without. Nothing that refuses a command belongs in this file. Every other permission rule stays per-developer in the gitignored .claude/settings.local.json.",
+  "description": "Project-scoped Claude Code settings for money-tracker.online. The guardrails that must apply to every checkout live in .claude/hooks, where a rule can carry its reasoning and a test; the allow list carries only the tracker operations the om-* pipeline cannot run without. The deny list is the exception to that split and is deliberately tiny: it repeats a handful of hook rules for the case the hooks cannot cover - this file being edited, the script erroring, or a mode that skips it - and it cannot explain itself, so it stays too short to reason with. deny wins over ask and allow in every mode, including the dontAsk a cezar run uses and the bypassPermissions of the review job. Every other permission rule stays per-developer in the gitignored .claude/settings.local.json.",
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "opus"
   },
@@ -10,6 +10,20 @@
       "Bash(gh pr comment:*)",
       "Bash(gh run view:*)",
       "Bash(gh issue:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /:*)",
+      "Bash(rm -rf ~:*)",
+      "Bash(rm -rf $HOME:*)",
+      "Bash(gh repo delete:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git filter-repo:*)",
+      "Read(./.dev.vars)",
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.ai/qa/test-env.env)"
     ]
   },
   "modelSettings": {
