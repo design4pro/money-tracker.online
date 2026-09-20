@@ -1271,6 +1271,35 @@ const messages = {
   'notifications.kind.goalReached.body':
     '{goal} is complete — you put aside {contributed} of {target}.',
 
+  /*
+    Email (21-S2).
+
+    Copy for a surface this catalogue could not reach until now: the messages the product sends
+    *out*. An email is read in an inbox, days later, by somebody who may not be signed in — so the
+    frame states why it arrived, and the body says in one line what to do. `{app}` is filled from
+    `app.name` rather than typed, so a rename lands in twelve strings at once.
+  */
+  'email.layout.footer.reasonAccount':
+    'You are getting this because of activity on your {app} account.',
+  'email.auth.greeting': 'Hi {name},',
+  /*
+    Stated once, in the frame of every auth email, because the failure it prevents is a person
+    keeping the message and clicking the link a week later.
+  */
+  'email.auth.singleUse': 'This link works once and expires soon.',
+  'email.auth.verifyEmail.subject': 'Confirm your {app} address',
+  'email.auth.verifyEmail.lead':
+    'Confirm this address to finish setting up your {app} account.',
+  'email.auth.verifyEmail.action': 'Confirm address',
+  'email.auth.resetPassword.subject': 'Reset your {app} password',
+  'email.auth.resetPassword.lead':
+    'Use the button below to choose a new password. If you did not ask for this, ignore this email and your password stays as it is.',
+  'email.auth.resetPassword.action': 'Choose a new password',
+  'email.auth.invitation.subject': 'You are invited to {workspace} on {app}',
+  'email.auth.invitation.lead':
+    '{workspace} has invited you to join them on {app}.',
+  'email.auth.invitation.action': 'Accept invitation',
+
   /* -- Accessibility ------------------------------------------------------ */
   'a11y.skipToContent': 'Skip to main content',
   /*

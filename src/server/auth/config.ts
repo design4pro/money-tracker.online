@@ -14,6 +14,7 @@ import { admin, organization, twoFactor } from 'better-auth/plugins'
 import { nanoid } from 'nanoid'
 
 import { authSchema } from '#/server/db/auth-schema'
+import { negotiateEmailLocale } from '#/server/fns/locale'
 import { loggerFromEnv } from '#/server/observability/logger'
 import { getDb } from './db'
 import { createAuthEmailer } from './email'
@@ -33,10 +34,26 @@ import { resolveOrProvisionOrganization } from './organization'
 import { DISABLED_ADMIN_PATHS, adminOptions } from './permissions'
 import { createKvSecondaryStorage } from './secondary-storage'
 
+import type { Locale } from '#/lib/i18n'
 import type { BetterAuthOptions, betterAuth } from 'better-auth'
 
 /** Where the auth routes are mounted. The browser client in `src/lib/auth-client.ts` matches it. */
 export const AUTH_BASE_PATH = '/api/auth'
+
+/**
+ * Which language to write an auth email in.
+ *
+ * Better Auth hands each email hook the `Request` that triggered it, and that request carries both
+ * signals the product has: the language picker's cookie and `Accept-Language`, weighed in that
+ * order by {@link negotiateEmailLocale}. A hook invoked without a request (Better Auth marks it
+ * optional) falls through to `en`, exactly as a request carrying neither does.
+ */
+function recipientLocale(request: Request | undefined): Locale {
+  return negotiateEmailLocale({
+    cookieHeader: request?.headers.get('cookie') ?? null,
+    acceptLanguage: request?.headers.get('accept-language') ?? null,
+  })
+}
 
 const DAY_SECONDS = 60 * 60 * 24
 const MINUTE_SECONDS = 60
@@ -161,12 +178,13 @@ export function authOptions(): BetterAuthOptions {
       autoSignIn: true,
       requireEmailVerification: false,
       resetPasswordTokenExpiresIn: VERIFICATION_EXPIRES_IN,
-      sendResetPassword: async ({ user, url }) => {
+      sendResetPassword: async ({ user, url }, request) => {
         await emailer.send({
           kind: 'reset-password',
           to: user.email,
           recipientName: user.name,
           url,
+          locale: recipientLocale(request),
         })
       },
     },
@@ -175,12 +193,13 @@ export function authOptions(): BetterAuthOptions {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
       expiresIn: VERIFICATION_EXPIRES_IN,
-      sendVerificationEmail: async ({ user, url }) => {
+      sendVerificationEmail: async ({ user, url }, request) => {
         await emailer.send({
           kind: 'verify-email',
           to: user.email,
           recipientName: user.name,
           url,
+          locale: recipientLocale(request),
         })
       },
     },
@@ -197,12 +216,15 @@ export function authOptions(): BetterAuthOptions {
       organization({
         allowUserToCreateOrganization: true,
         creatorRole: 'owner',
-        sendInvitationEmail: async (data) => {
+        sendInvitationEmail: async (data, request) => {
           await emailer.send({
             kind: 'organization-invitation',
             to: data.email,
             url: `${appUrl()}/invite/${data.id}`,
             organizationName: data.organization.name,
+            // The inviter's language, not the invitee's — nothing is known about somebody who has
+            // no account yet, and the household that invited them is the better guess.
+            locale: recipientLocale(request),
           })
         },
       }),

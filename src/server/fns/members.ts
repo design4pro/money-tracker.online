@@ -22,6 +22,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
+import { getRequestHeader } from '@tanstack/react-start/server'
 import { z } from 'zod'
 
 import { appUrl, emailDelivery } from '#/server/auth/env'
@@ -29,6 +30,7 @@ import { createAuthEmailer } from '#/server/auth/email'
 import { requireOrg, requireUser } from '#/server/auth/guards'
 import { resolveLimits } from '#/server/billing/resolve-limits'
 import { loggerFromEnv } from '#/server/observability/logger'
+import { negotiateEmailLocale } from './locale'
 import {
   acceptInvitation as acceptInvitationRow,
   changeMemberRole as changeMemberRoleRow,
@@ -202,5 +204,14 @@ async function sendInvitationEmail(input: {
     to: input.email,
     url: `${appUrl()}/invite/${input.invitationId}`,
     organizationName: input.workspace,
+    /**
+     * The inviter's language: the invitee has no account and no stored preference, so the closest
+     * signal is the request of the member who typed their address — the same cookie-then-header
+     * chain the document itself is negotiated with (`./locale`).
+     */
+    locale: negotiateEmailLocale({
+      cookieHeader: getRequestHeader('cookie') ?? null,
+      acceptLanguage: getRequestHeader('accept-language') ?? null,
+    }),
   })
 }

@@ -17,6 +17,7 @@ import { createLogger, createMemorySink } from '#/server/observability/logger'
 
 import { createAuthEmailer, maskEmail, renderAuthEmail } from '../email'
 
+import type { Locale } from '#/lib/i18n'
 import type { LogRecord } from '#/server/observability/logger'
 
 const DELIVERY = {
@@ -30,6 +31,7 @@ const RESET = {
   to: 'anna@example.com',
   recipientName: 'Anna',
   url: 'https://app.example.com/reset?token=super-secret-token',
+  locale: 'en',
 } as const
 
 function loggerWithSink() {
@@ -70,36 +72,52 @@ describe('maskEmail', () => {
 })
 
 describe('renderAuthEmail', () => {
-  it('always sends a text alternative beside the HTML', () => {
-    const rendered = renderAuthEmail(RESET)
+  it('always sends a text alternative beside the HTML', async () => {
+    const rendered = await renderAuthEmail(RESET)
     expect(rendered.text).toContain(RESET.url)
     expect(rendered.html).toContain(RESET.url)
     expect(rendered.subject.length).toBeGreaterThan(0)
   })
 
-  it('addresses the person by name, and by their local part when there is none', () => {
-    expect(renderAuthEmail(RESET).text).toContain('Hi Anna,')
-    expect(renderAuthEmail({ ...RESET, recipientName: null }).text).toContain(
-      'Hi anna,',
-    )
+  it('addresses the person by name, and by their local part when there is none', async () => {
+    expect((await renderAuthEmail(RESET)).text).toContain('Hi Anna,')
+    expect(
+      (await renderAuthEmail({ ...RESET, recipientName: null })).text,
+    ).toContain('Hi anna,')
   })
 
-  it('escapes a display name so a workspace cannot inject markup', () => {
-    const rendered = renderAuthEmail({
+  it('escapes a display name so a workspace cannot inject markup', async () => {
+    const rendered = await renderAuthEmail({
       kind: 'organization-invitation',
       to: 'anna@example.com',
       url: 'https://app.example.com/invite/1',
       organizationName: '<img src=x onerror=alert(1)>',
+      locale: 'en',
     })
 
     expect(rendered.html).not.toContain('<img')
     expect(rendered.html).toContain('&lt;img')
   })
 
-  it('tells a reset apart from a verification, so neither arrives as the other', () => {
-    const reset = renderAuthEmail(RESET)
-    const verify = renderAuthEmail({ ...RESET, kind: 'verify-email' })
+  it('tells a reset apart from a verification, so neither arrives as the other', async () => {
+    const reset = await renderAuthEmail(RESET)
+    const verify = await renderAuthEmail({ ...RESET, kind: 'verify-email' })
     expect(reset.subject).not.toBe(verify.subject)
+  })
+
+  /**
+   * The regression this phase closes: the copy used to be English literals in this module, so the
+   * locale the rest of the product negotiates stopped at the inbox.
+   */
+  it('writes in the recipient’s language, not in the sender’s', async () => {
+    const en = await renderAuthEmail(RESET)
+    const pl = await renderAuthEmail({ ...RESET, locale: 'pl' })
+
+    expect(pl.subject).not.toBe(en.subject)
+    expect(pl.html).toContain('Cześć Anna,')
+    expect(pl.html).toContain('lang="pl"')
+    // Still the same link, still in both parts — the language changed and nothing else did.
+    expect(pl.text).toContain(RESET.url)
   })
 })
 
@@ -184,6 +202,42 @@ describe('when a provider is configured', () => {
     const records = (sink as unknown as { records: Array<LogRecord> }).records
     expect(records[0]?.level).toBe('error')
     expect(records[0]?.status).toBe(422)
+  })
+
+  it('posts the language the caller negotiated, not the one it was written in', async () => {
+    const { logger } = loggerWithSink()
+    const transport = okFetch()
+
+    await createAuthEmailer({
+      delivery: DELIVERY,
+      logger,
+      fetch: transport.fetch,
+    }).send({ ...RESET, locale: 'pl' })
+
+    const body = JSON.parse(String(transport.calls[0]?.body)) as {
+      subject: string
+    }
+    expect(body.subject).toContain('hasło')
+  })
+
+  it('reports a render failure instead of throwing into the sign-up handler', async () => {
+    const { logger, sink } = loggerWithSink()
+    const transport = okFetch()
+
+    // A locale no catalogue exists for. Guarantee 3 covers the template as well as the network:
+    // by the time an auth email is rendered the user row is already written, so a throw here would
+    // turn a successful sign-up into a 500 the account's owner cannot undo.
+    await expect(
+      createAuthEmailer({
+        delivery: DELIVERY,
+        logger,
+        fetch: transport.fetch,
+      }).send({ ...RESET, locale: 'de' as Locale }),
+    ).resolves.toBe('failed')
+
+    expect(transport.calls).toHaveLength(0)
+    const records = (sink as unknown as { records: Array<LogRecord> }).records
+    expect(records[0]?.level).toBe('error')
   })
 
   it('reports a transport failure the same way, and does not reject', async () => {
