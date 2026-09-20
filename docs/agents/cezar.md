@@ -183,9 +183,9 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   | `merge-gate`                           | `.github/workflows/merge-gate.yml`         |
 
   Every one is a GitHub Actions job in this repository (`integration_id` 15368), and that is what
-  makes the set usable rather than merely readable: the Actions-run path that **get-pr-checks**
-  falls back to reports all five, so the check-run blind spot above costs nothing _at the merge gate_ as
-  the ruleset stands today. That is a property to re-probe, not to assume — an App-published check
+  makes the set usable rather than merely readable: **get-pr-checks**' Actions-run fallback reports
+  all five, so the check-run blind spot above costs nothing _at the merge gate_ as the ruleset
+  stands today. That is a property to re-probe, not to assume — an App-published check
   added to the required set would be both required and invisible, and nothing in the repository
   would say so. The pipeline still holds a merge as well — the labels, the review verdict and the
   QA gate in `SDLC.md` — but it is no longer the only thing holding one, and prose elsewhere
