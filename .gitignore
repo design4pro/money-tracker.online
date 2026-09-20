@@ -19,8 +19,14 @@ coverage/
 .claude/worktrees/
 
 # The open-mercato skill collection is vendored: `.claude/skills/om-*` and skills-lock.json are
-# committed, byte-identical to the SHA pinned in .ai/cezar/config.json. `pnpm install-skills`
-# refreshes them and the pin moves in the same commit (docs/agents/cezar.md).
+# both committed, and the lockfile's per-skill `computedHash` is what makes a run reproducible.
+# (.ai/cezar/config.json does not pin a SHA - it never did, whatever this comment used to say.)
+# `pnpm install-skills` refreshes both, and they move in the same commit (docs/agents/cezar.md).
+#
+# That script passes `--copy` because the `skills` CLI symlinks by default: without it the
+# vendored directories are replaced by links into an untracked `.agents/skills/`, which reads as
+# hundreds of deleted files and puts the collection outside review and outside guard-generated.sh.
+# `.agents/` is deliberately not ignored here - if it ever appears, the install was wrong.
 
 # Per-run artefacts of the om pipeline. The launchers .ai/scripts/test-env-*.sh stay tracked
 # so a fresh Cezar worktree can boot the QA environment.
