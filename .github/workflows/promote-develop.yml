@@ -66,7 +66,7 @@ permissions:
 # production now deploys from one local machine, and the switch has to work when that
 # machine does not. That is why it is an organisation variable and not a literal label
 # array - reverting by pull request would need the merge gate, which needs the same
-# runners that are missing. See agent-kit's README, "The runner pool".
+# runners that are missing. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
 
 jobs:
   promote:

@@ -27,7 +27,7 @@ runs:
         version: 10.15.0
 
     # The self-hosted CI pool mounts a persistent pnpm store at this path
-    # (agent-kit host/runner/pool.sh, volume `gha-pnpm-store`), and pnpm never
+    # (design4pro/cezar host/runner/pool.sh, volume `gha-pnpm-store`), and pnpm never
     # used it: action-setup exports PNPM_HOME, pnpm's default store is
     # $PNPM_HOME/store, and that lives in the disposable container. Measured in
     # job 105157932544: `pnpm store path` printed

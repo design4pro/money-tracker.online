@@ -6,11 +6,10 @@ One document per designed change. The directory a spec sits in is its state, the
 its `H1` names the issue and the pull requests behind it, and both are held together by
 `scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).
 
-## Draft — being written (3)
+## Draft — being written (2)
 
 | Spec                                                                                                                       | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
-| [A test companion for agent-kit-check.mjs](2026-09-18-agent-kit-check-test-companion.md)                                   | 2026-09-18 | [#127](https://github.com/design4pro/money-tracker.online/issues/127) | [#334](https://github.com/design4pro/money-tracker.online/pull/334) | —              |
 | [Reduced motion: the `[data-motion-transform]` reset and the proof it works](2026-09-11-reduced-motion-transform-reset.md) | 2026-09-11 | [#214](https://github.com/design4pro/money-tracker.online/issues/214) | [#251](https://github.com/design4pro/money-tracker.online/pull/251) | —              |
 | [The notification dispatcher, the store and per-user preferences](2026-09-10-notification-dispatcher-and-preferences.md)   | 2026-09-10 | [#219](https://github.com/design4pro/money-tracker.online/issues/219) | [#220](https://github.com/design4pro/money-tracker.online/pull/220) | —              |
 
@@ -39,3 +38,9 @@ its `H1` names the issue and the pull requests behind it, and both are held toge
 | [Desktop layout density: every surface either earns its width or stops growing](implemented/2026-09-09-desktop-layout-density.md)                | 2026-09-09 | [#18](https://github.com/design4pro/money-tracker.online/issues/18)   | [#134](https://github.com/design4pro/money-tracker.online/pull/134) | [#156](https://github.com/design4pro/money-tracker.online/pull/156)                                                                                                                                         |
 | [Design-system plan reconciliation](implemented/2026-09-08-design-system-plan-reconciliation.md)                                                 | 2026-09-08 | [#201](https://github.com/design4pro/money-tracker.online/issues/201) | [#97](https://github.com/design4pro/money-tracker.online/pull/97)   | [#205](https://github.com/design4pro/money-tracker.online/pull/205)                                                                                                                                         |
 | [Foundations plan reconciliation](implemented/2026-09-07-foundations-plan-reconciliation.md)                                                     | 2026-09-07 | [#77](https://github.com/design4pro/money-tracker.online/issues/77)   | [#75](https://github.com/design4pro/money-tracker.online/pull/75)   | [#98](https://github.com/design4pro/money-tracker.online/pull/98), [#111](https://github.com/design4pro/money-tracker.online/pull/111), [#116](https://github.com/design4pro/money-tracker.online/pull/116) |
+
+## Archived — superseded or abandoned (1)
+
+| Spec                                                                                              | Date       | Issue                                                                 | Spec PR                                                             | Superseded by |
+| ------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------- |
+| [A test companion for agent-kit-check.mjs](archived/2026-09-18-agent-kit-check-test-companion.md) | 2026-09-18 | [#127](https://github.com/design4pro/money-tracker.online/issues/127) | [#334](https://github.com/design4pro/money-tracker.online/pull/334) | abandoned     |

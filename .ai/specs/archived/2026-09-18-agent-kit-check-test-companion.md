@@ -1,11 +1,17 @@
 # A test companion for agent-kit-check.mjs
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #127  |
-| **Spec PR**        | #334  |
-| **Implementation** | none  |
+| Field              | Value     |
+| ------------------ | --------- |
+| **Status**         | archived  |
+| **Issue**          | #127      |
+| **Spec PR**        | #334      |
+| **Implementation** | none      |
+| **Superseded by**  | abandoned |
+
+> **Archived 2026-09-20.** `design4pro/agent-kit` was retired and the agent layer vendored in
+> place (ADR 0021). `.ai/scripts/agent-kit-check.mjs` and the lock it verified are deleted, so the
+> test companion this spec asks the kit to render has nothing left to test. Issue #127 is closed
+> unimplemented.
 
 ## 📝 TLDR
 

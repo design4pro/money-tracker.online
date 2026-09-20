@@ -175,3 +175,19 @@ The costs:
   taken.
 - planned.travel runs the same pipeline (its ADR 0021) and adopts this after money-tracker has run
   it; its `change scope` job, which diffs `refs/pull/N/merge`, needs a `merge_group` form first.
+
+## Amendment 2026-09-20
+
+**Two of the consequences above were written against an agent kit that no longer exists.** ADR 0021
+retired `design4pro/agent-kit` and vendored the rendered files in place, so:
+
+- The bullet "the agent-kit check in `verify` falls back to hashes only there" is void. There is no
+  agent-kit check: `node .ai/scripts/agent-kit-check.mjs` is gone from `validation.commands` and
+  from the `verify` job, and the script and its lock are deleted. Lint in the queue still runs
+  without the ESLint cache, which is the half of that bullet that survives.
+- Decision 2's "Both workflows are kit-managed, so this lands in agent-kit first" and decision 4's
+  "The shared descriptor text lives in agent-kit" describe a delivery route that is closed.
+  `merge-gate.yml`, `claude-code-review.yml` and `.ai/trackers/github.md` are ordinary files of
+  this repository and are edited here.
+
+The queue mechanism, the `verdict` job and the required checks are untouched.
