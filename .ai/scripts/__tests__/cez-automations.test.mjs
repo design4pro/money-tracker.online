@@ -219,6 +219,23 @@ describe('cez-automations.sh', () => {
     expect(result.stderr).not.toContain('drift in')
   })
 
+  // jq's `//` reads `false` as absent, so a `$cur[.key] // null` lookup turned a boolean both
+  // sides agree on into a phantom drift line. These two pin both halves of the comparison.
+  it('reports no drift on a top-level boolean both sides hold as false', async () => {
+    const def = definition('Weekly lessons', { autonomous: false })
+    const result = await run([def], [held(def, { id: 'a6', enabled: true })])
+    expect(result.stderr).not.toContain('drift in')
+  })
+
+  it('still names a top-level boolean the cockpit does not hold', async () => {
+    const def = definition('Weekly lessons', { autonomous: false })
+    const result = await run(
+      [def],
+      [held(definition('Weekly lessons'), { id: 'a6', enabled: true })],
+    )
+    expect(result.stderr).toMatch(/drift in Weekly lessons:.*autonomous/)
+  })
+
   it('applies every definition even when the first one has not drifted', async () => {
     const first = definition('Triage new issues')
     const second = definition('Weekly lessons', { intervalSeconds: 60 })

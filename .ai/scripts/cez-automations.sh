@@ -64,7 +64,10 @@ jq -c '.[]' "$FILE" | while read -r def; do
     # exists". A nested value compares whole, so `filters` or `task` shows up when any one field
     # inside it moved. Both lines are `if`, not `&& say`: under `set -e` a false `&&` is a failed
     # command, and it would end the run on the first automation that had not drifted.
-    drift=$(jq -r --argjson cur "$current" '[to_entries[] | select(.key != "enabled") | select(($cur[.key] // null) != .value) | .key] | join(", ")' <<<"$def")
+    # No `// null` on the lookup: jq's `//` treats `false` as absent, so a boolean field the
+    # cockpit and the file both hold as `false` would report as drift. A key the cockpit does
+    # not hold already yields `null`, which is the comparison this wants.
+    drift=$(jq -r --argjson cur "$current" '[to_entries[] | select(.key != "enabled") | select($cur[.key] != .value) | .key] | join(", ")' <<<"$def")
     if [ -n "$drift" ]; then say "  drift in $name: $drift"; fi
     if [ "$keep" = "false" ]; then
       say "  $name stays disabled: the cockpit holds it paused and the file does not say otherwise"
