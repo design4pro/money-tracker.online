@@ -140,6 +140,11 @@ page, which is why three of them said "no" about permissions the token holds. No
 repository would have noticed; the probe below, and the settings page, are what turn the column back
 into a fact.
 
+The column keeps its 2026-09-10 date on purpose. The probe below was re-run on 2026-09-20 and the
+three rows it can observe were unchanged — check runs refused, Commit statuses readable, Actions
+readable — but a probe reads behaviour, and only the settings page can confirm or clear the two
+drift rows. Re-date the column when someone reads that page, not when a run reads the API.
+
 - **CI status.** The check-run view is the one that bites, and it is permanently out of reach:
   **get-pr-checks** answers `403 Resource not accessible by personal access token`; the GraphQL
   wording names `statusCheckRollup`, and once Commit statuses landed it narrowed to the per-context
@@ -152,29 +157,62 @@ into a fact.
   scope grant. Note what that costs: a check
   posted by an installed GitHub App rather than by a workflow would be invisible to a run, and this
   paragraph would stop being true without any signal that it had.
-- **Required checks.** **get-required-checks** answers 403 here on 2026-09-10 _with_ the drifted
-  Administration: read in hand — `branches/develop/protection/required_status_checks` refuses this
-  token whatever the picker grants, so do not read the 403 as the missing-permission signal the rest
-  of this section uses it for. The status code is moot anyway: that call reads _classic branch
-  protection_ and this repository's gate is a repository **ruleset**, so neither a 403 nor a 404 nor
-  a 200 from it would be the required set. The readable truth needs Metadata alone:
-  `gh api repos/{owner}/{repo}/rules/branches/{branch} --jq '.[].type'`. On 2026-09-09 both
-  `develop` and `main` resolved to `deletion`, `non_fast_forward`, `pull_request` and nothing else:
-  **no status check is required by the ruleset**, and the merge gate is the pull-request rule with
-  `required_approving_review_count: 0`. The descriptor's documented fallback — "treat every
-  reported check as required" — is therefore stricter than the gate, not a stand-in for it. That is
-  the safe direction, and a run may keep it; what it must not do is call it the required set.
-  It follows that what holds a merge here is the pipeline — the labels, the review verdict and the
-  QA gate in `SDLC.md`, and the merge tooling's own refusal to merge on red — and not the ruleset,
-  which enforces only that `develop` and `main` are reached through a pull request and are neither
-  deleted nor force-pushed, plus — on `main` since 2026-09-13 — that the pull request merges with a
-  merge commit rather than a squash (ADR 0003, amendment 2026-09-13). None of those is a status
-  check, so the rule types read above are unchanged by it. Prose elsewhere that credits required
-  checks or branch protection with holding the merge predates this reading and is tracked
-  separately. None of this generalises: the same read against `design4pro/planned.travel` returns a
-  `required_status_checks` rule on its `develop`. Two repositories share this token and disagree
-  about their gate, which is the argument for reading the ruleset per repository rather than
-  assuming either answer.
+- **Required checks.** Classic branch protection stays unreadable:
+  `branches/develop/protection/required_status_checks` answered 403 again on 2026-09-20, _with_ the
+  drifted Administration: read in hand, so do not read that 403 as the missing-permission signal the
+  rest of this section uses it for. It no longer decides anything, because that call reads _classic
+  branch protection_ and this repository's gate is a repository **ruleset**, readable with Metadata
+  alone: `gh api repos/{owner}/{repo}/rules/branches/{branch} --jq '.[].type'`. Since kit 47
+  (`4b78a1c`) the descriptor reads exactly that first and classic protection only as an additive
+  second source, falling back to "treat every reported check as required" only when **both** reads
+  fail. So **get-required-checks** returns the real set here rather than a guess — which is what
+  #133 asked for.
+
+  **That set is no longer empty, and this section previously said it was.** On 2026-09-09 both
+  branches resolved to `deletion`, `non_fast_forward`, `pull_request` and nothing else. On
+  2026-09-20 `develop` (ruleset 22037820) adds `required_status_checks` and `merge_queue`, and
+  `main` (22037770) adds `required_status_checks`. Both require the same five contexts, with
+  `strict_required_status_checks_policy: false` so a branch need not be current to merge:
+
+  | Required context                       | Published by                               |
+  | -------------------------------------- | ------------------------------------------ |
+  | `claude-review`                        | `.github/workflows/claude-code-review.yml` |
+  | `generated · typecheck · lint · build` | `.github/workflows/ci.yml`                 |
+  | `unit tests · coverage`                | `.github/workflows/ci.yml`                 |
+  | `e2e · merged report`                  | `.github/workflows/ci.yml`                 |
+  | `merge-gate`                           | `.github/workflows/merge-gate.yml`         |
+
+  Every one is a GitHub Actions job in this repository (`integration_id` 15368), and that is what
+  makes the set usable rather than merely readable: **get-pr-checks**' Actions-run fallback reports
+  all five, so the check-run blind spot above costs nothing _at the merge gate_ as the ruleset
+  stands today. That is a property to re-probe, not to assume — an App-published _check run_ added
+  to the required set would be both required and invisible, and nothing in the repository would say
+  so. An App that posts a _commit status_ rather than a check run stays readable, because Commit
+  statuses: read is held; it is only the check-run half that no fine-grained PAT reaches.
+
+  **One of the five never runs on a pull request, and a run must not read that as a failure.**
+  `ci.yml` gates its `e2e` matrix on `github.event_name != 'pull_request'` (line 367), and
+  `e2e · merged report` in turn runs only when that matrix did, so on every pull request the
+  required context `e2e · merged report` reports **skipped**. GitHub counts a skipped required
+  check as satisfied: observed on #348 on 2026-09-20, where `mergeStateStatus` went `BLOCKED` →
+  `CLEAN` with that context skipped and the other four green. So a run looking for five green
+  contexts on a pull request will never find them, and must treat `skipped` as satisfied rather
+  than wait for a job that is not coming. The browser journeys are gated on the push to `develop`
+  instead, which is where that job does run.
+
+  The pipeline still holds a merge as well — the labels, the review verdict and the
+  QA gate in `SDLC.md` — but it is no longer the only thing holding one, and prose elsewhere
+  (this section included, before this revision) that credits the ruleset with enforcing nothing but
+  pull-request-and-no-force-push predates the reading above. The `pull_request` rule still sets
+  `required_approving_review_count: 0` on both branches, so the review gate remains the pipeline's,
+  not GitHub's. It also sets `allowed_merge_methods: ["merge"]` on both — on `main` since
+  2026-09-13 (ADR 0003, amendment 2026-09-13) and now on `develop` too — while `develop`'s merge
+  queue is configured `merge_method: SQUASH`, `grouping_strategy: ALLGREEN`. Whether the merge
+  tooling agrees with either is a merge-path question, not a CI one, and is tracked separately.
+  Read the ruleset per repository and per branch rather than generalising:
+  `design4pro/planned.travel` carries this same token and requires five contexts of its own on
+  `develop` — near-identical but not equal (`lint · typecheck · build`, `unit tests`).
+
 - **Re-running a job.** Actions: write is held as of 2026-09-10, so **rerun-failed** has the grant
   it needs; #133 recorded it as missing from a run's behaviour before the token page was read.
   Re-running is still bounded by judgement rather than by permission: a run that suspects
@@ -184,8 +222,14 @@ into a fact.
 
 Probe, from the bot's `gh` config, once per repository — `planned.travel` carries the same token and
 the same expectations, so run it there too. `HEAD` in a REST path is the default branch's tip, which
-is what makes the first two lines stable to paste; the fourth prints the ruleset instead of a
-verdict, because reading it is the point.
+is what makes the first two lines stable to paste; the last two print the ruleset instead of a
+verdict, because reading it is the point. The fifth is the one that catches the drift this section
+has already been wrong about twice, and its output is a prompt to look rather than a verdict. 15368
+is GitHub Actions. `unpinned` means the context is pinned to no app — `integration_id` is optional
+in the ruleset API — which is ordinarily a plain Actions job, not an App check. Any other id is
+pinned to some other App and is worth reading further: it is invisible to a run only if that App
+publishes a _check run_, since one publishing a _commit status_ is readable with the Commit
+statuses: read this token holds.
 
 ```bash
 R=design4pro/money-tracker.online   # then repeat with design4pro/planned.travel
@@ -198,6 +242,14 @@ GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/commits/HEAD/status" >/dev/nul
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/actions/runs?per_page=1" >/dev/null 2>&1 \
   && echo "actions: read ok" || echo "actions: read MISSING"
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/rules/branches/develop" --jq '.[].type'
+# The required contexts themselves, with the app each is pinned to. 15368 is GitHub Actions;
+# `unpinned` is no app at all (the field is optional) and is ordinarily still a workflow. Any
+# other id is pinned to another App - out of reach only if it publishes a check run rather than
+# a commit status.
+GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/rules/branches/develop" \
+  --jq '.[] | select(.type=="required_status_checks")
+        | .parameters.required_status_checks[]
+        | "\(.integration_id // "unpinned")\t\(.context)"'
 ```
 
 Both repositories are private, so an unauthenticated 200 cannot mask a missing permission. Were one
@@ -207,9 +259,11 @@ a scope it does not have.
 Nothing is left to grant on this token. There is no `Checks` permission to add, and Actions: write
 is already held; the one edit still owed under Settings → Personal access tokens on the
 `design4pro-agent` account is a **removal** — Workflows and Administration off, re-approved once by
-the organisation. The descriptor half of the change lives in `design4pro/agent-kit`, which renders
-`.ai/trackers/github.md`; the piece worth carrying there is teaching **get-required-checks** the
-rulesets endpoint, which needs no new scope at all.
+the organisation. The descriptor half has landed: `design4pro/agent-kit` renders
+`.ai/trackers/github.md`, and teaching **get-required-checks** the rulesets endpoint arrived here
+with kit 47 (`4b78a1c`, agent-kit#53), so nothing on the CI half of the pipeline is waiting on a
+scope grant or on a kit sync any more. What remains is upkeep rather than a gap: the reading in this
+section is a snapshot, and the ruleset has already changed under it once.
 
 ### The cockpit process
 
