@@ -8,9 +8,12 @@
   from src/styles/app.css with its wash taken as a property.
 
   Every colour is a real token value read from src/styles/tokens.css. The
-  --pen-* values are the candidates measured in the spec (a 34% hue mix toward
-  surface in light, 38% in dark); the ratio beside each row is --color-ink on
-  that wash composited at 0.75 over --color-surface, computed the same way
+  --pen-* values are the candidates measured in the spec: in light the existing
+  -soft tint with about 11% more of its own hue mixed back in, in dark a 38% mix
+  of the hue into surface. The ratio beside each row is --color-ink on that wash
+  composited at 0.75, worst of --color-surface and --color-surface-sunken -
+  which is surface-sunken in light and surface in dark, because the darker plane
+  changes sides between the themes - computed the same way
   src/styles/__tests__/tokens-contrast.test.ts computes a wash.
 
   The #mark-pen-rough filter is inlined below because __root.tsx mounts it once
@@ -29,7 +32,7 @@
         --ink-2: #4b4941;
         --border-subtle: #c3d1c4;
         --border-panel: #a8b5a9;
-        --border-strong: #8a9a8b;
+        --border-strong: #6f7d71;
         --brand: #4a2a82;
         --brand-soft: #ece4f7;
         --highlighter: #ece4f7;
@@ -327,8 +330,11 @@
       Left of each pair is what ships: a rectangle, ruled or filled, with the
       tone's hue in the text. Right is the proposal: one mark, the hue in the
       run of pen, the word always in <code>ink</code>. The ratio column is
-      <code>--color-ink</code> on that wash composited at 0.75 over
-      <code>--color-surface</code>, the floor being 7:1. Placeholder words only.
+      <code>--color-ink</code> on that wash composited at 0.75, worst of
+      <code>--color-surface</code> and <code>--color-surface-sunken</code> -
+      which is <code>surface-sunken</code> in light and <code>surface</code> in
+      dark, because the darker plane changes sides between the themes. The floor
+      is 7:1. Placeholder words only.
     </p>
 
     <div class="sheets">
@@ -384,7 +390,7 @@
               <td class="name">settled</td>
               <td class="mark"><span class="pen settled sm">Settled</span></td>
               <td class="mark"><span class="pen settled sm">Settled</span></td>
-              <td class="ratio">13.14:1</td>
+              <td class="ratio">12.66:1</td>
             </tr>
           </tbody>
         </table>

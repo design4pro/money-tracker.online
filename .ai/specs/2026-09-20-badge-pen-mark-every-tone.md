@@ -189,11 +189,14 @@ during this spec (`oklab` mixing and sRGB alpha compositing reproduced from `app
 So the mark's structure requires the ink and the hue to be different axes, which means the hue
 belongs to the wash. This is also what `badge.tsx` already says about `settled` — "the typed word
 stays in `ink`, and a run of `highlighter` is drawn behind it" — generalised from one tone to all of
-them. Under that model every tone clears 7:1: at the candidate saturation this spec proposes (a 34%
-hue mix in light, 38% in dark), the worst composite measures **10.51:1** (light, `neutral` and
-`info`) and **7.15:1** (dark, `warning`), against a floor of 7 — wide headroom in light, and
-deliberately close to the floor in dark, where the palette is tightest. Both figures are the worst
-rows of the Phase 2 Step 5 token table, measured the same way.
+them. Under that model every tone clears 7:1: at the candidate saturation this spec proposes — in
+light the existing `-soft` tint with roughly 11% more of its own hue mixed back in, in dark a 38% mix
+of the hue into `surface` — the worst composite measures **10.51:1** (light, `neutral` and `info`)
+and **7.15:1** (dark, `warning`), against a floor of 7 — wide headroom in light, and deliberately
+close to the floor in dark, where the palette is tightest. Both figures are the worst rows of the
+Phase 2 Step 5 token table, measured the same way. The two themes are built from different starting
+points on purpose, for the reason Q3 gives: in dark every `-soft` token is a panel tint, so a pen
+mixed from one would read as a panel.
 
 A second consequence, and a good one: the tone's hue stops being text at all. `docs/ACCESSIBILITY.md`
 §1's Colour-Is-Never-Alone Rule is satisfied structurally rather than by convention — the word is the
@@ -438,11 +441,14 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
    | `--color-pen-warning`  | `#decdb2` (10.59:1) | `#635840` (7.15:1) |
    | `--color-pen-brand`    | `#d8cfea` (10.96:1) | `#57516a` (7.53:1) |
 
-   Ratios are `--color-ink` on the wash composited at 0.75 over `--color-surface` — the one ground
-   the mockup renders, so the two columns are the same measurement. `surface-sunken` is the tighter
-   ground in light and the looser one in dark (measured on `--color-highlighter`: 13.14:1 against
-   12.66:1 in light, 8.69:1 against 9.11:1 in dark), which is why Step 6 asserts both grounds rather
-   than trusting this column.
+   Ratios are `--color-ink` on the wash composited at 0.75, **worst of `surface` and
+   `surface-sunken`** — which is not the same ground in both themes, and saying so is the point.
+   `surface-sunken` is the darker plane in light, so it is the worst case there; in dark it is the
+   darker plane again, which makes `surface` the worst case instead. The light column is therefore
+   measured over `surface-sunken` and the dark column over `surface`. Reproduced on
+   `--color-pen-brand`: light 10.93:1 over `surface-sunken` against 11.37:1 over `surface`, dark
+   7.58:1 over `surface` against 7.98:1 over `surface-sunken`. Step 6 asserts both grounds anyway, so
+   the column is the binding case rather than the only one measured.
    The **light** column is derived from the existing `-soft` tints with the chroma pushed back up,
    and clears **7.5:1 even on the pooled edge** — it stands whichever way Step 4 answers Q8. The
    **dark** column assumes the decorative reading; if a glyph overlaps the pooled edge, dark drops to
