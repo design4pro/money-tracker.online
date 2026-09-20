@@ -183,8 +183,11 @@ during this spec (`oklab` mixing and sRGB alpha compositing reproduced from `app
   the pooled edge moves 30% of the way from the wash to the text, and the pair collapses. Searched
   across the whole saturation range, in both themes: the **maximum** pool that still clears 7:1 is
   **0–1%**. There is no palette that fixes this; the model is wrong, not the values.
-- `settled` escapes it because its two axes are independent: the ink is `--color-ink`, the wash and
-  the deepen are violet. Ink against a violet wash has enough headroom to absorb a 30% pool.
+- `settled` escapes the **collapse** because its two axes are independent: the ink is `--color-ink`,
+  the wash and the deepen are violet, so a 30% pool moves the wash toward another violet rather than
+  toward the text. It does not escape the 7:1 floor everywhere: the Risks section below measures the
+  shipped dark `settled` pooled edge at **5.98:1**. What rescues that is Q8's decorative reading at
+  3:1, not headroom — the independence buys a pool that degrades gracefully, not one that is free.
 
 So the mark's structure requires the ink and the hue to be different axes, which means the hue
 belongs to the wash. This is also what `badge.tsx` already says about `settled` — "the typed word
@@ -192,7 +195,7 @@ stays in `ink`, and a run of `highlighter` is drawn behind it" — generalised f
 them. Under that model every tone clears 7:1: at the candidate saturation this spec proposes — in
 light the existing `-soft` tint with more of its own hue mixed back in (11% for `brand`, 14% for
 `negative`, 16% for the other four), in dark a 38% mix of the hue into `surface` — the worst
-composite measures **10.51:1** (light, `neutral` and `info`) and **7.15:1** (dark, `warning`),
+composite measures **10.51:1** (light, `neutral` and `info`) and **7.18:1** (dark, `warning`),
 against a floor of 7 — wide headroom in light, and deliberately close to the floor in dark, where the
 palette is tightest. Both figures are the worst rows of the Phase 2 Step 5 token table, measured the
 same way. The two themes are built from different starting points on purpose, for the reason Q3
@@ -243,8 +246,14 @@ export interface BadgeProps
 ```
 
 Both unions, `BadgeProps`, the `icon` prop and the named `badgeVariants` export are byte-identical
-before and after. Nothing outside `src/components/ui/index.ts` imports `badgeVariants` today
-(measured: zero files), so the class strings are not a contract anyone can depend on.
+before and after. Nothing outside `src/components/ui/index.ts` **imports** `badgeVariants` today
+(measured: zero files) — but one place **depends on its output anyway**:
+`e2e/desktop-density.spec.ts` hardcodes the exact class string for `tone="negative" size="md"` as a
+literal, quoted rather than imported for the `import.meta.glob` reason its own docstring gives, and
+measures a real layout against it. Phase 3 Steps 8 and 9 change precisely the classes in that literal
+(`bg-negative-soft text-negative`, `h-6`, `px-2`), so it is an impacted file, not a bystander, and
+Step 9 updates it in the same change. The lesson its docstring records — a stand-in that "stayed
+green while `pl` scrolled" — is exactly what a stale literal would reintroduce.
 
 ## 📝 UI/UX
 
@@ -348,14 +357,14 @@ the composites the browser actually produces, against the shipped values:
 
 | theme | ground           | wash @0.75 | pooled @0.75 | paused @0.4 |
 | ----- | ---------------- | ---------- | ------------ | ----------- |
-| light | `surface`        | 13.14:1    | 8.82:1       | 10.24:1     |
-| light | `surface-sunken` | 12.66:1    | 8.44:1       | 9.30:1      |
-| dark  | `surface`        | 8.69:1     | **5.99:1**   | 8.08:1      |
-| dark  | `surface-sunken` | 9.11:1     | **6.27:1**   | 9.12:1      |
+| light | `surface`        | 13.09:1    | 8.80:1       | 10.25:1     |
+| light | `surface-sunken` | 12.61:1    | 8.43:1       | 9.28:1      |
+| dark  | `surface`        | 8.68:1     | **5.98:1**   | 8.08:1      |
+| dark  | `surface-sunken` | 9.12:1     | **6.29:1**   | 9.11:1      |
 
 The wash composite is never the binding case: a tinted wash sits between the ground and the ink, so
 compositing it toward the ground only helps. The **pooled edge** is the binding case, and in dark it
-measures **5.99:1** against a palette designed to 7:1 — on the mark that ships today, on the landing.
+measures **5.98:1** against a palette designed to 7:1 — on the mark that ships today, on the landing.
 The suite does not see it because the suite measures the token and the browser paints a composite.
 
 Two honest caveats, neither of which makes it go away: the pooled region sits at the trailing edge of
@@ -399,9 +408,14 @@ Four phases. Each is at most one product area, needs no migration, and is finish
 ### Phase 1 — the mark becomes parameterisable
 
 1. **Introduce the two properties.** In `@utility mark-pen`, declare `--mark-pen-wash:
-var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewrite
-   `--mark-pen-pooled`, `--mark-pen-paused` and `background-color` to read them. Geometry,
-   `box-shadow`, `filter` and both pseudo-elements are untouched.
+var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewrite every site that
+   names a colour to read them: `--mark-pen-pooled` and `--mark-pen-paused` on the utility,
+   `&::before`'s `background-color`, and the second stop of `&::after`'s `radial-gradient` — the one
+   easy to miss, because it is hardcoded to `var(--color-highlighter)` today and would otherwise
+   leave a green wash with a lilac paused blob. The mockup already shows the target:
+   `radial-gradient(var(--mark-pen-paused), var(--mark-pen-wash))`. Geometry, `box-shadow`, `filter`
+   and both `opacity` values are untouched; the pseudo-elements keep their structure and change only
+   the colours they name.
    _Verify:_ `pnpm build` produces the same computed values for the `settled` badge; the landing
    frame is unchanged in both themes.
    _Tenant isolation case:_ none — no repository touched. _Money invariant case:_ none — no amount
@@ -434,12 +448,12 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
 
    | token                  | light               | dark               |
    | ---------------------- | ------------------- | ------------------ |
-   | `--color-pen-neutral`  | `#cfcec5` (10.51:1) | `#535352` (7.70:1) |
-   | `--color-pen-info`     | `#cfcec5` (10.51:1) | `#535352` (7.70:1) |
-   | `--color-pen-positive` | `#bbd7c6` (10.73:1) | `#415f52` (7.22:1) |
-   | `--color-pen-negative` | `#ebc7c1` (10.62:1) | `#684f4d` (7.56:1) |
-   | `--color-pen-warning`  | `#decdb2` (10.59:1) | `#635840` (7.15:1) |
-   | `--color-pen-brand`    | `#d8cfea` (10.96:1) | `#57516a` (7.53:1) |
+   | `--color-pen-neutral`  | `#cfcec5` (10.51:1) | `#535352` (7.71:1) |
+   | `--color-pen-info`     | `#cfcec5` (10.51:1) | `#535352` (7.71:1) |
+   | `--color-pen-positive` | `#bbd7c6` (10.71:1) | `#415f52` (7.22:1) |
+   | `--color-pen-negative` | `#ebc7c1` (10.60:1) | `#684f4d` (7.55:1) |
+   | `--color-pen-warning`  | `#decdb2` (10.62:1) | `#635840` (7.18:1) |
+   | `--color-pen-brand`    | `#d8cfea` (10.93:1) | `#57516a` (7.58:1) |
 
    Ratios are `--color-ink` on the wash composited at 0.75, **worst of `surface` and
    `surface-sunken`** — which is not the same ground in both themes, and saying so is the point.
@@ -448,7 +462,9 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
    measured over `surface-sunken` and the dark column over `surface`. Reproduced on
    `--color-pen-brand`: light 10.93:1 over `surface-sunken` against 11.37:1 over `surface`, dark
    7.58:1 over `surface` against 7.98:1 over `surface-sunken`. Step 6 asserts both grounds anyway, so
-   the column is the binding case rather than the only one measured.
+   the column is the binding case rather than the only one measured. Every ratio in this document is
+   computed from the declared hex and rounded once, to two places — recompute rather than transcribe
+   when a value moves, because these figures ship as the CSS comments beside the declarations.
    The **light** column is derived from the existing `-soft` tints with the chroma pushed back up,
    and clears **7.5:1 even on the pooled edge** — it stands whichever way Step 4 answers Q8. The
    **dark** column assumes the decorative reading; if a glyph overlaps the pooled edge, dark drops to
@@ -481,9 +497,12 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
 9. **Re-derive the geometry.** Replace the box's `h-5`/`h-6` and horizontal padding with the metrics
    the mark needs, restore optical alignment at both sizes, and fix the two compensations: the
    `relative -top-0.5` on the transaction row and the `sm:ms-1 max-sm:block` wrapper on the landing.
-   Add the minimum inline gap between adjacent badges.
+   Add the minimum inline gap between adjacent badges. Update the `badgeClass` literal in
+   `e2e/desktop-density.spec.ts`'s `STATUS_COLUMN` to the string Step 8 and this step produce, in
+   both locales — it is a transcription of `badgeVariants`' output and goes stale silently.
    _Verify:_ browser evidence on `/transactions`, `/recurring`, `/categories` and the landing, both
-   themes, 360 and 1280; no shearing in a table cell.
+   themes, 360 and 1280; no shearing in a table cell; `pnpm e2e` green on
+   `e2e/desktop-density.spec.ts`, which fails if the literal was not updated.
 10. **Hold forced colours.** Add the `forced-colors: active` rule that restores a one-pixel
     `CanvasText` boundary on every tone (Q6).
     _Verify:_ a forced-colours frame per archetype (table row, card, tree row); `e2e/accessibility.spec.ts`
