@@ -185,9 +185,11 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   Every one is a GitHub Actions job in this repository (`integration_id` 15368), and that is what
   makes the set usable rather than merely readable: **get-pr-checks**' Actions-run fallback reports
   all five, so the check-run blind spot above costs nothing _at the merge gate_ as the ruleset
-  stands today. That is a property to re-probe, not to assume — an App-published check
-  added to the required set would be both required and invisible, and nothing in the repository
-  would say so. The pipeline still holds a merge as well — the labels, the review verdict and the
+  stands today. That is a property to re-probe, not to assume — an App-published _check run_ added
+  to the required set would be both required and invisible, and nothing in the repository would say
+  so. An App that posts a _commit status_ rather than a check run stays readable, because Commit
+  statuses: read is held; it is only the check-run half that no fine-grained PAT reaches. The
+  pipeline still holds a merge as well — the labels, the review verdict and the
   QA gate in `SDLC.md` — but it is no longer the only thing holding one, and prose elsewhere
   (this section included, before this revision) that credits the ruleset with enforcing nothing but
   pull-request-and-no-force-push predates the reading above. The `pull_request` rule still sets
@@ -211,8 +213,12 @@ Probe, from the bot's `gh` config, once per repository — `planned.travel` carr
 the same expectations, so run it there too. `HEAD` in a REST path is the default branch's tip, which
 is what makes the first two lines stable to paste; the last two print the ruleset instead of a
 verdict, because reading it is the point. The fifth is the one that catches the drift this section
-has already been wrong about twice — a required context whose `integration_id` is not 15368 is
-published by an App rather than by a workflow, and is therefore required but invisible to a run.
+has already been wrong about twice, and its output is a prompt to look rather than a verdict. 15368
+is GitHub Actions. `unpinned` means the context is pinned to no app — `integration_id` is optional
+in the ruleset API — which is ordinarily a plain Actions job, not an App check. Any other id is
+pinned to some other App and is worth reading further: it is invisible to a run only if that App
+publishes a _check run_, since one publishing a _commit status_ is readable with the Commit
+statuses: read this token holds.
 
 ```bash
 R=design4pro/money-tracker.online   # then repeat with design4pro/planned.travel
@@ -225,11 +231,14 @@ GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/commits/HEAD/status" >/dev/nul
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/actions/runs?per_page=1" >/dev/null 2>&1 \
   && echo "actions: read ok" || echo "actions: read MISSING"
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/rules/branches/develop" --jq '.[].type'
-# The required contexts themselves, with the integration that publishes each. 15368 is GitHub
-# Actions; any other id is an App check, which no fine-grained PAT can see.
+# The required contexts themselves, with the app each is pinned to. 15368 is GitHub Actions;
+# `unpinned` is no app at all (the field is optional) and is ordinarily still a workflow. Any
+# other id is pinned to another App - out of reach only if it publishes a check run rather than
+# a commit status.
 GH_CONFIG_DIR=~/.config/gh-agent gh api "repos/$R/rules/branches/develop" \
   --jq '.[] | select(.type=="required_status_checks")
-        | .parameters.required_status_checks[] | "\(.integration_id)\t\(.context)"'
+        | .parameters.required_status_checks[]
+        | "\(.integration_id // "unpinned")\t\(.context)"'
 ```
 
 Both repositories are private, so an unauthenticated 200 cannot mask a missing permission. Were one
