@@ -278,10 +278,16 @@ Workflows live in `.ai/cezar/workflows/`; the committed definitions are
 | Weekly architecture review       | Mondays 06:00                         | `architecture-review` (`afk-architecture-review`) |
 | Weekly lessons                   | Fridays 16:00                         | `lessons` (`afk-lessons`)                         |
 
-Five workflows have **no automation and are started by hand** from the cockpit: `housekeeping`
-(`om-review-prs`, `om-merge-buddy` report, `om-close-fixed-issues`), `backlog`, `brainstorm`,
-`implement-spec` and `pr-review`. Post-merge housekeeping and the review sweep therefore do not run
-on a schedule here — an issue whose PR merged stays open until someone runs it.
+`housekeeping` (`om-review-prs`, `om-merge-buddy` report, `om-close-fixed-issues`) has **no cezar
+automation but does run on a schedule**: the launchd agent `dev.money-tracker.housekeeping` calls
+`.ai/scripts/housekeeping.sh` on weekdays at 07:00, 12:00 and 17:00. It is not in the table above
+because that table lists cezar automations, and this one is a host-level timer — which is exactly
+why this paragraph used to say the opposite. So the review sweep and post-merge reconciliation do
+run unattended; an issue whose PR merged closes at the next run rather than waiting for a person,
+and a merger's manual `/om-close-fixed-issues` matters only between those three runs.
+
+Four workflows have **no automation and no schedule**, started by hand from the cockpit:
+`backlog`, `brainstorm`, `implement-spec` and `pr-review`.
 
 The `authors: ["rafalwolak"]` filter on the two `opened` automations is a security gate, not a
 convenience: those runs read the issue or PR body as a prompt and hold Bash with no allowlist, so

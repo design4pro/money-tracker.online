@@ -1,13 +1,13 @@
 ---
 name: afk-codebase-design
-description: money-tracker.online's own half of the codebase-design skill - its house idiom, seams, dependency examples, test layout and risk-high interfaces. Overrides the kit-rendered base of the same name; read that base for the vocabulary and the rules.
+description: money-tracker.online's own half of the codebase-design skill - its house idiom, seams, dependency examples, test layout and risk-high interfaces. Shadows the shared base of the same name; read that base for the vocabulary and the rules.
 ---
 
 # AFK codebase design in money-tracker.online
 
-**Read `.ai/skills/afk-codebase-design/SKILL.md` first.** That file is the shared half, rendered by the agent kit into every repository that uses this pipeline: the vocabulary (module, interface, depth, seam, adapter, leverage, locality), the five rules, the dependency-category skeleton, the design-it-twice procedure and the done-when. `afk-triage`, `afk-to-tickets` and `afk-architecture-review` read that path literally, so those terms are guaranteed to be the same everywhere.
+**Read `.ai/skills/afk-codebase-design/SKILL.md` first.** That file is the shared half, kept identical by hand across the repositories that use this pipeline (ADR 0021 retired the renderer): the vocabulary (module, interface, depth, seam, adapter, leverage, locality), the five rules, the dependency-category skeleton, the design-it-twice procedure and the done-when. `afk-triage`, `afk-to-tickets` and `afk-architecture-review` read that path literally, so those terms are guaranteed to be the same everywhere.
 
-This file is the other half: what is true only here. It shadows the rendered file by name in the cockpit's registry - `.ai/cezar/skills` is scanned before `.ai/skills` and the first of a name wins - so an agent that loads the skill by name gets **this** file and must read the rendered one alongside it. Neither half is complete on its own.
+This file is the other half: what is true only here. It shadows the shared file by name in the cockpit's registry - `.ai/cezar/skills` is scanned before `.ai/skills` and the first of a name wins - so an agent that loads the skill by name gets **this** file and must read the shared one alongside it. Neither half is complete on its own.
 
 ## The house idiom: ports passed in, never looked up
 

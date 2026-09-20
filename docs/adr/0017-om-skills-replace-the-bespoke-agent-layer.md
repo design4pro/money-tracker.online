@@ -195,15 +195,17 @@ starting an autofix run on one is how a disagreement gets bulldozed. `om-auto-re
 cannot arm a second run against itself in any case. Cezar 0.10.1 has no automation event for a
 review, and its poller drops label events on pull requests outright (patch 4 in
 `.ai/scripts/cezar-host-patch.sh` exists for that reason). So the producer of the signal has to sit
-outside both, and a GitHub Action is the only place left.
+outside both, and a GitHub Action is the only place left. (Both halves of that parenthesis have
+since expired; see the 2026-09-20 amendment at the end.)
 
 What this costs, stated plainly, is the thing decision 6 was avoiding: two review passes on a pull
 request, one from `om-auto-review-pr` inside the cezar run and one from the Action. That is the
 price, it is paid on every PR, and it buys the only automated route from "the review left something
 unresolved" to "something clears it". The drift objection is narrower than it was in the original
 context: the Action runs the upstream `code-review` plugin rather than a bespoke reimplementation,
-and it is now one of the files the agent-kit convergence keeps identical between this repository and
-`planned.travel`, where the same chain runs.
+and it is now one of the files kept identical between this repository and `planned.travel`, where
+the same chain runs. (That convergence was the agent kit's until ADR 0021 retired it; see the
+2026-09-20 amendment.)
 
 Two things follow that are not yet done. This repository's `develop` ruleset does not carry
 `required_review_thread_resolution`, so an unresolved thread still blocks nothing at the merge gate
@@ -299,3 +301,27 @@ GitHub Actions.
 Decision 2's own text is unaffected: `.claude/skills/om-*` and `skills-lock.json` are still
 committed, the pin still moves in the same commit, and an upgrade is still a pull request read
 with `om-apply-upgrade-notes`.
+
+## Amendment, 2026-09-20: three mechanisms this ADR reasons from no longer exist
+
+The 2026-09-08 amendment above ("decision 6 is superseded") argues from three facts that have all
+expired. The decision it reached still stands — the Action is still what arms `review-threads`, and
+`scripts/ci/review-threads-label.mjs` still restricts arming to `claude`, `claude[bot]` and
+`github-actions[bot]` — but the reasoning should not be re-derived from what it says.
+
+- **`.ai/scripts/cezar-host-patch.sh` is deleted.** ADR 0021 retired `design4pro/agent-kit` and
+  vendored the host layer in place; the patch set went with it. A reader sent to that file finds
+  nothing.
+- **Cezar no longer drops label events on pull requests.** The patch existed because it did.
+  Cezar 0.11.1 takes `filters.includePullRequests` on a `github` automation
+  (`packages/cezar/src/automations/github-poller.ts`), and the committed "Resolve blocking review
+  threads" definition in `docs/agents/cezar-automations.json` already sets it. The upstream gap
+  this ADR worked around is closed.
+- **There is no agent-kit convergence.** `merge-gate.yml`, `claude-code-review.yml` and
+  `.ai/trackers/github.md` are ordinary files of this repository, edited here. They are still kept
+  in step with `planned.travel`, but by a person making the same change twice, not by a renderer.
+
+What does **not** follow from the second point: that the Action should be replaced by a cezar
+automation. The Action is also the only producer that sees a review event at all, and it is the one
+place the arming decision can read the thread author before the label exists. The workaround became
+unnecessary; the reason underneath it did not.
