@@ -9,7 +9,7 @@ description: Shared vocabulary and rules for designing deep modules in money-tra
 
 Adapted from mattpocock/skills `codebase-design` for unattended runs. Use these words exactly in designs, briefs, review findings and PR bodies. Do not substitute "component", "service", "API" or "boundary".
 
-**This file is the shared half.** The vocabulary and the rules below are identical in every repository the kit renders into, because `afk-triage`, `afk-to-tickets` and `afk-architecture-review` all read this path for terms they name exactly. The other half - this repository's own house idiom, seam table, dependency examples, test layout and risk-high list - is at `.ai/cezar/skills/afk-codebase-design/SKILL.md`, which shadows this file by name in the cockpit's registry. Read both before designing anything.
+**This file is the shared half.** The vocabulary and the rules below are kept identical across the repositories that share this agent layer - `planned.travel` and `cezar` - because `afk-triage`, `afk-to-tickets` and `afk-architecture-review` all read this literal path for terms they name exactly. Nothing renders it any more: ADR 0021 retired `design4pro/agent-kit`, so a change here is a change made by hand in each of them. The other half - this repository's own house idiom, seam table, dependency examples, test layout and risk-high list - is at `.ai/cezar/skills/afk-codebase-design/SKILL.md`, which shadows this file by name in the cockpit's registry. Read both before designing anything.
 
 ## Vocabulary
 

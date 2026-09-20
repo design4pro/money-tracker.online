@@ -30,8 +30,9 @@ the rules of `SDLC.md`.
   `docs/host/README.md`, sections "The cockpit runs a fork, not npx" and "Taking an upstream
   release", is the runbook. Until kit 39
   these fixes were string patches on an npm install's `dist/`, applied by
-  `.ai/scripts/cezar-host-patch.sh`, now deleted; `CEZ_SKILLS_AUTO_UPDATE=0` lives in the kit's
-  plist template.
+  `.ai/scripts/cezar-host-patch.sh`; ADR 0021 retired the kit and that script is deleted.
+  `CEZ_SKILLS_AUTO_UPDATE=0` is set in the cockpit plist on the host
+  (`~/Library/LaunchAgents/dev.cezar.cockpit.plist`), which no template renders any more.
   - `issue.labeled` polls fail as soon as one recently updated issue has a comment or a
     cross-reference (open-mercato/cezar#914, fix in upstream PR #916, not in 0.11.0), so
     **Re-groom on request**, **Fix issues on the autofix label** and **Write a spec for feature issues** never fire. The fork cherry-picks #916.
@@ -327,24 +328,53 @@ carries no permission rules; it is hooks-only, and the rules a `deny` list used 
 
 ## Workflows (`.ai/cezar/workflows/`)
 
-Every workflow is a setup step (`HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm
-generate-routes`) and one agent step whose prompt is the skill as a slash command (`/om-… {{task}}`;
-never `skill:`, which would load the thin `.ai/skills/` override alone). `allowedTools` is the
-full set for skills that write code and drops `Edit`/`Write` for the ones that must not. The tree
-is the same nine workflows as `planned.travel`, under the same names; the setup step differs only
-where that repository provisions D1 and a basemap it needs and this one does not.
+Most workflows are a setup step (`HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm
+generate-routes`) and one agent step whose prompt is the skill as a slash command
+(`/om-… {{task}}`). `allowedTools` is the full set for skills that write code and drops
+`Edit`/`Write` for the ones that must not.
 
-| Workflow         | Agent step                                                               | Model                | Started by                                                                                                                               |
-| ---------------- | ------------------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `issue-groom`    | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                |
-| `issue-autofix`  | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation **Fix issues on the autofix label** (label `autofix`)                                                                         |
-| `spec`           | `/om-auto-write-spec {{task}}`                                           | opus                 | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                             |
-| `implement-spec` | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
-| `pr-autopilot`   | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer)                                                 |
-| `pr-review`      | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                                                                                |
-| `pr-fix`         | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation **Resolve blocking review threads** (label `review-threads` on a PR)                                                          |
-| `housekeeping`   | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd via `.ai/scripts/housekeeping.sh`, or a human                                                                                    |
-| `brainstorm`     | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                                                                                     |
+**Two things that sentence used to claim, and should not.** It said the tree is "the same nine
+workflows as `planned.travel`": there are fifteen here, and the six that arrived with the `afk-*`
+intake ladder have no counterpart there. And it said `/om-…` rather than `skill:` because the
+slash form "would load the thin `.ai/skills/` override alone" — reading cezar 0.11.1 says
+otherwise. `expandRegistrySlashSkillText` resolves `/name` through the same registry `skill:` uses
+and injects the same single winning body (`packages/cezar/src/workflows/run.ts`), and local-first
+precedence means the `.ai/skills/` override wins either way. The slash form is the house
+convention, not a fix. What actually keeps the chain working is that every `.ai/skills/om-*`
+override names its installed `.claude/skills/<name>/SKILL.md` in its opening line and every
+workflow grants `Read`, so the agent can follow the pointer; `.ai/scripts/__tests__/agent-layer-parity.test.mjs`
+asserts exactly that.
+
+`backlog` deliberately has no bootstrap step: it is plain node plus `gh`, and a report that is
+cheap to start is one a human actually starts. The four `afk-*` workflows have none either, but
+not deliberately — see the note under the table.
+
+| Workflow              | Agent step                                                               | Model                | Started by                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `issue-groom`         | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                |
+| `issue-autofix`       | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation **Fix issues on the autofix label** (label `autofix`)                                                                         |
+| `spec`                | `/om-auto-write-spec {{task}}`                                           | opus                 | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                             |
+| `implement-spec`      | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
+| `pr-autopilot`        | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer)                                                 |
+| `pr-review`           | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                                                                                |
+| `pr-fix`              | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation **Resolve blocking review threads** (label `review-threads` on a PR)                                                          |
+| `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                         |
+| `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                                                                                     |
+| `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | sonnet               | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                  |
+| `implement-ticket`    | `skill:` `om-fix` → gate → `om-open-pr` → `om-auto-review-pr`            | unpinned             | automation **Implement ready-for-agent issues** (label `ready-for-agent`)                                                                |
+| `triage`              | `skills: [afk-triage]`                                                   | unpinned             | automation **Triage new issues** (label `needs-triage`)                                                                                  |
+| `spec-to-tickets`     | `skills: [afk-to-tickets]`                                               | unpinned             | automation **Spec to tickets**, weekdays 07:00                                                                                           |
+| `architecture-review` | `skills: [afk-architecture-review]`                                      | unpinned             | automation **Weekly architecture review**, Mondays 06:00                                                                                 |
+| `lessons`             | `skills: [afk-lessons]`                                                  | unpinned             | automation **Weekly lessons**, Fridays 16:00                                                                                             |
+
+The last five rows are shaped unlike the ten above them, and that is a defect rather than a style.
+Four of them are the three-line `skills:` shorthand, so they carry no bootstrap step, no `model:`
+and cezar's `DEFAULT_ALLOWED_TOOLS` — `[Read, Edit, Write, Grep, Glob, Bash]`, which both
+over-grants (`triage` and `architecture-review` are documented read-only) and under-grants
+(`Skill` and `TodoWrite` are absent, so `afk-lessons` §1 and §4 cannot reach `om-pipeline-retro`
+or `om-open-pr`). `implement-ticket` carries a fourth step whose command inlines all seven
+validation commands verbatim, which is the one place in the repository that copies
+`validation.commands` instead of reading it.
 
 The task text an automation sends is the issue or PR number alone (`{{github.number}}`); a second
 token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled
@@ -353,10 +383,22 @@ text naming exactly one issue of this repository as an issue reference. From the
 same: a number, a spec path, or for `brainstorm` the idea.
 
 **Starting a run.** GitHub tab → issue → "Hand this to the agent" → workflow → the task box.
-Implementation also has a label trigger: `autofix` on an issue starts **Fix issues on the autofix label** without the
-cockpit. The four command labels (`groom`, `autofix`, `spec` on an issue, `review-threads` on a
-PR) are the only things that start code-writing work, and no skill adds them (the `.ai/skills/`
-overrides say so), so no run can start another.
+Implementation also has label triggers. Two ladders start code-writing work, and only the first is
+a human's lever:
+
+- **The four command labels** — `groom`, `autofix`, `spec` on an issue, `review-threads` on a PR.
+  No skill adds any of them (the `.ai/skills/` overrides say so), so no run can start another
+  through this route.
+- **The intake ladder** — `needs-triage` starts `triage`, and `ready-for-agent` starts
+  `implement-ticket`. These the pipeline does set for itself: `afk-triage` consumes `needs-triage`
+  and applies one of `needs-info` / `ready-for-agent` / `ready-for-human`, which is the whole point
+  of the ladder. What keeps it bounded is the filter rather than the label discipline: the
+  implementing automation excludes `risk-high` and `security`, and `afk-triage` routes both to
+  `ready-for-human` before it could matter.
+
+This paragraph used to end "the four command labels are the only things that start code-writing
+work". That has not been true since `ready-for-agent` was wired to `implement-ticket` (ADR 0017,
+amendment 2026-09-17).
 
 **Merge and after.** `om-merge-buddy` reports what is mergeable; a human runs
 `/om-approve-merge-pr <n>`, which adds the PR to `develop`'s merge queue — the queue runs the suite
@@ -371,11 +413,21 @@ human sets `qa-approved`: the blind pair is `node scripts/visual/capture.mjs` (A
 Registered with the running cockpit by `.ai/scripts/cez-automations.sh` (`--dry-run` first;
 idempotent: update in place or create enabled; it lists definitions the cockpit holds that the
 file no longer names, and `--prune` deletes them except an enabled one, so the file is the whole
-truth). Six definitions: **Groom new issues** on `issue.opened` with `authors` naming the
-human maintainers; **Re-groom on request**, **Fix issues on the autofix label**, **Write a spec for feature issues** on `issue.labeled` with
-`changedLabels` `groom` / `autofix` / `spec`; **Autopilot new pull requests** on `pull_request.opened`, again with
-`authors`; **Resolve blocking review threads** on `issue.labeled` with `changedLabels` `review-threads` and
+truth). Eleven definitions, in three groups.
+
+**The command-label six:** **Groom new issues** on `issue.opened` with `authors` naming the human
+maintainers; **Re-groom on request**, **Fix issues on the autofix label**, **Write a spec for
+feature issues** on `issue.labeled` with `changedLabels` `groom` / `autofix` / `spec`;
+**Autopilot new pull requests** on `pull_request.opened`, again with `authors`; **Resolve blocking
+review threads** on `issue.labeled` with `changedLabels` `review-threads` and
 `includePullRequests`, the only one that fires on a PR.
+
+**The intake pair:** **Triage new issues** on `changedLabels` `needs-triage`, and **Implement
+ready-for-agent issues** on `changedLabels` `ready-for-agent`, the latter excluding `risk-high`
+and `security`.
+
+**The three schedules:** **Spec to tickets** (weekdays 07:00), **Weekly architecture review**
+(Mondays 06:00) and **Weekly lessons** (Fridays 16:00).
 
 Every trigger is gated on who can produce it: the open events by author, the label events because
 only a collaborator or an Actions token can set a label. This matters because the agent step holds Bash with no
