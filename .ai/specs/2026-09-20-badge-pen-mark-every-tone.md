@@ -248,7 +248,7 @@ before and after. Nothing outside `src/components/ui/index.ts` imports `badgeVar
 
 ## 📝 UI/UX
 
-**The mark, stated once.** A typed word in its tone's ink with a run of pen drawn behind it at 75%
+**The mark, stated once.** A typed word in `ink` with a run of the tone's pen drawn behind it at 75%
 opacity: past both ends of the word, further where the pen lifted, pooled darker at its trailing
 edge, its outline roughened by a displacement filter, a small blob where the pen paused. It sits on
 the baseline of the line it belongs to, because a highlighter is run over a line, not placed above
@@ -361,7 +361,7 @@ The suite does not see it because the suite measures the token and the browser p
 Two honest caveats, neither of which makes it go away: the pooled region sits at the trailing edge of
 a wash that runs `0.75ch` past the last glyph, so **whether any glyph overlaps it is a geometry
 question this spec has not answered in a browser** (Q8); and if none does, it is a graphical object
-under **1.4.11** at 3:1, which it clears comfortably. That check is Phase 2 Step 5a, and it decides
+under **1.4.11** at 3:1, which it clears comfortably. That check is Phase 2 Step 4, and it decides
 the saturation of the whole pen palette. Either way the assertion moves from the token to the
 composite, extending the machinery already there (`parseWashes`, `washOver`, and the twenty
 composited pairs added by `2026-09-11-negative-bold-on-composited-washes.md`) rather than inventing a
