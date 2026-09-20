@@ -548,6 +548,7 @@
 @utility mark-pen {
   --mark-pen-wash: var(--color-highlighter);
   --mark-pen-deepen: var(--color-brand);
+  --mark-pen-filter: url('#mark-pen-rough');
   --mark-pen-pooled: color-mix(
     in oklab,
     var(--mark-pen-wash),
@@ -572,7 +573,7 @@
     box-shadow:
       inset -2px 0 1px var(--mark-pen-pooled),
       inset -4px 0 5px var(--mark-pen-pooled);
-    filter: url('#mark-pen-rough');
+    filter: var(--mark-pen-filter);
   }
 
   &::after {
@@ -587,8 +588,26 @@
     opacity: 0.4;
     border-radius: 10px 0 50px / 200px 0;
     rotate: 15deg;
-    filter: url('#mark-pen-rough');
+    filter: var(--mark-pen-filter);
   }
+}
+
+/* The same pen with its roughened outline dropped, for a mark that repeats.
+
+   `#mark-pen-rough` is `feTurbulence` at four octaves feeding a displacement
+   map, and it is re-rastered per pseudo-element: measured in headless Chromium
+   over a 50-row transactions table with two badges a row, it costs 12.6 ms
+   (light) and 15.8 ms (dark) of raster per frame on top of the mark itself,
+   against roughly 0.12-0.23 ms for a single mark. Scaled linearly, and a whole
+   60 Hz frame budget spent on one screenful of badges.
+
+   So the mark is kept and the outline is what yields, exactly as Q1 of
+   `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md` named it: the wash, the
+   bleed, the pooled trailing edge and the paused blob all stay, and only the
+   roughness goes. One mark standing alone - the landing's `settled` stamp -
+   keeps it. */
+@utility mark-pen-flat {
+  --mark-pen-filter: none;
 }
 
 /* Visible only to assistive technology. Used by every chart's data table and

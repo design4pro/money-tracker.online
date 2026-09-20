@@ -66,5 +66,18 @@ it('leaves the geometry and the one filter alone', async () => {
   expect(css).toContain(
     'box-shadow: inset -2px 0 1px var(--mark-pen-pooled), inset -4px 0 5px var(--mark-pen-pooled)',
   )
-  expect(occurrences(css, "filter: url('#mark-pen-rough')")).toBe(2)
+  expect(css).toContain("--mark-pen-filter: url('#mark-pen-rough')")
+  expect(occurrences(css, 'filter: var(--mark-pen-filter)')).toBe(2)
+})
+
+it('lets a repeating mark drop the roughness and keep the pen', async () => {
+  const system = await designSystem()
+  const [css] = system.candidatesToCss(['mark-pen-flat'])
+
+  // Q1's named fallback: the outline yields, the mark does not. Nothing else
+  // may be in it - a `mark-pen-flat` that also moved the wash would be a second
+  // pen wearing the fallback's name.
+  expect(css).toContain('--mark-pen-filter: none')
+  expect(css).not.toContain('--mark-pen-wash')
+  expect(css).not.toContain('background')
 })

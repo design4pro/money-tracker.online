@@ -39,7 +39,16 @@ export const badgeVariants = cva(
         settled: 'mark-pen border-transparent text-ink',
       },
       size: {
-        sm: 'h-5 px-1.5 text-micro tracking-label uppercase',
+        /**
+         * The dense size, and the one that repeats: a table cell, a tree row.
+         * `mark-pen-flat` drops the roughened outline here and keeps the rest
+         * of the pen, because `#mark-pen-rough` is re-rastered per mark and a
+         * screenful of them costs a whole frame budget - the measurement and
+         * the decision are Q1 of
+         * `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`. It is inert
+         * until a `sm` badge wears the mark.
+         */
+        sm: 'mark-pen-flat h-5 px-1.5 text-micro tracking-label uppercase',
         md: 'h-6 px-2 text-caption',
       },
     },
