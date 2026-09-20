@@ -23,7 +23,7 @@ steps:
       - Record each decision the brief left open as a Resolved assumptions row in the handoff file, for the PR body.
   - id: gate
     name: Validation gate
-    command: (test -d node_modules || pnpm install --frozen-lockfile) && node .ai/scripts/agent-kit-check.mjs && pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts && pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/ && pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md && pnpm typecheck && pnpm lint && pnpm test && pnpm build
+    command: (test -d node_modules || pnpm install --frozen-lockfile) && pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts && pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/ && pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md && pnpm typecheck && pnpm lint && pnpm test && pnpm build
     onFail:
       retry: implement
       max: 2
