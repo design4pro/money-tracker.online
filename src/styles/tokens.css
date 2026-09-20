@@ -250,6 +250,35 @@
   --color-info-soft: #ebeae1; /* = sunken. carries --color-info at 7.47:1 */
   --color-on-info: #ffffff; /* 9.02:1 on info */
 
+  /* The pen palette. Six runs of highlighter, one per badge tone, so a status
+     is marked rather than boxed (`.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`).
+     `mark-pen` paints a wash at `opacity: 0.75` and deepens its trailing edge
+     30% toward the tone's own ink, so the pair a reader meets is a composite
+     and never the value declared here: the ratios below are that composite
+     against `--color-ink`, on the worse of the two planes a badge lands on.
+     In light that plane is `surface-sunken`.
+
+     The hue lives in the pen and the word stays `ink` — the arithmetic in the
+     spec shows there is no palette in which the tone's hue can be both the text
+     and the pool. The light column is the existing `-soft` tint with its chroma
+     pushed back up, which is why it clears 7.5:1 even on the pooled edge; the
+     dark column is mixed from `surface` instead, because at night every `-soft`
+     token is a panel tint and a pen mixed from one reads as a panel.
+
+     `neutral` and `info` are deliberately one value: `--color-info` **is**
+     `--color-ink-2`, so once the rule is gone there is nothing left to tell them
+     apart, and two names for one wash is the honest spelling of that. `accent`
+     and `settled` declare nothing — `accent` reuses `brand`'s pen because
+     `--color-accent` is `--color-brand`, and `settled` is `mark-pen`'s own
+     default, `--color-highlighter`. The pooled edge is a graphical object at
+     3:1 rather than text at 7:1, measured in a browser: Q8 in the spec. */
+  --color-pen-neutral: #cfcec5; /* ink 10.51:1 washed, pooled edge 7.55:1 */
+  --color-pen-info: #cfcec5; /* = pen-neutral, because --color-info is --color-ink-2 */
+  --color-pen-positive: #bbd7c6; /* ink 10.71:1 washed, pooled edge 7.59:1 */
+  --color-pen-negative: #ebc7c1; /* ink 10.60:1 washed, pooled edge 7.51:1 */
+  --color-pen-warning: #decdb2; /* ink 10.62:1 washed, pooled edge 7.56:1 */
+  --color-pen-brand: #d8cfea; /* ink 10.93:1 washed, pooled edge 7.53:1 */
+
   /* Interaction washes, drawn in ink at low alpha so they read the same on
      every ground. */
   --color-hover: rgb(38 36 32 / 0.06);
@@ -385,6 +414,17 @@
     --color-info-soft: #111214; /* = sunken. carries --color-info at 9.15:1 */
     --color-on-info: #16171a; /* 8.75:1 on info */
 
+    /* The pen palette — see the note beside the light values. Dark's worse
+       plane is `surface`, not `surface-sunken`, so that is the ground the
+       ratios below are measured over. Mixed from `surface` rather than from the
+       `-soft` tints, which are panel tints at night. */
+    --color-pen-neutral: #535352; /* ink 7.71:1 washed, pooled edge 5.55:1 */
+    --color-pen-info: #535352; /* = pen-neutral, because --color-info is --color-ink-2 */
+    --color-pen-positive: #415f52; /* ink 7.22:1 washed, pooled edge 5.01:1 */
+    --color-pen-negative: #684f4d; /* ink 7.55:1 washed, pooled edge 5.36:1 */
+    --color-pen-warning: #635840; /* ink 7.18:1 washed, pooled edge 4.97:1 */
+    --color-pen-brand: #57516a; /* ink 7.58:1 washed, pooled edge 5.42:1 */
+
     --color-hover: rgb(235 232 223 / 0.07);
     --color-press: rgb(235 232 223 / 0.12);
     --color-selection: #2f2745;
@@ -469,6 +509,15 @@
   --color-info: #b9b5aa; /* = ink-2. 7.11:1 on raised */
   --color-info-soft: #111214; /* = sunken. carries --color-info at 9.15:1 */
   --color-on-info: #16171a; /* 8.75:1 */
+
+  /* The pen palette — see the note beside the light values. Measured over
+     `surface`, dark's worse plane. */
+  --color-pen-neutral: #535352; /* ink 7.71:1 washed, pooled edge 5.55:1 */
+  --color-pen-info: #535352; /* = pen-neutral, because --color-info is --color-ink-2 */
+  --color-pen-positive: #415f52; /* ink 7.22:1 washed, pooled edge 5.01:1 */
+  --color-pen-negative: #684f4d; /* ink 7.55:1 washed, pooled edge 5.36:1 */
+  --color-pen-warning: #635840; /* ink 7.18:1 washed, pooled edge 4.97:1 */
+  --color-pen-brand: #57516a; /* ink 7.58:1 washed, pooled edge 5.42:1 */
 
   --color-hover: rgb(235 232 223 / 0.07);
   --color-press: rgb(235 232 223 / 0.12);
