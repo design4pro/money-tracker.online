@@ -158,13 +158,21 @@ block() {
 # rest, so it is a forced push to the shared branches on its own, with or without `--force`. That
 # is wider than the thread that prompted this, which named only `--force --all`; it is the same
 # hole and refusing half of it would have been a worse answer than saying so here.
+#
+# The pieces are cut on `(`, `)` and a backtick as well as on `;`, `&` and `|`, because a subshell
+# and a command substitution are command boundaries too and the rule is written per command. The
+# review found the symptom on the right-hand side - `(git push -f origin main)` left `)` straight
+# after the branch, which the boundary class does not accept - and adding `)` to that class would
+# have fixed the one spelling while leaving `x=$(git push --force origin main)` and the backtick
+# form to be argued about separately. A command boundary belongs in the splitter, which is where
+# the secret rule below already puts it.
 push_force='git[[:space:]]+push\b[^;&|]*[[:space:]](--force|--mirror([[:space:]]|$)|-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$))'
 push_shared='git[[:space:]]+push\b[^;&|]*(([[:space:]]|[/+:])(develop|main)([[:space:]]|:|$)|[[:space:]](--all|--mirror)([[:space:]]|$))'
 while IFS= read -r push_command; do
   grep -Eq "$push_force" <<< "$push_command" || continue
   grep -Eq "$push_shared" <<< "$push_command" || continue
   block 'force-push to develop/main'
-done <<< "$(tr ';&|' '\n' <<< "$scan")"
+done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 
 echo "$scan" | grep -Eq 'git\s+reset\s+--hard' && block 'git reset --hard'
 echo "$scan" | grep -Eq 'git\s+clean\s+-[a-zA-Z]*f' && block 'git clean -f'
@@ -208,7 +216,10 @@ rm_flags='(-[[:alnum:]-]+[[:space:]]+)*'
 rm_operands='([^[:space:];&|]+[[:space:]]+)*'
 rm_path='([^[:space:];&|]*/)?'
 rm_recursive="(^|[^[:alnum:]_/-])${rm_path}rm[[:space:]]+${rm_flags}-[[:alnum:]-]*[rR][[:alnum:]-]*[[:space:]]+${rm_operands}"
-rm_end='([[:space:]]|;|&|\||\)|$)'
+# A backtick closes a command the same way `)` does, so it ends a target too: without it in this
+# class, `rm -rf /` inside a substitution had its `/` followed by a character the rule did not
+# accept as an end, and the whole match failed on the one command that mattered.
+rm_end='([[:space:]]|;|&|\||\)|`|$)'
 
 # `./.git` deletes what `.git` deletes, and `./` is how a path is ordinarily written rather than an
 # evasion. The alternation had only a trailing `/?\*?`, so the leading spelling slid past it:
@@ -223,9 +234,19 @@ rm_dots='(\.\.?/)*'
 # `git`, because `git rm -r .` without it deletes the working tree and is exactly what the rule is
 # for. Only that one command is cut out of what the two rules below read, so
 # `git rm -r --cached . && rm -rf /` is still refused on its second half.
-rm_scan=$(printf '%s' "$scan" | sed -E 's/git[[:space:]]+rm[^;&|]*--cached[^;&|]*//g')
+#
+# What the exemption spans stops at a command boundary, and `(`, `)` and a backtick are boundaries
+# as much as `;`, `&` and `|` are: `git rm --cached $(rm -rf /)` is an exempt command wrapped around
+# a command that is not, and a span that ran to the end of the line erased both, so neither rule
+# below ever saw the delete the shell would actually run. An exemption that can be made to carry
+# something else out with it is not an exemption.
+rm_scan=$(printf '%s' "$scan" | sed -E 's/git[[:space:]]+rm[^;&|()`]*--cached[^;&|()`]*//g')
 
-echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/?\*?${rm_end}" \
+# One trailing slash or several: `rm -rf ~//` expands to the same `$HOME` that `rm -rf ~/` does, and
+# the suffix used to allow at most one, so the second slash met no boundary and the rule did not
+# match. The same `/*` goes on the project-root rule below, which had the same suffix and the same
+# hole - `rm -rf $PWD//` was allowed while `rm -rf $PWD/` was refused.
+echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/*\*?${rm_end}" \
   && block 'rm -r of a dangerous root'
 
 # The worktree root spelled out, which the pattern above cannot cover because it is a path like any
@@ -245,7 +266,7 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.
 # exactly this reason; these belong here for the same one.
 project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
 project_root_spelling='\$\{?(PWD|CLAUDE_PROJECT_DIR)\}?|\$\(pwd\)|`pwd`'
-echo "$rm_scan" | grep -Eq "${rm_recursive}(${project_root}|${project_root_spelling})/?\*?${rm_end}" \
+echo "$rm_scan" | grep -Eq "${rm_recursive}(${project_root}|${project_root_spelling})/*\*?${rm_end}" \
   && block 'rm -r of the project root'
 
 # The repository itself. Tier three refuses the whole `gh repo` surface under Actions; these four
@@ -334,7 +355,14 @@ echo "$scan" | grep -Eq 'git\s+gc\b[^;&|]*--prune=(now|all)' && block 'git gc --
 # enumerating readers.
 secret_file='(^|[[:space:]]|=|/)(\.dev\.vars|\.env|test-env\.env)([[:space:]]|$|\.|/)'
 secret_names='.dev.vars .env test-env.env'
-secret_head='^[[:space:]]*(([!{]|if|then|else|elif|do|while|until|time)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
+# The prefix is its own expression because two things need it: `secret_head`, to find the reader
+# behind it, and the loop below, to cut it off before `reader_operands` counts words. The function
+# takes the reader to be the first word, which `secret_head` had already made untrue - for
+# `if grep -q ".env" .gitignore` it consumed `grep` as the pattern, leaving `.env` to be read as a
+# path and the command refused. An over-block, not a hole, and exactly the kind this machinery
+# exists to avoid.
+secret_prefix='^[[:space:]]*(([!{]|if|then|else|elif|do|while|until|time)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*'
+secret_head="${secret_prefix}([^[:space:]]*/)?"
 plain_reader='cat|bat|less|more|head|tail|strings|xxd|od|base64|nl|tac|cut|sort|uniq|dd'
 pattern_reader='grep|egrep|fgrep|rg|ag|awk|sed'
 
@@ -399,10 +427,11 @@ secret_raw=$(unquote "$secret_raw")
 secret_commands=$(tr ';&|()`' '\n' <<< "$secret_raw" \
   | sed -E -e 's/^[[:space:]]*<[[:space:]]*([^[:space:]]+)[[:space:]]+(.*)$/\2 \1/' -e 's/[<>]/ /g')
 while IFS= read -r secret_command; do
+  secret_body=$(sed -E "s/${secret_prefix}//" <<< "$secret_command")
   if grep -Eq "${secret_head}(${plain_reader})([[:space:]]|$)" <<< "$secret_command"; then
-    secret_args=$(reader_operands "$secret_command" 1)
+    secret_args=$(reader_operands "$secret_body" 1)
   elif grep -Eq "${secret_head}(${pattern_reader})([[:space:]]|$)" <<< "$secret_command"; then
-    secret_args=$(reader_operands "$secret_command" 0)
+    secret_args=$(reader_operands "$secret_body" 0)
   else
     continue
   fi

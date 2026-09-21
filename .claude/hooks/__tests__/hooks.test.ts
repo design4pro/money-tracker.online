@@ -97,6 +97,11 @@ describe('git-guardrails.sh', () => {
     'git push --force --mirror origin',
     'git push --mirror --force origin',
     'git push --mirror origin',
+    // A subshell and a command substitution are command boundaries, and the branch ends at `)`.
+    '(cd repo && git push --force origin develop)',
+    '(git push -f origin main)',
+    'x=$(git push --force origin main)',
+    'echo `git push -f origin main`',
   ])('blocks the force-push %s', (command) => {
     const r = bash(command)
     expect(r.status).toBe(2)
@@ -120,6 +125,8 @@ describe('git-guardrails.sh', () => {
     'git push -q origin fix/issue-12-x',
     'git push --all origin',
     'git push --tags origin',
+    '(git push -f origin fix/issue-12-x)',
+    '(git push origin develop)',
   ])('leaves the force-push to a feature branch %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
@@ -158,6 +165,15 @@ describe('git-guardrails.sh', () => {
     // The same line continuation that defeated the push rule reaches this one too.
     'rm -rf \\\n/',
     'rm -rf \\\n.git',
+    // One trailing slash or several: `~//` expands to the same $HOME that `~/` does.
+    'rm -rf ~//',
+    'rm -rf $HOME//',
+    'rm -rf .git//',
+    // The `git rm --cached` exemption must not carry a real delete out with it: a substitution is
+    // a command boundary, and the shell runs what is inside it.
+    'git rm --cached $(rm -rf /)',
+    'git rm --cached `rm -rf /`',
+    'git rm --cached $(rm -rf $PWD)',
   ])('blocks the recursive delete %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -180,6 +196,9 @@ describe('git-guardrails.sh', () => {
     'rm -rf ./node_modules',
     'rm -rf ./build ./dist',
     'rm -rf \\\nnode_modules',
+    // A doubled slash is not what makes a target dangerous; the target is.
+    'rm -rf node_modules//',
+    'git rm --cached src/generated.ts',
     // Two commands on two lines, each an ordinary cleanup: the continuation join must leave a
     // real newline alone, or the second operand would be read as the first command's.
     'rm -rf dist\nrm -rf build',
@@ -207,6 +226,7 @@ describe('git-guardrails.sh', () => {
     'rm -rf $(pwd)',
     'rm -rf `pwd`',
     'rm -rf dist $PWD',
+    'rm -rf $PWD//',
   ])('blocks the project root written as %s', (command) => {
     expect(bash(command).status).toBe(2)
   })
@@ -338,6 +358,11 @@ describe('git-guardrails.sh', () => {
     'cat \\\n.dev.vars',
     'head -1 \\\n.env.local',
     '< .env.local head -2',
+    // A prefix word in front of the reader must not lose the rule the file it was reading.
+    'if cat .dev.vars; then true; fi',
+    '! grep APP_URL .dev.vars',
+    'FOO=1 cat .dev.vars',
+    'if grep -q "" .dev.vars; then true; fi',
   ])('blocks the secret read %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -378,6 +403,11 @@ describe('git-guardrails.sh', () => {
     'grep "" package.json',
     '< package.json cat',
     '< .dev.vars.example cat',
+    // A prefix word in front of a pattern-taking reader used to cost it its pattern: the reader
+    // itself was counted as the pattern, and the pattern was then read as a path and refused.
+    'if grep -q ".env" .gitignore; then echo yes; fi',
+    '! grep -q ".dev.vars" .gitignore',
+    'FOO=1 grep ".env" src',
   ])('leaves %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
