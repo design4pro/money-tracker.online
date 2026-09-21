@@ -77,6 +77,11 @@ describe('git-guardrails.sh', () => {
     'git push origin develop -f',
     'git push origin HEAD:refs/heads/develop --force',
     'git push --force-with-lease origin develop',
+    // A `;` straight after the branch is not a space, a colon or the end of the line, so while
+    // both halves were searched over the whole string this matched neither boundary and went
+    // through. Inside one simple command the branch sits at the end of the line.
+    'git push --force origin develop; echo done',
+    'git push -f origin main && echo ok',
   ])('blocks the force-push %s', (command) => {
     const r = bash(command)
     expect(r.status).toBe(2)
@@ -86,6 +91,10 @@ describe('git-guardrails.sh', () => {
   it.each([
     'git push --force-with-lease origin fix/issue-12-x',
     'git push origin fix/issue-12-x --force',
+    // Two commands, not one: the forced push is to a feature branch and the push of develop is
+    // ordinary. Searching both patterns over the whole line read them as a single forced push.
+    'git push -f origin fix/issue-12-x && git push origin develop',
+    'git push origin develop; git push --force origin fix/issue-9-y',
   ])('leaves the force-push to a feature branch %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
@@ -111,6 +120,16 @@ describe('git-guardrails.sh', () => {
     'rm -rf dist .git',
     'rm -rf node_modules /',
     'rm -rf a b /',
+    // `rm` answers to its path too, and the left boundary excluded the `/` that puts it there.
+    '/bin/rm -rf /',
+    '/usr/bin/rm -rf $HOME',
+    '/bin/rm -rf .git',
+    // `./` is how a path is ordinarily written, and it deletes the same thing.
+    'rm -rf ./.git',
+    'rm -rf ./',
+    'rm -rf ./..',
+    'rm -rf ../..',
+    'rm -rf dist ./.git',
   ])('blocks the recursive delete %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -128,6 +147,10 @@ describe('git-guardrails.sh', () => {
     // into a target it is not.
     'rm -rf build dist',
     'rm -rf .ai/qa/artifacts_1 .ai/qa/artifacts_2',
+    // The path prefix and the `./` prefix only reach what was already a root; neither of these is.
+    '/bin/rm -rf node_modules',
+    'rm -rf ./node_modules',
+    'rm -rf ./build ./dist',
   ])('leaves the ordinary cleanup %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
@@ -267,6 +290,18 @@ describe('git-guardrails.sh', () => {
     // The template suffixes are why the filename needs a right-hand boundary; these two still go.
     'cat .env.local',
     'cat .env.production',
+    // An empty quoted pattern is an argument: `grep ""` matches every line and `sed ''` is `cat`.
+    // Stripping the quote characters left nothing, so the filename slid into the pattern's slot
+    // and was dropped as the pattern.
+    'grep "" .dev.vars',
+    "sed '' .dev.vars",
+    'grep "" .env.local',
+    'awk "" .dev.vars',
+    // A redirection may lead, which puts the filename in front of the reader the head-word test
+    // is anchored on.
+    '< .dev.vars cat',
+    '<.dev.vars cat',
+    '< .env.local head -2',
   ])('blocks the secret read %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -302,6 +337,11 @@ describe('git-guardrails.sh', () => {
     'cat *',
     'cat tsconfig*.json',
     'grep -rn pattern *.ts',
+    // The sentinel that holds the empty pattern's slot must not turn an ordinary file into a
+    // secret, and a leading redirection of one is still ordinary.
+    'grep "" package.json',
+    '< package.json cat',
+    '< .dev.vars.example cat',
   ])('leaves %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })

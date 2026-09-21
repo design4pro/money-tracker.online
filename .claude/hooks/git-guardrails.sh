@@ -116,15 +116,27 @@ block() {
 
 # The flag and the ref come in either order, and the pattern this replaces wanted the flag first:
 # `git push origin develop --force` read straight past it while looking as though it was covered.
-# Both halves are anchored on the same `git push` and bounded by the control operators, so a forced
-# push to a feature branch standing beside an ordinary push of develop is not read as one command.
-# `--force-with-lease` is deliberately inside the first pattern: leased or not, it rewrites what
+# `--force-with-lease` is deliberately inside the flag pattern: leased or not, it rewrites what
 # somebody else has already pulled, and only the branch decides.
+#
+# The line is cut into simple commands first, and both halves have to match the *same* piece. Two
+# independent searches over the whole string were wrong in both directions at once, and the second
+# way was the worse one:
+#
+#   - over-blocking, which is what the comment here used to deny while the code did it anyway:
+#     a forced push to a feature branch followed by an ordinary push of develop was read as one
+#     forced push of develop and refused.
+#   - under-blocking, which no review caught and the split closes as a by-product: `develop` had to
+#     be followed by a space, a colon or the end of the line, and a `;` is none of those, so
+#     `git push --force origin develop; echo done` matched neither half's right-hand boundary and
+#     went through. Inside a piece, that `develop` sits at the end of the line.
 push_force='git[[:space:]]+push\b[^;&|]*[[:space:]](--force|-f([[:space:]]|$))'
 push_shared='git[[:space:]]+push\b[^;&|]*([[:space:]]|[/+:])(develop|main)([[:space:]]|:|$)'
-if grep -Eq "$push_force" <<< "$scan" && grep -Eq "$push_shared" <<< "$scan"; then
+while IFS= read -r push_command; do
+  grep -Eq "$push_force" <<< "$push_command" || continue
+  grep -Eq "$push_shared" <<< "$push_command" || continue
   block 'force-push to develop/main'
-fi
+done <<< "$(tr ';&|' '\n' <<< "$scan")"
 
 echo "$scan" | grep -Eq 'git\s+reset\s+--hard' && block 'git reset --hard'
 echo "$scan" | grep -Eq 'git\s+clean\s+-[a-zA-Z]*f' && block 'git clean -f'
@@ -158,10 +170,24 @@ echo "$scan" | grep -Eq 'wrangler\s+((d1|r2\s+bucket|kv\s+namespace)\s+)?delete\
 # the target may hide behind is any operand, not just a flag - stopping at a control operator,
 # because past one the `rm` has ended. The target itself still has to match whole, which is what
 # keeps `rm -rf dist` and `rm -rf /tmp/x` open.
+#
+# `rm` also answers to its path. The left boundary is a negated class that excludes `/`, so the `/`
+# in `/bin/rm` failed it and the whole rule quietly did not match - a fail-open on the single
+# command it exists for. The optional directory prefix is the same allowance `secret_head` already
+# makes for readers two sections down. It has to end in `/` to be consumed, so `charm -rf /` still
+# fails the boundary and `git rm -r .` still matches on the space, exactly as before.
 rm_flags='(-[[:alnum:]-]+[[:space:]]+)*'
 rm_operands='([^[:space:];&|]+[[:space:]]+)*'
-rm_recursive="(^|[^[:alnum:]_/-])rm[[:space:]]+${rm_flags}-[[:alnum:]-]*[rR][[:alnum:]-]*[[:space:]]+${rm_operands}"
+rm_path='([^[:space:];&|]*/)?'
+rm_recursive="(^|[^[:alnum:]_/-])${rm_path}rm[[:space:]]+${rm_flags}-[[:alnum:]-]*[rR][[:alnum:]-]*[[:space:]]+${rm_operands}"
 rm_end='([[:space:]]|;|&|\||\)|$)'
+
+# `./.git` deletes what `.git` deletes, and `./` is how a path is ordinarily written rather than an
+# evasion. The alternation had only a trailing `/?\*?`, so the leading spelling slid past it:
+# `.` matched and then `rm_end` met `/.git` instead of a boundary. `..` in front works the same way,
+# which is what `rm -rf ../..` was. The prefix is optional and repeatable and changes nothing else -
+# `./node_modules` still has no dangerous root behind it and stays open.
+rm_dots='(\.\.?/)*'
 
 # `git rm -r --cached .` is an index operation: it unstages, touches no file on disk, and `git
 # reset` puts it back. It reached this rule because `rm` is matched as a word and a space is a word
@@ -171,7 +197,7 @@ rm_end='([[:space:]]|;|&|\||\)|$)'
 # `git rm -r --cached . && rm -rf /` is still refused on its second half.
 rm_scan=$(printf '%s' "$scan" | sed -E 's/git[[:space:]]+rm[^;&|]*--cached[^;&|]*//g')
 
-echo "$rm_scan" | grep -Eq "${rm_recursive}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/?\*?${rm_end}" \
+echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/?\*?${rm_end}" \
   && block 'rm -r of a dangerous root'
 
 # The worktree root spelled out, which the pattern above cannot cover because it is a path like any
@@ -328,7 +354,22 @@ glob_reaches_secret() {
   return 1
 }
 
-secret_commands=$(tr ';&|()`' '\n' <<< "$raw" | sed -E 's/[<>]/ /g')
+# An empty quoted pattern is an argument, not an absence: `grep "" .dev.vars` matches every line
+# and `sed '' .dev.vars` is `cat`. unquote() removes quote *characters*, so the pair collapsed to
+# nothing, the argument vanished from the token stream, and the filename slid into the slot
+# `reader_operands` drops as "the pattern" - the secret was never looked at. A sentinel holds the
+# slot. It must not begin with `-`, or `reader_operands` reads it as a flag and drops the filename
+# again instead.
+secret_raw=$(printf '%s' "$command" | sed -e 's/""/EMPTY_PATTERN/g' -e "s/''/EMPTY_PATTERN/g")
+secret_raw=$(unquote "$secret_raw")
+
+# `< .dev.vars cat` is valid and ordinary, and spacing the operator out is not enough on its own:
+# it leaves the filename in front of the reader, where `secret_head` - anchored at `^` - reads the
+# filename as the head word, finds no reader and moves on. So a leading redirection is rotated to
+# the back of its own piece first, which turns it into the `cat < .dev.vars` spelling the next
+# expression already handles.
+secret_commands=$(tr ';&|()`' '\n' <<< "$secret_raw" \
+  | sed -E -e 's/^[[:space:]]*<[[:space:]]*([^[:space:]]+)[[:space:]]+(.*)$/\2 \1/' -e 's/[<>]/ /g')
 while IFS= read -r secret_command; do
   if grep -Eq "${secret_head}(${plain_reader})([[:space:]]|$)" <<< "$secret_command"; then
     secret_args=$(reader_operands "$secret_command" 1)
