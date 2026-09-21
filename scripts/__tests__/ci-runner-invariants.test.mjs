@@ -73,6 +73,24 @@ describe('.github/actions/e2e-env/action.yml', () => {
     // because a root-less runner takes the one without `--with-deps` (#411).
     for (const install of installs) expect(install).toMatch(/\bchromium\b/)
   })
+
+  it('passes --with-deps only where the runner can become root (#411)', () => {
+    const action = read('.github/actions/e2e-env/action.yml')
+    const probe = action.match(
+      /^\s*if sudo -n true\b[^\n]*\n([\s\S]*?)^\s*else\n([\s\S]*?)^\s*fi$/m,
+    )
+    const withDeps = /playwright install[^\n]*--with-deps/
+
+    expect(
+      probe,
+      'the browser install no longer sits behind a `sudo -n` probe - on the unprivileged pool `--with-deps` dies in `su: Authentication failure` (#411)',
+    ).not.toBeNull()
+    const [guarded, rooted, rootless] = probe
+    expect(action.replace(guarded, '')).not.toMatch(withDeps)
+    expect(rooted).toMatch(withDeps)
+    expect(rootless).toMatch(/pnpm exec playwright install\b/)
+    expect(rootless).not.toMatch(withDeps)
+  })
 })
 
 describe.each([
