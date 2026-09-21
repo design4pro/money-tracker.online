@@ -44,6 +44,11 @@ but whether the ladder is moving. Four numbers, all from files and commands whos
 
 Reading it:
 
+- **Two of the four need the cockpit's checkout.** `.ai/cezar/runs.json` is gitignored, so launches
+  and gate retries can only be counted where the cockpit writes it. In a worktree - which is where
+  every cezar run works - or a fresh clone, the report says those two are not measured instead of
+  printing a zero per automation. A `0` row therefore always means "counted, and it was zero";
+  never "could not count".
 - **Launch counts are "since the oldest retained run", never "ever".** `runs.json` is a window the
   service rewrites; a count can go *down* between two invocations as old runs age out.
 - **"never labelled" is not "the bridge failed" for an old issue.** The groom→`needs-triage` edge

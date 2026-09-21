@@ -24,7 +24,9 @@
 // `--flow` answers a different question: not where each issue sits, but whether the ladder is
 // moving at all. Four numbers, each from a file or a command whose output is read - launches per
 // automation, issue opened to `needs-triage`, `ready-for-agent` to the first pull request, and the
-// share of gate steps that needed a second try. Poll counts are deliberately absent: they live
+// share of gate steps that needed a second try. Two of those read `.ai/cezar/runs.json`, which is
+// gitignored and therefore absent in a worktree or a fresh clone; there the report says it cannot
+// measure them rather than printing the zeroes. Poll counts are deliberately absent: they live
 // only in the running cockpit's automation state, not in any committed file, and the report says
 // so rather than printing a zero it did not measure.
 //
@@ -465,19 +467,37 @@ export function parseArgs(argv) {
  * `polls` is not among them and is not a zero: the cockpit counts a poll in memory and commits it
  * nowhere, so the report names the gap instead of implying the pollers are idle.
  */
-export function flowReport({ runs, automations, issues, prLinks, prOpenedAt }) {
+export function flowReport({
+  runs,
+  automations,
+  issues,
+  prLinks,
+  prOpenedAt,
+  runsVisible = true,
+}) {
   const gate = gateRetries(runs);
+  const notMeasured = [
+    "poll counts per automation - the cockpit holds them in memory and commits them nowhere",
+  ];
+  // `.ai/cezar/runs.json` is gitignored, so it exists only in the checkout the cockpit writes to -
+  // never in a worktree, a fresh clone or CI, which is where most runs read this. An absent file
+  // means no run is *visible*, not that none ran, and the difference is the whole report: without
+  // it every automation prints `0 ... last: never launched`, which the backlog skill tells a human
+  // to read as "the cockpit has never fired it". That is a count aimed at something that exists.
+  if (!runsVisible)
+    notMeasured.push(
+      "automation launches and gate retries - no .ai/cezar/runs.json on this host, so no run is visible to count",
+    );
   return {
-    launches: automationLaunches(runs, automations),
+    runsVisible,
+    launches: runsVisible ? automationLaunches(runs, automations) : [],
     intake: spanSummary(intakeSpans(issues)),
     firstPr: spanSummary(firstPrSpans(issues, prLinks, prOpenedAt)),
     gate: {
       ...gate,
-      retryRate: gate.steps ? Number((gate.retried / gate.steps).toFixed(3)) : null,
+      retryRate: runsVisible && gate.steps ? Number((gate.retried / gate.steps).toFixed(3)) : null,
     },
-    notMeasured: [
-      "poll counts per automation - the cockpit holds them in memory and commits them nowhere",
-    ],
+    notMeasured,
     sources: { runs: runs.length, automations: automations.length, issues: issues.length },
   };
 }
@@ -497,7 +517,7 @@ export const humanHours = (hours) => {
   return `${(hours / 24).toFixed(1)} d`;
 };
 
-/** `#1, #2, #3 and 97 more` - a full list of a long backlog buries the number above it. */
+/** `#98, #99, #100 and 97 more` - the most recent few; a full list buries the number above it. */
 export const sample = (numbers, limit = 8) => {
   if (!numbers.length) return "";
   const shown = numbers.slice(-limit).map((n) => `#${n}`).join(", ");
@@ -505,7 +525,10 @@ export const sample = (numbers, limit = 8) => {
 };
 
 function printFlow(report) {
+  const unmeasured = '    not measured on this host - see "Not measured here"';
+
   console.log("\n## Automation launches");
+  if (!report.runsVisible) console.log(unmeasured);
   for (const row of report.launches)
     console.log(
       `${String(row.launches).padStart(4)}  ${row.workflow}  (${row.names.join("; ")})` +
@@ -529,15 +552,19 @@ function printFlow(report) {
   span("Time to first PR - ready-for-agent to the PR opening", report.firstPr, "no PR yet");
 
   console.log("\n## Gate retries");
-  console.log(`    gate steps: ${report.gate.steps} over ${report.gate.attempts} attempts`);
-  console.log(
-    `    retried:    ${report.gate.retried}${report.gate.retryRate === null ? " (rate not measured: no gate step has run)" : ` (${(report.gate.retryRate * 100).toFixed(1)}%)`}`,
-  );
+  if (!report.runsVisible) {
+    console.log(unmeasured);
+  } else {
+    console.log(`    gate steps: ${report.gate.steps} over ${report.gate.attempts} attempts`);
+    console.log(
+      `    retried:    ${report.gate.retried}${report.gate.retryRate === null ? " (rate not measured: no gate step has run)" : ` (${(report.gate.retryRate * 100).toFixed(1)}%)`}`,
+    );
+  }
 
   console.log("\n## Not measured here");
   for (const gap of report.notMeasured) console.log(`    - ${gap}`);
   console.log(
-    `\nfrom ${report.sources.runs} retained runs, ${report.sources.automations} automations, ${report.sources.issues} issues`,
+    `\nfrom ${report.runsVisible ? `${report.sources.runs} retained runs` : "no visible runs"}, ${report.sources.automations} automations, ${report.sources.issues} issues`,
   );
 }
 
@@ -586,12 +613,14 @@ function mainFlow(asJson) {
     "pr", "list", "--state", "all", "--limit", "300",
     "--json", "number,title,body,headRefName,createdAt",
   ]);
+  const runsVisible = existsSync(RUNS);
   const report = flowReport({
-    runs: existsSync(RUNS) ? JSON.parse(readFileSync(RUNS, "utf8")) : [],
+    runs: runsVisible ? JSON.parse(readFileSync(RUNS, "utf8")) : [],
     automations: JSON.parse(readFileSync(AUTOMATIONS, "utf8")),
     issues: fetchIssueTimelines(),
     prLinks: linkOpenPrs(prs),
     prOpenedAt: new Map(prs.map((pr) => [pr.number, pr.createdAt])),
+    runsVisible,
   });
   if (asJson) console.log(JSON.stringify(report, null, 2));
   else printFlow(report);

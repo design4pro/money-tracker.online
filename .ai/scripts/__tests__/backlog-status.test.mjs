@@ -511,6 +511,13 @@ describe("sample", () => {
     expect(sample([1, 2, 3, 4], 2)).toBe("#3, #4 and 2 more");
   });
 
+  // The docblock example is a spec in a file whose comments are this load-bearing, and it used to
+  // show the first few while the code takes the last few.
+  it("matches its own docblock example", () => {
+    const hundred = Array.from({ length: 100 }, (_, i) => i + 1);
+    expect(sample(hundred, 3)).toBe("#98, #99, #100 and 97 more");
+  });
+
   it("shows everything when the list fits", () => {
     expect(sample([1, 2], 2)).toBe("#1, #2");
   });
@@ -556,5 +563,64 @@ describe("flowReport", () => {
       prOpenedAt: new Map(),
     });
     expect(report.gate.retryRate).toBe(0.5);
+  });
+});
+
+describe("flowReport without a visible runs.json", () => {
+  // `.ai/cezar/runs.json` is gitignored, so every cezar run - which works in a worktree - reads
+  // this report with the file absent. Treating that as an empty file printed `0 ... last: never
+  // launched` for every automation, which `.claude/skills/backlog/SKILL.md` tells a human to read
+  // as "the cockpit has never fired it": a count aimed at something that exists.
+  const report = () =>
+    flowReport({
+      runs: [],
+      automations: AUTOMATION_DEFS,
+      issues: [],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+      runsVisible: false,
+    });
+
+  it("reports no launches at all rather than a zero for every automation", () => {
+    expect(report().launches).toEqual([]);
+    expect(report().runsVisible).toBe(false);
+  });
+
+  it("names launches and gate retries as unmeasured, by reason", () => {
+    const gaps = report().notMeasured.join(" ");
+    expect(gaps).toMatch(/automation launches and gate retries/);
+    expect(gaps).toMatch(/runs\.json/);
+  });
+
+  it("withholds the gate retry rate instead of reporting a clean 0%", () => {
+    expect(report().gate.retryRate).toBeNull();
+  });
+
+  it("still measures the two numbers that come from the tracker, not from runs", () => {
+    const measured = flowReport({
+      runs: [],
+      automations: AUTOMATION_DEFS,
+      issues: [
+        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T00:00:02Z", "needs-triage"]]),
+      ],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+      runsVisible: false,
+    });
+    expect(measured.intake.measured).toBe(1);
+    expect(measured.intake.medianHours).toBeGreaterThan(0);
+  });
+
+  it("counts launches normally when the file is there", () => {
+    const visible = flowReport({
+      runs: [{ workflow: "issue-groom", automation: {}, startedAt: "2026-09-20T10:00:00Z" }],
+      automations: AUTOMATION_DEFS,
+      issues: [],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+    });
+    expect(visible.runsVisible).toBe(true);
+    expect(visible.launches.find((row) => row.workflow === "issue-groom").launches).toBe(1);
+    expect(visible.notMeasured.join(" ")).not.toMatch(/automation launches/);
   });
 });
