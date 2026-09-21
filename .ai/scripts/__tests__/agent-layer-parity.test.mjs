@@ -14,7 +14,7 @@
  * These cases are deliberately about existence and arithmetic, not about prose. A test cannot tell
  * whether a paragraph is true; it can tell whether the things the paragraph names are there.
  */
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -116,20 +116,36 @@ describe('agent-layer parity', () => {
         // of them whenever the cockpit's skills coordinator has run (docs/agents/cezar.md).
         // Reading one that points at a directory throws EISDIR.
         if (!entry.isFile()) continue
-        if (!/\.(md|mjs|js|ts|json|sh|yml)$/.test(entry.name)) continue
-        // This file states the phrases in order to forbid them, and matched itself on first run.
-        if (entry.name === 'agent-layer-parity.test.mjs') continue
-        const body = read(rel)
-        if (
-          /Kit-managed|the kit renders|kit-rendered|edit the template there/i.test(
-            body,
-          )
-        ) {
-          suspect.push(rel)
-        }
+        inspect(rel)
       }
     }
-    for (const dir of ['.ai', 'docs/agents']) walk(dir)
+    const inspect = (rel) => {
+      if (!/\.(md|mjs|js|ts|json|sh|yml)$/.test(rel)) return
+      // This file states the phrases in order to forbid them, and matched itself on first run.
+      if (rel.endsWith('/agent-layer-parity.test.mjs')) return
+      if (
+        /Kit-managed|the kit renders|kit-rendered|edit the template there/i.test(
+          read(rel),
+        )
+      ) {
+        suspect.push(rel)
+      }
+    }
+    // Every location AGENTS.md names as formerly rendered by the kit, plus `docs/agents`. `docs/adr`
+    // is left out on purpose: an ADR is amended, not rewritten, so a superseded "kit-managed" line
+    // stays in its history under the amendment that voids it (ADR 0020).
+    for (const root of [
+      '.ai',
+      'docs/agents',
+      '.claude/hooks',
+      '.claude/settings.json',
+      '.claude/skills/backlog/SKILL.md',
+      'scripts/ci',
+      '.github/workflows',
+    ]) {
+      if (statSync(join(ROOT, root)).isDirectory()) walk(root)
+      else inspect(root)
+    }
 
     expect(suspect).toEqual([])
   })
