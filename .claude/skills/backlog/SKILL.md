@@ -41,14 +41,29 @@ but whether the ladder is moving. Four numbers, all from files and commands whos
 | Intake latency        | Issue opened → the first `needs-triage`                        | A rising median is the groom→triage bridge falling behind        |
 | Time to first PR      | The first `ready-for-agent` → the pull request opening         | A long tail is the implement automation not picking work up      |
 | Gate retries          | `steps[id=gate].iterations` across retained runs               | A rising share is the gate catching what the agent ships         |
+| Stale claims          | `in-progress` on a PR with no active run behind it             | An open one is a PR the merge tooling silently skips             |
 
 Reading it:
 
-- **Two of the four need the cockpit's checkout.** `.ai/cezar/runs.json` is gitignored, so launches
-  and gate retries can only be counted where the cockpit writes it. In a worktree - which is where
-  every cezar run works - or a fresh clone, the report says those two are not measured instead of
-  printing a zero per automation. A `0` row therefore always means "counted, and it was zero";
-  never "could not count".
+- **Three of the five need the cockpit's checkout.** `.ai/cezar/runs.json` is gitignored, so
+  launches, gate retries and stale claims can only be counted where the cockpit writes it. In a
+  worktree - which is where every cezar run works - or a fresh clone, the report says those are not
+  measured instead of printing a zero per automation. A `0` row therefore always means "counted,
+  and it was zero"; never "could not count". For stale claims the safe direction matters twice
+  over: with no runs file every claim would look dead, which would send a human to strip locks off
+  work that is running.
+- **A stale claim under `BLOCKING` is a PR nothing will touch.** `SDLC.md` § The claim protocol
+  says the merge tooling skips a PR carrying `in-progress`, so a lock left behind by a run that
+  died makes a ready PR invisible. The fix is a human removing the label; the script only names
+  them, it never mutates the tracker. A `residue` line is the same label on a closed PR - noise,
+  not a blockage.
+- **Read the PR's newest 🤖 claim comment before removing an `in-progress` label.** The detector
+  compares against `.ai/cezar/runs.json`, so it can only see this cockpit's runs. A claim placed by
+  a human, or by a run on another host, appears as `BLOCKING` because nothing here accounts for it.
+  The claim comment says who holds it (`SDLC.md` § The claim protocol, `.ai/trackers/github.md`).
+- **`ci-monitoring` is never counted as a claim.** `SDLC.md:181` says it blocks nobody; it means
+  only that a CI-result comment is still owed. Lumping it in with the lock signals is the exact
+  mistake that made agents skip fully processed PRs.
 - **Launch counts are "since the oldest retained run", never "ever".** `runs.json` is a window the
   service rewrites; a count can go *down* between two invocations as old runs age out.
 - **"never labelled" is not "the bridge failed" for an old issue.** The groom→`needs-triage` edge
