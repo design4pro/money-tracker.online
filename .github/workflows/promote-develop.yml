@@ -57,15 +57,17 @@ permissions:
   contents: read
   pull-requests: write
 
-# `runs-on` below reads through `vars.RUNNER_CI`, an organisation variable that is
-# deliberately unset: unset, the default here selects the self-hosted pool. Setting it
-# to `["ubuntu-latest"]` moves every job in every repository back to GitHub-hosted
-# runners without a pull request.
+# `runs-on` below reads through `vars.RUNNER_CI`, which on this repository is set to
+# `["blacksmith-2vcpu-ubuntu-2404-arm"]` (2026-09-21), so this job runs on a Blacksmith
+# machine - an ARM64 runner that registers as self-hosted and spends no Actions minutes.
+# The label array below is only the fallback and still names the local pool:
+# deleting the variable moves every job here back to the pool without a pull request,
+# and setting it at the organisation level would move every repository at once.
 #
 # In a test workflow that is a convenience. Here it is the recovery path for shipping:
-# production now deploys from one local machine, and the switch has to work when that
-# machine does not. That is why it is an organisation variable and not a literal label
-# array - reverting by pull request would need the merge gate, which needs the same
+# production deploys on a GitHub-hosted machine, not the local pool, and the switch has to
+# work when the local host does not. That is why it is a variable at all and not a literal
+# label array - reverting by pull request would need the merge gate, which needs the same
 # runners that are missing. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
 
 jobs:
