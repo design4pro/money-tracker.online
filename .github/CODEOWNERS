@@ -1,0 +1,40 @@
+# Who is asked to look at a change to a document that records a decision.
+#
+# What this file does here today: GitHub requests a review from the owner automatically when a
+# pull request touches one of these paths. That is routing, and it is worth having - the ladder
+# opens pull requests unattended, and an unrequested review is one nobody is waiting for.
+#
+# What it does NOT do here today: block anything. Both rulesets carry
+# `"require_code_owner_review": false` and `"required_approving_review_count": 0`
+# (`gh api repos/design4pro/money-tracker.online/rulesets/22037820`, and `22037770` for `main`),
+# and neither branch has classic protection - the REST endpoint answers `404 Branch not
+# protected`. A CODEOWNERS entry with that setting off is a suggestion.
+#
+# The rule that actually binds is the `governance-gate` required check
+# (`.github/workflows/governance-gate.yml`): a pull request touching these same paths needs a
+# person to apply `governance-approved`. This file and that check are deliberately kept in step,
+# and `scripts/ci/__tests__/governance-gate.test.mjs` pins the paths against the filesystem so a
+# rename cannot leave either one guarding a file that no longer exists.
+#
+# Turning `require_code_owner_review` on is a separate decision with a trap worth naming: GitHub
+# does not let anyone approve their own pull request, so with a single code owner every governance
+# change that owner writes would need the `OrganizationAdmin` bypass - which teaches the habit of
+# bypassing. The check above asks for a label instead, which the author can apply themselves and
+# which leaves a record either way.
+
+# The accessibility claim. `BACKWARD_COMPATIBILITY.md` already says it changes only through this
+# document and an ADR (ADR 0009).
+/docs/ACCESSIBILITY.md @rafalwolak
+
+# The money arithmetic every other layer cites rather than restates.
+/docs/MONEY.md @rafalwolak
+
+# The component guidelines a second call site is supposed to trigger.
+/DESIGN.md @rafalwolak
+
+# The registry of protected surfaces and the required path off each one.
+/BACKWARD_COMPATIBILITY.md @rafalwolak
+
+# The decision records themselves. An unattended run may propose one
+# (`.ai/skills/afk-domain-modeling/SKILL.md`); accepting it is a person's act.
+/docs/adr/ @rafalwolak

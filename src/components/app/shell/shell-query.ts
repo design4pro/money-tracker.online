@@ -44,7 +44,7 @@ const SHELL_GC_TIME = Number.POSITIVE_INFINITY
  * `revalidateIfStale` exists only on the deprecated `ensureQueryData` options in the pinned
  * query-core. Its suggested replacement, `query({ staleTime: 'static' })`, means "never stale" and
  * would invert this, so a query-core major owes this behaviour a deliberate re-implementation
- * (`.ai/specs/2026-09-11-first-navigation-loading-state.md`, "What Q3 costs").
+ * (`.ai/specs/implemented/2026-09-11-first-navigation-loading-state.md`, "What Q3 costs").
  */
 export function shellQueryOptions({
   queryFn,

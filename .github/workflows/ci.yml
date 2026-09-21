@@ -384,13 +384,11 @@ jobs:
           - project: mobile-chromium
             shard: 1
             shards: 1
-    # No `container:`. The runner image is itself built FROM
-    # `mcr.microsoft.com/playwright:v1.62.1-noble`, so the browsers are already
-    # on the runner and pulling the same image again per job would buy nothing.
-    # The version coupling did not go away, it moved: keep
-    # `host/runner/Dockerfile` in design4pro/cezar in step with the `@playwright/test`
-    # devDependency in package.json, or a mismatch is reported as a missing
-    # executable rather than as a wrong one.
+    # No `container:`, and no browsers on the runner either. `./.github/actions/e2e-env`
+    # installs them per job from the `@playwright/test` devDependency, so the version
+    # coupling this comment used to describe - a runner image to keep in step with
+    # package.json, on pain of a missing executable - is retired rather than moved. A
+    # browser image per job would buy back only the download.
 
     steps:
       - name: Check out

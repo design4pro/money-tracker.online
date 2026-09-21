@@ -49,7 +49,7 @@ Concretely, for #230: the shell resolved during SSR crosses into the client's qu
 navigation finds it warm. `beforeLoad` keeps its `await`, its redirect and its error boundary.
 
 The rejected shape is named here, not only in the spec, because it is the obvious answer and will be
-proposed again. `.ai/specs/2026-09-11-first-navigation-loading-state.md` is the design; this is the
+proposed again. `.ai/specs/implemented/2026-09-11-first-navigation-loading-state.md` is the design; this is the
 standing rule it rests on.
 
 ## What this costs
