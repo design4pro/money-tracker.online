@@ -14,8 +14,9 @@
  * The browser suites install their own browsers. Both of them - the e2e gate and the axe gate -
  * used to inherit them from a runner image built FROM `mcr.microsoft.com/playwright`, and when the
  * jobs moved to a pool without that image every `browserType.launch` failed on a missing
- * executable while the required check stayed green on any pull request the path filters let skip
- * the suite (#403). An assumption about the machine cannot be tested; a step in the action can.
+ * executable. The required merged report went on passing throughout, because the e2e legs run on a
+ * push and not on a pull request (ADR 0020) and a skipped job is a passing required check (#403).
+ * An assumption about the machine cannot be tested; a step in the action can.
  *
  * Read as text, like the other workflow-shape tests here: the repository pins no YAML parser.
  *

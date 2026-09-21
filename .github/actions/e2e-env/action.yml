@@ -12,10 +12,11 @@ description: >
   Installs the browsers rather than assuming them. The assumption held while
   these jobs ran in `mcr.microsoft.com/playwright:v<version>-noble`, and then
   while they ran on a self-hosted pool whose image was built FROM exactly that.
-  It stopped holding when they moved to a pool that carries no browsers, and
-  because the browser jobs are path-filtered the gate stayed green on everything
-  that skipped them while every run that did not skip them failed at the first
-  page load (#403). A step is testable; an assumption about the machine is not.
+  It stopped holding when they moved to a pool that carries no browsers: every
+  run failed at the first page load, and because the e2e legs run on a push and
+  not on a pull request (ADR 0020) the required merged report kept reporting
+  skipped while it did (#403). A step is testable; an assumption about the
+  machine is not.
 
   There is no R2 fetch and no asset cache here. This product has no basemap and
   no large binary fixture: the seed is pure SQL through the Worker, so the whole
