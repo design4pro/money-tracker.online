@@ -5,7 +5,7 @@
 | **Status**         | in-progress |
 | **Issue**          | #210        |
 | **Spec PR**        | #344        |
-| **Implementation** | none        |
+| **Implementation** | #349        |
 
 ## 📝 TLDR
 
