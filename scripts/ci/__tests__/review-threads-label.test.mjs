@@ -102,7 +102,15 @@ describe('decide', () => {
   })
 
   it('recognises the bot under each login it posts as', () => {
-    for (const author of ['claude', 'claude[bot]', 'github-actions[bot]'])
+    // A bot is pinned under every login it posts under: GraphQL's `author.login` drops the `[bot]`
+    // suffix that REST carries, and `decide` is called with whichever the caller read.
+    for (const author of [
+      'claude',
+      'claude[bot]',
+      'github-actions[bot]',
+      'chatgpt-codex-connector',
+      'chatgpt-codex-connector[bot]',
+    ])
       expect(decide(input({ threads: [botThread({ author })] })).act).toBe(
         'label',
       )

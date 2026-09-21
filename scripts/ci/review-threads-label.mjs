@@ -40,8 +40,22 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-/** Logins whose threads are the automation's business. A human's thread is a human's to settle. */
-const DEFAULT_REVIEW_BOTS = ['claude', 'claude[bot]', 'github-actions[bot]']
+/**
+ * Logins whose threads are the automation's business. A human's thread is a human's to settle.
+ *
+ * A login belongs here when the account posts review threads this pipeline is expected to answer -
+ * a review bot, not a person. A bot needs an entry for every form its login takes, because the two
+ * APIs disagree: GraphQL's `author.login` drops the `[bot]` suffix that REST carries, and `decide`
+ * is called with whichever the caller read. Omitting a bot is silent: its threads are read as a person's, the label is never
+ * armed, and the findings go out with the squash - which is what happened to Codex until #405.
+ */
+const DEFAULT_REVIEW_BOTS = [
+  'claude',
+  'claude[bot]',
+  'github-actions[bot]',
+  'chatgpt-codex-connector',
+  'chatgpt-codex-connector[bot]',
+]
 
 export const MARKER = '<!-- agent-review-threads:'
 

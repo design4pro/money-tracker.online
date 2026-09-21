@@ -18,4 +18,5 @@ steps:
     name: om-auto-fix-pr
     prompt: '/om-auto-fix-pr {{task}}'
     model: opus
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+    # `Task` dispatches the review personas in .claude/agents (CODE_REVIEW.md -> Review personas).
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]
