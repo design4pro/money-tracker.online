@@ -89,6 +89,135 @@ describe('agent-layer parity', () => {
     expect(automationList.length).toBeGreaterThan(5)
   })
 
+  // CODE_REVIEW.md dispatches review personas by name. A name with no file is a reviewer sent to
+  // fetch a lens that does not exist - and, unlike a missing workflow, nothing fails loudly: the
+  // dispatch just returns nothing and the report reads as though the lens had passed.
+  it('names a review persona only where .claude/agents has one', () => {
+    const doc = read('CODE_REVIEW.md')
+    const section = doc.slice(doc.indexOf('## Review personas'))
+    const named = [...section.matchAll(/^\| `([a-z][a-z0-9-]*)`\s*\|/gm)].map(
+      (m) => m[1],
+    )
+    expect(named.length).toBeGreaterThan(0)
+    const missing = named.filter(
+      (name) => !existsSync(join(ROOT, '.claude/agents', `${name}.md`)),
+    )
+    expect(missing).toEqual([])
+  })
+
+  // The other direction: a persona file nobody dispatches is dead weight, and the four here were
+  // added to be dispatched. The impeccable-* agents predate this rule and belong to a skill rather
+  // than to code review, so they are not required to appear in the table.
+  it('dispatches every review persona it ships', () => {
+    const doc = read('CODE_REVIEW.md')
+    const section = doc.slice(doc.indexOf('## Review personas'))
+    const files = readdirSync(join(ROOT, '.claude/agents'))
+      .filter((f) => f.endsWith('.md') && !f.startsWith('impeccable-'))
+      .map((f) => f.replace(/\.md$/, ''))
+    expect(files.length).toBeGreaterThan(0)
+    expect(files.filter((name) => !section.includes(`\`${name}\``))).toEqual([])
+  })
+
+  // Dispatch needs the `Task` tool, and a workflow that does not grant it reviews without personas
+  // while reporting nothing about it. CODE_REVIEW.md -> Review personas says every step reaching
+  // the review grants it; this is what makes that sentence true rather than aspirational. The
+  // entry points are listed rather than followed: each skill's own Chaining section says it runs
+  // om-auto-review-pr, and a chain is not something a regex can walk.
+  const REVIEW_ENTRY_POINTS = [
+    'om-auto-review-pr',
+    'om-pr-autopilot',
+    'om-auto-fix-pr',
+    'om-auto-fix-issue',
+    'om-auto-implement-spec',
+  ]
+
+  it('grants Task on every workflow step that reaches the review', () => {
+    const ungranted = []
+    for (const name of workflows) {
+      const text = read(`${WORKFLOW_DIR}/${name}.yml`)
+      // Step blocks, in file order; a step begins at column 2 with `- id: `.
+      for (const block of text.split(/^ {2}- id: /m).slice(1)) {
+        const reaches = REVIEW_ENTRY_POINTS.some((skill) =>
+          block.includes(`/${skill} `),
+        )
+        const grants = /^\s+allowedTools: \[[^\]]*\bTask\b/m.test(block)
+        if (reaches && !grants)
+          ungranted.push(`${name}.yml: ${block.split('\n', 1)[0].trim()}`)
+      }
+    }
+    expect(ungranted).toEqual([])
+  })
+
+  // A persona is a prompt made almost entirely of citations, and a citation is the one part of it
+  // nobody notices going stale: the agent reads a section that no longer exists, finds nothing, and
+  // carries on. The first smoke test of these four produced three - `src/server/catalog` called the
+  // "single exception" when SPEC §5.2 names billing_events as the second and last, `beforeLoad is
+  // UX` credited to ADR 0011 instead of SPEC §6, and a reference to an `SDLC.md § Risk` that has
+  // never been a heading. Paths this catches outright; named sections it catches by their first
+  // clause, which is what went wrong in the third one.
+  const personaFiles = readdirSync(join(ROOT, '.claude/agents'))
+    .filter((f) => f.endsWith('.md') && !f.startsWith('impeccable-'))
+    .map((f) => `.claude/agents/${f}`)
+
+  it('has personas to check', () => {
+    expect(personaFiles.length).toBeGreaterThan(0)
+  })
+
+  // Two kinds of path are cited on purpose and are not in the tree, so they are listed here rather
+  // than silently tolerated by a looser pattern: a reader can see the whole exemption at once.
+  const ABSENT_ON_PURPOSE = new Map([
+    // Named so a persona refuses to read it. It is gitignored and must never be in the tree.
+    ['.ai/qa/test-env.env', 'a secret file, named in order to be refused'],
+    // The product layer is configured but the brief has not been written; `product-owner` says in
+    // as many words what to do when it is missing, and om-discover is what creates it.
+    ['.ai/specs/product-brief.md', 'the product brief, cited conditionally'],
+  ])
+
+  it.each(personaFiles)('%s cites only paths that exist', (file) => {
+    const body = read(file)
+    // A backticked token with a slash and no glob, space or placeholder in it is a repo path.
+    const cited = [
+      ...body.matchAll(/`([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+\/?)`/g),
+    ].map((m) => m[1])
+    expect(cited.length).toBeGreaterThan(0)
+    const missing = [...new Set(cited)].filter(
+      (path) => !ABSENT_ON_PURPOSE.has(path) && !existsSync(join(ROOT, path)),
+    )
+    expect(missing).toEqual([])
+  })
+
+  it.each(personaFiles)('%s cites only headings that exist', (file) => {
+    const body = read(file)
+    // `FILE.md` § Some Name -> the first clause, up to a comma or the end of the phrase. A
+    // numbered section (§5.2) is skipped: SPEC numbers its headings, and the number is the check.
+    const refs = [
+      ...body.matchAll(/`([A-Za-z0-9_./-]+\.md)`\s*§\s*([A-Za-z][A-Za-z ]+)/g),
+    ]
+    const wrong = []
+    for (const [, target, rawSection] of refs) {
+      const section = rawSection.trim().toLowerCase()
+      if (!existsSync(join(ROOT, target))) {
+        wrong.push(`${target} (file missing)`)
+        continue
+      }
+      const headings = read(target)
+        .split('\n')
+        .filter((line) => /^#{1,6} /.test(line))
+        .map((line) => line.replace(/^#+ /, '').trim().toLowerCase())
+      // Prefix either way. A reference often runs on into the sentence ("§ Severity puts at
+      // `major`"), so the heading is a prefix of the capture; and a reference is often shortened
+      // ("§ Priorities" for "Priorities, in order"), so the capture is a prefix of the heading.
+      // Both are the same claim - this section exists - and neither accepts a name that is not
+      // there: nothing in SDLC.md is a prefix of "Risk", or has "Risk" as one.
+      if (
+        !headings.some((h) => h.startsWith(section) || section.startsWith(h))
+      ) {
+        wrong.push(`${target} § ${rawSection.trim()}`)
+      }
+    }
+    expect(wrong).toEqual([])
+  })
+
   // The table in docs/agents/cezar.md is the map a person reads before starting a run. A workflow
   // missing from it is one nobody knows exists; a row naming a file that is gone sends them to a
   // run that cannot start.

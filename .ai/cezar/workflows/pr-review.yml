@@ -11,4 +11,6 @@ steps:
     name: om-auto-review-pr
     prompt: '/om-auto-review-pr {{task}} --autofix'
     model: opus
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+    # `Task` is what lets the review dispatch the persona subagents in .claude/agents
+    # (CODE_REVIEW.md -> Review personas). Each persona's own grant is narrower than this one.
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]

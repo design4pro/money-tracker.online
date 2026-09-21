@@ -43,6 +43,21 @@ Read before the first finding, per touched area:
 | A missing loading, empty or error state on a screen                                                                                                           | major    |
 | `TODO`, `console.log`, commented-out code, placeholder copy                                                                                                   | minor    |
 
+## Review personas
+
+`CODE_REVIEW.md` -> **Review personas** holds the dispatch table and the boundary: four subagents in
+`.claude/agents/` (`manual-tester`, `accessibility-specialist`, `security-tenancy-reviewer`,
+`product-owner`), each dispatched on the paths it matches, each reporting only. Read the table
+there rather than a second copy here.
+
+Two rules apply to this skill when it dispatches one:
+
+- A persona's finding enters the report at the severity of the map above, not at the severity the
+  persona felt. Re-rank it; do not paste it.
+- A persona that could not run - no browser, no environment, `Task` not granted - is named in the
+  report as not run. Silence reads as a pass, and a review that claims a lens it never used is the
+  one failure mode this whole arrangement can produce.
+
 ## Rules
 
 - The gate's two drift commands run first. A dirty generated file is a finding; never regenerate

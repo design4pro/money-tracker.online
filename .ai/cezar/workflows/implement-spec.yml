@@ -12,4 +12,5 @@ steps:
     name: om-auto-implement-spec
     prompt: '/om-auto-implement-spec {{task}}'
     model: opus
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+    # `Task` dispatches the review personas in .claude/agents (CODE_REVIEW.md -> Review personas).
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]
