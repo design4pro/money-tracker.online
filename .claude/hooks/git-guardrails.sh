@@ -114,10 +114,17 @@ block() {
   exit 2
 }
 
-case "$scan" in
-  *"git push"*--force*develop*|*"git push"*--force*main*|*"git push"*-f\ *develop*|*"git push"*-f\ *main*)
-    block "force-push to develop/main" ;;
-esac
+# The flag and the ref come in either order, and the pattern this replaces wanted the flag first:
+# `git push origin develop --force` read straight past it while looking as though it was covered.
+# Both halves are anchored on the same `git push` and bounded by the control operators, so a forced
+# push to a feature branch standing beside an ordinary push of develop is not read as one command.
+# `--force-with-lease` is deliberately inside the first pattern: leased or not, it rewrites what
+# somebody else has already pulled, and only the branch decides.
+push_force='git[[:space:]]+push\b[^;&|]*[[:space:]](--force|-f([[:space:]]|$))'
+push_shared='git[[:space:]]+push\b[^;&|]*([[:space:]]|[/+:])(develop|main)([[:space:]]|:|$)'
+if grep -Eq "$push_force" <<< "$scan" && grep -Eq "$push_shared" <<< "$scan"; then
+  block 'force-push to develop/main'
+fi
 
 echo "$scan" | grep -Eq 'git\s+reset\s+--hard' && block 'git reset --hard'
 echo "$scan" | grep -Eq 'git\s+clean\s+-[a-zA-Z]*f' && block 'git clean -f'
@@ -155,7 +162,16 @@ rm_flags='(-[[:alnum:]-]+[[:space:]]+)*'
 rm_operands='([^[:space:];&|]+[[:space:]]+)*'
 rm_recursive="(^|[^[:alnum:]_/-])rm[[:space:]]+${rm_flags}-[[:alnum:]-]*[rR][[:alnum:]-]*[[:space:]]+${rm_operands}"
 rm_end='([[:space:]]|;|&|\||\)|$)'
-echo "$scan" | grep -Eq "${rm_recursive}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/?\*?${rm_end}" \
+
+# `git rm -r --cached .` is an index operation: it unstages, touches no file on disk, and `git
+# reset` puts it back. It reached this rule because `rm` is matched as a word and a space is a word
+# boundary, so `git rm` read as `rm`. The exemption is keyed on `--cached` and not on the word
+# `git`, because `git rm -r .` without it deletes the working tree and is exactly what the rule is
+# for. Only that one command is cut out of what the two rules below read, so
+# `git rm -r --cached . && rm -rf /` is still refused on its second half.
+rm_scan=$(printf '%s' "$scan" | sed -E 's/git[[:space:]]+rm[^;&|]*--cached[^;&|]*//g')
+
+echo "$rm_scan" | grep -Eq "${rm_recursive}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/?\*?${rm_end}" \
   && block 'rm -r of a dangerous root'
 
 # The worktree root spelled out, which the pattern above cannot cover because it is a path like any
@@ -175,7 +191,7 @@ echo "$scan" | grep -Eq "${rm_recursive}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/?\
 # exactly this reason; these belong here for the same one.
 project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
 project_root_spelling='\$\{?(PWD|CLAUDE_PROJECT_DIR)\}?|\$\(pwd\)|`pwd`'
-echo "$scan" | grep -Eq "${rm_recursive}(${project_root}|${project_root_spelling})/?\*?${rm_end}" \
+echo "$rm_scan" | grep -Eq "${rm_recursive}(${project_root}|${project_root_spelling})/?\*?${rm_end}" \
   && block 'rm -r of the project root'
 
 # The repository itself. Tier three refuses the whole `gh repo` surface under Actions; these four
@@ -236,8 +252,22 @@ echo "$scan" | grep -Eq 'git\s+gc\b[^;&|]*--prune=(now|all)' && block 'git gc --
 # whole bypass. $raw has only the quote characters removed, and the head-word test is what the
 # prose stripping was doing here, done in a way a reader cannot step around.
 #
-# A path ending `.example` is dropped first, per token rather than by testing the whole command for
-# the word, so `cat .dev.vars .dev.vars.example` is still refused on its first argument.
+# A redirection is a read, and the shell does not need a space for one: `cat<.dev.vars` is
+# `cat < .dev.vars`. So `<` and `>` are spaced out before anything is tokenised, which closes that
+# spelling and one other - `cat .dev.vars>/tmp/out.example` was a single token ending `.example`,
+# and the template exemption below deleted the secret along with it.
+#
+# A path ending `.example`, `.sample` or `.template` is dropped first, per token rather than by
+# testing the whole command for the word, so `cat .dev.vars .dev.vars.example` is still refused on
+# its first argument. Those three suffixes are also why the filename needs a right-hand boundary:
+# without one, `\.env` matched `.envrc`, which is direnv's config and not a secret, while
+# `.env.local` and `.env.production` still have to be refused.
+#
+# A glob is a filename this hook cannot read, because the shell expands it after the hook has
+# spoken: `cat .dev.var?` and `cat .dev.*` both print the real file. What can be decided here is
+# the literal part in front of the first metacharacter - if a secret name starts with it, the glob
+# can reach the secret. A metacharacter in the first position of the name leaves nothing to decide,
+# so `cat *` and `cat .ai/qa/*` are not refused; that is the same limit the rest of this rule has.
 #
 # Here-strings, not pipes, for the same reason the prose test above uses them: `grep -q` closes
 # early, and under `pipefail` that turns a match into a non-zero pipeline - so on a long command
@@ -248,7 +278,8 @@ echo "$scan" | grep -Eq 'git\s+gc\b[^;&|]*--prune=(now|all)' && block 'git gc --
 # the script's own business. That is the shape of the guarantee here - an obvious read is refused, a
 # determined one is not. The deny list in .claude/settings.json is the layer that does not depend on
 # enumerating readers.
-secret_file='(^|[[:space:]]|=|/|<)(\.dev\.vars|\.env|test-env\.env)'
+secret_file='(^|[[:space:]]|=|/)(\.dev\.vars|\.env|test-env\.env)([[:space:]]|$|\.|/)'
+secret_names='.dev.vars .env test-env.env'
 secret_head='^[[:space:]]*(([!{]|if|then|else|elif|do|while|until|time)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]]*/)?'
 plain_reader='cat|bat|less|more|head|tail|strings|xxd|od|base64|nl|tac|cut|sort|uniq|dd'
 pattern_reader='grep|egrep|fgrep|rg|ag|awk|sed'
@@ -269,7 +300,35 @@ reader_operands() {
   printf '%s' "$out"
 }
 
-secret_commands=$(tr ';&|()`' '\n' <<< "$raw")
+# A glob reaches whatever it expands to, and that happens after this hook has answered. Refuse the
+# ones whose literal head is a head of a secret name; a glob that starts with the metacharacter
+# says nothing and is left alone.
+# The loop is indexed rather than `for arg in "${words[@]}"`, which under `set -u` is an unbound
+# variable on an empty array in bash 3.2 - the shell macOS ships, and the one that ended this hook
+# with exit 1 on `env | grep TOKEN` until the case table was run against it.
+glob_reaches_secret() {
+  local arg literal name i
+  local -a words
+  read -r -a words <<< "$1"
+  for ((i = 0; i < ${#words[@]}; i++)); do
+    arg=${words[i]}
+    case "$arg" in
+      *[*?[]*) ;;
+      *) continue ;;
+    esac
+    literal=${arg%%[*?[]*}
+    literal=${literal##*/}
+    [ -z "$literal" ] && continue
+    for name in $secret_names; do
+      case "$name" in
+        "$literal"*) return 0 ;;
+      esac
+    done
+  done
+  return 1
+}
+
+secret_commands=$(tr ';&|()`' '\n' <<< "$raw" | sed -E 's/[<>]/ /g')
 while IFS= read -r secret_command; do
   if grep -Eq "${secret_head}(${plain_reader})([[:space:]]|$)" <<< "$secret_command"; then
     secret_args=$(reader_operands "$secret_command" 1)
@@ -278,8 +337,10 @@ while IFS= read -r secret_command; do
   else
     continue
   fi
-  secret_args=$(sed -E 's/[^[:space:]]*\.example([[:space:]]|$)/ /g' <<< "$secret_args")
+  secret_args=$(sed -E 's/[^[:space:]]*\.(example|sample|template)([[:space:]]|$)/ /g' <<< "$secret_args")
   grep -Eq "$secret_file" <<< "$secret_args" \
+    && block 'reading .dev.vars, .env or the QA test-env file'
+  glob_reaches_secret "$secret_args" \
     && block 'reading .dev.vars, .env or the QA test-env file'
 done <<< "$secret_commands"
 

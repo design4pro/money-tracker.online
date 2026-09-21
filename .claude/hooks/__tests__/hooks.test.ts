@@ -70,16 +70,24 @@ describe('git-guardrails.sh', () => {
     'git push --force origin main',
     'git push -f origin develop',
     'git push -f origin main',
+    // The flag can come after the ref, which is the spelling a pattern wanting it first read
+    // straight past. Leased or not, it rewrites what somebody else has already pulled.
+    'git push origin develop --force',
+    'git push origin main --force',
+    'git push origin develop -f',
+    'git push origin HEAD:refs/heads/develop --force',
+    'git push --force-with-lease origin develop',
   ])('blocks the force-push %s', (command) => {
     const r = bash(command)
     expect(r.status).toBe(2)
     expect(r.stderr).toContain('force-push to develop/main')
   })
 
-  it('leaves a force-push to a feature branch alone', () => {
-    expect(
-      bash('git push --force-with-lease origin fix/issue-12-x').status,
-    ).toBe(0)
+  it.each([
+    'git push --force-with-lease origin fix/issue-12-x',
+    'git push origin fix/issue-12-x --force',
+  ])('leaves the force-push to a feature branch %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
   })
 
   // `rm -r` is judged by where it points, not by the flags: the target has to match whole, so the
@@ -154,6 +162,18 @@ describe('git-guardrails.sh', () => {
       expect(bash(command).status).toBe(0)
     },
   )
+
+  // `rm` matched as a word, and a space is a word boundary, so `git rm` read as `rm`. The index
+  // operation is reversible with `git reset` and touches no file on disk; the same command
+  // without `--cached` deletes the working tree and is exactly what the rule is for.
+  it('tells git rm --cached from a recursive delete', () => {
+    expect(bash('git rm -r --cached .').status).toBe(0)
+    expect(bash('git rm -r --cached $PWD').status).toBe(0)
+    expect(bash('git rm -r src/old').status).toBe(0)
+    expect(bash('git rm -r .').status).toBe(2)
+    // The exemption removes that one command, not the rest of the line.
+    expect(bash('git rm -r --cached . && rm -rf /').status).toBe(2)
+  })
 
   // A rename breaks the remote of every open worktree and a transfer moves the repository out of
   // reach, so these are refused in every session - tier three's `gh repo` rule is Actions-only.
@@ -233,6 +253,20 @@ describe('git-guardrails.sh', () => {
     'echo $(cat .dev.vars)',
     'if cat .dev.vars; then true; fi',
     'sed -n 1p .dev.vars',
+    // The shell needs no space for a redirection, and a redirection is a read.
+    'cat<.dev.vars',
+    'head<.dev.vars',
+    // Without a space the whole thing was one token ending `.example`, and the template
+    // exemption deleted the secret along with the destination.
+    'cat .dev.vars>/tmp/output.example',
+    'cat .dev.vars > /tmp/output.example',
+    // A glob is expanded after this hook has answered, so what is judged is the literal head.
+    'cat .dev.var?',
+    'cat .dev.*',
+    'cat .env*',
+    // The template suffixes are why the filename needs a right-hand boundary; these two still go.
+    'cat .env.local',
+    'cat .env.production',
   ])('blocks the secret read %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -258,6 +292,16 @@ describe('git-guardrails.sh', () => {
     'git commit -m "docs: explain why cat .dev.vars is refused"',
     'git commit -m "docs: grep the .env file for APP_URL"',
     'echo "copy .dev.vars.example to .dev.vars then head it"',
+    // `.envrc` is direnv's config and the other two are templates: a filename that merely begins
+    // with a secret's name is not that secret.
+    'cat .envrc',
+    'cat .env.sample',
+    'cat .env.template',
+    // A glob whose metacharacter comes first says nothing about what it will reach, which is the
+    // stated limit of the glob rule rather than an oversight.
+    'cat *',
+    'cat tsconfig*.json',
+    'grep -rn pattern *.ts',
   ])('leaves %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
