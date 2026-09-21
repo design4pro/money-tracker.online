@@ -52,12 +52,13 @@ runs:
     # `chromium.launch()`; the `webkit` and `mobile-safari` projects in playwright.config.ts run
     # locally and are not this gate's to download.
     #
-    # Not cached, deliberately. The runners are ephemeral, so this downloads once per job - two
-    # e2e legs plus the axe gate - and a cache keyed on the Playwright version trades that for a
-    # restore whose speed on this pool nobody has measured. The one measurement this repository
-    # does have went the other way: ../setup/action.yml carries a `cache: pnpm` restore that cost
-    # 198 s of a 134 s-average step on the pool it was meant to speed up. Measure this install
-    # before adding a key to it.
+    # Not cached, and now measured rather than assumed: 35.3 s in job 106320156422, 111 MiB over
+    # the wire with `--with-deps`' apt work in it. The runners are ephemeral, so that is paid once
+    # per job - two e2e legs plus the axe gate, ~105 s a push - and a cache keyed on the Playwright
+    # version would trade it for a restore of about the same bytes. The one restore this repository
+    # has timed went the wrong way: ../setup/action.yml carries a `cache: pnpm` restore that cost
+    # 198 s of a 134 s-average step on the pool it was meant to speed up. 35 s is under the bar
+    # where that trade is worth making; revisit it if the number grows.
     - name: Install the browsers
       shell: bash
       run: pnpm exec playwright install --with-deps chromium
