@@ -60,6 +60,13 @@
     "outside": ["do-not-close"]
   },
   "qaGate": true,
+  "discovery": {
+    "enabled": true,
+    "roles": {
+      "domainExpert": false,
+      "designer": false
+    }
+  },
   "ci": {
     "maxWaitMinutes": 40
   },
