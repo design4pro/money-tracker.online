@@ -31,15 +31,19 @@ permissions:
 # is deliberately unset: unset, the default here selects GitHub-hosted runners, and
 # deploying is the one thing in this repository that does.
 #
-# Everything else runs on the self-hosted pool, which is four CI slots on one local
-# machine shared with the other repository. Two reasons put shipping on the other side
-# of that line, and both are about the deploy rather than about the budget. A deploy
-# must not queue behind an agent's twenty-minute browser suite, because the slot it is
-# waiting for is the slot that decides how long production stays on the old bundle.
-# And a deploy has to work when the local machine does not - the note this replaces
-# said as much about `vars.RUNNER_CI` being the recovery path for shipping, which made
-# recovery a variable somebody has to remember to set, under exactly the conditions
-# that make it hard to remember. Running there by default retires that lever.
+# Everything else used to run on the self-hosted pool - four CI slots on one local
+# machine shared with the other repository - and since 2026-09-21 it no longer does
+# either: `RUNNER_CI` is set to `["blacksmith-2vcpu-ubuntu-2404-arm"]` on this
+# repository, so the line this paragraph draws is one only the fallbacks still hold.
+# The two reasons below are kept because they are why shipping crossed first, and they
+# apply again the moment that variable is deleted. Both are about the deploy rather than
+# about the budget. A deploy must not queue behind an agent's twenty-minute browser
+# suite, because the slot it is waiting for is the slot that decides how long production
+# stays on the old bundle. And a deploy has to work when the local machine does not -
+# the note this replaces said as much about `vars.RUNNER_CI` being the recovery path for
+# shipping, which made recovery a variable somebody has to remember to set, under
+# exactly the conditions that make it hard to remember. Running there by default retires
+# that lever.
 #
 # It fits, and the premise is written down because it is plan-dependent and has already
 # been wrong once. Verified 2026-09-17 in the organisation's billing page: GitHub Team,
@@ -49,6 +53,42 @@ permissions:
 # containers - inside the 3,000, with room left for a failover. On GitHub Free the
 # allowance is 2,000 and this no longer fits; if the organisation is ever downgraded,
 # set `RUNNER_DEPLOY` back to the pool before the next deploy.
+#
+# That headroom was briefly the whole gate's too, and is the deploy's again. On
+# 2026-09-21 `RUNNER_CI` went to `["ubuntu-latest"]` for a few hours and then to
+# `["blacksmith-2vcpu-ubuntu-2404-arm"]`, which does not spend this allowance at all:
+# Blacksmith machines register as *self-hosted* runners, answering on
+# `/orgs/design4pro/actions/runners` beside `gha-ci-1..4`, ephemeral, one per job. The
+# counter agrees - this repository read 473.59 September Actions minutes before a full
+# Blacksmith gate and 473.59 after. They are billed by Blacksmith instead, which is a
+# different budget and not this paragraph's.
+#
+# The hours in between are what made that worth measuring. This repository stood at 94
+# September minutes on the morning of the 21st and 473.59 by the afternoon: ~380 for one
+# day of hosted CI, which is the 3,000 in about eight days. Read it as an upper bound -
+# that day was mostly runner experiments, re-running the same gate on purpose - but even
+# halved it does not leave the deploy the room the paragraph above counts on.
+#
+# The same pull request's two heavy jobs, measured on all three:
+#
+#   job                                    pool    hosted x64   blacksmith ARM
+#   generated · typecheck · lint · build   1m26s   1m54s        1m55s
+#   unit tests · coverage                  2m25s   5m45s        6m40s
+#
+# So the ~2.2x above is roughly right for the hosted column - 1.99x measured, though the
+# spread matters more than the average, the CPU-bound suite carrying 2.38x of it and the
+# other job 1.33x. The Blacksmith column is the slowest of the three on the clock and the
+# only one that costs nothing here; its numbers are warm-cache, the first run being 2m25s
+# and 6m52s before the ESLint cache and Blacksmith's own layer had anything in them.
+# `blacksmith-4vcpu-ubuntu-2404-arm` is the lever if that 6m40s starts to hurt.
+#
+# `gh variable delete RUNNER_CI` is still the whole reversal for the gate, in either
+# direction; the agent job in `claude.yml` crossed on its own variable and needs
+# `gh variable delete RUNNER_AGENT` as well. The deploy jobs deliberately did not move:
+# `RUNNER_DEPLOY` stays unset, so the Cloudflare credential is never handed to
+# Blacksmith or any other third-party runner vendor. It does run on a GitHub-hosted
+# machine, which this organisation does not run either - the narrower claim is the
+# true one.
 #
 # `RUNNER_DEPLOY` set to `["self-hosted","linux","ARM64","ci"]` puts shipping back on
 # the pool without a pull request, which is the same escape hatch in the other

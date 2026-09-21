@@ -2,7 +2,7 @@
 
 | Field              | Value       |
 | ------------------ | ----------- |
-| **Status**         | in-progress |
+| **Status**         | implemented |
 | **Issue**          | #245        |
 | **Spec PR**        | #253        |
 | **Implementation** | #264        |
@@ -342,7 +342,7 @@ property of the router, not of which component drew the link, so the rule surviv
 becoming client-side. Phase 3 verifies it against a rail navigation rather than assuming it, and
 `e2e/support/__tests__/states.test.ts` gets a case for the new call pattern.
 
-**Interaction with #230 / `.ai/specs/2026-09-11-first-navigation-loading-state.md`.** Independent and
+**Interaction with #230 / `.ai/specs/implemented/2026-09-11-first-navigation-loading-state.md`.** Independent and
 complementary. That spec makes the _first_ client-side navigation in a tab draw its loading state by
 priming the query cache; this one makes the rail produce client-side navigations at all. Neither
 blocks the other, and landing this one first makes that one's benefit apply to the rail too. Neither

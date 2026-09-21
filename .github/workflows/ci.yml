@@ -21,11 +21,20 @@ name: CI
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
-#            RUNNER_CI - organisation-level, and deliberately unset. Every job
-#            below runs on the self-hosted pool; setting it to
-#            `["ubuntu-latest"]` moves them all back to GitHub-hosted runners
-#            without a pull request, which is the only recovery path that does
-#            not need the host to be up. See design4pro/cezar,
+#            RUNNER_CI - set to `["blacksmith-2vcpu-ubuntu-2404-arm"]` on this
+#            repository since 2026-09-21, so every job below runs on a
+#            Blacksmith machine: still ARM64 Ubuntu, still a self-hosted runner
+#            as far as GitHub is concerned (it answers on the organisation's
+#            runners endpoint, ephemeral, one per job), and so it spends no
+#            Actions minutes. Note the label carries no `self-hosted` - the
+#            fallback array's first element would never match one. That array
+#            is only the fallback, and it still names the local pool: deleting
+#            the variable (`gh variable delete RUNNER_CI`) moves every job back
+#            there without a pull request, and the same lever in the other
+#            direction is what makes recovery possible when the host is down. A
+#            repository variable - there is no organisation-level one - so it
+#            moves this repository alone; setting one at the organisation
+#            level would move the siblings too. See design4pro/cezar,
 #            `docs/host/README.md`, "The runner pool".
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -376,13 +385,11 @@ jobs:
           - project: mobile-chromium
             shard: 1
             shards: 1
-    # No `container:`. The runner image is itself built FROM
-    # `mcr.microsoft.com/playwright:v1.62.1-noble`, so the browsers are already
-    # on the runner and pulling the same image again per job would buy nothing.
-    # The version coupling did not go away, it moved: keep
-    # `host/runner/Dockerfile` in design4pro/cezar in step with the `@playwright/test`
-    # devDependency in package.json, or a mismatch is reported as a missing
-    # executable rather than as a wrong one.
+    # No `container:`, and no browsers on the runner either. `./.github/actions/e2e-env`
+    # installs them per job from the `@playwright/test` devDependency, so the version
+    # coupling this comment used to describe - a runner image to keep in step with
+    # package.json, on pain of a missing executable - is retired rather than moved. A
+    # browser image per job would buy back only the download.
 
     steps:
       - name: Check out

@@ -202,6 +202,13 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   than wait for a job that is not coming. The browser journeys are gated on the push to `develop`
   instead, which is where that job does run.
 
+  **A sixth check exists and is deliberately not in that set.** `governance-gate`
+  (`.github/workflows/governance-gate.yml`) reports on every pull request but requires none,
+  because it was added after the rulesets were last written and making it required is a
+  repository-configuration change a person takes on purpose. Read the table above as "what a merge
+  waits for", not as "what runs": until someone adds the context to both rulesets, a red
+  `governance-gate` is advice. Adding it means editing this table in the same change.
+
   The pipeline still holds a merge as well — the labels, the review verdict and the
   QA gate in `SDLC.md` — but it is no longer the only thing holding one, and prose elsewhere
   (this section included, before this revision) that credits the ruleset with enforcing nothing but
@@ -361,20 +368,28 @@ not deliberately — see the note under the table.
 | `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                         |
 | `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                                                                                     |
 | `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | sonnet               | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                  |
-| `implement-ticket`    | `skill:` `om-fix` → gate → `om-open-pr` → `om-auto-review-pr`            | unpinned             | automation **Implement ready-for-agent issues** (label `ready-for-agent`)                                                                |
-| `triage`              | `skills: [afk-triage]`                                                   | unpinned             | automation **Triage new issues** (label `needs-triage`)                                                                                  |
-| `spec-to-tickets`     | `skills: [afk-to-tickets]`                                               | unpinned             | automation **Spec to tickets**, weekdays 07:00                                                                                           |
-| `architecture-review` | `skills: [afk-architecture-review]`                                      | unpinned             | automation **Weekly architecture review**, Mondays 06:00                                                                                 |
-| `lessons`             | `skills: [afk-lessons]`                                                  | unpinned             | automation **Weekly lessons**, Fridays 16:00                                                                                             |
+| `implement-ticket`    | `/om-fix {{task}}` → gate → `/om-open-pr` → `/om-auto-review-pr`         | opus, sonnet, opus   | automation **Implement ready-for-agent issues** (label `ready-for-agent`, and `risk-low`)                                                |
+| `triage`              | `/afk-triage {{task}}`                                                   | opus                 | automation **Triage new issues** (label `needs-triage`)                                                                                  |
+| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                               | opus                 | automation **Spec to tickets**, weekdays 07:00                                                                                           |
+| `architecture-review` | `/afk-architecture-review {{task}}`                                      | opus                 | automation **Weekly architecture review**, Mondays 06:00                                                                                 |
+| `lessons`             | `/afk-lessons {{task}}`                                                  | opus                 | automation **Weekly lessons**, Fridays 16:00                                                                                             |
 
-The last five rows are shaped unlike the ten above them, and that is a defect rather than a style.
-Four of them are the three-line `skills:` shorthand, so they carry no bootstrap step, no `model:`
-and cezar's `DEFAULT_ALLOWED_TOOLS` — `[Read, Edit, Write, Grep, Glob, Bash]`, which both
-over-grants (`triage` and `architecture-review` are documented read-only) and under-grants
-(`Skill` and `TodoWrite` are absent, so `afk-lessons` §1 and §4 cannot reach `om-pipeline-retro`
-or `om-open-pr`). `implement-ticket` carries a fourth step whose command inlines all seven
-validation commands verbatim, which is the one place in the repository that copies
+The last five rows were shaped unlike the ten above them until 2026-09-20, and it was a defect
+rather than a style. Four were the three-line `skills:` shorthand, so they carried no bootstrap
+step, no `model:` and cezar's `DEFAULT_ALLOWED_TOOLS` — `[Read, Edit, Write, Grep, Glob, Bash]`,
+which both over-granted (`triage` and `architecture-review` are documented read-only) and
+under-granted (`Skill` and `TodoWrite` are absent, so `afk-lessons` §1 and §4 could not reach
+`om-pipeline-retro` or `om-open-pr`). `implement-ticket` inlined all seven validation commands
+verbatim in its gate step, which was the one place in the repository that copied
 `validation.commands` instead of reading it.
+
+All five now carry a bootstrap step, a pinned model and an explicit grant: `triage`,
+`spec-to-tickets` and `architecture-review` read-only (`[Read, Grep, Glob, Bash, Skill,
+TodoWrite]`), `lessons` and `implement-ticket` with `Edit` and `Write` because they write. The
+gate step runs `node scripts/ci/run-validation.mjs`, which reads `validation.commands` — so the
+list lives in one file again, and `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails if any
+workflow copies a command out of it. The same test fails a workflow that prompts without a model
+or a grant, or one that neither bootstraps nor says in a comment why it does not.
 
 The task text an automation sends is the issue or PR number alone (`{{github.number}}`); a second
 token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled
@@ -390,11 +405,15 @@ a human's lever:
   No skill adds any of them (the `.ai/skills/` overrides say so), so no run can start another
   through this route.
 - **The intake ladder** — `needs-triage` starts `triage`, and `ready-for-agent` starts
-  `implement-ticket`. These the pipeline does set for itself: `afk-triage` consumes `needs-triage`
-  and applies one of `needs-info` / `ready-for-agent` / `ready-for-human`, which is the whole point
-  of the ladder. What keeps it bounded is the filter rather than the label discipline: the
-  implementing automation excludes `risk-high` and `security`, and `afk-triage` routes both to
-  `ready-for-human` before it could matter.
+  `implement-ticket`. These the pipeline does set for itself: a groom that ends
+  `READY_STATUS=ready` applies `needs-triage` when the issue carries no intake label yet, and
+  `afk-triage` consumes that label and applies one of `needs-info` / `ready-for-agent` /
+  `ready-for-human`. That is the whole point of the ladder, and it is why a filed issue reaches an
+  open PR with nobody in it. What keeps it bounded is the filter rather than the label discipline:
+  the implementing automation requires `risk-low` and excludes `risk-high` and `security`, and
+  `afk-triage` routes the last two to `ready-for-human` before either could matter. Grooming never
+  applies `ready-for-agent` itself — it does not check that the issue is real, still unfixed, or
+  already covered by an open PR, and triage is the step that does.
 
 This paragraph used to end "the four command labels are the only things that start code-writing
 work". That has not been true since `ready-for-agent` was wired to `implement-ticket` (ADR 0017,

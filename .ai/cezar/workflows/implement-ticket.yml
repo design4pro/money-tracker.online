@@ -1,11 +1,26 @@
+# The last step of the unattended intake ladder (ADR 0017): `ready-for-agent` on an issue starts
+# this, and it ends at an open, reviewed pull request. Nothing here merges, and no step applies
+# `qa-approved` - the boundary is `SDLC.md` § The automation contract.
+#
+# The gate calls scripts/ci/run-validation.mjs rather than listing commands. The list lives in
+# exactly one place, .ai/agentic.config.json -> validation.commands, and this file used to be the
+# second copy of it.
+#
+# `$CEZ_HANDOFF_FILE` is cezar's per-run handoff file - an absolute path outside the worktree, in
+# the main checkout's gitignored .ai/cezar/runs/. It is the only channel between these steps, so
+# both things that have to travel go through it: the `STOP:` line and the Resolved assumptions
+# table. The steps match any line starting `STOP:`, never "the first line", because cezar prepends
+# its own step entries to that file's progress log after every step.
 name: implement-ticket
 description: Implement one ready-for-agent issue test-first from its Agent Brief, pass the validation gate, open a PR and review it. Never merges.
 steps:
+  - id: bootstrap
+    name: Install dependencies and generate the route tree
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: implement
     name: Check readiness and implement
-    skill: om-fix
     prompt: |
-      {{task}}
+      /om-fix {{task}}
 
       This workflow has no om-root-cause step: the issue's `## Agent Brief` comment is your brief.
 
@@ -14,39 +29,43 @@ steps:
       - it has no Agent Brief comment, or the brief says a spec is needed;
       - an issue listed under "Blocked by" is still open;
       - three or more open PRs labeled `review` are authored by the current `gh` user (WIP limit).
-      To stop: write `STOP: <reason>` as the first progress-log line of this run's handoff file, then end with CEZ:DONE. Later steps read that line and skip.
+      To stop: append a line `STOP: <reason>` to the file `$CEZ_HANDOFF_FILE`, then end with CEZ:DONE. Later steps grep that file for such a line and skip.
 
       Otherwise implement per om-fix, with these rules:
       - Test first at the brief's Test seam, through the module's interface: write the failing test, see it fail, then make it pass (afk-codebase-design).
       - Build one complete vertical slice, inside the acceptance criteria and "Out of scope".
       - Use CONTEXT.md terms. Add or update entries for any concept you introduce or rename (afk-domain-modeling).
-      - Record each decision the brief left open as a Resolved assumptions row in the handoff file, for the PR body.
+      - Append each decision the brief left open to `$CEZ_HANDOFF_FILE` under a `## Resolved assumptions` heading, as a `# | Question | Applied default | Why` row. The PR step reads that table from there.
+    model: opus
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: gate
     name: Validation gate
-    command: (test -d node_modules || pnpm install --frozen-lockfile) && pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts && pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/ && pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md && pnpm typecheck && pnpm lint && pnpm test && pnpm build
+    command: grep -q '^STOP:' "$CEZ_HANDOFF_FILE" || node scripts/ci/run-validation.mjs
     onFail:
       retry: implement
       max: 2
   - id: pr
     name: Open the PR
-    skill: om-open-pr
     prompt: |
-      {{task}}
+      /om-open-pr {{task}}
 
-      If the first progress-log line of this run's handoff file starts with `STOP:`, end at once with CEZ:DONE.
+      If `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds, print that line and end at once with CEZ:DONE.
 
-      Otherwise open the PR per om-open-pr, with the issue number from the task as the issue id. Put the Resolved assumptions table from the handoff file in the PR body, and reference the issue with `Fixes #<number>`.
+      Otherwise open the PR per om-open-pr, with the issue number from the task as the issue id. Copy the `## Resolved assumptions` table out of `$CEZ_HANDOFF_FILE` into the PR body, and reference the issue with `Fixes #<number>`.
+    model: sonnet
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: review
     name: Review the PR
-    skill: om-auto-review-pr
     prompt: |
-      {{task}}
+      /om-auto-review-pr {{task}}
 
       End at once with CEZ:DONE if either holds:
-      - the first progress-log line of this run's handoff file starts with `STOP:`;
+      - `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds;
       - no PR is open for this branch (`gh pr list --head "$(git branch --show-current)"`).
 
       Otherwise review that PR per om-auto-review-pr:
       - Report the Standards axis and the Spec axis separately (CODE_REVIEW.md).
       - On the Spec axis, check each acceptance criterion from the issue's Agent Brief.
       - Never merge, and never run om-approve-merge-pr.
+    model: opus
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
