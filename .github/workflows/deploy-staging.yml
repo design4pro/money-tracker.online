@@ -56,12 +56,16 @@ permissions:
 # That headroom is no longer the deploy's alone. Since 2026-09-21 `RUNNER_CI` is set to
 # `["ubuntu-latest"]` on this repository, so its whole gate bills against the same 3,000.
 # Measured the same day: 373 Actions minutes used across the organisation in September,
-# 94 of them this repository, back when only deploys ran hosted. One pull request's two
-# heavy jobs cost 3m51s of pool time, so roughly 9 hosted minutes at the 2.2x above,
-# before `a11y` and `claude-review` and before the browser suites that run on the push to
-# the base branch. The new rate is a projection, not a measurement - read it off the
-# billing page after a full week, and if it does not fit, `gh variable delete RUNNER_CI`
-# is the whole reversal.
+# 94 of them this repository, back when only deploys ran hosted. Then measured on both
+# sides of the move, one pull request's two heavy jobs: `generated · typecheck · lint ·
+# build` 1m26s on the pool against 1m54s hosted, and `unit tests · coverage` 2m25s
+# against 5m45s. That is 1.99x overall, so the 2.2x above was close - but the spread
+# matters more than the average, because the CPU-bound suite carries 2.38x of it and the
+# other job only 1.33x. Eight billable minutes for the pair, Actions rounding each job up
+# to the minute; call it nine a push with the gates, before `a11y` and `claude-review`
+# and before the browser suites that run on the push to the base branch rather than on a
+# pull request. Read the real monthly rate off the billing page after a full week, and if
+# it does not fit, `gh variable delete RUNNER_CI` is the whole reversal.
 #
 # `RUNNER_DEPLOY` set to `["self-hosted","linux","ARM64","ci"]` puts shipping back on
 # the pool without a pull request, which is the same escape hatch in the other
