@@ -22,8 +22,9 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 
 - **Data access.** Every query goes through the tenant-scoped base repository in
   `src/server/repos`, takes a `TenantScope` as its first parameter, and the tenant predicate cannot
-  be removed by a caller. `src/server/catalog` is the single exception, guarded by
-  `requirePermission` plus a platform audit-log write.
+  be removed by a caller. `docs/SPEC.md` §5.2 documents exactly two exceptions: `src/server/catalog`,
+  guarded by `requirePermission` plus a platform audit-log write, and `billing_events`, whose two
+  delivery writes take a bare `Database` because a webhook arrives before its workspace is known.
 - **Money.** No float arithmetic on an amount anywhere, including a tooltip or a chart label. The
   scale is `currencies.digits`, never a hard-coded 2. `ref_amount_minor` is written once at the
   booked date's rate and never recomputed. Balances are rebuilt wholesale through the `LEDGER`
@@ -78,9 +79,9 @@ They are not `om-synthetic-users`, which builds a panel from research material a
 `[SYNTHETIC]` hypotheses about people. These four read a diff and the rules in this repository, and
 what they produce is a review finding.
 
-Dispatching needs the `Task` tool. The cockpit's `pr-review` workflow grants it; the unattended
-`implement-ticket` review step does not yet, so a run started from `ready-for-agent` reviews
-without personas until that grant lands.
+Dispatching needs the `Task` tool. Every step in `.ai/cezar/workflows/` that reaches
+`om-auto-review-pr` grants it, and `.ai/scripts/__tests__/agent-layer-parity.test.mjs` fails if one
+stops. Where the tool is absent the review runs without personas and names them as not run.
 
 ## Severity
 

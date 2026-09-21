@@ -68,4 +68,5 @@ steps:
       - On the Spec axis, check each acceptance criterion from the issue's Agent Brief.
       - Never merge, and never run om-approve-merge-pr.
     model: opus
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+    # `Task` dispatches the review personas in .claude/agents (CODE_REVIEW.md -> Review personas).
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]

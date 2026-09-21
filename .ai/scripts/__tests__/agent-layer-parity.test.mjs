@@ -62,12 +62,43 @@ describe('agent-layer parity', () => {
   // added to be dispatched. The impeccable-* agents predate this rule and belong to a skill rather
   // than to code review, so they are not required to appear in the table.
   it('dispatches every review persona it ships', () => {
-    const section = read('CODE_REVIEW.md')
+    const doc = read('CODE_REVIEW.md')
+    const section = doc.slice(doc.indexOf('## Review personas'))
     const files = readdirSync(join(ROOT, '.claude/agents'))
       .filter((f) => f.endsWith('.md') && !f.startsWith('impeccable-'))
       .map((f) => f.replace(/\.md$/, ''))
     expect(files.length).toBeGreaterThan(0)
     expect(files.filter((name) => !section.includes(`\`${name}\``))).toEqual([])
+  })
+
+  // Dispatch needs the `Task` tool, and a workflow that does not grant it reviews without personas
+  // while reporting nothing about it. CODE_REVIEW.md -> Review personas says every step reaching
+  // the review grants it; this is what makes that sentence true rather than aspirational. The
+  // entry points are listed rather than followed: each skill's own Chaining section says it runs
+  // om-auto-review-pr, and a chain is not something a regex can walk.
+  const REVIEW_ENTRY_POINTS = [
+    'om-auto-review-pr',
+    'om-pr-autopilot',
+    'om-auto-fix-pr',
+    'om-auto-fix-issue',
+    'om-auto-implement-spec',
+  ]
+
+  it('grants Task on every workflow step that reaches the review', () => {
+    const ungranted = []
+    for (const name of workflows) {
+      const text = read(`${WORKFLOW_DIR}/${name}.yml`)
+      // Step blocks, in file order; a step begins at column 2 with `- id: `.
+      for (const block of text.split(/^ {2}- id: /m).slice(1)) {
+        const reaches = REVIEW_ENTRY_POINTS.some((skill) =>
+          block.includes(`/${skill} `),
+        )
+        const grants = /^\s+allowedTools: \[[^\]]*\bTask\b/m.test(block)
+        if (reaches && !grants)
+          ungranted.push(`${name}.yml: ${block.split('\n', 1)[0].trim()}`)
+      }
+    }
+    expect(ungranted).toEqual([])
   })
 
   // A persona is a prompt made almost entirely of citations, and a citation is the one part of it

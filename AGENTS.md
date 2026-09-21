@@ -12,7 +12,8 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
 - Money stays in integer minor units at every layer. The scale is `currencies.digits`, never a
   hard-coded 2. `ref_amount_minor` is historical and never recomputed (`docs/MONEY.md`).
 - All SQL lives in `src/server/repos` and goes through the tenant-scoped base repository;
-  `src/server/catalog` is the single exception (`docs/SPEC.md` §6.1).
+  `src/server/catalog` and `billing_events` are the two documented exceptions
+  (`docs/SPEC.md` §5.2).
 - Validate every server-function input with Zod, and parse it a second time in the repository.
   Validation is shape, never permission.
 - A new repository function ships with a case in `src/server/repos/__tests__/tenant-isolation.test.ts`;
