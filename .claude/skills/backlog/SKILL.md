@@ -57,6 +57,10 @@ Reading it:
   died makes a ready PR invisible. The fix is a human removing the label; the script only names
   them, it never mutates the tracker. A `residue` line is the same label on a closed PR - noise,
   not a blockage.
+- **Read the PR's newest 🤖 claim comment before removing an `in-progress` label.** The detector
+  compares against `.ai/cezar/runs.json`, so it can only see this cockpit's runs. A claim placed by
+  a human, or by a run on another host, appears as `BLOCKING` because nothing here accounts for it.
+  The claim comment says who holds it (`SDLC.md` § The claim protocol, `.ai/trackers/github.md`).
 - **`ci-monitoring` is never counted as a claim.** `SDLC.md:181` says it blocks nobody; it means
   only that a CI-result comment is still owed. Lumping it in with the lock signals is the exact
   mistake that made agents skip fully processed PRs.

@@ -40,7 +40,17 @@ import { pathToFileURL } from "node:url";
 
 const AUTOMATIONS = "docs/agents/cezar-automations.json";
 const RUNS = ".ai/cezar/runs.json";
-const ACTIVE_RUN_STATES = new Set(["queued", "running", "review"]);
+// cezar's own in-flight set, verbatim: `IN_FLIGHT_STATUSES` in
+// packages/cezar/src/dispatch/engine.ts:33. `waiting` is a run parked on `CEZ:ASK` - still live,
+// still holding its claim - and `review` is *terminal* there (`TERMINAL_STATUSES`, line 37),
+// alongside done, failed and cancelled.
+//
+// This set used to read `queued, running, review`, which was wrong in both directions: it called
+// a finished run active, and it called a run waiting on a human dead. The second is the dangerous
+// one - `staleClaims` would print a live run as a BLOCKING stale lock, and the backlog skill tells
+// a reader to remove those labels, which would drop a real claim and let the next poll start
+// duplicate work on the same pull request.
+const ACTIVE_RUN_STATES = new Set(["queued", "running", "waiting"]);
 
 export const PRIORITY_ORDER = [
   "priority-extreme",

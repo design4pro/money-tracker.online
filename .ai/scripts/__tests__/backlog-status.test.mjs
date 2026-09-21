@@ -674,7 +674,7 @@ describe("staleClaims", () => {
   });
 
   it("leaves a claim alone while a run holds the issue the branch names", () => {
-    const runs = [{ status: "review", issueNumber: 392 }];
+    const runs = [{ status: "running", issueNumber: 392 }];
     const open = staleClaims(
       [pr(400, "OPEN", ["in-progress"], { headRefName: "fix/issue-392-slug" })],
       runs,
@@ -685,6 +685,21 @@ describe("staleClaims", () => {
   it("counts a finished run as no claim at all", () => {
     const runs = [{ status: "done", prNumber: 381 }, { status: "failed", prNumber: 381 }];
     expect(staleClaims([pr(381, "OPEN", ["in-progress"])], runs).open).toHaveLength(1);
+  });
+
+  // cezar parks a run on `CEZ:ASK` as `waiting`, and that run still holds its claim. Calling it
+  // dead is the dangerous direction: the backlog skill tells a reader to remove such a label, and
+  // removing a live one lets the next poll start duplicate work on the same pull request.
+  it("treats a run waiting on a human as live, not as a dead lock", () => {
+    const runs = [{ status: "waiting", prNumber: 500 }];
+    expect(staleClaims([pr(500, "OPEN", ["in-progress"])], runs).open).toEqual([]);
+  });
+
+  // `review` is terminal in cezar (TERMINAL_STATUSES, dispatch/engine.ts:37), beside done, failed
+  // and cancelled. Counting it as active would shield a claim that really is stale.
+  it("treats a run in review as finished: the claim behind it is stale", () => {
+    const runs = [{ status: "review", prNumber: 500 }];
+    expect(staleClaims([pr(500, "OPEN", ["in-progress"])], runs).open).toHaveLength(1);
   });
 
   it("never treats ci-monitoring as a claim: it blocks nobody (SDLC.md)", () => {
