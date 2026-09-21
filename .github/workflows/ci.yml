@@ -22,14 +22,17 @@ name: CI
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
 #            RUNNER_CI - unset again since 2026-09-21, which is the state
-#            these files are written for: every job below falls back to the
-#            array beside its `runs-on` and runs on the local pool, ARM64
+#            these files are written for: every gate job below falls back to
+#            the array beside its `runs-on` and runs on the local pool, ARM64
 #            containers labelled `ci` on one machine shared with the other
 #            repository. The variable is how the pool is left without a pull
 #            request: `gh variable set RUNNER_CI '["ubuntu-latest"]'` moves
-#            every job here onto GitHub-hosted machines in one command, which
-#            is the recovery path when the host is down, and deleting it again
-#            brings them back. That lever was pulled twice on 2026-09-21,
+#            the gate jobs onto GitHub-hosted machines in one command, and
+#            deleting it again brings them back. The two deploy jobs at the
+#            end do not read it - their runner is `RUNNER_DEPLOY`'s, so
+#            recovering shipping when the host is down is
+#            `gh variable set RUNNER_DEPLOY '["ubuntu-latest"]'` as well, as
+#            deploy-production.yml says. That lever was pulled twice on 2026-09-21,
 #            first to `["ubuntu-latest"]` and then to
 #            `["blacksmith-2vcpu-ubuntu-2404-arm"]`, and what the day measured
 #            is written down in deploy-production.yml. A repository variable -
