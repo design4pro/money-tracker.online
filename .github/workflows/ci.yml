@@ -32,8 +32,9 @@ name: CI
 #            the variable (`gh variable delete RUNNER_CI`) moves every job back
 #            there without a pull request, and the same lever in the other
 #            direction is what makes recovery possible when the host is down. A
-#            repository variable, so it shadows the organisation one rather
-#            than moving the sibling repositories too. See design4pro/cezar,
+#            repository variable - there is no organisation-level one - so it
+#            moves this repository alone; setting one at the organisation
+#            level would move the siblings too. See design4pro/cezar,
 #            `docs/host/README.md`, "The runner pool".
 # ──────────────────────────────────────────────────────────────────────────────
 

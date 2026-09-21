@@ -82,9 +82,13 @@ permissions:
 # and 6m52s before the ESLint cache and Blacksmith's own layer had anything in them.
 # `blacksmith-4vcpu-ubuntu-2404-arm` is the lever if that 6m40s starts to hurt.
 #
-# `gh variable delete RUNNER_CI` is still the whole reversal, in either direction. The
-# deploy jobs deliberately did not move: `RUNNER_DEPLOY` stays unset, so no Cloudflare
-# credential is ever handed to a machine this organisation does not run.
+# `gh variable delete RUNNER_CI` is still the whole reversal for the gate, in either
+# direction; the agent job in `claude.yml` crossed on its own variable and needs
+# `gh variable delete RUNNER_AGENT` as well. The deploy jobs deliberately did not move:
+# `RUNNER_DEPLOY` stays unset, so the Cloudflare credential is never handed to
+# Blacksmith or any other third-party runner vendor. It does run on a GitHub-hosted
+# machine, which this organisation does not run either - the narrower claim is the
+# true one.
 #
 # `RUNNER_DEPLOY` set to `["self-hosted","linux","ARM64","ci"]` puts shipping back on
 # the pool without a pull request, which is the same escape hatch in the other
