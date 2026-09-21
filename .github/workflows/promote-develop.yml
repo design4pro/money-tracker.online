@@ -65,10 +65,10 @@ permissions:
 # and setting it at the organisation level would move every repository at once.
 #
 # In a test workflow that is a convenience. Here it is the recovery path for shipping:
-# production now deploys from one local machine, and the switch has to work when that
-# machine does not. That is why it is a variable at all and not a literal label array -
-# reverting by pull request would need the merge gate, which needs the same runners
-# that are missing. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
+# production deploys on a GitHub-hosted machine, not the local pool, and the switch has to
+# work when the local host does not. That is why it is a variable at all and not a literal
+# label array - reverting by pull request would need the merge gate, which needs the same
+# runners that are missing. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
 
 jobs:
   promote:
