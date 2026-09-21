@@ -99,6 +99,10 @@ describe('git-guardrails.sh', () => {
     'rm --recursive --force /',
     'rm -r -f ~',
     'cd /tmp && rm -rf /',
+    // `rm` takes more than one operand, and a harmless one in front used to hide the rest.
+    'rm -rf dist .git',
+    'rm -rf node_modules /',
+    'rm -rf a b /',
   ])('blocks the recursive delete %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -112,6 +116,10 @@ describe('git-guardrails.sh', () => {
     'rm -rf .ai/qa/artifacts_123',
     'rm -rf /tmp/claude-501/x',
     'rm package-lock.json',
+    // Several operands, none of them a root: stepping over an operand must not turn the next one
+    // into a target it is not.
+    'rm -rf build dist',
+    'rm -rf .ai/qa/artifacts_1 .ai/qa/artifacts_2',
   ])('leaves the ordinary cleanup %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
@@ -125,6 +133,27 @@ describe('git-guardrails.sh', () => {
     expect(bash(`rm -rf ${root}/`).status).toBe(2)
     expect(bash(`rm -rf ${root}/node_modules`).status).toBe(0)
   })
+
+  // The expanded path is not how the root is usually written. These four spellings all name the
+  // same directory, and a rule that knew only the expansion let every one of them through.
+  it.each([
+    'rm -rf $PWD',
+    'rm -rf ${PWD}',
+    'rm -rf $CLAUDE_PROJECT_DIR',
+    'rm -rf "$CLAUDE_PROJECT_DIR"',
+    'rm -rf $(pwd)',
+    'rm -rf `pwd`',
+    'rm -rf dist $PWD',
+  ])('blocks the project root written as %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
+
+  it.each(['rm -rf $PWD/node_modules', 'rm -rf $CLAUDE_PROJECT_DIR/dist'])(
+    'leaves %s alone',
+    (command) => {
+      expect(bash(command).status).toBe(0)
+    },
+  )
 
   // A rename breaks the remote of every open worktree and a transfer moves the repository out of
   // reach, so these are refused in every session - tier three's `gh repo` rule is Actions-only.
@@ -150,6 +179,9 @@ describe('git-guardrails.sh', () => {
     'git push origin :develop',
     'git push -d origin feature/x',
     'git push origin +refs/heads/x:refs/heads/develop',
+    // git's own shorthand for `+develop:develop`, and just as forced. The colon is not what makes
+    // a refspec dangerous; the `+` is.
+    'git push origin +develop',
   ])('blocks the destructive refspec %s', (command) => {
     expect(bash(command).status).toBe(2)
   })
@@ -157,6 +189,7 @@ describe('git-guardrails.sh', () => {
   it.each([
     'git push origin HEAD:refs/heads/fix/issue-1-x',
     'git push origin HEAD',
+    'git push --force-with-lease origin fix/issue-1-x',
   ])('leaves the ordinary push %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
@@ -189,6 +222,17 @@ describe('git-guardrails.sh', () => {
     'xxd .dev.vars',
     // The `.example` exemption is per token, not per command, so the first argument still counts.
     'cat .dev.vars .dev.vars.example',
+    // `/bin/cat` is `cat`: the head word is read through its directory prefix.
+    '/bin/cat .dev.vars',
+    '/usr/bin/head -2 .env.local',
+    // A redirection is a read with no space in front of the filename.
+    'cat <.dev.vars',
+    // The reader is judged where it stands, so a chain, a substitution and a compound command
+    // each get looked at rather than swallowed by the word that opens them.
+    'ls -la && cat .dev.vars',
+    'echo $(cat .dev.vars)',
+    'if cat .dev.vars; then true; fi',
+    'sed -n 1p .dev.vars',
   ])('blocks the secret read %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -206,8 +250,25 @@ describe('git-guardrails.sh', () => {
     'sh .ai/scripts/test-env-up.sh',
     'cat package.json',
     'grep -rn APP_URL src',
+    // A pattern-taking reader spends its first operand on the pattern, so searching *for* the
+    // filename is not reading the file. The rule that could not tell those apart refused the
+    // commit messages below - including the ones written while fixing it.
+    'grep -rn ".env" src',
+    'grep -rn "\\.dev\\.vars" .claude/hooks',
+    'git commit -m "docs: explain why cat .dev.vars is refused"',
+    'git commit -m "docs: grep the .env file for APP_URL"',
+    'echo "copy .dev.vars.example to .dev.vars then head it"',
   ])('leaves %s alone', (command) => {
     expect(bash(command).status).toBe(0)
+  })
+
+  // The rule reads the command through here-strings, not pipes: `grep -q` closes early, and under
+  // `pipefail` that turns a match into a non-zero pipeline - the one failure shape that lets a
+  // long command through unchecked.
+  it('still refuses a secret read buried in a very long command', () => {
+    const filler = 'x'.repeat(40_000)
+    expect(bash(`cat .dev.vars # ${filler}`).status).toBe(2)
+    expect(bash(`echo ok # ${filler}`).status).toBe(0)
   })
 
   it('leaves pnpm and env alone outside agent runs', () => {
