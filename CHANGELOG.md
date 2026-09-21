@@ -21,11 +21,12 @@ and the passbook design system the whole surface is drawn in. Money is integer m
 layer, every query is tenant-scoped, and the accessibility gate is WCAG 2.2 AA.
 
 > **About this entry.** It is a seed, derived from the titles of the 185 pull requests merged into
-> `develop` between 2026-09-02 and 2026-09-20 - 27 `feat`, 32 `fix`, 47 `chore`, 46 `docs`, 15
-> `ci`, 15 `test` and 3 `refactor`. Only the two user-visible categories are itemised; the rest are
-> the agent layer, the delivery process, the test net and the documentation, which a reader of a
-> changelog does not need line by line. It carries no `*(@handle)*` credits because it did not go
-> through the Supersede Credit Rule's verification pass - entries from 0.2.0 on do.
+> `develop` between 2026-09-02 and 2026-09-20 - 27 `feat`, 32 `fix`, 46 `chore`, 46 `docs`, 15
+> `ci`, 15 `test`, 3 `refactor`, and one title carrying no type at all (#23). Only the two
+> user-visible categories are itemised; the rest are the agent layer, the delivery process, the
+> test net and the documentation, which a reader of a changelog does not need line by line. It
+> carries no `*(@handle)*` credits because it did not go through the Supersede Credit Rule's
+> verification pass - entries from 0.2.0 on do.
 
 ## ✨ Features
 
