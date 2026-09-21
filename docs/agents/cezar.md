@@ -202,6 +202,13 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   than wait for a job that is not coming. The browser journeys are gated on the push to `develop`
   instead, which is where that job does run.
 
+  **A sixth check exists and is deliberately not in that set.** `governance-gate`
+  (`.github/workflows/governance-gate.yml`) reports on every pull request but requires none,
+  because it was added after the rulesets were last written and making it required is a
+  repository-configuration change a person takes on purpose. Read the table above as "what a merge
+  waits for", not as "what runs": until someone adds the context to both rulesets, a red
+  `governance-gate` is advice. Adding it means editing this table in the same change.
+
   The pipeline still holds a merge as well — the labels, the review verdict and the
   QA gate in `SDLC.md` — but it is no longer the only thing holding one, and prose elsewhere
   (this section included, before this revision) that credits the ruleset with enforcing nothing but
