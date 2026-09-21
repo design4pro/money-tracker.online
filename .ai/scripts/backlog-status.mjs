@@ -24,7 +24,8 @@
 // `--flow` answers a different question: not where each issue sits, but whether the ladder is
 // moving at all. Four numbers, each from a file or a command whose output is read - launches per
 // automation, issue opened to `needs-triage`, `ready-for-agent` to the first pull request, and the
-// share of gate steps that needed a second try. Two of those read `.ai/cezar/runs.json`, which is
+// share of gate steps that needed a second try - plus the `in-progress` claims no live run stands
+// behind, which is the commonest way the ladder stops. Three of those read `.ai/cezar/runs.json`, which is
 // gitignored and therefore absent in a worktree or a fresh clone; there the report says it cannot
 // measure them rather than printing the zeroes. Poll counts are deliberately absent: they live
 // only in the running cockpit's automation state, not in any committed file, and the report says
@@ -462,6 +463,57 @@ export function parseArgs(argv) {
 }
 
 /**
+ * Pull requests carrying `in-progress` that no live run accounts for.
+ *
+ * `SDLC.md` § The claim protocol: a pull request carrying `in-progress` is skipped by the merge
+ * tooling. The matching obligation - release the label when finished, even on failure - is stated
+ * and nothing checks it, so a run that dies mid-work leaves a lock nobody holds and every later
+ * automation steps around it in silence. Measured on 2026-09-21: zero active runs, six labelled
+ * pull requests, one of them a mergeable promotion PR nothing would ever pick up.
+ *
+ * `ci-monitoring` is deliberately not read here. `SDLC.md` is explicit that it blocks nobody - it
+ * says only that a CI-result comment is still owed - and treating it as a lock is the specific
+ * mistake that made agents skip fully processed pull requests.
+ *
+ * Needs the same `runsVisible` the launches do, and for the same reason: with no runs file every
+ * claim would look dead, which is the more damaging direction of that bug rather than the safer
+ * one - it would send a human to strip locks off work that is running.
+ */
+export function staleClaims(prs, runs, { runsVisible = true } = {}) {
+  if (!runsVisible) return { runsVisible: false, open: [], closed: [] };
+
+  const activePrs = new Set();
+  const activeIssues = new Set();
+  for (const run of runs) {
+    if (!ACTIVE_RUN_STATES.has(run.status)) continue;
+    if (run.prNumber) activePrs.add(Number(run.prNumber));
+    if (run.issueNumber) activeIssues.add(Number(run.issueNumber));
+  }
+
+  const open = [];
+  const closed = [];
+  for (const pr of prs) {
+    const labels = (pr.labels ?? []).map((label) => label.name ?? label);
+    if (!labels.includes("in-progress")) continue;
+    if (activePrs.has(pr.number)) continue;
+    // A run can hold the issue before its pull request exists - `implement-ticket` labels the
+    // branch's PR in a later step than the one that claims the ticket. Reusing this file's own
+    // linkage keeps that run from being reported as a dead claim while it is still working.
+    const claimed = new Set([
+      ...closeKeywordTargets(pr.body),
+      ...closeKeywordTargets(pr.title),
+    ]);
+    const branch = branchIssue(pr.headRefName);
+    if (branch !== null) claimed.add(branch);
+    if ([...claimed].some((issue) => activeIssues.has(issue))) continue;
+
+    (pr.state === "OPEN" ? open : closed).push({ number: pr.number, labels });
+  }
+  const byNumber = (a, b) => a.number - b.number;
+  return { runsVisible: true, open: open.sort(byNumber), closed: closed.sort(byNumber) };
+}
+
+/**
  * The four numbers, assembled from data the caller fetched. Pure, so the whole report has a test.
  *
  * `polls` is not among them and is not a zero: the cockpit counts a poll in memory and commits it
@@ -471,6 +523,7 @@ export function flowReport({
   runs,
   automations,
   issues,
+  prs,
   prLinks,
   prOpenedAt,
   runsVisible = true,
@@ -486,10 +539,11 @@ export function flowReport({
   // to read as "the cockpit has never fired it". That is a count aimed at something that exists.
   if (!runsVisible)
     notMeasured.push(
-      "automation launches and gate retries - no .ai/cezar/runs.json on this host, so no run is visible to count",
+      "automation launches, gate retries and stale claims - no .ai/cezar/runs.json on this host, so no run is visible to count",
     );
   return {
     runsVisible,
+    claims: staleClaims(prs, runs, { runsVisible }),
     launches: runsVisible ? automationLaunches(runs, automations) : [],
     intake: spanSummary(intakeSpans(issues)),
     firstPr: spanSummary(firstPrSpans(issues, prLinks, prOpenedAt)),
@@ -561,6 +615,22 @@ function printFlow(report) {
     );
   }
 
+  console.log("\n## Stale in-progress claims");
+  if (!report.claims.runsVisible) {
+    console.log(unmeasured);
+  } else if (!report.claims.open.length && !report.claims.closed.length) {
+    console.log("    none - every in-progress label has a live run behind it");
+  } else {
+    for (const claim of report.claims.open)
+      console.log(`    BLOCKING  #${claim.number}  ${claim.labels.join(", ")}`);
+    for (const claim of report.claims.closed)
+      console.log(`    residue   #${claim.number}  ${claim.labels.join(", ")}`);
+    console.log(
+      `    ${report.claims.open.length} open, ${report.claims.closed.length} already closed` +
+        " - only the open ones stop work (SDLC.md: the merge tooling skips them)",
+    );
+  }
+
   console.log("\n## Not measured here");
   for (const gap of report.notMeasured) console.log(`    - ${gap}`);
   console.log(
@@ -611,13 +681,14 @@ function fetchIssueTimelines(pages = 4) {
 function mainFlow(asJson) {
   const prs = gh([
     "pr", "list", "--state", "all", "--limit", "300",
-    "--json", "number,title,body,headRefName,createdAt",
+    "--json", "number,title,body,headRefName,createdAt,state,labels",
   ]);
   const runsVisible = existsSync(RUNS);
   const report = flowReport({
     runs: runsVisible ? JSON.parse(readFileSync(RUNS, "utf8")) : [],
     automations: JSON.parse(readFileSync(AUTOMATIONS, "utf8")),
     issues: fetchIssueTimelines(),
+    prs,
     prLinks: linkOpenPrs(prs),
     prOpenedAt: new Map(prs.map((pr) => [pr.number, pr.createdAt])),
     runsVisible,

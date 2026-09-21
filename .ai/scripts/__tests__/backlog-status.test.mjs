@@ -28,6 +28,7 @@ import {
   parseArgs,
   sample,
   spanSummary,
+  staleClaims,
   readTriggers,
   sortIssues,
 } from "../backlog-status.mjs";
@@ -533,6 +534,7 @@ describe("flowReport", () => {
       runs: [],
       automations: AUTOMATION_DEFS,
       issues: [],
+      prs: [],
       prLinks: new Map(),
       prOpenedAt: new Map(),
     });
@@ -547,6 +549,7 @@ describe("flowReport", () => {
       runs: [],
       automations: AUTOMATION_DEFS,
       issues: [],
+      prs: [],
       prLinks: new Map(),
       prOpenedAt: new Map(),
     });
@@ -559,6 +562,7 @@ describe("flowReport", () => {
       runs: [{ steps: [{ id: "gate", iterations: 2 }] }, { steps: [{ id: "gate", iterations: 1 }] }],
       automations: AUTOMATION_DEFS,
       issues: [],
+      prs: [],
       prLinks: new Map(),
       prOpenedAt: new Map(),
     });
@@ -576,6 +580,7 @@ describe("flowReport without a visible runs.json", () => {
       runs: [],
       automations: AUTOMATION_DEFS,
       issues: [],
+      prs: [],
       prLinks: new Map(),
       prOpenedAt: new Map(),
       runsVisible: false,
@@ -588,7 +593,8 @@ describe("flowReport without a visible runs.json", () => {
 
   it("names launches and gate retries as unmeasured, by reason", () => {
     const gaps = report().notMeasured.join(" ");
-    expect(gaps).toMatch(/automation launches and gate retries/);
+    expect(gaps).toMatch(/automation launches/);
+    expect(gaps).toMatch(/gate retries/);
     expect(gaps).toMatch(/runs\.json/);
   });
 
@@ -603,6 +609,7 @@ describe("flowReport without a visible runs.json", () => {
       issues: [
         labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T00:00:02Z", "needs-triage"]]),
       ],
+      prs: [],
       prLinks: new Map(),
       prOpenedAt: new Map(),
       runsVisible: false,
@@ -616,11 +623,117 @@ describe("flowReport without a visible runs.json", () => {
       runs: [{ workflow: "issue-groom", automation: {}, startedAt: "2026-09-20T10:00:00Z" }],
       automations: AUTOMATION_DEFS,
       issues: [],
+      prs: [],
       prLinks: new Map(),
       prOpenedAt: new Map(),
     });
     expect(visible.runsVisible).toBe(true);
     expect(visible.launches.find((row) => row.workflow === "issue-groom").launches).toBe(1);
     expect(visible.notMeasured.join(" ")).not.toMatch(/automation launches/);
+  });
+});
+
+describe("staleClaims", () => {
+  const pr = (number, state, labels, extra = {}) => ({
+    number,
+    state,
+    labels: labels.map((name) => ({ name })),
+    title: "",
+    body: "",
+    headRefName: "",
+    ...extra,
+  });
+
+  it("reports an in-progress pull request no live run accounts for", () => {
+    const claims = staleClaims([pr(381, "OPEN", ["merge-queue", "in-progress"])], []);
+    expect(claims.open).toEqual([{ number: 381, labels: ["merge-queue", "in-progress"] }]);
+    expect(claims.closed).toEqual([]);
+  });
+
+  it("separates a blocking open claim from residue on a closed one", () => {
+    const claims = staleClaims(
+      [pr(381, "OPEN", ["in-progress"]), pr(377, "MERGED", ["in-progress"])],
+      [],
+    );
+    expect(claims.open.map((c) => c.number)).toEqual([381]);
+    expect(claims.closed.map((c) => c.number)).toEqual([377]);
+  });
+
+  it("leaves a claim alone while a run holds that pull request", () => {
+    const runs = [{ status: "running", prNumber: 381 }];
+    expect(staleClaims([pr(381, "OPEN", ["in-progress"])], runs).open).toEqual([]);
+  });
+
+  it("leaves a claim alone while a run still holds the issue the PR closes", () => {
+    const runs = [{ status: "queued", issueNumber: 339 }];
+    const open = staleClaims(
+      [pr(340, "OPEN", ["in-progress"], { body: "Closes #339", headRefName: "cez/781957ae" })],
+      runs,
+    ).open;
+    expect(open).toEqual([]);
+  });
+
+  it("leaves a claim alone while a run holds the issue the branch names", () => {
+    const runs = [{ status: "review", issueNumber: 392 }];
+    const open = staleClaims(
+      [pr(400, "OPEN", ["in-progress"], { headRefName: "fix/issue-392-slug" })],
+      runs,
+    ).open;
+    expect(open).toEqual([]);
+  });
+
+  it("counts a finished run as no claim at all", () => {
+    const runs = [{ status: "done", prNumber: 381 }, { status: "failed", prNumber: 381 }];
+    expect(staleClaims([pr(381, "OPEN", ["in-progress"])], runs).open).toHaveLength(1);
+  });
+
+  it("never treats ci-monitoring as a claim: it blocks nobody (SDLC.md)", () => {
+    const claims = staleClaims([pr(381, "OPEN", ["merge-queue", "ci-monitoring"])], []);
+    expect(claims.open).toEqual([]);
+    expect(claims.closed).toEqual([]);
+  });
+
+  it("says it cannot tell with no visible runs, rather than calling every claim dead", () => {
+    const claims = staleClaims([pr(381, "OPEN", ["in-progress"])], [], { runsVisible: false });
+    expect(claims).toEqual({ runsVisible: false, open: [], closed: [] });
+  });
+
+  it("finds nothing when nothing carries the label", () => {
+    expect(staleClaims([pr(1, "OPEN", ["review"])], [])).toEqual({
+      runsVisible: true,
+      open: [],
+      closed: [],
+    });
+  });
+
+  it("finds nothing at all on an empty repository", () => {
+    expect(staleClaims([], [])).toEqual({ runsVisible: true, open: [], closed: [] });
+  });
+
+  it("goes into notMeasured with the launches when the runs file is absent", () => {
+    const report = flowReport({
+      runs: [],
+      automations: AUTOMATION_DEFS,
+      issues: [],
+      prs: [pr(381, "OPEN", ["in-progress"])],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+      runsVisible: false,
+    });
+    expect(report.claims.runsVisible).toBe(false);
+    expect(report.notMeasured.join(" ")).toMatch(/stale claims/);
+  });
+
+  it("carries the claims through flowReport when runs are visible", () => {
+    const report = flowReport({
+      runs: [],
+      automations: AUTOMATION_DEFS,
+      issues: [],
+      prs: [pr(381, "OPEN", ["in-progress"])],
+      prLinks: new Map(),
+      prOpenedAt: new Map(),
+    });
+    expect(report.claims.open.map((c) => c.number)).toEqual([381]);
+    expect(report.notMeasured.join(" ")).not.toMatch(/stale claims/);
   });
 });

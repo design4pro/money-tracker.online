@@ -35,6 +35,53 @@ const automationList = Array.isArray(automations)
     automations.definitions ??
     Object.values(automations).find(Array.isArray))
 
+// Coding agents load `AGENTS.md` from the repository root down to the working directory and stop
+// once the COMBINED size reaches their project-instruction budget. Codex's `project_doc_max_bytes`
+// defaults to 32,768 BYTES - a byte budget, not characters and not tokens - and everything past
+// that offset is dropped from the first-turn prompt with no warning to anyone
+// (https://github.com/openai/codex/issues/13386). So the root file spends the budget its nested
+// files need, and `AGENTS.md`'s own "It stays under 32 KiB" was a sentence nothing measured.
+const INSTRUCTION_BUDGET = 32_768
+// Nested files have to fit somewhere. Without a reserve the root could legally eat the whole
+// budget, and every byte of `.ai/specs/AGENTS.md` would be the one that falls off the end.
+const NESTED_RESERVE = 1_536
+const ROOT_LIMIT = INSTRUCTION_BUDGET - NESTED_RESERVE
+
+// Generated trees, the cockpit's per-run worktrees and the scratch directories all carry copies of
+// these files. None of them is what an agent loads, and walking them dominates the runtime.
+const BUDGET_SKIP =
+  /^(node_modules|dist|\.git|\.wrangler|\.output)$|^\.ai\/(tmp|cezar|qa)$/
+
+const agentsFiles = (dir = '') => {
+  const found = []
+  for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+    const rel = dir ? `${dir}/${entry.name}` : entry.name
+    if (BUDGET_SKIP.test(rel)) continue
+    if (entry.isDirectory()) found.push(...agentsFiles(rel))
+    else if (entry.isFile() && entry.name === 'AGENTS.md') found.push(rel)
+  }
+  return found
+}
+
+// Bytes, never `String.length`. These files are full of em dashes, arrows and emoji, each of which
+// is one character and three bytes - a character count reports a file as comfortably inside a
+// budget it has already overrun.
+const bytes = (path) => Buffer.byteLength(read(path), 'utf8')
+
+/** Root-first, the way an agent loads them: every AGENTS.md on the path down to `file`. */
+const chainFor = (file) => {
+  const segments = file.split('/').slice(0, -1)
+  const chain = []
+  for (let depth = 0; depth <= segments.length; depth++) {
+    const candidate = [...segments.slice(0, depth), 'AGENTS.md'].join('/')
+    if (existsSync(join(ROOT, candidate))) chain.push(candidate)
+  }
+  return chain
+}
+
+const over = (measured, limit) =>
+  `${measured} bytes, ${measured - limit} over the ${limit}-byte limit`
+
 describe('agent-layer parity', () => {
   it('has workflows to check', () => {
     // A guard on the guard: an empty glob would make every case below vacuously true.
@@ -132,5 +179,38 @@ describe('agent-layer parity', () => {
     for (const dir of ['.ai', 'docs/agents']) walk(dir)
 
     expect(suspect).toEqual([])
+  })
+
+  // AGENTS.md:8 claims "This file is the router. It stays under 32 KiB". Before this case nothing
+  // measured it, and the failure mode is silent: an agent gets the truncated file and never learns
+  // that the rule it is about to break was in the part that fell off.
+  it('keeps the root AGENTS.md inside the instruction budget', () => {
+    const measured = bytes('AGENTS.md')
+    expect(
+      measured,
+      `AGENTS.md is ${over(measured, ROOT_LIMIT)}. Move long-form procedure into a document the ` +
+        'Task Router points at; the root keeps hard rules, boundaries and routing.',
+    ).toBeLessThanOrEqual(ROOT_LIMIT)
+  })
+
+  // The root is not the whole story: an agent started inside .ai/specs loads the root first and
+  // then that directory's file, and the budget is the sum. A root edit is what silently truncates
+  // a nested file, which is why this is measured per chain rather than per file.
+  it('keeps every root-to-nested AGENTS.md chain inside the instruction budget', () => {
+    const files = agentsFiles()
+    // A guard on the guard: an empty walk would make this vacuously true.
+    expect(files).toContain('AGENTS.md')
+
+    const overruns = []
+    for (const file of files) {
+      const chain = chainFor(file)
+      const measured = chain.reduce((sum, part) => sum + bytes(part), 0)
+      if (measured > INSTRUCTION_BUDGET)
+        overruns.push(
+          `${chain.join(' -> ')}: ${over(measured, INSTRUCTION_BUDGET)}`,
+        )
+    }
+
+    expect(overruns).toEqual([])
   })
 })
