@@ -319,6 +319,18 @@ anything from anyone else waits for a maintainer to add a trigger label.
   shared — the `issue-autofix` output counts against it too, because both ladders publish under the
   same `gh` identity.
 - Neither triage nor implementation touches `risk-high` or `security` work.
+- **A change to a governance document needs a person's signature.** `DESIGN.md`,
+  `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record
+  decisions a human owns, so the `governance-gate` check
+  (`.github/workflows/governance-gate.yml`) refuses a PR touching one until somebody applies
+  **`governance-approved`** — this repository's own switch outside the shared taxonomy, alongside
+  `do-not-close`. It is not keyed on who opened the PR: cezar publishes as `design4pro-agent` but
+  an agent driving a maintainer's checkout pushes as that maintainer, so an author test would wave
+  through the commoner case. It refuses nothing outright either, because an unattended run is
+  documented to propose an ADR as `Status: proposed`
+  (`.ai/skills/afk-domain-modeling/SKILL.md`); the label is the record that a person read it.
+  `.github/CODEOWNERS` routes the same paths to a reviewer, and routes only — both rulesets carry
+  `require_code_owner_review: false`.
 - To stop it all, `cez automation pause <id>`, or start the cockpit with `CEZ_AUTOMATIONS=0`.
 
 **The agent layer is this repository's.** `.ai/cezar/workflows/`, `.ai/scripts/`,
