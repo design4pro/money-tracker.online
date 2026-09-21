@@ -16,7 +16,10 @@
  * jobs moved to a pool without that image every `browserType.launch` failed on a missing
  * executable. The required merged report went on passing throughout, because the e2e legs run on a
  * push and not on a pull request (ADR 0020) and a skipped job is a passing required check (#403).
- * An assumption about the machine cannot be tested; a step in the action can.
+ * An assumption about the machine cannot be tested; a step in the action can. What the step must
+ * not assume is root: `--with-deps` is behind a `sudo -n` probe since it turned out to be a dead
+ * path on the unprivileged pool (#411), so the install can appear on more than one line and every
+ * one of them has to name the browser CI opens.
  *
  * Read as text, like the other workflow-shape tests here: the repository pins no YAML parser.
  *
@@ -54,18 +57,21 @@ describe('.github/actions/setup/action.yml', () => {
 
 describe('.github/actions/e2e-env/action.yml', () => {
   it('installs the browsers rather than assuming the runner carries them', () => {
-    const install = read('.github/actions/e2e-env/action.yml').match(
-      /^\s*run: pnpm exec playwright install[^\n]*/m,
-    )
+    const installs = [
+      ...read('.github/actions/e2e-env/action.yml').matchAll(
+        /^\s*(?:run: )?pnpm exec playwright install[^\n]*/gm,
+      ),
+    ].map((m) => m[0].trim())
 
     expect(
-      install,
+      installs,
       'the action launches Playwright without installing it - on a runner whose image does not carry the browsers, the first `browserType.launch` is where anyone finds out (#403)',
-    ).not.toBeNull()
+    ).not.toHaveLength(0)
     // Scoped to what CI actually opens: the `chromium` and `mobile-chromium` projects in
     // ci.yml's matrix, and `chromium.launch()` in .github/a11y/axe-scan.mjs. `webkit` and
-    // `mobile-safari` are declared in playwright.config.ts and never run there.
-    expect(install[0]).toMatch(/\bchromium\b/)
+    // `mobile-safari` are declared in playwright.config.ts and never run there. Every branch,
+    // because a root-less runner takes the one without `--with-deps` (#411).
+    for (const install of installs) expect(install).toMatch(/\bchromium\b/)
   })
 })
 
