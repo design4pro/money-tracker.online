@@ -33,7 +33,7 @@ no request is the whole backlog.
 ## Flow health
 
 `node .ai/scripts/backlog-status.mjs --flow` answers the other question: not where each issue sits,
-but whether the ladder is moving. Four numbers, all from files and commands whose output it reads:
+but whether the ladder is moving. Five numbers, all from files and commands whose output it reads:
 
 | Number                | From                                                           | What a bad value means                                           |
 | --------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |

@@ -524,7 +524,7 @@ export function staleClaims(prs, runs, { runsVisible = true } = {}) {
 }
 
 /**
- * The four numbers, assembled from data the caller fetched. Pure, so the whole report has a test.
+ * The five numbers, assembled from data the caller fetched. Pure, so the whole report has a test.
  *
  * `polls` is not among them and is not a zero: the cockpit counts a poll in memory and commits it
  * nowhere, so the report names the gap instead of implying the pollers are idle.

@@ -209,6 +209,54 @@ describe('agent-layer parity', () => {
     ).toBeLessThanOrEqual(ROOT_LIMIT)
   })
 
+  // `#395` added a fifth row to the Flow health table in `.claude/skills/backlog/SKILL.md` and left
+  // the sentence above it saying "Four numbers". `.ai/review-checklist.md` and `CODE_REVIEW.md:52`
+  // both require a headline total to agree with the table it summarises, and nothing measured it.
+  // The failure is quiet in the worst way: the count is the first thing a reader believes, and a
+  // row nobody counted is a measure nobody looks for.
+  it('keeps the Flow health headline agreeing with the table it summarises', () => {
+    const section = read('.claude/skills/backlog/SKILL.md')
+      .split(/^## /m)
+      .find((part) => part.startsWith('Flow health'))
+    expect(
+      section,
+      'the Flow health section is gone or was renamed',
+    ).toBeDefined()
+
+    const words = {
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+    }
+    const headline = section.match(/\b([A-Za-z]+) numbers\b/)
+    expect(
+      headline,
+      'no "<word> numbers" headline introduces the table',
+    ).not.toBeNull()
+    const claimed = words[headline[1].toLowerCase()]
+    expect(
+      claimed,
+      `"${headline[1]} numbers" is not a number word this case knows`,
+    ).toBeDefined()
+
+    // Data rows only: the header row and the `| --- |` separator are not measures.
+    const rows = section
+      .split('\n')
+      .filter((line) => line.startsWith('| ') && !/^\|\s*-+\s*\|/.test(line))
+      .slice(1)
+
+    expect(
+      rows.length,
+      `the headline says ${headline[1]} (${claimed}) but the table has ${rows.length} rows: ` +
+        rows.map((row) => row.split('|')[1].trim()).join(', '),
+    ).toBe(claimed)
+  })
+
   // The root is not the whole story: an agent started inside .ai/specs loads the root first and
   // then that directory's file, and the budget is the sum. A root edit is what silently truncates
   // a nested file, which is why this is measured per chain rather than per file.
