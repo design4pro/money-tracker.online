@@ -31,9 +31,12 @@ permissions:
 # is deliberately unset: unset, the default here selects GitHub-hosted runners, and
 # deploying is the one thing in this repository that does.
 #
-# Everything else runs on the self-hosted pool, which is four CI slots on one local
-# machine shared with the other repository. Two reasons put shipping on the other side
-# of that line, and both are about the deploy rather than about the budget. A deploy
+# Everything else used to run on the self-hosted pool - four CI slots on one local
+# machine shared with the other repository - and since 2026-09-21 it no longer does
+# either: `RUNNER_CI` is set to `["ubuntu-latest"]` on this repository, so the line
+# this paragraph draws is one only the fallbacks still hold. The two reasons below are
+# kept because they are why shipping crossed first, and they apply again the moment
+# that variable is deleted. Both are about the deploy rather than about the budget. A deploy
 # must not queue behind an agent's twenty-minute browser suite, because the slot it is
 # waiting for is the slot that decides how long production stays on the old bundle.
 # And a deploy has to work when the local machine does not - the note this replaces
@@ -49,6 +52,16 @@ permissions:
 # containers - inside the 3,000, with room left for a failover. On GitHub Free the
 # allowance is 2,000 and this no longer fits; if the organisation is ever downgraded,
 # set `RUNNER_DEPLOY` back to the pool before the next deploy.
+#
+# That headroom is no longer the deploy's alone. Since 2026-09-21 `RUNNER_CI` is set to
+# `["ubuntu-latest"]` on this repository, so its whole gate bills against the same 3,000.
+# Measured the same day: 373 Actions minutes used across the organisation in September,
+# 94 of them this repository, back when only deploys ran hosted. One pull request's two
+# heavy jobs cost 3m51s of pool time, so roughly 9 hosted minutes at the 2.2x above,
+# before `a11y` and `claude-review` and before the browser suites that run on the push to
+# the base branch. The new rate is a projection, not a measurement - read it off the
+# billing page after a full week, and if it does not fit, `gh variable delete RUNNER_CI`
+# is the whole reversal.
 #
 # `RUNNER_DEPLOY` set to `["self-hosted","linux","ARM64","ci"]` puts shipping back on
 # the pool without a pull request, which is the same escape hatch in the other

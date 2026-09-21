@@ -21,11 +21,15 @@ name: CI
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
-#            RUNNER_CI - organisation-level, and deliberately unset. Every job
-#            below runs on the self-hosted pool; setting it to
-#            `["ubuntu-latest"]` moves them all back to GitHub-hosted runners
-#            without a pull request, which is the only recovery path that does
-#            not need the host to be up. See design4pro/cezar,
+#            RUNNER_CI - set to `["ubuntu-latest"]` on this repository since
+#            2026-09-21, so every job below runs on a GitHub-hosted runner.
+#            The label array in each `runs-on` is only the fallback, and it
+#            still names the self-hosted pool: deleting the variable
+#            (`gh variable delete RUNNER_CI`) moves them all back to the pool
+#            without a pull request, and the same lever in the other direction
+#            is what makes recovery possible when the host is down. A
+#            repository variable, so it shadows the organisation one rather
+#            than moving the sibling repositories too. See design4pro/cezar,
 #            `docs/host/README.md`, "The runner pool".
 # ──────────────────────────────────────────────────────────────────────────────
 
