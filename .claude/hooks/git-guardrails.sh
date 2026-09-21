@@ -69,7 +69,23 @@ prose_command='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(
 # read $scan, because a commit message that merely names a dangerous command is not that command.
 # The secret-file rule reads $raw instead: `cat` is on the prose list above, so for `cat ".dev.vars"`
 # the quoted span would be deleted before $scan is built and quoting the path would be the bypass.
-raw=$(unquote "$command")
+#
+# A backslash-newline is a line continuation: the shell joins the two lines into one command. Every
+# rule below is line-based - `grep` reads a line at a time, and the push loop splits on newlines -
+# so a continued command arrived as two fragments, each missing what the other held, and no rule
+# saw a command it recognised. `unquote()` removes the backslash and leaves the newline, which is
+# what made the halves look like two separate commands.
+#
+# It is not only the push rule the review found it in. `rm -rf \` + newline + `/`, and `cat \` +
+# newline + `.dev.vars`, were allowed by the same mechanism: three of this file's rules defeated by
+# a line break a person would write for readability.
+#
+# awk rather than sed, because matching an embedded newline in the pattern space is a GNU extension
+# and BSD sed - the one macOS ships - rejects it. A line that does not end in a backslash keeps its
+# newline, so a real newline still separates two commands, which is what the prose test below and
+# the push loop rely on.
+joined=$(printf '%s' "$command" | awk '{ if (sub(/\\$/, " ")) printf "%s", $0; else print }')
+raw=$(unquote "$joined")
 
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
   scan="$raw"
@@ -77,8 +93,8 @@ else
   scan="$raw"
   # Here-strings, not pipes: `grep -q` closes early, and under `pipefail` that turns a match into
   # a non-zero pipeline - the one failure shape that would silently re-open the stripping.
-  if grep -Eq "$prose_command" <<< "${command%%$'\n'*}"; then
-    text=$(printf '%s' "$command" | awk '
+  if grep -Eq "$prose_command" <<< "${joined%%$'\n'*}"; then
+    text=$(printf '%s' "$joined" | awk '
       skip { if ($0 == tag) skip = 0; next }
       {
         if (match($0, /<<-?["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
@@ -130,8 +146,20 @@ block() {
 #     be followed by a space, a colon or the end of the line, and a `;` is none of those, so
 #     `git push --force origin develop; echo done` matched neither half's right-hand boundary and
 #     went through. Inside a piece, that `develop` sits at the end of the line.
-push_force='git[[:space:]]+push\b[^;&|]*[[:space:]](--force|-f([[:space:]]|$))'
-push_shared='git[[:space:]]+push\b[^;&|]*([[:space:]]|[/+:])(develop|main)([[:space:]]|:|$)'
+#
+# Short flags bundle, and git's own syntax is what a person types: `-fu` and `-uf` both carry `-f`
+# and neither matched a pattern that wanted `-f` standing alone. `f` anywhere in a single-dash run
+# of letters is the force flag - no other short flag of `git push` is spelled `f` - while `--force`
+# stays its own alternative, because `--` is not a letter and must not be read as a bundle.
+#
+# A branch does not have to be named to be reached. `--all` pushes every local branch and `--mirror`
+# every ref, so both arrive at develop and main without spelling either. `--mirror` is in *both*
+# patterns rather than only the second: it deletes remote refs the local side lacks and forces the
+# rest, so it is a forced push to the shared branches on its own, with or without `--force`. That
+# is wider than the thread that prompted this, which named only `--force --all`; it is the same
+# hole and refusing half of it would have been a worse answer than saying so here.
+push_force='git[[:space:]]+push\b[^;&|]*[[:space:]](--force|--mirror([[:space:]]|$)|-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$))'
+push_shared='git[[:space:]]+push\b[^;&|]*(([[:space:]]|[/+:])(develop|main)([[:space:]]|:|$)|[[:space:]](--all|--mirror)([[:space:]]|$))'
 while IFS= read -r push_command; do
   grep -Eq "$push_force" <<< "$push_command" || continue
   grep -Eq "$push_shared" <<< "$push_command" || continue
@@ -360,7 +388,7 @@ glob_reaches_secret() {
 # `reader_operands` drops as "the pattern" - the secret was never looked at. A sentinel holds the
 # slot. It must not begin with `-`, or `reader_operands` reads it as a flag and drops the filename
 # again instead.
-secret_raw=$(printf '%s' "$command" | sed -e 's/""/EMPTY_PATTERN/g' -e "s/''/EMPTY_PATTERN/g")
+secret_raw=$(printf '%s' "$joined" | sed -e 's/""/EMPTY_PATTERN/g' -e "s/''/EMPTY_PATTERN/g")
 secret_raw=$(unquote "$secret_raw")
 
 # `< .dev.vars cat` is valid and ordinary, and spacing the operator out is not enough on its own:

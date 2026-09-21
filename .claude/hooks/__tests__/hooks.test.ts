@@ -82,6 +82,21 @@ describe('git-guardrails.sh', () => {
     // through. Inside one simple command the branch sits at the end of the line.
     'git push --force origin develop; echo done',
     'git push -f origin main && echo ok',
+    // A backslash-newline is a line continuation, so this is one command written over two lines.
+    // Every rule here is line-based, and each half on its own matches nothing.
+    'git push --force \\\norigin develop',
+    'git push \\\n--force origin main',
+    'git push --force-with-lease \\\norigin develop',
+    // Short flags bundle: `-fu` is `-f -u`, and a pattern anchored on a lone `f` read past it.
+    'git push -fu origin develop',
+    'git push -uf origin develop',
+    'git push -fu origin main',
+    // `--all` and `--mirror` name no branch, and both include develop and main. `--mirror` also
+    // forces on its own and deletes remote refs the local side lacks, so it needs no `--force`.
+    'git push --force --all origin',
+    'git push --force --mirror origin',
+    'git push --mirror --force origin',
+    'git push --mirror origin',
   ])('blocks the force-push %s', (command) => {
     const r = bash(command)
     expect(r.status).toBe(2)
@@ -95,6 +110,16 @@ describe('git-guardrails.sh', () => {
     // ordinary. Searching both patterns over the whole line read them as a single forced push.
     'git push -f origin fix/issue-12-x && git push origin develop',
     'git push origin develop; git push --force origin fix/issue-9-y',
+    'git push -fu origin fix/issue-12-x',
+    // Two real newlines are two commands, not a continuation: neither one is a forced push to a
+    // shared branch, and the join must not run them together into something that looks like one.
+    'git push -f origin fix/issue-12-x\ngit push origin develop',
+    // Flags that neither force nor reach every branch: `-u` sets upstream, `-q` is quiet, and
+    // `--all`/`--tags` without `--force` cannot rewrite what somebody else has pulled.
+    'git push -u origin fix/issue-12-x',
+    'git push -q origin fix/issue-12-x',
+    'git push --all origin',
+    'git push --tags origin',
   ])('leaves the force-push to a feature branch %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
@@ -130,6 +155,9 @@ describe('git-guardrails.sh', () => {
     'rm -rf ./..',
     'rm -rf ../..',
     'rm -rf dist ./.git',
+    // The same line continuation that defeated the push rule reaches this one too.
+    'rm -rf \\\n/',
+    'rm -rf \\\n.git',
   ])('blocks the recursive delete %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -151,6 +179,10 @@ describe('git-guardrails.sh', () => {
     '/bin/rm -rf node_modules',
     'rm -rf ./node_modules',
     'rm -rf ./build ./dist',
+    'rm -rf \\\nnode_modules',
+    // Two commands on two lines, each an ordinary cleanup: the continuation join must leave a
+    // real newline alone, or the second operand would be read as the first command's.
+    'rm -rf dist\nrm -rf build',
   ])('leaves the ordinary cleanup %s alone', (command) => {
     expect(bash(command).status).toBe(0)
   })
@@ -301,6 +333,10 @@ describe('git-guardrails.sh', () => {
     // is anchored on.
     '< .dev.vars cat',
     '<.dev.vars cat',
+    // The reader and the file on two lines joined by a backslash: the same continuation defect,
+    // against the rule that keeps a secret out of the transcript.
+    'cat \\\n.dev.vars',
+    'head -1 \\\n.env.local',
     '< .env.local head -2',
   ])('blocks the secret read %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
