@@ -1,5 +1,5 @@
 /**
- * Two runner invariants #318 introduced, which until now lived only in comments.
+ * Three runner invariants that until now lived only in comments - two from #318, one from #403.
  *
  * `setup-node`'s `cache: pnpm` restores a ~330 MB tarball. On the self-hosted pool that restore
  * cost more than the rest of the toolchain step combined, and the pool keeps a persistent store of
@@ -11,12 +11,20 @@
  * without a pull request. Hard-code a runner, or lose the hosted default, and the lever or the
  * default disappears silently - the next deploy is the first place anyone notices.
  *
+ * The browser suites install their own browsers. Both of them - the e2e gate and the axe gate -
+ * used to inherit them from a runner image built FROM `mcr.microsoft.com/playwright`, and when the
+ * jobs moved to a pool without that image every `browserType.launch` failed on a missing
+ * executable while the required check stayed green on any pull request the path filters let skip
+ * the suite (#403). An assumption about the machine cannot be tested; a step in the action can.
+ *
  * Read as text, like the other workflow-shape tests here: the repository pins no YAML parser.
  *
  * @see .github/actions/setup/action.yml
+ * @see .github/actions/e2e-env/action.yml
  * @see .github/workflows/deploy-staging.yml
  * @see .github/workflows/deploy-production.yml
  * @see https://github.com/design4pro/money-tracker.online/pull/318
+ * @see https://github.com/design4pro/money-tracker.online/issues/403
  */
 
 import { readFileSync } from 'node:fs'
@@ -40,6 +48,23 @@ describe('.github/actions/setup/action.yml', () => {
       'setup-node no longer sets `cache` - this test can no longer see it',
     ).not.toBeNull()
     expect(cache[0]).toMatch(/runner\.environment == 'github-hosted' && 'pnpm'/)
+  })
+})
+
+describe('.github/actions/e2e-env/action.yml', () => {
+  it('installs the browsers rather than assuming the runner carries them', () => {
+    const install = read('.github/actions/e2e-env/action.yml').match(
+      /^\s*run: pnpm exec playwright install[^\n]*/m,
+    )
+
+    expect(
+      install,
+      'the action launches Playwright without installing it - on a runner whose image does not carry the browsers, the first `browserType.launch` is where anyone finds out (#403)',
+    ).not.toBeNull()
+    // Scoped to what CI actually opens: the `chromium` and `mobile-chromium` projects in
+    // ci.yml's matrix, and `chromium.launch()` in .github/a11y/axe-scan.mjs. `webkit` and
+    // `mobile-safari` are declared in playwright.config.ts and never run there.
+    expect(install[0]).toMatch(/\bchromium\b/)
   })
 })
 

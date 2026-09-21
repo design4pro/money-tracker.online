@@ -9,10 +9,13 @@ description: >
   accessibility gate in a11y.yml - and a drift between them would show up as a
   suite that only fails in one of the two. So it lives here once.
 
-  Assumes a runner that already carries the browsers. That used to mean a job
-  running in `mcr.microsoft.com/playwright:v<version>-noble`; it now means the
-  self-hosted pool, whose image is built FROM exactly that. Installing them per
-  run costs a couple of minutes and pins nothing extra.
+  Installs the browsers rather than assuming them. The assumption held while
+  these jobs ran in `mcr.microsoft.com/playwright:v<version>-noble`, and then
+  while they ran on a self-hosted pool whose image was built FROM exactly that.
+  It stopped holding when they moved to a pool that carries no browsers, and
+  because the browser jobs are path-filtered the gate stayed green on everything
+  that skipped them while every run that did not skip them failed at the first
+  page load (#403). A step is testable; an assumption about the machine is not.
 
   There is no R2 fetch and no asset cache here. This product has no basemap and
   no large binary fixture: the seed is pure SQL through the Worker, so the whole
@@ -39,6 +42,24 @@ runs:
   steps:
     - name: Set up the toolchain
       uses: ./.github/actions/setup
+
+    # First, so a runner without browsers says so in seconds rather than after a build and a
+    # seed. `pnpm exec` takes the version from the `@playwright/test` devDependency the lockfile
+    # already fixes, which retires the image-to-package coupling this action used to carry rather
+    # than moving it somewhere new. `chromium` alone is what CI opens: ci.yml's matrix runs the
+    # `chromium` and `mobile-chromium` projects and .github/a11y/axe-scan.mjs calls
+    # `chromium.launch()`; the `webkit` and `mobile-safari` projects in playwright.config.ts run
+    # locally and are not this gate's to download.
+    #
+    # Not cached, deliberately. The runners are ephemeral, so this downloads once per job - two
+    # e2e legs plus the axe gate - and a cache keyed on the Playwright version trades that for a
+    # restore whose speed on this pool nobody has measured. The one measurement this repository
+    # does have went the other way: ../setup/action.yml carries a `cache: pnpm` restore that cost
+    # 198 s of a 134 s-average step on the pool it was meant to speed up. Measure this install
+    # before adding a key to it.
+    - name: Install the browsers
+      shell: bash
+      run: pnpm exec playwright install --with-deps chromium
 
     - name: Generate route tree
       shell: bash
