@@ -141,7 +141,7 @@ Intake labels go on issues only, one at a time, and say who acts on the issue ne
 
 - **Transitions:** an issue labeled `needs-triage` moves to exactly one of `needs-info`, `ready-for-agent` or `ready-for-human`. When the reporter answers a `needs-info` issue, a human moves it back to `needs-triage`, and triage runs again. Re-triaging a decided issue means removing `ready-for-agent` or `ready-for-human` first, then adding `needs-triage`.
 - **Grooming comes first.** `om-auto-manage-issues` owns `issue.opened` and adds the SDLC labels and the Definition of Ready check. `afk-triage` answers the `needs-triage` label instead, so the two never groom one issue at the same time.
-- **Grooming does not yet hand the issue on, and that is the open gap in this process.** A finished groom records `READY_STATUS` and stops; grooming applies no `needs-triage`, so an issue that arrives through the issue form waits for a human to add an intake or trigger label before anything else happens. The only skill that sets the label is `afk-architecture-review`, on the `Strong` candidates it raises itself — it never reaches a groomed issue, so it does not close this gap. The intended edge — a groom that ends `READY_STATUS=ready` applies `needs-triage` as its last mutation — is designed but not wired; it is specified in the cezar repository's `.ai/specs/2026-09-17-afk-intake-bridge.md`, and until it lands, read every "the pipeline picks it up" below as "a human picks it up".
+- **Grooming hands the issue on only where the repository wires it.** A finished groom records `READY_STATUS`; the installed `om-auto-manage-issues` applies no intake label, so on its own it stops there. The edge that closes the gap — a groom ending `READY_STATUS=ready` applies `needs-triage`, and nothing else, as its last mutation — lives in the repo-local override, and `## This repository` says whether it is wired here. Where it is not, an issue that arrives through the issue form waits for a human to add an intake or trigger label, and every "the pipeline picks it up" below reads as "a human picks it up". Either way grooming never applies `ready-for-agent` itself: it does not check that the issue is real, still unfixed on the base branch, or already covered by an open PR, and those three checks are what keep `risk-high` and `security` work out of the unattended lane. `afk-architecture-review` also sets `needs-triage`, on the `Strong` candidates it raises itself.
 - **Limits on skills:** automated skills never add `ready-for-agent` to `risk-high` or `security` work, and never close an issue. Consuming `needs-triage` is exactly what `afk-triage` is for, so that one label it may remove; `ready-for-agent` and `ready-for-human` are terminal, and a skill never removes either once a human set it.
 - **Human override:** a human may move any issue to any intake label at any time.
 
@@ -262,6 +262,14 @@ Three amendment rules are specific to this document's shape:
   here, and no skill adds one to its own input. Alongside them the intake ladder runs:
   `needs-triage` starts triage, and `ready-for-agent` starts `implement-ticket` (ADR 0017, as
   amended). A person can also hand an issue to the agent directly from the cockpit.
+- **The intake bridge is wired here.** `.ai/skills/om-auto-manage-issues/SKILL.md` applies
+  `needs-triage` when a groom ends `READY_STATUS=ready` on an issue that carries no intake label
+  yet, so the ladder runs from a filed issue to an open PR with nobody in it: groom -> triage ->
+  `implement-ticket`. It is event-driven only — an issue already carrying an intake label is left
+  alone, and no run sweeps the existing backlog. The implementing automation additionally filters
+  on `allLabels: ["risk-low"]`, so a `risk-medium` issue still earns a full Agent Brief and
+  `ready-for-agent` and then waits for a person to start it. The ladder ends at an open, reviewed
+  PR: nothing merges, and no automation applies `qa-approved`.
 - **Risk here.** `risk-high` means anything touching auth, tenant scoping, money, the ledger,
   billing or a migration. `docs/MONEY.md` is not background reading: representation, rounding and
   currency have rules a plausible-looking change breaks silently, so read it before touching any
