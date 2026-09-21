@@ -196,7 +196,9 @@ cannot arm a second run against itself in any case. Cezar 0.10.1 has no automati
 review, and its poller drops label events on pull requests outright (patch 4 in
 `.ai/scripts/cezar-host-patch.sh` exists for that reason). So the producer of the signal has to sit
 outside both, and a GitHub Action is the only place left. (Both halves of that parenthesis have
-since expired; see the 2026-09-20 amendment at the end.)
+since expired; see the 2026-09-20 amendment at the end.) The list of logins in the first sentence
+has since grown as well - Codex joined it under both of its login forms - while the restriction it
+describes stayed exactly as deliberate; see the 2026-09-21 amendment.
 
 What this costs, stated plainly, is the thing decision 6 was avoiding: two review passes on a pull
 request, one from `om-auto-review-pr` inside the cezar run and one from the Action. That is the
@@ -306,8 +308,9 @@ with `om-apply-upgrade-notes`.
 
 The 2026-09-08 amendment above ("decision 6 is superseded") argues from three facts that have all
 expired. The decision it reached still stands — the Action is still what arms `review-threads`, and
-`scripts/ci/review-threads-label.mjs` still restricts arming to `claude`, `claude[bot]` and
-`github-actions[bot]` — but the reasoning should not be re-derived from what it says.
+`scripts/ci/review-threads-label.mjs` still restricts arming to review bots rather than people -
+`claude`, `claude[bot]` and `github-actions[bot]` as of this date, Codex's two logins since (see the
+2026-09-21 amendment) — but the reasoning should not be re-derived from what it says.
 
 - **`.ai/scripts/cezar-host-patch.sh` is deleted.** ADR 0021 retired `design4pro/agent-kit` and
   vendored the host layer in place; the patch set went with it. A reader sent to that file finds
@@ -325,3 +328,34 @@ What does **not** follow from the second point: that the Action should be replac
 automation. The Action is also the only producer that sees a review event at all, and it is the one
 place the arming decision can read the thread author before the label exists. The workaround became
 unnecessary; the reason underneath it did not.
+
+## Amendment, 2026-09-21: the arming allowlist names Codex, and a bot needs one entry per login form
+
+Two sentences above date from when `DEFAULT_REVIEW_BOTS` in `scripts/ci/review-threads-label.mjs`
+held exactly `claude`, `claude[bot]` and `github-actions[bot]`: the one in the 2026-09-08 amendment
+that introduces the restriction, and the one in the 2026-09-20 amendment that restates it. The list now also carries
+`chatgpt-codex-connector` and `chatgpt-codex-connector[bot]` (#405, #406). Read both sentences as
+the record of their dates; this is the current membership.
+
+**The criterion, which is what a reader assessing the safety model actually needs.** A login belongs
+on the list when the account posts review threads this pipeline is expected to answer - a review
+bot, not a person. That is the same boundary the 2026-09-08 amendment drew and gave its reason for:
+a human's review thread is a conversation, and starting an autofix run on one is how a disagreement
+gets bulldozed. Adding Codex does not move the boundary; it corrects the list's membership against
+it. Codex reviews every pull request here and its threads were being read as a person's, so the
+`review-threads` label never armed and the findings went out with the squash - silently, because a
+login that is absent produces no log line and no failure.
+
+**Two entries per bot, because the two GitHub APIs disagree.** GraphQL's `Bot.login` returns a
+GitHub App's slug without the `[bot]` suffix that REST carries, and `decide` is called with
+whichever form the caller read. A bot entered under one form only is half-registered: it arms
+through the caller that reads REST and not through the one that reads GraphQL. The unit test pins
+every login each bot posts under, so that half-registration now fails there rather than in CI.
+
+`chatgpt-codex-connector[bot]` was read from the API - the REST review comments on #402 list
+exactly two authors, `claude[bot]` and `chatgpt-codex-connector[bot]`, both of type `Bot`. The
+suffix-free form was **not** re-measured: GraphQL answered `RATE_LIMIT` for that account on the run
+that added it, and GraphQL is the read this script actually performs. It is carried on the same
+basis as the `claude` / `claude[bot]` pair already in the list, which is reasoning about the API
+rather than a reading of it. An entry that never turns up costs nothing, so carrying both is the
+safe side of the uncertainty either way.
