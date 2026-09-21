@@ -1,11 +1,11 @@
 # Reduced motion: the `[data-motion-transform]` reset and the proof it works
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #214  |
-| **Spec PR**        | #251  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #214        |
+| **Spec PR**        | #251        |
+| **Implementation** | #254        |
 
 ## 📝 TLDR
 

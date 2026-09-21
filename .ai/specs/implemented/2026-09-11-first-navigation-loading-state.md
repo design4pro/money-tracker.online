@@ -2,7 +2,7 @@
 
 | Field              | Value       |
 | ------------------ | ----------- |
-| **Status**         | in-progress |
+| **Status**         | implemented |
 | **Issue**          | #230        |
 | **Spec PR**        | #232        |
 | **Implementation** | #338        |

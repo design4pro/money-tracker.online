@@ -2,7 +2,7 @@
 
 What every route module in this product declares for the three states a reader meets when a screen
 has nothing in it, is fetching, or failed. Written for issue #21, from the design in
-`.ai/specs/2026-09-09-designed-empty-loading-error-states.md`.
+`.ai/specs/implemented/2026-09-09-designed-empty-loading-error-states.md`.
 
 `docs/agents/reference.md` names **state completeness** as one of the six things a comparison round
 judges. The round of 2026-09-03 (`docs/rounds/2026-09-03-blind-comparison.md` §5) recorded "no

@@ -1,0 +1,91 @@
+name: Governance gate
+
+# Asks for a person's signature on a change to a document that records a decision: the
+# accessibility claim, the money arithmetic, the component guidelines, the protected-surface
+# registry, the decision records. `BACKWARD_COMPATIBILITY.md` and `AGENTS.md` already state those
+# rules, but they state them to a reader - and since the intake ladder runs from a filed issue to
+# an open pull request with nobody in it, a rule addressed to a reader is not a mechanism.
+#
+# It refuses nothing outright. `scripts/ci/governance-gate.mjs` explains why that matters: an
+# unattended run is documented to write an ADR as `Status: proposed`, so the gate's job is to make
+# the acceptance explicit, not to forbid the change.
+#
+# Same trigger set as `merge-gate.yml`, for the same reason: `labeled` and `unlabeled` are what
+# make this a gate rather than a snapshot taken when the pull request opened. Applying
+# `governance-approved` has to turn the check green without a push, and removing it has to turn it
+# red again.
+#
+# `merge_group` is here so the check reports where a merge queue requires it. A queue builds its
+# own commit and waits for every required check on it; a workflow with no trigger for that event
+# never reports one, so the entry waits out `check_response_timeout_minutes` and is dropped.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
+    branches: [develop, main]
+  merge_group:
+    types: [checks_requested]
+
+# The labels arrive in the event payload; the file list does not, and is the one thing this needs a
+# token for. The job below takes back exactly that scope and nothing more - it never writes.
+permissions: {}
+
+# A label flip fires this while the previous run is still starting, and without cancellation the
+# older of the two can report last, leaving a green check on a pull request whose receipt somebody
+# just removed. A merge group carries no pull request number, so `run_id` keeps those runs from
+# cancelling each other - a cancelled required check is how a queue learns to drop an entry.
+concurrency:
+  group: governance-gate-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # The job id and the job name are both `governance-gate` because that string is the check context
+  # a ruleset's `required_status_checks` names. Renaming either un-requires the check silently: a
+  # ruleset entry matching no check is not an error, it is simply never waited for.
+  governance-gate:
+    name: governance-gate
+    # Only a pull request has labels and a file list to read. In a merge group this skips, and a
+    # skipped job is a passing required check - the gate already had its say when the pull request
+    # was enqueued.
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # The base branch, never the pull request's own tree. This job decides whether a change to
+      # the governance documents may merge, so the branch proposing that change must not be what
+      # supplies the script, the path list or the label name that decides - otherwise the first
+      # thing an unattended run learns is that it can widen its own permission in the same commit.
+      # `sparse-checkout` keeps it to the one directory the step runs from.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 1
+          sparse-checkout: scripts/ci
+
+      - name: Ask for a person's signature on a governance change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          # Through the environment, never interpolated into the shell: a branch name is attacker-
+          # controlled text on a fork, and `run:` splices it in before bash ever sees a quote.
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # The deciding script comes from the base branch, so the pull request that *introduces*
+          # this check finds none there and has nothing to enforce. The window closes once and
+          # cannot reopen: a merge into the base branch is the only thing that puts the script
+          # there, and a pull request removing it is itself gated by the copy still on the base.
+          # Measured rather than predicted - the merge gate's first adoption failed exactly here.
+          if [ ! -f scripts/ci/governance-gate.mjs ]; then
+            echo "scripts/ci/governance-gate.mjs is not on $BASE_REF yet - nothing to enforce until it lands there"
+            exit 0
+          fi
+
+          # `--paginate` emits one jq result per page, so a newline-separated list is the only
+          # shape that survives concatenation. A path cannot contain a newline in git.
+          FILES="$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files" -q '.[].filename')"
+          export FILES
+
+          node scripts/ci/governance-gate.mjs

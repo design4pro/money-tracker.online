@@ -1,3 +1,16 @@
+# Weekly, on a schedule (docs/agents/cezar-automations.json). afk-lessons turns mistakes repeated
+# across recent PRs into enforced rules and lands them on at most one PR. Unlike the other three
+# afk-* workflows this one writes: it runs `om-pipeline-retro` for the ranked causes and opens
+# its PR through `om-open-pr`, so the grant carries Edit, Write and Skill. A lesson that adds a
+# test passes the full validation gate before the PR opens.
 name: lessons
 description: Turn mistakes repeated across recent PRs into enforced rules, at most one PR (afk-lessons).
-skills: [afk-lessons]
+steps:
+  - id: bootstrap
+    name: Install dependencies and generate the route tree
+    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+  - id: afk-lessons
+    name: afk-lessons
+    prompt: '/afk-lessons {{task}}'
+    model: opus
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
