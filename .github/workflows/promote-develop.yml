@@ -57,17 +57,18 @@ permissions:
   contents: read
   pull-requests: write
 
-# `runs-on` below reads through `vars.RUNNER_CI`, which on this repository is set to
-# `["blacksmith-2vcpu-ubuntu-2404-arm"]` (2026-09-21), so this job runs on a Blacksmith
-# machine - an ARM64 runner that registers as self-hosted and spends no Actions minutes.
-# The label array below is only the fallback and still names the local pool:
-# deleting the variable moves every job here back to the pool without a pull request,
-# and setting it at the organisation level would move every repository at once.
+# `runs-on` below reads through `vars.RUNNER_CI`, which on this repository is unset again
+# since 2026-09-21, so this job runs on the local pool the fallback array names - and so
+# does everything else here, shipping included. Setting the variable
+# (`gh variable set RUNNER_CI '["ubuntu-latest"]'`) moves every job that reads it off the
+# pool without a pull request, and setting it at the organisation level would move every
+# repository at once.
 #
 # In a test workflow that is a convenience. Here it is the recovery path for shipping:
-# production deploys on a GitHub-hosted machine, not the local pool, and the switch has to
-# work when the local host does not. That is why it is a variable at all and not a literal
-# label array - reverting by pull request would need the merge gate, which needs the same
+# production now deploys on the same pool, through `vars.RUNNER_DEPLOY`
+# (deploy-production.yml), so a host outage leaves no leg of a release standing and the
+# switch has to work without one. That is why these are variables at all and not literal
+# label arrays - reverting by pull request would need the merge gate, which needs the same
 # runners that are missing. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
 
 jobs:
