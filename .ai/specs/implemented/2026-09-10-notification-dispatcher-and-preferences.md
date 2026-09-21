@@ -1,11 +1,11 @@
 # The notification dispatcher, the store and per-user preferences
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #219  |
-| **Spec PR**        | #220  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | implemented |
+| **Issue**          | #219        |
+| **Spec PR**        | #220        |
+| **Implementation** | #224        |
 
 ## 📝 TLDR
 

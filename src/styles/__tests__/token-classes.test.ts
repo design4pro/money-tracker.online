@@ -162,7 +162,7 @@ const INLINE_SAFE_AREA =
  * which is a different finding from the one this case exists for: not "a token
  * that should be a class is not", but "a token that is documentation". Deciding
  * per token whether to surface or delete it is a product call and its own issue
- * (spec `.ai/specs/2026-09-10-token-utility-reachability.md`, Q3/Q4).
+ * (spec `.ai/specs/implemented/2026-09-10-token-utility-reachability.md`, Q3/Q4).
  */
 const UNREACHABLE_BY_DESIGN: Record<string, string> = {
   // The spacing ladder documents the scale; it does not implement it. Every
