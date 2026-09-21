@@ -21,13 +21,17 @@ name: CI
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
-#            RUNNER_CI - set to `["ubuntu-latest"]` on this repository since
-#            2026-09-21, so every job below runs on a GitHub-hosted runner.
-#            The label array in each `runs-on` is only the fallback, and it
-#            still names the self-hosted pool: deleting the variable
-#            (`gh variable delete RUNNER_CI`) moves them all back to the pool
-#            without a pull request, and the same lever in the other direction
-#            is what makes recovery possible when the host is down. A
+#            RUNNER_CI - set to `["blacksmith-2vcpu-ubuntu-2404-arm"]` on this
+#            repository since 2026-09-21, so every job below runs on a
+#            Blacksmith machine: still ARM64 Ubuntu, still a self-hosted runner
+#            as far as GitHub is concerned (it answers on the organisation's
+#            runners endpoint, ephemeral, one per job), and so it spends no
+#            Actions minutes. Note the label carries no `self-hosted` - the
+#            fallback array's first element would never match one. That array
+#            is only the fallback, and it still names the local pool: deleting
+#            the variable (`gh variable delete RUNNER_CI`) moves every job back
+#            there without a pull request, and the same lever in the other
+#            direction is what makes recovery possible when the host is down. A
 #            repository variable, so it shadows the organisation one rather
 #            than moving the sibling repositories too. See design4pro/cezar,
 #            `docs/host/README.md`, "The runner pool".

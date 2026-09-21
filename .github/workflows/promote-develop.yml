@@ -58,8 +58,9 @@ permissions:
   pull-requests: write
 
 # `runs-on` below reads through `vars.RUNNER_CI`, which on this repository is set to
-# `["ubuntu-latest"]` (2026-09-21), so this job runs on a GitHub-hosted runner. The
-# label array below is only the fallback and still names the self-hosted pool:
+# `["blacksmith-2vcpu-ubuntu-2404-arm"]` (2026-09-21), so this job runs on a Blacksmith
+# machine - an ARM64 runner that registers as self-hosted and spends no Actions minutes.
+# The label array below is only the fallback and still names the local pool:
 # deleting the variable moves every job here back to the pool without a pull request,
 # and setting it at the organisation level would move every repository at once.
 #

@@ -35,11 +35,15 @@ jobs:
       contains(github.event.review.body, '@claude') ||
       contains(github.event.issue.body, '@claude') ||
       contains(github.event.issue.title, '@claude')
-    # The agent pool: a container that takes this one job and is then destroyed, mounting
-    # none of the caches the ci pool carries. This job holds `contents: write` for forty
-    # turns, so nothing it leaves behind should be able to reach the next job. Setting the
-    # `RUNNER_AGENT` organisation variable to `["ubuntu-latest"]` moves it back to
-    # GitHub-hosted runners without a pull request.
+    # A machine that takes this one job and is then destroyed, mounting none of the
+    # caches the ci pool carries. This job holds `contents: write` for forty turns, so
+    # nothing it leaves behind should be able to reach the next job. Since 2026-09-21 the
+    # `RUNNER_AGENT` repository variable is `["blacksmith-2vcpu-ubuntu-2404-arm"]`, so
+    # that machine is Blacksmith's rather than this organisation's: still one job per
+    # runner and still destroyed after, but the isolation is now a third party's promise
+    # instead of a local container's. The deploy jobs were deliberately left hosted for
+    # the same reason - see `deploy-production.yml`. `gh variable delete RUNNER_AGENT`
+    # moves this job back to the local agent pool without a pull request.
     runs-on: ${{ fromJSON(vars.RUNNER_AGENT || '["self-hosted","linux","ARM64","agent"]') }}
     timeout-minutes: 45
 
