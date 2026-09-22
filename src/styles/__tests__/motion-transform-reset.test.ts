@@ -85,7 +85,7 @@ function transformUtilities(css: string): Set<string> {
 
 function openingTagAt(source: string, index: number): string | undefined {
   const start = source.lastIndexOf('<', index)
-  if (start === -1 || source.slice(start, index).includes('>')) return undefined
+  if (start === -1) return undefined
 
   let quote: string | undefined
   let braces = 0
@@ -100,6 +100,7 @@ function openingTagAt(source: string, index: number): string | undefined {
     } else if (character === '}') {
       braces -= 1
     } else if (character === '>' && braces === 0) {
+      if (cursor < index) return undefined
       return source.slice(start, cursor + 1)
     }
   }
@@ -107,13 +108,63 @@ function openingTagAt(source: string, index: number): string | undefined {
   return undefined
 }
 
+function declarationEnd(source: string, start: number): number {
+  let quote: string | undefined
+  let parentheses = 0
+  let brackets = 0
+  let braces = 0
+  let sawValue = false
+
+  for (let cursor = start; cursor < source.length; cursor += 1) {
+    const character = source[cursor]
+    if (quote) {
+      if (character === quote && source[cursor - 1] !== '\\') quote = undefined
+      continue
+    }
+    if (character === '"' || character === "'" || character === '`') {
+      quote = character
+      sawValue = true
+    } else if (character === '(') {
+      parentheses += 1
+      sawValue = true
+    } else if (character === ')') {
+      parentheses -= 1
+    } else if (character === '[') {
+      brackets += 1
+      sawValue = true
+    } else if (character === ']') {
+      brackets -= 1
+    } else if (character === '{') {
+      braces += 1
+      sawValue = true
+    } else if (character === '}') {
+      braces -= 1
+    } else if (!/\s/.test(character)) {
+      sawValue = true
+    }
+
+    if (
+      character === '\n' &&
+      sawValue &&
+      parentheses === 0 &&
+      brackets === 0 &&
+      braces === 0
+    ) {
+      return cursor
+    }
+  }
+
+  return source.length
+}
+
 function declarationName(source: string, index: number): string | undefined {
   const prefix = source.slice(Math.max(0, index - 2_000), index)
   const match = [...prefix.matchAll(/(?:export\s+)?const\s+(\w+)\s*=/g)].at(-1)
 
-  return match && !prefix.slice(match.index).includes(';')
-    ? match[1]
-    : undefined
+  if (!match) return undefined
+
+  const declarationStart = Math.max(0, index - 2_000) + match.index
+  return index < declarationEnd(source, declarationStart) ? match[1] : undefined
 }
 
 function hasStaticTransform(tag: string): boolean {
@@ -126,24 +177,33 @@ function animationSites(
   files: Array<SourceFile>,
   utility: string,
 ): Array<AnimationSite> {
-  const pattern = new RegExp(`(?:^|:)animate-${utility}(?![\\w-])`, 'g')
+  const pattern = new RegExp(`(?<![\\w-])animate-${utility}(?![\\w-])`, 'g')
   const sites: Array<AnimationSite> = []
+  const seen = new Set<string>()
 
   for (const file of files) {
     for (const match of file.text.matchAll(pattern)) {
       const index = match.index + match[0].lastIndexOf('animate-')
       const owner = declarationName(file.text, index)
-      const references = owner
-        ? files.flatMap((candidate) =>
-            [...candidate.text.matchAll(new RegExp(`\\b${owner}\\b`, 'g'))].map(
-              (reference) => ({ file: candidate, index: reference.index }),
-            ),
-          )
-        : [{ file, index }]
+      const references = [
+        { file, index },
+        ...(owner
+          ? files.flatMap((candidate) =>
+              [
+                ...candidate.text.matchAll(new RegExp(`\\b${owner}\\b`, 'g')),
+              ].map((reference) => ({
+                file: candidate,
+                index: reference.index,
+              })),
+            )
+          : []),
+      ]
 
       for (const reference of references) {
         const tag = openingTagAt(reference.file.text, reference.index)
-        if (tag?.includes('className')) {
+        const key = `${reference.file.path}:${tag}`
+        if (tag?.includes('className') && !seen.has(key)) {
+          seen.add(key)
           sites.push({ file: reference.file.path, utility, tag })
         }
       }
@@ -191,4 +251,30 @@ it('rejects a popover whose shared animation loses the reduced-motion hook', () 
     'src/components/ui/popover.tsx: animate-pop-out must either carry ' +
       '`data-motion-transform` (it rests at identity) or a static transform utility (it rests elsewhere).',
   ])
+})
+
+it('rejects an unprefixed transform animation whose hook is removed', () => {
+  const files = sourceFiles().map((file) =>
+    file.path.endsWith('/spinner.tsx')
+      ? { ...file, text: file.text.replace('data-motion-transform=""\n', '') }
+      : file,
+  )
+
+  expect(driftMessages(files)).toContain(
+    'src/components/ui/spinner.tsx: animate-spin-slow must either carry ' +
+      '`data-motion-transform` (it rests at identity) or a static transform utility (it rests elsewhere).',
+  )
+})
+
+it('requires a static transform when the skeleton sheen declines the hook', () => {
+  const files = sourceFiles().map((file) =>
+    file.path.endsWith('/skeleton.tsx')
+      ? { ...file, text: file.text.replace('-translate-x-full ', '') }
+      : file,
+  )
+
+  expect(driftMessages(files)).toContain(
+    'src/components/ui/skeleton.tsx: animate-shimmer must either carry ' +
+      '`data-motion-transform` (it rests at identity) or a static transform utility (it rests elsewhere).',
+  )
 })

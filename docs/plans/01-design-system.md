@@ -148,7 +148,7 @@ question for a human, not a blocker on the code.
 PR #254. The Phase 3 source guard on #415 keeps a new transform animation from bypassing either
 resting-state decision.
 
-`DSY-06 missing → missing` — the hand-rolled `src/lib/motion.ts` presets and their
+`DSY-08 missing → missing` — the hand-rolled `src/lib/motion.ts` presets and their
 `src/lib/__tests__/motion.test.ts` contract remain the stage's only unbuilt capability.
 
 `DSY-04` — the motion tokens, the keyframe set and the global reduced-motion block — is **not** a
