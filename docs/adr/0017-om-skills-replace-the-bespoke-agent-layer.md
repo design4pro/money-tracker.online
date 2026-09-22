@@ -329,6 +329,44 @@ automation. The Action is also the only producer that sees a review event at all
 place the arming decision can read the thread author before the label exists. The workaround became
 unnecessary; the reason underneath it did not.
 
+## Amendment, 2026-09-20: a short deny list returns, as a backstop and not as the boundary
+
+The 2026-09-07 (second) amendment above says `.claude/settings.json` is hooks-only and that the
+deny list "no longer exists". `.claude/settings.json` now carries a `permissions.deny` of twelve
+entries again. The two are less in conflict than they read, and the distinction is the point.
+
+That amendment's argument was about `deny` as a **boundary**, and it is correct: a prefix matcher
+misses `pnpm run deploy` and `wrangler versions deploy`, it cannot read a command the way
+`git-guardrails.sh` does, and it cannot explain itself to the model it refuses. Nothing here
+disputes that. The boundary is still the hooks, and every rule in the new deny list also exists in
+`git-guardrails.sh`, with its reasoning and its cases.
+
+What the amendment did not weigh is the failure mode the hooks have and `deny` does not: the hook
+is a script, and a script can be edited, or can error. Both happened while this list was being
+written. `.claude/hooks/guard-generated.sh` deliberately stopped refusing `.claude/` in a cezar run
+(the 2026-09-20 amendment above), so a run can now edit the very file that restrains it. And the
+first draft of the new `rm -r` rule escaped the project root with a `sed` expression BSD `sed`
+rejects, which under `set -e` ended the hook with **exit 1** — a status the harness reads as
+_allowed_. For the length of that draft, every rule in the file was inert and nothing said so.
+
+So the split is by failure mode, not by rule:
+
+- **The hooks carry the reasoning.** Every rule, its comment, its tier, and its case in
+  `.claude/hooks/__tests__/hooks.test.ts` — including the ordinary command each rule must not
+  block, which is the half a prefix matcher cannot express at all.
+- **`permissions.deny` carries the few that must survive the hook not running.** `deny` is
+  evaluated by the harness before any hook, wins over `ask` and `allow`, and applies in every
+  permission mode including the `dontAsk` a cezar run uses and the `bypassPermissions` of the
+  review job. It is deliberately too short to reason with: the irreversible set only.
+
+It names the exact secret files rather than a glob, because `.dev.vars.example` and
+`.env.local.example` are files `AGENTS.md` sends a reader to, and `Read(./.dev.vars.*)` would have
+refused them — the same over-breadth the 2026-09-07 amendment warned about, arriving from the
+other direction.
+
+Decision 3's text is unaffected: the hooks are still what the skills' GitHub access is loosened
+against, and they still keep blocking destructive git, environment dumps and `--no-verify`.
+
 ## Amendment, 2026-09-21: the arming allowlist names Codex, and a bot needs one entry per login form
 
 Two sentences above date from when `DEFAULT_REVIEW_BOTS` in `scripts/ci/review-threads-label.mjs`

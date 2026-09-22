@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # PreToolUse hook (Bash). Three tiers, by who is at the other end of the command.
 #
-# Tier one - everyone, in every session: destructive git, `--no-verify`, and the two Cloudflare
+# Tier one - everyone, in every session: destructive git, `--no-verify`, the two Cloudflare
 # operations nothing recovers from - writing a secret and deleting a D1/R2/KV store or the Worker
-# itself. Everything here destroys work that is not recoverable from the reflog by someone who
+# itself - and, further down, the four that do not go through git at all: `rm -r` at a dangerous
+# root, `gh repo delete` and its siblings, a push that deletes or forces a refspec, and history
+# rewriting. Everything here destroys work that is not recoverable from the reflog by someone who
 # does not already know to look. `develop` and `main` are the shared branches - staging and
 # production respectively - so a force-push to either rewrites what somebody else has pulled.
+# Tier one closes with the one read that is not a write: the secret files, which guard-read.sh
+# cannot reach because `cat .dev.vars` arrives here as a Bash call instead.
 #
 # Tier two - agent runs (CEZ_TASK_ID or GITHUB_ACTIONS): the things an om-* run never needs.
 # Dumping the environment (the worktree holds live secrets in .dev.vars), changing the pinned
@@ -18,8 +22,11 @@
 # The Cloudflare rules are split by what a mistake costs. A deploy is undone by deploying again,
 # so a developer at the keyboard keeps the ordinary approval prompt for it; a written secret is
 # already in the transcript and a deleted database is gone, so those are refused in every session.
-# Nothing that refuses a command belongs in `.claude/settings.json` - its allow list is only for
-# the tracker operations the om-* pipeline cannot run without.
+# Almost nothing that refuses a command belongs in `.claude/settings.json`. The reasoning lives
+# here, where it can be written down and tested; the deny list there carries only the handful of
+# rules that must survive this file being edited, broken or never invoked, and it is deliberately
+# too short to reason with. The two layers are not redundant: a hook can fail, and `deny` cannot
+# explain itself.
 #
 # Contract: exit 2 blocks the tool call and feeds stderr back to the model; exit 0 allows.
 set -euo pipefail
@@ -58,14 +65,36 @@ prose_command='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(
 # it. Only the quoting characters go, which is what makes `gh pr "review" 12 --approve` still
 # match the rule for `gh pr review` - the raw string does not, because the quotes sit exactly
 # where the verb is expected.
+# $raw is the command with only its quoting characters gone - no prose stripping, ever. Most rules
+# read $scan, because a commit message that merely names a dangerous command is not that command.
+# The secret-file rule reads $raw instead: `cat` is on the prose list above, so for `cat ".dev.vars"`
+# the quoted span would be deleted before $scan is built and quoting the path would be the bypass.
+#
+# A backslash-newline is a line continuation: the shell joins the two lines into one command. Every
+# rule below is line-based - `grep` reads a line at a time, and the push loop splits on newlines -
+# so a continued command arrived as two fragments, each missing what the other held, and no rule
+# saw a command it recognised. `unquote()` removes the backslash and leaves the newline, which is
+# what made the halves look like two separate commands.
+#
+# It is not only the push rule the review found it in. `rm -rf \` + newline + `/`, and `cat \` +
+# newline + `.dev.vars`, were allowed by the same mechanism: three of this file's rules defeated by
+# a line break a person would write for readability.
+#
+# awk rather than sed, because matching an embedded newline in the pattern space is a GNU extension
+# and BSD sed - the one macOS ships - rejects it. A line that does not end in a backslash keeps its
+# newline, so a real newline still separates two commands, which is what the prose test below and
+# the push loop rely on.
+joined=$(printf '%s' "$command" | awk '{ if (sub(/\\$/, " ")) printf "%s", $0; else print }')
+raw=$(unquote "$joined")
+
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
-  scan=$(unquote "$command")
+  scan="$raw"
 else
-  scan=$(unquote "$command")
+  scan="$raw"
   # Here-strings, not pipes: `grep -q` closes early, and under `pipefail` that turns a match into
   # a non-zero pipeline - the one failure shape that would silently re-open the stripping.
-  if grep -Eq "$prose_command" <<< "${command%%$'\n'*}"; then
-    text=$(printf '%s' "$command" | awk '
+  if grep -Eq "$prose_command" <<< "${joined%%$'\n'*}"; then
+    text=$(printf '%s' "$joined" | awk '
       skip { if ($0 == tag) skip = 0; next }
       {
         if (match($0, /<<-?["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
@@ -101,10 +130,49 @@ block() {
   exit 2
 }
 
-case "$scan" in
-  *"git push"*--force*develop*|*"git push"*--force*main*|*"git push"*-f\ *develop*|*"git push"*-f\ *main*)
-    block "force-push to develop/main" ;;
-esac
+# The flag and the ref come in either order, and the pattern this replaces wanted the flag first:
+# `git push origin develop --force` read straight past it while looking as though it was covered.
+# `--force-with-lease` is deliberately inside the flag pattern: leased or not, it rewrites what
+# somebody else has already pulled, and only the branch decides.
+#
+# The line is cut into simple commands first, and both halves have to match the *same* piece. Two
+# independent searches over the whole string were wrong in both directions at once, and the second
+# way was the worse one:
+#
+#   - over-blocking, which is what the comment here used to deny while the code did it anyway:
+#     a forced push to a feature branch followed by an ordinary push of develop was read as one
+#     forced push of develop and refused.
+#   - under-blocking, which no review caught and the split closes as a by-product: `develop` had to
+#     be followed by a space, a colon or the end of the line, and a `;` is none of those, so
+#     `git push --force origin develop; echo done` matched neither half's right-hand boundary and
+#     went through. Inside a piece, that `develop` sits at the end of the line.
+#
+# Short flags bundle, and git's own syntax is what a person types: `-fu` and `-uf` both carry `-f`
+# and neither matched a pattern that wanted `-f` standing alone. `f` anywhere in a single-dash run
+# of letters is the force flag - no other short flag of `git push` is spelled `f` - while `--force`
+# stays its own alternative, because `--` is not a letter and must not be read as a bundle.
+#
+# A branch does not have to be named to be reached. `--all` pushes every local branch and `--mirror`
+# every ref, so both arrive at develop and main without spelling either. `--mirror` is in *both*
+# patterns rather than only the second: it deletes remote refs the local side lacks and forces the
+# rest, so it is a forced push to the shared branches on its own, with or without `--force`. That
+# is wider than the thread that prompted this, which named only `--force --all`; it is the same
+# hole and refusing half of it would have been a worse answer than saying so here.
+#
+# The pieces are cut on `(`, `)` and a backtick as well as on `;`, `&` and `|`, because a subshell
+# and a command substitution are command boundaries too and the rule is written per command. The
+# review found the symptom on the right-hand side - `(git push -f origin main)` left `)` straight
+# after the branch, which the boundary class does not accept - and adding `)` to that class would
+# have fixed the one spelling while leaving `x=$(git push --force origin main)` and the backtick
+# form to be argued about separately. A command boundary belongs in the splitter, which is where
+# the secret rule below already puts it.
+push_force='git[[:space:]]+push\b[^;&|]*[[:space:]](--force|--mirror([[:space:]]|$)|-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$))'
+push_shared='git[[:space:]]+push\b[^;&|]*(([[:space:]]|[/+:])(develop|main)([[:space:]]|:|$)|[[:space:]](--all|--mirror)([[:space:]]|$))'
+while IFS= read -r push_command; do
+  grep -Eq "$push_force" <<< "$push_command" || continue
+  grep -Eq "$push_shared" <<< "$push_command" || continue
+  block 'force-push to develop/main'
+done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 
 echo "$scan" | grep -Eq 'git\s+reset\s+--hard' && block 'git reset --hard'
 echo "$scan" | grep -Eq 'git\s+clean\s+-[a-zA-Z]*f' && block 'git clean -f'
@@ -121,6 +189,258 @@ echo "$scan" | grep -Eq 'git\s+commit\b.*\s-n(\s|$)' && block 'git --no-verify'
 # in any session.
 echo "$scan" | grep -Eq 'wrangler\s+secret\b' && block 'wrangler secret'
 echo "$scan" | grep -Eq 'wrangler\s+((d1|r2\s+bucket|kv\s+namespace)\s+)?delete\b' && block 'wrangler delete'
+
+# The rules above all take git as their subject, and a repository is not the only thing a run can
+# destroy. These four do not go through git at all, or go through it sideways: `rm -r` at a
+# dangerous root, deleting the repository on GitHub, pushing a deletion or a forced refspec, and
+# rewriting history. None is recoverable from this checkout and none has a caller in any session.
+
+# `rm -r` is dangerous only where it points, so the target has to match whole: `rm -rf dist`,
+# `rm -rf node_modules` and `rm -rf /tmp/x` stay open while `rm -rf .`, `rm -rf /`, `rm -rf ~`,
+# `rm -rf *` and `rm -rf .git` do not. The flag group repeats on both sides of the recursive flag,
+# which is what makes `rm --recursive --force /` and `rm -r -f /` read the same as `rm -rf /`.
+#
+# `rm` takes more than one operand, and a harmless one in front is not a reprieve for the rest:
+# `rm -rf dist .git` destroys .git exactly as `rm -rf .git` does, and the first shape of this rule
+# allowed it because only flags were permitted between the recursive flag and the target. So what
+# the target may hide behind is any operand, not just a flag - stopping at a control operator,
+# because past one the `rm` has ended. The target itself still has to match whole, which is what
+# keeps `rm -rf dist` and `rm -rf /tmp/x` open.
+#
+# `rm` also answers to its path. The left boundary is a negated class that excludes `/`, so the `/`
+# in `/bin/rm` failed it and the whole rule quietly did not match - a fail-open on the single
+# command it exists for. The optional directory prefix is the same allowance `secret_head` already
+# makes for readers two sections down. It has to end in `/` to be consumed, so `charm -rf /` still
+# fails the boundary and `git rm -r .` still matches on the space, exactly as before.
+rm_flags='(-[[:alnum:]-]+[[:space:]]+)*'
+rm_operands='([^[:space:];&|]+[[:space:]]+)*'
+rm_path='([^[:space:];&|]*/)?'
+rm_recursive="(^|[^[:alnum:]_/-])${rm_path}rm[[:space:]]+${rm_flags}-[[:alnum:]-]*[rR][[:alnum:]-]*[[:space:]]+${rm_operands}"
+# A backtick closes a command the same way `)` does, so it ends a target too: without it in this
+# class, `rm -rf /` inside a substitution had its `/` followed by a character the rule did not
+# accept as an end, and the whole match failed on the one command that mattered.
+rm_end='([[:space:]]|;|&|\||\)|`|$)'
+
+# `./.git` deletes what `.git` deletes, and `./` is how a path is ordinarily written rather than an
+# evasion. The alternation had only a trailing `/?\*?`, so the leading spelling slid past it:
+# `.` matched and then `rm_end` met `/.git` instead of a boundary. `..` in front works the same way,
+# which is what `rm -rf ../..` was. The prefix is optional and repeatable and changes nothing else -
+# `./node_modules` still has no dangerous root behind it and stays open.
+rm_dots='(\.\.?/)*'
+
+# `git rm -r --cached .` is an index operation: it unstages, touches no file on disk, and `git
+# reset` puts it back. It reached this rule because `rm` is matched as a word and a space is a word
+# boundary, so `git rm` read as `rm`. The exemption is keyed on `--cached` and not on the word
+# `git`, because `git rm -r .` without it deletes the working tree and is exactly what the rule is
+# for. Only that one command is cut out of what the two rules below read, so
+# `git rm -r --cached . && rm -rf /` is still refused on its second half.
+#
+# What the exemption spans stops at a command boundary, and `(`, `)` and a backtick are boundaries
+# as much as `;`, `&` and `|` are: `git rm --cached $(rm -rf /)` is an exempt command wrapped around
+# a command that is not, and a span that ran to the end of the line erased both, so neither rule
+# below ever saw the delete the shell would actually run. An exemption that can be made to carry
+# something else out with it is not an exemption.
+rm_scan=$(printf '%s' "$scan" | sed -E 's/git[[:space:]]+rm[^;&|()`]*--cached[^;&|()`]*//g')
+
+# One trailing slash or several: `rm -rf ~//` expands to the same `$HOME` that `rm -rf ~/` does, and
+# the suffix used to allow at most one, so the second slash met no boundary and the rule did not
+# match. The same `/*` goes on the project-root rule below, which had the same suffix and the same
+# hole - `rm -rf $PWD//` was allowed while `rm -rf $PWD/` was refused.
+echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/*\*?${rm_end}" \
+  && block 'rm -r of a dangerous root'
+
+# The worktree root spelled out, which the pattern above cannot cover because it is a path like any
+# other. CLAUDE_PROJECT_DIR is what the harness sets; $PWD is the fallback, and under cezar that is
+# the worktree the task was given rather than the developer's checkout. Only the root itself, so
+# `rm -rf $root/node_modules` - how a bootstrap step recovers from a half-written install - stays
+# open.
+# `[` comes last in the set on purpose: `[.`, `[=` and `[:` open a collating symbol, an equivalence
+# class and a character class, so a `[` sitting before the `.` makes BSD sed reject the whole
+# expression - and under `set -e` that ends the hook with exit 1, which the harness reads as
+# "allowed". A guard that fails open is worse than no guard, and this one did until it was run.
+#
+# `project_root` is the path already expanded, and the command is not: the two variables named
+# above are how this root is usually written, and `$(pwd)` is a third spelling of the same
+# directory. A rule that knew only the expansion refused `rm -rf /Users/.../money-tracker.online`
+# and allowed `rm -rf $PWD`, which deletes the same tree. `$HOME` is in the alternation above for
+# exactly this reason; these belong here for the same one.
+project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
+project_root_spelling='\$\{?(PWD|CLAUDE_PROJECT_DIR)\}?|\$\(pwd\)|`pwd`'
+echo "$rm_scan" | grep -Eq "${rm_recursive}(${project_root}|${project_root_spelling})/*\*?${rm_end}" \
+  && block 'rm -r of the project root'
+
+# The repository itself. Tier three refuses the whole `gh repo` surface under Actions; these four
+# verbs are refused in every session, because none of them is undone by running something again: a
+# rename breaks the remote of every open worktree, a transfer moves the repository out of reach,
+# archiving makes it read-only, and a delete ends it.
+echo "$scan" | grep -Eq 'gh\s+repo\s+(delete|archive|rename|transfer)\b' \
+  && block 'gh repo delete/archive/rename/transfer'
+
+# Refspecs. AGENTS.md requires `git push origin HEAD:refs/heads/<branch>` precisely because a bare
+# branch name lets push.default choose the destination, so the colon is this repository's ordinary
+# spelling and stays open. What is refused is the colon with an empty source - `git push origin
+# :develop` deletes the remote branch - the explicit `--delete`, and a `+` prefix, which forces the
+# update whatever the remote holds and is a force-push wearing a refspec.
+#
+# The `+` rule is anchored on the prefix, not on the colon: `git push origin +develop` is git's own
+# shorthand for `+develop:develop` and forces the update just as loudly, so requiring the colon
+# read the shorthand as an ordinary push. Nothing legitimate starts a push argument with `+`.
+echo "$scan" | grep -Eq 'git\s+push\b[^;&|]*(--delete|[[:space:]]-d)([[:space:]]|$)' \
+  && block 'git push --delete'
+echo "$scan" | grep -Eq 'git\s+push\b[^;&|]*[[:space:]]:[^[:space:]]+' \
+  && block 'git push :branch (deletes the remote branch)'
+echo "$scan" | grep -Eq 'git\s+push\b[^;&|]*[[:space:]]\+[^[:space:]]' \
+  && block 'git push +refspec (forced)'
+
+# History rewriting. The reflog is what makes a hard reset recoverable by someone who knows to look,
+# so expiring it removes the recovery every rule above quietly assumes; filter-branch and
+# filter-repo rewrite every commit in place.
+echo "$scan" | grep -Eq 'git\s+(filter-branch|filter-repo)\b' && block 'git filter-branch/filter-repo'
+echo "$scan" | grep -Eq 'git\s+reflog\s+(expire|delete)\b' && block 'git reflog expire'
+echo "$scan" | grep -Eq 'git\s+gc\b[^;&|]*--prune=(now|all)' && block 'git gc --prune=now'
+
+# The hole guard-read.sh names in its own header: it guards Read, Glob and Grep, and `cat .dev.vars`
+# is a Bash call that never reaches it.
+#
+# The rule is decided one simple command at a time. Its first shape ran two independent searches
+# over the whole string - "a reader word appears somewhere" and "a secret filename appears
+# somewhere" - which is the same over-broad mistake this file's header already records once: it
+# refused a commit message that merely named the read, and a `grep` looking for the string
+# `.dev.vars` in this very directory, while a reader reached through a path was not a reader at
+# all. So the command is cut at its control operators and each piece is judged by its head word,
+# which is what separates an invocation from a mention: `cat .dev.vars` has `cat` as its head word
+# and a commit message naming it does not. `$(`, `)` and a backtick cut too, so the inner command
+# of `echo $(cat .dev.vars)` is judged on its own rather than on the `echo`.
+#
+# Readers only - a command that opens the file and prints it. `cp` and `mv` are absent because
+# `cp .dev.vars.example .dev.vars` is how the file is created, and a rule that could not tell those
+# two apart would refuse the setup step it is meant to protect. The head word is read through an
+# optional directory prefix, because `/bin/cat` is `cat`.
+#
+# A pattern-taking reader spends its first operand on the pattern and not on a path, so that
+# operand is dropped before the filename is looked for. That is the difference between
+# `grep .dev.vars .claude/hooks`, which searches for the string, and `grep APP_URL .dev.vars`,
+# which reads the file.
+#
+# It reads $raw, not $scan. `cat` is on the prose list, so for `cat ".dev.vars"` the quoted span is
+# deleted before $scan is built and the rule would see `cat` alone - quoting the path would be the
+# whole bypass. $raw has only the quote characters removed, and the head-word test is what the
+# prose stripping was doing here, done in a way a reader cannot step around.
+#
+# A redirection is a read, and the shell does not need a space for one: `cat<.dev.vars` is
+# `cat < .dev.vars`. So `<` and `>` are spaced out before anything is tokenised, which closes that
+# spelling and one other - `cat .dev.vars>/tmp/out.example` was a single token ending `.example`,
+# and the template exemption below deleted the secret along with it.
+#
+# A path ending `.example`, `.sample` or `.template` is dropped first, per token rather than by
+# testing the whole command for the word, so `cat .dev.vars .dev.vars.example` is still refused on
+# its first argument. Those three suffixes are also why the filename needs a right-hand boundary:
+# without one, `\.env` matched `.envrc`, which is direnv's config and not a secret, while
+# `.env.local` and `.env.production` still have to be refused.
+#
+# A glob is a filename this hook cannot read, because the shell expands it after the hook has
+# spoken: `cat .dev.var?` and `cat .dev.*` both print the real file. What can be decided here is
+# the literal part in front of the first metacharacter - if a secret name starts with it, the glob
+# can reach the secret. A metacharacter in the first position of the name leaves nothing to decide,
+# so `cat *` and `cat .ai/qa/*` are not refused; that is the same limit the rest of this rule has.
+#
+# Here-strings, not pipes, for the same reason the prose test above uses them: `grep -q` closes
+# early, and under `pipefail` that turns a match into a non-zero pipeline - so on a long command
+# the `if` read false and the rule failed open, which is the one direction it must never fail.
+#
+# .ai/scripts/test-env-up.sh reads .dev.vars by design and keeps working: it is invoked as one
+# command, so this hook sees `sh .ai/scripts/test-env-up.sh` and the `head` and `grep` inside it are
+# the script's own business. That is the shape of the guarantee here - an obvious read is refused, a
+# determined one is not. The deny list in .claude/settings.json is the layer that does not depend on
+# enumerating readers.
+secret_file='(^|[[:space:]]|=|/)(\.dev\.vars|\.env|test-env\.env)([[:space:]]|$|\.|/)'
+secret_names='.dev.vars .env test-env.env'
+# The prefix is its own expression because two things need it: `secret_head`, to find the reader
+# behind it, and the loop below, to cut it off before `reader_operands` counts words. The function
+# takes the reader to be the first word, which `secret_head` had already made untrue - for
+# `if grep -q ".env" .gitignore` it consumed `grep` as the pattern, leaving `.env` to be read as a
+# path and the command refused. An over-block, not a hole, and exactly the kind this machinery
+# exists to avoid.
+secret_prefix='^[[:space:]]*(([!{]|if|then|else|elif|do|while|until|time)[[:space:]]+)*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*'
+secret_head="${secret_prefix}([^[:space:]]*/)?"
+plain_reader='cat|bat|less|more|head|tail|strings|xxd|od|base64|nl|tac|cut|sort|uniq|dd'
+pattern_reader='grep|egrep|fgrep|rg|ag|awk|sed'
+
+# Everything after the head word, minus - for a pattern-taking reader, which is what $2 says - the
+# first operand that is not a flag. That one is the pattern.
+reader_operands() {
+  local out='' skipped="$2" i
+  local -a words
+  read -r -a words <<< "$1"
+  for ((i = 1; i < ${#words[@]}; i++)); do
+    if [ "$skipped" = 0 ] && [ "${words[i]#-}" = "${words[i]}" ]; then
+      skipped=1
+      continue
+    fi
+    out="$out ${words[i]}"
+  done
+  printf '%s' "$out"
+}
+
+# A glob reaches whatever it expands to, and that happens after this hook has answered. Refuse the
+# ones whose literal head is a head of a secret name; a glob that starts with the metacharacter
+# says nothing and is left alone.
+# The loop is indexed rather than `for arg in "${words[@]}"`, which under `set -u` is an unbound
+# variable on an empty array in bash 3.2 - the shell macOS ships, and the one that ended this hook
+# with exit 1 on `env | grep TOKEN` until the case table was run against it.
+glob_reaches_secret() {
+  local arg literal name i
+  local -a words
+  read -r -a words <<< "$1"
+  for ((i = 0; i < ${#words[@]}; i++)); do
+    arg=${words[i]}
+    case "$arg" in
+      *[*?[]*) ;;
+      *) continue ;;
+    esac
+    literal=${arg%%[*?[]*}
+    literal=${literal##*/}
+    [ -z "$literal" ] && continue
+    for name in $secret_names; do
+      case "$name" in
+        "$literal"*) return 0 ;;
+      esac
+    done
+  done
+  return 1
+}
+
+# An empty quoted pattern is an argument, not an absence: `grep "" .dev.vars` matches every line
+# and `sed '' .dev.vars` is `cat`. unquote() removes quote *characters*, so the pair collapsed to
+# nothing, the argument vanished from the token stream, and the filename slid into the slot
+# `reader_operands` drops as "the pattern" - the secret was never looked at. A sentinel holds the
+# slot. It must not begin with `-`, or `reader_operands` reads it as a flag and drops the filename
+# again instead.
+secret_raw=$(printf '%s' "$joined" | sed -e 's/""/EMPTY_PATTERN/g' -e "s/''/EMPTY_PATTERN/g")
+secret_raw=$(unquote "$secret_raw")
+
+# `< .dev.vars cat` is valid and ordinary, and spacing the operator out is not enough on its own:
+# it leaves the filename in front of the reader, where `secret_head` - anchored at `^` - reads the
+# filename as the head word, finds no reader and moves on. So a leading redirection is rotated to
+# the back of its own piece first, which turns it into the `cat < .dev.vars` spelling the next
+# expression already handles.
+secret_commands=$(tr ';&|()`' '\n' <<< "$secret_raw" \
+  | sed -E -e 's/^[[:space:]]*<[[:space:]]*([^[:space:]]+)[[:space:]]+(.*)$/\2 \1/' -e 's/[<>]/ /g')
+while IFS= read -r secret_command; do
+  secret_body=$(sed -E "s/${secret_prefix}//" <<< "$secret_command")
+  if grep -Eq "${secret_head}(${plain_reader})([[:space:]]|$)" <<< "$secret_command"; then
+    secret_args=$(reader_operands "$secret_body" 1)
+  elif grep -Eq "${secret_head}(${pattern_reader})([[:space:]]|$)" <<< "$secret_command"; then
+    secret_args=$(reader_operands "$secret_body" 0)
+  else
+    continue
+  fi
+  secret_args=$(sed -E 's/[^[:space:]]*\.(example|sample|template)([[:space:]]|$)/ /g' <<< "$secret_args")
+  grep -Eq "$secret_file" <<< "$secret_args" \
+    && block 'reading .dev.vars, .env or the QA test-env file'
+  glob_reaches_secret "$secret_args" \
+    && block 'reading .dev.vars, .env or the QA test-env file'
+done <<< "$secret_commands"
 
 # Everything below applies to agent runs only; a developer at the keyboard keeps pnpm and env.
 [ -n "${CEZ_TASK_ID:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ] || exit 0

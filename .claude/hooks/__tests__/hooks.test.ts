@@ -70,16 +70,355 @@ describe('git-guardrails.sh', () => {
     'git push --force origin main',
     'git push -f origin develop',
     'git push -f origin main',
+    // The flag can come after the ref, which is the spelling a pattern wanting it first read
+    // straight past. Leased or not, it rewrites what somebody else has already pulled.
+    'git push origin develop --force',
+    'git push origin main --force',
+    'git push origin develop -f',
+    'git push origin HEAD:refs/heads/develop --force',
+    'git push --force-with-lease origin develop',
+    // A `;` straight after the branch is not a space, a colon or the end of the line, so while
+    // both halves were searched over the whole string this matched neither boundary and went
+    // through. Inside one simple command the branch sits at the end of the line.
+    'git push --force origin develop; echo done',
+    'git push -f origin main && echo ok',
+    // A backslash-newline is a line continuation, so this is one command written over two lines.
+    // Every rule here is line-based, and each half on its own matches nothing.
+    'git push --force \\\norigin develop',
+    'git push \\\n--force origin main',
+    'git push --force-with-lease \\\norigin develop',
+    // Short flags bundle: `-fu` is `-f -u`, and a pattern anchored on a lone `f` read past it.
+    'git push -fu origin develop',
+    'git push -uf origin develop',
+    'git push -fu origin main',
+    // `--all` and `--mirror` name no branch, and both include develop and main. `--mirror` also
+    // forces on its own and deletes remote refs the local side lacks, so it needs no `--force`.
+    'git push --force --all origin',
+    'git push --force --mirror origin',
+    'git push --mirror --force origin',
+    'git push --mirror origin',
+    // A subshell and a command substitution are command boundaries, and the branch ends at `)`.
+    '(cd repo && git push --force origin develop)',
+    '(git push -f origin main)',
+    'x=$(git push --force origin main)',
+    'echo `git push -f origin main`',
   ])('blocks the force-push %s', (command) => {
     const r = bash(command)
     expect(r.status).toBe(2)
     expect(r.stderr).toContain('force-push to develop/main')
   })
 
-  it('leaves a force-push to a feature branch alone', () => {
-    expect(
-      bash('git push --force-with-lease origin fix/issue-12-x').status,
-    ).toBe(0)
+  it.each([
+    'git push --force-with-lease origin fix/issue-12-x',
+    'git push origin fix/issue-12-x --force',
+    // Two commands, not one: the forced push is to a feature branch and the push of develop is
+    // ordinary. Searching both patterns over the whole line read them as a single forced push.
+    'git push -f origin fix/issue-12-x && git push origin develop',
+    'git push origin develop; git push --force origin fix/issue-9-y',
+    'git push -fu origin fix/issue-12-x',
+    // Two real newlines are two commands, not a continuation: neither one is a forced push to a
+    // shared branch, and the join must not run them together into something that looks like one.
+    'git push -f origin fix/issue-12-x\ngit push origin develop',
+    // Flags that neither force nor reach every branch: `-u` sets upstream, `-q` is quiet, and
+    // `--all`/`--tags` without `--force` cannot rewrite what somebody else has pulled.
+    'git push -u origin fix/issue-12-x',
+    'git push -q origin fix/issue-12-x',
+    'git push --all origin',
+    'git push --tags origin',
+    '(git push -f origin fix/issue-12-x)',
+    '(git push origin develop)',
+  ])('leaves the force-push to a feature branch %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // `rm -r` is judged by where it points, not by the flags: the target has to match whole, so the
+  // roots below go and every ordinary cleanup stays. Every mode, like the rest of tier one.
+  it.each([
+    'rm -rf /',
+    'rm -rf /*',
+    'rm -rf ~',
+    'rm -rf ~/',
+    'rm -rf $HOME',
+    'rm -rf ${HOME}',
+    'rm -rf .',
+    'rm -rf ..',
+    'rm -rf *',
+    'rm -rf .git',
+    'rm -fr /',
+    'rm --recursive --force /',
+    'rm -r -f ~',
+    'cd /tmp && rm -rf /',
+    // `rm` takes more than one operand, and a harmless one in front used to hide the rest.
+    'rm -rf dist .git',
+    'rm -rf node_modules /',
+    'rm -rf a b /',
+    // `rm` answers to its path too, and the left boundary excluded the `/` that puts it there.
+    '/bin/rm -rf /',
+    '/usr/bin/rm -rf $HOME',
+    '/bin/rm -rf .git',
+    // `./` is how a path is ordinarily written, and it deletes the same thing.
+    'rm -rf ./.git',
+    'rm -rf ./',
+    'rm -rf ./..',
+    'rm -rf ../..',
+    'rm -rf dist ./.git',
+    // The same line continuation that defeated the push rule reaches this one too.
+    'rm -rf \\\n/',
+    'rm -rf \\\n.git',
+    // One trailing slash or several: `~//` expands to the same $HOME that `~/` does.
+    'rm -rf ~//',
+    'rm -rf $HOME//',
+    'rm -rf .git//',
+    // The `git rm --cached` exemption must not carry a real delete out with it: a substitution is
+    // a command boundary, and the shell runs what is inside it.
+    'git rm --cached $(rm -rf /)',
+    'git rm --cached `rm -rf /`',
+    'git rm --cached $(rm -rf $PWD)',
+  ])('blocks the recursive delete %s', (command) => {
+    for (const env of [{}, AGENT, ACTIONS]) {
+      expect(bash(command, env).status).toBe(2)
+    }
+  })
+
+  it.each([
+    'rm -rf node_modules',
+    'rm -rf dist',
+    'rm -rf ./dist',
+    'rm -rf .ai/qa/artifacts_123',
+    'rm -rf /tmp/claude-501/x',
+    'rm package-lock.json',
+    // Several operands, none of them a root: stepping over an operand must not turn the next one
+    // into a target it is not.
+    'rm -rf build dist',
+    'rm -rf .ai/qa/artifacts_1 .ai/qa/artifacts_2',
+    // The path prefix and the `./` prefix only reach what was already a root; neither of these is.
+    '/bin/rm -rf node_modules',
+    'rm -rf ./node_modules',
+    'rm -rf ./build ./dist',
+    'rm -rf \\\nnode_modules',
+    // A doubled slash is not what makes a target dangerous; the target is.
+    'rm -rf node_modules//',
+    'git rm --cached src/generated.ts',
+    // Two commands on two lines, each an ordinary cleanup: the continuation join must leave a
+    // real newline alone, or the second operand would be read as the first command's.
+    'rm -rf dist\nrm -rf build',
+  ])('leaves the ordinary cleanup %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // The worktree root by its absolute path, which no pattern of roots can cover. A path *under*
+  // the root stays open: `rm -rf <root>/node_modules` is how a bootstrap step recovers from a
+  // half-written install.
+  it('blocks a recursive delete of the project root, not of a path inside it', () => {
+    const root = process.cwd()
+    expect(bash(`rm -rf ${root}`).status).toBe(2)
+    expect(bash(`rm -rf ${root}/`).status).toBe(2)
+    expect(bash(`rm -rf ${root}/node_modules`).status).toBe(0)
+  })
+
+  // The expanded path is not how the root is usually written. These four spellings all name the
+  // same directory, and a rule that knew only the expansion let every one of them through.
+  it.each([
+    'rm -rf $PWD',
+    'rm -rf ${PWD}',
+    'rm -rf $CLAUDE_PROJECT_DIR',
+    'rm -rf "$CLAUDE_PROJECT_DIR"',
+    'rm -rf $(pwd)',
+    'rm -rf `pwd`',
+    'rm -rf dist $PWD',
+    'rm -rf $PWD//',
+  ])('blocks the project root written as %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
+
+  it.each(['rm -rf $PWD/node_modules', 'rm -rf $CLAUDE_PROJECT_DIR/dist'])(
+    'leaves %s alone',
+    (command) => {
+      expect(bash(command).status).toBe(0)
+    },
+  )
+
+  // `rm` matched as a word, and a space is a word boundary, so `git rm` read as `rm`. The index
+  // operation is reversible with `git reset` and touches no file on disk; the same command
+  // without `--cached` deletes the working tree and is exactly what the rule is for.
+  it('tells git rm --cached from a recursive delete', () => {
+    expect(bash('git rm -r --cached .').status).toBe(0)
+    expect(bash('git rm -r --cached $PWD').status).toBe(0)
+    expect(bash('git rm -r src/old').status).toBe(0)
+    expect(bash('git rm -r .').status).toBe(2)
+    // The exemption removes that one command, not the rest of the line.
+    expect(bash('git rm -r --cached . && rm -rf /').status).toBe(2)
+  })
+
+  // A rename breaks the remote of every open worktree and a transfer moves the repository out of
+  // reach, so these are refused in every session - tier three's `gh repo` rule is Actions-only.
+  it.each([
+    'gh repo delete design4pro/money-tracker.online',
+    'gh repo archive',
+    'gh repo rename newname',
+    'gh repo transfer someone',
+  ])('blocks %s everywhere', (command) => {
+    expect(bash(command).status).toBe(2)
+    expect(bash(command, AGENT).status).toBe(2)
+  })
+
+  it('leaves reading the repository alone', () => {
+    expect(bash('gh repo view --json name', AGENT).status).toBe(0)
+  })
+
+  // AGENTS.md requires `HEAD:refs/heads/<branch>` because a bare branch name lets push.default
+  // choose the destination, so the colon is the ordinary spelling here and keeps working. What
+  // goes is the colon with an empty source, `--delete`, and the `+` that forces the update.
+  it.each([
+    'git push origin --delete develop',
+    'git push origin :develop',
+    'git push -d origin feature/x',
+    'git push origin +refs/heads/x:refs/heads/develop',
+    // git's own shorthand for `+develop:develop`, and just as forced. The colon is not what makes
+    // a refspec dangerous; the `+` is.
+    'git push origin +develop',
+  ])('blocks the destructive refspec %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
+
+  it.each([
+    'git push origin HEAD:refs/heads/fix/issue-1-x',
+    'git push origin HEAD',
+    'git push --force-with-lease origin fix/issue-1-x',
+  ])('leaves the ordinary push %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // The reflog is what makes a hard reset recoverable by someone who knows to look, so expiring
+  // it removes the recovery the rest of tier one assumes.
+  it.each([
+    'git filter-branch --tree-filter true HEAD',
+    'git filter-repo --path src',
+    'git reflog expire --expire=now --all',
+    'git gc --prune=now',
+  ])('blocks the history rewrite %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
+
+  it.each(['git gc', 'git reflog'])('leaves %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // guard-read.sh guards Read, Glob and Grep; `cat .dev.vars` is a Bash call that never reaches
+  // it. The quoted spelling is the case that matters: `cat` is on the prose list, so a rule
+  // reading $scan instead of $raw would see `cat` alone and let the quoted path through.
+  it.each([
+    'cat .dev.vars',
+    'cat ".dev.vars"',
+    'head -1 .dev.vars',
+    'grep APP_URL .dev.vars',
+    'tail -n 5 .env.local',
+    'cat .ai/qa/test-env.env',
+    'xxd .dev.vars',
+    // The `.example` exemption is per token, not per command, so the first argument still counts.
+    'cat .dev.vars .dev.vars.example',
+    // `/bin/cat` is `cat`: the head word is read through its directory prefix.
+    '/bin/cat .dev.vars',
+    '/usr/bin/head -2 .env.local',
+    // A redirection is a read with no space in front of the filename.
+    'cat <.dev.vars',
+    // The reader is judged where it stands, so a chain, a substitution and a compound command
+    // each get looked at rather than swallowed by the word that opens them.
+    'ls -la && cat .dev.vars',
+    'echo $(cat .dev.vars)',
+    'if cat .dev.vars; then true; fi',
+    'sed -n 1p .dev.vars',
+    // The shell needs no space for a redirection, and a redirection is a read.
+    'cat<.dev.vars',
+    'head<.dev.vars',
+    // Without a space the whole thing was one token ending `.example`, and the template
+    // exemption deleted the secret along with the destination.
+    'cat .dev.vars>/tmp/output.example',
+    'cat .dev.vars > /tmp/output.example',
+    // A glob is expanded after this hook has answered, so what is judged is the literal head.
+    'cat .dev.var?',
+    'cat .dev.*',
+    'cat .env*',
+    // The template suffixes are why the filename needs a right-hand boundary; these two still go.
+    'cat .env.local',
+    'cat .env.production',
+    // An empty quoted pattern is an argument: `grep ""` matches every line and `sed ''` is `cat`.
+    // Stripping the quote characters left nothing, so the filename slid into the pattern's slot
+    // and was dropped as the pattern.
+    'grep "" .dev.vars',
+    "sed '' .dev.vars",
+    'grep "" .env.local',
+    'awk "" .dev.vars',
+    // A redirection may lead, which puts the filename in front of the reader the head-word test
+    // is anchored on.
+    '< .dev.vars cat',
+    '<.dev.vars cat',
+    // The reader and the file on two lines joined by a backslash: the same continuation defect,
+    // against the rule that keeps a secret out of the transcript.
+    'cat \\\n.dev.vars',
+    'head -1 \\\n.env.local',
+    '< .env.local head -2',
+    // A prefix word in front of the reader must not lose the rule the file it was reading.
+    'if cat .dev.vars; then true; fi',
+    '! grep APP_URL .dev.vars',
+    'FOO=1 cat .dev.vars',
+    'if grep -q "" .dev.vars; then true; fi',
+  ])('blocks the secret read %s', (command) => {
+    for (const env of [{}, AGENT, ACTIONS]) {
+      expect(bash(command, env).status).toBe(2)
+    }
+  })
+
+  // The limits, stated as tests so they are not mistaken for oversights. A copy is not a read -
+  // `cp .dev.vars.example .dev.vars` is how the file is created - and test-env-up.sh reads
+  // .dev.vars by design, which survives because the hook sees the `sh` invocation, not the
+  // `head` inside it.
+  it.each([
+    'cat .dev.vars.example',
+    'cat .env.example',
+    'cp .dev.vars.example .dev.vars',
+    'sh .ai/scripts/test-env-up.sh',
+    'cat package.json',
+    'grep -rn APP_URL src',
+    // A pattern-taking reader spends its first operand on the pattern, so searching *for* the
+    // filename is not reading the file. The rule that could not tell those apart refused the
+    // commit messages below - including the ones written while fixing it.
+    'grep -rn ".env" src',
+    'grep -rn "\\.dev\\.vars" .claude/hooks',
+    'git commit -m "docs: explain why cat .dev.vars is refused"',
+    'git commit -m "docs: grep the .env file for APP_URL"',
+    'echo "copy .dev.vars.example to .dev.vars then head it"',
+    // `.envrc` is direnv's config and the other two are templates: a filename that merely begins
+    // with a secret's name is not that secret.
+    'cat .envrc',
+    'cat .env.sample',
+    'cat .env.template',
+    // A glob whose metacharacter comes first says nothing about what it will reach, which is the
+    // stated limit of the glob rule rather than an oversight.
+    'cat *',
+    'cat tsconfig*.json',
+    'grep -rn pattern *.ts',
+    // The sentinel that holds the empty pattern's slot must not turn an ordinary file into a
+    // secret, and a leading redirection of one is still ordinary.
+    'grep "" package.json',
+    '< package.json cat',
+    '< .dev.vars.example cat',
+    // A prefix word in front of a pattern-taking reader used to cost it its pattern: the reader
+    // itself was counted as the pattern, and the pattern was then read as a path and refused.
+    'if grep -q ".env" .gitignore; then echo yes; fi',
+    '! grep -q ".dev.vars" .gitignore',
+    'FOO=1 grep ".env" src',
+  ])('leaves %s alone', (command) => {
+    expect(bash(command).status).toBe(0)
+  })
+
+  // The rule reads the command through here-strings, not pipes: `grep -q` closes early, and under
+  // `pipefail` that turns a match into a non-zero pipeline - the one failure shape that lets a
+  // long command through unchecked.
+  it('still refuses a secret read buried in a very long command', () => {
+    const filler = 'x'.repeat(40_000)
+    expect(bash(`cat .dev.vars # ${filler}`).status).toBe(2)
+    expect(bash(`echo ok # ${filler}`).status).toBe(0)
   })
 
   it('leaves pnpm and env alone outside agent runs', () => {
