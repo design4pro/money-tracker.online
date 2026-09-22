@@ -180,8 +180,14 @@ done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 # From a shared checkout, a force-push is unsafe even when its refspec is only `HEAD`; a named
 # feature refspec remains open because it does not rewrite the checked-out shared branch.
 current_branch=$(git branch --show-current 2>/dev/null || true)
-current_push=$(git rev-parse --abbrev-ref --symbolic-full-name '@{push}' 2>/dev/null || \
-  git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
+current_remote=$(git config --get "branch.${current_branch}.remote" 2>/dev/null || true)
+current_merge=$(git config --get "branch.${current_branch}.merge" 2>/dev/null || true)
+if [ -n "$current_remote" ] && [ -n "$current_merge" ]; then
+  current_push="${current_remote}/${current_merge#refs/heads/}"
+else
+  current_push=$(git rev-parse --abbrev-ref --symbolic-full-name '@{push}' 2>/dev/null || \
+    git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
+fi
 push_implicit="^[[:space:]]*git[[:space:]]+push([[:space:]]+${force_flag})?([[:space:]]+[^[:space:]]+)?([[:space:]]+${force_flag})?([[:space:]]+HEAD)?[[:space:]]*$"
 if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ] || \
   [[ "$current_push" =~ /(develop|main)$ ]]; then
