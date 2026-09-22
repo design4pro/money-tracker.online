@@ -50,10 +50,20 @@ function hook(
 const bash = (command: string, env = {}) =>
   hook('git-guardrails.sh', { command }, env)
 
-function gitRoot(branch: string) {
+function gitRoot(branch: string, upstream?: string) {
   const root = mkdtempSync(join(tmpdir(), 'guard-git-'))
   execFileSync('git', ['init'], { cwd: root })
   execFileSync('git', ['checkout', '-b', branch], { cwd: root })
+  if (upstream) {
+    execFileSync('git', ['remote', 'add', 'origin', 'https://example.invalid/repo.git'], {
+      cwd: root,
+    })
+    execFileSync('git', ['config', `branch.${branch}.remote`, 'origin'], { cwd: root })
+    execFileSync('git', ['config', `branch.${branch}.merge`, `refs/heads/${upstream}`], {
+      cwd: root,
+    })
+    execFileSync('git', ['config', 'push.default', 'upstream'], { cwd: root })
+  }
   return root
 }
 
@@ -167,6 +177,14 @@ describe('git-guardrails.sh', () => {
     (command) => {
       const root = gitRoot('fix/issue-408')
       expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+    },
+  )
+
+  it.each(['git push --force', 'git push -f', 'git push --force-with-lease'])(
+    'blocks the implicit force-push to a shared upstream from a differently named branch %s',
+    (command) => {
+      const root = gitRoot('local-work', 'main')
+      expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(2)
     },
   )
 
@@ -294,6 +312,13 @@ describe('git-guardrails.sh', () => {
       expect(bash(command).status).toBe(0)
     },
   )
+
+  it.each([
+    'rm -rf $CLAUDE_PROJECT_DIR/..',
+    'rm -rf ${CLAUDE_PROJECT_DIR}/../../etc',
+  ])('blocks a traversal written from the project-root variable %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
 
   // `rm` matched as a word, and a space is a word boundary, so `git rm` read as `rm`. The index
   // operation is reversible with `git reset` and touches no file on disk; the same command

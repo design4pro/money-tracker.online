@@ -180,8 +180,11 @@ done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 # From a shared checkout, a force-push is unsafe even when its refspec is only `HEAD`; a named
 # feature refspec remains open because it does not rewrite the checked-out shared branch.
 current_branch=$(git branch --show-current 2>/dev/null || true)
+current_push=$(git rev-parse --abbrev-ref --symbolic-full-name '@{push}' 2>/dev/null || \
+  git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
 push_implicit="^[[:space:]]*git[[:space:]]+push([[:space:]]+${force_flag})?([[:space:]]+[^[:space:]]+)?([[:space:]]+${force_flag})?([[:space:]]+HEAD)?[[:space:]]*$"
-if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ]; then
+if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ] || \
+  [[ "$current_push" =~ /(develop|main)$ ]]; then
   while IFS= read -r push_command; do
     grep -Eq "$push_implicit" <<< "$push_command" && block 'force-push to develop/main'
   done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
@@ -277,7 +280,8 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
 rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*##g')
 # The worktree exception admits paths below the checkout, not a traversal out of it. Test this
 # before removing the safe suffix, so `worktree/..` cannot erase the destructive target.
-project_path_traversal="${project_root}"'(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
+project_root_target="(${project_root}|${project_root_spelling})"
+project_path_traversal="${project_root_target}"'(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
 echo "$rm_without_scratchpads" | grep -Eq "${rm_recursive}${project_path_traversal}" \
   && block 'rm -r traversal from the project root'
 rm_safe_suffix='/[^[:space:];&|)`]*'
