@@ -16,25 +16,23 @@ import type { Locator, Page } from '@playwright/test'
  * identity. Both are stylesheet claims, and this file is what turns them into something that can go
  * red (spec `.ai/specs/2026-09-11-reduced-motion-transform-reset.md`, Phase 2).
  *
- * ## Five assertions per overlay
+ * ## Four assertions per overlay
  *
- * 1. **A frame right after the overlay appears equals one taken a second later.** Motion still
- *    running is the only thing that can make them differ. The frames are compared against each
- *    other inside the run: no stored baseline (ADR 0016) and nothing written into the repository,
- *    so machine speed moves *when* the frames are taken and not what they contain. "Equal" is
- *    pixel for pixel, with {@link RASTER_NOISE} as the only allowance.
- * 2. **Every hooked element on the page computes an identity transform** once the overlay settled.
- * 3. **The overlay itself sits inside a hooked element**, counted, so a renamed or dropped hook turns
- *    this file red instead of letting assertion 2 pass over zero elements.
+ * 1. **Right after the overlay appears nothing is animating, and a second later it has not moved.**
+ *    No animation in the document is still running past the sweep's collapse, and the overlay's box
+ *    and opacity read the same as they do a second later. Nothing here takes a picture: ADR 0016
+ *    keeps every screenshot comparison out of CI, so "at rest" is read from the state that paints
+ *    the frame rather than from the frame.
+ * 2. **Every hooked element holding the overlay computes an identity transform with its entrance
+ *    held at its first keyframe.** Read after the entrance has finished, the transform is `none`
+ *    with or without the reset, because nothing else sets one; so the entrance is restarted and
+ *    paused at `currentTime` 0, the one instant the reset has anything to override.
+ * 3. **The overlay itself sits inside a hooked element that has an entrance to hold**, counted, so a
+ *    renamed or dropped hook or entrance turns this file red instead of letting assertion 2 pass
+ *    over nothing.
  * 4. **Escape closes the overlay and it detaches.** The sweep collapses durations rather than
  *    killing animation because React Aria unmounts an exiting overlay on `animationend`; an
  *    animation that never ends is a dialog that never closes, and this is the assertion that says so.
- * 5. **With its entrance held on the first keyframe, the hooked element still computes the
- *    identity.** Assertion 2 alone cannot see the reset: no entrance fills `forwards`, so once the
- *    collapsed animation ends there is no `transform` left in the cascade and the element computes
- *    `none` with or without `[data-motion-transform] { transform: none !important }`. Pausing the
- *    entrance keeps its `from` keyframe applied, and only the reset outranks it. A separate test,
- *    because an entrance that never ends is an overlay that never closes.
  *
  * ## Which overlays, where
  *
@@ -54,28 +52,17 @@ test.use({
 
 const THEMES: readonly AppTheme[] = ['light', 'dark']
 
-/** How long the second frame waits after the first: far longer than any animation token. */
+/** How long the second reading waits after the first: far longer than any animation token. */
 const SETTLE_MS = 1_000
 
-/**
- * The largest per-channel difference, out of 255, that two frames may show at one pixel.
- *
- * Not a tolerance for motion. Measured while writing this file: on `chromium` a static glyph in the
- * freshly opened modal is sometimes re-rasterised after the first frame, and the two frames then
- * differ at 7 anti-aliased pixels by at most 9 — with every element on the page computing the same
- * style in both. Anything that moves or fades changes a pixel by far more than 16: the smallest
- * entrance in the product, `pop-in`, starts at opacity 0.
- */
-const RASTER_NOISE = 16
+/** The longest an animation the sweep collapsed can last: its `0.01ms`, with room to spare. */
+const COLLAPSED_MS = 1
 
 /**
  * One overlay: the control that opens it, and the element that must appear and detach.
  *
  * The trigger is activated from the keyboard, never by pointer. A click leaves the pointer resting
- * on the page, and the frame pair then records the product catching up with it rather than motion:
- * measured while writing this file, desktop WebKit painted the trigger under the scrim in its
- * pressed colour on the first frame and its hover colour a second later, and `mobile-safari` gave
- * the More sheet's row under the tap point its hover fill only on the second frame.
+ * on the page, and a hover transition started under it is motion this file did not ask about.
  */
 interface Overlay {
   readonly name: string
@@ -102,117 +89,78 @@ const SHEET: Overlay = {
   locate: (page) => page.getByRole('dialog'),
 }
 
-/** `btoa` in slices: the repository's type set has no Node `Buffer#toString('base64')`. */
-function toBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let start = 0; start < bytes.length; start += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000))
-  }
-  return btoa(binary)
-}
-
 /**
- * How many pixels differ between two PNG frames by more than {@link RASTER_NOISE} in any channel.
+ * Every running animation or transition in the document that the sweep did not collapse.
  *
- * Decoded in the page because the browser is the PNG decoder this suite already has. Both frames go
- * through the same canvas, so whatever colour handling it applies, it applies to both.
+ * A collapsed one lasts 0.01ms and can still read `running` for the frame it lands on - measured on
+ * `chromium`, a colour transition started as focus moves into the modal - but it cannot move
+ * anything. Longer than {@link COLLAPSED_MS} is motion the preference failed to stop.
  */
-async function differingPixels(
-  page: Page,
-  first: Buffer,
-  later: Buffer,
-): Promise<number> {
+async function motionStillRunning(page: Page): Promise<string[]> {
   return page.evaluate(
-    async ([a, b, noise]) => {
-      const decode = async (base64: string) => {
-        const bytes = Uint8Array.from(atob(base64), (char) =>
-          char.charCodeAt(0),
+    (collapsedMs) =>
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === 'running' &&
+            Number(animation.effect?.getComputedTiming().duration) >
+              collapsedMs,
         )
-        const bitmap = await createImageBitmap(
-          new Blob([bytes], { type: 'image/png' }),
-        )
-        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-        const context = canvas.getContext('2d')
-        if (context === null) throw new Error('no 2d context to decode a frame')
-        context.drawImage(bitmap, 0, 0)
-        return context.getImageData(0, 0, bitmap.width, bitmap.height).data
-      }
-      const [pixelsA, pixelsB] = await Promise.all([decode(a), decode(b)])
-      if (pixelsA.length !== pixelsB.length) return Number.POSITIVE_INFINITY
-      let differing = 0
-      for (let index = 0; index < pixelsA.length; index += 4) {
-        for (let channel = 0; channel < 4; channel += 1) {
-          const delta = Math.abs(
-            (pixelsA[index + channel] ?? 0) - (pixelsB[index + channel] ?? 0),
-          )
-          if (delta > noise) {
-            differing += 1
-            break
-          }
-        }
-      }
-      return differing
-    },
-    [toBase64(first), toBase64(later), RASTER_NOISE] as const,
+        .map((animation) =>
+          animation instanceof CSSAnimation
+            ? animation.animationName
+            : animation instanceof CSSTransition
+              ? `transition of ${animation.transitionProperty}`
+              : animation.id || 'a script animation',
+        ),
+    COLLAPSED_MS,
   )
 }
 
+/** Where the overlay is and how opaque it is: what a frame would show moving, without the frame. */
+async function overlayState(element: Locator) {
+  return element.evaluate((node) => {
+    const { x, y, width, height } = node.getBoundingClientRect()
+    return { x, y, width, height, opacity: getComputedStyle(node).opacity }
+  })
+}
+
 /**
- * The transform every hooked element on the page computes, as `none` or as a matrix.
+ * The transform each hooked element computes with its own entrance held at its first keyframe.
+ *
+ * The entrance is the product's: setting `data-entering` matches the same `data-[entering]:animate-*`
+ * class React Aria matched when the overlay opened, and `getAnimations()` hands back the animation
+ * that started. Paused at `currentTime` 0 it applies its `from` keyframe — `translateY(8px)
+ * scale(0.985)`, `translateY(100%)` — unless the `[data-motion-transform]` reset outranks it. The
+ * attribute and the animation are removed again before anything else reads the page.
  *
  * Identity is decided with `DOMMatrixReadOnly` rather than by string, because an engine may
  * serialise the identity as `matrix(1, 0, 0, 1, 0, 0)` rather than `none`.
  */
-async function hookedTransforms(
-  page: Page,
-): Promise<Array<{ transform: string; identity: boolean }>> {
-  return page.evaluate(() =>
-    Array.from(document.querySelectorAll('[data-motion-transform]')).map(
-      (element) => {
-        const { transform } = window.getComputedStyle(element)
-        return {
-          transform,
-          identity:
-            transform === 'none' || new DOMMatrixReadOnly(transform).isIdentity,
-        }
-      },
-    ),
+async function transformsAtFirstKeyframe(
+  hooks: Locator,
+): Promise<Array<{ entrance: boolean; transform: string; identity: boolean }>> {
+  return hooks.evaluateAll((elements) =>
+    elements.map((element) => {
+      element.setAttribute('data-entering', '')
+      const animations = element.getAnimations()
+      for (const animation of animations) {
+        animation.pause()
+        animation.currentTime = 0
+      }
+      const { transform } = window.getComputedStyle(element)
+      for (const animation of animations) animation.cancel()
+      element.removeAttribute('data-entering')
+      return {
+        entrance: animations.length > 0,
+        transform,
+        identity:
+          transform === 'none' || new DOMMatrixReadOnly(transform).isIdentity,
+      }
+    }),
   )
 }
-
-/**
- * Opens `/accounts` with the preference set. Without it every assertion in this file could pass on
- * a fast machine for the wrong reason, so the emulation is checked rather than trusted.
- */
-async function gotoWithReducedMotion(page: Page): Promise<void> {
-  await gotoApp(page, '/accounts')
-  expect(
-    await page.evaluate(
-      () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    ),
-  ).toBe(true)
-}
-
-/** Opens the overlay from the keyboard and returns it once visible. */
-async function openOverlay(page: Page, overlay: Overlay): Promise<Locator> {
-  await overlay.trigger(page).focus()
-  await page.keyboard.press('Enter')
-  const element = overlay.locate(page)
-  await expect(element).toBeVisible()
-  return element
-}
-
-/** The hooked elements the overlay sits inside. */
-function hooksAround(page: Page, element: Locator): Locator {
-  return page.locator('[data-motion-transform]').filter({ has: element })
-}
-
-/**
- * Holds every hooked element's animations on their first keyframe. Added before the overlay opens,
- * so its entrance is created paused at `currentTime` 0, inside its active interval.
- */
-const HOLD_ENTRANCE =
-  '[data-motion-transform] { animation-play-state: paused !important; }'
 
 for (const theme of THEMES) {
   test.describe(`reduced motion, ${theme} theme`, () => {
@@ -225,21 +173,31 @@ for (const theme of THEMES) {
       test(`${overlay.name} is at rest on its first frame`, async ({
         page,
         isMobile,
-      }, testInfo) => {
+      }) => {
         test.skip(
           (overlay === POPOVER && isMobile) || (overlay === SHEET && !isMobile),
           'the popover is proved on the desktop projects, the docked sheet on the phone projects',
         )
 
-        await gotoWithReducedMotion(page)
-        const element = await openOverlay(page, overlay)
+        await gotoApp(page, '/accounts')
+        // Without the preference every assertion below could pass on a fast machine for the wrong
+        // reason, so the emulation is checked rather than trusted.
+        expect(
+          await page.evaluate(
+            () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+          ),
+        ).toBe(true)
+
+        await overlay.trigger(page).focus()
+        await page.keyboard.press('Enter')
+        const element = overlay.locate(page)
+        await expect(element).toBeVisible()
 
         // The sweep shortens every animation and transition to 0.01ms; it does not remove them. A
         // colour transition started by the same state change that opened the overlay is still
         // `running` at `currentTime` 0 when the overlay first becomes visible, and lands on the next
-        // frame - measured on both engines, and desktop WebKit repainted the menu trigger's glyph in
-        // its new colour only after the first frame. So the first frame is taken two animation
-        // frames in: enough for anything the sweep collapsed to finish, far too short for motion.
+        // frame - measured on both engines. So the first reading is taken two animation frames in:
+        // enough for anything the sweep collapsed to finish, far too short for motion.
         await page.evaluate(
           () =>
             new Promise<void>((resolve) => {
@@ -250,82 +208,35 @@ for (const theme of THEMES) {
               })
             }),
         )
-        const first = await page.screenshot()
+        expect(
+          await motionStillRunning(page),
+          `animations still running two frames after ${overlay.name} appeared`,
+        ).toEqual([])
+        const first = await overlayState(element)
         await page.waitForTimeout(SETTLE_MS)
-        const later = await page.screenshot()
-        const differing = await differingPixels(page, first, later)
-        if (differing > 0) {
-          // Evidence goes to the test's output directory, never into the repository.
-          await testInfo.attach('first-frame', {
-            body: first,
-            contentType: 'image/png',
-          })
-          await testInfo.attach('frame-one-second-later', {
-            body: later,
-            contentType: 'image/png',
-          })
-        }
         expect(
-          differing,
-          `pixels that differ between the first frame of ${overlay.name} and one ${SETTLE_MS} ms later: motion was still running`,
-        ).toBe(0)
+          await overlayState(element),
+          `${overlay.name} moved or faded between its first frame and ${SETTLE_MS} ms later`,
+        ).toEqual(first)
 
-        const hooks = hooksAround(page, element)
+        const hooks = page
+          .locator('[data-motion-transform]')
+          .filter({ has: element })
+        const held = await transformsAtFirstKeyframe(hooks)
         expect(
-          await hooks.count(),
-          `${overlay.name} is not inside a [data-motion-transform] element; the hook was renamed or dropped`,
+          held.filter(({ entrance }) => entrance).length,
+          `${overlay.name} is not inside a [data-motion-transform] element with an entrance; the hook or the entrance was renamed or dropped`,
         ).toBeGreaterThan(0)
-        for (const { transform, identity } of await hookedTransforms(page)) {
+        for (const { transform, identity } of held) {
           expect(
             identity,
-            `a [data-motion-transform] element computes transform: ${transform}`,
+            `a [data-motion-transform] element held at its first keyframe computes transform: ${transform}`,
           ).toBe(true)
         }
 
         await page.keyboard.press('Escape')
         await expect(element).not.toBeAttached()
         await expect(hooks).toHaveCount(0)
-      })
-
-      test(`${overlay.name} keeps the identity transform with its entrance held`, async ({
-        page,
-        isMobile,
-      }) => {
-        test.skip(
-          (overlay === POPOVER && isMobile) || (overlay === SHEET && !isMobile),
-          'the popover is proved on the desktop projects, the docked sheet on the phone projects',
-        )
-
-        await gotoWithReducedMotion(page)
-        await page.addStyleTag({ content: HOLD_ENTRANCE })
-        const element = await openOverlay(page, overlay)
-
-        const held = await hooksAround(page, element).evaluateAll((hooks) =>
-          hooks.map((hook) => {
-            const { transform } = window.getComputedStyle(hook)
-            return {
-              paused: hook
-                .getAnimations()
-                .some((animation) => animation.playState === 'paused'),
-              transform,
-              identity:
-                transform === 'none' ||
-                new DOMMatrixReadOnly(transform).isIdentity,
-            }
-          }),
-        )
-        expect(
-          held.length,
-          `${overlay.name} is not inside a [data-motion-transform] element; the hook was renamed or dropped`,
-        ).toBeGreaterThan(0)
-        for (const { paused, transform, identity } of held) {
-          // Without a held animation the identity below would be the vacuous one assertion 2 sees.
-          expect(paused, `${overlay.name} has no entrance held`).toBe(true)
-          expect(
-            identity,
-            `a [data-motion-transform] element holding its entrance computes transform: ${transform}`,
-          ).toBe(true)
-        }
       })
     }
   })
