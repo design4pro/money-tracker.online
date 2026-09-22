@@ -59,9 +59,26 @@ runs:
     # has timed went the wrong way: ../setup/action.yml carries a `cache: pnpm` restore that cost
     # 198 s of a 134 s-average step on the pool it was meant to speed up. 35 s is under the bar
     # where that trade is worth making; revisit it if the number grows.
+    #
+    # `--with-deps` only where the runner can become root. It shells out to `apt-get` through
+    # `su`, and the pool's containers run as an unprivileged `runner` on purpose
+    # (cezar, `host/runner/Dockerfile`), so there the flag is not a slow path but a dead one:
+    # `su: Authentication failure`, then `Failed to install browsers`, in run 35656190448. It is
+    # also work already done there - that image is built FROM `mcr.microsoft.com/playwright`,
+    # which carries both the browsers and the libraries the flag would install, and
+    # `@playwright/test` is pinned to the version it ships. The install itself stays
+    # unconditional, because that is #403's invariant: a machine without the browsers says so in
+    # this step rather than at the first page load.
     - name: Install the browsers
       shell: bash
-      run: pnpm exec playwright install --with-deps chromium
+      run: |
+        set -euo pipefail
+        if sudo -n true 2>/dev/null; then
+          pnpm exec playwright install --with-deps chromium
+        else
+          echo 'No passwordless root here - installing the browsers without --with-deps and trusting the image for the system libraries.'
+          pnpm exec playwright install chromium
+        fi
 
     - name: Generate route tree
       shell: bash
