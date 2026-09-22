@@ -12,12 +12,9 @@
       "Bash(gh issue:*)"
     ],
     "deny": [
-      "Bash(rm -rf /:*)",
       "Bash(rm -rf ~:*)",
       "Bash(rm -rf $HOME:*)",
       "Bash(gh repo delete:*)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
       "Bash(git filter-branch:*)",
       "Bash(git filter-repo:*)",
       "Read(./.dev.vars)",

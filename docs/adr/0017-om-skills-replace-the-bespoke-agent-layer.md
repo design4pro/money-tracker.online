@@ -332,7 +332,7 @@ unnecessary; the reason underneath it did not.
 ## Amendment, 2026-09-20: a short deny list returns, as a backstop and not as the boundary
 
 The 2026-09-07 (second) amendment above says `.claude/settings.json` is hooks-only and that the
-deny list "no longer exists". `.claude/settings.json` now carries a `permissions.deny` of twelve
+deny list "no longer exists". `.claude/settings.json` now carries a `permissions.deny` of nine
 entries again. The two are less in conflict than they read, and the distinction is the point.
 
 That amendment's argument was about `deny` as a **boundary**, and it is correct: a prefix matcher
@@ -358,6 +358,11 @@ So the split is by failure mode, not by rule:
   evaluated by the harness before any hook, wins over `ask` and `allow`, and applies in every
   permission mode including the `dontAsk` a cezar run uses and the `bypassPermissions` of the
   review job. It is deliberately too short to reason with: the irreversible set only.
+
+The deny matcher is prefix-only, so it cannot represent the hook's distinction between a
+force-push to `develop` or `main` and one to a feature branch, nor its whole-target distinction
+between `rm -rf /` and scratchpad cleanup below `/tmp`. Those three prefixes are therefore absent:
+the hook remains their precise enforcement and its paired cases preserve the ordinary commands.
 
 It names the exact secret files rather than a glob, because `.dev.vars.example` and
 `.env.local.example` are files `AGENTS.md` sends a reader to, and `Read(./.dev.vars.*)` would have

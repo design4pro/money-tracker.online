@@ -9,6 +9,7 @@ import {
   mkdirSync,
   mkdtempSync,
   realpathSync,
+  readFileSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -50,6 +51,16 @@ const bash = (command: string, env = {}) =>
   hook('git-guardrails.sh', { command }, env)
 
 describe('git-guardrails.sh', () => {
+  it('does not prefix-deny ordinary feature pushes and scratchpad cleanup', () => {
+    const settings = JSON.parse(
+      readFileSync(resolve(HOOKS, '..', 'settings.json'), 'utf8'),
+    ) as { permissions: { deny: string[] } }
+
+    expect(settings.permissions.deny).not.toContain('Bash(rm -rf /:*)')
+    expect(settings.permissions.deny).not.toContain('Bash(git push --force:*)')
+    expect(settings.permissions.deny).not.toContain('Bash(git push -f:*)')
+  })
+
   it('blocks destructive git for everyone', () => {
     // Every mode, because this tier is the one that has no audience: nothing a developer,
     // a cezar run or the review job legitimately does needs any of it.
