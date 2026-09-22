@@ -256,6 +256,7 @@ describe('git-guardrails.sh', () => {
     expect(bash(`rm -rf ${root}`).status).toBe(2)
     expect(bash(`rm -rf ${root}/`).status).toBe(2)
     expect(bash(`rm -rf ${root}/node_modules`).status).toBe(0)
+    expect(bash(`rm -rf ${root}/node_modules /etc`).status).toBe(2)
   })
 
   // The expanded path is not how the root is usually written. These four spellings all name the

@@ -234,6 +234,11 @@ rm_recursive="(^|[^[:alnum:]_/-])${rm_path}rm[[:space:]]+${rm_flags}-[[:alnum:]-
 # accept as an end, and the whole match failed on the one command that mattered.
 rm_end='([[:space:]]|;|&|\||\)|`|$)'
 
+# The worktree root is handled specially below: deleting it is dangerous, while removing a path
+# inside it is the ordinary recovery path for a broken install or generated artifact.
+project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
+project_root_spelling='\$\{?(PWD|CLAUDE_PROJECT_DIR)\}?|\$\(pwd\)|`pwd`'
+
 # `./.git` deletes what `.git` deletes, and `./` is how a path is ordinarily written rather than an
 # evasion. The alternation had only a trailing `/?\*?`, so the leading spelling slid past it:
 # `.` matched and then `rm_end` met `/.git` instead of a boundary. `..` in front works the same way,
@@ -266,8 +271,10 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.
 # prefix was removed. Remove only disposable scratchpad operands before checking absolute targets,
 # so a harmless scratchpad beside `/etc` still blocks.
 rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-[[:alnum:]_-]+[^[:space:];&|)`]*##g')
+rm_safe_suffix='/[^[:space:];&|)`]*'
+rm_without_safe_paths=$(printf '%s' "$rm_without_scratchpads" | sed -E "s#${project_root}${rm_safe_suffix}##g")
 rm_absolute='/[^[:space:];&|)`]*'
-echo "$rm_without_scratchpads" | grep -Eq "${rm_recursive}${rm_absolute}${rm_end}" \
+echo "$rm_without_safe_paths" | grep -Eq "${rm_recursive}${rm_absolute}${rm_end}" \
   && block 'rm -r of an absolute path'
 
 # The worktree root spelled out, which the pattern above cannot cover because it is a path like any
@@ -285,8 +292,6 @@ echo "$rm_without_scratchpads" | grep -Eq "${rm_recursive}${rm_absolute}${rm_end
 # directory. A rule that knew only the expansion refused `rm -rf /Users/.../money-tracker.online`
 # and allowed `rm -rf $PWD`, which deletes the same tree. `$HOME` is in the alternation above for
 # exactly this reason; these belong here for the same one.
-project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
-project_root_spelling='\$\{?(PWD|CLAUDE_PROJECT_DIR)\}?|\$\(pwd\)|`pwd`'
 echo "$rm_scan" | grep -Eq "${rm_recursive}(${project_root}|${project_root_spelling})/*\*?${rm_end}" \
   && block 'rm -r of the project root'
 
