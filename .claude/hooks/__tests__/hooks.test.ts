@@ -259,7 +259,6 @@ describe('git-guardrails.sh', () => {
     'rm -rf .ai/qa/artifacts_123',
     'rm -rf /tmp/claude-501/x',
     'rm -rf /private/tmp/claude-501/x',
-    'rm -rf /tmp/claude-*',
     'rm package-lock.json',
     // Several operands, none of them a root: stepping over an operand must not turn the next one
     // into a target it is not.
@@ -278,6 +277,17 @@ describe('git-guardrails.sh', () => {
     'rm -rf dist\nrm -rf build',
   ])('leaves the ordinary cleanup %s alone', (command) => {
     expect(bash(command).status).toBe(0)
+  })
+
+  it('leaves a controlled scratchpad glob alone', () => {
+    const scratchpad = mkdtempSync(join(tmpdir(), 'claude-glob-'))
+    const glob = `${scratchpad.slice(0, -6)}*`
+
+    try {
+      expect(bash(`rm -rf ${glob}`).status).toBe(0)
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true })
+    }
   })
 
   it('blocks recursive cleanup through a scratchpad symlink', () => {
