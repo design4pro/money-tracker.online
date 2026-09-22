@@ -285,7 +285,11 @@ describe('git-guardrails.sh', () => {
     rmSync(scratchpad, { recursive: true })
     symlinkSync('/etc', scratchpad)
 
-    expect(bash(`rm -rf ${scratchpad}/*`).status).toBe(2)
+    try {
+      expect(bash(`rm -rf ${scratchpad}/*`).status).toBe(2)
+    } finally {
+      rmSync(scratchpad, { force: true })
+    }
   })
 
   it('fails closed for an unresolved scratchpad symlink', () => {
@@ -293,7 +297,11 @@ describe('git-guardrails.sh', () => {
     rmSync(scratchpad, { recursive: true })
     symlinkSync(join(tmpdir(), 'missing-scratchpad-target'), scratchpad)
 
-    expect(bash(`rm -rf ${scratchpad}`).status).toBe(2)
+    try {
+      expect(bash(`rm -rf ${scratchpad}`).status).toBe(2)
+    } finally {
+      rmSync(scratchpad, { force: true })
+    }
   })
 
   // The worktree root by its absolute path, which no pattern of roots can cover. A path *under*
