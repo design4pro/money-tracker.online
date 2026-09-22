@@ -12,5 +12,4 @@ steps:
   - id: brainstorm
     name: om-brainstorm
     prompt: '/om-brainstorm {{task}}'
-    model: opus
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite, Write]

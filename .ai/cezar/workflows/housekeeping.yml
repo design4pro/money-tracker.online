@@ -12,15 +12,12 @@ steps:
   - id: review-prs
     name: om-review-prs
     prompt: '/om-review-prs'
-    model: opus
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: merge-buddy
     name: om-merge-buddy (read-only)
     prompt: '/om-merge-buddy'
-    model: sonnet
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
   - id: close-fixed
     name: om-close-fixed-issues
     prompt: '/om-close-fixed-issues --limit 50'
-    model: sonnet
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]

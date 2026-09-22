@@ -356,40 +356,50 @@ asserts exactly that.
 cheap to start is one a human actually starts. The four `afk-*` workflows have none either, but
 not deliberately — see the note under the table.
 
-| Workflow              | Agent step                                                               | Model                | Started by                                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `issue-groom`         | `/om-auto-manage-issues {{task}} --prep-impl`                            | sonnet               | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                |
-| `issue-autofix`       | `/om-auto-fix-issue {{task}}`                                            | opus                 | automation **Fix issues on the autofix label** (label `autofix`)                                                                         |
-| `spec`                | `/om-auto-write-spec {{task}}`                                           | opus                 | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                             |
-| `implement-spec`      | `/om-auto-implement-spec {{task}}`                                       | opus                 | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
-| `pr-autopilot`        | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | opus                 | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer)                                                 |
-| `pr-review`           | `/om-auto-review-pr {{task}} --autofix`                                  | opus                 | a human, from the cockpit, on a PR number                                                                                                |
-| `pr-fix`              | `/om-auto-fix-pr {{task}}`                                               | opus                 | automation **Resolve blocking review threads** (label `review-threads` on a PR)                                                          |
-| `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | opus, sonnet, sonnet | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                         |
-| `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | opus                 | a human, from the cockpit, with the idea as the task                                                                                     |
-| `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | sonnet               | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                  |
-| `implement-ticket`    | `/om-fix {{task}}` → gate → `/om-open-pr` → `/om-auto-review-pr`         | opus, sonnet, opus   | automation **Implement ready-for-agent issues** (label `ready-for-agent`, and `risk-low`)                                                |
-| `triage`              | `/afk-triage {{task}}`                                                   | opus                 | automation **Triage new issues** (label `needs-triage`)                                                                                  |
-| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                               | opus                 | automation **Spec to tickets**, weekdays 07:00                                                                                           |
-| `architecture-review` | `/afk-architecture-review {{task}}`                                      | opus                 | automation **Weekly architecture review**, Mondays 06:00                                                                                 |
-| `lessons`             | `/afk-lessons {{task}}`                                                  | opus                 | automation **Weekly lessons**, Fridays 16:00                                                                                             |
+| Workflow              | Agent step                                                               | Started by                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `issue-groom`         | `/om-auto-manage-issues {{task}} --prep-impl`                            | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                |
+| `issue-autofix`       | `/om-auto-fix-issue {{task}}`                                            | automation **Fix issues on the autofix label** (label `autofix`)                                                                         |
+| `spec`                | `/om-auto-write-spec {{task}}`                                           | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                             |
+| `implement-spec`      | `/om-auto-implement-spec {{task}}`                                       | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
+| `pr-autopilot`        | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer)                                                 |
+| `pr-review`           | `/om-auto-review-pr {{task}} --autofix`                                  | a human, from the cockpit, on a PR number                                                                                                |
+| `pr-fix`              | `/om-auto-fix-pr {{task}}`                                               | automation **Resolve blocking review threads** (label `review-threads` on a PR)                                                          |
+| `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                         |
+| `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | a human, from the cockpit, with the idea as the task                                                                                     |
+| `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                  |
+| `implement-ticket`    | `/om-fix {{task}}` → gate → `/om-open-pr` → `/om-auto-review-pr`         | automation **Implement ready-for-agent issues** (label `ready-for-agent`, and `risk-low`)                                                |
+| `triage`              | `/afk-triage {{task}}`                                                   | automation **Triage new issues** (label `needs-triage`)                                                                                  |
+| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                               | automation **Spec to tickets**, weekdays 07:00                                                                                           |
+| `architecture-review` | `/afk-architecture-review {{task}}`                                      | automation **Weekly architecture review**, Mondays 06:00                                                                                 |
+| `lessons`             | `/afk-lessons {{task}}`                                                  | automation **Weekly lessons**, Fridays 16:00                                                                                             |
 
 The last five rows were shaped unlike the ten above them until 2026-09-20, and it was a defect
 rather than a style. Four were the three-line `skills:` shorthand, so they carried no bootstrap
-step, no `model:` and cezar's `DEFAULT_ALLOWED_TOOLS` — `[Read, Edit, Write, Grep, Glob, Bash]`,
+step and cezar's `DEFAULT_ALLOWED_TOOLS` — `[Read, Edit, Write, Grep, Glob, Bash]`,
 which both over-granted (`triage` and `architecture-review` are documented read-only) and
 under-granted (`Skill` and `TodoWrite` are absent, so `afk-lessons` §1 and §4 could not reach
 `om-pipeline-retro` or `om-open-pr`). `implement-ticket` inlined all seven validation commands
 verbatim in its gate step, which was the one place in the repository that copied
 `validation.commands` instead of reading it.
 
-All five now carry a bootstrap step, a pinned model and an explicit grant: `triage`,
+All five now carry a bootstrap step and an explicit grant: `triage`,
 `spec-to-tickets` and `architecture-review` read-only (`[Read, Grep, Glob, Bash, Skill,
 TodoWrite]`), `lessons` and `implement-ticket` with `Edit` and `Write` because they write. The
 gate step runs `node scripts/ci/run-validation.mjs`, which reads `validation.commands` — so the
 list lives in one file again, and `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails if any
-workflow copies a command out of it. The same test fails a workflow that prompts without a model
-or a grant, or one that neither bootstraps nor says in a comment why it does not.
+workflow copies a command out of it. The same test fails a workflow that prompts without a grant,
+or one that neither bootstraps nor says in a comment why it does not.
+
+**No workflow names a model, and the test enforces that.** Until 2026-09-22 most agent steps
+carried a `model:` — `opus` on the ones that reason, `sonnet` on the ones that execute. A step
+`model:` wins over the model the run was started with, and it is a claim about one backend: a
+Claude alias handed to a codex run is a model the API refuses every request on. Eighteen local
+codex runs did nothing at all, seventeen of them recorded `done`, because the refusal arrived on a
+channel the runner did not read. The model now belongs to the run: the cockpit composer picks it
+for a run a human starts, and an automation run uses the backend CLI's own default unless the
+automation sets `task.model` in `.ai/cezar/automations.json`.
+`.ai/scripts/__tests__/cezar-workflows.test.mjs` fails any agent step that pins one again.
 
 The task text an automation sends is the issue or PR number alone (`{{github.number}}`); a second
 token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled

@@ -12,5 +12,4 @@ steps:
   - id: afk-lessons
     name: afk-lessons
     prompt: '/afk-lessons {{task}}'
-    model: opus
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]

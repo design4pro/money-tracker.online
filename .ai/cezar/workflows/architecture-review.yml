@@ -12,5 +12,4 @@ steps:
   - id: afk-architecture-review
     name: afk-architecture-review
     prompt: '/afk-architecture-review {{task}}'
-    model: opus
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
