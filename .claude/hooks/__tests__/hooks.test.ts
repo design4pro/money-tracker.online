@@ -52,19 +52,25 @@ function hook(
 const bash = (command: string, env = {}) =>
   hook('git-guardrails.sh', { command }, env)
 
+// A commit made from a worktree runs pre-commit, and so this file, with GIT_DIR pointing at that
+// worktree's git directory. Inherited, it turns `git init` below into a re-init of the real
+// repository - which, with no work tree beside it, sets `core.bare = true` in the shared config
+// and leaves the checkout and every worktree unusable. The scratch repositories get none of it.
+const gitEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
+)
+const git = (args: string[], cwd: string) =>
+  execFileSync('git', args, { cwd, env: gitEnv })
+
 function gitRoot(branch: string, upstream?: string) {
   const root = mkdtempSync(join(tmpdir(), 'guard-git-'))
-  execFileSync('git', ['init'], { cwd: root })
-  execFileSync('git', ['checkout', '-b', branch], { cwd: root })
+  git(['init'], root)
+  git(['checkout', '-b', branch], root)
   if (upstream) {
-    execFileSync('git', ['remote', 'add', 'origin', 'https://example.invalid/repo.git'], {
-      cwd: root,
-    })
-    execFileSync('git', ['config', `branch.${branch}.remote`, 'origin'], { cwd: root })
-    execFileSync('git', ['config', `branch.${branch}.merge`, `refs/heads/${upstream}`], {
-      cwd: root,
-    })
-    execFileSync('git', ['config', 'push.default', 'upstream'], { cwd: root })
+    git(['remote', 'add', 'origin', 'https://example.invalid/repo.git'], root)
+    git(['config', `branch.${branch}.remote`, 'origin'], root)
+    git(['config', `branch.${branch}.merge`, `refs/heads/${upstream}`], root)
+    git(['config', 'push.default', 'upstream'], root)
   }
   return root
 }
