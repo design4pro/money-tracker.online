@@ -288,6 +288,20 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
 home_traversal='(~|\$\{?HOME\}?)(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
 echo "$rm_scan" | grep -Eq "${rm_recursive}${home_traversal}" \
   && block 'rm -r traversal from home'
+# A scratchpad name is disposable, but a symlink below that name can lead `rm` outside the
+# scratchpad. Expand only the operands this exemption would remove and reject any resolved path
+# that does not remain below a scratchpad root.
+shopt -s nullglob
+while IFS= read -r scratchpad; do
+  for candidate in $scratchpad; do
+    [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+    resolved=$(realpath "$candidate")
+    case "$resolved" in
+      /tmp/claude-*|/private/tmp/claude-*) ;;
+      *) block 'rm -r through a scratchpad symlink' ;;
+    esac
+  done
+done < <(grep -oE '/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*' <<< "$rm_scan")
 rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*##g')
 # The worktree exception admits paths below the checkout, not a traversal out of it. Test this
 # before removing the safe suffix, so `worktree/..` cannot erase the destructive target.

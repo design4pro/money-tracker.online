@@ -10,6 +10,8 @@ import {
   mkdtempSync,
   realpathSync,
   readFileSync,
+  rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -276,6 +278,14 @@ describe('git-guardrails.sh', () => {
     'rm -rf dist\nrm -rf build',
   ])('leaves the ordinary cleanup %s alone', (command) => {
     expect(bash(command).status).toBe(0)
+  })
+
+  it('blocks recursive cleanup through a scratchpad symlink', () => {
+    const scratchpad = mkdtempSync(join(tmpdir(), 'claude-link-'))
+    rmSync(scratchpad, { recursive: true })
+    symlinkSync('/etc', scratchpad)
+
+    expect(bash(`rm -rf ${scratchpad}/*`).status).toBe(2)
   })
 
   // The worktree root by its absolute path, which no pattern of roots can cover. A path *under*
