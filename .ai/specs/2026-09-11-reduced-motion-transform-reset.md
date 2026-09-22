@@ -451,22 +451,29 @@ an ADR.
 
 ## Amendment — PR #416
 
-Phase 2 shipped differently from the design above in four places, each measured on that PR. The
+Phase 2 shipped differently from the design above in five places, each measured on that PR. The
 Phase 1 corrections in the tracking plan are still owed here by Phase 3.
 
-1. **"Byte-identical" is zero pixels past a raster-noise floor.** `RASTER_NOISE` in
-   `e2e/reduced-motion.visual.spec.ts` lets a pixel differ by at most 16/255 in any channel. On
-   `chromium` a static glyph in the freshly opened modal is sometimes re-rasterised after the first
-   frame (7 pixels, largest delta 9) with every computed style unchanged, so buffer equality would
-   flake on a still page. Real motion is thousands of pixels past the floor: the falsification run
-   measured 6,876 to 2,106,829.
-2. **The first frame is taken two animation frames after the overlay is visible**, not immediately.
-   The `*` sweep shortens a colour transition started by the same state change to 0.01ms without
-   removing it, and it lands on the next frame; two frames are far too short for any animation to
-   finish.
-3. **The docked case is the bottom navigation's More sheet**, not the **New account** modal. The
+1. **"At rest" is read from state, not from frames.** ADR 0016 keeps every screenshot comparison
+   out of CI, a comparison made inside the run included, so the frame pair became a state pair: no
+   animation or transition in the document still running for longer than the sweep's 0.01ms, and
+   the overlay's box and opacity equal to what they read a second later. With the whole
+   reduced-motion block disabled every case went red, naming `dialog-in`, `pop-in`, `drawer-in` and
+   `fade-in` as still running.
+2. **The transform reset is read with the entrance held at its first keyframe.** After an entrance
+   finishes nothing sets a `transform` on a hooked element, so a read at rest is `none` with or
+   without the reset. The spec restarts the element's own entrance through `data-entering`, pauses
+   it at `currentTime` 0 and reads the transform there; with the reset deleted every case went red
+   (`matrix(0.985, 0, 0, 0.985, 0, 8)` on the modal, `matrix(1, 0, 0, 1, 0, 285)` on the sheet).
+   The count assertion counts hooks that have an entrance to hold, and went red on every modal and
+   sheet case with the hook removed from `RACModal`.
+3. **The first reading is taken two animation frames after the overlay is visible**, not
+   immediately. The `*` sweep shortens a colour transition started by the same state change to
+   0.01ms without removing it, and it lands on the next frame; two frames are far too short for any
+   animation to finish.
+4. **The docked case is the bottom navigation's More sheet**, not the **New account** modal. The
    account form is centred at every width (tracking plan, correction 2), so the modal is proved
    centred on every project and the sheet on the phone projects. The popover is the shell's
    Appearance menu on the desktop projects.
-4. **Four browser projects, not three.** The config now defines `mobile-chromium` as well (issue
+5. **Four browser projects, not three.** The config now defines `mobile-chromium` as well (issue
    #317), which supersedes Q8: the sheet runs on both phone projects and the modal on all four.
