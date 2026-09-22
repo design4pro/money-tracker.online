@@ -85,7 +85,10 @@ jobs:
 
           # `--paginate` emits one jq result per page, so a newline-separated list is the only
           # shape that survives concatenation. A path cannot contain a newline in git.
-          FILES="$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files" -q '.[].filename')"
+          # A rename is one entry named by its new path, with the old one only in
+          # `previous_filename`; without it, moving a governed document out of its path reads as
+          # touching nothing governed.
+          FILES="$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files" -q '.[] | .filename, (.previous_filename // empty)')"
           export FILES
 
           node scripts/ci/governance-gate.mjs
