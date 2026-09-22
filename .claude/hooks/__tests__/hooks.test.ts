@@ -204,6 +204,48 @@ describe('git-guardrails.sh', () => {
     expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
   })
 
+  // The shared-checkout check used to read the command's shape: at most one token between `push`
+  // and an optional `HEAD`. Any second flag moved a real force-push out of that shape, and `-u` is
+  // the flag a person reaches for beside `--force`. A value-taking option must not lend its value
+  // to the refspec count either.
+  it.each([
+    'git push -u --force origin HEAD',
+    'git push --force -u origin',
+    'git push -u -f origin HEAD',
+    'git push --force origin HEAD --quiet',
+    'git push --force-with-lease=origin/develop -u origin',
+    'git push -o ci.skip --force origin',
+    'git push --force origin fix/issue-1-x HEAD',
+    // A force flag in front of `git push` leaves no words after it. Under `set -u`, bash 3.2 calls
+    // an empty array unbound and exits 1, which the harness reads as "allowed".
+    'env -f git push',
+  ])('blocks the implicit force-push from a shared branch with more flags %s', (command) => {
+    const root = gitRoot('develop')
+    const r = hook('git-guardrails.sh', { command }, {}, root)
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('force-push to develop/main')
+  })
+
+  it.each([
+    'git push -u --force origin fix/issue-1-x',
+    'git push --force -o ci.skip origin fix/issue-1-x',
+    'git push --force origin HEAD:refs/heads/fix/issue-1-x',
+  ])('leaves the explicit feature refspec with more flags from a shared branch %s alone', (command) => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+  })
+
+  // `-follow` inside `--follow-tags` is a dash, no letters and then an `f`: the short-flag
+  // alternative read it as a force flag, and what was left after stripping it looked like a bare
+  // push. A force flag is a whole token, never part of a longer option.
+  it.each(['git push --follow-tags', 'git push --follow-tags origin HEAD', 'git push -u origin HEAD'])(
+    'leaves the ordinary push from a shared branch %s alone',
+    (command) => {
+      const root = gitRoot('develop')
+      expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+    },
+  )
+
   // `rm -r` is judged by where it points, not by the flags: the target has to match whole, so the
   // roots below go and every ordinary cleanup stays. Every mode, like the rest of tier one.
   it.each([
@@ -283,6 +325,38 @@ describe('git-guardrails.sh', () => {
     'rm -rf dist\nrm -rf build',
   ])('leaves the ordinary cleanup %s alone', (command) => {
     expect(bash(command).status).toBe(0)
+  })
+
+  // `~/x`, `$HOME/x` and `${HOME}/x` are absolute paths in another spelling. The root rule knew
+  // them only as the whole operand and the absolute-path rule only by a leading `/`, so a path
+  // under home was checked by neither. They are read as the path they expand to, which also keeps
+  // the project-root exception working for a checkout that lives under home.
+  it.each(['rm -rf ~/.ssh', 'rm -rf $HOME/.aws', 'rm -rf ${HOME}/.claude', 'rm -rf dist ~/x'])(
+    'blocks the recursive delete under home %s',
+    (command) => {
+      for (const env of [{}, AGENT, ACTIONS]) {
+        const r = bash(command, env)
+        expect(r.status).toBe(2)
+        expect(r.stderr).toContain('rm -r of an absolute path')
+      }
+    },
+  )
+
+  it('reads a home-relative path to the project the way it reads the absolute one', () => {
+    const home = realpathSync(mkdtempSync(join(tmpdir(), 'guard-home-')))
+    const project = join(home, 'project')
+    mkdirSync(project)
+
+    try {
+      const run = (command: string) =>
+        hook('git-guardrails.sh', { command }, { HOME: home }, project).status
+      expect(run('rm -rf ~/project/node_modules')).toBe(0)
+      expect(run('rm -rf $HOME/project/dist')).toBe(0)
+      expect(run('rm -rf ~/project')).toBe(2)
+      expect(run('rm -rf ~/elsewhere')).toBe(2)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 
   it('leaves a controlled scratchpad glob alone', () => {

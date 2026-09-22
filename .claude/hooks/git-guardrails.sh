@@ -188,13 +188,44 @@ else
   current_push=$(git rev-parse --abbrev-ref --symbolic-full-name '@{push}' 2>/dev/null || \
     git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
 fi
+
+# The force flag is a whole token here. Unanchored, its short-flag alternative found `-follow`
+# inside `--follow-tags`, so an ordinary `git push --follow-tags` from develop was refused.
+#
+# Whether the push names a refspec of its own is read from its arguments, not from its shape. The
+# shape this used to match - at most one token between `push` and an optional `HEAD` - let any
+# second flag through: `git push -u --force origin HEAD` pushes the checked-out branch exactly as
+# `git push --force origin HEAD` does. Options are skipped, and the ones that take a separate value
+# skip that value too, so `-o ci.skip` cannot pass for a remote and a refspec. The first operand is
+# the remote; a push with no refspec after it, or with `HEAD` among them, sends the current branch.
+force_token="(^|[[:space:]])${force_flag}(=[^[:space:]]*)?([[:space:]]|$)"
 if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ] || \
   [[ "$current_push" =~ /(develop|main)$ ]]; then
   while IFS= read -r push_command; do
-    grep -Eq "$force_flag" <<< "$push_command" || continue
-    push_without_force=$(printf '%s' "$push_command" | sed -E "s/${force_flag}//g")
-    grep -Eq '^[[:space:]]*git[[:space:]]+push([[:space:]]+[^[:space:]]+)?([[:space:]]+HEAD)?[[:space:]]*$' \
-      <<< "$push_without_force" && block 'force-push to develop/main'
+    grep -Eq 'git[[:space:]]+push([[:space:]]|$)' <<< "$push_command" || continue
+    grep -Eq "$force_token" <<< "$push_command" || continue
+    read -ra push_words <<< "$(sed -E 's/^.*git[[:space:]]+push([[:space:]]|$)//' <<< "$push_command")"
+    operands=0
+    sends_current=
+    skip_value=
+    # The `+` form expands to nothing for an empty array; bash 3.2 under `set -u` calls a bare
+    # empty "${push_words[@]}" unbound and exits 1, which fails open.
+    for word in ${push_words[@]+"${push_words[@]}"}; do
+      if [ -n "$skip_value" ]; then skip_value=; continue; fi
+      case "$word" in
+        -o|--push-option|--repo|--receive-pack|--exec) skip_value=1 ;;
+        -*) ;;
+        *)
+          operands=$((operands + 1))
+          if [ "$operands" -gt 1 ] && { [ "$word" = HEAD ] || [ "$word" = @ ]; }; then
+            sends_current=1
+          fi
+          ;;
+      esac
+    done
+    if [ "$operands" -le 1 ] || [ -n "$sends_current" ]; then
+      block 'force-push to develop/main'
+    fi
   done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 fi
 
@@ -288,6 +319,16 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
 home_traversal='(~|\$\{?HOME\}?)(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
 echo "$rm_scan" | grep -Eq "${rm_recursive}${home_traversal}" \
   && block 'rm -r traversal from home'
+# `~/x`, `$HOME/x` and `${HOME}/x` are absolute paths spelled another way. The root rule above
+# knows them only as the whole operand and the absolute-path rule below only by a leading `/`, so a
+# path under home was checked by neither and `rm -rf ~/.ssh` went through. From here on they are
+# read as the path they expand to, which puts them under the same scratchpad and project-root
+# exceptions as the absolute spelling - a checkout under home stays cleanable either way. The
+# whole-operand and traversal forms are judged above, before this rewrite. An unset HOME expands to
+# a path no exception covers, so it fails closed.
+home_spelling='(^|[[:space:]])(~|\$\{?HOME\}?)/'
+home_expanded=$(printf '%s' "${HOME:-/home-unset}" | sed 's/[\\&#]/\\&/g')
+rm_scan=$(printf '%s' "$rm_scan" | sed -E "s#${home_spelling}#\\1${home_expanded}/#g")
 # A scratchpad name is disposable, but a symlink below that name can lead `rm` outside the
 # scratchpad. Expand only the operands this exemption would remove and reject any resolved path
 # that does not remain below a scratchpad root.
