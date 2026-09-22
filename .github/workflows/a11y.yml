@@ -80,14 +80,19 @@ jobs:
           A11Y_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
         run: pnpm exec tsx .github/a11y/axe-scan.mjs
 
-      # `always()`: the JSON is at its most useful on the run that failed.
+      # `always()`: the JSON is at its most useful on the run that failed. `continue-on-error`
+      # because the verdict is the scan above, not this upload - on 2026-09-21 the scan passed on
+      # the pool and the job went red anyway, on `Artifact storage quota has been hit`
+      # (run 35659108917, #417). Seven days rather than thirty: nothing reads this file on a
+      # schedule, and the allowance it shares is 2 GB.
       - name: Upload the axe results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: a11y-axe-results
           path: a11y-report
-          retention-days: 30
+          retention-days: 7
           if-no-files-found: ignore
 
       - name: Upload the dev server log

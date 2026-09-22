@@ -310,13 +310,24 @@ jobs:
       - name: Run the workerd suite
         run: pnpm test:workerd
 
+      # `continue-on-error`, and one of only two uploads in this repository that carries it.
+      # Nothing gates on this report - a human reads it after the fact - while the check it sits
+      # in is required, so without the flag the organisation's storage bill can fail a green
+      # suite: `Failed to CreateArtifact: Artifact storage quota has been hit`, run 35656190925,
+      # with 216 test files passing above it (#417). The blob reports further down are the
+      # opposite case and deliberately keep no flag: `e2e · merged report` downloads them.
+      #
+      # Three days rather than seven for the same reason. Coverage is read on the pull request
+      # that produced it or not at all, and a week of pull requests is what fills a 2 GB
+      # allowance.
       - name: Upload the coverage report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
 
   # The browser gate: the same suite, in the same container image, on two
