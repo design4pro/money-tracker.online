@@ -166,13 +166,37 @@ block() {
 # have fixed the one spelling while leaving `x=$(git push --force origin main)` and the backtick
 # form to be argued about separately. A command boundary belongs in the splitter, which is where
 # the secret rule below already puts it.
-push_force='git[[:space:]]+push\b[^;&|]*[[:space:]](--force|--mirror([[:space:]]|$)|-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$))'
+force_flag='(--force(-with-lease)?|-[[:alnum:]]*f[[:alnum:]_]*)'
+push_force="git[[:space:]]+push\\b[^;&|]*[[:space:]](${force_flag}|--mirror([[:space:]]|$))"
 push_shared='git[[:space:]]+push\b[^;&|]*(([[:space:]]|[/+:])(develop|main)([[:space:]]|:|$)|[[:space:]](--all|--mirror)([[:space:]]|$))'
 while IFS= read -r push_command; do
   grep -Eq "$push_force" <<< "$push_command" || continue
   grep -Eq "$push_shared" <<< "$push_command" || continue
   block 'force-push to develop/main'
 done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
+
+# A push without a refspec sends the checked-out branch. The command has no branch name for the
+# matcher above to see, so determine that one fact from Git before allowing a force flag through.
+# From a shared checkout, a force-push is unsafe even when its refspec is only `HEAD`; a named
+# feature refspec remains open because it does not rewrite the checked-out shared branch.
+current_branch=$(git branch --show-current 2>/dev/null || true)
+current_remote=$(git config --get "branch.${current_branch}.remote" 2>/dev/null || true)
+current_merge=$(git config --get "branch.${current_branch}.merge" 2>/dev/null || true)
+if [ -n "$current_remote" ] && [ -n "$current_merge" ]; then
+  current_push="${current_remote}/${current_merge#refs/heads/}"
+else
+  current_push=$(git rev-parse --abbrev-ref --symbolic-full-name '@{push}' 2>/dev/null || \
+    git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
+fi
+if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ] || \
+  [[ "$current_push" =~ /(develop|main)$ ]]; then
+  while IFS= read -r push_command; do
+    grep -Eq "$force_flag" <<< "$push_command" || continue
+    push_without_force=$(printf '%s' "$push_command" | sed -E "s/${force_flag}//g")
+    grep -Eq '^[[:space:]]*git[[:space:]]+push([[:space:]]+[^[:space:]]+)?([[:space:]]+HEAD)?[[:space:]]*$' \
+      <<< "$push_without_force" && block 'force-push to develop/main'
+  done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
+fi
 
 echo "$scan" | grep -Eq 'git\s+reset\s+--hard' && block 'git reset --hard'
 echo "$scan" | grep -Eq 'git\s+clean\s+-[a-zA-Z]*f' && block 'git clean -f'
@@ -195,10 +219,11 @@ echo "$scan" | grep -Eq 'wrangler\s+((d1|r2\s+bucket|kv\s+namespace)\s+)?delete\
 # dangerous root, deleting the repository on GitHub, pushing a deletion or a forced refspec, and
 # rewriting history. None is recoverable from this checkout and none has a caller in any session.
 
-# `rm -r` is dangerous only where it points, so the target has to match whole: `rm -rf dist`,
-# `rm -rf node_modules` and `rm -rf /tmp/x` stay open while `rm -rf .`, `rm -rf /`, `rm -rf ~`,
-# `rm -rf *` and `rm -rf .git` do not. The flag group repeats on both sides of the recursive flag,
-# which is what makes `rm --recursive --force /` and `rm -r -f /` read the same as `rm -rf /`.
+# `rm -r` is dangerous at a root or an arbitrary absolute target. The one exception is a cezar
+# scratchpad below `/tmp/claude-*` (or macOS's `/private/tmp` spelling), where agents write their
+# disposable evidence. Relative build output stays open; the flag group repeats on both sides of
+# the recursive flag, which is what makes `rm --recursive --force /` and `rm -r -f /` read the
+# same as `rm -rf /`.
 #
 # `rm` takes more than one operand, and a harmless one in front is not a reprieve for the rest:
 # `rm -rf dist .git` destroys .git exactly as `rm -rf .git` does, and the first shape of this rule
@@ -220,6 +245,11 @@ rm_recursive="(^|[^[:alnum:]_/-])${rm_path}rm[[:space:]]+${rm_flags}-[[:alnum:]-
 # class, `rm -rf /` inside a substitution had its `/` followed by a character the rule did not
 # accept as an end, and the whole match failed on the one command that mattered.
 rm_end='([[:space:]]|;|&|\||\)|`|$)'
+
+# The worktree root is handled specially below: deleting it is dangerous, while removing a path
+# inside it is the ordinary recovery path for a broken install or generated artifact.
+project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
+project_root_spelling='\$\{?(PWD|CLAUDE_PROJECT_DIR)\}?|\$\(pwd\)|`pwd`'
 
 # `./.git` deletes what `.git` deletes, and `./` is how a path is ordinarily written rather than an
 # evasion. The alternation had only a trailing `/?\*?`, so the leading spelling slid past it:
@@ -249,6 +279,43 @@ rm_scan=$(printf '%s' "$scan" | sed -E 's/git[[:space:]]+rm[^;&|()`]*--cached[^;
 echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.|\*|\.git)/*\*?${rm_end}" \
   && block 'rm -r of a dangerous root'
 
+# The prior root-only rule let `rm -rf /etc` and its siblings through after the broad permission
+# prefix was removed. Remove only disposable scratchpad operands before checking absolute targets,
+# so a harmless scratchpad beside `/etc` still blocks.
+scratchpad_traversal='/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*/\.\.'
+echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
+  && block 'rm -r traversal from a scratchpad'
+home_traversal='(~|\$\{?HOME\}?)(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
+echo "$rm_scan" | grep -Eq "${rm_recursive}${home_traversal}" \
+  && block 'rm -r traversal from home'
+# A scratchpad name is disposable, but a symlink below that name can lead `rm` outside the
+# scratchpad. Expand only the operands this exemption would remove and reject any resolved path
+# that does not remain below a scratchpad root.
+shopt -s nullglob
+while IFS= read -r scratchpad; do
+  for candidate in $scratchpad; do
+    [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+    resolved=$(realpath "$candidate" 2>/dev/null || true)
+    [ -n "$resolved" ] || block 'rm -r through an unresolved scratchpad path'
+    case "$resolved" in
+      /tmp/claude-*|/private/tmp/claude-*) ;;
+      *) block 'rm -r through a scratchpad symlink' ;;
+    esac
+  done
+done < <(grep -oE '/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*' <<< "$rm_scan")
+rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*##g')
+# The worktree exception admits paths below the checkout, not a traversal out of it. Test this
+# before removing the safe suffix, so `worktree/..` cannot erase the destructive target.
+project_root_target="(${project_root}|${project_root_spelling})"
+project_path_traversal="${project_root_target}"'(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
+echo "$rm_without_scratchpads" | grep -Eq "${rm_recursive}${project_path_traversal}" \
+  && block 'rm -r traversal from the project root'
+rm_safe_suffix='/[^[:space:];&|)`]*'
+rm_without_safe_paths=$(printf '%s' "$rm_without_scratchpads" | sed -E "s$(printf '\037')${project_root}${rm_safe_suffix}$(printf '\037')$(printf '\037')g")
+rm_absolute='/[^[:space:];&|)`]*'
+echo "$rm_without_safe_paths" | grep -Eq "${rm_recursive}${rm_absolute}${rm_end}" \
+  && block 'rm -r of an absolute path'
+
 # The worktree root spelled out, which the pattern above cannot cover because it is a path like any
 # other. CLAUDE_PROJECT_DIR is what the harness sets; $PWD is the fallback, and under cezar that is
 # the worktree the task was given rather than the developer's checkout. Only the root itself, so
@@ -264,8 +331,6 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.
 # directory. A rule that knew only the expansion refused `rm -rf /Users/.../money-tracker.online`
 # and allowed `rm -rf $PWD`, which deletes the same tree. `$HOME` is in the alternation above for
 # exactly this reason; these belong here for the same one.
-project_root=$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
-project_root_spelling='\$\{?(PWD|CLAUDE_PROJECT_DIR)\}?|\$\(pwd\)|`pwd`'
 echo "$rm_scan" | grep -Eq "${rm_recursive}(${project_root}|${project_root_spelling})/*\*?${rm_end}" \
   && block 'rm -r of the project root'
 

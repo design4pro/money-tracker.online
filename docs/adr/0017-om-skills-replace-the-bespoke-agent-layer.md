@@ -367,6 +367,15 @@ other direction.
 Decision 3's text is unaffected: the hooks are still what the skills' GitHub access is loosened
 against, and they still keep blocking destructive git, environment dumps and `--no-verify`.
 
+## Amendment, 2026-09-22: prefix denials yield to tested command-aware enforcement
+
+The three prefix denials for `rm -rf /`, `git push --force`, and `git push -f` are removed. They
+blocked ordinary feature-branch force-pushes and cezar scratchpad cleanup before the hook could
+evaluate the command's target. The hook now closes the two omitted cases that review found: a
+force-push without a refspec while `develop` or `main` is checked out, and a recursive deletion of
+an absolute path other than the disposable `/tmp/claude-*` scratchpad. Its regression cases cover
+the protected and permitted commands together.
+
 ## Amendment, 2026-09-21: the arming allowlist names Codex, and a bot needs one entry per login form
 
 Two sentences above date from when `DEFAULT_REVIEW_BOTS` in `scripts/ci/review-threads-label.mjs`

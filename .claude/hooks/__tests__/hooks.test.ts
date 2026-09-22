@@ -4,11 +4,14 @@
 // write `Closes #n` and run `pnpm exec`, so none of those is blocked under cezar; what is blocked
 // there is the pinned stack (`pnpm add`) and the environment dump. Under GitHub Actions the review
 // job reads untrusted PR content with a write token, so every gh mutation stays blocked there.
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import {
   mkdirSync,
   mkdtempSync,
   realpathSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -49,7 +52,34 @@ function hook(
 const bash = (command: string, env = {}) =>
   hook('git-guardrails.sh', { command }, env)
 
+function gitRoot(branch: string, upstream?: string) {
+  const root = mkdtempSync(join(tmpdir(), 'guard-git-'))
+  execFileSync('git', ['init'], { cwd: root })
+  execFileSync('git', ['checkout', '-b', branch], { cwd: root })
+  if (upstream) {
+    execFileSync('git', ['remote', 'add', 'origin', 'https://example.invalid/repo.git'], {
+      cwd: root,
+    })
+    execFileSync('git', ['config', `branch.${branch}.remote`, 'origin'], { cwd: root })
+    execFileSync('git', ['config', `branch.${branch}.merge`, `refs/heads/${upstream}`], {
+      cwd: root,
+    })
+    execFileSync('git', ['config', 'push.default', 'upstream'], { cwd: root })
+  }
+  return root
+}
+
 describe('git-guardrails.sh', () => {
+  it('does not prefix-deny ordinary feature pushes and scratchpad cleanup', () => {
+    const settings = JSON.parse(
+      readFileSync(resolve(HOOKS, '..', 'settings.json'), 'utf8'),
+    ) as { permissions: { deny: string[] } }
+
+    expect(settings.permissions.deny).not.toContain('Bash(rm -rf /:*)')
+    expect(settings.permissions.deny).not.toContain('Bash(git push --force:*)')
+    expect(settings.permissions.deny).not.toContain('Bash(git push -f:*)')
+  })
+
   it('blocks destructive git for everyone', () => {
     // Every mode, because this tier is the one that has no audience: nothing a developer,
     // a cezar run or the review job legitimately does needs any of it.
@@ -131,6 +161,43 @@ describe('git-guardrails.sh', () => {
     expect(bash(command).status).toBe(0)
   })
 
+  it.each([
+    'git push --force',
+    'git push -f',
+    'git push --force-with-lease origin',
+    'git push origin -f',
+    'git push --force origin HEAD',
+    'git push -f origin HEAD',
+    'git push --force-with-lease origin HEAD',
+  ])('blocks the implicit force-push from a shared branch %s', (command) => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(2)
+  })
+
+  it.each(['git push --force', 'git push origin -f'])(
+    'leaves the implicit force-push from a feature branch %s alone',
+    (command) => {
+      const root = gitRoot('fix/issue-408')
+      expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+    },
+  )
+
+  it.each(['git push --force', 'git push -f', 'git push --force-with-lease'])(
+    'blocks the implicit force-push to a shared upstream from a differently named branch %s',
+    (command) => {
+      const root = gitRoot('local-work', 'main')
+      expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(2)
+    },
+  )
+
+  it.each([
+    'git push --force origin fix/issue-408',
+    'git push origin fix/issue-408 -f',
+  ])('leaves the explicit feature refspec from a shared branch %s alone', (command) => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+  })
+
   // `rm -r` is judged by where it points, not by the flags: the target has to match whole, so the
   // roots below go and every ordinary cleanup stays. Every mode, like the rest of tier one.
   it.each([
@@ -174,6 +241,11 @@ describe('git-guardrails.sh', () => {
     'git rm --cached $(rm -rf /)',
     'git rm --cached `rm -rf /`',
     'git rm --cached $(rm -rf $PWD)',
+    'rm -rf /etc',
+    'rm -rf /usr/local',
+    'rm -rf /var/lib',
+    'rm -rf /home',
+    'rm -rf /opt',
   ])('blocks the recursive delete %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -186,6 +258,7 @@ describe('git-guardrails.sh', () => {
     'rm -rf ./dist',
     'rm -rf .ai/qa/artifacts_123',
     'rm -rf /tmp/claude-501/x',
+    'rm -rf /private/tmp/claude-501/x',
     'rm package-lock.json',
     // Several operands, none of them a root: stepping over an operand must not turn the next one
     // into a target it is not.
@@ -206,6 +279,41 @@ describe('git-guardrails.sh', () => {
     expect(bash(command).status).toBe(0)
   })
 
+  it('leaves a controlled scratchpad glob alone', () => {
+    const scratchpad = mkdtempSync(join(tmpdir(), 'claude-glob-'))
+    const glob = `${scratchpad.slice(0, -6)}*`
+
+    try {
+      expect(bash(`rm -rf ${glob}`).status).toBe(0)
+    } finally {
+      rmSync(scratchpad, { recursive: true, force: true })
+    }
+  })
+
+  it('blocks recursive cleanup through a scratchpad symlink', () => {
+    const scratchpad = mkdtempSync(join(tmpdir(), 'claude-link-'))
+    rmSync(scratchpad, { recursive: true })
+    symlinkSync('/etc', scratchpad)
+
+    try {
+      expect(bash(`rm -rf ${scratchpad}/*`).status).toBe(2)
+    } finally {
+      rmSync(scratchpad, { force: true })
+    }
+  })
+
+  it('fails closed for an unresolved scratchpad symlink', () => {
+    const scratchpad = mkdtempSync(join(tmpdir(), 'claude-link-'))
+    rmSync(scratchpad, { recursive: true })
+    symlinkSync(join(tmpdir(), 'missing-scratchpad-target'), scratchpad)
+
+    try {
+      expect(bash(`rm -rf ${scratchpad}`).status).toBe(2)
+    } finally {
+      rmSync(scratchpad, { force: true })
+    }
+  })
+
   // The worktree root by its absolute path, which no pattern of roots can cover. A path *under*
   // the root stays open: `rm -rf <root>/node_modules` is how a bootstrap step recovers from a
   // half-written install.
@@ -213,7 +321,10 @@ describe('git-guardrails.sh', () => {
     const root = process.cwd()
     expect(bash(`rm -rf ${root}`).status).toBe(2)
     expect(bash(`rm -rf ${root}/`).status).toBe(2)
+    expect(bash(`rm -rf ${root}/..`).status).toBe(2)
     expect(bash(`rm -rf ${root}/node_modules`).status).toBe(0)
+    expect(bash(`rm -rf ${root}/node_modules /etc`).status).toBe(2)
+    expect(bash('rm -rf /tmp/claude-1/../..').status).toBe(2)
   })
 
   // The expanded path is not how the root is usually written. These four spellings all name the
@@ -237,6 +348,20 @@ describe('git-guardrails.sh', () => {
       expect(bash(command).status).toBe(0)
     },
   )
+
+  it.each(['rm -rf $HOME/x/../../etc', 'rm -rf ${HOME}/x/../../etc', 'rm -rf ~/x/../../etc'])(
+    'blocks a traversal written from home %s',
+    (command) => {
+      expect(bash(command).status).toBe(2)
+    },
+  )
+
+  it.each([
+    'rm -rf $CLAUDE_PROJECT_DIR/..',
+    'rm -rf ${CLAUDE_PROJECT_DIR}/../../etc',
+  ])('blocks a traversal written from the project-root variable %s', (command) => {
+    expect(bash(command).status).toBe(2)
+  })
 
   // `rm` matched as a word, and a space is a word boundary, so `git rm` read as `rm`. The index
   // operation is reversible with `git reset` and touches no file on disk; the same command
