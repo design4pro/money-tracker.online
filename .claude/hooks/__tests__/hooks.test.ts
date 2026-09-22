@@ -288,6 +288,14 @@ describe('git-guardrails.sh', () => {
     expect(bash(`rm -rf ${scratchpad}/*`).status).toBe(2)
   })
 
+  it('fails closed for an unresolved scratchpad symlink', () => {
+    const scratchpad = mkdtempSync(join(tmpdir(), 'claude-link-'))
+    rmSync(scratchpad, { recursive: true })
+    symlinkSync(join(tmpdir(), 'missing-scratchpad-target'), scratchpad)
+
+    expect(bash(`rm -rf ${scratchpad} /etc`).status).toBe(2)
+  })
+
   // The worktree root by its absolute path, which no pattern of roots can cover. A path *under*
   // the root stays open: `rm -rf <root>/node_modules` is how a bootstrap step recovers from a
   // half-written install.

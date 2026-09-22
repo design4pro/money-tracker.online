@@ -295,7 +295,8 @@ shopt -s nullglob
 while IFS= read -r scratchpad; do
   for candidate in $scratchpad; do
     [ -e "$candidate" ] || [ -L "$candidate" ] || continue
-    resolved=$(realpath "$candidate")
+    resolved=$(realpath "$candidate" 2>/dev/null || true)
+    [ -n "$resolved" ] || block 'rm -r through an unresolved scratchpad path'
     case "$resolved" in
       /tmp/claude-*|/private/tmp/claude-*) ;;
       *) block 'rm -r through a scratchpad symlink' ;;
