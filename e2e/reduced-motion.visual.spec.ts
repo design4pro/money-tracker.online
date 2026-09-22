@@ -16,20 +16,25 @@ import type { Locator, Page } from '@playwright/test'
  * identity. Both are stylesheet claims, and this file is what turns them into something that can go
  * red (spec `.ai/specs/2026-09-11-reduced-motion-transform-reset.md`, Phase 2).
  *
- * ## Four assertions per overlay
+ * ## Five assertions per overlay
  *
  * 1. **A frame right after the overlay appears equals one taken a second later.** Motion still
  *    running is the only thing that can make them differ. The frames are compared against each
  *    other inside the run: no stored baseline (ADR 0016) and nothing written into the repository,
  *    so machine speed moves *when* the frames are taken and not what they contain. "Equal" is
  *    pixel for pixel, with {@link RASTER_NOISE} as the only allowance.
- * 2. **Every hooked element on the page computes an identity transform** — pixel identity proves
- *    motion stopped, only the computed transform proves it stopped in the right place.
+ * 2. **Every hooked element on the page computes an identity transform** once the overlay settled.
  * 3. **The overlay itself sits inside a hooked element**, counted, so a renamed or dropped hook turns
  *    this file red instead of letting assertion 2 pass over zero elements.
  * 4. **Escape closes the overlay and it detaches.** The sweep collapses durations rather than
  *    killing animation because React Aria unmounts an exiting overlay on `animationend`; an
  *    animation that never ends is a dialog that never closes, and this is the assertion that says so.
+ * 5. **With its entrance held on the first keyframe, the hooked element still computes the
+ *    identity.** Assertion 2 alone cannot see the reset: no entrance fills `forwards`, so once the
+ *    collapsed animation ends there is no `transform` left in the cascade and the element computes
+ *    `none` with or without `[data-motion-transform] { transform: none !important }`. Pausing the
+ *    entrance keeps its `from` keyframe applied, and only the reset outranks it. A separate test,
+ *    because an entrance that never ends is an overlay that never closes.
  *
  * ## Which overlays, where
  *
@@ -175,6 +180,40 @@ async function hookedTransforms(
   )
 }
 
+/**
+ * Opens `/accounts` with the preference set. Without it every assertion in this file could pass on
+ * a fast machine for the wrong reason, so the emulation is checked rather than trusted.
+ */
+async function gotoWithReducedMotion(page: Page): Promise<void> {
+  await gotoApp(page, '/accounts')
+  expect(
+    await page.evaluate(
+      () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    ),
+  ).toBe(true)
+}
+
+/** Opens the overlay from the keyboard and returns it once visible. */
+async function openOverlay(page: Page, overlay: Overlay): Promise<Locator> {
+  await overlay.trigger(page).focus()
+  await page.keyboard.press('Enter')
+  const element = overlay.locate(page)
+  await expect(element).toBeVisible()
+  return element
+}
+
+/** The hooked elements the overlay sits inside. */
+function hooksAround(page: Page, element: Locator): Locator {
+  return page.locator('[data-motion-transform]').filter({ has: element })
+}
+
+/**
+ * Holds every hooked element's animations on their first keyframe. Added before the overlay opens,
+ * so its entrance is created paused at `currentTime` 0, inside its active interval.
+ */
+const HOLD_ENTRANCE =
+  '[data-motion-transform] { animation-play-state: paused !important; }'
+
 for (const theme of THEMES) {
   test.describe(`reduced motion, ${theme} theme`, () => {
     test.beforeEach(async ({ page, context }) => {
@@ -192,19 +231,8 @@ for (const theme of THEMES) {
           'the popover is proved on the desktop projects, the docked sheet on the phone projects',
         )
 
-        await gotoApp(page, '/accounts')
-        // Without the preference every assertion below could pass on a fast machine for the wrong
-        // reason, so the emulation is checked rather than trusted.
-        expect(
-          await page.evaluate(
-            () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-          ),
-        ).toBe(true)
-
-        await overlay.trigger(page).focus()
-        await page.keyboard.press('Enter')
-        const element = overlay.locate(page)
-        await expect(element).toBeVisible()
+        await gotoWithReducedMotion(page)
+        const element = await openOverlay(page, overlay)
 
         // The sweep shortens every animation and transition to 0.01ms; it does not remove them. A
         // colour transition started by the same state change that opened the overlay is still
@@ -242,9 +270,7 @@ for (const theme of THEMES) {
           `pixels that differ between the first frame of ${overlay.name} and one ${SETTLE_MS} ms later: motion was still running`,
         ).toBe(0)
 
-        const hooks = page
-          .locator('[data-motion-transform]')
-          .filter({ has: element })
+        const hooks = hooksAround(page, element)
         expect(
           await hooks.count(),
           `${overlay.name} is not inside a [data-motion-transform] element; the hook was renamed or dropped`,
@@ -259,6 +285,47 @@ for (const theme of THEMES) {
         await page.keyboard.press('Escape')
         await expect(element).not.toBeAttached()
         await expect(hooks).toHaveCount(0)
+      })
+
+      test(`${overlay.name} keeps the identity transform with its entrance held`, async ({
+        page,
+        isMobile,
+      }) => {
+        test.skip(
+          (overlay === POPOVER && isMobile) || (overlay === SHEET && !isMobile),
+          'the popover is proved on the desktop projects, the docked sheet on the phone projects',
+        )
+
+        await gotoWithReducedMotion(page)
+        await page.addStyleTag({ content: HOLD_ENTRANCE })
+        const element = await openOverlay(page, overlay)
+
+        const held = await hooksAround(page, element).evaluateAll((hooks) =>
+          hooks.map((hook) => {
+            const { transform } = window.getComputedStyle(hook)
+            return {
+              paused: hook
+                .getAnimations()
+                .some((animation) => animation.playState === 'paused'),
+              transform,
+              identity:
+                transform === 'none' ||
+                new DOMMatrixReadOnly(transform).isIdentity,
+            }
+          }),
+        )
+        expect(
+          held.length,
+          `${overlay.name} is not inside a [data-motion-transform] element; the hook was renamed or dropped`,
+        ).toBeGreaterThan(0)
+        for (const { paused, transform, identity } of held) {
+          // Without a held animation the identity below would be the vacuous one assertion 2 sees.
+          expect(paused, `${overlay.name} has no entrance held`).toBe(true)
+          expect(
+            identity,
+            `a [data-motion-transform] element holding its entrance computes transform: ${transform}`,
+          ).toBe(true)
+        }
       })
     }
   })

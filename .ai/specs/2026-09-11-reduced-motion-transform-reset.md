@@ -451,7 +451,7 @@ an ADR.
 
 ## Amendment — PR #416
 
-Phase 2 shipped differently from the design above in four places, each measured on that PR. The
+Phase 2 shipped differently from the design above in five places, each measured on that PR. The
 Phase 1 corrections in the tracking plan are still owed here by Phase 3.
 
 1. **"Byte-identical" is zero pixels past a raster-noise floor.** `RASTER_NOISE` in
@@ -470,3 +470,11 @@ Phase 1 corrections in the tracking plan are still owed here by Phase 3.
    Appearance menu on the desktop projects.
 4. **Four browser projects, not three.** The config now defines `mobile-chromium` as well (issue
    #317), which supersedes Q8: the sheet runs on both phone projects and the modal on all four.
+5. **The reset is proved with the entrance held, not on the settled overlay.** No entrance fills
+   `forwards`, so once the collapsed animation ends there is no `transform` left in the cascade and a
+   settled hooked element computes `none` with or without the reset: removing it left step 6's
+   assertion green on every case. A second test per overlay pauses the hooked element's animations
+   before opening it, so the `from` keyframe stays applied, and asserts the element still computes
+   the identity. With the reset removed, all eight such cases on `chromium` and `mobile-chromium` go
+   red (`matrix(0.96, 0, 0, 0.96, 0, -1.92)` on the popover, `matrix(0.985, 0, 0, 0.985, 0, 8)` on
+   the modal, `matrix(1, 0, 0, 1, 0, 285)` on the sheet) while the eight settled cases stay green.
