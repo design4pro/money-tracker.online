@@ -293,7 +293,7 @@ describe('git-guardrails.sh', () => {
     rmSync(scratchpad, { recursive: true })
     symlinkSync(join(tmpdir(), 'missing-scratchpad-target'), scratchpad)
 
-    expect(bash(`rm -rf ${scratchpad} /etc`).status).toBe(2)
+    expect(bash(`rm -rf ${scratchpad}`).status).toBe(2)
   })
 
   // The worktree root by its absolute path, which no pattern of roots can cover. A path *under*
