@@ -1,11 +1,11 @@
 # Reduced motion: the `[data-motion-transform]` reset and the proof it works
 
-| Field              | Value       |
-| ------------------ | ----------- |
-| **Status**         | in-progress |
-| **Issue**          | #214        |
-| **Spec PR**        | #251        |
-| **Implementation** | #254, #416  |
+| Field              | Value            |
+| ------------------ | ---------------- |
+| **Status**         | implemented      |
+| **Issue**          | #214             |
+| **Spec PR**        | #251             |
+| **Implementation** | #254, #416, #419 |
 
 ## 📝 TLDR
 
@@ -451,8 +451,8 @@ an ADR.
 
 ## Amendment — PR #416
 
-Phase 2 shipped differently from the design above in five places, each measured on that PR. The
-Phase 1 corrections in the tracking plan are still owed here by Phase 3.
+Phase 2 shipped differently from the design above in five places, each measured on that PR. Phase 3
+in PR #419 closes the source-guard and documentation work without changing those deviations.
 
 1. **"At rest" is read from state, not from frames.** ADR 0016 keeps every screenshot comparison
    out of CI, a comparison made inside the run included, so the frame pair became a state pair: no
