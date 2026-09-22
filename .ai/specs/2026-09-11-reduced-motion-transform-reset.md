@@ -5,7 +5,7 @@
 | **Status**         | in-progress |
 | **Issue**          | #214        |
 | **Spec PR**        | #251        |
-| **Implementation** | #254        |
+| **Implementation** | #254, #416  |
 
 ## 📝 TLDR
 
@@ -448,3 +448,32 @@ smallest-scope answer. Every row is a decision a human can overturn before the s
 No assumption carries `⚠ NEEDS HUMAN CONFIRMATION`: none of the eight weakens security, tenant
 scoping, a `BACKWARD_COMPATIBILITY.md` surface, the accessibility claim, or a decision recorded in
 an ADR.
+
+## Amendment — PR #416
+
+Phase 2 shipped differently from the design above in five places, each measured on that PR. The
+Phase 1 corrections in the tracking plan are still owed here by Phase 3.
+
+1. **"At rest" is read from state, not from frames.** ADR 0016 keeps every screenshot comparison
+   out of CI, a comparison made inside the run included, so the frame pair became a state pair: no
+   animation or transition in the document still running for longer than the sweep's 0.01ms, and
+   the overlay's box and opacity equal to what they read a second later. With the whole
+   reduced-motion block disabled every case went red, naming `dialog-in`, `pop-in`, `drawer-in` and
+   `fade-in` as still running.
+2. **The transform reset is read with the entrance held at its first keyframe.** After an entrance
+   finishes nothing sets a `transform` on a hooked element, so a read at rest is `none` with or
+   without the reset. The spec restarts the element's own entrance through `data-entering`, pauses
+   it at `currentTime` 0 and reads the transform there; with the reset deleted every case went red
+   (`matrix(0.985, 0, 0, 0.985, 0, 8)` on the modal, `matrix(1, 0, 0, 1, 0, 285)` on the sheet).
+   The count assertion counts hooks that have an entrance to hold, and went red on every modal and
+   sheet case with the hook removed from `RACModal`.
+3. **The first reading is taken two animation frames after the overlay is visible**, not
+   immediately. The `*` sweep shortens a colour transition started by the same state change to
+   0.01ms without removing it, and it lands on the next frame; two frames are far too short for any
+   animation to finish.
+4. **The docked case is the bottom navigation's More sheet**, not the **New account** modal. The
+   account form is centred at every width (tracking plan, correction 2), so the modal is proved
+   centred on every project and the sheet on the phone projects. The popover is the shell's
+   Appearance menu on the desktop projects.
+5. **Four browser projects, not three.** The config now defines `mobile-chromium` as well (issue
+   #317), which supersedes Q8: the sheet runs on both phone projects and the modal on all four.
