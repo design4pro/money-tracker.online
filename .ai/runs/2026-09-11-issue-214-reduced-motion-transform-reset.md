@@ -114,10 +114,10 @@ the spec rather than as a silent divergence.
 
 ### Phase 2: The runtime proof
 
-- [ ] 2.1 Write the reduced-motion spec
-- [ ] 2.2 Assert pixel identity
-- [ ] 2.3 Assert the computed transform and the hook count
-- [ ] 2.4 Close the overlay and assert it detaches
+- [x] 2.1 Write the reduced-motion spec (issue #414)
+- [x] 2.2 Assert pixel identity (issue #414)
+- [x] 2.3 Assert the computed transform and the hook count (issue #414)
+- [x] 2.4 Close the overlay and assert it detaches (issue #414)
 
 ### Phase 3: The drift guard and the documents
 
