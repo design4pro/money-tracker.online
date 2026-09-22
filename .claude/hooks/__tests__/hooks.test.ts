@@ -154,6 +154,9 @@ describe('git-guardrails.sh', () => {
     'git push -f',
     'git push --force-with-lease origin',
     'git push origin -f',
+    'git push --force origin HEAD',
+    'git push -f origin HEAD',
+    'git push --force-with-lease origin HEAD',
   ])('blocks the implicit force-push from a shared branch %s', (command) => {
     const root = gitRoot('develop')
     expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(2)
@@ -228,6 +231,7 @@ describe('git-guardrails.sh', () => {
     'rm -rf .ai/qa/artifacts_123',
     'rm -rf /tmp/claude-501/x',
     'rm -rf /private/tmp/claude-501/x',
+    'rm -rf /tmp/claude-*',
     'rm package-lock.json',
     // Several operands, none of them a root: stepping over an operand must not turn the next one
     // into a target it is not.
@@ -257,6 +261,7 @@ describe('git-guardrails.sh', () => {
     expect(bash(`rm -rf ${root}/`).status).toBe(2)
     expect(bash(`rm -rf ${root}/node_modules`).status).toBe(0)
     expect(bash(`rm -rf ${root}/node_modules /etc`).status).toBe(2)
+    expect(bash('rm -rf /tmp/claude-1/../..').status).toBe(2)
   })
 
   // The expanded path is not how the root is usually written. These four spellings all name the

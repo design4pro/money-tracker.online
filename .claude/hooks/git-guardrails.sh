@@ -177,9 +177,9 @@ done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 
 # A push without a refspec sends the checked-out branch. The command has no branch name for the
 # matcher above to see, so determine that one fact from Git before allowing a force flag through.
-# An explicit feature-branch refspec remains the previous loop's responsibility and stays open.
+# From a shared checkout, a force-push is unsafe even when its refspec is only `HEAD`.
 current_branch=$(git branch --show-current 2>/dev/null || true)
-push_implicit="^[[:space:]]*git[[:space:]]+push[[:space:]]+(${force_flag}([[:space:]]+[^[:space:]]+)?|[^[:space:]]+[[:space:]]+${force_flag})[[:space:]]*$"
+push_implicit="git[[:space:]]+push\\b[^;&|]*[[:space:]]${force_flag}"
 if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ]; then
   while IFS= read -r push_command; do
     grep -Eq "$push_implicit" <<< "$push_command" && block 'force-push to develop/main'
@@ -270,9 +270,12 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.
 # The prior root-only rule let `rm -rf /etc` and its siblings through after the broad permission
 # prefix was removed. Remove only disposable scratchpad operands before checking absolute targets,
 # so a harmless scratchpad beside `/etc` still blocks.
-rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-[[:alnum:]_-]+[^[:space:];&|)`]*##g')
+scratchpad_traversal='/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*/\.\.'
+echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
+  && block 'rm -r traversal from a scratchpad'
+rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*##g')
 rm_safe_suffix='/[^[:space:];&|)`]*'
-rm_without_safe_paths=$(printf '%s' "$rm_without_scratchpads" | sed -E "s#${project_root}${rm_safe_suffix}##g")
+rm_without_safe_paths=$(printf '%s' "$rm_without_scratchpads" | sed -E "s$(printf '\037')${project_root}${rm_safe_suffix}$(printf '\037')$(printf '\037')g")
 rm_absolute='/[^[:space:];&|)`]*'
 echo "$rm_without_safe_paths" | grep -Eq "${rm_recursive}${rm_absolute}${rm_end}" \
   && block 'rm -r of an absolute path'
