@@ -312,7 +312,8 @@ floor over it.
 `DSY-04 missing → done` — the motion tokens, the keyframe set and the global reduced-motion block.
 The four durations, the four easings and the `prefers-reduced-motion: reduce` block are in
 `src/styles/tokens.css`; the keyframe set is in `src/styles/app.css`. The `[data-motion-transform]`
-reset the row's original stage designed is **not** implemented and stays open there.
+reset shipped for #214 in PR #254, with the runtime proof in PR #416 and a derived source guard on
+#415 to keep later transform animations honest.
 
 Requisitioned by `01-S1`, which cannot build a primitive against tokens that do not exist.
 

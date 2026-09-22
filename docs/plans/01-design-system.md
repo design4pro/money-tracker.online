@@ -143,9 +143,13 @@ question for a human, not a blocker on the code.
 
 ### Reference rows
 
-`DSY-05 missing → missing` — the reduced-motion test that proves a preference actually removes
-motion. `e2e/reduced-motion.visual.spec.ts` is absent, and so is the `[data-motion-transform]` hook
-the stage designed, which appears nowhere under `src/` or `e2e/`.
+`DSY-05 missing → done` — #214's reduced-motion contract is now proved by
+`e2e/reduced-motion.visual.spec.ts` (PR #416), and its `[data-motion-transform]` hook shipped in
+PR #254. The Phase 3 source guard on #415 keeps a new transform animation from bypassing either
+resting-state decision.
+
+`DSY-06 missing → missing` — the hand-rolled `src/lib/motion.ts` presets and their
+`src/lib/__tests__/motion.test.ts` contract remain the stage's only unbuilt capability.
 
 `DSY-04` — the motion tokens, the keyframe set and the global reduced-motion block — is **not** a
 row of this stage. Its subject shipped inside `src/styles/tokens.css`, a shared path this plan may
@@ -185,8 +189,9 @@ None.
   keyframes that animate `transform` and `opacity` only, and a `prefers-reduced-motion: reduce`
   block that collapses every one of the durations rather than blanket-killing animation — because a
   `!important` `animation: none` breaks components that wait on `animationend`, which is how a
-  dialog that never closes gets shipped. All of that is in the tree; the one clause that is not is
-  the `[data-motion-transform]` reset, and it stays an open requirement below.
+  dialog that never closes gets shipped. All of that is in the tree, including the
+  `[data-motion-transform]` reset from #214 (PR #254), with runtime proof in PR #416 and a source
+  guard on #415 that keeps the resting-state contract from drifting.
 - **Components.** `src/lib/motion.ts` exports `useReducedMotion()` and the shared transition presets,
   whose durations resolve from the `tokens.css` scale rather than from literals. Every animation in
   the product goes through one of them. The presets are hand-rolled: the `motion` package this clause
@@ -202,13 +207,11 @@ None.
   over 400 ms exists in the product except a deliberately-declared ambient loop, and there is none
   in v1. Whether 320 ms is the right slowest step is a separate question and is not settled here.
 - **Accessibility.** `prefers-reduced-motion: reduce` collapses every animation to `0.01ms` and one
-  iteration and keeps indeterminate progress indicators readable — both shipped, in the
-  reduced-motion block of `tokens.css`. **Motion is transform and opacity only** — a
-  layout-affecting animation is a layout shift wearing a nicer name. One clause of this contract is
-  **unimplemented**: reduced motion never resets `transform` on a parked element, and the
-  `[data-motion-transform]` hook designed for it exists nowhere in the tree. It is kept as an open
-  requirement rather than deleted, because deleting it would erase the only written record that the
-  enforcement was designed.
+  iteration, keeps indeterminate progress indicators readable, and resets `transform` on the
+  `[data-motion-transform]` hook — all shipped for #214 in PR #254. PR #416 proves the runtime
+  state, and #415's source guard requires every transform animation to declare an identity or static
+  resting transform. **Motion is transform and opacity only** — a layout-affecting animation is a
+  layout shift wearing a nicer name.
 
 ### Quota
 
@@ -252,8 +255,9 @@ All seven §7 items and all ten §2 clauses, with the motion clause carrying thi
   that was carried unused for the length of a plan is worth more than a clean list. This stage stays
   open and buildable: its presets are hand-rolled against the `tokens.css` duration scale, and a
   preset that genuinely needs a JS animation library is a new dependency decision in a new ADR.
-- **The `[data-motion-transform]` reset is unimplemented (#214).** A live accessibility gap rather
-  than a documentation one; the row stays open and the defect is tracked on its own issue.
+- **The `[data-motion-transform]` reset shipped for #214 (PR #254).** PR #416 proves overlays settle
+  at rest, and #415's derived source guard prevents a later transform animation from silently
+  bypassing the hook or its own static resting transform.
 - **The drift guard cannot see the shared-path rule (#216).** This stage is the first that could
   trip it: repointing `src/styles/motion.css` at `src/styles/tokens.css` would have produced a
   malformed stage that the guard would have passed. The requisition of `DSY-04` into `00-S3` avoids
