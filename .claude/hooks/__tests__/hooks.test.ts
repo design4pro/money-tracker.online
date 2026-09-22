@@ -215,6 +215,10 @@ describe('git-guardrails.sh', () => {
     'git push --force origin HEAD --quiet',
     'git push --force-with-lease=origin/develop -u origin',
     'git push -o ci.skip --force origin',
+    'git push -fo ci.skip origin',
+    'git push --force --recurse-submodules on-demand origin',
+    'git push --force --recurse-submodules=on-demand origin',
+    'git push -ufqo ci.skip origin',
     'git push --force origin fix/issue-1-x HEAD',
     // A force flag in front of `git push` leaves no words after it. Under `set -u`, bash 3.2 calls
     // an empty array unbound and exits 1, which the harness reads as "allowed".
@@ -229,10 +233,29 @@ describe('git-guardrails.sh', () => {
   it.each([
     'git push -u --force origin fix/issue-1-x',
     'git push --force -o ci.skip origin fix/issue-1-x',
+    'git push -fo ci.skip origin fix/issue-1-x',
+    'git push --force --recurse-submodules on-demand origin fix/issue-1-x',
+    'git push -foci.skip origin fix/issue-1-x',
     'git push --force origin HEAD:refs/heads/fix/issue-1-x',
   ])('leaves the explicit feature refspec with more flags from a shared branch %s alone', (command) => {
     const root = gitRoot('develop')
     expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+  })
+
+  it.each([
+    'grep -rn "git push --force" .claude/hooks | head -20',
+    'git log --oneline | grep "git push --force"',
+    'echo done && grep -n "git push --force" AGENTS.md',
+  ])('allows prose mentioning a force push from a shared checkout %s', (command) => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+  })
+
+  it('still blocks a push following a prose command from a shared checkout', () => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', {
+      command: 'grep "git push --force" AGENTS.md; git push --force origin',
+    }, {}, root).status).toBe(2)
   })
 
   // `-follow` inside `--follow-tags` is a dash, no letters and then an `f`: the short-flag
@@ -341,6 +364,20 @@ describe('git-guardrails.sh', () => {
       }
     },
   )
+
+  it.each([
+    'rm -rf ~root/.ssh',
+    'rm -rf ~root',
+    'rm -rf ~root/x/../../etc',
+    'rm -rf dist ~another-user/.aws',
+    'rm -rf ~root/project/dist',
+  ])('blocks recursive deletion through a named home %s', (command) => {
+    for (const env of [{}, AGENT, ACTIONS]) {
+      const r = bash(command, env)
+      expect(r.status).toBe(2)
+      expect(r.stderr).toContain('rm -r through a named home')
+    }
+  })
 
   it('reads a home-relative path to the project the way it reads the absolute one', () => {
     const home = realpathSync(mkdtempSync(join(tmpdir(), 'guard-home-')))

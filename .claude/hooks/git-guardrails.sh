@@ -202,6 +202,9 @@ force_token="(^|[[:space:]])${force_flag}(=[^[:space:]]*)?([[:space:]]|$)"
 if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ] || \
   [[ "$current_push" =~ /(develop|main)$ ]]; then
   while IFS= read -r push_command; do
+    # Judge each command piece separately: a pipeline keeps its quoted grep pattern in scan,
+    # but that pattern is still prose. Executable substitutions were split into their own pieces.
+    grep -Eq "$prose_command" <<< "$push_command" && continue
     grep -Eq 'git[[:space:]]+push([[:space:]]|$)' <<< "$push_command" || continue
     grep -Eq "$force_token" <<< "$push_command" || continue
     read -ra push_words <<< "$(sed -E 's/^.*git[[:space:]]+push([[:space:]]|$)//' <<< "$push_command")"
@@ -213,8 +216,11 @@ if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ] || \
     for word in ${push_words[@]+"${push_words[@]}"}; do
       if [ -n "$skip_value" ]; then skip_value=; continue; fi
       case "$word" in
-        -o|--push-option|--repo|--receive-pack|--exec) skip_value=1 ;;
-        -*) ;;
+        -o|--push-option|--repo|--receive-pack|--exec|--recurse-submodules) skip_value=1 ;;
+        -*)
+          # In a short-option bundle, -o consumes the remainder or, when last, the next word.
+          [[ "$word" =~ ^-[^-o]*o$ ]] && skip_value=1
+          ;;
         *)
           operands=$((operands + 1))
           if [ "$operands" -gt 1 ] && { [ "$word" = HEAD ] || [ "$word" = @ ]; }; then
@@ -316,6 +322,11 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.
 scratchpad_traversal='/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*/\.\.'
 echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
   && block 'rm -r traversal from a scratchpad'
+# A named user's home is not $HOME. Refuse it before traversal checks or expansion rather than
+# accidentally granting the current user's project exception to another account's directory.
+named_home='~[[:alnum:]._-]+(/[^[:space:];&|)`]*)?'
+echo "$rm_scan" | grep -Eq "${rm_recursive}${named_home}${rm_end}" \
+  && block 'rm -r through a named home'
 home_traversal='(~|\$\{?HOME\}?)(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
 echo "$rm_scan" | grep -Eq "${rm_recursive}${home_traversal}" \
   && block 'rm -r traversal from home'
