@@ -188,11 +188,13 @@ else
   current_push=$(git rev-parse --abbrev-ref --symbolic-full-name '@{push}' 2>/dev/null || \
     git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
 fi
-push_implicit="^[[:space:]]*git[[:space:]]+push([[:space:]]+${force_flag})?([[:space:]]+[^[:space:]]+)?([[:space:]]+${force_flag})?([[:space:]]+HEAD)?[[:space:]]*$"
 if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ] || \
   [[ "$current_push" =~ /(develop|main)$ ]]; then
   while IFS= read -r push_command; do
-    grep -Eq "$push_implicit" <<< "$push_command" && block 'force-push to develop/main'
+    grep -Eq "$force_flag" <<< "$push_command" || continue
+    push_without_force=$(printf '%s' "$push_command" | sed -E "s/${force_flag}//g")
+    grep -Eq '^[[:space:]]*git[[:space:]]+push([[:space:]]+[^[:space:]]+)?([[:space:]]+HEAD)?[[:space:]]*$' \
+      <<< "$push_without_force" && block 'force-push to develop/main'
   done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 fi
 
