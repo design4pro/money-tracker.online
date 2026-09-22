@@ -109,3 +109,30 @@ describe.each([
     ])
   })
 })
+
+describe('runner recovery documentation', () => {
+  it('describes the repository-scoped deployment variable consistently', () => {
+    const headers = [
+      '.github/workflows/deploy-staging.yml',
+      '.github/workflows/deploy-production.yml',
+    ].map(
+      (path) => read(path).match(/^(# `runs-on` below[\s\S]*?)^jobs:/m)?.[1],
+    )
+
+    expect(headers).toEqual([headers[0], headers[0]])
+    expect(headers[0]).toMatch(
+      /a repository variable that is deliberately\s*\n# unset/,
+    )
+    expect(headers[0]).not.toContain('organisation variable')
+  })
+
+  it('records the current CI and agent runner settings in the ADR amendment', () => {
+    const adr = read('docs/adr/0021-the-agent-layer-is-vendored.md')
+
+    expect(adr).toContain('## Amendment 2026-09-22')
+    expect(adr).toMatch(
+      /`RUNNER_CI` and `RUNNER_AGENT`\s*\nare repository variables/,
+    )
+    expect(adr).toContain('`["blacksmith-2vcpu-ubuntu-2404-arm"]`')
+  })
+})
