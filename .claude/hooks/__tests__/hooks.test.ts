@@ -313,6 +313,13 @@ describe('git-guardrails.sh', () => {
     },
   )
 
+  it.each(['rm -rf $HOME/x/../../etc', 'rm -rf ${HOME}/x/../../etc', 'rm -rf ~/x/../../etc'])(
+    'blocks a traversal written from home %s',
+    (command) => {
+      expect(bash(command).status).toBe(2)
+    },
+  )
+
   it.each([
     'rm -rf $CLAUDE_PROJECT_DIR/..',
     'rm -rf ${CLAUDE_PROJECT_DIR}/../../etc',
