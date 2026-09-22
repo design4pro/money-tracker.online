@@ -177,9 +177,10 @@ done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
 
 # A push without a refspec sends the checked-out branch. The command has no branch name for the
 # matcher above to see, so determine that one fact from Git before allowing a force flag through.
-# From a shared checkout, a force-push is unsafe even when its refspec is only `HEAD`.
+# From a shared checkout, a force-push is unsafe even when its refspec is only `HEAD`; a named
+# feature refspec remains open because it does not rewrite the checked-out shared branch.
 current_branch=$(git branch --show-current 2>/dev/null || true)
-push_implicit="git[[:space:]]+push\\b[^;&|]*[[:space:]]${force_flag}"
+push_implicit="^[[:space:]]*git[[:space:]]+push([[:space:]]+${force_flag})?([[:space:]]+[^[:space:]]+)?([[:space:]]+${force_flag})?([[:space:]]+HEAD)?[[:space:]]*$"
 if [ "$current_branch" = 'develop' ] || [ "$current_branch" = 'main' ]; then
   while IFS= read -r push_command; do
     grep -Eq "$push_implicit" <<< "$push_command" && block 'force-push to develop/main'
@@ -274,6 +275,11 @@ scratchpad_traversal='/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`
 echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
   && block 'rm -r traversal from a scratchpad'
 rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*##g')
+# The worktree exception admits paths below the checkout, not a traversal out of it. Test this
+# before removing the safe suffix, so `worktree/..` cannot erase the destructive target.
+project_path_traversal="${project_root}"'(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
+echo "$rm_without_scratchpads" | grep -Eq "${rm_recursive}${project_path_traversal}" \
+  && block 'rm -r traversal from the project root'
 rm_safe_suffix='/[^[:space:];&|)`]*'
 rm_without_safe_paths=$(printf '%s' "$rm_without_scratchpads" | sed -E "s$(printf '\037')${project_root}${rm_safe_suffix}$(printf '\037')$(printf '\037')g")
 rm_absolute='/[^[:space:];&|)`]*'

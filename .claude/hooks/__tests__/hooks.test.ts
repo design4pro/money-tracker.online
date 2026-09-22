@@ -170,6 +170,14 @@ describe('git-guardrails.sh', () => {
     },
   )
 
+  it.each([
+    'git push --force origin fix/issue-408',
+    'git push origin fix/issue-408 -f',
+  ])('leaves the explicit feature refspec from a shared branch %s alone', (command) => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+  })
+
   // `rm -r` is judged by where it points, not by the flags: the target has to match whole, so the
   // roots below go and every ordinary cleanup stays. Every mode, like the rest of tier one.
   it.each([
@@ -259,6 +267,7 @@ describe('git-guardrails.sh', () => {
     const root = process.cwd()
     expect(bash(`rm -rf ${root}`).status).toBe(2)
     expect(bash(`rm -rf ${root}/`).status).toBe(2)
+    expect(bash(`rm -rf ${root}/..`).status).toBe(2)
     expect(bash(`rm -rf ${root}/node_modules`).status).toBe(0)
     expect(bash(`rm -rf ${root}/node_modules /etc`).status).toBe(2)
     expect(bash('rm -rf /tmp/claude-1/../..').status).toBe(2)
