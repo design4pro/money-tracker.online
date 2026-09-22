@@ -285,6 +285,9 @@ echo "$rm_scan" | grep -Eq "${rm_recursive}${rm_dots}(/|~|\\\$\{?HOME\}?|\.|\.\.
 scratchpad_traversal='/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*/\.\.'
 echo "$rm_scan" | grep -Eq "${rm_recursive}${scratchpad_traversal}" \
   && block 'rm -r traversal from a scratchpad'
+home_traversal='(~|\$\{?HOME\}?)(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
+echo "$rm_scan" | grep -Eq "${rm_recursive}${home_traversal}" \
+  && block 'rm -r traversal from home'
 rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*##g')
 # The worktree exception admits paths below the checkout, not a traversal out of it. Test this
 # before removing the safe suffix, so `worktree/..` cannot erase the destructive target.
