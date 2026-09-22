@@ -34,7 +34,8 @@ on:
 permissions:
   contents: read
 
-# `runs-on` below reads through `vars.RUNNER_DEPLOY`, which is unset: unset, the fallback
+# `runs-on` below reads through `vars.RUNNER_DEPLOY`, a repository variable that is deliberately
+# unset: the fallback
 # array selects the local self-hosted pool - the `ci` label, ARM64 containers on one
 # machine shared with the other repository - and since 2026-09-21 deploying runs there
 # like everything else. The gate, the agent jobs and shipping are on the same machines
