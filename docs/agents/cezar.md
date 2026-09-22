@@ -398,7 +398,7 @@ Claude alias handed to a codex run is a model the API refuses every request on. 
 codex runs did nothing at all, seventeen of them recorded `done`, because the refusal arrived on a
 channel the runner did not read. The model now belongs to the run: the cockpit composer picks it
 for a run a human starts, and an automation run uses the backend CLI's own default unless the
-automation sets `task.model` in `.ai/cezar/automations.json`.
+automation sets `task.model` in `docs/agents/cezar-automations.json`.
 `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails any agent step that pins one again.
 
 The task text an automation sends is the issue or PR number alone (`{{github.number}}`); a second
