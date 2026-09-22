@@ -448,3 +448,25 @@ smallest-scope answer. Every row is a decision a human can overturn before the s
 No assumption carries `⚠ NEEDS HUMAN CONFIRMATION`: none of the eight weakens security, tenant
 scoping, a `BACKWARD_COMPATIBILITY.md` surface, the accessibility claim, or a decision recorded in
 an ADR.
+
+## Amendment — PR #416
+
+Phase 2 shipped differently from the design above in four places, each measured on that PR. The
+Phase 1 corrections in the tracking plan are still owed here by Phase 3.
+
+1. **"Byte-identical" is zero pixels past a raster-noise floor.** `RASTER_NOISE` in
+   `e2e/reduced-motion.visual.spec.ts` lets a pixel differ by at most 16/255 in any channel. On
+   `chromium` a static glyph in the freshly opened modal is sometimes re-rasterised after the first
+   frame (7 pixels, largest delta 9) with every computed style unchanged, so buffer equality would
+   flake on a still page. Real motion is thousands of pixels past the floor: the falsification run
+   measured 6,876 to 2,106,829.
+2. **The first frame is taken two animation frames after the overlay is visible**, not immediately.
+   The `*` sweep shortens a colour transition started by the same state change to 0.01ms without
+   removing it, and it lands on the next frame; two frames are far too short for any animation to
+   finish.
+3. **The docked case is the bottom navigation's More sheet**, not the **New account** modal. The
+   account form is centred at every width (tracking plan, correction 2), so the modal is proved
+   centred on every project and the sheet on the phone projects. The popover is the shell's
+   Appearance menu on the desktop projects.
+4. **Four browser projects, not three.** The config now defines `mobile-chromium` as well (issue
+   #317), which supersedes Q8: the sheet runs on both phone projects and the modal on all four.
