@@ -4,7 +4,7 @@
 // write `Closes #n` and run `pnpm exec`, so none of those is blocked under cezar; what is blocked
 // there is the pinned stack (`pnpm add`) and the environment dump. Under GitHub Actions the review
 // job reads untrusted PR content with a write token, so every gh mutation stays blocked there.
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import {
   mkdirSync,
   mkdtempSync,
@@ -49,6 +49,13 @@ function hook(
 }
 const bash = (command: string, env = {}) =>
   hook('git-guardrails.sh', { command }, env)
+
+function gitRoot(branch: string) {
+  const root = mkdtempSync(join(tmpdir(), 'guard-git-'))
+  execFileSync('git', ['init'], { cwd: root })
+  execFileSync('git', ['checkout', '-b', branch], { cwd: root })
+  return root
+}
 
 describe('git-guardrails.sh', () => {
   it('does not prefix-deny ordinary feature pushes and scratchpad cleanup', () => {
@@ -142,6 +149,24 @@ describe('git-guardrails.sh', () => {
     expect(bash(command).status).toBe(0)
   })
 
+  it.each([
+    'git push --force',
+    'git push -f',
+    'git push --force-with-lease origin',
+    'git push origin -f',
+  ])('blocks the implicit force-push from a shared branch %s', (command) => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(2)
+  })
+
+  it.each(['git push --force', 'git push origin -f'])(
+    'leaves the implicit force-push from a feature branch %s alone',
+    (command) => {
+      const root = gitRoot('fix/issue-408')
+      expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+    },
+  )
+
   // `rm -r` is judged by where it points, not by the flags: the target has to match whole, so the
   // roots below go and every ordinary cleanup stays. Every mode, like the rest of tier one.
   it.each([
@@ -185,6 +210,11 @@ describe('git-guardrails.sh', () => {
     'git rm --cached $(rm -rf /)',
     'git rm --cached `rm -rf /`',
     'git rm --cached $(rm -rf $PWD)',
+    'rm -rf /etc',
+    'rm -rf /usr/local',
+    'rm -rf /var/lib',
+    'rm -rf /home',
+    'rm -rf /opt',
   ])('blocks the recursive delete %s', (command) => {
     for (const env of [{}, AGENT, ACTIONS]) {
       expect(bash(command, env).status).toBe(2)
@@ -197,6 +227,7 @@ describe('git-guardrails.sh', () => {
     'rm -rf ./dist',
     'rm -rf .ai/qa/artifacts_123',
     'rm -rf /tmp/claude-501/x',
+    'rm -rf /private/tmp/claude-501/x',
     'rm package-lock.json',
     // Several operands, none of them a root: stepping over an operand must not turn the next one
     // into a target it is not.

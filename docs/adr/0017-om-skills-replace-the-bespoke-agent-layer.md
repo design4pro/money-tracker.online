@@ -332,7 +332,7 @@ unnecessary; the reason underneath it did not.
 ## Amendment, 2026-09-20: a short deny list returns, as a backstop and not as the boundary
 
 The 2026-09-07 (second) amendment above says `.claude/settings.json` is hooks-only and that the
-deny list "no longer exists". `.claude/settings.json` now carries a `permissions.deny` of nine
+deny list "no longer exists". `.claude/settings.json` now carries a `permissions.deny` of twelve
 entries again. The two are less in conflict than they read, and the distinction is the point.
 
 That amendment's argument was about `deny` as a **boundary**, and it is correct: a prefix matcher
@@ -359,11 +359,6 @@ So the split is by failure mode, not by rule:
   permission mode including the `dontAsk` a cezar run uses and the `bypassPermissions` of the
   review job. It is deliberately too short to reason with: the irreversible set only.
 
-The deny matcher is prefix-only, so it cannot represent the hook's distinction between a
-force-push to `develop` or `main` and one to a feature branch, nor its whole-target distinction
-between `rm -rf /` and scratchpad cleanup below `/tmp`. Those three prefixes are therefore absent:
-the hook remains their precise enforcement and its paired cases preserve the ordinary commands.
-
 It names the exact secret files rather than a glob, because `.dev.vars.example` and
 `.env.local.example` are files `AGENTS.md` sends a reader to, and `Read(./.dev.vars.*)` would have
 refused them — the same over-breadth the 2026-09-07 amendment warned about, arriving from the
@@ -371,6 +366,15 @@ other direction.
 
 Decision 3's text is unaffected: the hooks are still what the skills' GitHub access is loosened
 against, and they still keep blocking destructive git, environment dumps and `--no-verify`.
+
+## Amendment, 2026-09-22: prefix denials yield to tested command-aware enforcement
+
+The three prefix denials for `rm -rf /`, `git push --force`, and `git push -f` are removed. They
+blocked ordinary feature-branch force-pushes and cezar scratchpad cleanup before the hook could
+evaluate the command's target. The hook now closes the two omitted cases that review found: a
+force-push without a refspec while `develop` or `main` is checked out, and a recursive deletion of
+an absolute path other than the disposable `/tmp/claude-*` scratchpad. Its regression cases cover
+the protected and permitted commands together.
 
 ## Amendment, 2026-09-21: the arming allowlist names Codex, and a bot needs one entry per login form
 
