@@ -6,10 +6,11 @@
  * its own, so the cache is gated on `runner.environment == 'github-hosted'`. Drop the gate and
  * every pool job gets slower without failing anything.
  *
- * Both deploy workflows run on GitHub-hosted runners unless `vars.RUNNER_DEPLOY` says otherwise:
- * a deploy must not queue behind the pool, and the variable is the lever that moves shipping back
- * without a pull request. Hard-code a runner, or lose the hosted default, and the lever or the
- * default disappears silently - the next deploy is the first place anyone notices.
+ * Both deploy workflows choose their runner through `vars.RUNNER_DEPLOY` and fall back to the
+ * pool: since 2026-09-21 shipping runs on the same machines as the gate (#409). The fallback is
+ * the default because a variable is invisible in the tree, and the variable stays because leaving
+ * the pool cannot need the merge gate that needs the pool. Hard-code a runner here and the lever
+ * disappears silently - the next deploy is the first place anyone notices.
  *
  * The browser suites install their own browsers. Both of them - the e2e gate and the axe gate -
  * used to inherit them from a runner image built FROM `mcr.microsoft.com/playwright`, and when the
@@ -29,6 +30,7 @@
  * @see .github/workflows/deploy-production.yml
  * @see https://github.com/design4pro/money-tracker.online/pull/318
  * @see https://github.com/design4pro/money-tracker.online/issues/403
+ * @see https://github.com/design4pro/money-tracker.online/issues/409
  */
 
 import { readFileSync } from 'node:fs'
@@ -97,13 +99,13 @@ describe.each([
   '.github/workflows/deploy-staging.yml',
   '.github/workflows/deploy-production.yml',
 ])('%s', (path) => {
-  it('selects its runner through vars.RUNNER_DEPLOY, defaulting to GitHub-hosted', () => {
+  it('selects its runner through vars.RUNNER_DEPLOY, defaulting to the pool', () => {
     const runsOn = [...read(path).matchAll(/^\s*runs-on:[^\n]*/gm)].map((m) =>
       m[0].trim(),
     )
 
     expect(runsOn).toEqual([
-      `runs-on: \${{ fromJSON(vars.RUNNER_DEPLOY || '["ubuntu-latest"]') }}`,
+      `runs-on: \${{ fromJSON(vars.RUNNER_DEPLOY || '["self-hosted","linux","ARM64","ci"]') }}`,
     ])
   })
 })
