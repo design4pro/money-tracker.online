@@ -12,5 +12,4 @@ steps:
   - id: afk-triage
     name: afk-triage
     prompt: '/afk-triage {{task}}'
-    model: opus
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]

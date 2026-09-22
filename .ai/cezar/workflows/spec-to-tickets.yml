@@ -11,5 +11,4 @@ steps:
   - id: afk-to-tickets
     name: afk-to-tickets
     prompt: '/afk-to-tickets {{task}}'
-    model: opus
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]

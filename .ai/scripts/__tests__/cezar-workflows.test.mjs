@@ -2,7 +2,7 @@
  * The shape every cezar workflow has to have, asserted rather than remembered.
  *
  * Four workflows spent weeks as three-line `skills:` shorthand — a name, a description and a skill
- * list — which meant no bootstrap step, no model pin, and cezar's DEFAULT_ALLOWED_TOOLS
+ * list — which meant no bootstrap step and cezar's DEFAULT_ALLOWED_TOOLS
  * (`Read, Edit, Write, Grep, Glob, Bash`). That over-granted Edit and Write to two workflows whose
  * own skills say they are read-only on code, and under-granted `Skill` to all four, so a skill
  * that tells the agent to run another skill could not. Nothing said so until someone read the
@@ -55,7 +55,7 @@ describe('cezar workflows', () => {
   )
 
   it.each(files.map((f) => [f.name]))(
-    '%s pins a model and a tool grant on every agent step',
+    '%s grants tools on every agent step, and pins no model',
     (name) => {
       const file = files.find((f) => f.name === name)
       const agentSteps = steps(file.text).filter((s) =>
@@ -63,13 +63,19 @@ describe('cezar workflows', () => {
       )
       expect(agentSteps.length).toBeGreaterThan(0)
       for (const step of agentSteps) {
-        expect(step.block, `${name} step "${step.id}" has no model:`).toMatch(
-          /^\s+model:/m,
-        )
         expect(
           step.block,
           `${name} step "${step.id}" has no allowedTools:`,
         ).toMatch(/^\s+allowedTools: \[/m)
+        // A step `model:` is a claim about ONE backend, and it wins over the model the run was
+        // started with - so a workflow pinned to a Claude alias handed that alias to whatever
+        // runner the task actually chose. On codex that meant a thread the API refused every
+        // request on: no text, no tokens, no error, eighteen runs that did nothing and
+        // seventeen of them recorded `done`. The model belongs to the run, not to the file.
+        expect(
+          step.block,
+          `${name} step "${step.id}" pins a model:`,
+        ).not.toMatch(/^\s+model:/m)
       }
     },
   )

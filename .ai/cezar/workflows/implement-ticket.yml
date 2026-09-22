@@ -36,7 +36,6 @@ steps:
       - Build one complete vertical slice, inside the acceptance criteria and "Out of scope".
       - Use CONTEXT.md terms. Add or update entries for any concept you introduce or rename (afk-domain-modeling).
       - Append each decision the brief left open to `$CEZ_HANDOFF_FILE` under a `## Resolved assumptions` heading, as a `# | Question | Applied default | Why` row. The PR step reads that table from there.
-    model: opus
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: gate
     name: Validation gate
@@ -52,7 +51,6 @@ steps:
       If `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds, print that line and end at once with CEZ:DONE.
 
       Otherwise open the PR per om-open-pr, with the issue number from the task as the issue id. Copy the `## Resolved assumptions` table out of `$CEZ_HANDOFF_FILE` into the PR body, and reference the issue with `Fixes #<number>`.
-    model: sonnet
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: review
     name: Review the PR
@@ -67,6 +65,5 @@ steps:
       - Report the Standards axis and the Spec axis separately (CODE_REVIEW.md).
       - On the Spec axis, check each acceptance criterion from the issue's Agent Brief.
       - Never merge, and never run om-approve-merge-pr.
-    model: opus
     # `Task` dispatches the review personas in .claude/agents (CODE_REVIEW.md -> Review personas).
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]

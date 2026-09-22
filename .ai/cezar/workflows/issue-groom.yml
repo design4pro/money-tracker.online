@@ -14,5 +14,4 @@ steps:
   - id: groom
     name: om-auto-manage-issues
     prompt: '/om-auto-manage-issues {{task}} --prep-impl'
-    model: sonnet
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
