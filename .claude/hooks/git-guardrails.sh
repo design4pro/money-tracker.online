@@ -54,6 +54,36 @@ command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 # deletes only the two quote marks left it matching nothing.
 unquote() { printf '%s' "$1" | tr -d '"\047\\'; }
 
+# Keep shell-executable text while discarding single-quoted literals and escaped substitution
+# markers. Two backslashes still expose the following $ or backtick to the shell.
+executable_text() {
+  local input="$1" out= quote= char next i
+  local slash='\'
+  for ((i = 0; i < ${#input}; i++)); do
+    char=${input:i:1}
+    next=${input:i+1:1}
+    if [ "$quote" = single ]; then
+      if [ "$char" = "'" ]; then quote=; fi
+      continue
+    fi
+    if [ "$char" = "$slash" ]; then
+      case "$next" in
+        '$'|'`') out+=' ' ;;
+        *) out+="$next" ;;
+      esac
+      i=$((i + 1))
+      continue
+    fi
+    if [ "$char" = "'" ] && [ -z "$quote" ]; then quote=single; continue; fi
+    if [ "$char" = '"' ]; then
+      if [ "$quote" = double ]; then quote=; else quote=double; fi
+      continue
+    fi
+    out+="$char"
+  done
+  printf '%s' "$out"
+}
+
 # Nothing on this list can execute a string it is handed: a message, a pattern, a heredoc written
 # to a file. `sed` (GNU `s///e`) and `awk` (`system()`) can, so they are deliberately absent even
 # though their arguments read as prose - the criterion is what the command *can* do, not what it
@@ -94,7 +124,7 @@ else
   # Here-strings, not pipes: `grep -q` closes early, and under `pipefail` that turns a match into
   # a non-zero pipeline - the one failure shape that would silently re-open the stripping.
   if grep -Eq "$prose_command" <<< "${joined%%$'\n'*}"; then
-    text=$(printf '%s' "$joined" | awk '
+    without_heredoc=$(printf '%s' "$joined" | awk '
       skip { if ($0 == tag) skip = 0; next }
       {
         if (match($0, /<<-?["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
@@ -104,23 +134,37 @@ else
         }
         print
       }
-    ' | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
-    # A control operator means a second command hides behind the first, and the head word says
-    # nothing about it: a `grep` chained by `&&` into a shell invocation would have had the
-    # payload stripped as if it were the grep's own pattern. Only a lone simple command is text.
-    #
-    # A newline is one of those operators. It separates commands exactly as `;` does, and leaving
-    # it out of the set was the whole bug: the head-word test above reads only the first line, so
-    # a prose head word followed by a newline and an executor carrying a quoted payload passed as
-    # prose, and the payload was deleted before a rule saw it. The awk above has already removed
-    # heredoc bodies, so a newline still in $text is a second command, never a quoted document -
-    # which is why the heredoc commit-message shape keeps its exemption.
-    #
-    # The trade-off, taken deliberately: a multi-line command that both starts with a prose head
-    # word and carries a matching token inside quotes on a later line is now refused. Re-issue it
-    # as one line. That is the fail-closed direction this file's mistakes should point in.
-    if ! grep -Eq '[|;&`]|\$\(' <<< "$text" && [ "$text" = "${text%%$'\n'*}" ]; then
-       scan="$text"
+    ')
+    # Single quotes and quoted heredocs are literal data. A substitution in any remaining
+    # argument is executed by the shell, even when the argument itself is double-quoted.
+    executable=
+    if grep -Eq '\$\(|`' <<< "$without_heredoc"; then
+      executable=$(executable_text "$without_heredoc")
+    fi
+    if [ -n "$executable" ] && grep -Eq '\$\(|`' <<< "$executable"; then
+      # Nested shells can execute quoted arguments. Preserve the complete command once an
+      # executable substitution is found, accepting false positives over a missed operation.
+      scan=$(unquote "$without_heredoc")
+    else
+      without_single=$(printf '%s' "$without_heredoc" | sed -E "s/'[^']*'//g")
+      text=$(printf '%s' "$without_single" | sed -E 's/"[^"]*"//g')
+      # A control operator means a second command hides behind the first, and the head word says
+      # nothing about it: a `grep` chained by `&&` into a shell invocation would have had the
+      # payload stripped as if it were the grep's own pattern. Only a lone simple command is text.
+      #
+      # A newline is one of those operators. It separates commands exactly as `;` does, and leaving
+      # it out of the set was the whole bug: the head-word test above reads only the first line, so
+      # a prose head word followed by a newline and an executor carrying a quoted payload passed as
+      # prose, and the payload was deleted before a rule saw it. The awk above has already removed
+      # heredoc bodies, so a newline still in $text is a second command, never a quoted document -
+      # which is why the heredoc commit-message shape keeps its exemption.
+      #
+      # The trade-off, taken deliberately: a multi-line command that both starts with a prose head
+      # word and carries a matching token inside quotes on a later line is now refused. Re-issue it
+      # as one line. That is the fail-closed direction this file's mistakes should point in.
+      if ! grep -Eq '[|;&`]|\$\(' <<< "$text" && [ "$text" = "${text%%$'\n'*}" ]; then
+        scan="$text"
+      fi
     fi
   fi
 fi
@@ -349,8 +393,12 @@ while IFS= read -r scratchpad; do
     [ -e "$candidate" ] || [ -L "$candidate" ] || continue
     resolved=$(realpath "$candidate" 2>/dev/null || true)
     [ -n "$resolved" ] || block 'rm -r through an unresolved scratchpad path'
+    scratchpad_root=$(printf '%s' "$candidate" | sed -E 's#^(/(private/)?tmp/claude-[[:alnum:]_-]+).*#\1#')
+    scratchpad_parent=$(realpath "$(dirname "$scratchpad_root")" 2>/dev/null || true)
+    [ -n "$scratchpad_parent" ] || block 'rm -r through an unresolved scratchpad path'
+    expected_root="${scratchpad_parent}/$(basename "$scratchpad_root")"
     case "$resolved" in
-      /tmp/claude-*|/private/tmp/claude-*) ;;
+      "$expected_root"|"$expected_root"/*) ;;
       *) block 'rm -r through a scratchpad symlink' ;;
     esac
   done
