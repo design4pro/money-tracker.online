@@ -54,12 +54,10 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
   comment: it is re-derived on the head under review, and a headline total agrees with the table it
   summarises (#170, #191, #222, #250, #252, #253).
 - **Governance documents.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`,
-  `docs/MONEY.md` and `docs/adr/` record decisions a person owns, and the `governance-gate` check
-  refuses a PR touching one until a person applies `governance-approved`. Reviewing such a PR means
-  reading the decision, not the diff's shape: what changed, what it supersedes, and whether the
-  change belongs in that document at all rather than in the code that cites it. An ADR proposed by
-  an unattended run arrives as `Status: proposed` and the merge is the acceptance, so the label is
-  the point at which somebody accepted it.
+  `docs/MONEY.md` and `docs/adr/` record decisions a person owns. A PR touching one is
+  `risk-high`; the required `merge-gate` verifies a configured human's `Risk approval: <full head SHA>`
+  comment and the `risk-approved` label. Reviewing it means reading the decision, not only the
+  diff's shape: what changed, what it supersedes, and whether the change belongs there.
 - **Documents name what exists.** A spec, ADR, `SDLC.md`, skill or comment that names a file, job,
   test, label, automation or mechanism names one that exists on the branch and does what the text
   says; the reviewer opens each one (#159, #191, #304, #308, #310, #319).

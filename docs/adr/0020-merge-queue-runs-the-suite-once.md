@@ -191,3 +191,25 @@ retired `design4pro/agent-kit` and vendored the rendered files in place, so:
   this repository and are edited here.
 
 The queue mechanism, the `verdict` job and the required checks are untouched.
+
+## Amendment 2026-09-23
+
+**The GitHub merge queue described above is not active in either live ruleset.** The `develop`
+and `main` rulesets were read through the GitHub API on 2026-09-23: both have
+`required_approving_review_count: 0` and require `generated · typecheck · lint · build`,
+`unit tests · coverage`, `e2e · merged report` and `merge-gate`, but neither has a `merge_queue`
+rule. `claude-review` is no longer a required context. The `merge-queue` label remains a process
+state, not a GitHub queue entry.
+
+Until this amendment, the `e2e` job skipped every pull request and the required `e2e · merged
+report` job skipped with it. GitHub treated that skipped check as passing, so an ordinary pull
+request could merge without a browser run. Deferring the journeys to `merge_group` only works if
+the base branch actually has a GitHub merge queue rule. The prior decision and cost table remain
+as history, not as a description of the active protection.
+
+CI now runs both browser legs on pull requests as well as merge groups. The required report runs
+on every pull request and fails if the legs did not succeed, including when they were skipped.
+Blob and HTML artifact operations remain advisory: storage failures do not change a passing
+browser result or hide a failing one. Push runs may still reuse a verified tree through `verdict`.
+This costs additional runner time; measure queue delay and runner use before changing parallelism
+or caching. A future GitHub merge queue rollout requires a new decision and live ruleset check.

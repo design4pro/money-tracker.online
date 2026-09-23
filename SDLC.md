@@ -169,7 +169,7 @@ The one hard rule of this process: **a PR carrying `needs-qa` must not merge unt
 - `skip-qa` is the explicit opt-out for docs-only, dependency-only, CI-only, test-only, and similarly low-risk non-user-facing changes. Never combine it with `needs-qa`.
 - `qa-failed`, `do-not-merge`, and `blocked` are hard blocks regardless of every other signal. An active `qa` pipeline label means a tester is on the PR right now — never merge under an active tester.
 - The gate is satisfied when a QA reviewer tests the PR and applies `qa-approved`.
-- **`qa-approved` is pinned to a commit.** The comment that grants it — the QA reviewer's note, or the self-QA evidence comment — carries the line `QA head: <sha>` for the head that was tested. A push after that line leaves the label in place but stales it: `om-merge-buddy` reports "QA evidence older than head", and `om-approve-merge-pr` asks for confirmation before merging. The way back is a QA reviewer re-testing, or stating on the PR that the new commits do not touch the tested scope, with a fresh `QA head:` line. A sign-off without the line pre-dates this rule and is read as unpinned, not as invalid.
+- **`qa-approved` is pinned to a commit.** The comment that grants it — the QA reviewer's note, or the self-QA evidence comment — carries the line `QA head: <sha>` for the head that was tested. A push after that line leaves the label in place but stales it: the required `merge-gate` fails until a QA reviewer re-tests, or states that the new commits do not touch the tested scope, with a fresh `QA head:` line.
 - **Self-QA exception**: when no QA reviewer has capacity in time, any engineer may sign off instead, on a `risk-low` or `risk-medium` PR only — but only by (1) checking the PR out and running it locally, (2) exercising the affected flow, and (3) attaching evidence to the PR that names the scenario exercised, the environment, the test data, the observed result, the negative cases tried, and the `QA head:` line. Then apply both `qa-approved` (so the gate passes) and `qa-self-verified` (so the exception is auditable). No evidence, no `qa-approved`.
 - **No self-QA on `risk-high`.** A PR labeled `risk-high`, or one whose diff touches auth, sessions, data scoping, money, schema migrations, or shared contracts (the `risk-high` inference above), needs a QA reviewer, or a maintainer's explicit exception stated on the PR. A change to auth or money also needs a second person's review regardless of the QA path.
 
@@ -197,7 +197,7 @@ The `om-auto-*` skills run this process unattended and are chainable: each accep
 
 Two properties bound the whole unattended loop, and both are worth stating plainly because they are what make it safe to leave running:
 
-- **Nothing merges automatically.** No automation calls `om-approve-merge-pr`. The pipeline's output is a reviewed PR; the merge is a human act.
+- **Merge policy is repository-specific.** The pipeline's output is a reviewed PR; `## This repository` states which reviewed PRs may auto-merge and which require a person's decision.
 - **The cap is on inventory, not on rate.** The implementing skills stop when enough agent PRs already wait in `review`, so a burst of intake cannot outrun review capacity. Raising throughput means reviewing, not tuning the trigger.
 
 ## Unattended decisions
@@ -251,7 +251,7 @@ Three amendment rules are specific to this document's shape:
 
 ## This repository
 
-- **The base branch is `develop`.** `om-approve-merge-pr <n>` adds the PR to `develop`'s **merge
+- **The base branch is `develop`.** Eligible PRs enter `develop`'s **merge
   queue** (ADR 0020), which runs the suite on the commit it builds and merges it minutes later. A
   merge into `develop` does not close an issue natively, so the merger then runs
   `om-close-fixed-issues` — once the merge has landed, not while the PR is still queued — and it
@@ -268,14 +268,16 @@ Three amendment rules are specific to this document's shape:
   alone, and no run sweeps the existing backlog. The implementing automation additionally filters
   on `allLabels: ["risk-low"]`, so a `risk-medium` issue still earns a full Agent Brief and
   `ready-for-agent` and then waits for a person to start it. The ladder ends at an open, reviewed
-  PR: nothing merges, and no automation applies `qa-approved`.
+  PR: only the eligible reviewed class may auto-merge, and no automation applies `qa-approved`.
 - **Risk here.** `risk-high` means anything touching auth, tenant scoping, money, the ledger,
-  billing or a migration. `docs/MONEY.md` is not background reading: representation, rounding and
+  billing, a migration, a protected decision document or a merge-policy surface. The trusted
+  `merge-gate` checks both the current and previous path of a rename. `docs/MONEY.md` is not background reading: representation, rounding and
   currency have rules a plausible-looking change breaks silently, so read it before touching any
   amount and prefer the helpers in `src/lib/money/`.
 - **QA routing.** A PR that reaches `src/routes/**`, `src/components/**`, `src/styles/**` or
   `src/lib/i18n/messages/*` carries `needs-qa`; docs, CI, tests, `scripts/**`, `.ai/**` and
-  dependency bumps carry `skip-qa`. The QA reviewer takes the blind pair with
+  dependency bumps carry `skip-qa`. A `needs-qa` PR remains a manual merge even after
+  `qa-approved`. The QA reviewer takes the blind pair with
   `node scripts/visual/capture.mjs` at 360x800 and 1280x900 in both themes (ADR 0016);
   `om-auto-qa-pr` evidence complements it and never replaces it. Its `--self-qa-signoff` flag is
   never used here: the shared half above permits a self-QA sign-off below `risk-high`, but the
@@ -320,22 +322,29 @@ anything from anyone else waits for a maintainer to add a trigger label.
 
 **Guardrails:**
 
-- Nothing merges automatically: no automation calls `om-approve-merge-pr`.
+- Only a non-draft PR targeting `develop`, without `risk-high` or `needs-qa`, may auto-merge.
+  Cezar posts `Cezar review: <full head SHA>` before setting the process label `merge-queue`.
+  The trusted controller reads current PR metadata, confirms the current head receipt, required
+  policy and labels, then enables GitHub auto-merge. GitHub's required checks control the final
+  merge. A push or disqualifying label cancels auto-merge and removes a queued PR. The controller
+  is fail-closed until the repository variable `AUTO_MERGE_ENABLED` is
+  `true`; the process label is not a GitHub merge queue entry.
+- `risk-high` requires `risk-approved` and a comment by a configured human with the exact line
+  `Risk approval: <full head SHA>`. The PR author may sign their own risk decision except where
+  auth or money requires a current-head GitHub approval from a second person. Risk-high PRs merge
+  manually. GitHub's `Required approvals` remains 0 on both branch rulesets; this receipt is the
+  trusted `merge-gate` condition, not a GitHub `APPROVE` review.
+- A `needs-qa` PR requires `qa-approved` and `QA head: <full head SHA>` from a configured
+  human QA reviewer. It merges manually. Promotion from `develop` to `main` also merges
+  manually after the release decision.
 - `implement-ticket` stops when three or more agent PRs already wait in `review`, and that cap is
   shared — the `issue-autofix` output counts against it too, because both ladders publish under the
   same `gh` identity.
 - Neither triage nor implementation touches `risk-high` or `security` work.
-- **A change to a governance document needs a person's signature.** `DESIGN.md`,
+- **Governance documents use the same risk gate.** `DESIGN.md`,
   `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record
-  decisions a human owns, so the `governance-gate` check
-  (`.github/workflows/governance-gate.yml`) refuses a PR touching one until somebody applies
-  **`governance-approved`** — this repository's own switch outside the shared taxonomy, alongside
-  `do-not-close`. It is not keyed on who opened the PR: cezar publishes as `design4pro-agent` but
-  an agent driving a maintainer's checkout pushes as that maintainer, so an author test would wave
-  through the commoner case. It refuses nothing outright either, because an unattended run is
-  documented to propose an ADR as `Status: proposed`
-  (`.ai/skills/afk-domain-modeling/SKILL.md`); the label is the record that a person read it.
-  `.github/CODEOWNERS` routes the same paths to a reviewer, and routes only — both rulesets carry
+  decisions a human owns. They require `risk-high` and the current-head human receipt above.
+  `.github/CODEOWNERS` routes the same paths to a reviewer; both rulesets keep
   `require_code_owner_review: false`.
 - To stop it all, `cez automation pause <id>`, or start the cockpit with `CEZ_AUTOMATIONS=0`.
 

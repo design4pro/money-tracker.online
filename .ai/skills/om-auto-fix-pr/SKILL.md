@@ -19,5 +19,6 @@ One addition to the stabilization loop's exit criteria:
   and ends the loop with `changes-requested`, never `merge-queue`; the final report names the thread
   and its reason so a human can settle it.
 
-The `develop` ruleset requires review-thread resolution. An open thread blocks the merge until it
-is resolved, even when the automated Claude review is no longer running.
+The live `develop` and `main` rulesets both set `required_review_thread_resolution: true`, so an
+open thread blocks the merge. The criterion above also keeps the skill from reporting an
+approvable PR while a finding still needs an answer.

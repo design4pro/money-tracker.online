@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Register docs/agents/cezar-automations.json with the running cezar through its API (never by
 # editing .ai/cezar/automations.json by hand). Idempotent: an automation with the same name is
-# updated in place, a new one is created enabled. Automations the cockpit holds that the file no
-# longer names are listed; --prune deletes them, so the file is the whole truth.
+# updated in place, a new one follows its enabled setting (default true). Automations the cockpit
+# holds that the file no longer names are listed; --prune deletes them, so the file is the whole truth.
 #
 # The file is the truth for every field it names - `enabled` included, when a definition states
 # it. What the file does not state, the cockpit keeps: an update used to send `enabled: true`
@@ -77,7 +77,7 @@ jq -c '.[]' "$FILE" | while read -r def; do
     [ "$(tail -1 <<<"$out")" = "200" ] || die "PUT $name -> $(tail -1 <<<"$out"): $(sed '$d' <<<"$out")"
     say "updated $name ($id)"
   else
-    body=$(jq -c '. + {enable: true}' <<<"$def")
+    body=$(jq -c '. + {enable: (if has("enabled") then .enabled else true end)}' <<<"$def")
     if [ "$DRY" -eq 1 ]; then say "would create $name"; continue; fi
     out=$(curl -sS -X POST "$API" -H 'content-type: application/json' -d "$body" -w '\n%{http_code}')
     [ "$(tail -1 <<<"$out")" = "201" ] || die "POST $name -> $(tail -1 <<<"$out"): $(sed '$d' <<<"$out")"
