@@ -14,7 +14,7 @@ import type { Locator, Page } from '@playwright/test'
  * every animation to `0.01ms` and one iteration, and `[data-motion-transform]` resets `transform`
  * on the elements whose transform is owned by an animation and whose resting transform is the
  * identity. Both are stylesheet claims, and this file is what turns them into something that can go
- * red (spec `.ai/specs/2026-09-11-reduced-motion-transform-reset.md`, Phase 2).
+ * red (spec `.ai/specs/implemented/2026-09-11-reduced-motion-transform-reset.md`, Phase 2).
  *
  * ## Four assertions per overlay
  *
