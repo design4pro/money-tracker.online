@@ -197,6 +197,55 @@ describe('cez-automations.sh', () => {
     expect(post(result)[0].body.enable).toBe(true)
   })
 
+  it('creates an explicitly disabled automation without starting it', async () => {
+    const def = definition('Paused automation', { enabled: false })
+    const result = await run([def], [])
+    expect(result.status).toBe(0)
+    expect(post(result)).toHaveLength(1)
+    expect(post(result)[0].body.enable).toBe(false)
+  })
+
+  it('prunes a disabled stray with spaces in its name using the original id', async () => {
+    const stray = held(definition('Old automation'), {
+      id: 'old-id',
+      enabled: false,
+    })
+    const result = await run([], [stray], ['--prune'])
+    expect(result.status).toBe(0)
+    expect(
+      result.sent.filter((request) => request.method === 'DELETE'),
+    ).toEqual([
+      {
+        method: 'DELETE',
+        path: `/api/v1/p/${PROJECT}/automations/old-id`,
+        body: null,
+      },
+    ])
+  })
+
+  it('compares stray names literally and keeps dry runs non-mutating', async () => {
+    const def = definition('name.with.dot')
+    const stray = held(definition('nameXwithXdot'), {
+      id: 'stray-id',
+      enabled: false,
+    })
+    const result = await run([def], [stray], ['--dry-run', '--prune'])
+    expect(result.status).toBe(0)
+    expect(result.stderr).toContain('would delete nameXwithXdot (stray-id)')
+    expect(result.sent.map((request) => request.method)).toEqual(['GET'])
+  })
+
+  it('describes an enabled stray in the conditional tense during a dry run', async () => {
+    const stray = held(definition('Manual automation'), {
+      id: 'manual-id',
+      enabled: true,
+    })
+    const result = await run([], [stray], ['--dry-run', '--prune'])
+    expect(result.status).toBe(0)
+    expect(result.stderr).toContain('would keep Manual automation (manual-id)')
+    expect(result.sent.map((request) => request.method)).toEqual(['GET'])
+  })
+
   it('names the fields that drifted from the file', async () => {
     const def = definition('Spec to tickets', { intervalSeconds: 600 })
     const drifted = held(

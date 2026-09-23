@@ -20,9 +20,11 @@
 
 import { spawnSync } from 'node:child_process'
 import { readFileSync, realpathSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const CONFIG_PATH = '.ai/agentic.config.json'
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
 /** The configured gate, as a list of shell lines. Throws when the config cannot supply one. */
 export function readCommands(json) {
@@ -46,17 +48,19 @@ export function readCommands(json) {
 export function runAll(commands, { run, log = () => {} }) {
   for (const [index, command] of commands.entries()) {
     log(`[${index + 1}/${commands.length}] ${command}`)
-    const status = run(command)
+    const status = run(command, { cwd: REPO_ROOT })
     if (status !== 0) return { index, command, status }
   }
   return null
 }
 
 function main() {
-  const commands = readCommands(JSON.parse(readFileSync(CONFIG_PATH, 'utf8')))
+  const commands = readCommands(
+    JSON.parse(readFileSync(join(REPO_ROOT, CONFIG_PATH), 'utf8')),
+  )
   const failure = runAll(commands, {
-    run: (command) =>
-      spawnSync(command, { shell: true, stdio: 'inherit' }).status ?? 1,
+    run: (command, { cwd }) =>
+      spawnSync(command, { cwd, shell: true, stdio: 'inherit' }).status ?? 1,
     log: (line) => console.log(`\n\u001b[1m${line}\u001b[0m`),
   })
   if (!failure) {

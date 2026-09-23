@@ -113,6 +113,54 @@ describe('decide', () => {
   })
 })
 
+// The list `decide` judges is built by the workflow, not by this script, so a path the jq query
+// never emits is a path no case above can see. A rename is the one that goes missing: the files API
+// reports it once, under its new name, with the old one in `previous_filename`. Moving a governed
+// document out of its governed path must still read as touching it, so the query is run here, as
+// written in the workflow, over the shape the API returns.
+describe('the files the workflow hands to the gate', () => {
+  const workflow = readFileSync(
+    join(ROOT, '.github/workflows/governance-gate.yml'),
+    'utf8',
+  )
+  const query = workflow.match(/pulls\/\$PR_NUMBER\/files" -q '([^']+)'/)?.[1]
+  const files = (page) =>
+    execFileSync('jq', ['-r', query ?? 'error("query not found")'], {
+      input: JSON.stringify(page),
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter((line) => line !== '')
+
+  it('names the old path of a renamed file as well as the new one', () => {
+    expect(
+      files([
+        { filename: 'src/app.ts', status: 'modified' },
+        {
+          filename: 'docs/decisions/0009-accessibility.md',
+          previous_filename: 'docs/adr/0009-accessibility.md',
+          status: 'renamed',
+        },
+      ]),
+    ).toEqual([
+      'src/app.ts',
+      'docs/decisions/0009-accessibility.md',
+      'docs/adr/0009-accessibility.md',
+    ])
+  })
+
+  it('refuses a governed document moved out of its path without the receipt', () => {
+    const moved = files([
+      {
+        filename: 'docs/money-notes.md',
+        previous_filename: 'docs/MONEY.md',
+        status: 'renamed',
+      },
+    ])
+    expect(decide({ files: moved, labels: [] }).ok).toBe(false)
+  })
+})
+
 describe('the guarded paths', () => {
   it.each(GOVERNANCE_FILES)(
     '%s exists, so the entry still guards something',

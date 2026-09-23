@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
@@ -42,6 +43,18 @@ describe('readCommands', () => {
 })
 
 describe('runAll', () => {
+  it('runs commands from the repository root even when invoked elsewhere', () => {
+    const cwd = fileURLToPath(new URL('../../../', import.meta.url))
+    const received = []
+    runAll(['pnpm test'], {
+      run: (command, options) => {
+        received.push({ command, ...options })
+        return 0
+      },
+    })
+    expect(received).toEqual([{ command: 'pnpm test', cwd }])
+  })
+
   it('runs every command in order when they all pass', () => {
     const ran = []
     const failure = runAll(['a', 'b', 'c'], {

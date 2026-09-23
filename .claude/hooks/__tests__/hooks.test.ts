@@ -251,6 +251,31 @@ describe('git-guardrails.sh', () => {
     expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
   })
 
+  it.each([
+    'grep "$(git push --force origin)" AGENTS.md',
+    'grep "`git push --force origin`" AGENTS.md',
+    'grep "$(echo $(git push --force origin))" AGENTS.md',
+    'grep "$(sh -c \'git push --force origin\')" AGENTS.md',
+    "grep $(sh -c 'git push --force origin') AGENTS.md",
+    'grep "\\\\$(git push --force origin)" AGENTS.md',
+  ])('blocks executable substitutions in prose arguments: %s', (command) => {
+    const root = gitRoot('develop')
+    const result = hook('git-guardrails.sh', { command }, {}, root)
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('force-push to develop/main')
+  })
+
+  it.each([
+    "grep '$(git push --force origin)' AGENTS.md",
+    "grep '`git push --force origin`' AGENTS.md",
+    'grep "\\$(git push --force origin)" AGENTS.md',
+    'grep "\\`git push --force origin\\`" AGENTS.md',
+    "cat > notes.txt <<'EOF'\n$(git push --force origin)\nEOF",
+  ])('keeps literal quoted text as data: %s', (command) => {
+    const root = gitRoot('develop')
+    expect(hook('git-guardrails.sh', { command }, {}, root).status).toBe(0)
+  })
+
   it('still blocks a push following a prose command from a shared checkout', () => {
     const root = gitRoot('develop')
     expect(hook('git-guardrails.sh', {
@@ -416,6 +441,21 @@ describe('git-guardrails.sh', () => {
       expect(bash(`rm -rf ${scratchpad}/*`).status).toBe(2)
     } finally {
       rmSync(scratchpad, { force: true })
+    }
+  })
+
+  it('blocks a scratchpad symlink into another scratchpad', () => {
+    const scratchpad = mkdtempSync('/tmp/claude-link-')
+    const destination = mkdtempSync('/tmp/claude-destination-')
+    writeFileSync(join(destination, 'evidence.txt'), 'evidence')
+    rmSync(scratchpad, { recursive: true })
+    symlinkSync(destination, scratchpad)
+
+    try {
+      expect(bash(`rm -rf ${scratchpad}/*`).status).toBe(2)
+    } finally {
+      rmSync(scratchpad, { force: true })
+      rmSync(destination, { recursive: true, force: true })
     }
   })
 
