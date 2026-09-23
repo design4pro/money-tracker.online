@@ -24,16 +24,16 @@ on:
 # and never checks out or executes code from the pull request.
 permissions: {}
 
-# A label flip fires this while the previous run is still starting, and without cancellation the
-# older of the two can report last - leaving a green check on a pull request somebody just marked
-# `blocked`. Cancelling means the newest label state is always the one that reports.
+# Ruleset-required workflows must not cancel an in-progress run. Serialize runs per PR instead;
+# a pending label-change run reads current metadata after its predecessor and reports the latest
+# policy state. GitHub may replace an older pending run with a newer one, which is safe here because
+# the decision never trusts the event's label snapshot.
 #
 # A merge group carries no pull request number, so without the fallback every queue run would share
-# the group `merge-gate-` and cancel the one before it - and a cancelled required check is how the
-# queue learns to drop an entry. `run_id` is unique per run, so those runs cancel nothing.
+# the group `merge-gate-` and delay each other. `run_id` is unique per run, so queue runs remain
+# independent.
 concurrency:
   group: merge-gate-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
-  cancel-in-progress: true
 
 jobs:
   # The job id and the job name are both `merge-gate` because that string is the check context a

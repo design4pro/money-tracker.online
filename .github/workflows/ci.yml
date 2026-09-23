@@ -45,10 +45,8 @@ name: CI
 on:
   pull_request:
     branches: [main, develop]
-  # The merge queue builds the commit that will become `develop` and waits for this workflow's
-  # required checks on it. That is where the suite runs once per change (ADR 0020): a pull request
-  # gets the fast rungs, this event gets everything including the journeys, and the push the queue's
-  # merge causes finds the verdict on its own SHA and only deploys.
+  # Keep merge_group support if a GitHub merge queue rule is enabled later. The live rulesets have
+  # no such rule, so pull requests run the browser journeys before merging (ADR 0020 amendment).
   merge_group:
     types: [checks_requested]
   push:
@@ -62,9 +60,7 @@ on:
 # with the newest, so a burst of merges costs two runs, not one each.
 #
 # A merge group is never cancelled either, and needs no rule of its own: `github.ref` is that
-# group's own `gh-readonly-queue/...` branch, unique per entry, so queue runs share no group. That
-# matters more here than it reads - a cancelled required check is how the queue decides to drop a
-# pull request.
+# group's own `gh-readonly-queue/...` branch, unique per entry, so queue runs share no group.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -350,18 +346,13 @@ jobs:
   # gate it rationed - there is no label to add, because there is nothing to opt
   # into.
   #
-  # Where it runs moved once more, to the merge queue (ADR 0020): the legs judge the commit that
-  # will become `develop`, once, instead of judging a pull request's merge preview and then the
-  # push that merge causes. So not on a `pull_request` at all - and on a `push` only when `verdict`
-  # found no earlier run for this tree, which is the fallback for a direct push, an admin bypass
-  # merge, or a hotfix on `main`.
-  #
-  # What that costs is in ADR 0016's amendment: the journeys report after a human enqueues rather
-  # than during review, and a failure arrives as a dropped queue entry.
+  # The live rulesets have no GitHub merge queue rule. A skipped required report on a PR therefore
+  # cannot prove the journeys passed before auto-merge. Run the legs on PRs and merge groups; a
+  # push only needs them when `verdict` found no earlier run for the tree (ADR 0020 amendment).
   e2e:
     needs: verdict
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && github.event_name != 'pull_request' }}
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
     # so the run's own clock is the one that fires first and names the test it
@@ -466,9 +457,9 @@ jobs:
   e2e-report:
     name: e2e · merged report
     needs: e2e
-    # Not behind legs that were skipped - on a `develop` → `main` promotion pull request - since
-    # there is nothing to merge; `!cancelled()` so a failing leg still owes the reader its report.
-    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
+    # Every PR needs a real verdict. If its legs were skipped, run and fail instead of publishing
+    # a skipped job as a green required check. A push with a reused verdict may still skip.
+    if: ${{ always() && (github.event_name == 'pull_request' || needs.e2e.result != 'skipped') }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 10
 
@@ -488,6 +479,7 @@ jobs:
           merge-multiple: true
 
       - name: Merge the reports
+        continue-on-error: true
         run: |
           set -euo pipefail
           if [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then

@@ -327,9 +327,9 @@ anything from anyone else waits for a maintainer to add a trigger label.
 - Only a non-draft PR targeting `develop`, without `risk-high` or `needs-qa`, may auto-merge.
   Cezar posts `Cezar review: <full head SHA>` before setting the process label `merge-queue`.
   The trusted controller reads current PR metadata, confirms the current head receipt, required
-  policy and labels, then enables GitHub auto-merge. GitHub's required checks and merge queue
-  control the final merge. A push or disqualifying label cancels auto-merge and removes a queued
-  PR. The controller is fail-closed until the repository variable `AUTO_MERGE_ENABLED` is
+  policy and labels, then enables GitHub auto-merge. GitHub's required checks control the final
+  merge. A push or disqualifying label cancels auto-merge and removes a queued PR. The controller
+  is fail-closed until the repository variable `AUTO_MERGE_ENABLED` is
   `true`; the process label is not a GitHub merge queue entry.
 - `risk-high` requires `risk-approved` and a comment by a configured human with the exact line
   `Risk approval: <full head SHA>`. The PR author may sign their own risk decision except where

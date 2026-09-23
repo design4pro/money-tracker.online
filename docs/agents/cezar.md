@@ -172,35 +172,27 @@ drift rows. Re-date the column when someone reads that page, not when a run read
 
   **That set is no longer empty, and this section previously said it was.** On 2026-09-09 both
   branches resolved to `deletion`, `non_fast_forward`, `pull_request` and nothing else. On
-  2026-09-20 `develop` (ruleset 22037820) adds `required_status_checks` and `merge_queue`, and
-  `main` (22037770) adds `required_status_checks`. Both require the same five contexts, with
-  `strict_required_status_checks_policy: false` so a branch need not be current to merge:
+  2026-09-23 `develop` (ruleset 22037820) and `main` (22037770) both have
+  `required_status_checks`, no `merge_queue` rule and `Required approvals: 0`. They require the
+  same four contexts, with `strict_required_status_checks_policy: false`:
 
-  | Required context                       | Published by                               |
-  | -------------------------------------- | ------------------------------------------ |
-  | `claude-review`                        | `.github/workflows/claude-code-review.yml` |
-  | `generated · typecheck · lint · build` | `.github/workflows/ci.yml`                 |
-  | `unit tests · coverage`                | `.github/workflows/ci.yml`                 |
-  | `e2e · merged report`                  | `.github/workflows/ci.yml`                 |
-  | `merge-gate`                           | `.github/workflows/merge-gate.yml`         |
+  | Required context                       | Published by                       |
+  | -------------------------------------- | ---------------------------------- |
+  | `generated · typecheck · lint · build` | `.github/workflows/ci.yml`         |
+  | `unit tests · coverage`                | `.github/workflows/ci.yml`         |
+  | `e2e · merged report`                  | `.github/workflows/ci.yml`         |
+  | `merge-gate`                           | `.github/workflows/merge-gate.yml` |
 
-  Every one is a GitHub Actions job in this repository (`integration_id` 15368), and that is what
-  makes the set usable rather than merely readable: **get-pr-checks**' Actions-run fallback reports
-  all five, so the check-run blind spot above costs nothing _at the merge gate_ as the ruleset
-  stands today. That is a property to re-probe, not to assume — an App-published _check run_ added
-  to the required set would be both required and invisible, and nothing in the repository would say
-  so. An App that posts a _commit status_ rather than a check run stays readable, because Commit
-  statuses: read is held; it is only the check-run half that no fine-grained PAT reaches.
+  The required contexts name the GitHub Actions integration (`integration_id` 15368). A status
+  name and integration alone do not identify a trusted workflow file; required-workflow pinning
+  and an adversarial workflow-edit test remain rollout prerequisites for automatic merging.
+  **get-pr-checks** must read the current head's required check runs, including the custom
+  `merge-gate` check run, rather than treating a skipped or missing result as a passing test.
 
-  **One of the five never runs on a pull request, and a run must not read that as a failure.**
-  `ci.yml` gates its `e2e` matrix on `github.event_name != 'pull_request'` (line 367), and
-  `e2e · merged report` in turn runs only when that matrix did, so on every pull request the
-  required context `e2e · merged report` reports **skipped**. GitHub counts a skipped required
-  check as satisfied: observed on #348 on 2026-09-20, where `mergeStateStatus` went `BLOCKED` →
-  `CLEAN` with that context skipped and the other four green. So a run looking for five green
-  contexts on a pull request will never find them, and must treat `skipped` as satisfied rather
-  than wait for a job that is not coming. The browser journeys are gated on the push to `develop`
-  instead, which is where that job does run.
+  `ci.yml` now runs the browser legs on every pull request. The required `e2e · merged report`
+  fails when those legs fail or are skipped. Artifact storage is advisory, but browser results
+  are not. ADR 0020's 2026-09-23 amendment explains why deferring E2E to `merge_group` was
+  unsafe without a live GitHub merge queue rule.
 
   **A sixth check exists and is deliberately not in that set.** `governance-gate`
   (`.github/workflows/governance-gate.yml`) reports on every pull request but requires none,
@@ -429,13 +421,16 @@ This paragraph used to end "the four command labels are the only things that sta
 work". That has not been true since `ready-for-agent` was wired to `implement-ticket` (ADR 0017,
 amendment 2026-09-17).
 
-**Merge and after.** `om-merge-buddy` reports what is mergeable; a human runs
-`/om-approve-merge-pr <n>`, which adds the PR to `develop`'s merge queue — the queue runs the suite
-on the commit it builds and squashes it in minutes later (ADR 0020) — then `/om-close-fixed-issues`,
-once that merge has landed, closes what the merge did not — Cezar has no `pull_request.merged` event, and `develop` is not the default branch,
-so nothing closes natively. Housekeeping runs both three times a day, so this is the merger's step
-only between those runs (`SDLC.md`). `needs-qa` without `qa-approved` never merges, and only a
-human sets `qa-approved`: the blind pair is `node scripts/visual/capture.mjs` (ADR 0016).
+**Merge and after.** `om-merge-buddy` reports what is mergeable. For a non-draft `develop` PR
+without `risk-high` or `needs-qa`, Cezar completes its review and the trusted controller may
+enable auto-merge after the required checks pass, once `AUTO_MERGE_ENABLED=true`. Until that
+rollout, a maintainer merges manually. `risk-high`, `needs-qa` and `develop` → `main` always
+merge manually after their respective human decisions (`SDLC.md`). The live rulesets have no
+GitHub merge queue rule; the `merge-queue` label is a process state only. After a merge,
+`/om-close-fixed-issues` closes what the merge did not: Cezar has no `pull_request.merged`
+event, and `develop` is not the default branch, so nothing closes natively. Housekeeping runs
+three times a day. Only a human sets `qa-approved`: the blind pair is
+`node scripts/visual/capture.mjs` (ADR 0016).
 
 ## Automations (`docs/agents/cezar-automations.json`)
 
@@ -532,11 +527,10 @@ deliberately not a trigger - the script arms only on the review bot's threads, b
 disagreement with a person is settled by talking. Rehearse the decision against any live PR with
 `GH_REPO=... PR_NUMBER=... HEAD_SHA=... node scripts/ci/review-threads-label.mjs --dry-run`.
 
-**What this repository still does not have.** Its `develop` ruleset does not carry
-`required_review_thread_resolution`, so an unresolved thread blocks nothing at the merge gate here -
-only `om-auto-fix-pr`'s own exit criterion (`.ai/skills/om-auto-fix-pr/SKILL.md`) holds it. The
-autofix chain above is live either way; what is missing is the hard stop behind it, and turning it
-on is a repository-settings change, not a change to any file in this tree.
+Both live rulesets, `develop` and `main`, set `required_review_thread_resolution: true`, so an
+unresolved review thread blocks merging. `om-auto-fix-pr` has the same exit criterion
+(`.ai/skills/om-auto-fix-pr/SKILL.md`); its review-thread run is the path to resolving bot findings
+before the required GitHub rule can pass.
 
 ## Prompt templates (`docs/agents/cezar-prompt-templates.json`)
 

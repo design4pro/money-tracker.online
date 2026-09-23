@@ -7,6 +7,16 @@ const workflow = readFileSync(
 )
 
 describe('e2e artifact quota', () => {
+  it('requires browser legs on pull requests before the required report can pass', () => {
+    expect(workflow).toMatch(
+      /e2e:\n\s+needs: verdict\n\s+name: e2e[^\n]+\n\s+if: \$\{\{ !cancelled\(\) && needs\.verdict\.outputs\.verified != 'true' \}\}/,
+    )
+    expect(workflow).toContain(
+      "github.event_name == 'pull_request' || needs.e2e.result != 'skipped'",
+    )
+    expect(workflow).toContain("needs.e2e.result != 'success'")
+  })
+
   it('reports test failures directly and keeps artifact upload advisory', () => {
     expect(workflow).toContain('--reporter=github,blob')
     expect(workflow).toMatch(
