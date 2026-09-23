@@ -397,7 +397,7 @@ describe('git-guardrails.sh', () => {
   })
 
   it('leaves a controlled scratchpad glob alone', () => {
-    const scratchpad = mkdtempSync(join(tmpdir(), 'claude-glob-'))
+    const scratchpad = mkdtempSync('/tmp/claude-glob-')
     const glob = `${scratchpad.slice(0, -6)}*`
 
     try {

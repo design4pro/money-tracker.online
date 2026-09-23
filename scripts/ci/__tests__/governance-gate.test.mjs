@@ -14,7 +14,8 @@
  * ... a document or comment names exists on this branch and does what the text says."
  */
 
-import { existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -140,5 +141,52 @@ describe('the guarded paths', () => {
         'AGENTS.md',
       ]),
     ).toEqual([])
+  })
+})
+
+describe('.github/workflows/governance-gate.yml', () => {
+  const workflow = readFileSync(
+    join(ROOT, '.github/workflows/governance-gate.yml'),
+    'utf8',
+  )
+
+  it('runs from the trusted default branch and fails when its script is absent', () => {
+    expect(workflow).toContain('pull_request_target:')
+    expect(workflow).toMatch(
+      /ref:\s*\$\{\{\s*github\.event\.repository\.default_branch\s*\}\}/,
+    )
+    expect(workflow).not.toMatch(
+      /if \[ ! -f scripts\/ci\/governance-gate\.mjs \]/,
+    )
+  })
+})
+
+describe('governance file query', () => {
+  const workflow = readFileSync(
+    join(ROOT, '.github/workflows/governance-gate.yml'),
+    'utf8',
+  )
+  const query = workflow.match(/pulls\/\$PR_NUMBER\/files" -q '([^']+)'/)?.[1]
+  const files = (page) =>
+    execFileSync('jq', ['-r', query ?? 'error("query not found")'], {
+      input: JSON.stringify(page),
+      encoding: 'utf8',
+    })
+      .trim()
+      .split('\n')
+
+  it('checks the old path when a governed document is renamed out', () => {
+    expect(
+      decide({
+        files: files([
+          {
+            filename: 'docs/money-notes.md',
+            previous_filename: 'docs/MONEY.md',
+            status: 'renamed',
+          },
+        ]),
+        labels: [],
+      }).ok,
+    ).toBe(false)
   })
 })

@@ -19,14 +19,14 @@ name: Governance gate
 # own commit and waits for every required check on it; a workflow with no trigger for that event
 # never reports one, so the entry waits out `check_response_timeout_minutes` and is dropped.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
     branches: [develop, main]
   merge_group:
     types: [checks_requested]
 
-# The labels arrive in the event payload; the file list does not, and is the one thing this needs a
-# token for. The job below takes back exactly that scope and nothing more - it never writes.
+# The workflow and script come from the trusted default branch. Labels and file paths
+# are untrusted data read through the API; no pull request code is executed. The job below takes back exactly that scope and nothing more - it never writes.
 permissions: {}
 
 # A label flip fires this while the previous run is still starting, and without cancellation the
@@ -46,7 +46,7 @@ jobs:
     # Only a pull request has labels and a file list to read. In a merge group this skips, and a
     # skipped job is a passing required check - the gate already had its say when the pull request
     # was enqueued.
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request_target'
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     permissions:
       contents: read
@@ -59,7 +59,7 @@ jobs:
       # `sparse-checkout` keeps it to the one directory the step runs from.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
           sparse-checkout: scripts/ci
 
@@ -71,21 +71,10 @@ jobs:
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           # Through the environment, never interpolated into the shell: a branch name is attacker-
           # controlled text on a fork, and `run:` splices it in before bash ever sees a quote.
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          # The deciding script comes from the base branch, so the pull request that *introduces*
-          # this check finds none there and has nothing to enforce. The window closes once and
-          # cannot reopen: a merge into the base branch is the only thing that puts the script
-          # there, and a pull request removing it is itself gated by the copy still on the base.
-          # Measured rather than predicted - the merge gate's first adoption failed exactly here.
-          if [ ! -f scripts/ci/governance-gate.mjs ]; then
-            echo "scripts/ci/governance-gate.mjs is not on $BASE_REF yet - nothing to enforce until it lands there"
-            exit 0
-          fi
-
           # `--paginate` emits one jq result per page, so a newline-separated list is the only
           # shape that survives concatenation. A path cannot contain a newline in git.
-          FILES="$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files" -q '.[].filename')"
+          FILES="$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files" -q '.[] | .filename, (.previous_filename // empty)')"
           export FILES
 
           node scripts/ci/governance-gate.mjs

@@ -422,9 +422,9 @@ jobs:
 
       # `PLAYWRIGHT_BASE_URL` points the suite at the server the composite action
       # already started and seeded, so the config starts none of its own.
-      # `--reporter=blob` replaces the config's reporters with the one
-      # `merge-reports` consumes - traces and failure screenshots travel inside
-      # the blob. The `setup` project is not named here: it is declared as a
+      # The GitHub reporter publishes failures even when the account's artifact quota prevents
+      # blob upload. The blob remains an optional source of traces and the merged HTML report.
+      # The `setup` project is not named here: it is declared as a
       # dependency of both browser projects, so Playwright runs it first on its
       # own, and naming it as well would only run it twice - once per shard is
       # already the price of splitting. `--shard` divides by test count and not
@@ -435,13 +435,14 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://localhost:3010
         run: >-
           pnpm exec playwright test --project=${{ matrix.project }}
-          --shard=${{ matrix.shard }}/${{ matrix.shards }} --reporter=blob
+          --shard=${{ matrix.shard }}/${{ matrix.shards }} --reporter=github,blob
 
       # The directory is `blob-report`, not vitest's dot-prefixed convention:
       # `upload-artifact` treats a dot-prefixed path as hidden and silently
       # uploads nothing.
       - name: Upload the blob report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: e2e-blob-${{ matrix.project }}-${{ matrix.shard }}
@@ -451,6 +452,7 @@ jobs:
 
       - name: Upload the server log
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: e2e-server-log-${{ matrix.project }}-${{ matrix.shard }}
@@ -478,6 +480,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Download the blob reports
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           pattern: e2e-blob-*
@@ -495,6 +498,7 @@ jobs:
 
       - name: Upload the Playwright report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report

@@ -33,6 +33,16 @@ request by hand under any title at all.
 
 ## Rules
 
+- For a `develop` PR without `risk-high` and without `needs-qa`, do not merge it manually.
+  After Cezar's current-head review receipt and `merge-queue`, the trusted controller enables
+  auto-merge and required checks decide when it lands.
+- For a `develop` PR with `risk-high`, verify `risk-approved` and a configured human's
+  `Risk approval: <full head SHA>` comment before the manual merge. The author may provide this
+  receipt unless auth or money requires a second person's current-head GitHub approval. A PR with
+  `needs-qa` also needs current-head QA evidence and a manual merge.
+- The `develop` to `main` promotion requires a person's release decision and a manual merge.
+  Do not use the installed skill's GitHub `APPROVE` step on an author's own PR; GitHub does not
+  permit it. The current-head risk receipt is the policy signal.
 - Base `main` and head `develop` → `--merge`. Every other pull request keeps the descriptor's
   `--squash`.
 - A promotion that will not merge cleanly is a back-merge of `main` into `develop` first, never a

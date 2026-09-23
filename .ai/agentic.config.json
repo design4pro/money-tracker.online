@@ -57,7 +57,7 @@
       "ready-for-human"
     ],
     "command": ["groom", "autofix", "spec", "review-threads"],
-    "outside": ["do-not-close", "governance-approved"]
+    "outside": ["do-not-close", "risk-approved"]
   },
   "qaGate": true,
   "discovery": {
