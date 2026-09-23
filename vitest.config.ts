@@ -35,10 +35,10 @@ const src = fileURLToPath(new URL('./src/', import.meta.url))
  * why the default turned `pnpm test` red locally and never on CI, whose runners are unloaded
  * (#88).
  *
- * 15000 ms is roughly three times the worst case measured: wide enough that neither a cold cache
- * nor a contention spike is a failure, narrow enough that a genuinely hung test still fails the
- * run rather than hanging it. It is set per project rather than in the root block on purpose —
- * `workerd` keeps the default, because nothing there has come near it.
+ * 15000 ms is roughly three times the earlier worst case measured for UI and server tests. The
+ * tooling project needs 30000 ms on the shared host: two different shell-hook cases took 19334 ms
+ * and 15707 ms under contention, then passed alone in 10350 ms and 12630 ms. The higher budget
+ * is limited to tooling; `workerd` keeps the default because nothing there has come near it.
  */
 const SLOW_STARTUP_TEST_TIMEOUT_MS = 15_000
 
@@ -173,7 +173,7 @@ export default defineConfig({
             '.claude/hooks/__tests__/*.test.ts',
             'e2e/support/__tests__/*.test.ts',
           ],
-          testTimeout: SLOW_STARTUP_TEST_TIMEOUT_MS,
+          testTimeout: 30_000,
           restoreMocks: true,
         },
       },
