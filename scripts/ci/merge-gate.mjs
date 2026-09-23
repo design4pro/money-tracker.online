@@ -1,34 +1,20 @@
 #!/usr/bin/env node
 
 /**
- * Turns the hard-block labels `SDLC.md` already declares into a check GitHub can require.
- *
- *   LABELS='["do-not-merge"]' node scripts/ci/merge-gate.mjs
- *
- * `do-not-merge`, `blocked` and `qa-failed` are documented as blocks "regardless of every other
- * signal", and `needs-qa` without `qa-approved` is documented as never merging. Until this script
- * existed only the skill prompts honoured that - `om-approve-merge-pr` and `om-merge-buddy` read
- * the labels and stand down. Nothing a human clicking "Squash and merge" goes through did, and
- * nothing in the rulesets required a check that did, so the rule held exactly as long as the
- * person merging remembered it. planned.travel #414 merged carrying `do-not-merge` and `needs-qa`
- * (staging smoke then failed) and #421 merged carrying `blocked`.
- *
- * The decision is a pure function of the label names because that is all it needs to be: the
- * labels arrive in the `pull_request` event payload, so the job that runs this needs no token, no
- * secret and no read of the pull request.
- *
- * Failing is the whole output. The job id and name in `.github/workflows/merge-gate.yml` are both
- * `merge-gate`, which is the context a ruleset's `required_status_checks` names - renaming either
- * silently un-requires the check, because a ruleset entry that matches no check is not an error.
+ * Required merge check. The trusted workflow fetches current GitHub metadata; the PR branch
+ * supplies no code or policy to this process. A failed metadata request fails the check.
  */
 
+import { execFileSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+
+import { decidePullRequest } from './pr-merge-policy.mjs'
 
 /** Blocks on their own, whatever else the pull request carries. */
 export const HARD_BLOCKS = ['do-not-merge', 'blocked', 'qa-failed']
 
-/** Manual QA is outstanding until `QA_APPROVED` says otherwise. */
+/** Legacy label-only decision retained for callers that report hard blocks before API access. */
 export const NEEDS_QA = 'needs-qa'
 export const QA_APPROVED = 'qa-approved'
 
@@ -55,28 +41,81 @@ export function decide(labels) {
   return { ok: true, reason: 'no hard-block label, and no manual QA outstanding' }
 }
 
+export function api(path, paginated = false) {
+  const args = paginated
+    ? ['api', '--paginate', '--slurp', path]
+    : ['api', path]
+  const result = JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }))
+  return paginated ? result.flat() : result
+}
+
+export function readPullRequestMetadata(repo, number, rawApprovers, rawQaApprovers) {
+  if (!repo || !number) throw new Error('GH_REPO or PR_NUMBER is missing')
+  const pull = api(`repos/${repo}/pulls/${number}`)
+  if (!['develop', 'main'].includes(pull.base?.ref))
+    throw new Error('Unexpected pull request base branch')
+  const input = {
+    labels: pull.labels.map(({ name }) => name),
+    headSha: pull.head.sha,
+    author: pull.user.login,
+    files: api(`repos/${repo}/pulls/${number}/files?per_page=100`, true),
+    comments: api(`repos/${repo}/issues/${number}/comments?per_page=100`, true),
+    reviews: api(`repos/${repo}/pulls/${number}/reviews?per_page=100`, true),
+    approvers: (rawApprovers ?? '').split(',').map((name) => name.trim()).filter(Boolean),
+    qaApprovers: (rawQaApprovers ?? '').split(',').map((name) => name.trim()).filter(Boolean),
+  }
+  return { pull, input }
+}
+
 function main() {
-  // The workflow passes `toJSON(github.event.pull_request.labels.*.name)`, which is `[]` on an
-  // unlabelled pull request - never absent. Absent means the step lost its `env:`, and a gate that
-  // cannot see the labels must not report the colour of one that saw none.
-  const raw = process.env.LABELS
-  if (raw === undefined) {
-    console.log(
-      '::error title=Merge gate::LABELS is unset, so the labels could not be read; refusing to pass.',
+  const repo = process.env.GH_REPO
+  let headSha = process.env.PR_HEAD_SHA
+  if (!repo || (headSha && !/^[a-f0-9]{40}$/.test(headSha)))
+    throw new Error('GH_REPO or PR_HEAD_SHA is invalid')
+
+  let ok = false
+  let reason = 'current pull request metadata is unavailable'
+  try {
+    const { input } = readPullRequestMetadata(
+      repo,
+      process.env.PR_NUMBER,
+      process.env.RISK_APPROVERS,
+      process.env.QA_APPROVERS,
     )
-    process.exit(1)
+    if (headSha && input.headSha !== headSha)
+      reason = 'the event head is no longer current'
+    else {
+      headSha = input.headSha
+      const decision = decidePullRequest(input)
+      ok = decision.ok
+      reason = decision.reason
+    }
+  } catch {
+    // Still publish a failed check on the event head when metadata cannot be read.
   }
 
-  const { ok, reason } = decide(JSON.parse(raw))
+  if (!/^[a-f0-9]{40}$/.test(headSha ?? ''))
+    throw new Error('Current PR head is unavailable')
+
+  const payload = {
+    name: 'merge-gate',
+    head_sha: headSha,
+    status: 'completed',
+    conclusion: ok ? 'success' : 'failure',
+    output: { title: ok ? 'Merge policy passed' : 'Merge blocked', summary: reason },
+  }
+  execFileSync('gh', ['api', '--method', 'POST', `repos/${repo}/check-runs`, '--input', '-'], {
+    input: JSON.stringify(payload),
+  })
   if (!ok) {
     console.log(`::error title=Merge blocked::${reason}.`)
-    process.exit(1)
+    process.exitCode = 1
+    return
   }
   console.log(`merge-gate: ${reason}.`)
 }
 
-// Importing this file for its `decide` table must not exit the test runner, so compare resolved
-// paths rather than basenames - the same guard, for the same reason, as `review-threads-label.mjs`.
+// Importing policy helpers must not exit the test runner.
 if (
   process.argv[1] &&
   realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)

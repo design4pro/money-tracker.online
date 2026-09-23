@@ -191,3 +191,50 @@ describe('the guarded paths', () => {
     ).toEqual([])
   })
 })
+
+describe('.github/workflows/governance-gate.yml', () => {
+  const workflow = readFileSync(
+    join(ROOT, '.github/workflows/governance-gate.yml'),
+    'utf8',
+  )
+
+  it('runs from the trusted default branch and fails when its script is absent', () => {
+    expect(workflow).toContain('pull_request_target:')
+    expect(workflow).toMatch(
+      /ref:\s*\$\{\{\s*github\.event\.repository\.default_branch\s*\}\}/,
+    )
+    expect(workflow).not.toMatch(
+      /if \[ ! -f scripts\/ci\/governance-gate\.mjs \]/,
+    )
+  })
+})
+
+describe('governance file query', () => {
+  const workflow = readFileSync(
+    join(ROOT, '.github/workflows/governance-gate.yml'),
+    'utf8',
+  )
+  const query = workflow.match(/pulls\/\$PR_NUMBER\/files" -q '([^']+)'/)?.[1]
+  const files = (page) =>
+    execFileSync('jq', ['-r', query ?? 'error("query not found")'], {
+      input: JSON.stringify(page),
+      encoding: 'utf8',
+    })
+      .trim()
+      .split('\n')
+
+  it('checks the old path when a governed document is renamed out', () => {
+    expect(
+      decide({
+        files: files([
+          {
+            filename: 'docs/money-notes.md',
+            previous_filename: 'docs/MONEY.md',
+            status: 'renamed',
+          },
+        ]),
+        labels: [],
+      }).ok,
+    ).toBe(false)
+  })
+})

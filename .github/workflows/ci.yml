@@ -45,10 +45,8 @@ name: CI
 on:
   pull_request:
     branches: [main, develop]
-  # The merge queue builds the commit that will become `develop` and waits for this workflow's
-  # required checks on it. That is where the suite runs once per change (ADR 0020): a pull request
-  # gets the fast rungs, this event gets everything including the journeys, and the push the queue's
-  # merge causes finds the verdict on its own SHA and only deploys.
+  # Keep merge_group support if a GitHub merge queue rule is enabled later. The live rulesets have
+  # no such rule, so pull requests run the browser journeys before merging (ADR 0020 amendment).
   merge_group:
     types: [checks_requested]
   push:
@@ -62,9 +60,7 @@ on:
 # with the newest, so a burst of merges costs two runs, not one each.
 #
 # A merge group is never cancelled either, and needs no rule of its own: `github.ref` is that
-# group's own `gh-readonly-queue/...` branch, unique per entry, so queue runs share no group. That
-# matters more here than it reads - a cancelled required check is how the queue decides to drop a
-# pull request.
+# group's own `gh-readonly-queue/...` branch, unique per entry, so queue runs share no group.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -350,18 +346,13 @@ jobs:
   # gate it rationed - there is no label to add, because there is nothing to opt
   # into.
   #
-  # Where it runs moved once more, to the merge queue (ADR 0020): the legs judge the commit that
-  # will become `develop`, once, instead of judging a pull request's merge preview and then the
-  # push that merge causes. So not on a `pull_request` at all - and on a `push` only when `verdict`
-  # found no earlier run for this tree, which is the fallback for a direct push, an admin bypass
-  # merge, or a hotfix on `main`.
-  #
-  # What that costs is in ADR 0016's amendment: the journeys report after a human enqueues rather
-  # than during review, and a failure arrives as a dropped queue entry.
+  # The live rulesets have no GitHub merge queue rule. A skipped required report on a PR therefore
+  # cannot prove the journeys passed before auto-merge. Run the legs on PRs and merge groups; a
+  # push only needs them when `verdict` found no earlier run for the tree (ADR 0020 amendment).
   e2e:
     needs: verdict
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && github.event_name != 'pull_request' }}
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
     # so the run's own clock is the one that fires first and names the test it
@@ -422,9 +413,9 @@ jobs:
 
       # `PLAYWRIGHT_BASE_URL` points the suite at the server the composite action
       # already started and seeded, so the config starts none of its own.
-      # `--reporter=blob` replaces the config's reporters with the one
-      # `merge-reports` consumes - traces and failure screenshots travel inside
-      # the blob. The `setup` project is not named here: it is declared as a
+      # The GitHub reporter publishes failures even when the account's artifact quota prevents
+      # blob upload. The blob remains an optional source of traces and the merged HTML report.
+      # The `setup` project is not named here: it is declared as a
       # dependency of both browser projects, so Playwright runs it first on its
       # own, and naming it as well would only run it twice - once per shard is
       # already the price of splitting. `--shard` divides by test count and not
@@ -435,13 +426,14 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://localhost:3010
         run: >-
           pnpm exec playwright test --project=${{ matrix.project }}
-          --shard=${{ matrix.shard }}/${{ matrix.shards }} --reporter=blob
+          --shard=${{ matrix.shard }}/${{ matrix.shards }} --reporter=github,blob
 
       # The directory is `blob-report`, not vitest's dot-prefixed convention:
       # `upload-artifact` treats a dot-prefixed path as hidden and silently
       # uploads nothing.
       - name: Upload the blob report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: e2e-blob-${{ matrix.project }}-${{ matrix.shard }}
@@ -451,6 +443,7 @@ jobs:
 
       - name: Upload the server log
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: e2e-server-log-${{ matrix.project }}-${{ matrix.shard }}
@@ -464,9 +457,9 @@ jobs:
   e2e-report:
     name: e2e · merged report
     needs: e2e
-    # Not behind legs that were skipped - on a `develop` → `main` promotion pull request - since
-    # there is nothing to merge; `!cancelled()` so a failing leg still owes the reader its report.
-    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
+    # Every PR needs a real verdict. If its legs were skipped, run and fail instead of publishing
+    # a skipped job as a green required check. A push with a reused verdict may still skip.
+    if: ${{ always() && (github.event_name == 'pull_request' || needs.e2e.result != 'skipped') }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     timeout-minutes: 10
 
@@ -478,6 +471,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Download the blob reports
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           pattern: e2e-blob-*
@@ -485,6 +479,7 @@ jobs:
           merge-multiple: true
 
       - name: Merge the reports
+        continue-on-error: true
         run: |
           set -euo pipefail
           if [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
@@ -495,6 +490,7 @@ jobs:
 
       - name: Upload the Playwright report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report

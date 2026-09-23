@@ -28,7 +28,6 @@ One addition to the stabilization loop's exit criteria:
   and ends the loop with `changes-requested`, never `merge-queue`; the final report names the thread
   and its reason so a human can settle it.
 
-Unlike `planned.travel`, this repository's `develop` ruleset does not carry
-`required_review_thread_resolution`, so an open thread does not physically block the merge here.
-The criterion above is the skill's own, and it is the reason the automation is worth having: a
-thread nobody answers is feedback that quietly disappears at the squash.
+The live `develop` and `main` rulesets both set `required_review_thread_resolution: true`, so an
+open thread blocks the merge. The criterion above also keeps the skill from reporting an
+approvable PR while a finding still needs an answer.

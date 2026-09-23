@@ -108,6 +108,8 @@ command:
 outside:
   - name: do-not-close
     description: 'om-close-fixed-issues leaves this issue open even when a merged PR names it.'
+  - name: risk-approved
+    description: 'Human acceptance of a risk-high PR, pinned to its current head SHA in a comment.'
 
 # "Visual change expected" is a body section (`## Visual change expected`), not a label; on a pull
 # request it becomes `needs-qa`.

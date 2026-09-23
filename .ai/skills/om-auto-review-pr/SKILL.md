@@ -72,6 +72,15 @@ additions to step 2 and step 11:
 ## Rules
 
 - Never apply `qa-approved` or `qa-self-verified`.
+- On an approving Cezar review, post a PR comment with the exact line
+  `Cezar review: <full head SHA>` before moving the PR to `merge-queue`. Read the head SHA again
+  immediately before posting; a later push invalidates the receipt. A request-changes verdict
+  posts no receipt. The trusted auto-merge controller accepts this receipt only from a configured
+  Cezar identity and only for the current head.
+- When the reviewing GitHub identity also authored the PR, GitHub refuses an `APPROVE` review.
+  Submit the same full approving verdict as a `COMMENTED` review, then post the current-head
+  Cezar receipt and move to `merge-queue`. This changes only the GitHub review state, not the
+  review work or the separate human approval required for `risk-high`.
 - Never add `review-threads`. The `claude-review` job applies it from
   `scripts/ci/review-threads-label.mjs`, once per head SHA, when a review leaves live threads, and a
   skill that applies it after leaving threads open would start a run on its own work. Name the open
