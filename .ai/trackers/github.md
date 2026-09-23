@@ -543,21 +543,18 @@ gh label create risk-high         --color b60205 --description "Wide blast radiu
 
 Four of those are load-bearing on a pull request rather than descriptive. `do-not-merge`, `blocked` and `qa-failed` block a merge on their own, and `needs-qa` blocks until `qa-approved` joins it; the `merge-gate` check reads them out of the event payload and fails the pull request, so applying one of them is the act that stops the merge — there is no second step, and removing it is what starts it again.
 
-The four command labels that start a Cezar automation (`docs/agents/cezar-automations.json`). A
-human sets three of them. `review-threads` is the exception: the `claude-review` job applies it
-from `scripts/ci/review-threads-label.mjs`, once per head SHA, when the review leaves threads open.
-Only a collaborator or an Actions token can set a label, which is what gates the `issue.labeled`
+The three command labels that start a Cezar automation (`docs/agents/cezar-automations.json`) are
+set by a human. Only a collaborator or an Actions token can set a label, which is what gates the `issue.labeled`
 triggers; the skill that reacts removes its own label as its first mutation, so
 a label still present means nobody picked the item up. No skill ever adds one.
 
 `spec` is the exception to that last diagnosis. **Write a spec for feature issues** filters on `allLabels: ["feature"]`,
 alone among the four, so on an issue that is not labelled `feature` the label sits there because no
 run was ever going to start - not because one stalled, which is where the sentence above would
-otherwise send you looking. The first three go on an issue, `review-threads` on a pull request:
+otherwise send you looking. All three go on an issue:
 
 ```bash
 gh label create groom          --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
 gh label create autofix        --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
 gh label create spec           --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
-gh label create review-threads --color 5319e7 --description "Automated trigger: the review job left unresolved threads; starts om-auto-fix-pr (Cezar automation)"
 ```

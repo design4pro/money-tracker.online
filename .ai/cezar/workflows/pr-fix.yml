@@ -1,15 +1,8 @@
-# The review job left unresolved threads on a PR and .github/workflows/claude-code-review.yml
-# applied `review-threads` (ADR 0017). om-auto-fix-pr merges the latest base, delegates the review
-# and autofix to om-auto-review-pr - which fixes each inherited thread and, per the repo override,
-# replies in it and resolves it - stabilizes CI, files follow-ups for the non-blocking findings and
-# leaves a merge-ready PR. It never merges: a human runs om-approve-merge-pr from the cockpit.
-#
-# The repo-local override (.ai/skills/om-auto-fix-pr/) removes `review-threads` as its first
-# mutation, so a label still present is a run nobody took - the same contract `autofix` has on
-# issues. That removal is also what makes the trigger re-armable: the next push re-runs the review
-# job, which re-applies the label only if threads are still open at the new head.
+# Manual PR-fix workflow. om-auto-fix-pr merges the latest base, delegates review and autofix to
+# om-auto-review-pr, resolves inherited threads it can settle, stabilizes CI and leaves a
+# merge-ready PR. It never merges: a human runs om-approve-merge-pr from the cockpit.
 name: pr-fix
-description: Unresolved review threads on a PR; om-auto-fix-pr drives it to merge-ready and resolves them.
+description: Manually drive a PR to merge-ready and resolve inherited review threads.
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree

@@ -82,7 +82,7 @@
   },
   {
     "name": "Autopilot new pull requests",
-    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - which is what makes `pull_request` workflows run on it at all, claude-code-review.yml among them - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml therefore opens it carrying `merge-queue`, which `excludeLabels` already stands down on.",
+    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - which makes `pull_request` workflows run on it - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml therefore opens it carrying `merge-queue`, which `excludeLabels` already stands down on.",
     "events": ["pull_request.opened"],
     "intervalSeconds": 300,
     "filters": {
@@ -104,27 +104,6 @@
     "task": {
       "prompt": "{{github.number}}",
       "workflow": "pr-autopilot",
-      "autonomous": true,
-      "worktree": true,
-      "variants": 1,
-      "generateFollowups": false
-    }
-  },
-  {
-    "name": "Resolve blocking review threads",
-    "description": "The `claude-review` job left unresolved review threads on a PR and applied `review-threads`; om-auto-fix-pr drives the PR to merge-ready and resolves them (ADR 0017). Without this the PR waits for a human to run the same skill by hand. `includePullRequests` is read by the design4pro/cezar fork the cockpit runs - stock cezar 0.11.0 drops every label event on a PR, so this automation does not fire without it. The gate is the label: only a collaborator or the Actions bot can set one, and the review job applies it once per head SHA. The run removes it as its first mutation, so a label still present is a run nobody took. The automation is only ever armed for pull requests targeting the integration branch: review-threads-label.mjs reads `baseBranch` from .ai/agentic.config.json and stands down on anything else, so the standing promotion - whose *head* is the integration branch, and which this run would therefore push follow-up commits straight onto - never arms one.",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 120,
-    "filters": {
-      "includePullRequests": true,
-      "changedLabels": ["review-threads"],
-      "excludeLabels": ["in-progress", "blocked", "do-not-merge"],
-      "lookbackDays": 3,
-      "maxRecords": 25
-    },
-    "task": {
-      "prompt": "{{github.number}}",
-      "workflow": "pr-fix",
       "autonomous": true,
       "worktree": true,
       "variants": 1,

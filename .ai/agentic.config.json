@@ -56,7 +56,7 @@
       "ready-for-agent",
       "ready-for-human"
     ],
-    "command": ["groom", "autofix", "spec", "review-threads"],
+    "command": ["groom", "autofix", "spec"],
     "outside": ["do-not-close", "governance-approved"]
   },
   "qaGate": true,
