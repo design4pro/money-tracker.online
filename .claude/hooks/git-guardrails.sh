@@ -12,8 +12,9 @@
 # cannot reach because `cat .dev.vars` arrives here as a Bash call instead.
 #
 # Tier two - agent runs (CEZ_TASK_ID or GITHUB_ACTIONS): the things an om-* run never needs.
-# Dumping the environment (the worktree holds live secrets in .dev.vars), changing the pinned
-# stack (docs/SPEC.md §3), and shipping - deploys and remote migrations. GitHub mutations,
+# Dumping the environment (the worktree holds live secrets in .dev.vars; `printenv NAME` for a
+# named non-secret variable stays open), changing the pinned stack (docs/SPEC.md §3), and
+# shipping - deploys and remote migrations. GitHub mutations,
 # `git add -A`, closing keywords and `pnpm exec` are the om-* skills' ordinary tools (tracker
 # descriptor .ai/trackers/github.md, SDLC.md) and stay open under Cezar.
 #
@@ -655,8 +656,29 @@ agent_block() {
 
 echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])pnpm\s+(add|remove|rm|uninstall|update|up|upgrade)\b' \
   && agent_block 'pnpm add|remove|update' 'The stack is pinned (docs/SPEC.md §3); end the run as blocked and name the dependency.'
-echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])printenv\b' && agent_block 'printenv' 'The environment holds secrets.'
-echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])env(\s*$|\s*\||\s+-0|\s*;|\s*&&)' && agent_block 'env dump' 'The environment holds secrets.'
+# The dump is what leaks, not a single value: `echo "$NAME"` already prints one and nothing here
+# refuses it, so refusing `printenv NAME` as well only sent runs looking for the git author, TMPDIR
+# or NODE_OPTIONS round the houses. `printenv` passes when every argument is a plain variable name
+# and none of them looks like a secret. Bare `printenv`, a flag, an expansion or a redirect after
+# it, and a name carrying TOKEN, KEY and the rest are refused - as are `env` and `env | grep`, which
+# print the whole environment before anything filters it.
+env_hint='The environment holds secrets. Read a named non-secret variable with `printenv NAME`.'
+while IFS= read -r env_command; do
+  grep -Eq '(^|[^[:alnum:]_/-])printenv\b' <<< "$env_command" || continue
+  # Everything after the first `printenv`, so a second one on the piece cannot hide an argument.
+  env_args="${env_command#*printenv}"
+  [[ "$env_args" =~ [^[:space:]] ]] || agent_block 'printenv' "$env_hint"
+  read -ra env_names <<< "$env_args"
+  for env_name in "${env_names[@]}"; do
+    [[ "$env_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || agent_block 'printenv' "$env_hint"
+    # AUTHOR is a name, not a credential: GIT_AUTHOR_NAME is one of the values runs asked for. Only
+    # that word is set aside - AUTHORIZATION still carries AUTH, and so does AUTHOR_TOKEN's TOKEN.
+    env_upper=$(tr '[:lower:]' '[:upper:]' <<< "$env_name" | sed -E 's/AUTHOR([^I]|$)/\1/g')
+    grep -Eq 'TOKEN|SECRET|KEY|PASS|AUTH|CREDENTIAL|COOKIE|SESSION|PRIVATE|DSN' <<< "$env_upper" \
+      && agent_block 'printenv of a secret-looking name' "$env_hint"
+  done
+done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
+echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])env(\s*$|\s*\||\s+-0|\s*;|\s*&&)' && agent_block 'env dump' "$env_hint"
 
 # Shipping is a human decision, and an unattended run has nobody to answer a prompt about it.
 # `deploy` is not the only way to ship: `versions upload` + `versions deploy` is the gradual

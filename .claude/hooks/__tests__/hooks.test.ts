@@ -1002,6 +1002,45 @@ describe('git-guardrails.sh', () => {
     expect(r.stderr).toContain(pattern)
   })
 
+  // One named value is what `echo "$NAME"` already prints; the dump is what leaks. So `printenv`
+  // takes plain variable names that do not look like secrets, and nothing else.
+  it.each([
+    'printenv NODE_OPTIONS',
+    'printenv TMPDIR CI SENTRY_ENVIRONMENT',
+    'printenv GIT_AUTHOR_NAME GIT_COMMITTER_EMAIL',
+    'echo "$(printenv NODE_OPTIONS)"',
+    'printenv CI && pnpm test',
+  ])('agent mode allows the named non-secret read %s', (command) => {
+    expect(bash(command, AGENT).status).toBe(0)
+    expect(bash(command, ACTIONS).status).toBe(0)
+  })
+
+  it.each([
+    ['printenv', 'printenv'],
+    ['printenv -0', 'printenv'],
+    ['printenv "$NAME"', 'printenv'],
+    ['printenv CI > out.txt', 'printenv'],
+    ['printenv GITHUB_TOKEN', 'printenv of a secret-looking name'],
+    ['printenv CI polar_access_token', 'printenv of a secret-looking name'],
+    ['printenv SENTRY_DSN', 'printenv of a secret-looking name'],
+    ['printenv CLOUDFLARE_API_KEY', 'printenv of a secret-looking name'],
+    ['printenv DB_PASSWORD', 'printenv of a secret-looking name'],
+    ['printenv BETTER_AUTH_URL', 'printenv of a secret-looking name'],
+    ['printenv HTTP_AUTHORIZATION', 'printenv of a secret-looking name'],
+    ['printenv git_author_token', 'printenv of a secret-looking name'],
+    ['printenv SESSION_COOKIE', 'printenv of a secret-looking name'],
+    ['printenv CI; printenv PRIVATE_KEY', 'printenv of a secret-looking name'],
+    ['x=$(printenv CREDENTIALS_FILE)', 'printenv of a secret-looking name'],
+    ["env | grep -E '^GIT_(AUTHOR|COMMITTER)'", 'env dump'],
+    ['env | grep NODE_OPTIONS', 'env dump'],
+  ])('agent mode still blocks %s', (command, pattern) => {
+    const r = bash(command, AGENT)
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain(pattern)
+    // The refusal names the form that does work, so a run does not go looking for another route.
+    expect(r.stderr).toContain('printenv NAME')
+  })
+
   // Everything a run legitimately does, asserted in agent mode and in a developer's session
   // alike. The developer tier is the permissive one, so a command refused there is a rule that
   // has escaped its tier - which is why both tables run over the same list.

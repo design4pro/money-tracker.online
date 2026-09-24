@@ -294,8 +294,9 @@ A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTI
 and the hooks in `.claude/hooks/` tighten:
 
 - `git-guardrails.sh` also blocks `pnpm add|remove|update` (the stack is pinned, `docs/SPEC.md`
-  §3), `printenv` and `env` dumps. For everyone it blocks force-pushes to `develop`/`main`,
-  `git reset --hard`, `git clean -f`, `git branch -D`, `git checkout/restore .` and `--no-verify`.
+  §3), `printenv` and `env` dumps (`printenv NAME` for a named non-secret variable stays open). For
+  everyone it blocks force-pushes to `develop`/`main`, `git reset --hard`, `git clean -f`,
+  `git branch -D`, `git checkout/restore .` and `--no-verify`.
   GitHub mutations, `git add -A`, closing keywords and `pnpm exec` are open: the om skills perform
   them through the tracker descriptor and `SDLC.md` governs them.
 - `guard-read.sh` (Read, Glob, Grep) confines reads to the worktree and denies `.dev.vars`,
