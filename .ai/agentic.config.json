@@ -10,8 +10,8 @@
       "pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts",
       "pnpm db:generate < /dev/null && git diff --exit-code -- drizzle/",
       "pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md",
-      "pnpm typecheck",
-      "pnpm lint",
+      "pnpm typecheck --incremental --tsBuildInfoFile node_modules/.cache/tsc/tsbuildinfo",
+      "pnpm lint --cache --cache-strategy content --cache-location node_modules/.cache/eslint/",
       "pnpm test",
       "pnpm build"
     ]
