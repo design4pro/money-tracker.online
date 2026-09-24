@@ -16,16 +16,9 @@
   "env": { "builtin": true },
   "ignorePatterns": [
     "prettier.config.js",
-    // Ignored one level at a time, and not with `.claude/**` plus a negation: these are gitignore
-    // semantics, so a path inside an excluded *directory* can never be re-included - the directory
-    // is pruned before the negation is read. The shorter form silently ignores the hook tests.
-    ".claude/*",
-    "!.claude/hooks",
-    ".claude/hooks/*",
-    // The hook tests are the carve-out: ordinary TypeScript in this repository's tsconfig.
-    "!.claude/hooks/__tests__",
+    ".claude/**",
     // Agent tooling that GitHub's own surfaces read - skills, agent definitions, hooks. Same reason
-    // as `.claude/*`: vendored configuration for tools around the project.
+    // as `.claude/**`: vendored configuration for tools around the project.
     ".github/**",
     "drizzle/**"
   ],
