@@ -470,14 +470,15 @@ a branch before opening the PR.
 ## Prompt templates (`docs/agents/cezar-prompt-templates.json`)
 
 Installed into the cockpit by `.ai/scripts/cez-prompt-templates.sh` (`--dry-run` lists what it would
-write). One template per `om-*` skill, 37 of them: the task text with its argument placeholder, the
-flags, and the preconditions the skill's `SKILL.md` and its `.ai/skills/` override state, phrased as
-directives because the text is sent as the task. They replace cezar's five generic built-ins. The
-installer `PUT`s `promptTemplates` to `/api/v1/p/money-tracker-online/ui-state`, which merges
-shallowly at the top level, so it rewrites that one array and leaves every other preference alone;
-the store is `.ai/cezar/ui-state.json`, which is gitignored because it also accumulates
-per-developer state (`skillUsage`, `lastTask`, `appearance`). Edit the tracked JSON and re-run the
-script — never the ui-state file by hand.
+write). One template per `om-*` skill, 38 of them for the collection's 42; `om-backlog`,
+`om-mockup-prototype`, `om-setup-discovery-pipeline` and `om-synthetic-users` have none yet. Each
+carries the task text with its argument placeholder, the flags, and the preconditions the skill's
+`SKILL.md` and its `.ai/skills/` override state, phrased as directives because the text is sent as
+the task. They replace cezar's five generic built-ins. The installer `PUT`s `promptTemplates` to
+`/api/v1/p/money-tracker-online/ui-state`, which merges shallowly at the top level, so it rewrites
+that one array and leaves every other preference alone; the store is `.ai/cezar/ui-state.json`,
+which is gitignored because it also accumulates per-developer state (`skillUsage`, `lastTask`,
+`appearance`). Edit the tracked JSON and re-run the script — never the ui-state file by hand.
 
 Cezar's normalizer truncates and drops silently, so the script checks the caps first: at most 50
 templates, `label` 80 characters, `text` 2000, ids unique and matching an installed skill — which
@@ -485,7 +486,7 @@ templates, `label` 80 characters, `text` 2000, ids unique and matching an instal
 
 A template whose `skills` array names the skill selected in the composer is applied automatically,
 but only while the composer is still pristine. That is why only the 19 skills taking a free-text
-brief or no argument carry `skills`; the 18 that take an issue number, a PR number, a spec path or
+brief or no argument carry `skills`; the 19 that take an issue number, a PR number, a spec path or
 a URL carry none and are reached through "Insert a template". From the GitHub issue or PR panel an
 auto-applied template lands as `<number>` + the template text, and a second token there reads as a
 brief to `om-auto-fix-issue` — the same hazard the automations avoid by sending `{{github.number}}`
@@ -559,7 +560,7 @@ claiming issues the new ones handle.
    script also lists any definition the cockpit still holds that the file no longer names. To
    remove one, disable it in the cockpit (Automations), then run `--dry-run --prune` and
    `--prune`: the script refuses to delete an enabled stray.
-7. `.ai/scripts/cez-prompt-templates.sh --dry-run`, then without the flag: 37 templates replace
+7. `.ai/scripts/cez-prompt-templates.sh --dry-run`, then without the flag: 38 templates replace
    cezar's five built-ins.
 8. Install the housekeeping plist (above) and run `bash .ai/scripts/housekeeping.sh` once by hand.
 9. Verify end to end: open a test issue with the Bug form (as a maintainer) → within two minutes an
