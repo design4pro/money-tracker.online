@@ -1,5 +1,7 @@
 import { useId, useState } from 'react'
-import { DropZone, FileTrigger, isFileDropItem } from 'react-aria-components'
+import { DropZone } from 'react-aria-components/DropZone'
+import { FileTrigger } from 'react-aria-components/FileTrigger'
+import { isFileDropItem } from 'react-aria-components/useDragAndDrop'
 import { useNavigate } from '@tanstack/react-router'
 import { Upload } from 'lucide-react'
 

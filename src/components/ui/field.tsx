@@ -1,9 +1,7 @@
-import {
-  FieldError as RACFieldError,
-  Group as RACGroup,
-  Label as RACLabel,
-  Text as RACText,
-} from 'react-aria-components'
+import { Text as RACText } from 'react-aria-components/Calendar'
+import { FieldError as RACFieldError } from 'react-aria-components/Checkbox'
+import { Label as RACLabel } from 'react-aria-components/CheckboxGroup'
+import { Group as RACGroup } from 'react-aria-components/DatePicker'
 
 import { cn } from '#/lib/cn'
 import {

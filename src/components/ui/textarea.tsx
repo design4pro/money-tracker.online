@@ -1,7 +1,5 @@
-import {
-  TextArea as RACTextArea,
-  TextField as RACTextField,
-} from 'react-aria-components'
+import { TextArea as RACTextArea } from 'react-aria-components/TextArea'
+import { TextField as RACTextField } from 'react-aria-components/TextField'
 
 import { Description, FieldError, Label, fieldRow } from './field'
 import { composeTw, fieldSurface, focusRing } from './shared'

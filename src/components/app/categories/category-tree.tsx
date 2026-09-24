@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useDragAndDrop } from 'react-aria-components'
+import { useDragAndDrop } from 'react-aria-components/useDragAndDrop'
 import {
   Archive,
   ArchiveRestore,

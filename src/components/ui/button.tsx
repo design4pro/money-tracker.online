@@ -1,4 +1,4 @@
-import { Button as RACButton } from 'react-aria-components'
+import { Button as RACButton } from 'react-aria-components/Button'
 import { cva } from 'class-variance-authority'
 
 import { cn } from '#/lib/cn'

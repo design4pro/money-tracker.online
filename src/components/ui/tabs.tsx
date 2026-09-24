@@ -3,7 +3,7 @@ import {
   TabList as RACTabList,
   TabPanel as RACTabPanel,
   Tabs as RACTabs,
-} from 'react-aria-components'
+} from 'react-aria-components/Tabs'
 
 import { composeTw, transitionBase } from './shared'
 

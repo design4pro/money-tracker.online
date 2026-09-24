@@ -1,7 +1,5 @@
-import {
-  Label as RACLabel,
-  ProgressBar as RACProgressBar,
-} from 'react-aria-components'
+import { Label as RACLabel } from 'react-aria-components/CheckboxGroup'
+import { ProgressBar as RACProgressBar } from 'react-aria-components/ProgressBar'
 
 import { cn } from '#/lib/cn'
 import { composeTw, transitionBase } from './shared'

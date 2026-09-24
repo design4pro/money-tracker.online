@@ -1,4 +1,4 @@
-import { I18nProvider as ReactAriaI18nProvider } from 'react-aria-components'
+import { I18nProvider as ReactAriaI18nProvider } from 'react-aria-components/I18nProvider'
 
 import { useLocale } from '#/lib/i18n'
 

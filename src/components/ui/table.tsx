@@ -1,14 +1,14 @@
+import { Button as RACButton } from 'react-aria-components/Button'
+import { Collection as RACCollection } from 'react-aria-components/Collection'
 import {
-  Button as RACButton,
   Cell as RACCell,
-  Collection as RACCollection,
   Column as RACColumn,
   ResizableTableContainer as RACResizableTableContainer,
   Row as RACRow,
   Table as RACTable,
   TableBody as RACTableBody,
   TableHeader as RACTableHeader,
-} from 'react-aria-components'
+} from 'react-aria-components/Table'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

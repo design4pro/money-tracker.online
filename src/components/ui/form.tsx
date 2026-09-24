@@ -1,4 +1,4 @@
-import { Form as RACForm } from 'react-aria-components'
+import { Form as RACForm } from 'react-aria-components/Form'
 
 import { cn } from '#/lib/cn'
 

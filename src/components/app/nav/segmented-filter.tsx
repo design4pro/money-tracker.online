@@ -1,4 +1,4 @@
-import { Radio, RadioGroup } from 'react-aria-components'
+import { Radio, RadioGroup } from 'react-aria-components/RadioGroup'
 
 import { focusRing } from '#/components/ui'
 import { cn } from '#/lib/cn'

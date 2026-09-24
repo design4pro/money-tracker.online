@@ -1,10 +1,10 @@
+import { Button as RACButton } from 'react-aria-components/Button'
+import { Heading as RACHeading } from 'react-aria-components/Calendar'
 import {
-  Button as RACButton,
   Disclosure as RACDisclosure,
-  DisclosureGroup as RACDisclosureGroup,
   DisclosurePanel as RACDisclosurePanel,
-  Heading as RACHeading,
-} from 'react-aria-components'
+} from 'react-aria-components/Disclosure'
+import { DisclosureGroup as RACDisclosureGroup } from 'react-aria-components/DisclosureGroup'
 import { ChevronRight } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

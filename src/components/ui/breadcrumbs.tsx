@@ -1,7 +1,7 @@
 import {
   Breadcrumb as RACBreadcrumb,
   Breadcrumbs as RACBreadcrumbs,
-} from 'react-aria-components'
+} from 'react-aria-components/Breadcrumbs'
 import { ChevronRight } from 'lucide-react'
 
 import { Link } from './link'

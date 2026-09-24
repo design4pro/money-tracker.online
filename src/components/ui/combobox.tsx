@@ -1,8 +1,6 @@
-import {
-  Button as RACButton,
-  ComboBox as RACComboBox,
-  Input as RACInput,
-} from 'react-aria-components'
+import { Button as RACButton } from 'react-aria-components/Button'
+import { Input as RACInput } from 'react-aria-components/ColorField'
+import { ComboBox as RACComboBox } from 'react-aria-components/ComboBox'
 import { ChevronDown } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

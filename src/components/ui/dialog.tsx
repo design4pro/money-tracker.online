@@ -1,10 +1,12 @@
+import { Heading as RACHeading } from 'react-aria-components/Calendar'
 import {
   Dialog as RACDialog,
   DialogTrigger as RACDialogTrigger,
-  Heading as RACHeading,
+} from 'react-aria-components/Dialog'
+import {
   Modal as RACModal,
   ModalOverlay as RACModalOverlay,
-} from 'react-aria-components'
+} from 'react-aria-components/Modal'
 import { createContext, useContext, useEffect, useId, useState } from 'react'
 import { X } from 'lucide-react'
 import { cva } from 'class-variance-authority'

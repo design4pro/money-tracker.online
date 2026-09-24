@@ -1,4 +1,5 @@
-import { Label as RACLabel, Meter as RACMeter } from 'react-aria-components'
+import { Label as RACLabel } from 'react-aria-components/CheckboxGroup'
+import { Meter as RACMeter } from 'react-aria-components/Meter'
 import { AlertTriangle, Check, TrendingUp } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
