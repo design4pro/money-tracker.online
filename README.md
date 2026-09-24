@@ -40,7 +40,7 @@ also the reference for the steps to run locally.
 | `pnpm dev`              | Vite dev server with the Cloudflare plugin, on :3000                               |
 | `pnpm build`            | Production build. `CLOUDFLARE_ENV=staging pnpm build` builds the staging Worker    |
 | `pnpm typecheck`        | `tsc --noEmit`                                                                     |
-| `pnpm lint`             | ESLint. `pnpm lint:fix` writes                                                     |
+| `pnpm lint`             | oxlint. `pnpm lint:fix` writes                                                     |
 | `pnpm test`             | Vitest (unit + repository). `pnpm test:watch`, `pnpm test:coverage`                |
 | `pnpm e2e`              | Playwright: behaviour, i18n and accessibility suites. `pnpm e2e:ui` for the runner |
 | `pnpm generate-routes`  | Regenerate `src/routeTree.gen.ts` — generated, never hand-edited                   |
@@ -64,7 +64,8 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
   passed on that commit: https://money-tracker.online (`deploy · production`, calling
   `deploy-production.yml`).
 - `ci.yml` runs lint · typecheck · unit tests · build · the route-tree and migration drift checks
-  and the browser suite on every pull request.
+  and the browser suite on every pull request that can change what the browser sees
+  (`scripts/ci/change-scope.mjs`; every push to `develop` and `main` runs it regardless).
 - No screenshot is compared anywhere: `docs/adr/0016-journeys-replace-the-visual-gate.md` retired
   the baselines. What a screen _looks_ like is judged by `node scripts/visual/capture.mjs` and a
   human at review; what the suite asserts is that the screen answers, hydrates, says nothing in

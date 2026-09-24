@@ -520,6 +520,85 @@ describe('git-guardrails.sh', () => {
     expect(bash(command).status).toBe(2)
   })
 
+  // A cezar run's own scratch directory, <main>/.ai/cezar/tmp/<id>, is its TMPDIR: the run cleans
+  // what it wrote there. Only below it, only this run's, and never through `..` - the directory
+  // next door is another run's. The paths need not exist; the rule reads the command.
+  describe("a cezar run's own scratch directory", () => {
+    const main = '/cezar-fixture/main'
+    const ownTmp = `${main}/.ai/cezar/tmp/${AGENT.CEZ_TASK_ID}`
+    const run = {
+      ...AGENT,
+      CLAUDE_PROJECT_DIR: `${main}/.ai/cezar/worktrees/${AGENT.CEZ_TASK_ID}`,
+    }
+
+    it.each([
+      `rm -rf ${ownTmp}/evidence`,
+      `rm -rf ${ownTmp}/new/deep`,
+      `rm -rf ${ownTmp}//evidence`,
+      `T=${ownTmp}/x; mkdir -p "$T"; rm -rf "$T"`,
+      // A directory from `mktemp -d` is named by a variable, which no rule here reads as a root.
+      'd=$(mktemp -d); echo x > $d/f; rm -rf $d',
+      'd=$(mktemp -d); rm -rf "$d"',
+      'd=$(mktemp -d); rm -rf "${d}"',
+      'rm -rf $TMPDIR/evidence',
+    ])('leaves %s alone', (command) => {
+      expect(bash(command, run).status).toBe(0)
+    })
+
+    it.each([
+      [ownTmp, 'rm -r of an absolute path'],
+      [`${ownTmp}/`, 'rm -r of an absolute path'],
+      [`${main}/.ai/cezar/tmp/another-run/x`, 'rm -r of an absolute path'],
+      [`${main}/.ai/cezar/runs`, 'rm -r of an absolute path'],
+      [`${ownTmp}/../another-run`, 'traversal from the scratch directory'],
+      [`${ownTmp}/x/../../another-run`, 'traversal from the scratch directory'],
+      [`${ownTmp}/x /etc`, 'rm -r of an absolute path'],
+      ['$TMPDIR/../another-run', 'traversal from the scratch directory'],
+      ['${TMPDIR}/..', 'traversal from the scratch directory'],
+    ])('blocks rm -rf %s', (target, reason) => {
+      const r = bash(`rm -rf ${target}`, run)
+      expect(r.status).toBe(2)
+      expect(r.stderr).toContain(reason)
+    })
+
+    it('grants nothing outside an agent run or for an id that is not one name', () => {
+      expect(
+        bash(`rm -rf ${ownTmp}/x`, {
+          CLAUDE_PROJECT_DIR: run.CLAUDE_PROJECT_DIR,
+        }).status,
+      ).toBe(2)
+      expect(
+        bash(`rm -rf ${main}/.ai/cezar/tmp/../runs`, {
+          ...run,
+          CEZ_TASK_ID: '..',
+        }).status,
+      ).toBe(2)
+    })
+
+    it('resolves a symlink below it before trusting the name', () => {
+      const real = realpathSync(mkdtempSync(join(tmpdir(), 'guard-own-tmp-')))
+      const tmp = join(real, '.ai/cezar/tmp', AGENT.CEZ_TASK_ID)
+      mkdirSync(join(tmp, 'evidence'), { recursive: true })
+      const env = {
+        ...AGENT,
+        CLAUDE_PROJECT_DIR: join(
+          real,
+          '.ai/cezar/worktrees',
+          AGENT.CEZ_TASK_ID,
+        ),
+      }
+
+      try {
+        expect(bash(`rm -rf ${tmp}/*`, env).status).toBe(0)
+        symlinkSync('/etc', join(tmp, 'link'))
+        expect(bash(`rm -rf ${tmp}/link`, env).status).toBe(2)
+        expect(bash(`rm -rf ${tmp}/*`, env).status).toBe(2)
+      } finally {
+        rmSync(real, { recursive: true, force: true })
+      }
+    })
+  })
+
   // `rm` matched as a word, and a space is a word boundary, so `git rm` read as `rm`. The index
   // operation is reversible with `git reset` and touches no file on disk; the same command
   // without `--cached` deletes the working tree and is exactly what the rule is for.
@@ -923,6 +1002,45 @@ describe('git-guardrails.sh', () => {
     expect(r.stderr).toContain(pattern)
   })
 
+  // One named value is what `echo "$NAME"` already prints; the dump is what leaks. So `printenv`
+  // takes plain variable names that do not look like secrets, and nothing else.
+  it.each([
+    'printenv NODE_OPTIONS',
+    'printenv TMPDIR CI SENTRY_ENVIRONMENT',
+    'printenv GIT_AUTHOR_NAME GIT_COMMITTER_EMAIL',
+    'echo "$(printenv NODE_OPTIONS)"',
+    'printenv CI && pnpm test',
+  ])('agent mode allows the named non-secret read %s', (command) => {
+    expect(bash(command, AGENT).status).toBe(0)
+    expect(bash(command, ACTIONS).status).toBe(0)
+  })
+
+  it.each([
+    ['printenv', 'printenv'],
+    ['printenv -0', 'printenv'],
+    ['printenv "$NAME"', 'printenv'],
+    ['printenv CI > out.txt', 'printenv'],
+    ['printenv GITHUB_TOKEN', 'printenv of a secret-looking name'],
+    ['printenv CI polar_access_token', 'printenv of a secret-looking name'],
+    ['printenv SENTRY_DSN', 'printenv of a secret-looking name'],
+    ['printenv CLOUDFLARE_API_KEY', 'printenv of a secret-looking name'],
+    ['printenv DB_PASSWORD', 'printenv of a secret-looking name'],
+    ['printenv BETTER_AUTH_URL', 'printenv of a secret-looking name'],
+    ['printenv HTTP_AUTHORIZATION', 'printenv of a secret-looking name'],
+    ['printenv git_author_token', 'printenv of a secret-looking name'],
+    ['printenv SESSION_COOKIE', 'printenv of a secret-looking name'],
+    ['printenv CI; printenv PRIVATE_KEY', 'printenv of a secret-looking name'],
+    ['x=$(printenv CREDENTIALS_FILE)', 'printenv of a secret-looking name'],
+    ["env | grep -E '^GIT_(AUTHOR|COMMITTER)'", 'env dump'],
+    ['env | grep NODE_OPTIONS', 'env dump'],
+  ])('agent mode still blocks %s', (command, pattern) => {
+    const r = bash(command, AGENT)
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain(pattern)
+    // The refusal names the form that does work, so a run does not go looking for another route.
+    expect(r.stderr).toContain('printenv NAME')
+  })
+
   // Everything a run legitimately does, asserted in agent mode and in a developer's session
   // alike. The developer tier is the permissive one, so a command refused there is a rule that
   // has escaped its tier - which is why both tables run over the same list.
@@ -1245,6 +1363,33 @@ describe('guard-generated.sh', () => {
       ).status,
     ).toBe(0)
   })
+
+  // A cezar worktree sits at <main>/.ai/cezar/worktrees/<id> and its TMPDIR at
+  // <main>/.ai/cezar/tmp/<id>: the one place outside the worktree a run writes, because cezar reaps
+  // it with the run. Another run's scratch, and the main checkout itself, stay outside.
+  it('lets a cezar run write its own scratch directory and nothing beside it', () => {
+    const main = '/cezar-main'
+    const w = (file_path: string, env: Record<string, string> = AGENT) =>
+      hook(
+        'guard-generated.sh',
+        { file_path },
+        {
+          ...env,
+          CLAUDE_PROJECT_DIR: `${main}/.ai/cezar/worktrees/${AGENT.CEZ_TASK_ID}`,
+        },
+      ).status
+    const ownTmp = `${main}/.ai/cezar/tmp/${AGENT.CEZ_TASK_ID}`
+    expect(w(`${ownTmp}/review.md`)).toBe(0)
+    expect(w(`${ownTmp}/new/deep/x.json`)).toBe(0)
+    expect(w(`${main}/.ai/cezar/tmp/another-run/review.md`)).toBe(2)
+    expect(w(`${ownTmp}/../another-run/review.md`)).toBe(2)
+    expect(w(`${main}/.ai/trackers/github.md`)).toBe(2)
+    expect(w(`${main}/src/x.ts`)).toBe(2)
+    // Under GitHub Actions there is no CEZ_TASK_ID, and so no scratch directory of a run.
+    expect(w(`${ownTmp}/review.md`, ACTIONS)).toBe(2)
+    // A generated file is refused there as everywhere.
+    expect(w(`${ownTmp}/src/routeTree.gen.ts`)).toBe(2)
+  })
 })
 
 describe('guard-read.sh', () => {
@@ -1373,6 +1518,79 @@ describe('guard-read.sh', () => {
       read({ path: root, pattern: '.ai/qa/test-env.env' }, AGENT, 'Glob')
         .status,
     ).toBe(2)
+  })
+
+  // A cezar run's worktree sits at <main>/.ai/cezar/worktrees/<id>. Three places outside it are
+  // the run's own: Claude Code's transcript directory for that path (an oversized tool result is
+  // stored there and read back), its TMPDIR <main>/.ai/cezar/tmp/<id>, and the main checkout the
+  // skills and tracker descriptors are read from - except .ai/cezar/ and .git/ in it.
+  describe('in a cezar worktree', () => {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), 'guard-read-main-')))
+    const main = join(base, 'main')
+    const worktree = join(main, '.ai/cezar/worktrees', AGENT.CEZ_TASK_ID)
+    const ownTmp = join(main, '.ai/cezar/tmp', AGENT.CEZ_TASK_ID)
+    const home = join(base, 'home')
+    const projects = join(home, '.claude/projects')
+    const slug = (path: string) => path.replace(/[^A-Za-z0-9]/g, '-')
+    const transcripts = join(projects, slug(worktree))
+    const otherWorktree = join(main, '.ai/cezar/worktrees/another-run')
+    for (const dir of [
+      join(worktree, 'src'),
+      ownTmp,
+      join(main, '.ai/cezar/tmp/another-run'),
+      join(main, '.ai/cezar/runs'),
+      join(main, '.ai/trackers'),
+      join(main, '.agents/skills/x'),
+      join(main, '.git'),
+      join(main, '.ai/qa'),
+      join(transcripts, 'session/tool-results'),
+      join(projects, slug(otherWorktree)),
+    ]) {
+      mkdirSync(dir, { recursive: true })
+    }
+    writeFileSync(join(main, '.dev.vars'), 'SECRET=1')
+    const readAt = (file_path: string, env: Record<string, string> = AGENT) =>
+      hook('guard-read.sh', { file_path }, { ...env, HOME: home }, worktree)
+
+    it.each([
+      join(transcripts, 'session/tool-results/b1.txt'),
+      join(ownTmp, 'review.md'),
+      join(main, '.ai/trackers/github.md'),
+      join(main, '.agents/skills/x/SKILL.md'),
+      join(main, 'AGENTS.md'),
+    ])('allows %s', (file_path) => {
+      expect(readAt(file_path).status).toBe(0)
+    })
+
+    it.each([
+      [join(projects, slug(otherWorktree), 'x.jsonl'), 'outside the worktree'],
+      [join(projects, slug(main), 'x.jsonl'), 'outside the worktree'],
+      [join(main, '.ai/cezar/tmp/another-run/review.md'), 'cezar run state'],
+      [`${ownTmp}/../another-run/review.md`, 'outside the worktree'],
+      [join(main, '.ai/cezar/runs/x.ndjson'), 'cezar run state'],
+      [join(main, '.ai/cezar/runs.json'), 'cezar run state'],
+      [join(otherWorktree, 'src/a.ts'), 'cezar run state'],
+      [join(main, '.git/config'), 'git internals'],
+      [join(main, '.dev.vars'), 'environment file'],
+      [join(main, '.env.local'), 'environment file'],
+      [join(main, '.ai/qa/test-env.env'), 'test-env credential file'],
+      [join(base, 'elsewhere/x'), 'outside the worktree'],
+    ])('denies %s', (file_path, reason) => {
+      const r = readAt(file_path)
+      expect(r.status).toBe(2)
+      expect(r.stderr).toContain(reason)
+    })
+
+    // The main checkout and the scratch directory are a cezar run's only: under GitHub Actions
+    // nothing beside the worktree was ever the run's but its own transcripts.
+    it('grants the main checkout and the scratch directory to a cezar run only', () => {
+      expect(readAt(join(main, '.ai/trackers/github.md'), ACTIONS).status).toBe(2)
+      expect(readAt(join(ownTmp, 'review.md'), ACTIONS).status).toBe(2)
+      expect(
+        readAt(join(transcripts, 'session/tool-results/b1.txt'), ACTIONS)
+          .status,
+      ).toBe(0)
+    })
   })
 })
 

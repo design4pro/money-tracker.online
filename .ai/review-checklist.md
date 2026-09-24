@@ -24,7 +24,7 @@ every agent branch used to be held to by `scripts/agent/floor-guard.mjs`.
 ## Quality floor
 
 - [ ] No added `@ts-ignore` or `@ts-expect-error`.
-- [ ] No added `eslint-disable` in any form.
+- [ ] No added `eslint-disable` or `oxlint-disable` in any form.
 - [ ] No added `.skip`, `.only`, `.todo`, `.fixme`, `xit` or `xdescribe`.
 - [ ] No deleted or renamed-away test file; no assertion narrowed to make a gate pass.
 - [ ] `src/routeTree.gen.ts` and `drizzle/` are regenerated, never hand-edited, and the drift

@@ -4,7 +4,9 @@
 # tracker descriptor needs it), and the issue body is the prompt, so the triggers are gated on
 # who can write them: `issue.opened` is filtered to maintainers and `groom` can only be set by a
 # collaborator (docs/agents/cezar-automations.json). The skill never edits source files, so the
-# step holds no Edit or Write; the bootstrap is deps and the route tree only, no D1 and no basemap.
+# step holds no Edit. It holds Write for the comment-body drafts it hands to `gh --body-file`, and
+# guard-generated.sh keeps those writes inside the worktree and the run's own TMPDIR. The
+# bootstrap is deps and the route tree only, no D1 and no basemap.
 name: issue-groom
 description: om-auto-manage-issues on one issue - labels, Definition of Ready, implementation notes; never code.
 steps:
@@ -14,4 +16,4 @@ steps:
   - id: groom
     name: om-auto-manage-issues
     prompt: '/om-auto-manage-issues {{task}} --prep-impl'
-    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
+    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite]

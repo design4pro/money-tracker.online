@@ -12,8 +12,9 @@
 # cannot reach because `cat .dev.vars` arrives here as a Bash call instead.
 #
 # Tier two - agent runs (CEZ_TASK_ID or GITHUB_ACTIONS): the things an om-* run never needs.
-# Dumping the environment (the worktree holds live secrets in .dev.vars), changing the pinned
-# stack (docs/SPEC.md §3), and shipping - deploys and remote migrations. GitHub mutations,
+# Dumping the environment (the worktree holds live secrets in .dev.vars; `printenv NAME` for a
+# named non-secret variable stays open), changing the pinned stack (docs/SPEC.md §3), and
+# shipping - deploys and remote migrations. GitHub mutations,
 # `git add -A`, closing keywords and `pnpm exec` are the om-* skills' ordinary tools (tracker
 # descriptor .ai/trackers/github.md, SDLC.md) and stay open under Cezar.
 #
@@ -404,6 +405,44 @@ while IFS= read -r scratchpad; do
   done
 done < <(grep -oE '/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*' <<< "$rm_scan")
 rm_without_scratchpads=$(printf '%s' "$rm_scan" | sed -E 's#/(private/)?tmp/claude-([[:alnum:]_-]+|\*)[^[:space:];&|)`]*##g')
+# A cezar run's own scratch directory, <main>/.ai/cezar/tmp/$CEZ_TASK_ID, is disposable in the same
+# way: cezar points TMPDIR there and reaps it when the run ends, so a path below it is the run's own
+# evidence to clean. The main checkout is the one the worktree sits in (<main>/.ai/cezar/worktrees/
+# <id>), or the root itself for a run started in place. Only paths below the directory - removing
+# the directory itself pulls TMPDIR out from under the run's next command - and only this run's:
+# an id that is not one plain name grants nothing, and neither a `..` nor a symlink may lead out,
+# because the next directory over is another run's. `$d` from `mktemp -d` and `$TMPDIR/x` never
+# reached the absolute-path rule, which judges only a literal `/`; `$TMPDIR/..` is refused below
+# for the same reason `$HOME/..` is above.
+tmpdir_traversal='\$\{?TMPDIR\}?(/[^[:space:];&|)`/]*)*/\.\.(/|[[:space:];&|)`]|$)'
+echo "$rm_scan" | grep -Eq "${rm_recursive}${tmpdir_traversal}" \
+  && block 'rm -r traversal from the scratch directory'
+rm_root="${CLAUDE_PROJECT_DIR:-$PWD}"
+rm_main=
+case "$rm_root" in */.ai/cezar/worktrees/*/*) ;; */.ai/cezar/worktrees/*) rm_main="${rm_root%/.ai/cezar/worktrees/*}" ;; esac
+case "${CEZ_TASK_ID:-}" in
+  ''|.|..|*/*) ;;
+  *)
+    own_tmp="${rm_main:-$rm_root}/.ai/cezar/tmp/$CEZ_TASK_ID"
+    own_tmp_re=$(printf '%s' "$own_tmp" | sed 's/[].*^$()+?{}|[\\]/\\&/g')
+    own_tmp_path="${own_tmp_re}/+[^[:space:];&|)\`/][^[:space:];&|)\`]*"
+    echo "$rm_without_scratchpads" | grep -Eq "${rm_recursive}${own_tmp_re}(/[^[:space:];&|)\`]*)?/\.\.(/|[[:space:];&|)\`]|$)" \
+      && block 'rm -r traversal from the scratch directory'
+    while IFS= read -r own_path; do
+      for candidate in $own_path; do
+        [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+        resolved=$(realpath "$candidate" 2>/dev/null || true)
+        own_tmp_real=$(realpath "$own_tmp" 2>/dev/null || true)
+        [ -n "$resolved" ] && [ -n "$own_tmp_real" ] || block 'rm -r through an unresolved scratch path'
+        case "$resolved" in
+          "$own_tmp_real"/*) ;;
+          *) block 'rm -r through a scratch directory symlink' ;;
+        esac
+      done
+    done < <(grep -oE "$own_tmp_path" <<< "$rm_without_scratchpads" || true)
+    rm_without_scratchpads=$(printf '%s' "$rm_without_scratchpads" | sed -E "s$(printf '\037')(^|[[:space:]])${own_tmp_path}$(printf '\037')\\1$(printf '\037')g")
+    ;;
+esac
 # The worktree exception admits paths below the checkout, not a traversal out of it. Test this
 # before removing the safe suffix, so `worktree/..` cannot erase the destructive target.
 project_root_target="(${project_root}|${project_root_spelling})"
@@ -617,8 +656,29 @@ agent_block() {
 
 echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])pnpm\s+(add|remove|rm|uninstall|update|up|upgrade)\b' \
   && agent_block 'pnpm add|remove|update' 'The stack is pinned (docs/SPEC.md §3); end the run as blocked and name the dependency.'
-echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])printenv\b' && agent_block 'printenv' 'The environment holds secrets.'
-echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])env(\s*$|\s*\||\s+-0|\s*;|\s*&&)' && agent_block 'env dump' 'The environment holds secrets.'
+# The dump is what leaks, not a single value: `echo "$NAME"` already prints one and nothing here
+# refuses it, so refusing `printenv NAME` as well only sent runs looking for the git author, TMPDIR
+# or NODE_OPTIONS round the houses. `printenv` passes when every argument is a plain variable name
+# and none of them looks like a secret. Bare `printenv`, a flag, an expansion or a redirect after
+# it, and a name carrying TOKEN, KEY and the rest are refused - as are `env` and `env | grep`, which
+# print the whole environment before anything filters it.
+env_hint='The environment holds secrets. Read a named non-secret variable with `printenv NAME`.'
+while IFS= read -r env_command; do
+  grep -Eq '(^|[^[:alnum:]_/-])printenv\b' <<< "$env_command" || continue
+  # Everything after the first `printenv`, so a second one on the piece cannot hide an argument.
+  env_args="${env_command#*printenv}"
+  [[ "$env_args" =~ [^[:space:]] ]] || agent_block 'printenv' "$env_hint"
+  read -ra env_names <<< "$env_args"
+  for env_name in "${env_names[@]}"; do
+    [[ "$env_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || agent_block 'printenv' "$env_hint"
+    # AUTHOR is a name, not a credential: GIT_AUTHOR_NAME is one of the values runs asked for. Only
+    # that word is set aside - AUTHORIZATION still carries AUTH, and so does AUTHOR_TOKEN's TOKEN.
+    env_upper=$(tr '[:lower:]' '[:upper:]' <<< "$env_name" | sed -E 's/AUTHOR([^I]|$)/\1/g')
+    grep -Eq 'TOKEN|SECRET|KEY|PASS|AUTH|CREDENTIAL|COOKIE|SESSION|PRIVATE|DSN' <<< "$env_upper" \
+      && agent_block 'printenv of a secret-looking name' "$env_hint"
+  done
+done <<< "$(tr ';&|()`' '\n' <<< "$scan")"
+echo "$scan" | grep -Eq '(^|[^[:alnum:]_/-])env(\s*$|\s*\||\s+-0|\s*;|\s*&&)' && agent_block 'env dump' "$env_hint"
 
 # Shipping is a human decision, and an unattended run has nobody to answer a prompt about it.
 # `deploy` is not the only way to ship: `versions upload` + `versions deploy` is the gradual

@@ -278,14 +278,14 @@ boundary that keeps a second implementation from appearing.
 shipped as `src/components/ui/index.ts`. The inventory did not: `docs/DESIGN-PRIMITIVES.md` is
 absent, and so is `src/components/__tests__/no-duplicate-primitives.test.ts`, which cross-checks the
 two against each other. The row stays open on the inventory half, which this stage still owns.
-`DSY-07 missing → done` — the ESLint boundary rule for `src/components/ui/**` is in
-`eslint.config.js`, as a `no-restricted-imports` block scoped to that directory: _components/ui never
+`DSY-07 missing → done` — the lint boundary rule for `src/components/ui/**` is in
+`.oxlintrc.json`, as a `no-restricted-imports` block scoped to that directory: _components/ui never
 imports from server/. Pass data in as props._
 
 ### Owned paths
 
 - `docs/DESIGN-PRIMITIVES.md` — new
-- `eslint.config.js` — edit
+- `.oxlintrc.json` — edit
 - `src/components/__tests__/no-duplicate-primitives.test.ts` — new
 
 ### Data and migration
@@ -295,7 +295,7 @@ None.
 ### Server (repo, server function, Zod)
 
 None. The rule this stage encodes is the inverse: **`components/ui` never imports from `server/`**,
-and `eslint.config.js` gains the `no-restricted-imports` boundary that makes it a build failure.
+and `.oxlintrc.json` gains the `no-restricted-imports` boundary that makes it a build failure.
 
 ### UI (route, components)
 

@@ -47,7 +47,7 @@ None. Charts render data they are given; they never fetch.
 ### Server (repo, server function, Zod)
 
 None. `src/components/charts/**` is client code and, like `components/ui`, **never imports from
-`server/`** — the same ESLint boundary from `01-S3` covers it, extended here to the charts directory.
+`server/`** — the same lint boundary from `01-S3` covers it, extended here to the charts directory.
 
 ### UI (route, components)
 

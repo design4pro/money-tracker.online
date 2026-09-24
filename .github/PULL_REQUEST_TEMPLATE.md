@@ -30,7 +30,7 @@ has drifted.
 - [ ] `pnpm typecheck`
 - [ ] `pnpm lint`
 - [ ] `pnpm test`
-- [ ] `pnpm e2e` (CI runs it on every pull request too)
+- [ ] `pnpm e2e` (CI runs it too, unless nothing in the diff reaches the browser)
 
 ## Invariants
 
