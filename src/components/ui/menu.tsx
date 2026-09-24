@@ -1,13 +1,13 @@
+import { Collection as RACCollection } from 'react-aria-components/Collection'
+import { Header as RACHeader } from 'react-aria-components/Header'
 import {
-  Collection as RACCollection,
-  Header as RACHeader,
   Menu as RACMenu,
   MenuItem as RACMenuItem,
   MenuSection as RACMenuSection,
   MenuTrigger as RACMenuTrigger,
   Separator as RACSeparator,
   SubmenuTrigger as RACSubmenuTrigger,
-} from 'react-aria-components'
+} from 'react-aria-components/Menu'
 import { Check, ChevronRight } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

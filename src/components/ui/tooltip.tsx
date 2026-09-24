@@ -1,8 +1,8 @@
+import { OverlayArrow as RACOverlayArrow } from 'react-aria-components/Popover'
 import {
-  OverlayArrow as RACOverlayArrow,
   Tooltip as RACTooltip,
   TooltipTrigger as RACTooltipTrigger,
-} from 'react-aria-components'
+} from 'react-aria-components/Tooltip'
 
 import { composeTw } from './shared'
 

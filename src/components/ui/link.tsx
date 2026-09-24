@@ -1,4 +1,4 @@
-import { Link as RACLink } from 'react-aria-components'
+import { Link as RACLink } from 'react-aria-components/Breadcrumbs'
 import { cva } from 'class-variance-authority'
 
 import {

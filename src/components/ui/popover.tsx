@@ -1,9 +1,9 @@
+import { Popover as RACPopover } from 'react-aria-components/ComboBox'
 import {
   Dialog as RACDialog,
   DialogTrigger as RACDialogTrigger,
-  OverlayArrow as RACOverlayArrow,
-  Popover as RACPopover,
-} from 'react-aria-components'
+} from 'react-aria-components/Dialog'
+import { OverlayArrow as RACOverlayArrow } from 'react-aria-components/Popover'
 
 import { composeTw, layerSurface, popMotion } from './shared'
 

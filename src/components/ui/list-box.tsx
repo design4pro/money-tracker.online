@@ -1,10 +1,10 @@
+import { Collection as RACCollection } from 'react-aria-components/Collection'
 import {
-  Collection as RACCollection,
-  Header as RACHeader,
   ListBox as RACListBox,
   ListBoxItem as RACListBoxItem,
   ListBoxSection as RACListBoxSection,
-} from 'react-aria-components'
+} from 'react-aria-components/ComboBox'
+import { Header as RACHeader } from 'react-aria-components/Header'
 import { Check } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

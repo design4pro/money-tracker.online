@@ -1,5 +1,5 @@
+import { Button as RACButton } from 'react-aria-components/Button'
 import {
-  Button as RACButton,
   Calendar as RACCalendar,
   CalendarCell as RACCalendarCell,
   CalendarGrid as RACCalendarGrid,
@@ -7,9 +7,9 @@ import {
   CalendarGridHeader as RACCalendarGridHeader,
   CalendarHeaderCell as RACCalendarHeaderCell,
   Heading as RACHeading,
-  RangeCalendar as RACRangeCalendar,
   Text as RACText,
-} from 'react-aria-components'
+} from 'react-aria-components/Calendar'
+import { RangeCalendar as RACRangeCalendar } from 'react-aria-components/DateRangePicker'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

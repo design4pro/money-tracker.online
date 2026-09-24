@@ -27,7 +27,7 @@
  * control rather than a waiting one. Opacity is reserved for controls with no
  * label of their own (an unchecked box, a switch track, a slider thumb).
  */
-import { composeRenderProps } from 'react-aria-components'
+import { composeRenderProps } from 'react-aria-components/composeRenderProps'
 
 import { cn } from '#/lib/cn'
 

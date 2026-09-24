@@ -1,4 +1,4 @@
-import { Toolbar as RACToolbar } from 'react-aria-components'
+import { Toolbar as RACToolbar } from 'react-aria-components/Toolbar'
 
 import { cn } from '#/lib/cn'
 import { composeTw } from './shared'

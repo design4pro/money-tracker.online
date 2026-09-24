@@ -1,8 +1,8 @@
+import { Button as RACButton } from 'react-aria-components/Button'
 import {
-  Button as RACButton,
   Select as RACSelect,
   SelectValue as RACSelectValue,
-} from 'react-aria-components'
+} from 'react-aria-components/Select'
 import { ChevronDown } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

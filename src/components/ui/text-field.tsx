@@ -1,7 +1,5 @@
-import {
-  Input as RACInput,
-  TextField as RACTextField,
-} from 'react-aria-components'
+import { Input as RACInput } from 'react-aria-components/ColorField'
+import { TextField as RACTextField } from 'react-aria-components/TextField'
 
 import { cn } from '#/lib/cn'
 import { Description, FieldError, Label, fieldRow } from './field'

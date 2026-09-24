@@ -1,8 +1,6 @@
-import {
-  Button as RACButton,
-  Input as RACInput,
-  SearchField as RACSearchField,
-} from 'react-aria-components'
+import { Button as RACButton } from 'react-aria-components/Button'
+import { Input as RACInput } from 'react-aria-components/ColorField'
+import { SearchField as RACSearchField } from 'react-aria-components/SearchField'
 import { Search, X } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

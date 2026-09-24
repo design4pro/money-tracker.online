@@ -1,8 +1,8 @@
+import { Button as RACButton } from 'react-aria-components/Button'
 import {
-  Button as RACButton,
   GridList as RACGridList,
   GridListItem as RACGridListItem,
-} from 'react-aria-components'
+} from 'react-aria-components/GridList'
 
 import { cn } from '#/lib/cn'
 import { Checkbox } from './checkbox'

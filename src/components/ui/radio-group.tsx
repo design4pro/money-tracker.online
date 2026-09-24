@@ -1,7 +1,7 @@
 import {
   Radio as RACRadio,
   RadioGroup as RACRadioGroup,
-} from 'react-aria-components'
+} from 'react-aria-components/RadioGroup'
 
 import { cn } from '#/lib/cn'
 import { Description, FieldError, Label, fieldRow } from './field'

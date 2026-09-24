@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { TextField as RACTextField } from 'react-aria-components'
+import { TextField as RACTextField } from 'react-aria-components/TextField'
 
 import {
   Button,

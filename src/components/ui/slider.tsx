@@ -1,9 +1,11 @@
 import {
-  Slider as RACSlider,
   SliderOutput as RACSliderOutput,
-  SliderThumb as RACSliderThumb,
   SliderTrack as RACSliderTrack,
-} from 'react-aria-components'
+} from 'react-aria-components/ColorSlider'
+import {
+  Slider as RACSlider,
+  SliderThumb as RACSliderThumb,
+} from 'react-aria-components/Slider'
 
 import { cn } from '#/lib/cn'
 import { Description, Label, fieldRow } from './field'

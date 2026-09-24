@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { I18nProvider } from 'react-aria-components'
+import { I18nProvider } from 'react-aria-components/I18nProvider'
 
 import { NumberField } from '../number-field'
 
