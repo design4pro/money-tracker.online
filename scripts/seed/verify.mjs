@@ -221,11 +221,26 @@ async function d1(args, sql) {
   return JSON.parse(stdout.slice(start))[0]?.results ?? []
 }
 
-/** One scalar. Every count below is one of these. */
-async function scalar(args, sql) {
-  const rows = await d1(args, sql)
-  const first = rows[0]
-  return first === undefined ? null : Number(Object.values(first)[0])
+/**
+ * Many scalars in one round trip: `select (<sql 1>) as "<name 1>", (<sql 2>) as "<name 2>", ...`.
+ *
+ * Every call to `d1` is a fresh `wrangler d1 execute` process, and on the CI pool starting one
+ * costs about three seconds while the query itself costs nothing. Asked one at a time, the eighty
+ * checks below spent over four minutes of the e2e leg on process start-up (#451). Folded into
+ * one statement each section pays that once. The subqueries are the same statements that used to
+ * run alone, so nothing about what a check reads changes.
+ */
+async function scalars(args, named) {
+  const columns = Object.entries(named).map(
+    ([name, sql]) => `(${sql}) as "${name}"`,
+  )
+  const row = (await d1(args, `select ${columns.join(', ')}`))[0] ?? {}
+  return Object.fromEntries(
+    Object.keys(named).map((name) => [
+      name,
+      row[name] === undefined || row[name] === null ? null : Number(row[name]),
+    ]),
+  )
 }
 
 async function main() {
@@ -384,9 +399,16 @@ async function main() {
     budgets: `select count(*) from budgets where id like 'demo-%'`,
   }
 
+  const gotCounts = await scalars(
+    args,
+    Object.fromEntries(
+      Object.keys(EXPECTED_COUNTS).map((name) => [name, counts[name]]),
+    ),
+  )
+
   out('Counts')
   for (const [name, expected] of Object.entries(EXPECTED_COUNTS)) {
-    const got = await scalar(args, counts[name])
+    const got = gotCounts[name]
     const ok = got === expected
     out(
       `  ${ok ? 'ok  ' : 'FAIL'}  ${name.padEnd(30)} ${String(got).padStart(5)} (expected ${expected})`,
@@ -434,8 +456,8 @@ async function main() {
   /* ---- Invariants -------------------------------------------------------
    *
    * Each is a pair: how many rows the check examined, and how many of them broke it. A check that
-   * examined nothing fails - see the header note. Both halves run as scalar subqueries of one
-   * statement, so an invariant costs one round trip rather than two.
+   * examined nothing fails - see the header note. Both halves of every invariant run as scalar
+   * subqueries of one statement, so the whole section costs one round trip (`scalars`).
    */
 
   const invariants = [
@@ -771,16 +793,20 @@ async function main() {
     },
   ]
 
+  const gotInvariants = await scalars(
+    args,
+    Object.fromEntries(
+      invariants.flatMap((inv, i) => [
+        [`checked${i}`, inv.checked],
+        [`violations${i}`, inv.violations],
+      ]),
+    ),
+  )
+
   out('\nInvariants')
-  for (const inv of invariants) {
-    const row = (
-      await d1(
-        args,
-        `select (${inv.checked}) as checked, (${inv.violations}) as violations`,
-      )
-    )[0]
-    const checked = Number(row.checked)
-    const violations = Number(row.violations)
+  for (const [i, inv] of invariants.entries()) {
+    const checked = Number(gotInvariants[`checked${i}`])
+    const violations = Number(gotInvariants[`violations${i}`])
     const ok = checked > 0 && violations === 0
     out(
       `  ${ok ? 'ok  ' : 'FAIL'}  ${inv.name.padEnd(36)} checked ${String(checked).padStart(4)}  violations ${violations}`,
@@ -806,7 +832,7 @@ async function main() {
 
 // Only when run as a command, exactly as `seed.mjs` guards its own `main()`. Without this the
 // module audits a workspace as a side effect of being imported, which puts `retryWhileBusy` -
-// the one part of this file a unit test can reach - behind eighty wrangler subprocesses.
+// the one part of this file a unit test can reach - behind four wrangler subprocesses.
 if (
   process.argv[1] !== undefined &&
   import.meta.url === pathToFileURL(process.argv[1]).href
