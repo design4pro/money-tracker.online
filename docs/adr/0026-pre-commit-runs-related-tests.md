@@ -6,7 +6,7 @@ Date: 2026-09-24
 ## Context
 
 `.husky/pre-commit` ran `lint-staged`, `pnpm typecheck` and the whole `pnpm test` on every
-developer commit. On the 4-vCPU VPS the whole suite took 222 s at a load average under 3 (217 test
+developer commit. On the 4-vCPU VPS the whole suite took 175 s at a load average under 3 (217 test
 files), and on a host shared with agent runs it is the suite that times out first, on a test the
 commit never touched.
 
@@ -46,8 +46,8 @@ Rejected alternatives:
 
 ## Consequences
 
-- The disk-reading set alone is 70 test files and 2006 of the suite's 3685 tests, 121 s against
-  the full run's 222 s, measured one after the other on `develop` at 08b2ad7 with this change on
+- The disk-reading set alone is 70 test files and 1494 of the suite's 3173 tests, 48 s against
+  the full run's 175 s, measured one after the other on `develop` at 2e85399 with this change on
   top. That is the least a commit pays. A commit that reaches a shared module pays more; one that touches the vitest config
   pays the whole suite.
 - A test that reads the disk through something the grep does not name, such as a new fs API or a
