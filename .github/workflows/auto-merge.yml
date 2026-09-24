@@ -27,8 +27,13 @@ concurrency:
 
 jobs:
   auto-merge:
-    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    # A closed pull request has no auto-merge left to sync: GitHub drops it on close, and the
+    # script would only decide `none`.
+    if: (github.event_name != 'issue_comment' || github.event.issue.pull_request) && (github.event.pull_request.state || github.event.issue.state) == 'open'
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
+    # Seconds-long (last 20 green runs: median 11 s, max 14 s); without this a hung API call holds
+    # the only `gate` slot for the 360-minute default.
+    timeout-minutes: 5
     permissions:
       contents: read
       issues: read

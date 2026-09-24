@@ -1,0 +1,20 @@
+name: Cancel closed PR runs
+
+# A merged or closed pull request's CI and gate runs otherwise keep the VPS pool busy for hours:
+# `cancel-in-progress` only fires on the next push. The logic lives in design4pro/.github so both
+# repositories cancel the same way.
+#
+# `pull_request_target` fires for fork pull requests too; it is safe here because the called
+# workflow only calls the API and never checks out pull request code.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  cancel:
+    permissions:
+      actions: write
+      pull-requests: read
+    uses: design4pro/.github/.github/workflows/cancel-closed-pr-runs.yml@main

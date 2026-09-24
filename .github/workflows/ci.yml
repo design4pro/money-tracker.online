@@ -456,8 +456,10 @@ jobs:
     # Every PR needs a real verdict. If its legs were skipped, run and fail instead of publishing
     # a skipped job as a green required check. A push with a reused verdict may still skip, and so
     # may a pull request `changes` found nothing browser-facing in: that skip is a decision with its
-    # reason in the `change scope` job, not a leg that never got to run (#455).
-    if: ${{ always() && needs.changes.outputs.browser != 'false' && (github.event_name == 'pull_request' || needs.e2e.result != 'skipped') }}
+    # reason in the `change scope` job, not a leg that never got to run (#455). `!cancelled()`, not
+    # `always()`: a cancelled run (superseded push, closed pull request) has no verdict to publish
+    # and must not take a `ci` slot to publish one.
+    if: ${{ !cancelled() && needs.changes.outputs.browser != 'false' && (github.event_name == 'pull_request' || needs.e2e.result != 'skipped') }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 10
 
