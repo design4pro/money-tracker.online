@@ -55,24 +55,19 @@ permissions:
   contents: read
   pull-requests: write
 
-# `runs-on` below reads through `vars.RUNNER_CI`, which on this repository is unset again
-# since 2026-09-21, so this job runs on the local pool the fallback array names - and so
-# does everything else here, shipping included. Setting the variable
-# (`gh variable set RUNNER_CI '["ubuntu-latest"]'`) moves every job that reads it off the
-# pool without a pull request, and setting it at the organisation level would move every
-# repository at once.
-#
-# In a test workflow that is a convenience. Here it is the recovery path for shipping:
-# production now deploys on the same pool, through `vars.RUNNER_DEPLOY`
-# (deploy-production.yml), so a host outage leaves no leg of a release standing and the
-# switch has to work without one. That is why these are variables at all and not literal
-# label arrays - reverting by pull request would need the merge gate, which needs the same
-# runners that are missing. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
+# `runs-on` below reads through `vars.RUNNER_CI`, unset on this repository, so this job runs on
+# the `gate` pool the fallback array names: small x64 containers on the OVH VPS for jobs that take
+# seconds, so they never queue behind an e2e leg (ADR 0022). Setting the variable
+# (`gh variable set RUNNER_CI '["ubuntu-latest"]'`) moves every job that reads it off the VPS
+# without a pull request; deploys follow `vars.RUNNER_DEPLOY` (deploy-production.yml). These are
+# variables and not literal label arrays because reverting by pull request would need the merge
+# gate, which needs the runners that are missing. See design4pro/cezar, `docs/host/README.md`,
+# "Linux host".
 
 jobs:
   promote:
     name: Open the develop → main pull request
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
     timeout-minutes: 5
 
     steps:

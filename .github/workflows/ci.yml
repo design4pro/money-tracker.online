@@ -21,25 +21,18 @@ name: CI
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
-#            RUNNER_CI - unset again since 2026-09-21, which is the state
-#            these files are written for: every gate job below falls back to
-#            the array beside its `runs-on` and runs on the local pool, ARM64
-#            containers labelled `ci` on one machine shared with the other
-#            repository. The variable is how the pool is left without a pull
-#            request: `gh variable set RUNNER_CI '["ubuntu-latest"]'` moves
-#            the gate jobs onto GitHub-hosted machines in one command, and
-#            deleting it again brings them back. The two deploy jobs at the
-#            end do not read it - their runner is `RUNNER_DEPLOY`'s, so
-#            recovering shipping when the host is down is
-#            `gh variable set RUNNER_DEPLOY '["ubuntu-latest"]'` as well, as
-#            deploy-production.yml says. That lever was pulled twice on 2026-09-21,
-#            first to `["ubuntu-latest"]` and then to
-#            `["blacksmith-2vcpu-ubuntu-2404-arm"]`, and what the day measured
-#            is written down in deploy-production.yml. A repository variable -
-#            there is no organisation-level one - so it moves this repository
-#            alone; setting one at the organisation level would move the
-#            siblings too. See design4pro/cezar, `docs/host/README.md`,
-#            "The runner pool".
+#            RUNNER_CI - unset, which is the state these files are written for:
+#            every gate job below falls back to the array beside its `runs-on`
+#            and runs on the `ci` pool on the OVH VPS, x64 containers in the
+#            `vps` runner group shared with design4pro/planned.travel - the
+#            only runners this repository uses since 2026-09-24 (ADR 0022).
+#            The variable is how the VPS is left without a pull request:
+#            `gh variable set RUNNER_CI '["ubuntu-latest"]'` moves the gate
+#            jobs onto GitHub-hosted machines in one command, and deleting it
+#            again brings them back. The two deploy jobs at the end read
+#            `RUNNER_DEPLOY` instead, as deploy-production.yml says. A
+#            repository variable, so it moves this repository alone. See
+#            design4pro/cezar, `docs/host/README.md`, "Linux host".
 # ──────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -354,17 +347,19 @@ jobs:
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
     if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
-    # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
+    # The outer bound. `playwright.config.ts` sets `globalTimeout` to 30 minutes
     # so the run's own clock is the one that fires first and names the test it
-    # died on; this only catches a job wedged before or after the suite.
-    timeout-minutes: 20
+    # died on; this only catches a job wedged before or after the suite. The
+    # ~6 min before the suite starts on the VPS (checkout, browsers, build,
+    # seeded D1, server; run 35971204308) is why this is 40 and not 35.
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       # `include:` rather than two axes, so a leg that grows towards the cap can
       # take a shard of its own without multiplying the others. Two clocks, and
       # they measure different things: `globalTimeout` caps the Playwright
-      # process at 900s, while `timeout-minutes` below caps the whole job - so
-      # the ~152s a leg spends before that process starts (checkout, build,
+      # process at 1800s, while `timeout-minutes` below caps the whole job - so
+      # the time a leg spends before that process starts (checkout, build,
       # seeded D1, server) is charged to the second clock and not the first.
       #
       # Both legs are whole, and the numbers say they can be. On `develop`

@@ -49,9 +49,8 @@ jobs:
     # The same runners as the e2e gate, and no `container:` on either: `./.github/actions/e2e-env`
     # installs the browsers per job, so neither gate needs a machine that carries them.
     #
-    # What that leaves this scan reading is arm64 where the hosted runners were amd64, against
-    # whatever font stack the runner image plus `playwright install --with-deps` ends up with
-    # rather than the Playwright image's. Font rasterisation is what axe's contrast rule samples
+    # What that leaves this scan reading is whatever font stack the VPS pool's image plus
+    # `playwright install` ends up with, rather than the hosted runners'. Font rasterisation is what axe's contrast rule samples
     # on text over a background it cannot compute, so a new borderline violation here is worth
     # reading as an environment finding before it is read as a product regression.
 
@@ -83,8 +82,9 @@ jobs:
       # `always()`: the JSON is at its most useful on the run that failed. `continue-on-error`
       # because the verdict is the scan above, not this upload - on 2026-09-21 the scan passed on
       # the pool and the job went red anyway, on `Artifact storage quota has been hit`
-      # (run 35659108917, #417). Seven days rather than thirty: nothing reads this file on a
-      # schedule, and the allowance it shares is 2 GB.
+      # (run 35659108917, #417). On the VPS the upload stays on the runner host and costs no GitHub
+      # storage (design4pro/.github `artifact-upload`); seven days applies only when it falls back
+      # to GitHub, whose 2 GB allowance it would share.
       - name: Upload the axe results
         if: always()
         continue-on-error: true

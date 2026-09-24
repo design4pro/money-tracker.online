@@ -176,3 +176,9 @@ are repository variables, not organisation variables, and currently both name
 `["blacksmith-2vcpu-ubuntu-2404-arm"]`. The kill switch remains the same: changing either
 repository variable moves only this repository's CI or agent jobs. The original decision and every
 other consequence stand unchanged.
+
+## Amendment 2026-09-24
+
+**Superseded for runners by ADR 0022.** The runner values recorded in the 2026-09-22 amendment no
+longer apply: `RUNNER_CI`, `RUNNER_DEPLOY` and `RUNNER_AGENT` are unset, and every job falls back to
+the VPS pool. The variables are still repository-scoped, and they are still the kill switch.
