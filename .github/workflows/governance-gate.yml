@@ -47,7 +47,7 @@ jobs:
     # skipped job is a passing required check - the gate already had its say when the pull request
     # was enqueued.
     if: github.event_name == 'pull_request_target'
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
     permissions:
       contents: read
       pull-requests: read
