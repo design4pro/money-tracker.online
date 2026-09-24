@@ -111,9 +111,16 @@ export default defineConfig({
   // project pushed it to twenty-five, and ADR 0016 has now deleted the file. Fifteen rather than
   // back to ten, because ten was measured against a suite this one has grown past. A leg that
   // grows towards it gets another shard in ci.yml, not a bigger number here (#239); the measured
-  // leg timings live beside that matrix. It sits inside the `timeout-minutes: 20` that ci.yml puts
+  // leg timings live beside that matrix. It sits inside the `timeout-minutes: 40` that ci.yml puts
   // on the job, so this one still fires first.
-  globalTimeout: isCI ? 15 * 60_000 : undefined,
+  //
+  // Doubled to thirty on 2026-09-24, when CI moved to the OVH VPS (ADR 0022). Its KVM Haswell
+  // vCPUs are about three times slower per core than the machine these numbers were measured on:
+  // run 35971204308 got through 238 `mobile-chromium` tests before the 900 s cap stopped it with
+  // 32 not run, and `chromium` ran 287 tests for 14.3 min before the 20-minute job cap cancelled it.
+  // Another shard would not buy time back there: the VPS runs two CI jobs at once, and each leg
+  // pays ~6 min of setup before the suite starts.
+  globalTimeout: isCI ? 30 * 60_000 : undefined,
   // The companion to `globalTimeout`, and the reason that one stopped naming anything.
   //
   // When the browser loses its route to the server mid-run, every remaining test raises the same

@@ -2,15 +2,15 @@
  * Three runner invariants that until now lived only in comments - two from #318, one from #403.
  *
  * `setup-node`'s `cache: pnpm` restores a ~330 MB tarball. On the self-hosted pool that restore
- * cost more than the rest of the toolchain step combined, and the pool keeps a persistent store of
- * its own, so the cache is gated on `runner.environment == 'github-hosted'`. Drop the gate and
- * every pool job gets slower without failing anything.
+ * cost more than the rest of the toolchain step combined, so the cache is gated on
+ * `runner.environment == 'github-hosted'`. Drop the gate and every pool job gets slower without
+ * failing anything.
  *
- * Both deploy workflows choose their runner through `vars.RUNNER_DEPLOY` and fall back to the
- * pool: since 2026-09-21 shipping runs on the same machines as the gate (#409). The fallback is
- * the default because a variable is invisible in the tree, and the variable stays because leaving
- * the pool cannot need the merge gate that needs the pool. Hard-code a runner here and the lever
- * disappears silently - the next deploy is the first place anyone notices.
+ * Both deploy workflows choose their runner through `vars.RUNNER_DEPLOY` and fall back to the `ci`
+ * pool on the OVH VPS, where the gate runs too (#409, ADR 0022). The fallback is the default
+ * because a variable is invisible in the tree, and the variable stays because leaving the VPS
+ * cannot need the merge gate that needs the VPS. Hard-code a runner here and the lever disappears
+ * silently - the next deploy is the first place anyone notices.
  *
  * The browser suites install their own browsers. Both of them - the e2e gate and the axe gate -
  * used to inherit them from a runner image built FROM `mcr.microsoft.com/playwright`, and when the
@@ -33,7 +33,7 @@
  * @see https://github.com/design4pro/money-tracker.online/issues/409
  */
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -99,13 +99,13 @@ describe.each([
   '.github/workflows/deploy-staging.yml',
   '.github/workflows/deploy-production.yml',
 ])('%s', (path) => {
-  it('selects its runner through vars.RUNNER_DEPLOY, defaulting to the pool', () => {
+  it('selects its runner through vars.RUNNER_DEPLOY, defaulting to the VPS ci pool', () => {
     const runsOn = [...read(path).matchAll(/^\s*runs-on:[^\n]*/gm)].map((m) =>
       m[0].trim(),
     )
 
     expect(runsOn).toEqual([
-      `runs-on: \${{ fromJSON(vars.RUNNER_DEPLOY || '["self-hosted","linux","ARM64","ci"]') }}`,
+      `runs-on: \${{ fromJSON(vars.RUNNER_DEPLOY || '["self-hosted","linux","X64","ci"]') }}`,
     ])
   })
 })
@@ -126,13 +126,31 @@ describe('runner recovery documentation', () => {
     expect(headers[0]).not.toContain('organisation variable')
   })
 
-  it('records the current CI and agent runner settings in the ADR amendment', () => {
-    const adr = read('docs/adr/0021-the-agent-layer-is-vendored.md')
+  it('records the current runner settings in the ADR that owns them', () => {
+    const adr = read('docs/adr/0022-ci-and-agents-run-only-on-the-vps-pool.md')
 
-    expect(adr).toContain('## Amendment 2026-09-22')
-    expect(adr).toMatch(
-      /`RUNNER_CI` and `RUNNER_AGENT`\s*\nare repository variables/,
+    expect(adr).toContain('Status: accepted')
+    for (const labels of [
+      '["self-hosted","linux","X64","ci"]',
+      '["self-hosted","linux","X64","gate"]',
+      '["self-hosted","linux","X64","agent"]',
+    ])
+      expect(adr).toContain(`\`${labels}\``)
+    expect(adr).toMatch(/`RUNNER_CI`, `RUNNER_DEPLOY` and `RUNNER_AGENT`/)
+  })
+
+  it('points every workflow at the VPS pool and nowhere else by default', () => {
+    const workflows = readdirSync(join(ROOT, '.github/workflows')).filter((f) =>
+      f.endsWith('.yml'),
     )
-    expect(adr).toContain('`["blacksmith-2vcpu-ubuntu-2404-arm"]`')
+    for (const file of workflows) {
+      for (const [line] of read(`.github/workflows/${file}`).matchAll(
+        /^\s*runs-on:[^\n]*/gm,
+      )) {
+        expect(line, file).toMatch(
+          /fromJSON\(vars\.RUNNER_(CI|DEPLOY|AGENT) \|\| '\["self-hosted","linux","X64","(ci|gate|agent)"\]'\)/,
+        )
+      }
+    }
   })
 })

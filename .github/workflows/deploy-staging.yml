@@ -28,51 +28,25 @@ permissions:
   contents: read
 
 # `runs-on` below reads through `vars.RUNNER_DEPLOY`, a repository variable that is deliberately
-# unset: the fallback
-# array selects the local self-hosted pool - the `ci` label, ARM64 containers on one
-# machine shared with the other repository - and since 2026-09-21 deploying runs there
-# like everything else. The gate, the agent jobs and shipping are on the same machines
-# again.
+# unset: the fallback array selects the `ci` pool on the OVH VPS - x64 containers in the `vps`
+# runner group, one job per container, shared with design4pro/planned.travel - where the gate
+# runs too. Since 2026-09-24 that VPS is the only place this repository's jobs run (ADR 0022).
 #
-# Shipping used to be the exception, and the two reasons it was are now costs this
-# repository has accepted rather than reasons that hold. A deploy queues behind whatever
-# the pool is already running, and the slot it waits for is the slot that decides how long
-# production stays on the old bundle. And a deploy no longer works when the local machine
-# does not: a host outage stops shipping as well as the gate, so recovery is a variable
-# somebody has to set under exactly the conditions that make it hard to remember. That
-# command is
+# A deploy queues behind whatever the pool is already running, and a VPS outage stops shipping
+# as well as the gate. Recovery is a variable, not a pull request, because the merge gate needs
+# the runners that are missing:
 #
 #   gh variable set RUNNER_DEPLOY '["ubuntu-latest"]'
 #
-# and it moves shipping onto GitHub-hosted machines without a pull request; deleting the
-# variable brings it back here. `RUNNER_CI` and `RUNNER_AGENT` are the same lever for the
-# gate and for the agent jobs, and reverting by pull request is what none of the three can
-# be, because the merge gate needs the runners that are missing.
-#
-# Actions minutes are no longer this paragraph's problem. The measurements are kept
-# because they are what the decision was made on. Verified 2026-09-17 in the
-# organisation's billing page: GitHub Team, 3,000 minutes included. Hosted CI spent them
-# fast - this repository read 94 September minutes on the morning of the 21st and 473.59
-# by the afternoon, ~380 in one day, which is the 3,000 in about eight days. Read that as
-# an upper bound; the day was mostly runner experiments. Blacksmith spent none of them -
-# those machines register as self-hosted runners and are billed by Blacksmith instead -
-# and the pool spends none either.
-#
-# The same pull request's two heavy jobs, measured on all three:
-#
-#   job                                    pool    hosted x64   blacksmith ARM
-#   generated · typecheck · lint · build   1m26s   1m54s        1m55s
-#   unit tests · coverage                  2m25s   5m45s        6m40s
-#
-# The pool is the fastest of the three and the only one that is this organisation's, which
-# is also why the Cloudflare credential this workflow carries never leaves it. The two
-# hosted columns are warm-cache numbers; the first Blacksmith run was 2m25s and 6m52s with
-# its own layer empty. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
+# moves shipping onto GitHub-hosted machines; deleting the variable brings it back to the VPS.
+# `RUNNER_CI` and `RUNNER_AGENT` are the same lever for the gate and for the agent jobs. The
+# Cloudflare credential this workflow carries stays on machines the organisation runs.
+# See design4pro/cezar, `docs/host/README.md`, "Linux host".
 
 jobs:
   deploy:
     name: Migrate and deploy to staging
-    runs-on: ${{ fromJSON(vars.RUNNER_DEPLOY || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_DEPLOY || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 25
     # Never run two deploys at once, and never cancel one half-way: an interrupted
     # `d1 migrations apply` would leave the schema between two versions. On the job, so it holds

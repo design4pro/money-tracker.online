@@ -46,7 +46,7 @@ jobs:
     # What that costs: a hard-block label added while the pull request sits in the queue is not
     # read. Taking it out of the queue is what stops it then, not the label.
     if: github.event_name == 'pull_request_target' || github.event_name == 'pull_request_review' || (github.event_name == 'issue_comment' && github.event.issue.pull_request)
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
     permissions:
       checks: write
       contents: read

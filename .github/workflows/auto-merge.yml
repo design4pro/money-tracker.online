@@ -28,7 +28,7 @@ concurrency:
 jobs:
   auto-merge:
     if: github.event_name != 'issue_comment' || github.event.issue.pull_request
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
     permissions:
       contents: read
       issues: read
