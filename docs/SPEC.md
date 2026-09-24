@@ -96,7 +96,7 @@ the shadcn shape · **`@internationalized/date`** and **`@internationalized/numb
 `@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
 
 Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
-(ADR 0015) · Playwright · **`@axe-core/playwright`** · `drizzle-kit` · ESLint 9 · Prettier ·
+(ADR 0015) · Playwright · **`@axe-core/playwright`** · `drizzle-kit` · oxlint (ADR 0023) · Prettier ·
 Husky + lint-staged · `vite-plugin-pwa`.
 
 Not used, deliberately: **Radix** (React Aria instead — ADR 0005), **any chart library** (ADR 0007),
@@ -118,8 +118,9 @@ whole class of failures nobody can explain.
 
 The set itself is changed by a human, in an ADR, with the reason attached - the freeze binds
 stages and agent runs, not the decision record. It binds both directions: `@cloudflare/vitest-pool-workers`
-is the one addition so far (ADR 0015) and `motion` the one removal (ADR 0019), declared and imported
-by nothing. A `### Blockers` row is still how a stage reports needing a package.
+was an addition (ADR 0015), `motion` a removal (ADR 0019), declared and imported by nothing, and
+`oxlint` a replacement for `eslint` and `@tanstack/eslint-config` (ADR 0023). A `### Blockers` row
+is still how a stage reports needing a package.
 
 What the freeze does not do is notice when a reason **expires** — a package declared ahead of a
 stage that then slips, or ships another way, keeps its line for as long as nobody re-reads the

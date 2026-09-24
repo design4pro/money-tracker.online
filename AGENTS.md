@@ -50,7 +50,7 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
 - Copying a string, a name, a number or a layout from the reference product: the clean-room rule
   in `docs/agents/reference.md`.
 - `--no-verify`; a force-push to `develop` or `main`; a hand edit to a generated file.
-- Adding `@ts-ignore`, `@ts-expect-error` or `eslint-disable`; `.skip`, `.only`, `.todo` or
+- Adding `@ts-ignore`, `@ts-expect-error`, `eslint-disable` or `oxlint-disable`; `.skip`, `.only`, `.todo` or
   `.fixme` on a test; deleting a test file to make a gate green.
 - Hardcoded user-facing copy; an `if (n === 1)` plural; `Intl.DisplayNames` in `src/lib/i18n`.
 - Reading `.dev.vars`, `.env.local` or `.ai/qa/test-env.env`.

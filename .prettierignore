@@ -8,7 +8,7 @@ drizzle
 # Claude Code orchestration scripts and run state.
 # ...except the hook tests, which are ordinary TypeScript in this repo's tsconfig.
 # Ignored one level at a time because a path inside an excluded directory cannot be
-# re-included; see the matching comment in eslint.config.js.
+# re-included; see the matching comment in .oxlintrc.json.
 .claude/*
 !.claude/hooks
 .claude/hooks/*

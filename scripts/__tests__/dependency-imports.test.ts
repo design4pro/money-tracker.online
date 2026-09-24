@@ -211,8 +211,8 @@ const packageJson = JSON.parse(
 const runtimeDependencies = Object.keys(packageJson.dependencies ?? {})
 
 /**
- * The files an import can live in. `git ls-files` rather than a directory walk, for the reason
- * `eslint-ignores.test.ts` gives: `.ai/cezar/worktrees/` holds full second checkouts of this
+ * The files an import can live in. `git ls-files` rather than a directory walk:
+ * `.ai/cezar/worktrees/` holds full second checkouts of this
  * repository, and walking it would descend into their `node_modules`. Asking git also means
  * `dist/`, `.output/`, `.wrangler/` and `coverage/` are excluded because they are untracked,
  * rather than because this file remembers to list them.
@@ -271,9 +271,9 @@ const IMPORT_CONTEXT = String.raw`(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\
  * a test fixture can switch off is worse than no guard, because it reads as a passing one.
  *
  * Anchoring costs the matches that were never imports and keeps every one that was: `declare module
- * '@tanstack/react-router'` in `src/routeTree.gen.ts`, `name: 'drizzle-orm'` in an
- * `eslint.config.js` rule, and a bare `'@tanstack/react-start'` in a skill script all stop counting,
- * while the packages themselves stay imported by 69, 68 and 43 files respectively.
+ * '@tanstack/react-router'` in `src/routeTree.gen.ts`, `name: 'drizzle-orm'` in an ESLint config
+ * rule (since moved to `.oxlintrc.json`), and a bare `'@tanstack/react-start'` in a skill script
+ * all stop counting, while the packages themselves stay imported by 69, 68 and 43 files respectively.
  *
  * Deliberately still a text scan and not a module graph. The graph would answer a narrower question
  * - "is this reachable from an entry point" - and would need a resolver per entry (the Worker, the
