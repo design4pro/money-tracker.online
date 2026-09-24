@@ -150,6 +150,7 @@ export default [
       // producing UI QA evidence was enough to turn the gate red on the machine that produced it.
       '.ai/qa/artifacts_*/**',
       '.ai/qa/test-env.lock/**',
+      '.ai/qa/knowledge-base/**',
       // Agent tooling that GitHub's own surfaces read — skills, agent definitions, hooks. Same
       // reason as `.claude/**`: vendored configuration for tools around the project, written
       // against no tsconfig of ours.
