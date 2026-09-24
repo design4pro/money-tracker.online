@@ -5,7 +5,8 @@
 #      truth. A hand-edit survives exactly until the next run of it, and in between produces the
 #      worst kind of failure: one that reproduces on one machine and not another.
 #   2. Worktree confinement, in agent runs (CEZ_TASK_ID or GITHUB_ACTIONS). No '..', nothing
-#      outside the worktree the run was given.
+#      outside the worktree the run was given - except a cezar run's own scratch directory,
+#      <main>/.ai/cezar/tmp/$CEZ_TASK_ID (its TMPDIR), which cezar reaps when the run ends.
 #   3. The paths that configure the agent, under GITHUB_ACTIONS only and without exception.
 #
 # A fourth layer used to sit beside the third: the same governance block in a cezar run, with an
@@ -104,6 +105,22 @@ deny_outside() { # reason
 # the directory does not exist, and a run names files by their plain path.
 case "$file_path" in ..|../*|*/..|*/../*) deny_outside "walks through '..'" ;; esac
 abs=$(resolve "$file_path")
+
+# The run's own scratch directory is the one place outside the worktree it writes: cezar points
+# TMPDIR there and removes it with the run. It hangs off the main checkout the worktree sits in,
+# <main>/.ai/cezar/worktrees/<id>, or off the root itself for a run started in place. Only this
+# run's - an id that is not one plain name grants nothing, and another run's directory stays
+# outside.
+main=
+case "$root" in */.ai/cezar/worktrees/*/*) ;; */.ai/cezar/worktrees/*) main="${root%/.ai/cezar/worktrees/*}" ;; esac
+case "${CEZ_TASK_ID:-}" in
+  ''|.|..|*/*) ;;
+  *)
+    own_tmp="${main:-$root}/.ai/cezar/tmp/$CEZ_TASK_ID"
+    case "$abs" in "$own_tmp"|"$own_tmp"/*) exit 0 ;; esac
+    ;;
+esac
+
 case "$abs" in
   "$root" | "$root"/*) ;;
   *) deny_outside "is outside the worktree" ;;
