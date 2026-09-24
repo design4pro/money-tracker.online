@@ -4,11 +4,13 @@
 # SDLC taxonomy (docs/adr/0017-om-skills-replace-the-bespoke-agent-layer.md). The pipeline labels
 # (`review`, `merge-queue`, ...) are written by the review chain, never by a bot's bump.
 #
-# Two pins are load-bearing and are NOT ignored here, because a bump to either has to be followed
-# by a matching edit and it is better that the pull request exists and goes red:
-#   * `@playwright/test` - the container image tag `mcr.microsoft.com/playwright:v<version>-noble`
-#     in ci.yml and a11y.yml has to move with it.
+# One pin is load-bearing and is NOT ignored here, because a bump has to be followed by a matching
+# edit and it is better that the pull request exists and goes red:
 #   * `wrangler` - the `wranglerVersion` input in both deploy workflows has to move with it.
+#
+# `@playwright/test` used to be the second: an image tag naming its version had to move with it.
+# It no longer is. `.github/actions/e2e-env` installs the browsers for whatever version the
+# lockfile resolves, so a bump carries its own and there is nothing to follow it with (#403).
 version: 2
 
 updates:

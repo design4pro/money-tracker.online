@@ -19,5 +19,4 @@ steps:
   - id: report
     name: backlog
     prompt: '/backlog {{task}}'
-    model: sonnet
     allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]

@@ -97,10 +97,10 @@ Pipeline labels are mutually exclusive: a PR carries at most one, and it names w
 | Priority | `priority-low`, `priority-medium`, `priority-high`, `priority-extreme`                     | one at a time; unset = medium | Urgency of the work                |
 | Risk     | `risk-low`, `risk-medium`, `risk-high`                                                     | one at a time; unset = medium | Blast radius of the change         |
 | Intake   | `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`                         | one at a time; issues only    | Who acts on the issue next         |
-| Command  | `groom`, `autofix`, `spec`, `review-threads`                                               | additive; consumed by the run | Start one run now                  |
+| Command  | `groom`, `autofix`, `spec`                                                                 | additive; consumed by the run | Start one run now                  |
 | Outside  | `do-not-close`                                                                             | additive                      | A human hold no skill may override |
 
-The first five groups are a PR's; **Intake** is an issue's and **Command** is either's, and each has its own section below rather than a line here. A repository may add a switch of its own outside the taxonomy; `## This repository` names it. Every group is also `labels.*` in `.ai/agentic.config.json`, and that file is what the skills read — a label this document names and the config does not is a label no skill will apply.
+The first five groups are a PR's; **Intake** and **Command** are an issue's, and each has its own section below rather than a line here. A repository may add a switch of its own outside the taxonomy; `## This repository` names it. Every group is also `labels.*` in `.ai/agentic.config.json`, and that file is what the skills read — a label this document names and the config does not is a label no skill will apply.
 
 Priority is how urgent the work is; risk is how dangerous the change is to ship. A one-line fix for an outage can be `priority-extreme` and `risk-low`; a large auth refactor that can wait can be `priority-low` and `risk-high`. A PR inherits both from its source issue unless the scope clearly changed. When an automated skill adds or changes a pipeline or meta label, it leaves a short comment explaining why.
 
@@ -141,20 +141,19 @@ Intake labels go on issues only, one at a time, and say who acts on the issue ne
 
 - **Transitions:** an issue labeled `needs-triage` moves to exactly one of `needs-info`, `ready-for-agent` or `ready-for-human`. When the reporter answers a `needs-info` issue, a human moves it back to `needs-triage`, and triage runs again. Re-triaging a decided issue means removing `ready-for-agent` or `ready-for-human` first, then adding `needs-triage`.
 - **Grooming comes first.** `om-auto-manage-issues` owns `issue.opened` and adds the SDLC labels and the Definition of Ready check. `afk-triage` answers the `needs-triage` label instead, so the two never groom one issue at the same time.
-- **Grooming does not yet hand the issue on, and that is the open gap in this process.** A finished groom records `READY_STATUS` and stops; grooming applies no `needs-triage`, so an issue that arrives through the issue form waits for a human to add an intake or trigger label before anything else happens. The only skill that sets the label is `afk-architecture-review`, on the `Strong` candidates it raises itself — it never reaches a groomed issue, so it does not close this gap. The intended edge — a groom that ends `READY_STATUS=ready` applies `needs-triage` as its last mutation — is designed but not wired; it is specified in the cezar repository's `.ai/specs/2026-09-17-afk-intake-bridge.md`, and until it lands, read every "the pipeline picks it up" below as "a human picks it up".
+- **Grooming hands the issue on only where the repository wires it.** A finished groom records `READY_STATUS`; the installed `om-auto-manage-issues` applies no intake label, so on its own it stops there. The edge that closes the gap — a groom ending `READY_STATUS=ready` applies `needs-triage`, and nothing else, as its last mutation — lives in the repo-local override, and `## This repository` says whether it is wired here. Where it is not, an issue that arrives through the issue form waits for a human to add an intake or trigger label, and every "the pipeline picks it up" below reads as "a human picks it up". Either way grooming never applies `ready-for-agent` itself: it does not check that the issue is real, still unfixed on the base branch, or already covered by an open PR, and those three checks are what keep `risk-high` and `security` work out of the unattended lane. `afk-architecture-review` also sets `needs-triage`, on the `Strong` candidates it raises itself.
 - **Limits on skills:** automated skills never add `ready-for-agent` to `risk-high` or `security` work, and never close an issue. Consuming `needs-triage` is exactly what `afk-triage` is for, so that one label it may remove; `ready-for-agent` and `ready-for-human` are terminal, and a skill never removes either once a human set it.
 - **Human override:** a human may move any issue to any intake label at any time.
 
 ## Trigger labels
 
-A trigger label is not a state: it is an instruction to start one run now. Adding one is how a human (or, for `review-threads`, a job) hands a specific piece of work to the pipeline out of band, and the skill's repo-local override removes the label as its first mutation — so a trigger label still present is a run nobody took.
+A trigger label is not a state: it is an instruction to start one run now. Adding one is how a human hands a specific piece of work to the pipeline out of band, and the skill's repo-local override removes the label as its first mutation — so a trigger label still present is a run nobody took.
 
-| Label            | Starts                                    | Notes                                                                                                                                |
-| ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `groom`          | `om-auto-manage-issues` on one issue      | Labels, Definition of Ready check, implementation notes. The way an issue from someone other than a maintainer is groomed at all.    |
-| `autofix`        | `om-auto-fix-issue`                       | A bug goes verify → root cause → fix → PR → review → QA; a feature goes spec → implement. The human express lane past triage.        |
-| `spec`           | `om-auto-write-spec` on a `feature` issue | The spec lands under `.ai/specs/` on a design-only PR. Implementation is a separate run once that PR merges.                         |
-| `review-threads` | `om-auto-fix-pr` on one PR                | The only trigger on a PR, and the only one no human adds: the review job applies it when it leaves threads the merge gate will hold. |
+| Label     | Starts                                    | Notes                                                                                                                             |
+| --------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `groom`   | `om-auto-manage-issues` on one issue      | Labels, Definition of Ready check, implementation notes. The way an issue from someone other than a maintainer is groomed at all. |
+| `autofix` | `om-auto-fix-issue`                       | A bug goes verify → root cause → fix → PR → review → QA; a feature goes spec → implement. The human express lane past triage.     |
+| `spec`    | `om-auto-write-spec` on a `feature` issue | The spec lands under `.ai/specs/` on a design-only PR. Implementation is a separate run once that PR merges.                      |
 
 Two rules hold wherever these are wired:
 
@@ -170,7 +169,7 @@ The one hard rule of this process: **a PR carrying `needs-qa` must not merge unt
 - `skip-qa` is the explicit opt-out for docs-only, dependency-only, CI-only, test-only, and similarly low-risk non-user-facing changes. Never combine it with `needs-qa`.
 - `qa-failed`, `do-not-merge`, and `blocked` are hard blocks regardless of every other signal. An active `qa` pipeline label means a tester is on the PR right now — never merge under an active tester.
 - The gate is satisfied when a QA reviewer tests the PR and applies `qa-approved`.
-- **`qa-approved` is pinned to a commit.** The comment that grants it — the QA reviewer's note, or the self-QA evidence comment — carries the line `QA head: <sha>` for the head that was tested. A push after that line leaves the label in place but stales it: `om-merge-buddy` reports "QA evidence older than head", and `om-approve-merge-pr` asks for confirmation before merging. The way back is a QA reviewer re-testing, or stating on the PR that the new commits do not touch the tested scope, with a fresh `QA head:` line. A sign-off without the line pre-dates this rule and is read as unpinned, not as invalid.
+- **`qa-approved` is pinned to a commit.** The comment that grants it — the QA reviewer's note, or the self-QA evidence comment — carries the line `QA head: <sha>` for the head that was tested. A push after that line leaves the label in place but stales it: the required `merge-gate` fails until a QA reviewer re-tests, or states that the new commits do not touch the tested scope, with a fresh `QA head:` line.
 - **Self-QA exception**: when no QA reviewer has capacity in time, any engineer may sign off instead, on a `risk-low` or `risk-medium` PR only — but only by (1) checking the PR out and running it locally, (2) exercising the affected flow, and (3) attaching evidence to the PR that names the scenario exercised, the environment, the test data, the observed result, the negative cases tried, and the `QA head:` line. Then apply both `qa-approved` (so the gate passes) and `qa-self-verified` (so the exception is auditable). No evidence, no `qa-approved`.
 - **No self-QA on `risk-high`.** A PR labeled `risk-high`, or one whose diff touches auth, sessions, data scoping, money, schema migrations, or shared contracts (the `risk-high` inference above), needs a QA reviewer, or a maintainer's explicit exception stated on the PR. A change to auth or money also needs a second person's review regardless of the QA path.
 
@@ -198,7 +197,7 @@ The `om-auto-*` skills run this process unattended and are chainable: each accep
 
 Two properties bound the whole unattended loop, and both are worth stating plainly because they are what make it safe to leave running:
 
-- **Nothing merges automatically.** No automation calls `om-approve-merge-pr`. The pipeline's output is a reviewed PR; the merge is a human act.
+- **Merge policy is repository-specific.** The pipeline's output is a reviewed PR; `## This repository` states which reviewed PRs may auto-merge and which require a person's decision.
 - **The cap is on inventory, not on rate.** The implementing skills stop when enough agent PRs already wait in `review`, so a burst of intake cannot outrun review capacity. Raising throughput means reviewing, not tuning the trigger.
 
 ## Unattended decisions
@@ -252,23 +251,33 @@ Three amendment rules are specific to this document's shape:
 
 ## This repository
 
-- **The base branch is `develop`.** `om-approve-merge-pr <n>` adds the PR to `develop`'s **merge
+- **The base branch is `develop`.** Eligible PRs enter `develop`'s **merge
   queue** (ADR 0020), which runs the suite on the commit it builds and merges it minutes later. A
   merge into `develop` does not close an issue natively, so the merger then runs
   `om-close-fixed-issues` — once the merge has landed, not while the PR is still queued — and it
   honours the PR's `Closes #n`. The `develop` → `main` promotion is a separate PR, merged directly
   with **a merge commit** and no queue (ADR 0003).
-- **Who starts a run.** `groom`, `autofix`, `spec` and `review-threads` are the trigger labels wired
+- **Who starts a run.** `groom`, `autofix` and `spec` are the trigger labels wired
   here, and no skill adds one to its own input. Alongside them the intake ladder runs:
   `needs-triage` starts triage, and `ready-for-agent` starts `implement-ticket` (ADR 0017, as
   amended). A person can also hand an issue to the agent directly from the cockpit.
+- **The intake bridge is wired here.** `.ai/skills/om-auto-manage-issues/SKILL.md` applies
+  `needs-triage` when a groom ends `READY_STATUS=ready` on an issue that carries no intake label
+  yet, so the ladder runs from a filed issue to an open PR with nobody in it: groom -> triage ->
+  `implement-ticket`. It is event-driven only — an issue already carrying an intake label is left
+  alone, and no run sweeps the existing backlog. The implementing automation additionally filters
+  on `allLabels: ["risk-low"]`, so a `risk-medium` issue still earns a full Agent Brief and
+  `ready-for-agent` and then waits for a person to start it. The ladder ends at an open, reviewed
+  PR: only the eligible reviewed class may auto-merge, and no automation applies `qa-approved`.
 - **Risk here.** `risk-high` means anything touching auth, tenant scoping, money, the ledger,
-  billing or a migration. `docs/MONEY.md` is not background reading: representation, rounding and
+  billing, a migration, a protected decision document or a merge-policy surface. The trusted
+  `merge-gate` checks both the current and previous path of a rename. `docs/MONEY.md` is not background reading: representation, rounding and
   currency have rules a plausible-looking change breaks silently, so read it before touching any
   amount and prefer the helpers in `src/lib/money/`.
 - **QA routing.** A PR that reaches `src/routes/**`, `src/components/**`, `src/styles/**` or
   `src/lib/i18n/messages/*` carries `needs-qa`; docs, CI, tests, `scripts/**`, `.ai/**` and
-  dependency bumps carry `skip-qa`. The QA reviewer takes the blind pair with
+  dependency bumps carry `skip-qa`. A `needs-qa` PR remains a manual merge even after
+  `qa-approved`. The QA reviewer takes the blind pair with
   `node scripts/visual/capture.mjs` at 360x800 and 1280x900 in both themes (ADR 0016);
   `om-auto-qa-pr` evidence complements it and never replaces it. Its `--self-qa-signoff` flag is
   never used here: the shared half above permits a self-QA sign-off below `risk-high`, but the
@@ -290,7 +299,6 @@ Workflows live in `.ai/cezar/workflows/`; the committed definitions are
 | Fix issues on the autofix label  | `autofix` added                       | `issue-autofix` (`om-auto-fix-issue`)             |
 | Write a spec for feature issues  | `spec` added to a `feature`           | `spec` (`om-auto-write-spec`)                     |
 | Autopilot new pull requests      | `pull_request.opened` by a maintainer | `pr-autopilot`                                    |
-| Resolve blocking review threads  | `review-threads` added                | `pr-fix` (`om-auto-fix-pr`)                       |
 | Triage new issues                | `needs-triage` added                  | `triage` (`afk-triage`)                           |
 | Implement ready-for-agent issues | `ready-for-agent` added               | `implement-ticket`                                |
 | Spec to tickets                  | weekdays 07:00                        | `spec-to-tickets` (`afk-to-tickets`)              |
@@ -314,11 +322,30 @@ anything from anyone else waits for a maintainer to add a trigger label.
 
 **Guardrails:**
 
-- Nothing merges automatically: no automation calls `om-approve-merge-pr`.
+- Only a non-draft PR targeting `develop`, without `risk-high` or `needs-qa`, may auto-merge.
+  Cezar posts `Cezar review: <full head SHA>` before setting the process label `merge-queue`.
+  The trusted controller reads current PR metadata, confirms the current head receipt, required
+  policy and labels, then enables GitHub auto-merge. GitHub's required checks control the final
+  merge. A push or disqualifying label cancels auto-merge and removes a queued PR. The controller
+  is fail-closed until the repository variable `AUTO_MERGE_ENABLED` is
+  `true`; the process label is not a GitHub merge queue entry.
+- `risk-high` requires `risk-approved` and a comment by a configured human with the exact line
+  `Risk approval: <full head SHA>`. The PR author may sign their own risk decision except where
+  auth or money requires a current-head GitHub approval from a second person. Risk-high PRs merge
+  manually. GitHub's `Required approvals` remains 0 on both branch rulesets; this receipt is the
+  trusted `merge-gate` condition, not a GitHub `APPROVE` review.
+- A `needs-qa` PR requires `qa-approved` and `QA head: <full head SHA>` from a configured
+  human QA reviewer. It merges manually. Promotion from `develop` to `main` also merges
+  manually after the release decision.
 - `implement-ticket` stops when three or more agent PRs already wait in `review`, and that cap is
   shared — the `issue-autofix` output counts against it too, because both ladders publish under the
   same `gh` identity.
 - Neither triage nor implementation touches `risk-high` or `security` work.
+- **Governance documents use the same risk gate.** `DESIGN.md`,
+  `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record
+  decisions a human owns. They require `risk-high` and the current-head human receipt above.
+  `.github/CODEOWNERS` routes the same paths to a reviewer; both rulesets keep
+  `require_code_owner_review: false`.
 - To stop it all, `cez automation pause <id>`, or start the cockpit with `CEZ_AUTOMATIONS=0`.
 
 **The agent layer is this repository's.** `.ai/cezar/workflows/`, `.ai/scripts/`,

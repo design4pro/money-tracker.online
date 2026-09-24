@@ -43,7 +43,7 @@
     "name": "Fix issues on the autofix label",
     "description": "A human adds `autofix`; om-auto-fix-issue drives the issue to a reviewed PR on develop (ADR 0017). Held, blocked, do-not-merge or spec-pending issues never match.",
     "events": ["issue.labeled"],
-    "intervalSeconds": 60,
+    "intervalSeconds": 120,
     "filters": {
       "changedLabels": ["autofix"],
       "excludeLabels": ["in-progress", "blocked", "do-not-merge", "spec"],
@@ -63,7 +63,7 @@
     "name": "Write a spec for feature issues",
     "description": "A human adds `spec` to a `feature` issue; om-auto-write-spec lands .ai/specs/<date>-<slug>.md on a design-only PR (ADR 0017).",
     "events": ["issue.labeled"],
-    "intervalSeconds": 60,
+    "intervalSeconds": 120,
     "filters": {
       "changedLabels": ["spec"],
       "allLabels": ["feature"],
@@ -82,7 +82,7 @@
   },
   {
     "name": "Autopilot new pull requests",
-    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - which is what makes `pull_request` workflows run on it at all, claude-code-review.yml among them - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml therefore opens it carrying `merge-queue`, which `excludeLabels` already stands down on.",
+    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain, never merges (ADR 0017). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - which makes `pull_request` workflows run on it - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml therefore opens it carrying `merge-queue`, which `excludeLabels` already stands down on.",
     "events": ["pull_request.opened"],
     "intervalSeconds": 300,
     "filters": {
@@ -111,27 +111,6 @@
     }
   },
   {
-    "name": "Resolve blocking review threads",
-    "description": "The `claude-review` job left unresolved review threads on a PR and applied `review-threads`; om-auto-fix-pr drives the PR to merge-ready and resolves them (ADR 0017). Without this the PR waits for a human to run the same skill by hand. `includePullRequests` is read by the design4pro/cezar fork the cockpit runs - stock cezar 0.11.0 drops every label event on a PR, so this automation does not fire without it. The gate is the label: only a collaborator or the Actions bot can set one, and the review job applies it once per head SHA. The run removes it as its first mutation, so a label still present is a run nobody took. The automation is only ever armed for pull requests targeting the integration branch: review-threads-label.mjs reads `baseBranch` from .ai/agentic.config.json and stands down on anything else, so the standing promotion - whose *head* is the integration branch, and which this run would therefore push follow-up commits straight onto - never arms one.",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 120,
-    "filters": {
-      "includePullRequests": true,
-      "changedLabels": ["review-threads"],
-      "excludeLabels": ["in-progress", "blocked", "do-not-merge"],
-      "lookbackDays": 3,
-      "maxRecords": 25
-    },
-    "task": {
-      "prompt": "{{github.number}}",
-      "workflow": "pr-fix",
-      "autonomous": true,
-      "worktree": true,
-      "variants": 1,
-      "generateFollowups": false
-    }
-  },
-  {
     "name": "Triage new issues",
     "description": "A human adds `needs-triage`; afk-triage verifies the report, writes an Agent Brief comment and sets exactly one intake label. The label is the gate - only a collaborator can set one - which is also why this does not fire on `issue.opened` the way it does in cezar: om-auto-manage-issues already owns that event here, and two autonomous runs grooming the same fresh issue would race on its labels. Groom first, then ask for a brief.",
     "events": ["issue.labeled"],
@@ -152,11 +131,12 @@
   },
   {
     "name": "Implement ready-for-agent issues",
-    "description": "An issue labeled `ready-for-agent` is implemented test-first in a worktree from its Agent Brief, gated, opened as a PR and reviewed. Never merges. Distinct from \"Fix issues on the autofix label\", which drives an ungroomed issue end to end - these two never contend for the same issue because they watch different labels. `risk-high` and `security` are excluded: afk-triage never promotes those to `ready-for-agent` in the first place, and this is the second lock on the same door.",
+    "description": "An issue labeled `ready-for-agent` is implemented test-first in a worktree from its Agent Brief, gated, opened as a PR and reviewed. Never merges. Distinct from \"Fix issues on the autofix label\", which drives an ungroomed issue end to end - these two never contend for the same issue because they watch different labels. `risk-high` and `security` are excluded: afk-triage never promotes those to `ready-for-agent` in the first place, and this is the second lock on the same door. `allLabels: [\"risk-low\"]` narrows it further, so only low-risk work starts by itself: a `risk-medium` issue still earns a full Agent Brief and `ready-for-agent`, it just waits for a person to start it. Both groom and triage apply exactly one risk label when none is present, so an issue reaching this filter without one is a bug upstream, not a ticket this automation should guess at.",
     "events": ["issue.labeled"],
     "intervalSeconds": 600,
     "filters": {
       "changedLabels": ["ready-for-agent"],
+      "allLabels": ["risk-low"],
       "excludeLabels": ["in-progress", "ready-for-human", "needs-info", "blocked", "do-not-merge", "risk-high", "security"],
       "maxRecords": 25,
       "lookbackDays": 7

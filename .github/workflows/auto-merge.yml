@@ -1,0 +1,53 @@
+name: Auto-merge controller
+
+on:
+  pull_request_target:
+    types:
+      [
+        opened,
+        reopened,
+        synchronize,
+        labeled,
+        unlabeled,
+        ready_for_review,
+        converted_to_draft,
+        edited,
+      ]
+    branches: [develop, main]
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created, edited, deleted]
+
+permissions: {}
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+          sparse-checkout: scripts/ci
+
+      - name: Recheck policy and synchronize GitHub auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+          RISK_APPROVERS: ${{ vars.RISK_APPROVERS }}
+          QA_APPROVERS: ${{ vars.QA_APPROVERS }}
+          CEZAR_REVIEWERS: ${{ vars.CEZAR_REVIEWERS }}
+          AUTO_MERGE_ENABLED: ${{ vars.AUTO_MERGE_ENABLED }}
+        run: node scripts/ci/auto-merge.mjs

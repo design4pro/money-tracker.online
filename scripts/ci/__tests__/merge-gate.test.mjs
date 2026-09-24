@@ -1,7 +1,6 @@
 /**
  * `decide` is the whole script: everything around it is one env read and one exit code. It is
- * exported and tested directly, the same arrangement as `review-threads-label.test.mjs` next to it
- * and for the same reason - what can go wrong is a judgement, not a crash.
+ * exported and tested directly because what can go wrong is a judgement, not a crash.
  *
  * The judgement is one a human has already made by clicking a label, so the table below is just
  * `SDLC.md`'s merge rules read back: three labels that block alone, and one that blocks until its
@@ -77,12 +76,31 @@ describe('.github/workflows/merge-gate.yml', () => {
     'utf8',
   )
 
-  it('takes the deciding script from the base branch, never from the pull request', () => {
-    expect(workflow).toMatch(/ref:\s*\$\{\{\s*github\.event\.pull_request\.base\.ref\s*\}\}/)
+  it('runs metadata policy from the trusted default branch', () => {
+    expect(workflow).toContain('pull_request_target:')
+    expect(workflow).toMatch(/ref:\s*\$\{\{\s*github\.event\.repository\.default_branch\s*\}\}/)
+    expect(workflow).not.toMatch(/ref:\s*\$\{\{\s*github\.event\.pull_request\.head/)
   })
 
-  it('passes when the base branch has no gate yet, instead of crashing on the missing module', () => {
-    expect(workflow).toMatch(/if \[ ! -f scripts\/ci\/merge-gate\.mjs \]/)
-    expect(workflow).toMatch(/exit 0/)
+  it('reads fresh pull request metadata instead of the triggering event snapshot', () => {
+    expect(workflow).toContain('GH_TOKEN: ${{ github.token }}')
+    expect(workflow).toContain('PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}')
+    expect(workflow).toContain('PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}')
+    expect(workflow).toContain('checks: write')
+    expect(workflow).not.toContain('toJSON(github.event.pull_request.labels')
+    expect(workflow).toContain('issue_comment:')
+    expect(workflow).toContain('pull_request_review:')
   })
+
+  it('publishes the trusted decision on the PR head commit', () => {
+    const script = readFileSync(new URL('../merge-gate.mjs', import.meta.url), 'utf8')
+    expect(script).toContain('repos/${repo}/check-runs')
+    expect(script).toContain("name: 'merge-gate'")
+    expect(script).toContain('head_sha: headSha')
+  })
+
+  it('fails closed when the trusted policy script is missing', () => {
+    expect(workflow).not.toMatch(/if \[ ! -f scripts\/ci\/merge-gate\.mjs \]/)
+  })
+
 })

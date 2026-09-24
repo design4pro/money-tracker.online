@@ -22,8 +22,9 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 
 - **Data access.** Every query goes through the tenant-scoped base repository in
   `src/server/repos`, takes a `TenantScope` as its first parameter, and the tenant predicate cannot
-  be removed by a caller. `src/server/catalog` is the single exception, guarded by
-  `requirePermission` plus a platform audit-log write.
+  be removed by a caller. `docs/SPEC.md` §5.2 documents exactly two exceptions: `src/server/catalog`,
+  guarded by `requirePermission` plus a platform audit-log write, and `billing_events`, whose two
+  delivery writes take a bare `Database` because a webhook arrives before its workspace is known.
 - **Money.** No float arithmetic on an amount anywhere, including a tooltip or a chart label. The
   scale is `currencies.digits`, never a hard-coded 2. `ref_amount_minor` is written once at the
   booked date's rate and never recomputed. Balances are rebuilt wholesale through the `LEDGER`
@@ -52,9 +53,40 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
   (`docs/SPEC.md` §7.7). The same holds for a figure written into a spec, a plan, an ADR or a code
   comment: it is re-derived on the head under review, and a headline total agrees with the table it
   summarises (#170, #191, #222, #250, #252, #253).
+- **Governance documents.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`,
+  `docs/MONEY.md` and `docs/adr/` record decisions a person owns. A PR touching one is
+  `risk-high`; the required `merge-gate` verifies a configured human's `Risk approval: <full head SHA>`
+  comment and the `risk-approved` label. Reviewing it means reading the decision, not only the
+  diff's shape: what changed, what it supersedes, and whether the change belongs there.
 - **Documents name what exists.** A spec, ADR, `SDLC.md`, skill or comment that names a file, job,
   test, label, automation or mechanism names one that exists on the branch and does what the text
   says; the reviewer opens each one (#159, #191, #304, #308, #310, #319).
+
+## Review personas
+
+The checks above are one lens: the code, judged against the rules. Four subagents in
+`.claude/agents/` read the same diff from somewhere else, and each cites this repository's own
+documents rather than general advice. They are dispatched by the reviewer - a person, or
+`om-auto-review-pr` - on the diff they match:
+
+| Persona                     | Dispatch it when the diff reaches                                                         | What it answers                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `manual-tester`             | `src/routes/**`, `src/components/**`, `src/styles/**`, `src/lib/i18n/messages/*`          | What a person hits off the happy path: the states, the keyboard path, both locales, both themes, the console  |
+| `accessibility-specialist`  | the same user-facing set                                                                  | WCAG 2.2 AA by criterion number, and the five named AAA criteria - never a wider claim                        |
+| `security-tenancy-reviewer` | `src/server/repos/**`, `src/server/auth/**`, `src/server/ledger/**`, billing, a migration | Whether a query can see another tenant's rows, and whether a permission is checked where a client can skip it |
+| `product-owner`             | a plan area in `docs/plans/`, or acceptance criteria on the issue                         | Whether the change does what was asked, what it did beyond that, and what it decided quietly                  |
+
+A persona **reports**. None of them edits source, applies a label - `qa-approved` least of all - or
+merges; the reviewer weighs what comes back and owns the verdict. A finding a persona raises enters
+the report at the severity this file's table gives it, not at the severity the persona felt.
+
+They are not `om-synthetic-users`, which builds a panel from research material and outputs
+`[SYNTHETIC]` hypotheses about people. These four read a diff and the rules in this repository, and
+what they produce is a review finding.
+
+Dispatching needs the `Task` tool. Every step in `.ai/cezar/workflows/` that reaches
+`om-auto-review-pr` grants it, and `.ai/scripts/__tests__/agent-layer-parity.test.mjs` fails if one
+stops. Where the tool is absent the review runs without personas and names them as not run.
 
 ## Severity
 

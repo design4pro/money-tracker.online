@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # Register docs/agents/cezar-automations.json with the running cezar through its API (never by
 # editing .ai/cezar/automations.json by hand). Idempotent: an automation with the same name is
-# updated in place and re-enabled, a new one is created enabled. Automations the cockpit holds
-# that the file no longer names are listed; --prune deletes them, so the file is the whole truth.
+# updated in place, a new one follows its enabled setting (default true). Automations the cockpit
+# holds that the file no longer names are listed; --prune deletes them, so the file is the whole truth.
+#
+# The file is the truth for every field it names - `enabled` included, when a definition states
+# it. What the file does not state, the cockpit keeps: an update used to send `enabled: true`
+# unconditionally, so every apply released whatever brake a person had pulled. That is the mistake
+# --prune already refuses to make with an enabled stray, in the other direction, and it matters
+# more now that the intake ladder runs unattended - pausing an automation in the cockpit is the
+# emergency stop. An update that leaves one paused says so on stderr, so a pause is never silent.
 #
 #   .ai/scripts/cez-automations.sh [--dry-run] [--prune]
 #
@@ -43,13 +50,34 @@ jq -c '.[]' "$FILE" | while read -r def; do
   current=$(jq -c --arg n "$name" '.automations[]? | select(.name == $n)' <<<"$LIST" | head -1)
   if [ -n "$current" ]; then
     id=$(jq -r .id <<<"$current"); rev=$(jq -r .revision <<<"$current")
-    body=$(jq -c --argjson rev "$rev" '. + {enabled: true, expectedRevision: $rev}' <<<"$def")
+    # `enabled` from the definition when it states one, otherwise whatever the cockpit holds.
+    # Anything the cockpit has never seen counts as enabled: that is how a create leaves it.
+    if jq -e 'has("enabled")' >/dev/null <<<"$def"; then
+      keep=$(jq -c '.enabled' <<<"$def")
+    else
+      keep=$(jq -c 'if .enabled == false then false else true end' <<<"$current")
+    fi
+    body=$(jq -c --argjson rev "$rev" --argjson en "$keep" '. + {enabled: $en, expectedRevision: $rev}' <<<"$def")
+    # Field-level drift: name-level matching alone hides an automation whose schedule, filters or
+    # task drifted from the file, and one of them had. This names the keys whose value in the
+    # cockpit differs from the file's, so --dry-run answers "what moves" and not only "what
+    # exists". A nested value compares whole, so `filters` or `task` shows up when any one field
+    # inside it moved. Both lines are `if`, not `&& say`: under `set -e` a false `&&` is a failed
+    # command, and it would end the run on the first automation that had not drifted.
+    # No `// null` on the lookup: jq's `//` treats `false` as absent, so a boolean field the
+    # cockpit and the file both hold as `false` would report as drift. A key the cockpit does
+    # not hold already yields `null`, which is the comparison this wants.
+    drift=$(jq -r --argjson cur "$current" '[to_entries[] | select(.key != "enabled") | select($cur[.key] != .value) | .key] | join(", ")' <<<"$def")
+    if [ -n "$drift" ]; then say "  drift in $name: $drift"; fi
+    if [ "$keep" = "false" ]; then
+      say "  $name stays disabled: the cockpit holds it paused and the file does not say otherwise"
+    fi
     if [ "$DRY" -eq 1 ]; then say "would update $name ($id, revision $rev)"; continue; fi
     out=$(curl -sS -X PUT "$API/$id" -H 'content-type: application/json' -d "$body" -w '\n%{http_code}')
     [ "$(tail -1 <<<"$out")" = "200" ] || die "PUT $name -> $(tail -1 <<<"$out"): $(sed '$d' <<<"$out")"
     say "updated $name ($id)"
   else
-    body=$(jq -c '. + {enable: true}' <<<"$def")
+    body=$(jq -c '. + {enable: (if has("enabled") then .enabled else true end)}' <<<"$def")
     if [ "$DRY" -eq 1 ]; then say "would create $name"; continue; fi
     out=$(curl -sS -X POST "$API" -H 'content-type: application/json' -d "$body" -w '\n%{http_code}')
     [ "$(tail -1 <<<"$out")" = "201" ] || die "POST $name -> $(tail -1 <<<"$out"): $(sed '$d' <<<"$out")"

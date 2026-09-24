@@ -10,5 +10,4 @@ steps:
   - id: spec
     name: om-auto-write-spec
     prompt: '/om-auto-write-spec {{task}}'
-    model: opus
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]

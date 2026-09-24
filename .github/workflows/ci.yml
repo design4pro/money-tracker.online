@@ -21,21 +21,32 @@ name: CI
 # variables  VITE_POLAR_PRODUCT_PLUS_MONTHLY, VITE_POLAR_PRODUCT_PLUS_YEARLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_MONTHLY,
 #            VITE_POLAR_PRODUCT_HOUSEHOLD_YEARLY, VITE_SENTRY_DSN
-#            RUNNER_CI - organisation-level, and deliberately unset. Every job
-#            below runs on the self-hosted pool; setting it to
-#            `["ubuntu-latest"]` moves them all back to GitHub-hosted runners
-#            without a pull request, which is the only recovery path that does
-#            not need the host to be up. See design4pro/cezar,
-#            `docs/host/README.md`, "The runner pool".
+#            RUNNER_CI - unset again since 2026-09-21, which is the state
+#            these files are written for: every gate job below falls back to
+#            the array beside its `runs-on` and runs on the local pool, ARM64
+#            containers labelled `ci` on one machine shared with the other
+#            repository. The variable is how the pool is left without a pull
+#            request: `gh variable set RUNNER_CI '["ubuntu-latest"]'` moves
+#            the gate jobs onto GitHub-hosted machines in one command, and
+#            deleting it again brings them back. The two deploy jobs at the
+#            end do not read it - their runner is `RUNNER_DEPLOY`'s, so
+#            recovering shipping when the host is down is
+#            `gh variable set RUNNER_DEPLOY '["ubuntu-latest"]'` as well, as
+#            deploy-production.yml says. That lever was pulled twice on 2026-09-21,
+#            first to `["ubuntu-latest"]` and then to
+#            `["blacksmith-2vcpu-ubuntu-2404-arm"]`, and what the day measured
+#            is written down in deploy-production.yml. A repository variable -
+#            there is no organisation-level one - so it moves this repository
+#            alone; setting one at the organisation level would move the
+#            siblings too. See design4pro/cezar, `docs/host/README.md`,
+#            "The runner pool".
 # ──────────────────────────────────────────────────────────────────────────────
 
 on:
   pull_request:
     branches: [main, develop]
-  # The merge queue builds the commit that will become `develop` and waits for this workflow's
-  # required checks on it. That is where the suite runs once per change (ADR 0020): a pull request
-  # gets the fast rungs, this event gets everything including the journeys, and the push the queue's
-  # merge causes finds the verdict on its own SHA and only deploys.
+  # Keep merge_group support if a GitHub merge queue rule is enabled later. The live rulesets have
+  # no such rule, so pull requests run the browser journeys before merging (ADR 0020 amendment).
   merge_group:
     types: [checks_requested]
   push:
@@ -49,9 +60,7 @@ on:
 # with the newest, so a burst of merges costs two runs, not one each.
 #
 # A merge group is never cancelled either, and needs no rule of its own: `github.ref` is that
-# group's own `gh-readonly-queue/...` branch, unique per entry, so queue runs share no group. That
-# matters more here than it reads - a cancelled required check is how the queue decides to drop a
-# pull request.
+# group's own `gh-readonly-queue/...` branch, unique per entry, so queue runs share no group.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -87,7 +96,7 @@ jobs:
   verdict:
     name: verdict
     if: github.event_name == 'push'
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -126,7 +135,7 @@ jobs:
     # rather than the implicit `success()`, which would read the skipped `verdict` as a reason to skip
     # this too (design4pro/planned.travel#531).
     if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 20
 
     steps:
@@ -271,7 +280,7 @@ jobs:
     name: unit tests · coverage
     # Same two clauses as `verify` above, for the same two reasons.
     if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 20
 
     steps:
@@ -301,13 +310,24 @@ jobs:
       - name: Run the workerd suite
         run: pnpm test:workerd
 
+      # `continue-on-error`, and one of only two uploads in this repository that carries it.
+      # Nothing gates on this report - a human reads it after the fact - while the check it sits
+      # in is required, so without the flag the organisation's storage bill can fail a green
+      # suite: `Failed to CreateArtifact: Artifact storage quota has been hit`, run 35656190925,
+      # with 216 test files passing above it (#417). The blob reports further down are the
+      # opposite case and deliberately keep no flag: `e2e · merged report` downloads them.
+      #
+      # Three days rather than seven for the same reason. Coverage is read on the pull request
+      # that produced it or not at all, and a week of pull requests is what fills a 2 GB
+      # allowance.
       - name: Upload the coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        uses: design4pro/.github/actions/artifact-upload@main
         with:
           name: coverage
           path: coverage
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
 
   # The browser gate: the same suite, in the same container image, on two
@@ -326,19 +346,14 @@ jobs:
   # gate it rationed - there is no label to add, because there is nothing to opt
   # into.
   #
-  # Where it runs moved once more, to the merge queue (ADR 0020): the legs judge the commit that
-  # will become `develop`, once, instead of judging a pull request's merge preview and then the
-  # push that merge causes. So not on a `pull_request` at all - and on a `push` only when `verdict`
-  # found no earlier run for this tree, which is the fallback for a direct push, an admin bypass
-  # merge, or a hotfix on `main`.
-  #
-  # What that costs is in ADR 0016's amendment: the journeys report after a human enqueues rather
-  # than during review, and a failure arrives as a dropped queue entry.
+  # The live rulesets have no GitHub merge queue rule. A skipped required report on a PR therefore
+  # cannot prove the journeys passed before auto-merge. Run the legs on PRs and merge groups; a
+  # push only needs them when `verdict` found no earlier run for the tree (ADR 0020 amendment).
   e2e:
     needs: verdict
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && github.event_name != 'pull_request' }}
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 15 minutes
     # so the run's own clock is the one that fires first and names the test it
     # died on; this only catches a job wedged before or after the suite.
@@ -376,13 +391,11 @@ jobs:
           - project: mobile-chromium
             shard: 1
             shards: 1
-    # No `container:`. The runner image is itself built FROM
-    # `mcr.microsoft.com/playwright:v1.62.1-noble`, so the browsers are already
-    # on the runner and pulling the same image again per job would buy nothing.
-    # The version coupling did not go away, it moved: keep
-    # `host/runner/Dockerfile` in design4pro/cezar in step with the `@playwright/test`
-    # devDependency in package.json, or a mismatch is reported as a missing
-    # executable rather than as a wrong one.
+    # No `container:`, and no browsers on the runner either. `./.github/actions/e2e-env`
+    # installs them per job from the `@playwright/test` devDependency, so the version
+    # coupling this comment used to describe - a runner image to keep in step with
+    # package.json, on pain of a missing executable - is retired rather than moved. A
+    # browser image per job would buy back only the download.
 
     steps:
       - name: Check out
@@ -400,9 +413,9 @@ jobs:
 
       # `PLAYWRIGHT_BASE_URL` points the suite at the server the composite action
       # already started and seeded, so the config starts none of its own.
-      # `--reporter=blob` replaces the config's reporters with the one
-      # `merge-reports` consumes - traces and failure screenshots travel inside
-      # the blob. The `setup` project is not named here: it is declared as a
+      # The GitHub reporter publishes failures even when the account's artifact quota prevents
+      # blob upload. The blob remains an optional source of traces and the merged HTML report.
+      # The `setup` project is not named here: it is declared as a
       # dependency of both browser projects, so Playwright runs it first on its
       # own, and naming it as well would only run it twice - once per shard is
       # already the price of splitting. `--shard` divides by test count and not
@@ -413,14 +426,15 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://localhost:3010
         run: >-
           pnpm exec playwright test --project=${{ matrix.project }}
-          --shard=${{ matrix.shard }}/${{ matrix.shards }} --reporter=blob
+          --shard=${{ matrix.shard }}/${{ matrix.shards }} --reporter=github,blob
 
       # The directory is `blob-report`, not vitest's dot-prefixed convention:
       # `upload-artifact` treats a dot-prefixed path as hidden and silently
       # uploads nothing.
       - name: Upload the blob report
         if: always()
-        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        uses: design4pro/.github/actions/artifact-upload@main
         with:
           name: e2e-blob-${{ matrix.project }}-${{ matrix.shard }}
           path: blob-report
@@ -429,7 +443,8 @@ jobs:
 
       - name: Upload the server log
         if: failure()
-        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        uses: design4pro/.github/actions/artifact-upload@main
         with:
           name: e2e-server-log-${{ matrix.project }}-${{ matrix.shard }}
           path: server.log
@@ -442,10 +457,10 @@ jobs:
   e2e-report:
     name: e2e · merged report
     needs: e2e
-    # Not behind legs that were skipped - on a `develop` → `main` promotion pull request - since
-    # there is nothing to merge; `!cancelled()` so a failing leg still owes the reader its report.
-    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
+    # Every PR needs a real verdict. If its legs were skipped, run and fail instead of publishing
+    # a skipped job as a green required check. A push with a reused verdict may still skip.
+    if: ${{ always() && (github.event_name == 'pull_request' || needs.e2e.result != 'skipped') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 10
 
     steps:
@@ -456,13 +471,15 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Download the blob reports
-        uses: actions/download-artifact@v8
+        continue-on-error: true
+        uses: design4pro/.github/actions/artifact-download@main
         with:
           pattern: e2e-blob-*
           path: all-blob-reports
           merge-multiple: true
 
       - name: Merge the reports
+        continue-on-error: true
         run: |
           set -euo pipefail
           if [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
@@ -473,7 +490,8 @@ jobs:
 
       - name: Upload the Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        uses: design4pro/.github/actions/artifact-upload@main
         with:
           name: playwright-report
           path: playwright-report

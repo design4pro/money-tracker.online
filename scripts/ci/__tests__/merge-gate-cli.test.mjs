@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const HEAD = 'a'.repeat(40)
-const script = new URL('../trusted-merge-gate.mjs', import.meta.url)
+const script = new URL('../merge-gate.mjs', import.meta.url)
 
 function runGate({ eventHead = HEAD, failMetadata = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'merge-gate-cli-'))

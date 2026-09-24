@@ -14,7 +14,7 @@
  * These cases are deliberately about existence and arithmetic, not about prose. A test cannot tell
  * whether a paragraph is true; it can tell whether the things the paragraph names are there.
  */
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -35,11 +35,187 @@ const automationList = Array.isArray(automations)
     automations.definitions ??
     Object.values(automations).find(Array.isArray))
 
+// Coding agents load `AGENTS.md` from the repository root down to the working directory and stop
+// once the COMBINED size reaches their project-instruction budget. Codex's `project_doc_max_bytes`
+// defaults to 32,768 BYTES - a byte budget, not characters and not tokens - and everything past
+// that offset is dropped from the first-turn prompt with no warning to anyone
+// (https://github.com/openai/codex/issues/13386). So the root file spends the budget its nested
+// files need, and `AGENTS.md`'s own "It stays under 32 KiB" was a sentence nothing measured.
+const INSTRUCTION_BUDGET = 32_768
+// Nested files have to fit somewhere. Without a reserve the root could legally eat the whole
+// budget, and every byte of `.ai/specs/AGENTS.md` would be the one that falls off the end.
+const NESTED_RESERVE = 1_536
+const ROOT_LIMIT = INSTRUCTION_BUDGET - NESTED_RESERVE
+
+// Generated trees, the cockpit's per-run worktrees and the scratch directories all carry copies of
+// these files. None of them is what an agent loads, and walking them dominates the runtime.
+const BUDGET_SKIP =
+  /^(node_modules|dist|\.git|\.wrangler|\.output)$|^\.ai\/(tmp|cezar|qa)$/
+
+const agentsFiles = (dir = '') => {
+  const found = []
+  for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+    const rel = dir ? `${dir}/${entry.name}` : entry.name
+    if (BUDGET_SKIP.test(rel)) continue
+    if (entry.isDirectory()) found.push(...agentsFiles(rel))
+    else if (entry.isFile() && entry.name === 'AGENTS.md') found.push(rel)
+  }
+  return found
+}
+
+// Bytes, never `String.length`. These files are full of em dashes, arrows and emoji, each of which
+// is one character and three bytes - a character count reports a file as comfortably inside a
+// budget it has already overrun.
+const bytes = (path) => Buffer.byteLength(read(path), 'utf8')
+
+/** Root-first, the way an agent loads them: every AGENTS.md on the path down to `file`. */
+const chainFor = (file) => {
+  const segments = file.split('/').slice(0, -1)
+  const chain = []
+  for (let depth = 0; depth <= segments.length; depth++) {
+    const candidate = [...segments.slice(0, depth), 'AGENTS.md'].join('/')
+    if (existsSync(join(ROOT, candidate))) chain.push(candidate)
+  }
+  return chain
+}
+
+const over = (measured, limit) =>
+  `${measured} bytes, ${measured - limit} over the ${limit}-byte limit`
+
 describe('agent-layer parity', () => {
   it('has workflows to check', () => {
     // A guard on the guard: an empty glob would make every case below vacuously true.
     expect(workflows.length).toBeGreaterThan(10)
     expect(automationList.length).toBeGreaterThan(5)
+  })
+
+  // CODE_REVIEW.md dispatches review personas by name. A name with no file is a reviewer sent to
+  // fetch a lens that does not exist - and, unlike a missing workflow, nothing fails loudly: the
+  // dispatch just returns nothing and the report reads as though the lens had passed.
+  it('names a review persona only where .claude/agents has one', () => {
+    const doc = read('CODE_REVIEW.md')
+    const section = doc.slice(doc.indexOf('## Review personas'))
+    const named = [...section.matchAll(/^\| `([a-z][a-z0-9-]*)`\s*\|/gm)].map(
+      (m) => m[1],
+    )
+    expect(named.length).toBeGreaterThan(0)
+    const missing = named.filter(
+      (name) => !existsSync(join(ROOT, '.claude/agents', `${name}.md`)),
+    )
+    expect(missing).toEqual([])
+  })
+
+  // The other direction: a persona file nobody dispatches is dead weight, and the four here were
+  // added to be dispatched. The impeccable-* agents predate this rule and belong to a skill rather
+  // than to code review, so they are not required to appear in the table.
+  it('dispatches every review persona it ships', () => {
+    const doc = read('CODE_REVIEW.md')
+    const section = doc.slice(doc.indexOf('## Review personas'))
+    const files = readdirSync(join(ROOT, '.claude/agents'))
+      .filter((f) => f.endsWith('.md') && !f.startsWith('impeccable-'))
+      .map((f) => f.replace(/\.md$/, ''))
+    expect(files.length).toBeGreaterThan(0)
+    expect(files.filter((name) => !section.includes(`\`${name}\``))).toEqual([])
+  })
+
+  // Dispatch needs the `Task` tool, and a workflow that does not grant it reviews without personas
+  // while reporting nothing about it. CODE_REVIEW.md -> Review personas says every step reaching
+  // the review grants it; this is what makes that sentence true rather than aspirational. The
+  // entry points are listed rather than followed: each skill's own Chaining section says it runs
+  // om-auto-review-pr, and a chain is not something a regex can walk.
+  const REVIEW_ENTRY_POINTS = [
+    'om-auto-review-pr',
+    'om-pr-autopilot',
+    'om-auto-fix-pr',
+    'om-auto-fix-issue',
+    'om-auto-implement-spec',
+  ]
+
+  it('grants Task on every workflow step that reaches the review', () => {
+    const ungranted = []
+    for (const name of workflows) {
+      const text = read(`${WORKFLOW_DIR}/${name}.yml`)
+      // Step blocks, in file order; a step begins at column 2 with `- id: `.
+      for (const block of text.split(/^ {2}- id: /m).slice(1)) {
+        const reaches = REVIEW_ENTRY_POINTS.some((skill) =>
+          block.includes(`/${skill} `),
+        )
+        const grants = /^\s+allowedTools: \[[^\]]*\bTask\b/m.test(block)
+        if (reaches && !grants)
+          ungranted.push(`${name}.yml: ${block.split('\n', 1)[0].trim()}`)
+      }
+    }
+    expect(ungranted).toEqual([])
+  })
+
+  // A persona is a prompt made almost entirely of citations, and a citation is the one part of it
+  // nobody notices going stale: the agent reads a section that no longer exists, finds nothing, and
+  // carries on. The first smoke test of these four produced three - `src/server/catalog` called the
+  // "single exception" when SPEC §5.2 names billing_events as the second and last, `beforeLoad is
+  // UX` credited to ADR 0011 instead of SPEC §6, and a reference to an `SDLC.md § Risk` that has
+  // never been a heading. Paths this catches outright; named sections it catches by their first
+  // clause, which is what went wrong in the third one.
+  const personaFiles = readdirSync(join(ROOT, '.claude/agents'))
+    .filter((f) => f.endsWith('.md') && !f.startsWith('impeccable-'))
+    .map((f) => `.claude/agents/${f}`)
+
+  it('has personas to check', () => {
+    expect(personaFiles.length).toBeGreaterThan(0)
+  })
+
+  // Two kinds of path are cited on purpose and are not in the tree, so they are listed here rather
+  // than silently tolerated by a looser pattern: a reader can see the whole exemption at once.
+  const ABSENT_ON_PURPOSE = new Map([
+    // Named so a persona refuses to read it. It is gitignored and must never be in the tree.
+    ['.ai/qa/test-env.env', 'a secret file, named in order to be refused'],
+    // The product layer is configured but the brief has not been written; `product-owner` says in
+    // as many words what to do when it is missing, and om-discover is what creates it.
+    ['.ai/specs/product-brief.md', 'the product brief, cited conditionally'],
+  ])
+
+  it.each(personaFiles)('%s cites only paths that exist', (file) => {
+    const body = read(file)
+    // A backticked token with a slash and no glob, space or placeholder in it is a repo path.
+    const cited = [
+      ...body.matchAll(/`([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+\/?)`/g),
+    ].map((m) => m[1])
+    expect(cited.length).toBeGreaterThan(0)
+    const missing = [...new Set(cited)].filter(
+      (path) => !ABSENT_ON_PURPOSE.has(path) && !existsSync(join(ROOT, path)),
+    )
+    expect(missing).toEqual([])
+  })
+
+  it.each(personaFiles)('%s cites only headings that exist', (file) => {
+    const body = read(file)
+    // `FILE.md` § Some Name -> the first clause, up to a comma or the end of the phrase. A
+    // numbered section (§5.2) is skipped: SPEC numbers its headings, and the number is the check.
+    const refs = [
+      ...body.matchAll(/`([A-Za-z0-9_./-]+\.md)`\s*§\s*([A-Za-z][A-Za-z ]+)/g),
+    ]
+    const wrong = []
+    for (const [, target, rawSection] of refs) {
+      const section = rawSection.trim().toLowerCase()
+      if (!existsSync(join(ROOT, target))) {
+        wrong.push(`${target} (file missing)`)
+        continue
+      }
+      const headings = read(target)
+        .split('\n')
+        .filter((line) => /^#{1,6} /.test(line))
+        .map((line) => line.replace(/^#+ /, '').trim().toLowerCase())
+      // Prefix either way. A reference often runs on into the sentence ("§ Severity puts at
+      // `major`"), so the heading is a prefix of the capture; and a reference is often shortened
+      // ("§ Priorities" for "Priorities, in order"), so the capture is a prefix of the heading.
+      // Both are the same claim - this section exists - and neither accepts a name that is not
+      // there: nothing in SDLC.md is a prefix of "Risk", or has "Risk" as one.
+      if (
+        !headings.some((h) => h.startsWith(section) || section.startsWith(h))
+      ) {
+        wrong.push(`${target} § ${rawSection.trim()}`)
+      }
+    }
+    expect(wrong).toEqual([])
   })
 
   // The table in docs/agents/cezar.md is the map a person reads before starting a run. A workflow
@@ -116,21 +292,118 @@ describe('agent-layer parity', () => {
         // of them whenever the cockpit's skills coordinator has run (docs/agents/cezar.md).
         // Reading one that points at a directory throws EISDIR.
         if (!entry.isFile()) continue
-        if (!/\.(md|mjs|js|ts|json|sh|yml)$/.test(entry.name)) continue
-        // This file states the phrases in order to forbid them, and matched itself on first run.
-        if (entry.name === 'agent-layer-parity.test.mjs') continue
-        const body = read(rel)
-        if (
-          /Kit-managed|the kit renders|kit-rendered|edit the template there/i.test(
-            body,
-          )
-        ) {
-          suspect.push(rel)
-        }
+        inspect(rel)
       }
     }
-    for (const dir of ['.ai', 'docs/agents']) walk(dir)
+    const inspect = (rel) => {
+      if (!/\.(md|mjs|js|ts|json|sh|yml)$/.test(rel)) return
+      // This file states the phrases in order to forbid them, and matched itself on first run.
+      if (rel.endsWith('/agent-layer-parity.test.mjs')) return
+      if (
+        /Kit-managed|the kit renders|kit-rendered|edit the template there/i.test(
+          read(rel),
+        )
+      ) {
+        suspect.push(rel)
+      }
+    }
+    // Every location AGENTS.md names as formerly rendered by the kit, plus `docs/agents`. `docs/adr`
+    // is left out on purpose: an ADR is amended, not rewritten, so a superseded "kit-managed" line
+    // stays in its history under the amendment that voids it (ADR 0020).
+    for (const root of [
+      '.ai',
+      'docs/agents',
+      '.claude/hooks',
+      '.claude/settings.json',
+      '.claude/skills/backlog/SKILL.md',
+      'scripts/ci',
+      '.github/workflows',
+    ]) {
+      if (statSync(join(ROOT, root)).isDirectory()) walk(root)
+      else inspect(root)
+    }
 
     expect(suspect).toEqual([])
+  })
+
+  // AGENTS.md:8 claims "This file is the router. It stays under 32 KiB". Before this case nothing
+  // measured it, and the failure mode is silent: an agent gets the truncated file and never learns
+  // that the rule it is about to break was in the part that fell off.
+  it('keeps the root AGENTS.md inside the instruction budget', () => {
+    const measured = bytes('AGENTS.md')
+    expect(
+      measured,
+      `AGENTS.md is ${over(measured, ROOT_LIMIT)}. Move long-form procedure into a document the ` +
+        'Task Router points at; the root keeps hard rules, boundaries and routing.',
+    ).toBeLessThanOrEqual(ROOT_LIMIT)
+  })
+
+  // `#395` added a fifth row to the Flow health table in `.claude/skills/backlog/SKILL.md` and left
+  // the sentence above it saying "Four numbers". `.ai/review-checklist.md` and `CODE_REVIEW.md:52`
+  // both require a headline total to agree with the table it summarises, and nothing measured it.
+  // The failure is quiet in the worst way: the count is the first thing a reader believes, and a
+  // row nobody counted is a measure nobody looks for.
+  it('keeps the Flow health headline agreeing with the table it summarises', () => {
+    const section = read('.claude/skills/backlog/SKILL.md')
+      .split(/^## /m)
+      .find((part) => part.startsWith('Flow health'))
+    expect(
+      section,
+      'the Flow health section is gone or was renamed',
+    ).toBeDefined()
+
+    const words = {
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+    }
+    const headline = section.match(/\b([A-Za-z]+) numbers\b/)
+    expect(
+      headline,
+      'no "<word> numbers" headline introduces the table',
+    ).not.toBeNull()
+    const claimed = words[headline[1].toLowerCase()]
+    expect(
+      claimed,
+      `"${headline[1]} numbers" is not a number word this case knows`,
+    ).toBeDefined()
+
+    // Data rows only: the header row and the `| --- |` separator are not measures.
+    const rows = section
+      .split('\n')
+      .filter((line) => line.startsWith('| ') && !/^\|\s*-+\s*\|/.test(line))
+      .slice(1)
+
+    expect(
+      rows.length,
+      `the headline says ${headline[1]} (${claimed}) but the table has ${rows.length} rows: ` +
+        rows.map((row) => row.split('|')[1].trim()).join(', '),
+    ).toBe(claimed)
+  })
+
+  // The root is not the whole story: an agent started inside .ai/specs loads the root first and
+  // then that directory's file, and the budget is the sum. A root edit is what silently truncates
+  // a nested file, which is why this is measured per chain rather than per file.
+  it('keeps every root-to-nested AGENTS.md chain inside the instruction budget', () => {
+    const files = agentsFiles()
+    // A guard on the guard: an empty walk would make this vacuously true.
+    expect(files).toContain('AGENTS.md')
+
+    const overruns = []
+    for (const file of files) {
+      const chain = chainFor(file)
+      const measured = chain.reduce((sum, part) => sum + bytes(part), 0)
+      if (measured > INSTRUCTION_BUDGET)
+        overruns.push(
+          `${chain.join(' -> ')}: ${over(measured, INSTRUCTION_BUDGET)}`,
+        )
+    }
+
+    expect(overruns).toEqual([])
   })
 })

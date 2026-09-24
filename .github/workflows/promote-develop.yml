@@ -26,8 +26,7 @@ name: Promote develop
 # cezar poller, from one that maintainer opened by hand: `pr-autopilot`
 # (docs/agents/cezar-automations.json) filters `pull_request.opened` by author and reads no base
 # branch. Every promotion therefore started a full agent run on a pull request the skill can do
-# nothing useful with - it carries no change of its own, is not the automation's to fix, is already
-# reviewed by claude-code-review.yml on the promotion diff, and merging it deploys production,
+# nothing useful with - it carries no change of its own, is not the automation's to fix, and merging it deploys production,
 # which the skill must never do. Observed on #148, #153, #188 and #193, each claimed within minutes
 # of opening; #193 spent roughly twenty of them re-reviewing an already-reviewed diff and then
 # labelled itself `merge-queue` - the very label that, applied at creation, would have stood the
@@ -36,8 +35,7 @@ name: Promote develop
 # `--label merge-queue` below is that stand-down, and it is the honest label rather than a
 # convenient one: SDLC.md calls `merge-queue` routing rather than proof of QA, and "green, waiting
 # on a human" is what a promotion pull request is from the moment it opens. It silences nothing
-# else - claude-code-review.yml triggers on `opened` and reads no labels, so the promotion diff is
-# still reviewed. Labelling a pull request goes through the issues endpoint, which GitHub grants to
+# else. Labelling a pull request goes through the issues endpoint, which GitHub grants to
 # `pull requests: write` as well as to `issues: write`, so it is covered by the permission this
 # token already needs to open the pull request at all, and by the job's `permissions:` block on the
 # GITHUB_TOKEN fallback path. Neither path needs a permission widened for it.
@@ -57,15 +55,18 @@ permissions:
   contents: read
   pull-requests: write
 
-# `runs-on` below reads through `vars.RUNNER_CI`, an organisation variable that is
-# deliberately unset: unset, the default here selects the self-hosted pool. Setting it
-# to `["ubuntu-latest"]` moves every job in every repository back to GitHub-hosted
-# runners without a pull request.
+# `runs-on` below reads through `vars.RUNNER_CI`, which on this repository is unset again
+# since 2026-09-21, so this job runs on the local pool the fallback array names - and so
+# does everything else here, shipping included. Setting the variable
+# (`gh variable set RUNNER_CI '["ubuntu-latest"]'`) moves every job that reads it off the
+# pool without a pull request, and setting it at the organisation level would move every
+# repository at once.
 #
 # In a test workflow that is a convenience. Here it is the recovery path for shipping:
-# production now deploys from one local machine, and the switch has to work when that
-# machine does not. That is why it is an organisation variable and not a literal label
-# array - reverting by pull request would need the merge gate, which needs the same
+# production now deploys on the same pool, through `vars.RUNNER_DEPLOY`
+# (deploy-production.yml), so a host outage leaves no leg of a release standing and the
+# switch has to work without one. That is why these are variables at all and not literal
+# label arrays - reverting by pull request would need the merge gate, which needs the same
 # runners that are missing. See design4pro/cezar, `docs/host/README.md`, "The runner pool".
 
 jobs:

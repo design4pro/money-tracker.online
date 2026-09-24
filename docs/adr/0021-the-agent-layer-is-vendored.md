@@ -168,3 +168,11 @@ here that said "agent-kit's README" now says that.
   `RUNNER_AGENT` set to `["ubuntu-latest"]`.
 - Reverting is a `git revert` of this pull request's commits plus re-enabling two workflows in the
   archived repository, for as long as the archive stands.
+
+## Amendment 2026-09-22
+
+**The runner scope in the final consequence above is corrected.** `RUNNER_CI` and `RUNNER_AGENT`
+are repository variables, not organisation variables, and currently both name
+`["blacksmith-2vcpu-ubuntu-2404-arm"]`. The kill switch remains the same: changing either
+repository variable moves only this repository's CI or agent jobs. The original decision and every
+other consequence stand unchanged.

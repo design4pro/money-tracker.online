@@ -1,11 +1,11 @@
 # Designed empty, loading and error states — evidence, gaps and reachability
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | ready |
-| **Issue**          | #21   |
-| **Spec PR**        | #135  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | implemented |
+| **Issue**          | #21         |
+| **Spec PR**        | #135        |
+| **Implementation** | #206        |
 
 ## 📝 TLDR
 

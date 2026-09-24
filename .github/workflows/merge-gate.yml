@@ -1,12 +1,8 @@
 name: Merge gate
 
-# The check that makes `SDLC.md`'s hard blocks enforceable. The labels are already declared to
-# block "regardless of every other signal"; until this workflow existed only the merge skills read
-# them, so the rule held exactly as long as the person clicking "Squash and merge" remembered it.
+# Required check for risk, QA and hard-block policy.
 #
-# `labeled` and `unlabeled` are what make it a gate rather than a snapshot taken when the pull
-# request opened: adding `blocked` has to turn the check red without a push, and removing it has to
-# turn it green again.
+# `labeled` and `unlabeled` refresh the decision after a policy change without a push.
 #
 # `merge_group` is here so the check reports where a merge queue requires it. A queue builds its own
 # commit and waits for every required check on it; a workflow with no trigger for that event never
@@ -14,27 +10,30 @@ name: Merge gate
 # then skips itself, and a skipped job reports success - which is the honest answer, because what
 # this gate reads (the labels, on the pull request) is not in a merge group payload.
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft, edited]
     branches: [develop, main]
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created, edited, deleted]
   merge_group:
     types: [checks_requested]
 
-# Nothing here writes, and the labels arrive in the event payload, so the workflow needs no token
-# at all. The one job below takes back the single scope a private repository needs to check itself
-# out, and nothing more.
+# The workflow and deciding script come from the default branch. The job reads metadata only
+# and never checks out or executes code from the pull request.
 permissions: {}
 
-# A label flip fires this while the previous run is still starting, and without cancellation the
-# older of the two can report last - leaving a green check on a pull request somebody just marked
-# `blocked`. Cancelling means the newest label state is always the one that reports.
+# Ruleset-required workflows must not cancel an in-progress run. Serialize runs per PR instead;
+# a pending label-change run reads current metadata after its predecessor and reports the latest
+# policy state. GitHub may replace an older pending run with a newer one, which is safe here because
+# the decision never trusts the event's label snapshot.
 #
 # A merge group carries no pull request number, so without the fallback every queue run would share
-# the group `merge-gate-` and cancel the one before it - and a cancelled required check is how the
-# queue learns to drop an entry. `run_id` is unique per run, so those runs cancel nothing.
+# the group `merge-gate-` and delay each other. `run_id` is unique per run, so queue runs remain
+# independent.
 concurrency:
-  group: merge-gate-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  group: merge-gate-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
 
 jobs:
   # The job id and the job name are both `merge-gate` because that string is the check context a
@@ -46,39 +45,27 @@ jobs:
     # passing required check - the gate already had its say when the pull request was enqueued.
     # What that costs: a hard-block label added while the pull request sits in the queue is not
     # read. Taking it out of the queue is what stops it then, not the label.
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request_target' || github.event_name == 'pull_request_review' || (github.event_name == 'issue_comment' && github.event.issue.pull_request)
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","ARM64","ci"]') }}
     permissions:
+      checks: write
       contents: read
+      issues: read
+      pull-requests: read
     steps:
-      # The base branch, never the pull request's own tree. This job decides whether the branch
-      # under review may merge, so the branch under review must not be what supplies the script
-      # that decides - the same rule claude-code-review.yml spells out, and here it is the whole
-      # point of the check. `sparse-checkout` keeps it to the one directory the step runs from.
+      # A required check must not execute policy supplied by the pull request it judges.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
           sparse-checkout: scripts/ci
 
-      - name: Refuse a pull request carrying a hard-block label
+      - name: Enforce the current pull request policy
         env:
-          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-          # Through the environment, never interpolated into the shell: a branch name is attacker-
-          # controlled text on a fork, and `run:` splices it in before bash ever sees a quote.
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          # The deciding script comes from the base branch, so the pull request that *introduces*
-          # this check finds none there. That pull request is the one whose base cannot express a
-          # hard block at all - there is no gate on it yet - so there is nothing to enforce and
-          # this passes. Measured rather than predicted: the first adoption in both repositories
-          # failed here with MODULE_NOT_FOUND on a pull request carrying no labels whatsoever.
-          #
-          # The window closes once and cannot reopen, because a merge into the base branch is the
-          # only thing that puts the script there and the only thing that could take it away - and
-          # a pull request doing the latter is itself gated by the copy still on the base.
-          if [ ! -f scripts/ci/merge-gate.mjs ]; then
-            echo "scripts/ci/merge-gate.mjs is not on $BASE_REF yet - nothing to enforce until it lands there"
-            exit 0
-          fi
-          node scripts/ci/merge-gate.mjs
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RISK_APPROVERS: ${{ vars.RISK_APPROVERS }}
+          QA_APPROVERS: ${{ vars.QA_APPROVERS }}
+        run: node scripts/ci/merge-gate.mjs
