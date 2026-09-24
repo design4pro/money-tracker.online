@@ -213,3 +213,29 @@ Blob and HTML artifact operations remain advisory: storage failures do not chang
 browser result or hide a failing one. Push runs may still reuse a verified tree through `verdict`.
 This costs additional runner time; measure queue delay and runner use before changing parallelism
 or caching. A future GitHub merge queue rollout requires a new decision and live ruleset check.
+
+## Amendment 2026-09-24
+
+**A pull request that cannot change what the browser sees skips the browser gate** (#455). Of the
+last 40 pull requests merged into `develop`, 22 changed only docs, the agent layer, pipeline
+scripts or hooks, and each still paid both e2e legs and the axe scan: three app builds, previews
+and seeded databases on the two-slot `ci` pool.
+
+A `change scope` job in `ci.yml` and in `a11y.yml` diffs the pull request's merge commit against
+its first parent with `scripts/ci/change-scope.mjs`. When no changed path can reach the browser,
+the `e2e` legs, `e2e · merged report` and `axe · WCAG 2.2 AA gate` skip, and GitHub reads the
+skipped required report as passing. The 2026-09-23 amendment's rule stands for every other skip: a
+report whose legs did not run for any reason but this classification still runs and fails.
+
+- **The classifier fails safe.** It lists what is known not to reach the browser; any other path,
+  an empty diff, and a failed or skipped `change scope` job leave the output anything but `false`,
+  and the gate runs. `scripts/ci/__tests__/change-scope.test.mjs` pins the list, and
+  `e2e-artifact-gate.test.mjs` pins the `!= 'false'` direction in both workflows.
+- **Only a pull request is scoped.** `verified-tree.mjs` never reads a `pull_request` run, so the
+  push to `develop` after the merge runs every leg before `deploy · staging`. A misclassified pull
+  request is caught there, before staging ships it, never in production.
+- **The unit suite is not scoped.** It reads the documents the list excludes (ADR numbering, plans,
+  `SDLC.md` regions, the spec registry, the design tokens), so a docs-only pull request can break
+  it.
+- **The job runs on the `gate` pool** (ADR 0022). The e2e legs wait for it, and on the `ci` pool it
+  would queue behind `verify` and `test`.

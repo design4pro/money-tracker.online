@@ -69,7 +69,8 @@ node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>con
 ```
 
 `pnpm e2e` is not in the gate because it needs a running environment: CI runs it on every pull
-request, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
+request that can change what the browser sees (`scripts/ci/change-scope.mjs`) and on every push to
+`develop`, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
 repo) is not a gate either; keep what you touch prettier-clean.
 
 The gate's first two commands regenerate and diff, but they do not both catch a hand edit.

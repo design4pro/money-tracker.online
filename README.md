@@ -64,7 +64,8 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
   passed on that commit: https://money-tracker.online (`deploy · production`, calling
   `deploy-production.yml`).
 - `ci.yml` runs lint · typecheck · unit tests · build · the route-tree and migration drift checks
-  and the browser suite on every pull request.
+  and the browser suite on every pull request that can change what the browser sees
+  (`scripts/ci/change-scope.mjs`; every push to `develop` and `main` runs it regardless).
 - No screenshot is compared anywhere: `docs/adr/0016-journeys-replace-the-visual-gate.md` retired
   the baselines. What a screen _looks_ like is judged by `node scripts/visual/capture.mjs` and a
   human at review; what the suite asserts is that the screen answers, hydrates, says nothing in
