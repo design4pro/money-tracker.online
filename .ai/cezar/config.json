@@ -1,5 +1,4 @@
 {
-  "defaultRunner": "codex",
   "reviewGate": false,
   "baseBranch": "develop",
   "worktreeRetention": 10,

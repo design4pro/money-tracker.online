@@ -23,7 +23,12 @@ the rules of `SDLC.md`.
   listing a repository there hands `.claude/skills/` to the cockpit, which then replaces the
   vendored `om-*` tree. The collection's SHA lives in `skills-lock.json` alone)). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
-  `config.json` and `workflows/` are tracked.
+  `config.json` and `workflows/` are tracked. `defaultRunner` is deliberately absent from it: the
+  backend is a fact about the host, so each host names its own in `~/.cezar/config.json`
+  (`agentDefaults.runner`, set through the cockpit's workspace settings), and a repository key
+  would override that on every host. A runner the host has not installed does not fail a run: the
+  run sits at `running` with no agent process, `cancel` has nothing to stop, and every restart
+  resumes it (issue-groom of #443 on a host without the Codex CLI, 2026-09-24).
 - Fork commits: one per fix this pipeline needs and upstream has not shipped, each dropped once an
   upstream release carries it. The cockpit is one per host and shared with `planned.travel`, so the
   fork's checkout is the one copy both repositories run; `design4pro/cezar`'s
