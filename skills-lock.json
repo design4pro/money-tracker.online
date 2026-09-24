@@ -187,6 +187,12 @@
       "skillPath": "skills/om-prepare-test-env/SKILL.md",
       "computedHash": "9095f8d11a52eacef262d828496a2019734e698f2b6f844748d3f84d3e8dbd0b"
     },
+    "om-qa-buddy": {
+      "source": "open-mercato/skills",
+      "sourceType": "github",
+      "skillPath": "skills/om-qa-buddy/SKILL.md",
+      "computedHash": "5c78c99d865f5005b4c39f4b9213e8f378ef5050dfc30f6ade55df05cb04c44c"
+    },
     "om-review-prs": {
       "source": "open-mercato/skills",
       "sourceType": "github",
@@ -203,7 +209,7 @@
       "source": "open-mercato/skills",
       "sourceType": "github",
       "skillPath": "skills/om-setup-agent-pipeline/SKILL.md",
-      "computedHash": "74869c4291962736c10b37a9cae57e1303757b1a4ddcf243bc8061bcb3d3b160"
+      "computedHash": "4455abfbb3577c5ec2e3b56d10b159e16dc39b2f081391813a673adcfcbe379f"
     },
     "om-setup-discovery-pipeline": {
       "source": "open-mercato/skills",
