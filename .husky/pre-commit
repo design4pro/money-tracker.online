@@ -8,4 +8,12 @@ fi
 
 npx lint-staged
 pnpm typecheck
-pnpm test
+# The tests this commit can reach, not the whole suite (ADR 0026): every test that imports a staged
+# file, plus every test-side file that reads the disk or starts a process, because what those
+# check (sources, migrations, .gitignore, the hooks) never enters the module graph `related`
+# walks. A staged package.json, vitest config or setup file still runs everything
+# (forceRerunTriggers). validation.commands and CI run the full suite.
+pnpm exec vitest related --run --passWithNoTests \
+  $(git diff --cached --name-only --diff-filter=d) \
+  $(git grep -lE 'readFileSync|readdirSync|readFile\(|readdir\(|existsSync|statSync|globSync|exec(File)?Sync|spawnSync|spawn\(|execFile\(' \
+    -- '*.test.*' '*__tests__/*')
