@@ -179,7 +179,6 @@ export async function waitForHydration(
       // occasional inexplicable red rather than as a broken helper.
       const element = document.querySelector('main') ?? document.body
       // `lib.dom` types `document.body` as non-nullable, which is the assumption that fails here.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (element === null) return false
       return Object.keys(element).some((key) => key.startsWith('__reactFiber$'))
     },

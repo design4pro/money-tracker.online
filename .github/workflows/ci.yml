@@ -200,16 +200,14 @@ jobs:
 
       # Rung 5.
       #
-      # ESLint spends its time building a typed program and then walking it, and
+      # ESLint spends its time parsing every file and then walking it, and
       # on a pull request almost none of that work is new. `--cache` skips a file
       # whose bytes have not changed since the last run.
       #
-      # Pull requests only, and that restriction is the point. The typed rules
-      # mean a change to one file can change another file's verdict, and the
-      # cache cannot know that - it keys on each file's own content, so a lint
-      # can come back green over an error it simply did not look at. The uncached
-      # run on a push to `develop` or `main` is the canonical one, and it is the
-      # one that guards the shared branch.
+      # Pull requests only. A push to `develop` or `main` starts from no cache and
+      # lints every file, so the run that guards the shared branch never leans on
+      # an earlier one. The cache itself is sound: the lint is untyped (see
+      # `eslint.config.js`), so a file's verdict depends on its own bytes alone.
       - name: Restore the ESLint cache
         if: github.event_name == 'pull_request'
         uses: actions/cache@v6
@@ -223,14 +221,13 @@ jobs:
           restore-keys: |
             eslint-${{ runner.os }}-${{ hashFiles('eslint.config.js', 'tsconfig.json', 'pnpm-lock.yaml') }}-
 
-      # `--cache-strategy content` and not the default. ESLint decides a file is
-      # unchanged by size and mtime unless told otherwise, and a fresh checkout
-      # stamps every file with a new mtime - so the default strategy restores a
-      # perfectly good cache and then ignores all of it.
+      # `--cache-strategy content` (in the `lint` script) and not the default.
+      # ESLint decides a file is unchanged by size and mtime unless told
+      # otherwise, and a fresh checkout stamps every file with a new mtime - so
+      # the default strategy restores a perfectly good cache and then ignores all
+      # of it.
       - name: Lint
-        run: >-
-          pnpm lint ${{ github.event_name == 'pull_request'
-          && '--cache --cache-strategy content' || '' }}
+        run: pnpm lint
 
       # No `pnpm check` rung. Formatting is enforced on the way in - lint-staged on commit, and
       # the format-file.sh Claude hook on every edit. Adding it here as well would gate on

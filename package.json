@@ -16,7 +16,7 @@
     "deploy": "pnpm run build && wrangler deploy",
     "deploy:staging": "CLOUDFLARE_ENV=staging pnpm run deploy",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint",
+    "lint": "eslint --cache --cache-strategy content",
     "lint:fix": "eslint --fix",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",

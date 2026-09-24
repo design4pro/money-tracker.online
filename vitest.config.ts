@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import {
   cloudflareTest,
@@ -125,6 +126,10 @@ export default defineConfig({
     alias: [{ find: /^#\/(.*)$/, replacement: `${src}$1` }],
   },
   test: {
+    // Leave one CPU for the coordinator and cap process pressure: the 4-vCPU VPS runs several
+    // agent gates side by side, and an uncapped run per gate pushed it into swap.
+    // Node 24 reads the container CPU quota through availableParallelism().
+    maxWorkers: Math.max(1, Math.min(2, availableParallelism() - 1)),
     projects: [
       {
         extends: true,

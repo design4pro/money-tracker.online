@@ -15,6 +15,20 @@ export default [
     },
   },
   {
+    // Untyped on purpose. The TanStack preset sets `parserOptions.project: true`, which makes
+    // eslint build a whole second TypeScript program next to the one `pnpm typecheck` builds in
+    // the same gate - measured on the 4-vCPU VPS, 55 s and 1.9 GB RSS per run, with several
+    // gates running side by side. Only the three rules below read type information; type-level
+    // checks belong to `tsc`. Without it a file's verdict depends on its own bytes alone, which is
+    // what makes `--cache` in the `lint` script sound.
+    languageOptions: { parserOptions: { project: false } },
+    rules: {
+      '@typescript-eslint/no-for-in-array': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+    },
+  },
+  {
     // Layering law: all SQL lives in server/repos (the currency/locale catalog is the single
     // stated exception). Client-side layers never see drizzle-orm.
     files: ['src/components/**', 'src/lib/**', 'src/routes/**'],
