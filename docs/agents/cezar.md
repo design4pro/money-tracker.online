@@ -190,8 +190,10 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   **get-pr-checks** must read the current head's required check runs, including the custom
   `merge-gate` check run, rather than treating a skipped or missing result as a passing test.
 
-  `ci.yml` now runs the browser legs on every pull request. The required `e2e · merged report`
-  fails when those legs fail or are skipped. Artifact storage is advisory, but browser results
+  `ci.yml` now runs the browser legs on every pull request that can change what the browser sees.
+  The required `e2e · merged report` fails when those legs fail or are skipped, except when the
+  `change scope` job classified the diff as unable to reach the browser: then the report skips too
+  (#455, ADR 0020's 2026-09-24 amendment). Artifact storage is advisory, but browser results
   are not. ADR 0020's 2026-09-23 amendment explains why deferring E2E to `merge_group` was
   unsafe without a live GitHub merge queue rule.
 

@@ -39,11 +39,35 @@ permissions:
   contents: read
 
 jobs:
+  # The same question, and the same script, as the `changes` job in ci.yml: a pull request that
+  # cannot change what the browser renders skips the scan (#455). Skipped on a push, where the empty
+  # output means "run", and the push to `develop` after the merge scans every route regardless.
+  changes:
+    name: change scope
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
+    timeout-minutes: 5
+    outputs:
+      browser: ${{ steps.scope.outputs.browser }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          sparse-checkout: scripts/ci
+
+      - name: Classify the changed files
+        id: scope
+        run: BASE_SHA=$(git rev-parse HEAD^1) HEAD_SHA=$(git rev-parse HEAD) node scripts/ci/change-scope.mjs
+
   axe:
     name: axe · WCAG 2.2 AA gate
+    needs: changes
     # A develop→main pull request duplicates the push-triggered run on the same commits; the push
-    # run is canonical for the shared branches.
-    if: github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
+    # run is canonical for the shared branches. `!cancelled()` rather than the implicit `success()`,
+    # which would read the skipped `changes` on a push as a reason to skip the scan too.
+    if: ${{ !cancelled() && needs.changes.outputs.browser != 'false' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 30
     # The same runners as the e2e gate, and no `container:` on either: `./.github/actions/e2e-env`
