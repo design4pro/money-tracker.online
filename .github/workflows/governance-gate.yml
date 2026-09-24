@@ -45,9 +45,12 @@ jobs:
     name: governance-gate
     # Only a pull request has labels and a file list to read. In a merge group this skips, and a
     # skipped job is a passing required check - the gate already had its say when the pull request
-    # was enqueued.
-    if: github.event_name == 'pull_request_target'
+    # was enqueued. A label changed on a closed pull request has nothing left to gate.
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.state == 'open'
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
+    # Seconds-long (last 20 green runs: median 9 s, max 10 s); without this a hung API call holds
+    # the only `gate` slot for the 360-minute default.
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
