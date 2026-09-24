@@ -81,10 +81,6 @@ additions to step 2 and step 11:
   Submit the same full approving verdict as a `COMMENTED` review, then post the current-head
   Cezar receipt and move to `merge-queue`. This changes only the GitHub review state, not the
   review work or the separate human approval required for `risk-high`.
-- Never add `review-threads`. The `claude-review` job applies it from
-  `scripts/ci/review-threads-label.mjs`, once per head SHA, when a review leaves live threads, and a
-  skill that applies it after leaving threads open would start a run on its own work. Name the open
-  threads in the report instead and let a person decide.
 - Pending CI is not a reason to wait: the browser suite runs on every PR and finishes in minutes.
   Report it as pending and let the bounded follow-up correct the label.
 - The `develop → main` promotion PR is reviewed like any other; when its diff is only merge

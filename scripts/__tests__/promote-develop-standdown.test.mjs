@@ -7,8 +7,7 @@
  * poller cannot tell the promotion apart from a pull request the same maintainer opened by hand:
  * `pr-autopilot` filters `pull_request.opened` by author and reads no base branch. So every
  * promotion started a full agent run on a pull request the skill can do nothing useful with - it
- * carries no change of its own, is not the automation's to fix, is already reviewed by
- * claude-code-review.yml on the promotion diff, and merging it deploys production, which the skill
+ * carries no change of its own, is not the automation's to fix, and merging it deploys production, which the skill
  * must never do. Not hypothetical here: #148, #153, #188 and #193 were each claimed within minutes
  * of opening (design4pro/planned.travel#380).
  *

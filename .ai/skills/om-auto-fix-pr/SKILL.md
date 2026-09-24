@@ -1,21 +1,12 @@
 ---
 name: om-auto-fix-pr
-description: Repo-local extension of om-auto-fix-pr - the `review-threads` trigger label the run consumes, and the open-thread exit criterion the stabilization loop gets.
+description: Repo-local extension of om-auto-fix-pr - the open-thread exit criterion the stabilization loop gets.
 ---
 
 # om-auto-fix-pr (money-tracker.online)
 
 This file extends the shared `om-auto-fix-pr` skill installed at
-`.claude/skills/om-auto-fix-pr/SKILL.md`. Follow its full workflow with the two additions below.
-
-## `review-threads` is a trigger label, and the run consumes it
-
-When the PR carries `review-threads`, remove it as the run's **first** tracker mutation, before the
-claim - the same contract `autofix` has on an issue, so a label still present is a run nobody took.
-The `claude-review` job applies it when it leaves live threads
-(`scripts/ci/review-threads-label.mjs`), and the **Resolve blocking review threads** automation turns it into this
-run; leaving it on would let the next poll start a second run beside this one. Removing it is also
-what re-arms the trigger: the job re-applies it on the next head that still has open threads. Never add `review-threads` to any PR.
+`.claude/skills/om-auto-fix-pr/SKILL.md`. Follow its full workflow with the addition below.
 
 ## An open thread ends the loop, it does not pass it
 
