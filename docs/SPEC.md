@@ -95,7 +95,7 @@ the shadcn shape · **`@internationalized/date`** and **`@internationalized/numb
 **Polar** through a hand-rolled REST client · `zod` v4 · Sentry · React Email · `sonner` ·
 `@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
 
-Tooling: Vite 8 · Wrangler 4 · TypeScript 6 · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
+Tooling: Vite 8 · Wrangler 4 · TypeScript 7 (ADR 0024) · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
 (ADR 0015) · Playwright · **`@axe-core/playwright`** · `drizzle-kit` · oxlint (ADR 0023) · Prettier ·
 Husky + lint-staged · `vite-plugin-pwa`.
 

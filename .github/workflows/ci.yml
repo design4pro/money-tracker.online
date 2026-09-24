@@ -6,7 +6,7 @@ name: CI
 #   1. route-tree  pnpm generate-routes     && git diff --exit-code -- src/routeTree.gen.ts
 #   2. db-drift    pnpm db:generate         && git diff --exit-code -- drizzle/
 #   3. spec-index  pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md
-#   4. typecheck   tsc --noEmit
+#   4. typecheck   tsc --noEmit --checkers 2
 #   5. lint        oxlint
 #   6. vitest      vitest run
 #
