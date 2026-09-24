@@ -300,12 +300,14 @@ and the hooks in `.claude/hooks/` tighten:
   them through the tracker descriptor and `SDLC.md` governs them.
 - `guard-read.sh` (Read, Glob, Grep) confines reads to the worktree and denies `.dev.vars`,
   `.env*`, cezar run state and `.ai/qa/test-env.env`. `.ai/runs`, `.ai/analysis`, `.ai/qa` and
-  `.ai/tmp` stay readable: the skills write their artefacts there.
+  `.ai/tmp` stay readable: the skills write their artefacts there. Outside the worktree a cezar run
+  also reads its own transcript directory under `~/.claude/projects/`, its own `TMPDIR`
+  (`<main>/.ai/cezar/tmp/<id>`) and the main checkout, except `.ai/cezar/` and `.git/` there.
 - `guard-generated.sh` (Edit, Write) refuses the generated files — `src/routeTree.gen.ts`,
   `drizzle/`, `worker-configuration.d.ts` — for everyone, in every mode, and in an agent run also
-  refuses any write that walks through `..` or lands outside the worktree. That confinement has a
-  real incident behind it: a pr-autopilot run once rewrote eight files in a sibling checkout a
-  human was working in, and nothing downstream could tell.
+  refuses any write that walks through `..` or lands outside the worktree, the run's own `TMPDIR`
+  aside. That confinement has a real incident behind it: a pr-autopilot run once rewrote eight
+  files in a sibling checkout a human was working in, and nothing downstream could tell.
 
   It used to refuse a third set — `.github/`, `.claude/`, `.husky/`, `.ai/cezar/`,
   `.ai/agentic.config.json`, `.ai/trackers/`, `.ai/browsers/`, `.ai/skills/`, `.ai/scripts/`,
