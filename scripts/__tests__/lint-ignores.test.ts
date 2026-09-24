@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
  * oxlint reads `.gitignore` itself (ADR 0023), so that list is gone and this file pins the premise
  * instead: a file dropped into a gitignored directory is never linted. The other half is the
  * `ignorePatterns` in `.oxlintrc.json`, which still names the tracked paths that are not ours to
- * lint - and one fragile ladder of `.claude` entries that carves the hook tests back in.
+ * lint, `.claude` among them.
  *
  * The answers come from the real binary against the real config (`--debug=files` prints the files
  * a run would lint, then exits) rather than from matching strings in the config, because the
@@ -92,18 +92,17 @@ describe('pnpm lint ignores', () => {
     },
   )
 
-  it('does not walk .claude/hooks/, whose tests the ladder carves back in', () => {
+  it('does not walk .claude/hooks/, agent tooling rather than application source', () => {
     expect(linted.has(probes.hook)).toBe(false)
   })
 
   // The premise the assertions above rest on. An ignore wide enough to cover `.ai/tmp/` must stay
-  // narrow enough to leave the sources the gate exists for - and the hook tests the `.claude`
-  // entries deliberately carve back in - being linted. `.ai/scripts/backlog-status.mjs` is the
-  // tracked file under `.ai/` a widened entry could shadow without anything else noticing.
+  // narrow enough to leave the sources the gate exists for being linted.
+  // `.ai/scripts/backlog-status.mjs` is the tracked file under `.ai/` a widened entry could shadow
+  // without anything else noticing.
   it.each([
     'src/lib/money/format.ts',
     'scripts/__tests__/lint-ignores.test.ts',
-    '.claude/hooks/__tests__/hooks.test.ts',
     '.ai/scripts/backlog-status.mjs',
   ])('still lints %s', (path) => {
     expect(linted.has(path)).toBe(true)

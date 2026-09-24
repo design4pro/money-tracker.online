@@ -10,7 +10,7 @@ describe('reachesBrowser', () => {
     'SDLC.md',
     '.ai/agentic.config.json',
     '.ai/specs/README.md',
-    '.claude/hooks/git-guardrails.sh',
+    '.claude/hooks/format-file.sh',
     '.husky/pre-commit',
     '.github/workflows/merge-gate.yml',
     '.github/ISSUE_TEMPLATE/bug.yml',

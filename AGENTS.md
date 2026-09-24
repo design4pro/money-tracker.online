@@ -80,7 +80,7 @@ against the last snapshot and only appends when the schema moved, so a hand-edit
 `drizzle/*.sql`, a hand-added migration with a matching `_journal.json` entry, or a tampered
 `drizzle/meta/*_snapshot.json` all leave that diff clean. `drizzle/0002_seed_currency_catalogue.sql`
 is a `--custom` migration with a hand-authored body, so the tree is not fully derived to begin
-with. What keeps `drizzle/` honest is the hook below, not the gate.
+with. What keeps `drizzle/` honest is the deny rule below, not the gate.
 
 The agent layer is yours to edit. `.ai/cezar/workflows/`, `.ai/cezar/config.json`,
 `.ai/skills/afk-*/`, `.claude/hooks/`, `.claude/settings.json`, `.claude/skills/backlog/SKILL.md`,
@@ -88,11 +88,10 @@ The agent layer is yours to edit. `.ai/cezar/workflows/`, `.ai/cezar/config.json
 `design4pro/agent-kit`, which refused hand edits; that repository is retired and they are ordinary
 files (ADR 0021). They are still in `.prettierignore`, so keep the formatting you find.
 
-Two things still refuse an edit, both through `.claude/hooks/guard-generated.sh`:
-`src/routeTree.gen.ts`, `drizzle/` and `worker-configuration.d.ts` in every mode, and — under
-`GITHUB_ACTIONS` only — that whole agent layer, because there the diff being read belongs to
-whoever opened the pull request. A cezar run is not restricted: it edits its own skills, workflows
-and gate on a branch, and the review is what judges that.
+`.claude/settings.json` refuses an edit of `src/routeTree.gen.ts` and `drizzle/` in every mode
+(`permissions.deny`), and asks before one of `worker-configuration.d.ts`, which a cezar run's
+`dontAsk` turns into a refusal (ADR 0025). A cezar run is otherwise not restricted: it edits its
+own skills, workflows and gate on a branch, and the review is what judges that.
 
 ## Task Router
 

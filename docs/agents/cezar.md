@@ -291,45 +291,27 @@ it is installed, stop running bare `cezar` in a repo. Log: `~/Library/Logs/cezar
 
 ## Agent mode
 
-A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTIONS` is set.
-`.husky/pre-commit` skips itself under `CEZ_TASK_ID` (`validation.commands` is the run's gate),
-and the hooks in `.claude/hooks/` tighten:
+cezar starts Claude Code with `--permission-mode dontAsk` (ADR 0025). `.husky/pre-commit` skips
+itself under `CEZ_TASK_ID` (`validation.commands` is the run's gate), and the project's
+`.claude/settings.json` decides the rest, with no project hook in the way:
 
-- `git-guardrails.sh` also blocks `pnpm add|remove|update` (the stack is pinned, `docs/SPEC.md`
-  §3), `printenv` and `env` dumps (`printenv NAME` for a named non-secret variable stays open). For
-  everyone it blocks force-pushes to `develop`/`main`, `git reset --hard`, `git clean -f`,
-  `git branch -D`, `git checkout/restore .` and `--no-verify`.
-  GitHub mutations, `git add -A`, closing keywords and `pnpm exec` are open: the om skills perform
-  them through the tracker descriptor and `SDLC.md` governs them.
-- `guard-read.sh` (Read, Glob, Grep) confines reads to the worktree and denies `.dev.vars`,
-  `.env*`, cezar run state and `.ai/qa/test-env.env`. `.ai/runs`, `.ai/analysis`, `.ai/qa` and
-  `.ai/tmp` stay readable: the skills write their artefacts there. Outside the worktree a cezar run
-  also reads its own transcript directory under `~/.claude/projects/`, its own `TMPDIR`
-  (`<main>/.ai/cezar/tmp/<id>`) and the main checkout, except `.ai/cezar/` and `.git/` there.
-- `guard-generated.sh` (Edit, Write) refuses the generated files — `src/routeTree.gen.ts`,
-  `drizzle/`, `worker-configuration.d.ts` — for everyone, in every mode, and in an agent run also
-  refuses any write that walks through `..` or lands outside the worktree, the run's own `TMPDIR`
-  aside. That confinement has a real incident behind it: a pr-autopilot run once rewrote eight
-  files in a sibling checkout a human was working in, and nothing downstream could tell.
-
-  It used to refuse a third set — `.github/`, `.claude/`, `.husky/`, `.ai/cezar/`,
-  `.ai/agentic.config.json`, `.ai/trackers/`, `.ai/browsers/`, `.ai/skills/`, `.ai/scripts/`,
-  `scripts/ci/`, `.npmrc`, `pnpm-workspace.yaml`, `docs/agents/reference.md` and
-  `docs/agents/out-of-scope.md` — in a cezar run too, with an exception for a file the branch
-  already changed. **Not any more** (ADR 0021): a cezar run edits its own skills, workflows and
-  gate like any other change here, and the review of its branch is what judges that. The
-  `in_branch_diff` exception went with it, having existed only to soften that block.
-
-  Under `GITHUB_ACTIONS` that third set is still refused, without exception. There the diff being
-  read is the pull request author's, so "this branch already changes it" is the author's own claim,
-  and the review job holds a write token while reading it.
+- `permissions.deny` is refused in every session, agent or not: reading `.dev.vars*` and `.env*`
+  (the `.example` files aside) and `.ai/qa/test-env.env`; hand-editing `src/routeTree.gen.ts` and
+  `drizzle/` (run the generator); force-pushing, `git reset --hard`, `--no-verify`,
+  `git filter-branch`/`filter-repo`, `gh repo delete` and `rm -rf ~`; writing a Cloudflare secret
+  and deleting a D1 database, R2 bucket, KV namespace or the Worker.
+- `permissions.ask` - deploys, remote D1 commands and an edit of the hand-mirrored
+  `worker-configuration.d.ts` - prompts a developer at the keyboard and is refused in a cezar run,
+  because `dontAsk` turns every prompt into a denial.
+- Everything else is open, including a write outside the worktree: a step that holds a bare `Edit`
+  or `Write` may write anywhere the user can. That is an accepted risk (ADR 0025); a pr-autopilot
+  run once rewrote eight files in a sibling checkout, and that shows up in the sibling's
+  `git status`, not in the run's own PR.
 
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
-`jq`, and a prefix allowlist would drop label mutations silently. The hooks in `.claude/hooks/`,
-the PAT scopes, one worktree per run and `maxParallel: 2` are the gate. `.claude/settings.json`
-carries no permission rules; it is hooks-only, and the rules a `deny` list used to hold moved into
-`git-guardrails.sh` and `guard-read.sh`, which see the whole command rather than a prefix.
-`.claude/hooks/__tests__/hooks.test.ts` (vitest project `tooling`) holds the hooks' contract.
+`jq`, and a prefix allowlist would drop label mutations silently. The permission rules above,
+branch protection on `develop` and `main`, the PAT scopes, one worktree per run, `maxParallel: 2`
+and review of every pull request are the gate.
 
 ## Workflows (`.ai/cezar/workflows/`)
 
@@ -472,10 +454,10 @@ got a second review the moment its `in-progress` lock lifted. Every filter exclu
 runs unless the service env sets `CEZ_AUTOMATIONS=0` (the default since 0.11.0; the plist's
 explicit `1` changes nothing), and a 409 from the API says it is off.
 
-A review or autopilot run checks out the PR's head, hooks included: a branch cut before the om
-cutover (`f2a258e`) carries the old `git-guardrails.sh`, which blocks every GitHub write in agent
-mode, and the run ends in a question nobody answers (PR #67, 2026-09-07). Merge `develop` into such
-a branch before opening the PR.
+A review or autopilot run checks out the PR's head, `.claude/` included: a branch cut before
+ADR 0025 still carries the guard hooks, and a branch cut before the om cutover (`f2a258e`) carries
+a `git-guardrails.sh` that blocks every GitHub write in agent mode, so the run ends in a question
+nobody answers (PR #67, 2026-09-07). Merge `develop` into such a branch before opening the PR.
 
 ## Prompt templates (`docs/agents/cezar-prompt-templates.json`)
 

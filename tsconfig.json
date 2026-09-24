@@ -1,15 +1,7 @@
 {
   // Line comments, not block ones: a `**` glob written inside a block comment closes it early
   // on its own `*` `/`.
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "prettier.config.js",
-    // Named explicitly because `**` does not descend into a dot-directory: without this
-    // line the hook tests compile in no project at all, and vitest transpiles each file on
-    // its own, so a type error there is never reported by anything.
-    ".claude/hooks/__tests__/**/*.ts"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "prettier.config.js"],
 
   // Spelled out because naming an `exclude` replaces the default one, which is where
   // `node_modules` comes from.
