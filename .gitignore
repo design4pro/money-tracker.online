@@ -36,4 +36,6 @@ coverage/
 .ai/qa/test-env-boot.log
 .ai/qa/test-env-build-cache.json
 .ai/qa/artifacts_*/
+# om-qa-buddy's knowledge base (module history, risk hotspots) stays on the host that ran it.
+.ai/qa/knowledge-base/
 .ai/tmp/
