@@ -40,7 +40,7 @@ also the reference for the steps to run locally.
 | `pnpm dev`              | Vite dev server with the Cloudflare plugin, on :3000                               |
 | `pnpm build`            | Production build. `CLOUDFLARE_ENV=staging pnpm build` builds the staging Worker    |
 | `pnpm typecheck`        | `tsc --noEmit`                                                                     |
-| `pnpm lint`             | ESLint. `pnpm lint:fix` writes                                                     |
+| `pnpm lint`             | oxlint. `pnpm lint:fix` writes                                                     |
 | `pnpm test`             | Vitest (unit + repository). `pnpm test:watch`, `pnpm test:coverage`                |
 | `pnpm e2e`              | Playwright: behaviour, i18n and accessibility suites. `pnpm e2e:ui` for the runner |
 | `pnpm generate-routes`  | Regenerate `src/routeTree.gen.ts` — generated, never hand-edited                   |

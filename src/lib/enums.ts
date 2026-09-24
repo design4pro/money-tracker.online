@@ -8,7 +8,7 @@
  * table definition and drizzle-orm with it, and a form that needs the six payment methods must not
  * pull that into the browser: a value import of the schema from client code put the whole table
  * catalogue and drizzle's SQLite core into the chunk every visitor downloads, the marketing page
- * included. Client code imports from here; the lint rule in `eslint.config.js` keeps it that way.
+ * included. Client code imports from here; the lint rule in `.oxlintrc.json` keeps it that way.
  *
  * Nothing in this file may import anything. It is data.
  */

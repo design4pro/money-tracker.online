@@ -1,0 +1,210 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // The rule set `@tanstack/eslint-config` gave ESLint, carried over by `@oxlint/migrate` with the
+  // same exceptions this repository made to it (ADR 0023). Four preset rules have no oxlint
+  // counterpart and are gone: `@typescript-eslint/naming-convention` (the `T`-prefix on type
+  // parameters), `@stylistic/spaced-comment`, `no-octal` (a syntax error in strict-mode modules
+  // anyway) and the type-aware trio this repository had already switched off.
+  // `node/prefer-node-protocol` lives on as `unicorn/prefer-node-protocol`.
+  //
+  // Everything a `.gitignore` refuses to track is skipped by oxlint itself, the nested
+  // `.ai/**/.gitignore` files included - so a scratch directory an agent run writes can no longer
+  // turn `pnpm lint` red the way #203 and #229 did, and `ignorePatterns` below only names tracked
+  // paths that are not ours to lint. `scripts/__tests__/lint-ignores.test.ts` pins both halves.
+  "plugins": ["import", "typescript", "unicorn"],
+  "categories": { "correctness": "off" },
+  "env": { "builtin": true },
+  "ignorePatterns": [
+    "prettier.config.js",
+    // Ignored one level at a time, and not with `.claude/**` plus a negation: these are gitignore
+    // semantics, so a path inside an excluded *directory* can never be re-included - the directory
+    // is pruned before the negation is read. The shorter form silently ignores the hook tests.
+    ".claude/*",
+    "!.claude/hooks",
+    ".claude/hooks/*",
+    // The hook tests are the carve-out: ordinary TypeScript in this repository's tsconfig.
+    "!.claude/hooks/__tests__",
+    // Agent tooling that GitHub's own surfaces read - skills, agent definitions, hooks. Same reason
+    // as `.claude/*`: vendored configuration for tools around the project.
+    ".github/**",
+    "drizzle/**"
+  ],
+  "overrides": [
+    {
+      // The preset's own scope. `.mjs` and `.cjs` files were linted under no rule at all, and
+      // still are.
+      "files": ["**/*.{js,ts,tsx}"],
+      "env": { "es2020": true, "browser": true },
+      "rules": {
+        "for-direction": "error",
+        "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
+        "import/first": "error",
+        "import/newline-after-import": "error",
+        "import/no-commonjs": "error",
+        "import/no-duplicates": "error",
+        "no-async-promise-executor": "error",
+        "no-case-declarations": "error",
+        "no-class-assign": "error",
+        "no-compare-neg-zero": "error",
+        "no-cond-assign": "error",
+        "no-constant-binary-expression": "error",
+        "no-constant-condition": "error",
+        "no-control-regex": "error",
+        "no-debugger": "error",
+        "no-delete-var": "error",
+        "no-dupe-else-if": "error",
+        "no-duplicate-case": "error",
+        "no-empty-character-class": "error",
+        "no-empty-pattern": "error",
+        "no-empty-static-block": "error",
+        "no-ex-assign": "error",
+        "no-extra-boolean-cast": "error",
+        "no-fallthrough": "error",
+        "no-global-assign": "error",
+        "no-invalid-regexp": "error",
+        "no-irregular-whitespace": "error",
+        "no-loss-of-precision": "error",
+        "no-misleading-character-class": "error",
+        "no-nonoctal-decimal-escape": "error",
+        "no-regex-spaces": "error",
+        "no-self-assign": "error",
+        "no-shadow": "warn",
+        "no-shadow-restricted-names": "error",
+        "no-sparse-arrays": "error",
+        "no-unsafe-finally": "error",
+        "no-unsafe-optional-chaining": "error",
+        "no-unused-labels": "error",
+        "no-unused-private-class-members": "error",
+        "no-useless-backreference": "error",
+        "no-useless-catch": "error",
+        "no-useless-escape": "error",
+        "no-var": "error",
+        "no-with": "error",
+        "prefer-const": "error",
+        "require-yield": "error",
+        "typescript/ban-ts-comment": [
+          "error",
+          {
+            "ts-expect-error": false,
+            "ts-ignore": "allow-with-description"
+          }
+        ],
+        "typescript/consistent-type-imports": [
+          "error",
+          {
+            "prefer": "type-imports"
+          }
+        ],
+        "typescript/method-signature-style": ["error", "property"],
+        "typescript/no-duplicate-enum-values": "error",
+        "typescript/no-extra-non-null-assertion": "error",
+        "typescript/no-inferrable-types": [
+          "error",
+          {
+            "ignoreParameters": true
+          }
+        ],
+        "typescript/no-misused-new": "error",
+        "typescript/no-namespace": "error",
+        "typescript/no-non-null-asserted-optional-chain": "error",
+        "typescript/no-unsafe-function-type": "error",
+        "typescript/no-wrapper-object-types": "error",
+        "typescript/prefer-as-const": "error",
+        "typescript/prefer-for-of": "warn",
+        "typescript/triple-slash-reference": "error",
+        "unicorn/prefer-node-protocol": "error",
+        "use-isnan": "error",
+        "valid-typeof": "error"
+      }
+    },
+    {
+      // Layering law: all SQL lives in server/repos (the currency/locale catalog is the single
+      // stated exception). Client-side layers never see drizzle-orm.
+      "files": ["src/components/**", "src/lib/**", "src/routes/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "drizzle-orm",
+                "message": "SQL lives in server/repos via the tenant base repository. Call a server function instead."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["drizzle-orm/*"],
+                "message": "SQL lives in server/repos via the tenant base repository. Call a server function instead."
+              },
+              {
+                // The schema module carries every table and drizzle-orm with it; a value import
+                // from client code put both into the chunk every visitor downloads. The tuples
+                // live in src/lib/enums and the types are free to import from either.
+                "group": ["#/server/db/schema", "**/server/db/schema"],
+                "allowTypeImports": true,
+                "message": "The enumerated tuples live in #/lib/enums. A value import of the schema ships every table and drizzle-orm to the browser."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // The dev seed route stays outside the layering law, as it was under ESLint. An override
+      // cannot carry its own `ignores`, so a later one switches the rule back off instead.
+      "files": ["src/routes/api/dev/-seed/**"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
+      // Layering law: design-system primitives never reach the server layer. After the block
+      // above so it wins (and therefore must repeat) the drizzle-orm restriction - an override
+      // replaces a rule's options wholesale, it does not merge them.
+      "files": ["src/components/ui/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "drizzle-orm",
+                "message": "SQL lives in server/repos via the tenant base repository. Call a server function instead."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["#/server/*", "**/server/*"],
+                "message": "components/ui never imports from server/. Pass data in as props."
+              },
+              {
+                "group": ["drizzle-orm/*"],
+                "message": "SQL lives in server/repos via the tenant base repository. Call a server function instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Money never leaves integer minor units. `toFixed` on a Number is the exact operation that
+      // turns a minor-unit integer into a float and back, and it is how the reference product
+      // acquired its rounding bugs. Formatting goes through `@internationalized/number` with the
+      // currency's own `digits`, in src/lib/money.
+      "files": ["src/**"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "property": "toFixed",
+            "message": "Money stays in integer minor units. Format through src/lib/money (Intl + the currency’s own digits) instead of toFixed."
+          }
+        ]
+      }
+    },
+    {
+      // Tests stay outside the `toFixed` rule, as they were under ESLint - switched off by a
+      // later override for the same reason as the seed route above.
+      "files": ["src/**/*.test.{ts,tsx}", "src/**/__tests__/**"],
+      "rules": { "no-restricted-properties": "off" }
+    }
+  ]
+}

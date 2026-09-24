@@ -4,7 +4,6 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "eslint.config.js",
     "prettier.config.js",
     // Named explicitly because `**` does not descend into a dot-directory: without this
     // line the hook tests compile in no project at all, and vitest transpiles each file on

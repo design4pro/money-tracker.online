@@ -5,7 +5,7 @@
  * the DDL that will actually be deployed — including the seeded currency catalogue, which is a
  * migration and not a fixture.
  *
- * It lives under `repos/__tests__` because the SQL layer owns it: `eslint.config.js` refuses a
+ * It lives under `repos/__tests__` because the SQL layer owns it: `.oxlintrc.json` refuses a
  * `drizzle-orm` import anywhere under `src/routes/**`, and a route-level test that needs a
  * database should borrow one from here rather than open the layering law for itself.
  *

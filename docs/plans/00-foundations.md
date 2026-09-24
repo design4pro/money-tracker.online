@@ -615,7 +615,7 @@ None.
 
 ### Server (repo, server function, Zod)
 
-None. **`components/ui` never fetches data and never imports from `server/`** — an ESLint boundary
+None. **`components/ui` never fetches data and never imports from `server/`** — a lint boundary
 rule enforces it and this stage adds that rule's fixture test.
 
 ### UI (route, components)
