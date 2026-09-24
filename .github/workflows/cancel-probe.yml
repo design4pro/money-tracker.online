@@ -1,0 +1,22 @@
+name: Cancel probe
+
+# Throwaway: proves that closing the pull request force-cancels an in-progress job and that the
+# `always()` job after it never starts. Never merged.
+on: pull_request
+
+permissions: {}
+
+jobs:
+  long:
+    runs-on: ${{ fromJSON(vars.RUNNER_AGENT || '["self-hosted","linux","X64","agent"]') }}
+    timeout-minutes: 15
+    steps:
+      - run: sleep 600
+
+  after:
+    needs: long
+    if: always()
+    runs-on: ${{ fromJSON(vars.RUNNER_AGENT || '["self-hosted","linux","X64","agent"]') }}
+    timeout-minutes: 2
+    steps:
+      - run: echo "ran after the long job"
