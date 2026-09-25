@@ -324,11 +324,11 @@ anything from anyone else waits for a maintainer to add a trigger label.
 **Guardrails:**
 
 - `pr-autopilot` merges into `develop` with `om-pr-autopilot --allow-merge`: a PR a maintainer
-  opened, and an agent PR reviewed into `merge-queue` (ADR 0026). A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
+  opened, and an agent PR reviewed into `merge-queue` (ADR 0027). A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
   land it once the required checks pass. The rulesets require only the three CI checks (`docs/agents/cezar.md`);
   every label rule in this document is a convention that `om-merge-buddy` and
   `om-approve-merge-pr` read and the person merging honours, and nothing in CI enforces it
-  (ADR 0026). The process label `merge-queue` is not a GitHub merge queue entry.
+  (ADR 0027). The process label `merge-queue` is not a GitHub merge queue entry.
 - A `risk-high` PR gets a deeper review and no self-QA: when it is `needs-qa`, a human QA reviewer
   applies `qa-approved`. A `needs-qa` PR waits for
   `qa-approved` from a human QA reviewer. Promotion from `develop` to `main` merges after the

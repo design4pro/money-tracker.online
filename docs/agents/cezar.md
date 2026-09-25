@@ -176,7 +176,7 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   2026-09-23 `develop` (ruleset 22037820) and `main` (22037770) both have
   `required_status_checks`, no `merge_queue` rule and `Required approvals: 0`. Since 2026-09-25
   they require the same three contexts, with `strict_required_status_checks_policy: false`
-  (ADR 0026):
+  (ADR 0027):
 
   | Required context                       | Published by               |
   | -------------------------------------- | -------------------------- |
@@ -200,7 +200,7 @@ drift rows. Re-date the column when someone reads that page, not when a run read
 
   The pipeline still holds a merge as well — the labels, the review verdict and the
   QA gate in `SDLC.md`, read by the merge skills as a convention and enforced by no check
-  (ADR 0026) — but it is no longer the only thing holding one, and prose elsewhere
+  (ADR 0027) — but it is no longer the only thing holding one, and prose elsewhere
   (this section included, before this revision) that credits the ruleset with enforcing nothing but
   pull-request-and-no-force-push predates the reading above. The `pull_request` rule still sets
   `required_approving_review_count: 0` on both branches, so the review gate remains the pipeline's,
@@ -406,7 +406,7 @@ amendment 2026-09-17).
 **Merge and after.** `pr-autopilot` merges into `develop`: `om-pr-autopilot --allow-merge` ends in
 `om-approve-merge-pr`, which reads the labels and the QA gate first. It runs on a PR a maintainer
 opens and on an agent PR reviewed into `merge-queue`. `om-merge-buddy` reports the rest, and a person merges it - by
-hand, or with GitHub's native `gh pr merge --auto` (ADR 0026). `needs-qa` and `develop` → `main` merge after their respective human
+hand, or with GitHub's native `gh pr merge --auto` (ADR 0027). `needs-qa` and `develop` → `main` merge after their respective human
 decisions (`SDLC.md`). The live rulesets have no
 GitHub merge queue rule; the `merge-queue` label is a process state only. After a merge,
 `/om-close-fixed-issues` closes what the merge did not: Cezar has no `pull_request.merged`
