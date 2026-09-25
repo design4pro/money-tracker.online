@@ -357,9 +357,10 @@ under-granted (`Skill` and `TodoWrite` are absent, so `afk-lessons` §1 and §4 
 verbatim in its gate step, which was the one place in the repository that copied
 `validation.commands` instead of reading it.
 
-All five now carry a bootstrap step and an explicit grant: `triage`,
-`spec-to-tickets` and `architecture-review` read-only (`[Read, Grep, Glob, Bash, Skill,
-TodoWrite]`), `lessons` and `implement-ticket` with `Edit` and `Write` because they write. The
+All five now carry a bootstrap step and an explicit grant: `triage` and `architecture-review`
+read-only (`[Read, Grep, Glob, Bash, Skill, TodoWrite]`), `spec-to-tickets` the same plus `Write`
+for its ticket drafts and no `Edit` (run b4bde0ac, 2026-09-25, failed on eleven denied `Write`
+calls without it), `lessons` and `implement-ticket` with `Edit` and `Write` because they write. The
 gate step runs `node scripts/ci/run-validation.mjs`, which reads `validation.commands` — so the
 list lives in one file again, and `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails if any
 workflow copies a command out of it. The same test fails a workflow that prompts without a grant,
