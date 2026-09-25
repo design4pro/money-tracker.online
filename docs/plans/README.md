@@ -248,7 +248,7 @@ A feature stage that needs a change to a shared path writes the requirement unde
 migration**, **UI** or **Quota** heading and stops. The requirement is then minted as a stage in
 `00-foundations.md`. A stage whose Owned paths list contains one of these eight is malformed and is
 rejected before it is scheduled. The rejection is the reviewer's to make; no test asserts it
-(ADR 0026).
+(ADR 0027).
 
 ---
 

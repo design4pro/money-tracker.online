@@ -35,7 +35,7 @@ request by hand under any title at all.
 
 - A person merges every PR. The label rules in `SDLC.md` (`do-not-merge`, `blocked`,
   `qa-failed`, `in-progress`, and `needs-qa` without `qa-approved`) are a convention this skill
-  reads and honours; no CI check enforces them (ADR 0026).
+  reads and honours; no CI check enforces them (ADR 0027).
 - The `develop` to `main` promotion requires a person's release decision.
   Do not use the installed skill's GitHub `APPROVE` step on an author's own PR; GitHub does not
   permit it.

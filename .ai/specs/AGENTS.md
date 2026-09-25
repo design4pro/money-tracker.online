@@ -105,4 +105,4 @@ pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md
 ```
 
 The gate checks only that the index is regenerated. The rules above are a convention the author and
-the reviewer hold; no test asserts them (ADR 0026).
+the reviewer hold; no test asserts them (ADR 0027).
