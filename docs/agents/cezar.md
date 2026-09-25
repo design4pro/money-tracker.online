@@ -330,23 +330,23 @@ workflow grants `Read`, so the agent can follow the pointer.
 cheap to start is one a human actually starts. The four `afk-*` workflows have none either, but
 not deliberately — see the note under the table.
 
-| Workflow              | Agent step                                                               | Started by                                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `issue-groom`         | `/om-auto-manage-issues {{task}} --prep-impl`                            | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                |
-| `issue-autofix`       | `/om-auto-fix-issue {{task}}`                                            | automation **Fix issues on the autofix label** (label `autofix`)                                                                         |
-| `spec`                | `/om-auto-write-spec {{task}}`                                           | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                             |
-| `implement-spec`      | `/om-auto-implement-spec {{task}}`                                       | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
-| `pr-autopilot`        | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer)                                                 |
-| `pr-review`           | `/om-auto-review-pr {{task}} --autofix`                                  | a human, from the cockpit, on a PR number                                                                                                |
-| `pr-fix`              | `/om-auto-fix-pr {{task}}`                                               | manual PR repair                                                                                                                         |
-| `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                         |
-| `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | a human, from the cockpit, with the idea as the task                                                                                     |
-| `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                  |
-| `implement-ticket`    | `/om-fix {{task}}` → gate → `/om-open-pr` → `/om-auto-review-pr`         | automation **Implement ready-for-agent issues** (label `ready-for-agent`, and `risk-low`)                                                |
-| `triage`              | `/afk-triage {{task}}`                                                   | automation **Triage new issues** (label `needs-triage`)                                                                                  |
-| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                               | automation **Spec to tickets**, weekdays 07:00                                                                                           |
-| `architecture-review` | `/afk-architecture-review {{task}}`                                      | automation **Weekly architecture review**, Mondays 06:00                                                                                 |
-| `lessons`             | `/afk-lessons {{task}}`                                                  | automation **Weekly lessons**, Fridays 16:00                                                                                             |
+| Workflow              | Agent step                                                               | Started by                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `issue-groom`         | `/om-auto-manage-issues {{task}} --prep-impl`                            | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                                                                  |
+| `issue-autofix`       | `/om-auto-fix-issue {{task}}`                                            | automation **Fix issues on the autofix label** (label `autofix`)                                                                                                                           |
+| `spec`                | `/om-auto-write-spec {{task}}`                                           | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                                                                               |
+| `implement-spec`      | `/om-auto-implement-spec {{task}}`                                       | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix`                                                   |
+| `pr-autopilot`        | `/om-pr-autopilot {{task}} --allow-merge`                                | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer), **Merge reviewed agent pull requests** (`pull_request.reviewed` on an agent PR in `merge-queue`) |
+| `pr-review`           | `/om-auto-review-pr {{task}} --autofix`                                  | a human, from the cockpit, on a PR number                                                                                                                                                  |
+| `pr-fix`              | `/om-auto-fix-pr {{task}}`                                               | manual PR repair                                                                                                                                                                           |
+| `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                                                                           |
+| `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | a human, from the cockpit, with the idea as the task                                                                                                                                       |
+| `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                                                                    |
+| `implement-ticket`    | `/om-fix {{task}}` → gate → `/om-open-pr` → `/om-auto-review-pr`         | automation **Implement ready-for-agent issues** (label `ready-for-agent`, and `risk-low`)                                                                                                  |
+| `triage`              | `/afk-triage {{task}}`                                                   | automation **Triage new issues** (label `needs-triage`)                                                                                                                                    |
+| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                               | automation **Spec to tickets**, weekdays 07:00                                                                                                                                             |
+| `architecture-review` | `/afk-architecture-review {{task}}`                                      | automation **Weekly architecture review**, Mondays 06:00                                                                                                                                   |
+| `lessons`             | `/afk-lessons {{task}}`                                                  | automation **Weekly lessons**, Fridays 16:00                                                                                                                                               |
 
 The last five rows were shaped unlike the ten above them until 2026-09-20, and it was a defect
 rather than a style. Four were the three-line `skills:` shorthand, so they carried no bootstrap
@@ -403,9 +403,10 @@ This paragraph used to end "the command labels are the only things that start co
 work". That has not been true since `ready-for-agent` was wired to `implement-ticket` (ADR 0017,
 amendment 2026-09-17).
 
-**Merge and after.** `om-merge-buddy` reports what is mergeable, and a person merges - by hand,
-or with GitHub's native `gh pr merge --auto` once the required checks pass. No workflow enables
-auto-merge (ADR 0026). `needs-qa` and `develop` → `main` merge after their respective human
+**Merge and after.** `pr-autopilot` merges into `develop`: `om-pr-autopilot --allow-merge` ends in
+`om-approve-merge-pr`, which reads the labels and the QA gate first. It runs on a PR a maintainer
+opens and on an agent PR reviewed into `merge-queue`. `om-merge-buddy` reports the rest, and a person merges it - by
+hand, or with GitHub's native `gh pr merge --auto` (ADR 0026). `needs-qa` and `develop` → `main` merge after their respective human
 decisions (`SDLC.md`). The live rulesets have no
 GitHub merge queue rule; the `merge-queue` label is a process state only. After a merge,
 `/om-close-fixed-issues` closes what the merge did not: Cezar has no `pull_request.merged`
@@ -418,12 +419,16 @@ three times a day. Only a human sets `qa-approved`: the blind pair is
 Registered with the running cockpit by `.ai/scripts/cez-automations.sh` (`--dry-run` first;
 idempotent: update in place or create enabled; it lists definitions the cockpit holds that the
 file no longer names, and `--prune` deletes them except an enabled one, so the file is the whole
-truth). Ten definitions, in three groups.
+truth). Eleven definitions, in four groups.
 
 **The command-label five:** **Groom new issues** on `issue.opened` with `authors` naming the human
 maintainers; **Re-groom on request**, **Fix issues on the autofix label**, **Write a spec for
 feature issues** on `issue.labeled` with `changedLabels` `groom` / `autofix` / `spec`;
 **Autopilot new pull requests** on `pull_request.opened`, again with `authors`.
+
+**The merge:** **Merge reviewed agent pull requests** on `pull_request.reviewed`, `authors`
+`design4pro-agent`, `anyLabels` `merge-queue`; it runs
+`pr-autopilot`, which merges into `develop`.
 
 **The intake pair:** **Triage new issues** on `changedLabels` `needs-triage`, and **Implement
 ready-for-agent issues** on `changedLabels` `ready-for-agent`, the latter excluding `risk-high`
@@ -541,7 +546,7 @@ claiming issues the new ones handle.
    ```
 
 6. `.ai/scripts/cez-automations.sh --dry-run`, then without the flag: **Groom new issues**, **Re-groom on request**,
-   **Fix issues on the autofix label**, **Write a spec for feature issues** and **Autopilot new pull requests** are created enabled. The
+   **Fix issues on the autofix label**, **Write a spec for feature issues**, **Autopilot new pull requests** and **Merge reviewed agent pull requests** are created enabled. The
    script also lists any definition the cockpit still holds that the file no longer names. To
    remove one, disable it in the cockpit (Automations), then run `--dry-run --prune` and
    `--prune`: the script refuses to delete an enabled stray.
@@ -554,7 +559,8 @@ claiming issues the new ones handle.
    `develop` with `Closes #n`, `bug`, `review` or `merge-queue`, `needs-qa` or `skip-qa`, priority
    and risk, a review from `om-auto-review-pr`, and ends with the `PR: #n` line in the cezar run.
    Nothing in its log mentions husky or lint-staged, and no duplicate issue appeared. Then open a
-   PR by hand: **Autopilot new pull requests** reviews it and does not merge.
+   PR by hand: **Autopilot new pull requests** reviews it and merges it into `develop` once it is
+   approvable, green and past the QA gate.
 
 ## Local use
 

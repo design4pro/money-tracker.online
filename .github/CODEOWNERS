@@ -13,8 +13,7 @@
 # Turning `require_code_owner_review` on is a separate decision with a trap worth naming: GitHub
 # does not let anyone approve their own pull request, so with a single code owner every governance
 # change that owner writes would need the `OrganizationAdmin` bypass - which teaches the habit of
-# bypassing. A change to these paths is `risk-high` by convention and a person merges it
-# (`SDLC.md`, ADR 0026).
+# bypassing. A change to these paths is `risk-high` by convention (`SDLC.md`, ADR 0026).
 
 # The accessibility claim. `BACKWARD_COMPATIBILITY.md` already says it changes only through this
 # document and an ADR (ADR 0009).

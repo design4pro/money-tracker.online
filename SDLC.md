@@ -266,8 +266,9 @@ Three amendment rules are specific to this document's shape:
   `implement-ticket`. It is event-driven only — an issue already carrying an intake label is left
   alone, and no run sweeps the existing backlog. The implementing automation additionally filters
   on `allLabels: ["risk-low"]`, so a `risk-medium` issue still earns a full Agent Brief and
-  `ready-for-agent` and then waits for a person to start it. The ladder ends at an open, reviewed
-  PR: a person merges it, and no automation applies `qa-approved`.
+  `ready-for-agent` and then waits for a person to start it. The ladder ends at a reviewed PR in
+  `merge-queue`, which **Merge reviewed agent pull requests** merges into `develop`; no automation
+  applies `qa-approved`.
 - **Risk here.** `risk-high` means anything touching auth, tenant scoping, money, the ledger,
   billing, a migration, a protected decision document or a merge-policy surface. The label is
   triage information for the reviewer, not a gate. `docs/MONEY.md` is not background reading: representation, rounding and
@@ -291,18 +292,19 @@ Three amendment rules are specific to this document's shape:
 Workflows live in `.ai/cezar/workflows/`; the committed definitions are
 `docs/agents/cezar-automations.json`, applied with `.ai/scripts/cez-automations.sh`.
 
-| Automation                       | Trigger                               | Workflow                                          |
-| -------------------------------- | ------------------------------------- | ------------------------------------------------- |
-| Groom new issues                 | `issue.opened` by a maintainer        | `issue-groom` (`om-auto-manage-issues`)           |
-| Re-groom on request              | `groom` added                         | `issue-groom`                                     |
-| Fix issues on the autofix label  | `autofix` added                       | `issue-autofix` (`om-auto-fix-issue`)             |
-| Write a spec for feature issues  | `spec` added to a `feature`           | `spec` (`om-auto-write-spec`)                     |
-| Autopilot new pull requests      | `pull_request.opened` by a maintainer | `pr-autopilot`                                    |
-| Triage new issues                | `needs-triage` added                  | `triage` (`afk-triage`)                           |
-| Implement ready-for-agent issues | `ready-for-agent` added               | `implement-ticket`                                |
-| Spec to tickets                  | weekdays 07:00                        | `spec-to-tickets` (`afk-to-tickets`)              |
-| Weekly architecture review       | Mondays 06:00                         | `architecture-review` (`afk-architecture-review`) |
-| Weekly lessons                   | Fridays 16:00                         | `lessons` (`afk-lessons`)                         |
+| Automation                         | Trigger                               | Workflow                                          |
+| ---------------------------------- | ------------------------------------- | ------------------------------------------------- |
+| Groom new issues                   | `issue.opened` by a maintainer        | `issue-groom` (`om-auto-manage-issues`)           |
+| Re-groom on request                | `groom` added                         | `issue-groom`                                     |
+| Fix issues on the autofix label    | `autofix` added                       | `issue-autofix` (`om-auto-fix-issue`)             |
+| Write a spec for feature issues    | `spec` added to a `feature`           | `spec` (`om-auto-write-spec`)                     |
+| Autopilot new pull requests        | `pull_request.opened` by a maintainer | `pr-autopilot`                                    |
+| Merge reviewed agent pull requests | agent PR reviewed into `merge-queue`  | `pr-autopilot`                                    |
+| Triage new issues                  | `needs-triage` added                  | `triage` (`afk-triage`)                           |
+| Implement ready-for-agent issues   | `ready-for-agent` added               | `implement-ticket`                                |
+| Spec to tickets                    | weekdays 07:00                        | `spec-to-tickets` (`afk-to-tickets`)              |
+| Weekly architecture review         | Mondays 06:00                         | `architecture-review` (`afk-architecture-review`) |
+| Weekly lessons                     | Fridays 16:00                         | `lessons` (`afk-lessons`)                         |
 
 `housekeeping` (`om-review-prs`, `om-merge-buddy` report, `om-close-fixed-issues`) has **no cezar
 automation but does run on a schedule**: the launchd agent `dev.money-tracker.housekeeping` calls
@@ -321,12 +323,14 @@ anything from anyone else waits for a maintainer to add a trigger label.
 
 **Guardrails:**
 
-- A person merges every PR, with `gh pr merge`, or with `gh pr merge --auto` to land it once the
-  required checks pass. The rulesets require only the three CI checks (`docs/agents/cezar.md`);
+- `pr-autopilot` merges into `develop` with `om-pr-autopilot --allow-merge`: a PR a maintainer
+  opened, and an agent PR reviewed into `merge-queue` (ADR 0026). A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
+  land it once the required checks pass. The rulesets require only the three CI checks (`docs/agents/cezar.md`);
   every label rule in this document is a convention that `om-merge-buddy` and
   `om-approve-merge-pr` read and the person merging honours, and nothing in CI enforces it
   (ADR 0026). The process label `merge-queue` is not a GitHub merge queue entry.
-- A `risk-high` PR gets a careful human review before anyone merges it. A `needs-qa` PR waits for
+- A `risk-high` PR gets a deeper review and no self-QA: when it is `needs-qa`, a human QA reviewer
+  applies `qa-approved`. A `needs-qa` PR waits for
   `qa-approved` from a human QA reviewer. Promotion from `develop` to `main` merges after the
   release decision.
 - `implement-ticket` stops when three or more agent PRs already wait in `review`, and that cap is

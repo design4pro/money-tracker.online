@@ -28,7 +28,7 @@ pipeline:
   - name: qa-failed
     description: 'Manual QA found a defect. Back to the fix chain.'
   - name: merge-queue
-    description: 'Reviewed and, if it needed QA, approved. om-merge-buddy reports it; a human merges.'
+    description: 'Reviewed and, if it needed QA, approved. pr-autopilot merges it into develop, or a human does.'
   - name: blocked
     description: 'Waits on something outside the pull request. The comment says what.'
   - name: do-not-merge

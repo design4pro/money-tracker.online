@@ -55,7 +55,7 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
   summarises (#170, #191, #222, #250, #252, #253).
 - **Governance documents.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`,
   `docs/MONEY.md` and `docs/adr/` record decisions a person owns. A PR touching one is
-  `risk-high`, and a person merges it. Reviewing it means reading the decision, not only the
+  `risk-high`. Reviewing it means reading the decision, not only the
   diff's shape: what changed, what it supersedes, and whether the change belongs there.
 - **Documents name what exists.** A spec, ADR, `SDLC.md`, skill or comment that names a file, job,
   test, label, automation or mechanism names one that exists on the branch and does what the text

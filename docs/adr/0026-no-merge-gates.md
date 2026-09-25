@@ -38,8 +38,14 @@ Open Mercato, runs the same `om-*` skills and the same label vocabulary with non
 3. `risk-approved`, the `Risk approval:`, `QA head:` and `Cezar review:` receipts, the mandatory
    second reviewer for auth and money, and the rule that CI enforces exactly one `risk-*` label are
    removed. The `risk-*` labels stay as triage information.
-4. A person merges, by hand or with GitHub's native `gh pr merge --auto`. No workflow enables
-   auto-merge.
+4. Merging into `develop` is cezar's `pr-autopilot` workflow, which runs
+   `om-pr-autopilot --allow-merge`: the chain ends in `om-approve-merge-pr`, which refuses on
+   `do-not-merge`, `blocked`, `qa-failed`, and `needs-qa` without `qa-approved`. It starts on a
+   pull request a maintainer opens (**Autopilot new pull requests**) and on an agent pull request
+   reviewed into `merge-queue` (**Merge reviewed agent pull requests**, `pull_request.reviewed`, author `design4pro-agent`). The `develop` → `main`
+   promotion is authored by a maintainer and opened carrying `merge-queue`, so neither automation
+   matches it. Everything else a person merges, by hand or with GitHub's native
+   `gh pr merge --auto`. No GitHub workflow enables auto-merge.
 5. The `gate` runner slot is folded into the `ci` pool: every job that ran on
    `["self-hosted","linux","X64","gate"]` falls back to `["self-hosted","linux","X64","ci"]`.
 6. The text-parity tests (the `SDLC.md` shared region, the agent-layer parity, the promotion
@@ -57,7 +63,8 @@ Open Mercato, runs the same `om-*` skills and the same label vocabulary with non
   line and treat its absence as a sign-off that predates pinning.
 - A change to a decision document (`DESIGN.md`, `BACKWARD_COMPATIBILITY.md`,
   `docs/ACCESSIBILITY.md`, `docs/MONEY.md`, `docs/adr/`) needs no label or receipt; `CODEOWNERS`
-  still requests the owner's review, and the owner merges it.
+  still requests the owner's review. It is `risk-high`, which means a deeper review and no self-QA,
+  as the `om-*` skills define it - not a manual merge.
 - The shared part of `SDLC.md` can drift from the sibling repositories, a spec's metadata table can
   disagree with its directory, and a plan can name a shared path in its Owned paths, without a test
   failing. Review is what catches them.
