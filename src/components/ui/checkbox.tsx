@@ -1,7 +1,5 @@
-import {
-  Checkbox as RACCheckbox,
-  CheckboxGroup as RACCheckboxGroup,
-} from 'react-aria-components'
+import { Checkbox as RACCheckbox } from 'react-aria-components/Checkbox'
+import { CheckboxGroup as RACCheckboxGroup } from 'react-aria-components/CheckboxGroup'
 import { Check, Minus } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

@@ -11,7 +11,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react'
-import { useDragAndDrop } from 'react-aria-components'
+import { useDragAndDrop } from 'react-aria-components/useDragAndDrop'
 
 import { ErrorPanel } from '#/components/app/shell'
 import { RulesListSkeleton } from '#/components/app/transactions'

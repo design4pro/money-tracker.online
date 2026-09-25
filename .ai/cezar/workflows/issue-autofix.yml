@@ -2,7 +2,7 @@
 # chain (verify, root cause, fix, PR, review, QA for UI fixes) to a reviewed PR on develop
 # (ADR 0017). The repo-local override (.ai/skills/om-auto-fix-issue/) removes `autofix` as its
 # first mutation, so a label still present is a run nobody took. No bashAllowlist by design:
-# the tracker descriptor needs shell functions and jq; hooks in .claude/hooks/ are the gate.
+# the tracker descriptor needs shell functions and jq; .claude/settings.json deny rules are the gate.
 name: issue-autofix
 description: Human added `autofix`; om-auto-fix-issue drives the issue to a reviewed draft-then-ready PR on develop.
 steps:

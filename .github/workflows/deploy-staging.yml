@@ -33,8 +33,8 @@ permissions:
 # runs too. Since 2026-09-24 that VPS is the only place this repository's jobs run (ADR 0022).
 #
 # A deploy queues behind whatever the pool is already running, and a VPS outage stops shipping
-# as well as the gate. Recovery is a variable, not a pull request, because the merge gate needs
-# the runners that are missing:
+# as well as the gate. Recovery is a variable, not a pull request, because the required checks
+# need the runners that are missing:
 #
 #   gh variable set RUNNER_DEPLOY '["ubuntu-latest"]'
 #

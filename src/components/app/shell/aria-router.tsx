@@ -1,5 +1,6 @@
 import { useRouter } from '@tanstack/react-router'
 import { useCallback } from 'react'
+// eslint-disable-next-line no-restricted-imports -- re-exported from react-aria, no per-component entry.
 import { RouterProvider as ReactAriaRouterProvider } from 'react-aria-components'
 
 import type { ReactNode } from 'react'

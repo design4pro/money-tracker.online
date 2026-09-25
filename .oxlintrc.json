@@ -16,16 +16,9 @@
   "env": { "builtin": true },
   "ignorePatterns": [
     "prettier.config.js",
-    // Ignored one level at a time, and not with `.claude/**` plus a negation: these are gitignore
-    // semantics, so a path inside an excluded *directory* can never be re-included - the directory
-    // is pruned before the negation is read. The shorter form silently ignores the hook tests.
-    ".claude/*",
-    "!.claude/hooks",
-    ".claude/hooks/*",
-    // The hook tests are the carve-out: ordinary TypeScript in this repository's tsconfig.
-    "!.claude/hooks/__tests__",
+    ".claude/**",
     // Agent tooling that GitHub's own surfaces read - skills, agent definitions, hooks. Same reason
-    // as `.claude/*`: vendored configuration for tools around the project.
+    // as `.claude/**`: vendored configuration for tools around the project.
     ".github/**",
     "drizzle/**"
   ],
@@ -67,6 +60,21 @@
         "no-misleading-character-class": "error",
         "no-nonoctal-decimal-escape": "error",
         "no-regex-spaces": "error",
+        // The root entry evaluates every component. Tests pay for it per file, and components/ui
+        // hands it to every test through the barrel. Repeated in each override below that sets
+        // this rule, since an override replaces its options.
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react-aria-components",
+                "allowTypeImports": true,
+                "message": "Import from the component's own entry, e.g. react-aria-components/Button. The root loads the whole library: 0.7 s in every test file that reaches it."
+              }
+            ]
+          }
+        ],
         "no-self-assign": "error",
         "no-shadow": "warn",
         "no-shadow-restricted-names": "error",
@@ -129,6 +137,11 @@
               {
                 "name": "drizzle-orm",
                 "message": "SQL lives in server/repos via the tenant base repository. Call a server function instead."
+              },
+              {
+                "name": "react-aria-components",
+                "allowTypeImports": true,
+                "message": "Import from the component's own entry, e.g. react-aria-components/Button. The root loads the whole library: 0.7 s in every test file that reaches it."
               }
             ],
             "patterns": [
@@ -168,6 +181,11 @@
               {
                 "name": "drizzle-orm",
                 "message": "SQL lives in server/repos via the tenant base repository. Call a server function instead."
+              },
+              {
+                "name": "react-aria-components",
+                "allowTypeImports": true,
+                "message": "Import from the component's own entry, e.g. react-aria-components/Button. The root loads the whole library: 0.7 s in every test file that reaches it."
               }
             ],
             "patterns": [

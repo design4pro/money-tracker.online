@@ -25,7 +25,7 @@ coverage/
 #
 # That script passes `--copy` because the `skills` CLI symlinks by default: without it the
 # vendored directories are replaced by links into an untracked `.agents/skills/`, which reads as
-# hundreds of deleted files and puts the collection outside review and outside guard-generated.sh.
+# hundreds of deleted files and puts the collection outside review.
 # `.agents/` is deliberately not ignored here - if it ever appears, the install was wrong.
 
 # Per-run artefacts of the om pipeline. The launchers .ai/scripts/test-env-*.sh stay tracked

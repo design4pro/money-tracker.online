@@ -9,8 +9,8 @@
  * Both deploy workflows choose their runner through `vars.RUNNER_DEPLOY` and fall back to the `ci`
  * pool on the OVH VPS, where the gate runs too (#409, ADR 0022). The fallback is the default
  * because a variable is invisible in the tree, and the variable stays because leaving the VPS
- * cannot need the merge gate that needs the VPS. Hard-code a runner here and the lever disappears
- * silently - the next deploy is the first place anyone notices.
+ * cannot need the required checks that need the VPS. Hard-code a runner here and the lever
+ * disappears silently - the next deploy is the first place anyone notices.
  *
  * The browser suites install their own browsers. Both of them - the e2e gate and the axe gate -
  * used to inherit them from a runner image built FROM `mcr.microsoft.com/playwright`, and when the
@@ -110,35 +110,7 @@ describe.each([
   })
 })
 
-describe('runner recovery documentation', () => {
-  it('describes the repository-scoped deployment variable consistently', () => {
-    const headers = [
-      '.github/workflows/deploy-staging.yml',
-      '.github/workflows/deploy-production.yml',
-    ].map(
-      (path) => read(path).match(/^(# `runs-on` below[\s\S]*?)^jobs:/m)?.[1],
-    )
-
-    expect(headers).toEqual([headers[0], headers[0]])
-    expect(headers[0]).toMatch(
-      /a repository variable that is deliberately\s*\n# unset/,
-    )
-    expect(headers[0]).not.toContain('organisation variable')
-  })
-
-  it('records the current runner settings in the ADR that owns them', () => {
-    const adr = read('docs/adr/0022-ci-and-agents-run-only-on-the-vps-pool.md')
-
-    expect(adr).toContain('Status: accepted')
-    for (const labels of [
-      '["self-hosted","linux","X64","ci"]',
-      '["self-hosted","linux","X64","gate"]',
-      '["self-hosted","linux","X64","agent"]',
-    ])
-      expect(adr).toContain(`\`${labels}\``)
-    expect(adr).toMatch(/`RUNNER_CI`, `RUNNER_DEPLOY` and `RUNNER_AGENT`/)
-  })
-
+describe('.github/workflows', () => {
   it('points every workflow at the VPS pool and nowhere else by default', () => {
     const workflows = readdirSync(join(ROOT, '.github/workflows')).filter((f) =>
       f.endsWith('.yml'),
@@ -148,7 +120,7 @@ describe('runner recovery documentation', () => {
         /^\s*runs-on:[^\n]*/gm,
       )) {
         expect(line, file).toMatch(
-          /fromJSON\(vars\.RUNNER_(CI|DEPLOY|AGENT) \|\| '\["self-hosted","linux","X64","(ci|gate|agent)"\]'\)/,
+          /fromJSON\(vars\.RUNNER_(CI|DEPLOY|AGENT) \|\| '\["self-hosted","linux","X64","(ci|agent)"\]'\)/,
         )
       }
     }

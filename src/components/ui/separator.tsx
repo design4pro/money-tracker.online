@@ -1,4 +1,4 @@
-import { Separator as RACSeparator } from 'react-aria-components'
+import { Separator as RACSeparator } from 'react-aria-components/Menu'
 
 import { cn } from '#/lib/cn'
 

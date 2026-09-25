@@ -1,4 +1,4 @@
-import { Switch as RACSwitch } from 'react-aria-components'
+import { Switch as RACSwitch } from 'react-aria-components/Switch'
 
 import { cn } from '#/lib/cn'
 import { composeTw, transitionBase } from './shared'

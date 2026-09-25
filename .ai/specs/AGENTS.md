@@ -65,8 +65,8 @@ same file, so the schema is deliberately identical in both.
 ## Always
 
 - Give a new spec the filename `YYYY-MM-DD-kebab-case-slug.md` and the metadata table above.
-- Move a spec between directories with `git mv`, and change `Status` in the same commit. The guard
-  fails when the two disagree, which is the point of recording it twice.
+- Move a spec between directories with `git mv`, and change `Status` in the same commit. Nothing
+  checks that the two agree, so the commit that moves one has to change the other.
 - Append the implementation pull request to `Implementation` when a phase merges — every phase, not
   only the last.
 - Run `pnpm generate-spec-index` after any of that. The index is generated; the validation gate
@@ -102,8 +102,7 @@ in-progress` and the built pull requests listed.
 
 ```bash
 pnpm generate-spec-index && git diff --exit-code -- .ai/specs/README.md
-pnpm exec vitest run --project=tooling scripts/specs
 ```
 
-Both are in the gate. The assertions live in `scripts/specs/registry.ts` and are documented there;
-`scripts/specs/__tests__/spec-registry.test.ts` is what fails on them.
+The gate checks only that the index is regenerated. The rules above are a convention the author and
+the reviewer hold; no test asserts them (ADR 0026).

@@ -121,13 +121,10 @@ jobs:
   # axe scan (#455). Only a pull request is scoped: on any other event this job skips, its output is
   # empty, and empty means "run". So does a failure here. The push to `develop` after the merge runs
   # every leg regardless, because `verified-tree.mjs` never reads a `pull_request` run.
-  #
-  # The `gate` pool, because the e2e legs wait for it: on the `ci` pool it would queue behind
-  # `verify` and `test` and hold the legs back by their whole duration.
   changes:
     name: change scope
     if: github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 5
     outputs:
       browser: ${{ steps.scope.outputs.browser }}
@@ -340,7 +337,7 @@ jobs:
   # into.
   #
   # The live rulesets have no GitHub merge queue rule. A skipped required report on a PR therefore
-  # cannot prove the journeys passed before auto-merge. Run the legs on PRs and merge groups; a
+  # cannot prove the journeys passed before the merge. Run the legs on PRs and merge groups; a
   # push only needs them when `verdict` found no earlier run for the tree (ADR 0020 amendment). A
   # pull request `changes` found nothing browser-facing in skips them (#455).
   e2e:

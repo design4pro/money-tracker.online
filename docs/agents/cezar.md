@@ -174,21 +174,19 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   **That set is no longer empty, and this section previously said it was.** On 2026-09-09 both
   branches resolved to `deletion`, `non_fast_forward`, `pull_request` and nothing else. On
   2026-09-23 `develop` (ruleset 22037820) and `main` (22037770) both have
-  `required_status_checks`, no `merge_queue` rule and `Required approvals: 0`. They require the
-  same four contexts, with `strict_required_status_checks_policy: false`:
+  `required_status_checks`, no `merge_queue` rule and `Required approvals: 0`. Since 2026-09-25
+  they require the same three contexts, with `strict_required_status_checks_policy: false`
+  (ADR 0026):
 
-  | Required context                       | Published by                       |
-  | -------------------------------------- | ---------------------------------- |
-  | `generated · typecheck · lint · build` | `.github/workflows/ci.yml`         |
-  | `unit tests · coverage`                | `.github/workflows/ci.yml`         |
-  | `e2e · merged report`                  | `.github/workflows/ci.yml`         |
-  | `merge-gate`                           | `.github/workflows/merge-gate.yml` |
+  | Required context                       | Published by               |
+  | -------------------------------------- | -------------------------- |
+  | `generated · typecheck · lint · build` | `.github/workflows/ci.yml` |
+  | `unit tests · coverage`                | `.github/workflows/ci.yml` |
+  | `e2e · merged report`                  | `.github/workflows/ci.yml` |
 
-  The required contexts name the GitHub Actions integration (`integration_id` 15368). A status
-  name and integration alone do not identify a trusted workflow file; required-workflow pinning
-  and an adversarial workflow-edit test remain rollout prerequisites for automatic merging.
-  **get-pr-checks** must read the current head's required check runs, including the custom
-  `merge-gate` check run, rather than treating a skipped or missing result as a passing test.
+  The required contexts name the GitHub Actions integration (`integration_id` 15368).
+  **get-pr-checks** must read the current head's required check runs rather than treating a
+  skipped or missing result as a passing test.
 
   `ci.yml` now runs the browser legs on every pull request that can change what the browser sees.
   The required `e2e · merged report` fails when those legs fail or are skipped, except when the
@@ -197,15 +195,12 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   are not. ADR 0020's 2026-09-23 amendment explains why deferring E2E to `merge_group` was
   unsafe without a live GitHub merge queue rule.
 
-  **A sixth check exists and is deliberately not in that set.** `governance-gate`
-  (`.github/workflows/governance-gate.yml`) reports on every pull request but requires none,
-  because it was added after the rulesets were last written and making it required is a
-  repository-configuration change a person takes on purpose. Read the table above as "what a merge
-  waits for", not as "what runs": until someone adds the context to both rulesets, a red
-  `governance-gate` is advice. Adding it means editing this table in the same change.
+  Read the table above as "what a merge waits for", not as "what runs". Adding a required context
+  means editing this table in the same change.
 
   The pipeline still holds a merge as well — the labels, the review verdict and the
-  QA gate in `SDLC.md` — but it is no longer the only thing holding one, and prose elsewhere
+  QA gate in `SDLC.md`, read by the merge skills as a convention and enforced by no check
+  (ADR 0026) — but it is no longer the only thing holding one, and prose elsewhere
   (this section included, before this revision) that credits the ruleset with enforcing nothing but
   pull-request-and-no-force-push predates the reading above. The `pull_request` rule still sets
   `required_approving_review_count: 0` on both branches, so the review gate remains the pipeline's,
@@ -291,45 +286,27 @@ it is installed, stop running bare `cezar` in a repo. Log: `~/Library/Logs/cezar
 
 ## Agent mode
 
-A Claude Code session is an agent run when `CEZ_TASK_ID` (cezar) or `GITHUB_ACTIONS` is set.
-`.husky/pre-commit` skips itself under `CEZ_TASK_ID` (`validation.commands` is the run's gate),
-and the hooks in `.claude/hooks/` tighten:
+cezar starts Claude Code with `--permission-mode dontAsk` (ADR 0025). `.husky/pre-commit` skips
+itself under `CEZ_TASK_ID` (`validation.commands` is the run's gate), and the project's
+`.claude/settings.json` decides the rest, with no project hook in the way:
 
-- `git-guardrails.sh` also blocks `pnpm add|remove|update` (the stack is pinned, `docs/SPEC.md`
-  §3), `printenv` and `env` dumps (`printenv NAME` for a named non-secret variable stays open). For
-  everyone it blocks force-pushes to `develop`/`main`, `git reset --hard`, `git clean -f`,
-  `git branch -D`, `git checkout/restore .` and `--no-verify`.
-  GitHub mutations, `git add -A`, closing keywords and `pnpm exec` are open: the om skills perform
-  them through the tracker descriptor and `SDLC.md` governs them.
-- `guard-read.sh` (Read, Glob, Grep) confines reads to the worktree and denies `.dev.vars`,
-  `.env*`, cezar run state and `.ai/qa/test-env.env`. `.ai/runs`, `.ai/analysis`, `.ai/qa` and
-  `.ai/tmp` stay readable: the skills write their artefacts there. Outside the worktree a cezar run
-  also reads its own transcript directory under `~/.claude/projects/`, its own `TMPDIR`
-  (`<main>/.ai/cezar/tmp/<id>`) and the main checkout, except `.ai/cezar/` and `.git/` there.
-- `guard-generated.sh` (Edit, Write) refuses the generated files — `src/routeTree.gen.ts`,
-  `drizzle/`, `worker-configuration.d.ts` — for everyone, in every mode, and in an agent run also
-  refuses any write that walks through `..` or lands outside the worktree, the run's own `TMPDIR`
-  aside. That confinement has a real incident behind it: a pr-autopilot run once rewrote eight
-  files in a sibling checkout a human was working in, and nothing downstream could tell.
-
-  It used to refuse a third set — `.github/`, `.claude/`, `.husky/`, `.ai/cezar/`,
-  `.ai/agentic.config.json`, `.ai/trackers/`, `.ai/browsers/`, `.ai/skills/`, `.ai/scripts/`,
-  `scripts/ci/`, `.npmrc`, `pnpm-workspace.yaml`, `docs/agents/reference.md` and
-  `docs/agents/out-of-scope.md` — in a cezar run too, with an exception for a file the branch
-  already changed. **Not any more** (ADR 0021): a cezar run edits its own skills, workflows and
-  gate like any other change here, and the review of its branch is what judges that. The
-  `in_branch_diff` exception went with it, having existed only to soften that block.
-
-  Under `GITHUB_ACTIONS` that third set is still refused, without exception. There the diff being
-  read is the pull request author's, so "this branch already changes it" is the author's own claim,
-  and the review job holds a write token while reading it.
+- `permissions.deny` is refused in every session, agent or not: reading `.dev.vars*` and `.env*`
+  (the `.example` files aside) and `.ai/qa/test-env.env`; hand-editing `src/routeTree.gen.ts` and
+  `drizzle/` (run the generator); force-pushing, `git reset --hard`, `--no-verify`,
+  `git filter-branch`/`filter-repo`, `gh repo delete` and `rm -rf ~`; writing a Cloudflare secret
+  and deleting a D1 database, R2 bucket, KV namespace or the Worker.
+- `permissions.ask` - deploys, remote D1 commands and an edit of the hand-mirrored
+  `worker-configuration.d.ts` - prompts a developer at the keyboard and is refused in a cezar run,
+  because `dontAsk` turns every prompt into a denial.
+- Everything else is open, including a write outside the worktree: a step that holds a bare `Edit`
+  or `Write` may write anywhere the user can. That is an accepted risk (ADR 0025); a pr-autopilot
+  run once rewrote eight files in a sibling checkout, and that shows up in the sibling's
+  `git status`, not in the run's own PR.
 
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
-`jq`, and a prefix allowlist would drop label mutations silently. The hooks in `.claude/hooks/`,
-the PAT scopes, one worktree per run and `maxParallel: 2` are the gate. `.claude/settings.json`
-carries no permission rules; it is hooks-only, and the rules a `deny` list used to hold moved into
-`git-guardrails.sh` and `guard-read.sh`, which see the whole command rather than a prefix.
-`.claude/hooks/__tests__/hooks.test.ts` (vitest project `tooling`) holds the hooks' contract.
+`jq`, and a prefix allowlist would drop label mutations silently. The permission rules above,
+branch protection on `develop` and `main`, the PAT scopes, one worktree per run, `maxParallel: 2`
+and review of every pull request are the gate.
 
 ## Workflows (`.ai/cezar/workflows/`)
 
@@ -347,30 +324,29 @@ and injects the same single winning body (`packages/cezar/src/workflows/run.ts`)
 precedence means the `.ai/skills/` override wins either way. The slash form is the house
 convention, not a fix. What actually keeps the chain working is that every `.ai/skills/om-*`
 override names its installed `.claude/skills/<name>/SKILL.md` in its opening line and every
-workflow grants `Read`, so the agent can follow the pointer; `.ai/scripts/__tests__/agent-layer-parity.test.mjs`
-asserts exactly that.
+workflow grants `Read`, so the agent can follow the pointer.
 
 `backlog` deliberately has no bootstrap step: it is plain node plus `gh`, and a report that is
 cheap to start is one a human actually starts. The four `afk-*` workflows have none either, but
 not deliberately — see the note under the table.
 
-| Workflow              | Agent step                                                               | Started by                                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `issue-groom`         | `/om-auto-manage-issues {{task}} --prep-impl`                            | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                |
-| `issue-autofix`       | `/om-auto-fix-issue {{task}}`                                            | automation **Fix issues on the autofix label** (label `autofix`)                                                                         |
-| `spec`                | `/om-auto-write-spec {{task}}`                                           | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                             |
-| `implement-spec`      | `/om-auto-implement-spec {{task}}`                                       | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix` |
-| `pr-autopilot`        | `/om-pr-autopilot {{task}}` (no `--allow-merge`)                         | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer)                                                 |
-| `pr-review`           | `/om-auto-review-pr {{task}} --autofix`                                  | a human, from the cockpit, on a PR number                                                                                                |
-| `pr-fix`              | `/om-auto-fix-pr {{task}}`                                               | manual PR repair                                                                                                                         |
-| `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                         |
-| `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | a human, from the cockpit, with the idea as the task                                                                                     |
-| `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                  |
-| `implement-ticket`    | `/om-fix {{task}}` → gate → `/om-open-pr` → `/om-auto-review-pr`         | automation **Implement ready-for-agent issues** (label `ready-for-agent`, and `risk-low`)                                                |
-| `triage`              | `/afk-triage {{task}}`                                                   | automation **Triage new issues** (label `needs-triage`)                                                                                  |
-| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                               | automation **Spec to tickets**, weekdays 07:00                                                                                           |
-| `architecture-review` | `/afk-architecture-review {{task}}`                                      | automation **Weekly architecture review**, Mondays 06:00                                                                                 |
-| `lessons`             | `/afk-lessons {{task}}`                                                  | automation **Weekly lessons**, Fridays 16:00                                                                                             |
+| Workflow              | Agent step                                                               | Started by                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `issue-groom`         | `/om-auto-manage-issues {{task}} --prep-impl`                            | automation **Groom new issues** (`issue.opened`), **Re-groom on request** (label `groom`)                                                                                                  |
+| `issue-autofix`       | `/om-auto-fix-issue {{task}}`                                            | automation **Fix issues on the autofix label** (label `autofix`)                                                                                                                           |
+| `spec`                | `/om-auto-write-spec {{task}}`                                           | automation **Write a spec for feature issues** (label `spec` on a `feature`)                                                                                                               |
+| `implement-spec`      | `/om-auto-implement-spec {{task}}`                                       | a human, from the cockpit, after the spec PR merged - or `autofix` on the FR issue, which reaches the same skill through `issue-autofix`                                                   |
+| `pr-autopilot`        | `/om-pr-autopilot {{task}} --allow-merge`                                | automation **Autopilot new pull requests** (`pull_request.opened` by a human maintainer), **Merge reviewed agent pull requests** (`pull_request.reviewed` on an agent PR in `merge-queue`) |
+| `pr-review`           | `/om-auto-review-pr {{task}} --autofix`                                  | a human, from the cockpit, on a PR number                                                                                                                                                  |
+| `pr-fix`              | `/om-auto-fix-pr {{task}}`                                               | manual PR repair                                                                                                                                                                           |
+| `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50` | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                                                                           |
+| `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                            | a human, from the cockpit, with the idea as the task                                                                                                                                       |
+| `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                      | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                                                                    |
+| `implement-ticket`    | `/om-fix {{task}}` → gate → `/om-open-pr` → `/om-auto-review-pr`         | automation **Implement ready-for-agent issues** (label `ready-for-agent`, and `risk-low`)                                                                                                  |
+| `triage`              | `/afk-triage {{task}}`                                                   | automation **Triage new issues** (label `needs-triage`)                                                                                                                                    |
+| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                               | automation **Spec to tickets**, weekdays 07:00                                                                                                                                             |
+| `architecture-review` | `/afk-architecture-review {{task}}`                                      | automation **Weekly architecture review**, Mondays 06:00                                                                                                                                   |
+| `lessons`             | `/afk-lessons {{task}}`                                                  | automation **Weekly lessons**, Fridays 16:00                                                                                                                                               |
 
 The last five rows were shaped unlike the ten above them until 2026-09-20, and it was a defect
 rather than a style. Four were the three-line `skills:` shorthand, so they carried no bootstrap
@@ -427,11 +403,11 @@ This paragraph used to end "the command labels are the only things that start co
 work". That has not been true since `ready-for-agent` was wired to `implement-ticket` (ADR 0017,
 amendment 2026-09-17).
 
-**Merge and after.** `om-merge-buddy` reports what is mergeable. For a non-draft `develop` PR
-without `risk-high` or `needs-qa`, Cezar completes its review and the trusted controller may
-enable auto-merge after the required checks pass, once `AUTO_MERGE_ENABLED=true`. Until that
-rollout, a maintainer merges manually. `risk-high`, `needs-qa` and `develop` → `main` always
-merge manually after their respective human decisions (`SDLC.md`). The live rulesets have no
+**Merge and after.** `pr-autopilot` merges into `develop`: `om-pr-autopilot --allow-merge` ends in
+`om-approve-merge-pr`, which reads the labels and the QA gate first. It runs on a PR a maintainer
+opens and on an agent PR reviewed into `merge-queue`. `om-merge-buddy` reports the rest, and a person merges it - by
+hand, or with GitHub's native `gh pr merge --auto` (ADR 0026). `needs-qa` and `develop` → `main` merge after their respective human
+decisions (`SDLC.md`). The live rulesets have no
 GitHub merge queue rule; the `merge-queue` label is a process state only. After a merge,
 `/om-close-fixed-issues` closes what the merge did not: Cezar has no `pull_request.merged`
 event, and `develop` is not the default branch, so nothing closes natively. Housekeeping runs
@@ -443,12 +419,16 @@ three times a day. Only a human sets `qa-approved`: the blind pair is
 Registered with the running cockpit by `.ai/scripts/cez-automations.sh` (`--dry-run` first;
 idempotent: update in place or create enabled; it lists definitions the cockpit holds that the
 file no longer names, and `--prune` deletes them except an enabled one, so the file is the whole
-truth). Ten definitions, in three groups.
+truth). Eleven definitions, in four groups.
 
 **The command-label five:** **Groom new issues** on `issue.opened` with `authors` naming the human
 maintainers; **Re-groom on request**, **Fix issues on the autofix label**, **Write a spec for
 feature issues** on `issue.labeled` with `changedLabels` `groom` / `autofix` / `spec`;
 **Autopilot new pull requests** on `pull_request.opened`, again with `authors`.
+
+**The merge:** **Merge reviewed agent pull requests** on `pull_request.reviewed`, `authors`
+`design4pro-agent`, `anyLabels` `merge-queue`; it runs
+`pr-autopilot`, which merges into `develop`.
 
 **The intake pair:** **Triage new issues** on `changedLabels` `needs-triage`, and **Implement
 ready-for-agent issues** on `changedLabels` `ready-for-agent`, the latter excluding `risk-high`
@@ -472,10 +452,10 @@ got a second review the moment its `in-progress` lock lifted. Every filter exclu
 runs unless the service env sets `CEZ_AUTOMATIONS=0` (the default since 0.11.0; the plist's
 explicit `1` changes nothing), and a 409 from the API says it is off.
 
-A review or autopilot run checks out the PR's head, hooks included: a branch cut before the om
-cutover (`f2a258e`) carries the old `git-guardrails.sh`, which blocks every GitHub write in agent
-mode, and the run ends in a question nobody answers (PR #67, 2026-09-07). Merge `develop` into such
-a branch before opening the PR.
+A review or autopilot run checks out the PR's head, `.claude/` included: a branch cut before
+ADR 0025 still carries the guard hooks, and a branch cut before the om cutover (`f2a258e`) carries
+a `git-guardrails.sh` that blocks every GitHub write in agent mode, so the run ends in a question
+nobody answers (PR #67, 2026-09-07). Merge `develop` into such a branch before opening the PR.
 
 ## Prompt templates (`docs/agents/cezar-prompt-templates.json`)
 
@@ -566,7 +546,7 @@ claiming issues the new ones handle.
    ```
 
 6. `.ai/scripts/cez-automations.sh --dry-run`, then without the flag: **Groom new issues**, **Re-groom on request**,
-   **Fix issues on the autofix label**, **Write a spec for feature issues** and **Autopilot new pull requests** are created enabled. The
+   **Fix issues on the autofix label**, **Write a spec for feature issues**, **Autopilot new pull requests** and **Merge reviewed agent pull requests** are created enabled. The
    script also lists any definition the cockpit still holds that the file no longer names. To
    remove one, disable it in the cockpit (Automations), then run `--dry-run --prune` and
    `--prune`: the script refuses to delete an enabled stray.
@@ -579,7 +559,8 @@ claiming issues the new ones handle.
    `develop` with `Closes #n`, `bug`, `review` or `merge-queue`, `needs-qa` or `skip-qa`, priority
    and risk, a review from `om-auto-review-pr`, and ends with the `PR: #n` line in the cezar run.
    Nothing in its log mentions husky or lint-staged, and no duplicate issue appeared. Then open a
-   PR by hand: **Autopilot new pull requests** reviews it and does not merge.
+   PR by hand: **Autopilot new pull requests** reviews it and merges it into `develop` once it is
+   approvable, green and past the QA gate.
 
 ## Local use
 

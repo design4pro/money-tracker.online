@@ -35,11 +35,12 @@ your own checkout use `pnpm dev` in one shell and `pnpm e2e` in another.
 
 1. **While working**: `pnpm typecheck`, `pnpm lint`, single vitest files
    (`pnpm exec vitest run <path>`).
-2. **Before committing**: `pnpm test`. The pre-commit hook runs `lint-staged`, `pnpm typecheck` and
-   `pnpm test`, so a broken tree is caught either way - but caught by the hook it scrolls past (see
-   "a count and no shape" below).
-3. **Before a PR**: `pnpm build`, plus the two drift gates when you touched the route tree or the
-   schema:
+2. **Before committing**: the pre-commit hook runs `lint-staged`, `pnpm typecheck` and the tests
+   the commit reaches - every test that imports a staged file, plus every test that reads the disk
+   or starts a process (ADR 0026) - not the whole suite. What it catches scrolls past (see "a count
+   and no shape" below).
+3. **Before a PR**: `pnpm test` and `pnpm build`, plus the two drift gates when you touched the
+   route tree or the schema:
    `pnpm generate-routes && git diff --exit-code -- src/routeTree.gen.ts` and
    `pnpm db:generate && git diff --exit-code -- drizzle/`. CI re-asserts both.
 4. **UI touched**: `pnpm e2e` locally, **and look at the screens**. Nothing compares a pixel

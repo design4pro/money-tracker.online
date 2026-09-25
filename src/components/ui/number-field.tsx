@@ -1,8 +1,6 @@
-import {
-  Button as RACButton,
-  Input as RACInput,
-  NumberField as RACNumberField,
-} from 'react-aria-components'
+import { Button as RACButton } from 'react-aria-components/Button'
+import { Input as RACInput } from 'react-aria-components/ColorField'
+import { NumberField as RACNumberField } from 'react-aria-components/NumberField'
 import { Minus, Plus } from 'lucide-react'
 
 import { cn } from '#/lib/cn'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { useLocale as useReactAriaLocale } from 'react-aria-components'
+import { useLocale as useReactAriaLocale } from 'react-aria-components/I18nProvider'
 
 import { I18nProvider } from '#/lib/i18n'
 

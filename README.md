@@ -91,8 +91,8 @@ missing — is `docs/DEPLOY.md`.
   QA gate are `SDLC.md`; the backlog contract is `docs/agents/issue-tracker.md`.
 - A human starts implementation with the `autofix` label on an issue, from the cockpit (issue →
   "Hand this to the agent" → `issue-autofix`) or locally with `/om-auto-fix-issue <n>`. Every
-  pull request is reviewed by `om-auto-review-pr` and stops at `review` or `merge-queue` for a
-  human; `needs-qa` without `qa-approved` never merges.
+  pull request is reviewed by `om-auto-review-pr`; one in `merge-queue` is merged into `develop` by
+  `pr-autopilot`; `needs-qa` without `qa-approved` never merges.
 
 ## Documentation
 

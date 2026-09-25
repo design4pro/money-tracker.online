@@ -12,4 +12,4 @@ contact_links:
     url: https://github.com/design4pro/money-tracker.online/blob/develop/SDLC.md
     about: >
       How an issue becomes a merged pull request, and what each label means. One category per
-      issue; the pipeline labels are written by the agents and read by the merge gate.
+      issue; the pipeline labels are written by the agents and read by the merge skills.

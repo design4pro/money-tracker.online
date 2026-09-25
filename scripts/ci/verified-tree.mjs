@@ -153,8 +153,7 @@ function report(verified, runId) {
     appendFileSync(out, `verified=${verified}\nverified-run=${runId ?? ''}\n`)
 }
 
-// Importing this file for its decision helpers must not run the lookup - the same guard, for the
-// same reason, as `merge-gate.mjs`.
+// Importing this file for its decision helpers must not run the lookup.
 if (
   process.argv[1] &&
   realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)

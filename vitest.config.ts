@@ -175,7 +175,6 @@ export default defineConfig({
             // run in this project for the same reason `scripts/ci/__tests__` do: they are
             // policy that lives outside `src/**` and nothing else gates them.
             '.ai/scripts/**/__tests__/*.test.mjs',
-            '.claude/hooks/__tests__/*.test.ts',
             'e2e/support/__tests__/*.test.ts',
           ],
           testTimeout: 30_000,
