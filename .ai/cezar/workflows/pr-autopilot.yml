@@ -1,15 +1,17 @@
-# A human opened a pull request (the "Autopilot new pull requests" automation filters on authors). om-pr-autopilot
-# diagnoses it and runs the right chain: continue, fix, review, QA. `--allow-merge` is absent on
-# purpose: nothing autonomous merges here; a human runs om-approve-merge-pr from the cockpit
-# (ADR 0017).
+# A human opened a pull request, or an agent pull request reached `merge-queue` (the "Autopilot new
+# pull requests" and "Merge reviewed agent pull requests" automations filter on authors and labels).
+# om-pr-autopilot diagnoses it and runs the right chain: continue, fix, review, QA, and with
+# `--allow-merge` the final om-approve-merge-pr merge, which still refuses on a failed QA gate or
+# `qa-failed` / `do-not-merge` / `blocked` (ADR 0026). The develop-to-main promotion PR never
+# reaches this workflow: it is authored by a maintainer and opened carrying `merge-queue`.
 name: pr-autopilot
-description: om-pr-autopilot on one PR - diagnose, then continue / fix / review / QA; never merges.
+description: om-pr-autopilot on one PR - diagnose, then continue / fix / review / QA / merge to develop.
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
     command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
   - id: autopilot
     name: om-pr-autopilot
-    prompt: '/om-pr-autopilot {{task}}'
+    prompt: '/om-pr-autopilot {{task}} --allow-merge'
     # `Task` dispatches the review personas in .claude/agents (CODE_REVIEW.md -> Review personas).
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]

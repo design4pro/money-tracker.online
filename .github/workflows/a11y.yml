@@ -45,7 +45,7 @@ jobs:
   changes:
     name: change scope
     if: github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 5
     outputs:
       browser: ${{ steps.scope.outputs.browser }}

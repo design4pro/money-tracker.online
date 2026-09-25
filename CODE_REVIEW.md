@@ -55,8 +55,7 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
   summarises (#170, #191, #222, #250, #252, #253).
 - **Governance documents.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`,
   `docs/MONEY.md` and `docs/adr/` record decisions a person owns. A PR touching one is
-  `risk-high`; the required `merge-gate` verifies a configured human's `Risk approval: <full head SHA>`
-  comment and the `risk-approved` label. Reviewing it means reading the decision, not only the
+  `risk-high`. Reviewing it means reading the decision, not only the
   diff's shape: what changed, what it supersedes, and whether the change belongs there.
 - **Documents name what exists.** A spec, ADR, `SDLC.md`, skill or comment that names a file, job,
   test, label, automation or mechanism names one that exists on the branch and does what the text
@@ -85,8 +84,7 @@ They are not `om-synthetic-users`, which builds a panel from research material a
 what they produce is a review finding.
 
 Dispatching needs the `Task` tool. Every step in `.ai/cezar/workflows/` that reaches
-`om-auto-review-pr` grants it, and `.ai/scripts/__tests__/agent-layer-parity.test.mjs` fails if one
-stops. Where the tool is absent the review runs without personas and names them as not run.
+`om-auto-review-pr` grants it. Where the tool is absent the review runs without personas and names them as not run.
 
 ## Severity
 

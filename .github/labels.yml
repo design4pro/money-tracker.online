@@ -28,7 +28,7 @@ pipeline:
   - name: qa-failed
     description: 'Manual QA found a defect. Back to the fix chain.'
   - name: merge-queue
-    description: 'Reviewed and, if it needed QA, approved. om-merge-buddy reports it; a human merges.'
+    description: 'Reviewed and, if it needed QA, approved. pr-autopilot merges it into develop, or a human does.'
   - name: blocked
     description: 'Waits on something outside the pull request. The comment says what.'
   - name: do-not-merge
@@ -56,7 +56,7 @@ meta:
   - name: needs-qa
     description: 'The pull request changes a screen; a human QA-approves it before merge.'
   - name: skip-qa
-    description: 'No screen changed; the merge gate does not wait for QA.'
+    description: 'No screen changed; the pull request does not wait for QA.'
   - name: qa-approved
     description: 'A human checked the screens. Only a human sets it.'
   - name: qa-self-verified
@@ -108,8 +108,6 @@ command:
 outside:
   - name: do-not-close
     description: 'om-close-fixed-issues leaves this issue open even when a merged PR names it.'
-  - name: risk-approved
-    description: 'Human acceptance of a risk-high PR, pinned to its current head SHA in a comment.'
 
 # "Visual change expected" is a body section (`## Visual change expected`), not a label; on a pull
 # request it becomes `needs-qa`.

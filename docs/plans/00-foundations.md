@@ -46,8 +46,7 @@ deleted, not filled.
 
 **Which of them closed.** The register above says who holds a concern; this one says whether they
 are finished. A stage is **closed** when every reference row it owns reads `→ done`, and **open**
-when any row does not. Both columns are re-derivable —
-`pnpm exec tsx scripts/plans/audit.ts docs/plans/00-foundations.md` reads the same rows — so neither
+when any row does not. Both columns are re-derivable from the stages' own reference rows, so neither
 is a claim anybody has to take on trust.
 
 | State      | Stages                                                                        | What the state means                                                                          |

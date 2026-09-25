@@ -72,15 +72,9 @@ additions to step 2 and step 11:
 ## Rules
 
 - Never apply `qa-approved` or `qa-self-verified`.
-- On an approving Cezar review, post a PR comment with the exact line
-  `Cezar review: <full head SHA>` before moving the PR to `merge-queue`. Read the head SHA again
-  immediately before posting; a later push invalidates the receipt. A request-changes verdict
-  posts no receipt. The trusted auto-merge controller accepts this receipt only from a configured
-  Cezar identity and only for the current head.
 - When the reviewing GitHub identity also authored the PR, GitHub refuses an `APPROVE` review.
-  Submit the same full approving verdict as a `COMMENTED` review, then post the current-head
-  Cezar receipt and move to `merge-queue`. This changes only the GitHub review state, not the
-  review work or the separate human approval required for `risk-high`.
+  Submit the same full approving verdict as a `COMMENTED` review, then move to `merge-queue`.
+  This changes only the GitHub review state, not the review work.
 - Pending CI is not a reason to wait: the browser suite runs on every PR and finishes in minutes.
   Report it as pending and let the bounded follow-up correct the label.
 - The `develop → main` promotion PR is reviewed like any other; when its diff is only merge
