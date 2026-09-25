@@ -17,18 +17,105 @@
  * other document is, rather than earning a `.prettierignore` entry and drifting out of the format
  * check with it.
  *
- * Assertions are not this module's job: {@link auditSpecs} carries them and
- * `__tests__/spec-registry.test.ts` fails on them. An index that refused to render a tree with a
- * typo in it would leave the reader with nothing at the moment they most need the list.
+ * The parse is lenient on purpose: a spec whose table has a typo is still listed, with whatever
+ * parsed. The rules a spec follows are in `.ai/specs/AGENTS.md` and are a convention, not a check.
  */
-import { writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { format, resolveConfig } from 'prettier'
 
-import { ABANDONED, SPEC_ROOT, auditSpecs } from './registry.ts'
-import type { Spec, SpecStatus } from './registry.ts'
+const SPEC_ROOT = '.ai/specs'
+
+/** Which statuses each directory may hold; the first is the fallback for an unreadable one. */
+const STATUSES_BY_DIRECTORY = {
+  '': ['draft', 'ready', 'in-progress'],
+  implemented: ['implemented'],
+  archived: ['archived'],
+} as const
+
+type SpecDirectory = keyof typeof STATUSES_BY_DIRECTORY
+type SpecStatus = (typeof STATUSES_BY_DIRECTORY)[SpecDirectory][number]
+
+/** The value `Superseded by` takes when nothing replaced an archived spec. */
+const ABANDONED = 'abandoned'
+
+type Spec = {
+  /** Repository-relative path, e.g. `.ai/specs/implemented/2026-09-09-….md`. */
+  path: string
+  title: string
+  /** The `YYYY-MM-DD` prefix of the filename. */
+  date: string
+  status: SpecStatus
+  issue: number | null
+  specPr: number | null
+  implementation: Array<number>
+  supersededBy: Array<number>
+}
+
+/** Documents that live beside the specs and are not specs. */
+const NOT_A_SPEC = new Set(['README.md', 'AGENTS.md', 'product-brief.md'])
+
+const isSpecDirectory = (name: string): name is SpecDirectory =>
+  Object.hasOwn(STATUSES_BY_DIRECTORY, name)
+
+/** The `| **Field** | value |` rows directly under the `H1`. */
+const metadataRows = (lines: ReadonlyArray<string>): Map<string, string> => {
+  let index = 1
+  while (lines[index]?.trim() === '') index += 1
+  const rows = new Map<string, string>()
+  if (!/^\|\s*Field\s*\|\s*Value\s*\|$/.test(lines[index]?.trim() ?? '')) {
+    return rows
+  }
+  for (const line of lines.slice(index + 2)) {
+    const cells = line.match(/^\|\s*\*\*(.+?)\*\*\s*\|\s*(.*?)\s*\|$/)
+    if (cells === null) break
+    rows.set(cells[1], cells[2])
+  }
+  return rows
+}
+
+const references = (value = 'none'): Array<number> =>
+  value.split(',').flatMap((part) => {
+    const reference = /^#(\d+)$/.exec(part.trim())
+    return reference === null ? [] : [Number(reference[1])]
+  })
+
+/** Every spec under the root and its status directories, newest first by filename. */
+const readSpecs = (root: string = SPEC_ROOT): Array<Spec> => {
+  const specs: Array<Spec> = []
+
+  for (const directory of Object.keys(STATUSES_BY_DIRECTORY)) {
+    if (!isSpecDirectory(directory)) continue
+    const dir = join(root, directory)
+    if (!existsSync(dir)) continue
+
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+      if (NOT_A_SPEC.has(entry.name)) continue
+
+      const path = join(dir, entry.name)
+      const lines = readFileSync(path, 'utf8').split('\n')
+      const values = metadataRows(lines)
+      const allowed: ReadonlyArray<string> = STATUSES_BY_DIRECTORY[directory]
+      const status = values.get('Status') ?? ''
+
+      specs.push({
+        path,
+        title: lines[0]?.replace(/^#\s+/, '') ?? entry.name,
+        date: /^(\d{4}-\d{2}-\d{2})-/.exec(entry.name)?.[1] ?? '',
+        status: (allowed.includes(status) ? status : allowed[0]) as SpecStatus,
+        issue: references(values.get('Issue')).at(0) ?? null,
+        specPr: references(values.get('Spec PR')).at(0) ?? null,
+        implementation: references(values.get('Implementation')),
+        supersededBy: references(values.get('Superseded by')),
+      })
+    }
+  }
+
+  return specs.sort((a, b) => basename(b.path).localeCompare(basename(a.path)))
+}
 
 const INDEX = join(SPEC_ROOT, 'README.md')
 
@@ -63,8 +150,8 @@ const pullLink = (reference: number): string =>
  * either, and the document does not say which. GitHub redirects `/issues/n` to `/pull/n` for the
  * same number, so one form reaches both.
  *
- * An archived spec with no reference is not a spec that forgot one: the guard admits it only when
- * the row says {@link ABANDONED}, so the cell says that rather than the dash it says elsewhere.
+ * An archived spec with no reference is read as {@link ABANDONED}, so the cell says that rather
+ * than the dash it says elsewhere.
  */
 const lastCell = (spec: Spec): string => {
   if (spec.status === 'archived') {
@@ -95,9 +182,8 @@ export const renderIndex = (specs: ReadonlyArray<Spec>): string => {
     '',
     '<!-- Generated by `pnpm generate-spec-index`. Edit the metadata table in the spec, not this file. -->',
     '',
-    'One document per designed change. The directory a spec sits in is its state, the table under',
-    'its `H1` names the issue and the pull requests behind it, and both are held together by',
-    '`scripts/specs/__tests__/spec-registry.test.ts`. The rules are in [AGENTS.md](AGENTS.md).',
+    'One document per designed change. The directory a spec sits in is its state, and the table under',
+    'its `H1` names the issue and the pull requests behind it. The rules are in [AGENTS.md](AGENTS.md).',
     '',
   ]
 
@@ -123,7 +209,7 @@ export const renderIndex = (specs: ReadonlyArray<Spec>): string => {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { specs } = auditSpecs()
+  const specs = readSpecs()
   const options = await resolveConfig(INDEX)
   writeFileSync(
     INDEX,

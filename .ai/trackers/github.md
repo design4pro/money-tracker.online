@@ -341,7 +341,7 @@ gh pr merge {prNumber} --squash
 ```
 **When the base branch has a merge queue** — `gh api "repos/{owner}/{repo}/rules/branches/{baseBranch}" --jq '.[].type'` lists `merge_queue` — drop the strategy and run `gh pr merge {prNumber}`. That enqueues the PR (enabling auto-merge while checks are still pending); the queue's own method decides, so `--squash` / `--merge` / `--rebase` are ignored with a warning and `--delete-branch` is refused outright. The command means **queued**, not merged: report it that way, and expect the merge minutes later, once the queue has run the suite on the commit it built. Removing an entry is `gh api graphql -f query='mutation { dequeuePullRequest(input: {id: "<node id>"}) { clientMutationId } }'` — `gh pr merge --disable-auto` does not do it.
 
-The hard blocks `SDLC.md` declares — `do-not-merge`, `blocked`, `qa-failed`, and `needs-qa` without `qa-approved` — are enforced by the **`merge-gate`** check (`.github/workflows/merge-gate.yml`, deciding in `scripts/ci/merge-gate.mjs`), not by this command and not by the skill that calls it. Read the check, not the labels: it re-runs on every label change, so a red `merge-gate` is the current answer. Never reach for `--admin` to get past it — that bypass is a human's deliberate act, never a skill's.
+The hard blocks `SDLC.md` declares — `do-not-merge`, `blocked`, `qa-failed`, `in-progress`, and `needs-qa` without `qa-approved` — are a convention, not a check: no CI job reads them, so the skill that calls this command reads the labels immediately before merging and refuses when one is present (ADR 0026). Never reach for `--admin` to get past a required check — that bypass is a human's deliberate act, never a skill's.
 
 #### mark-pr-ready
 Promote a draft PR.
@@ -541,7 +541,7 @@ gh label create risk-medium       --color fbca04 --description "Ordinary change 
 gh label create risk-high         --color b60205 --description "Wide blast radius, review deeply"
 ```
 
-Four of those are load-bearing on a pull request rather than descriptive. `do-not-merge`, `blocked` and `qa-failed` block a merge on their own, and `needs-qa` blocks until `qa-approved` joins it; the `merge-gate` check reads them out of the event payload and fails the pull request, so applying one of them is the act that stops the merge — there is no second step, and removing it is what starts it again.
+Four of those are load-bearing on a pull request rather than descriptive. `do-not-merge`, `blocked` and `qa-failed` block a merge on their own, and `needs-qa` blocks until `qa-approved` joins it. The merge skills read them before merging and the person merging honours them, so applying one of them is the act that stops the merge. Nothing in CI enforces them (ADR 0026).
 
 The three command labels that start a Cezar automation (`docs/agents/cezar-automations.json`) are
 set by a human. Only a collaborator or an Actions token can set a label, which is what gates the `issue.labeled`

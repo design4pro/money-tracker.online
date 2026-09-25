@@ -24,8 +24,7 @@ top:
   its PR, not a silent divergence. `.ai/specs/implemented/2026-09-09-desktop-layout-density.md` is the
   worked example.
 - Run `pnpm generate-spec-index` after any of the above and commit `.ai/specs/README.md` with the
-  change. It is generated, the validation gate compares it (`AGENTS.md` → Validation Commands), and
-  `scripts/specs/__tests__/spec-registry.test.ts` fails when a table disagrees with the directory
-  holding it.
+  change. It is generated, and the validation gate compares it (`AGENTS.md` → Validation Commands).
+  Nothing checks that a table agrees with the directory holding it, so keep them in step by hand.
 - The implementation PR is the one that carries all of this. The spec PR stays design-only, exactly as
   the installed skill says.

@@ -48,8 +48,8 @@ every agent branch used to be held to by `scripts/agent/floor-guard.mjs`.
       product (`docs/agents/reference.md`).
 - [ ] A change to a surface in `BACKWARD_COMPATIBILITY.md` follows its required path.
 - [ ] A change to `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`, `docs/MONEY.md`
-      or `docs/adr/` carries `governance-approved`, applied by a person who read the decision - not
-      by a skill (`governance-gate`).
+      or `docs/adr/` is `risk-high` and is merged by a person who read the decision - not by a
+      skill.
 - [ ] Every figure written into a spec, plan, ADR or code comment was re-derived on this head, and a
       headline total agrees with the table beneath it.
 - [ ] Every file, job, test, label, automation or mechanism a document or comment names exists on

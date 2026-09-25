@@ -198,8 +198,7 @@ inventory that stage `01-S3` owns; it has not been written. Once that stage land
 re-stated from the inventory's own count and cites it. Until then it stays approximate and is **not**
 to be replaced by another unsourced number (#218). The inventory's path and the full measurement are
 recorded under `01-S3`'s **Blockers** in `01-design-system.md`. They are named there rather than here
-because the register may not name a document the tree does not have — the rule
-`scripts/plans/__tests__/register-references.test.ts` enforces.
+because the register may not name a document the tree does not have.
 
 Three placements are editorial rather than mechanical and are stated so nobody goes looking for a
 missing edge:
@@ -248,12 +247,8 @@ it invites an agent to invent work in the one file where invention is most expen
 A feature stage that needs a change to a shared path writes the requirement under its own **Data and
 migration**, **UI** or **Quota** heading and stops. The requirement is then minted as a stage in
 `00-foundations.md`. A stage whose Owned paths list contains one of these eight is malformed and is
-rejected before it is scheduled.
-
-The rejection is asserted, not left to a reader: assertion 5 of `scripts/plans/audit.ts` fails any
-stage outside `00-foundations.md` whose Owned paths names one of the eight, and
-`scripts/plans/__tests__/plan-paths.test.ts` runs it over every plan document and holds the table
-above equal to the list the assertion encodes.
+rejected before it is scheduled. The rejection is the reviewer's to make; no test asserts it
+(ADR 0026).
 
 ---
 

@@ -12,10 +12,10 @@ describe('reachesBrowser', () => {
     '.ai/specs/README.md',
     '.claude/hooks/format-file.sh',
     '.husky/pre-commit',
-    '.github/workflows/merge-gate.yml',
+    '.github/workflows/promote-develop.yml',
     '.github/ISSUE_TEMPLATE/bug.yml',
     'scripts/ci/verified-tree.mjs',
-    'scripts/plans/parse-plan.ts',
+    'scripts/specs/index.ts',
     'eslint.config.js',
     'vitest.config.ts',
     'vitest.setup.dom.ts',
@@ -56,9 +56,9 @@ describe('reachesBrowser', () => {
 
 describe('touchesBrowser', () => {
   it('is false when every file stays out of the browser', () => {
-    expect(touchesBrowser(['docs/SPEC.md', 'scripts/ci/merge-gate.mjs'])).toBe(
-      false,
-    )
+    expect(
+      touchesBrowser(['docs/SPEC.md', 'scripts/ci/verified-tree.mjs']),
+    ).toBe(false)
   })
 
   it('is true when any one file reaches the browser', () => {

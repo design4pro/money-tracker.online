@@ -29,7 +29,8 @@ import { describe, expect, it } from 'vitest'
  *
  * A fourteenth row is here that #234 never listed: `@tanstack/react-table`. #234 counted a package
  * as imported when its name appeared in quotes anywhere, and an `isPathShaped` fixture row in
- * `scripts/plans/__tests__/parse-plan.test.ts` quotes that package for reasons that have nothing to
+ * the since-removed `scripts/plans/__tests__/parse-plan.test.ts` quoted that package for reasons
+ * that have nothing to
  * do with modules. The scan therefore never saw it. {@link importsDependency} says what closed that
  * hole and what it cost.
  *
@@ -140,7 +141,8 @@ const DISPOSITIONS: Readonly<Record<string, DependencyDisposition>> = {
   },
 
   // The row #234's scan could not see, because a quoted fixture in
-  // `scripts/plans/__tests__/parse-plan.test.ts` read as an import of it. Its stage is open and its
+  // the since-removed `scripts/plans/__tests__/parse-plan.test.ts` read as an import of it. Its stage
+  // is open and its
   // Ask First question has already been answered: `docs/plans/00-foundations.md` § Blockers records
   // that #105 put "remove the package or schedule the stage" to a human and the answer was schedule
   // the stage, so `00-S8` owns `src/components/ui/data-table.tsx` again. The only `data-table.tsx`
@@ -264,7 +266,8 @@ const IMPORT_CONTEXT = String.raw`(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\
  * or `'name/sub'` - in an import context in one of those files.
  *
  * Quotes alone are not enough, which is the mistake #234's scan and this file's first head both
- * made. `scripts/plans/__tests__/parse-plan.test.ts` carries the `isPathShaped` fixture row
+ * made. The since-removed `scripts/plans/__tests__/parse-plan.test.ts` carried the `isPathShaped`
+ * fixture row
  * `['@tanstack/react-table', false]` - a string about path shapes, quoted, and about as far from an
  * import as a string gets. It was enough to read `@tanstack/react-table` as imported, so the one
  * dependency whose row #234 should have found never reached {@link unimported} at all. A guard that
@@ -298,8 +301,9 @@ const dispositioned = Object.keys(DISPOSITIONS)
 
 describe('runtime dependency imports', () => {
   // What separates an import from a mention, and the assertion #234's own scan needed. Counting any
-  // quoted occurrence of a package name let `scripts/plans/__tests__/parse-plan.test.ts` defeat the
-  // guard: its `isPathShaped` table carries the fixture row `['@tanstack/react-table', false]`, a
+  // quoted occurrence of a package name let the since-removed
+  // `scripts/plans/__tests__/parse-plan.test.ts` defeat the
+  // guard: its `isPathShaped` table carried the fixture row `['@tanstack/react-table', false]`, a
   // string about path shapes and not about modules, and that one pair of quotes was enough to read
   // the package as imported and never ask it for a disposition. Anchoring to the syntax that
   // actually pulls a module in is what makes a fixture, a lint-rule name and a `declare module`
