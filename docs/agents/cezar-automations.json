@@ -82,7 +82,7 @@
   },
   {
     "name": "Autopilot new pull requests",
-    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain through to the merge into develop (ADR 0026). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - which makes `pull_request` workflows run on it - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml therefore opens it carrying `merge-queue`, which `excludeLabels` already stands down on.",
+    "description": "A human maintainer opens a PR; om-pr-autopilot diagnoses and runs the right chain through to the merge into develop (ADR 0027). Agent PRs (authored by design4pro-agent, the cockpit's gh identity) and dependabot are excluded by author; pipeline labels exclude the race with om-open-pr. The standing develop-to-main promotion PR is opened with a maintainer's token - which makes `pull_request` workflows run on it - so the author filter cannot tell it apart from a hand-opened one, and no filter here reads the base branch. .github/workflows/promote-develop.yml therefore opens it carrying `merge-queue`, which `excludeLabels` already stands down on.",
     "events": ["pull_request.opened"],
     "intervalSeconds": 300,
     "filters": {
@@ -112,7 +112,7 @@
   },
   {
     "name": "Merge reviewed agent pull requests",
-    "description": "An agent PR (authored by design4pro-agent) that om-auto-review-pr approved into `merge-queue` gets om-pr-autopilot --allow-merge, which merges it into develop through om-approve-merge-pr (ADR 0026). The promotion PR is authored by a maintainer, so the author filter keeps it out.",
+    "description": "An agent PR (authored by design4pro-agent) that om-auto-review-pr approved into `merge-queue` gets om-pr-autopilot --allow-merge, which merges it into develop through om-approve-merge-pr (ADR 0027). The promotion PR is authored by a maintainer, so the author filter keeps it out.",
     "events": ["pull_request.reviewed"],
     "intervalSeconds": 300,
     "filters": {

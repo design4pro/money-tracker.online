@@ -1,4 +1,4 @@
-# 0026. No merge gates
+# 0027. No merge gates
 
 Status: accepted
 Date: 2026-09-25
