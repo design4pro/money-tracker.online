@@ -15,7 +15,11 @@ import { describe, expect, it } from 'vitest'
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' })
 
-/** The documents an agent reads as instructions: the router, the review and process rules, the skills. */
+/**
+ * The documents an agent reads as instructions: the router, what it routes to, the review and
+ * process rules, the skills and the subagents. The vendored `om-*` skills are left out: they are
+ * refreshed from their lock by `pnpm install-skills`, never edited here.
+ */
 const DOCUMENTS = git(
   'ls-files',
   'AGENTS.md',
@@ -23,12 +27,18 @@ const DOCUMENTS = git(
   'SDLC.md',
   'CONTEXT.md',
   'BACKWARD_COMPATIBILITY.md',
+  '.ai/review-checklist.md',
+  '.ai/specs/AGENTS.md',
+  '.ai/trackers/*.md',
+  '.ai/browsers/*.md',
   '.ai/skills/**/SKILL.md',
   '.ai/cezar/skills/**/*.md',
+  '.claude/skills/*/SKILL.md',
+  '.claude/agents/*.md',
   'docs/agents/*.md',
 )
   .split('\n')
-  .filter(Boolean)
+  .filter((document) => document && !document.startsWith('.claude/skills/om-'))
 
 /** A token is checked when it starts at one of the repository's own top-level directories. */
 const REPO_PATH = /^(\.ai|\.claude|\.github|src|docs|scripts|e2e|drizzle)\//
@@ -43,6 +53,8 @@ const EXPECTED_ABSENT = {
   'docs/host/README.md': 'lives in the cezar repository',
   'docs/plans/00': 'the start of the `docs/plans/00`-`27` range',
   '.ai/scripts/cezar-host-patch.sh': 'named as deleted by ADR 0021',
+  'scripts/agent/floor-guard.mjs':
+    'named as the retired guard the checklist replaced',
 }
 
 /** A directory pattern (`worktrees/`) matches only the path with its trailing slash, so both are asked. */
