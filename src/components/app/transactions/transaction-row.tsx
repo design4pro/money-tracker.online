@@ -279,13 +279,15 @@ function AccountFacts({
           {accountName}
         </span>
       ) : null}
+      {/* A mark sits on the line it covers: `-top-px` puts the `sm` word within 0.25px of the
+          caption's baseline on the typed line (measured; `-top-0.5` was derived for the box). */}
       {row.isBalanceAdjustment ? (
-        <Badge tone="warning" size="sm" className="relative -top-0.5">
+        <Badge tone="warning" size="sm" className="relative -top-px">
           {t('transactions.balanceAdjustment')}
         </Badge>
       ) : null}
       {row.excludeFromStats ? (
-        <Badge tone="neutral" size="sm" className="relative -top-0.5">
+        <Badge tone="neutral" size="sm" className="relative -top-px">
           {t('transactions.excludedFromTotals')}
         </Badge>
       ) : null}
@@ -392,7 +394,13 @@ function TransactionRowImpl({
       {/* ---- Date --------------------------------------------------------- */}
       <td
         {...cellProps(column.date)}
-        className={cn(CELL_BASE, CELL_RULE, AT_META, 'text-start', rowWashSecondary)}
+        className={cn(
+          CELL_BASE,
+          CELL_RULE,
+          AT_META,
+          'text-start',
+          rowWashSecondary,
+        )}
       >
         {/* From `sm` up the column holds the date. The date is spoken in full on every row: a
             listener has no day heading above them to carry the context forward. */}
