@@ -5,7 +5,7 @@
 | **Status**         | implemented          |
 | **Issue**          | #366, #486           |
 | **Spec PR**        | #367                 |
-| **Implementation** | #370, #373, #TBD-486 |
+| **Implementation** | #370, #373, #487 |
 
 ## 📝 TLDR
 
