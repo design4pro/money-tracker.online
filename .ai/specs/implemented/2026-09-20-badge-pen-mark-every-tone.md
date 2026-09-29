@@ -1,10 +1,10 @@
 # The badge wears the pen mark, in every tone
 
-| Field              | Value                |
-| ------------------ | -------------------- |
-| **Status**         | implemented          |
-| **Issue**          | #366, #486           |
-| **Spec PR**        | #367                 |
+| Field              | Value            |
+| ------------------ | ---------------- |
+| **Status**         | implemented      |
+| **Issue**          | #366, #486       |
+| **Spec PR**        | #367             |
 | **Implementation** | #370, #373, #487 |
 
 ## 📝 TLDR
@@ -652,8 +652,12 @@ stamp always had, so they stay: `sm` is `h-5 px-1.5 text-micro tracking-label up
   padding inside it, which is what the _UI/UX_ anatomy asked for.
 - **`info` dropped `rowWashPromote`.** It has a ground of its own now; the export stays for
   `rowWashSecondary`.
-- **Only the two compensations moved.** The transaction row's nudge and the landing wrapper were
-  re-aligned against the mark; no API, call site or copy changed.
+- **Only one compensation moved.** Both were re-derived against the mark. The transaction row's
+  nudge went from `-top-0.5` to `-top-px`, measured in the browser: `-top-0.5` put the `sm` word
+  1.25px above the caption's baseline, `-top-px` puts it within 0.25px. The landing wrapper
+  (`sm:ms-1 max-sm:block`) needed no change, because the stamp's box did not move; the stamp now
+  carries `me-[1.25ch]` like every badge, and that room falls at the end of its line. No API,
+  other call site or copy changed.
 
 **The ADR is 0028, not 0022.** `docs/adr/0022-ci-and-agents-run-only-on-the-vps-pool.md` took 0022
 before Phase 4 ran, so Step 13's file is `docs/adr/0028-the-mark-is-the-badge.md` and every

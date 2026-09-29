@@ -213,6 +213,17 @@ test.describe('the tone sheet', () => {
     await page.emulateMedia({ forcedColors: 'active' })
     await gotoApp(page, '/')
     await mountToneSheet(page)
+    // Chromium forces an existing transparent border to a system colour on its own, so the sheet
+    // alone would pass without the rule. A bare `mark-pen` carries no border of its own: its rule
+    // can only come from the `forced-colors` block in `mark-pen`, which makes this case falsifiable.
+    await page.evaluate(() => {
+      const bare = document.createElement('span')
+      bare.className = 'mark-pen'
+      bare.dataset.tone = 'bare mark-pen'
+      bare.dataset.size = ''
+      bare.textContent = 'mark'
+      document.querySelector('[data-tone-sheet]')?.appendChild(bare)
+    })
 
     const rules = await page.evaluate(() =>
       [
