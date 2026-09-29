@@ -1,6 +1,6 @@
 # Execution plan — badge pen mark, Phase 2 (the pen palette)
 
-Source doc: .ai/specs/2026-09-20-badge-pen-mark-every-tone.md
+Source doc: .ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md
 Issue: #366
 Spec PR: #367 (merged, design-only)
 Preceding phase: #370 (merged) — Phase 1, the mark became parameterisable
