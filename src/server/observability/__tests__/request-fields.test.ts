@@ -17,14 +17,11 @@ describe('requestFields', () => {
     ['GET', '/unsubscribe'],
     ['POST', '/api/unsubscribe'],
   ])('records %s %s without its query string', (method, path) => {
-    const request = new Request(
-      `https://money-tracker.test${path}?t=${TOKEN}`,
-      {
-        method,
-      },
-    )
-
-    const fields = requestFields(request)
+    const fields = requestFields({
+      method,
+      url: `https://money-tracker.test${path}?t=${TOKEN}`,
+      headers: new Headers(),
+    })
 
     expect(fields.path).toBe(path)
     expect(JSON.stringify(fields)).not.toContain(TOKEN)
