@@ -1300,6 +1300,13 @@ const messages = {
   'notifications.kind.goalReached.title': 'Cel {goal} osiągnięty',
   'notifications.kind.goalReached.body':
     'Cel {goal} jest zrealizowany — odłożono {contributed} z {target}.',
+  // Nominative on purpose: the unsubscribe sentence places the topic after a colon, so no Polish
+  // case has to agree with it, and 21-S3's preference matrix reuses these as row headers.
+  'notifications.kind.budgetThresholdCrossed.label': 'Progi budżetów',
+  'notifications.kind.budgetExceeded.label': 'Wyczerpane budżety',
+  'notifications.kind.recurringDueSoon.label': 'Nadchodzące płatności',
+  'notifications.kind.recurringOverdue.label': 'Zaległe płatności',
+  'notifications.kind.goalReached.label': 'Osiągnięte cele',
 
   /*
     Email (21-S2).
@@ -1652,6 +1659,21 @@ const messages = {
   'invite.loading': 'Wczytujemy to zaproszenie…',
   'invite.notFound': 'Ten link z zaproszeniem donikąd nie prowadzi.',
   'invite.goToApp': 'Przejdź do domu',
+
+  /* -- Unsubscribing from an email link ------------------------------------ */
+  'unsubscribe.meta.title': 'Wypisanie z e-maili',
+  'unsubscribe.topic.digest': 'codzienne podsumowanie',
+  'unsubscribe.confirm.title': 'Wyłączyć te e-maile?',
+  'unsubscribe.confirm.body':
+    'Przestaniesz dostawać e-maile z {workspace} na temat: {topic}.',
+  'unsubscribe.confirm.action': 'Wypisz mnie',
+  'unsubscribe.done.title': 'Wypisano Cię',
+  'unsubscribe.done.body':
+    'Nie będziesz już dostawać e-maili z {workspace} na temat: {topic}. Powiadomienia w aplikacji zostają bez zmian.',
+  'unsubscribe.invalid.title': 'Ten link nie działa',
+  'unsubscribe.invalid.body':
+    'Mógł wygasnąć albo zostać skopiowany niekompletnie. Zaloguj się, aby zmienić, jakie e-maile dostajesz.',
+  'unsubscribe.invalid.signIn': 'Zaloguj się',
 
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Każda kwota co do grosza.',
