@@ -154,7 +154,11 @@ function UnsubscribeRoute() {
                   setPending(true)
                   void confirmUnsubscribe({ data: { t: token } })
                     .then(setApplied)
-                    .catch(() => setApplied(INVALID))
+                    .catch(() => {
+                      // A request that never got an answer says nothing about the link, so the
+                      // button stays for another try rather than claiming the link is invalid.
+                      setPending(false)
+                    })
                 }}
               >
                 {t('unsubscribe.confirm.action')}

@@ -16,8 +16,9 @@ import type { Page } from '@playwright/test'
  * The public `/unsubscribe` page, at the product's outermost interface.
  *
  * The token is minted here with the product's own signer and the key the server was started with:
- * `.github/actions/e2e-env` writes {@link SIGNING_KEY} into the throwaway `.dev.vars`, and a local
- * run passes the same value through `UNSUBSCRIBE_TOKEN_SECRET`. A server started without one
+ * `.github/actions/e2e-env` writes {@link SIGNING_KEY} into the throwaway `.dev.vars`. A local run
+ * needs the same value in its own `.dev.vars`, or `UNSUBSCRIBE_TOKEN_SECRET` in this process's env
+ * set to whatever the server's `.dev.vars` holds - the server never reads this process's env. A server started without one
  * renders every link invalid by design, and the confirm cases below then fail naming that state.
  *
  * Tenant B is the person, because it is the fixture workspace that exists to be written to. Each
