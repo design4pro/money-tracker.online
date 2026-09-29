@@ -20,6 +20,12 @@ colors:
   brand-hover: '#35195f'
   brand-soft: '#ece4f7'
   highlighter: '#ece4f7'
+  pen-neutral: '#cfcec5'
+  pen-info: '#cfcec5'
+  pen-brand: '#d8cfea'
+  pen-positive: '#bbd7c6'
+  pen-negative: '#ebc7c1'
+  pen-warning: '#decdb2'
   on-brand: '#ffffff'
   positive: '#0b5136'
   positive-soft: '#dcf2e4'
@@ -187,40 +193,21 @@ components:
     textColor: '{colors.ink}'
     rounded: '{rounded.xl}'
     padding: '{spacing.5}'
-  badge-neutral:
-    backgroundColor: '{colors.surface}'
+  # One family: every tone is the pen mark, and a tone fills the `wash` slot and nothing else - the
+  # word is `ink` in all eight. `settled` takes the default `highlighter`; `neutral` and `info`
+  # take `pen-neutral` / `pen-info` (one value), `brand` and `accent` take `pen-brand`, and
+  # `positive`, `negative` and `warning` take their own `pen-*` (`### Badges`, ADR 0028).
+  badge:
+    backgroundColor: 'transparent'
     textColor: '{colors.ink}'
+    wash: '{colors.highlighter}'
     rounded: '{rounded.sm}'
     height: '1.5rem'
     padding: '0 {spacing.2}'
     typography: '{typography.caption}'
-  badge-positive:
-    backgroundColor: '{colors.positive-soft}'
-    textColor: '{colors.positive}'
-    rounded: '{rounded.sm}'
-    height: '1.5rem'
-    padding: '0 {spacing.2}'
-    typography: '{typography.caption}'
-  badge-negative:
-    backgroundColor: '{colors.negative-soft}'
-    textColor: '{colors.negative}'
-    rounded: '{rounded.sm}'
-    height: '1.5rem'
-    padding: '0 {spacing.2}'
-    typography: '{typography.caption}'
-  badge-brand:
-    backgroundColor: '{colors.brand-soft}'
-    textColor: '{colors.brand}'
-    rounded: '{rounded.sm}'
-    height: '1.5rem'
-    padding: '0 {spacing.2}'
-    typography: '{typography.caption}'
-  badge-settled:
-    backgroundColor: '{colors.highlighter}'
-    textColor: '{colors.ink}'
-    rounded: '{rounded.sm}'
+  badge-sm:
     height: '1.25rem'
-    padding: '0 {spacing.1}'
+    padding: '0 0.375rem'
     typography: '{typography.micro}'
   typed-line:
     backgroundColor: 'transparent'
@@ -291,7 +278,7 @@ ink, lilac stamp - designed as a second set of values rather than inverted from 
 three risks the world was built to avoid are: reading as school-like or childish (so the hand is
 bold, adult and never decorated), as retro or nostalgic (so there is no texture, no aged paper, no
 faux stamp graphic - the metaphor lives in rules and type, and the one drawn gesture is the
-highlighter run over a settled line), and as too little like an
+highlighter pen, run behind the word of every badge), and as too little like an
 application (so every control is a React Aria primitive with a 3:1 boundary, a 44px target and a
 two-ring focus indicator).
 
@@ -329,6 +316,12 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   itself (`#ece4f7`, carrying `ink` at 12.55:1); in dark it is a lilac pen (`#523e7c`, carrying
   `ink` at 7.33:1) rather than the selection tint, because a highlighter run over a line has to
   read as a pen and not as a selected row. It is spent on the `settled` badge and nowhere else.
+- **Pens** (`pen-neutral`, `pen-info`, `pen-brand`, `pen-positive`, `pen-negative`,
+  `pen-warning`): the wash of every other badge tone - the tone's own hue, and never text. `ink`
+  on each, composited at the mark's 75% over `surface` and `surface-sunken`, clears 7:1 in both
+  themes (worst 10.51:1 light, 7.18:1 dark); the pooled trailing edge carries no glyph and is held
+  to 3:1 as a graphical object. `pen-neutral` and `pen-info` are one value, and `accent` has no
+  pen of its own, because the palette never separated those tones (`### Badges`).
 
 ### Tertiary - the coloured inks
 
@@ -400,7 +393,7 @@ darkest ground it can sit on; dark text against `surface-raised`, the lightest.
   tone _and_ a rule, dark has only the rule, so the rule carries a larger share and is measured
   against dark's own floor rather than re-valued from light's. And a green line on slate grounds
   reads as an unconverted leftover rather than as printed ruling, which is what made the `info`
-  badge - whose entire chrome is a `border-panel` rule - glow at night. The floors are stated in
+  badge - whose entire chrome was then a `border-panel` rule - glow at night. The floors are stated in
   `src/styles/tokens.css` and checked per theme against every ground in
   `src/styles/__tests__/tokens-contrast.test.ts`.
 - **Control Boundary** (`border-strong`): the edge of anything pressable or typeable. 4.33:1 on
@@ -416,12 +409,13 @@ is never text.
 
 ### Named Rules
 
-**The One Stamp Rule.** Violet is spent on what commands and on what is settled - the primary
-action, a link, the current destination, the focus ring, the selected row. It is never spent on a
-planned line, a decoration, a heading or a divider. "Settled" has its own mark - the `settled`
-badge tone, a typed word in `ink` with a run of `highlighter` wash behind it - and it is the
-only status that may spend the stamp ink. If a screen needs a second violet thing, one of them is
-not an action.
+**The One Stamp Rule.** The rule governs hue, not marking. Violet is spent only on what commands and
+on what is settled - the primary action, a link, the current destination, the focus ring, the
+selected row, and the `settled` badge, whose run of pen is the `highlighter` wash. It is never
+spent on a planned line, a decoration, a heading or a divider. Every badge is the pen mark
+(`### Badges`); every other tone marks in its own hue, so a green, red, brown or grey run of pen is
+not a second stamp. If a screen needs a second violet thing, one of them is not an action
+(`docs/adr/0028-the-mark-is-the-badge.md`).
 
 **The Pencil Rule.** A planned entry is written in `ink-2` with the word beside it; a booked entry
 is written in `ink`. State is line form before hue, and nothing is ever struck through.
@@ -720,22 +714,60 @@ A slip laid on the paper, for content that needs its own ground. Not the scaffol
 
 ### Badges
 
-`sm` radius (2px), 20px (sm, micro uppercase) or 24px (md, caption) height, bold. Tones: `neutral`
-(ruled, `border-strong` on `surface`), `accent`, `brand`, `positive`, `negative`, `warning`,
-`info`, and `settled`; every tinted tone pairs a `-soft` ground with its own ink at 7:1 or better.
-**`info`** is the typed status - "Hidden", "Planned", "Auto" - in `ink-2` inside a one-pixel
-`border-panel` rule on whatever ground it lands on, no wash: a ruled label, so it can never be
-mistaken for the mark. **`settled`** is the highlighter (`mark-pen` in `app.css`): the word typed
-in `ink` at the small size (micro, uppercase, 0.06em, 20px high) with a run of `highlighter` drawn
-behind it at 75%, past both ends of the word and further where the pen lifted, pooled darker at
-its trailing edge, its outline roughened by the one SVG displacement filter in the product
-(mounted once in `__root.tsx`), and a small blob where the pen paused. Every colour in it is a
-token, so it inverts for dark; in forced colours the wash drops and the typed word remains. It is
-the only status that spends the stamp ink and the only "settled" mark in the product; it is never
-placed on a planned line. On the landing it stands once, beside the passbook's opening line, on
-the baseline of the word it follows, the wash crossing the printed rule the way a pen does; on the
-narrow page it is the second line of the opening entry. A category carries its series
-colour as a dot beside its name; the colour is never the only identifier.
+A word with a run of pen behind it. Every badge, in every tone, is the pen mark (`mark-pen` in
+`app.css`); there is no boxed badge (`docs/adr/0028-the-mark-is-the-badge.md`).
+
+- **Anatomy.** Text, always, typed in `ink` in every tone - the hue lives only in the wash. Behind
+  the word a run of the tone's pen at 75% opacity: past both ends of the word (`0.25ch` before it,
+  `0.75ch` after it) and further where the pen lifted, pooled darker at its trailing edge, and a
+  small blob where the pen paused a further `0.25em` out. It sits on the baseline of the line it
+  belongs to, because a highlighter is run over a line, not placed above one. The bleed is part of
+  the element, so a badge needs room **beside** it, never padding inside it: every badge carries
+  `1.25ch` of trailing room (`me-[1.25ch]`) - its own `0.75ch` trailing bleed, the next badge's
+  `0.25ch` leading bleed and `0.25ch` of paper between them. That is the minimum inline gap, owned
+  by the badge rather than by each call site, and it is also what keeps a cell's end edge from
+  shearing the run. A container that clips it gets room, never a smaller bleed.
+- **Flat and rough.** The pen's outline is roughened by `#mark-pen-rough`, the one SVG
+  displacement filter in the product (mounted once in `__root.tsx`). That filter costs a whole
+  60 Hz frame of raster on a screenful of marks, so every tone that repeats down a table or a tree
+  wears `mark-pen-flat`: the wash, the bleed, the pooled edge and the blob stay, and only the
+  roughness goes. `settled` alone keeps the rough outline, because it stands alone: once, on the
+  landing. Which marks are flat is decided by the tone, not by the size - `sm` is not a synonym for
+  "repeats", and the landing's stamp is `sm`.
+- **Tones**, picked by meaning, never by colour. `neutral` when there is no verdict and no status
+  either - a classification, a kind, a name. `info` for a status with no verdict ("Hidden",
+  "Planned", "Auto"). `positive`, `negative` and `warning` for a verdict, each in its own pen.
+  `brand` for the rare badge in the product's own voice, which would follow a rebrand. `settled`
+  for what is settled, and only that - the `highlighter` wash, the one badge that spends the stamp
+  violet, never on a planned line. **When in doubt the answer is `info`.** Two pairs render
+  identically, and that is recorded rather than hidden: `neutral` and `info` share one pen, because
+  `info` is `ink-2`'s value and the difference was only ever the weight of a rule; `accent` is an
+  alias of `brand` and shares its pen, because `accent` is `brand`'s value. The names stay, because
+  the call sites mean different things by them.
+- **Sizes.** Two, and no more, with the box metrics the stamp always had. `sm` - 20px, `micro`,
+  uppercase, `tracking-label` - inside a dense row or a table cell. `md` - 24px, `caption` - beside
+  a heading or in a card. Both at the bold weight, at `sm` radius (2px).
+- **States.** None. A badge is not interactive: it takes no hover, press, focus or selected
+  rendering, and a row's hover wash does not reach it because it has a ground of its own. A badge
+  that can be clicked is a `Button` with `shape="pill"`, which is how it gets a focus ring and a
+  44px hit area.
+- **Accessibility contract.** The word is the meaning and colour is never alone
+  (`docs/ACCESSIBILITY.md` §2.1) - structurally, since the word is `ink` in every tone. `ink` clears
+  7:1 on every wash composited over `surface` and `surface-sunken`, in both themes; the pooled
+  trailing edge carries no glyph (measured at both sizes) and is a graphical object held to 3:1.
+  Both are asserted on the composite, not the token, in `tokens-contrast.test.ts`. Under
+  `forced-colors: active` the wash is dropped and every tone, `settled` included, draws a
+  one-pixel `CanvasText` rule instead, so the badge stays an element beside a table's other text
+  rather than a bare word. The rule is the badge's own border, transparent until then, so forced
+  colours cost no layout shift. The mark is static; `prefers-reduced-motion` has nothing to reduce.
+- **When not to use one.** For a count (a number in type), for an amount (`formatMoney` with a
+  sign), for anything clickable (a `Button`), or to repeat a word the row already says. A category
+  carries its series colour as a dot beside its name, not as a badge; the colour is never the only
+  identifier.
+
+On the landing the `settled` stamp stands once, beside the passbook's opening line, on the baseline
+of the word it follows, the wash crossing the printed rule the way a pen does; on the narrow page it
+is the second line of the opening entry.
 
 ### Tables
 
@@ -872,8 +904,10 @@ still fire.
   `settled` mark on a planned line or mark a page that closes in pencil; and don't strike
   anything through - there is no voided line.
 - **Don't** add texture, aged paper, a faux stamp graphic, or a decorative flourish; the metaphor
-  lives in rules and type, the highlighter run over a settled line is the one drawn gesture, and
-  the world must not read as retro or as a schoolbook.
+  lives in rules and type, the highlighter pen run behind a badge's word is the one drawn gesture,
+  and the world must not read as retro or as a schoolbook.
+- **Don't** draw a badge as a box or a fill, pad it to make room for its bleed, or put its hue in
+  the word; the word is `ink`, the hue is the pen, and the room is beside it.
 - **Don't** paint text in a series colour, encode direction or status by colour alone, abbreviate
   money outside a chart axis, or render an amount from a float.
 - **Don't** use negative tracking on either face.
