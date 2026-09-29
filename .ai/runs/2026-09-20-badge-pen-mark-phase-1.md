@@ -1,6 +1,6 @@
 # Badge pen mark — Phase 1: the mark becomes parameterisable
 
-Source doc: `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`
+Source doc: `.ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md`
 Tracking plan: `.ai/runs/2026-09-20-badge-pen-mark-phase-1.md`
 
 ## Goal
