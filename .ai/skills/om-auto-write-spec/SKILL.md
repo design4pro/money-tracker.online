@@ -12,7 +12,7 @@ Extends the installed skill: read `.claude/skills/om-auto-write-spec/SKILL.md` a
   FR issue driving the run, `Spec PR` is the design PR, `Implementation` is `none` - filling it is
   `om-auto-implement-spec`'s job. A brief-driven run with no issue still needs one before the spec can
   be scheduled; open it rather than leaving `Issue: none` on a merged spec, which is how
-  `.ai/specs/2026-09-08-design-system-plan-reconciliation.md` came to sit unbuilt with nothing to
+  `.ai/specs/implemented/2026-09-08-design-system-plan-reconciliation.md` came to sit unbuilt with nothing to
   schedule it from. New specs land at the root of `.ai/specs/`; `implemented/` and `archived/` are the
   other lifecycle states and belong to later skills. The rules are `.ai/specs/AGENTS.md`.
 - Run `pnpm generate-spec-index` before opening the spec PR and commit `.ai/specs/README.md` with the

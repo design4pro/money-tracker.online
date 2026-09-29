@@ -59,7 +59,9 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
   diff's shape: what changed, what it supersedes, and whether the change belongs there.
 - **Documents name what exists.** A spec, ADR, `SDLC.md`, skill or comment that names a file, job,
   test, label, automation or mechanism names one that exists on the branch and does what the text
-  says; the reviewer opens each one (#159, #191, #304, #308, #310, #319).
+  says; the reviewer opens each one (#159, #191, #304, #308, #310, #319). A backticked path in an
+  agent-facing document is checked by `.ai/scripts/__tests__/doc-paths.test.mjs`; jobs, labels,
+  automations and what a named thing does stay the reviewer's to open (#386, #421, #441).
 
 ## Review personas
 
