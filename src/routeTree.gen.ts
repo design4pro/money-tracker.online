@@ -18,6 +18,7 @@ import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as authRegisterRouteImport } from './routes/(auth)/register'
 import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiUnsubscribeRouteImport } from './routes/api/unsubscribe'
 import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
 import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
@@ -93,6 +94,11 @@ const authResetPasswordRoute = authResetPasswordRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUnsubscribeRoute = ApiUnsubscribeRouteImport.update({
+  id: '/api/unsubscribe',
+  path: '/api/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InviteInvitationIdRoute = InviteInvitationIdRouteImport.update({
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof authRegisterRoute
   '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
@@ -314,6 +321,7 @@ export interface FileRoutesByTo {
   '/register': typeof authRegisterRoute
   '/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
@@ -359,6 +367,7 @@ export interface FileRoutesById {
   '/(auth)/register': typeof authRegisterRoute
   '/(auth)/reset-password': typeof authResetPasswordRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/_app/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/api/health'
+    | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
@@ -445,6 +455,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/api/health'
+    | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/(auth)/register'
     | '/(auth)/reset-password'
     | '/api/health'
+    | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/_app/accounts/$accountId'
     | '/_app/budgets/$budgetId'
@@ -530,6 +542,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   UnsubscribeRoute: typeof UnsubscribeRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiUnsubscribeRoute: typeof ApiUnsubscribeRoute
   InviteInvitationIdRoute: typeof InviteInvitationIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingCheckoutRoute: typeof ApiBillingCheckoutRoute
@@ -602,6 +615,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/unsubscribe': {
+      id: '/api/unsubscribe'
+      path: '/api/unsubscribe'
+      fullPath: '/api/unsubscribe'
+      preLoaderRoute: typeof ApiUnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/invite/$invitationId': {
@@ -922,6 +942,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   UnsubscribeRoute: UnsubscribeRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiUnsubscribeRoute: ApiUnsubscribeRoute,
   InviteInvitationIdRoute: InviteInvitationIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingCheckoutRoute: ApiBillingCheckoutRoute,
