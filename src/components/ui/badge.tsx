@@ -1,56 +1,65 @@
 import { cva } from 'class-variance-authority'
 
 import { cn } from '#/lib/cn'
-import { rowWashPromote } from './shared'
 
 import type { VariantProps } from 'class-variance-authority'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
+/**
+ * Every tone is the pen mark (`mark-pen` in app.css): the word typed in `ink`,
+ * a run of the tone's pen drawn behind it. The hue lives in the wash and never
+ * in the word, because the mark pools its trailing edge toward the tone's ink
+ * and a word in that ink would sink into its own pool
+ * (`docs/adr/0028-the-mark-is-the-badge.md`).
+ *
+ * The border is transparent and stays: under forced colours `mark-pen` turns it
+ * into a one-pixel `CanvasText` rule, and a border that already exists costs no
+ * layout shift when it does.
+ *
+ * `me-[1.25ch]` is the room the bleed needs, carried by the badge rather than
+ * left to each call site: the trailing run (`0.75ch`) and the next badge's
+ * leading run (`0.25ch`) plus `0.25ch` of paper between them. It is also what
+ * keeps a cell's end edge from shearing the run.
+ */
 export const badgeVariants = cva(
-  'inline-flex shrink-0 items-center gap-1 rounded-sm border font-semibold whitespace-nowrap [&_svg]:size-3',
+  'mark-pen inline-flex shrink-0 items-center gap-1 rounded-sm border border-transparent font-semibold whitespace-nowrap text-ink me-[1.25ch] [&_svg]:size-3',
   {
     variants: {
       tone: {
-        neutral: 'border-border-strong bg-surface text-ink',
-        accent: 'border-transparent bg-accent text-on-accent',
+        /**
+         * `mark-pen-flat` on every tone but `settled`: these are the marks that
+         * repeat, down a table or a tree, and the roughened outline is the part
+         * that yields there - Q1's measured fallback in
+         * `.ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md`.
+         * It sits on the tone rather than on `sm` because `sm` is not a synonym
+         * for "repeats": the landing's lone `settled` stamp is `sm`.
+         */
+        neutral: 'mark-pen-flat pen-neutral',
+        /** `--color-accent` is `--color-brand`, so its pen is `brand`'s (Q11). */
+        accent: 'mark-pen-flat pen-brand',
         /** Product identity: the product speaking about itself. Follows a rebrand. */
-        brand: 'border-transparent bg-brand-soft text-brand',
-        positive: 'border-transparent bg-positive-soft text-positive',
-        negative: 'border-transparent bg-negative-soft text-negative',
-        warning: 'border-transparent bg-warning-soft text-warning',
+        brand: 'mark-pen-flat pen-brand',
+        positive: 'mark-pen-flat pen-positive',
+        negative: 'mark-pen-flat pen-negative',
+        warning: 'mark-pen-flat pen-warning',
         /**
-         * A neutral status with no verdict - "Hidden", "Planned", "Auto". Typed in pencil inside
-         * a one-pixel `border-panel` rule on whatever ground it lands on: a ruled label, not a
-         * wash. Only `settled` carries the stamp ink.
-         *
-         * It is the one tone with no fill of its own, so on a hoverable row its ground is the
-         * row's - and `--color-info` is `ink-2`'s value, which the interaction wash costs the
-         * same 7:1 it costs the grey. `rowWashPromote` is the same answer `rowWashSecondary`
-         * gives, minus the base colour this variant already names.
+         * A neutral status with no verdict - "Hidden", "Planned", "Auto". It
+         * shares `neutral`'s pen, because `--color-info` is `ink-2`'s value and
+         * the difference was only ever the weight of a rule (Q10). It has a
+         * ground of its own now, so a row's hover wash no longer reaches it.
          */
-        info: `border-border-panel text-info ${rowWashPromote}`,
+        info: 'mark-pen-flat pen-info',
         /**
-         * The highlighter: the typed word stays in `ink`, and a run of `highlighter` is drawn
-         * behind it the way a pen is run over a line that has been checked - past both ends,
-         * pooled where it pressed, roughened at the edge (`mark-pen` in app.css). It is the mark
-         * the product puts on what is settled, and the one status that spends the stamp ink.
-         * Never on what is planned.
+         * The highlighter: `mark-pen`'s own defaults, a run of `highlighter`
+         * pooled toward `brand`. It is the mark the product puts on what is
+         * settled, the one tone that spends the stamp ink, and the one that
+         * stands alone often enough to keep its roughened outline. Never on
+         * what is planned.
          */
-        settled: 'mark-pen border-transparent text-ink',
+        settled: '',
       },
       size: {
-        /**
-         * The dense size, and the one that will repeat: a table cell, a tree
-         * row. `mark-pen-flat` - Q1's measured fallback in
-         * `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`, and a utility
-         * this phase ships - belongs on the marks that repeat, and it is
-         * Phase 3 that puts marks on them. It is deliberately **not** on this
-         * recipe: `sm` is not a synonym for "repeats", and the one `settled`
-         * badge in the app today is the landing's stamp at `sm`
-         * (`src/routes/-ui/ledger-preview.tsx`), a single mark standing alone
-         * that keeps its roughened outline. Flattening here would have made
-         * this phase visible on the one screen it promised not to touch.
-         */
+        /** The dense size: a table cell, a tree row. */
         sm: 'h-5 px-1.5 text-micro tracking-label uppercase',
         md: 'h-6 px-2 text-caption',
       },
@@ -68,21 +77,19 @@ export interface BadgeProps
 /**
  * A small status label.
  *
- * A badge is **text**, always. Every tinted variant carries its own hue as
- * readable type at 7:1 or better (the ratios are stated beside the `-soft`
- * tokens in `tokens.css`), which is what lets a status be legible when the
- * colour is not — a "Pending" badge still says Pending in greyscale, in forced
- * colours, and to a reader who cannot separate the amber wash from the white
- * sheet behind it.
+ * A badge is **text**, always. The word is `ink` in every tone and the tone's
+ * hue is only the run of pen behind it, so a "Pending" badge still says Pending
+ * in greyscale, in forced colours, and to a reader who cannot separate the amber
+ * wash from the sheet behind it. `ink` clears 7:1 on every wash composited over
+ * `surface` and `surface-sunken` (`tokens-contrast.test.ts`).
  *
  * A badge is not a button. If it can be clicked it is a `Button` with
  * `shape="pill"`, so it gets a focus ring and a 44px hit area.
  *
- * ### `info` is pencil, `settled` is the highlighter
+ * ### Violet is spent on what commands and on what is settled
  *
- * Violet is spent on what commands and on what is settled, so a status never
- * wears it: `info` is `ink-2` inside a neutral rule, and `settled` is the one
- * tone that spends the stamp ink, as the wash behind the word. Pick by
+ * Every tone marks; the One Stamp Rule governs which hue a mark spends. A
+ * status never wears violet: `settled` alone spends the stamp ink. Pick by
  * meaning: `brand` is for the rare badge that is part of the product's own
  * voice and would follow a rebrand; a status with no valence is `info`.
  * **When in doubt the answer is `info`.**

@@ -93,6 +93,10 @@ runs:
     # Cloudflare loads no .env file into the Worker's `env`, and a VITE_ name
     # written into .dev.vars is silently empty at build time rather than an
     # error. See .dev.vars.example.
+    #
+    # UNSUBSCRIBE_TOKEN_SECRET is a fixed value rather than a random one because
+    # e2e/unsubscribe.spec.ts mints its tokens with the same key; it signs links
+    # for a database that is gone when the job ends.
     - name: Write the throwaway .dev.vars
       shell: bash
       run: |
@@ -100,6 +104,7 @@ runs:
         cat > .dev.vars <<EOF
         BETTER_AUTH_SECRET=$(openssl rand -base64 32)
         APP_URL=http://localhost:${{ inputs.port }}
+        UNSUBSCRIBE_TOKEN_SECRET=e2e-unsubscribe-token-secret
         EOF
 
     - name: Apply D1 migrations to the local database

@@ -251,7 +251,7 @@
   --color-on-info: #ffffff; /* 9.02:1 on info */
 
   /* The pen palette. Six runs of highlighter, one per badge tone, so a status
-     is marked rather than boxed (`.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`).
+     is marked rather than boxed (`.ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md`).
      `mark-pen` paints a wash at `opacity: 0.75` and deepens its trailing edge
      30% toward the tone's own ink, so the pair a reader meets is a composite
      and never the value declared here: the ratios below are that composite

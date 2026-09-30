@@ -86,7 +86,9 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
-import { isMember } from '../members'
+import { isMember, memberScopeFor } from '../members'
+import { applyUnsubscribe } from '#/server/email/unsubscribe'
+import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
 import { notify } from '#/server/notify/dispatch'
 import {
   advanceImportBatch,
@@ -1343,5 +1345,80 @@ describe('membership is a question about one workspace at a time', () => {
     // Nothing written in either workspace — not A’s, and not the one `user-b` does belong to.
     expect(await countUnread(world.scope)).toBe(0)
     expect(await countUnread(world.otherScope)).toBe(0)
+  })
+})
+
+describe('an unsubscribe link acts in the workspace it names and nowhere else', () => {
+  const KEYS = { current: 'test-signing-key' }
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('builds a scope only for a member of that workspace, with their own role', async () => {
+    await addSecondMember(world.db)
+
+    const bInA = await memberScopeFor(world.db, 'org-a', 'user-b')
+    expect(bInA?.ctx).toEqual({
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+    await expect(
+      memberScopeFor(world.db, 'org-b', 'user-a'),
+    ).resolves.toBeNull()
+  })
+
+  it('scopes the membership read to the workspace the link names', async () => {
+    harnessExecuted.length = 0
+    await memberScopeFor(world.db, 'org-a', 'user-b')
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('from "member"'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+
+  it('never lets a token for B change A, for a person who is a member of both', async () => {
+    await addSecondMember(world.db)
+    const bInA = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+    const token = await signUnsubscribeToken(
+      { userId: 'user-b', organizationId: 'org-b', subject: 'budget.exceeded' },
+      KEYS.current,
+      NOW,
+    )
+
+    const outcome = await applyUnsubscribe(world.db, KEYS, token, NOW)
+
+    expect(outcome).toMatchObject({ ok: true, workspaceName: 'B' })
+    const inB = (await listPrefsFor(world.otherScope, 'user-b')).get(
+      'budget.exceeded',
+    )
+    expect(inB?.email).toBe(false)
+    // A holds no row for this person at all: their defaults, untouched.
+    expect((await listPrefsFor(bInA, 'user-b')).size).toBe(0)
+  })
+
+  it('does nothing with a token for a workspace the person does not belong to', async () => {
+    const token = await signUnsubscribeToken(
+      { userId: 'user-b', organizationId: 'org-a', subject: 'budget.exceeded' },
+      KEYS.current,
+      NOW,
+    )
+
+    await expect(applyUnsubscribe(world.db, KEYS, token, NOW)).resolves.toEqual(
+      {
+        ok: false,
+      },
+    )
+    expect((await listPrefsFor(world.otherScope, 'user-b')).size).toBe(0)
   })
 })

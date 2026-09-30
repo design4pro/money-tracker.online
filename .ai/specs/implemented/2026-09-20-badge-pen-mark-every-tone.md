@@ -1,11 +1,11 @@
 # The badge wears the pen mark, in every tone
 
-| Field              | Value       |
-| ------------------ | ----------- |
-| **Status**         | in-progress |
-| **Issue**          | #366        |
-| **Spec PR**        | #367        |
-| **Implementation** | #370, #373  |
+| Field              | Value            |
+| ------------------ | ---------------- |
+| **Status**         | implemented      |
+| **Issue**          | #366, #486       |
+| **Spec PR**        | #367             |
+| **Implementation** | #370, #373, #487 |
 
 ## 📝 TLDR
 
@@ -130,7 +130,7 @@ server function, no repository, no migration.
 | The pen palette                                    | `src/styles/tokens.css`                         | `--color-pen-{neutral,brand,positive,negative,warning,info}`, three declaration sites each |
 | Which tone spends which wash                       | `src/components/ui/badge.tsx` (`badgeVariants`) | one `cva` variant per tone, unchanged union                                                |
 | What a badge is, and when not to use one           | `DESIGN.md` → `### Badges`                      | the guideline                                                                              |
-| Why the Named Rule moved                           | `docs/adr/0022-*.md`                            | the decision                                                                               |
+| Why the Named Rule moved                           | `docs/adr/0028-the-mark-is-the-badge.md`        | the decision                                                                               |
 
 **Contract between them.** `mark-pen` is a pure consumer of two properties:
 
@@ -444,7 +444,7 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
    `-info` at all three sites (`:root`, the `prefers-color-scheme: dark` block, `[data-theme='dark']`),
    each with its measured ratio in a comment beside the declaration — the convention the palette
    already runs on. Starting point, measured during this spec and rendered in
-   `assets/badge-pen-mark-every-tone/mockup-01-tone-sheet.html`:
+   `.ai/specs/assets/badge-pen-mark-every-tone/mockup-01-tone-sheet.html`:
 
    | token                  | light               | dark               |
    | ---------------------- | ------------------- | ------------------ |
@@ -519,7 +519,7 @@ var(--color-highlighter)` and `--mark-pen-deepen: var(--color-brand)`, and rewri
     spent only on what commands and what is settled** — every other tone marks in its own hue.
     _Verify:_ no line in `DESIGN.md` still claims `settled` is the only mark, and none widens the
     accessibility claim.
-13. **Write the ADR.** `docs/adr/0022-the-mark-is-the-badge.md`: the decision, the alternatives from
+13. **Write the ADR.** `docs/adr/0028-the-mark-is-the-badge.md`: the decision, the alternatives from
     _Proposed Solution_, and what it costs (Q1's measurement, and the two collapses the palette accepts —
     `neutral`/`info` and `accent`/`brand`).
     _Verify:_ referenced from `DESIGN.md` and from this spec's metadata trail.
@@ -571,7 +571,7 @@ because the spec is what somebody opens first.
 
 **One observation this document does not act on.** The expense is `numOctaves="4"` on
 `feTurbulence`. Lowering it is a third option this spec never named and it would change how the one
-shipped mark looks, so it belongs to ADR 0022 (Phase 4) rather than to a phase that was supposed to
+shipped mark looks, so it belongs to ADR 0028 (Phase 4) rather than to a phase that was supposed to
 be invisible.
 
 ## Amendment — Q8 settled: no glyph overlaps the pooled edge (2026-09-20, PR #373)
@@ -620,3 +620,46 @@ clearance, not the 2.5px of noise on top of it.
 7:1 this palette is designed to and above the 3:1 this amendment establishes as its floor. Q8 makes
 that a passing measurement rather than a failing one; it does not make it a comfortable one, and
 #366 carries it as its own observation.
+
+## Amendment - Phase 3: where the flat pen landed and what the geometry kept (2026-09-29, #486)
+
+Phase 3 and Phase 4 shipped together on #486. Two things landed differently from how Steps 8, 9 and
+13 read, and both are recorded here because this is the document somebody opens first.
+
+**The flat pen sits on the tone, not on the size.** Q1 named `sm` as where the fallback lands, and
+the Phase 1 amendment above already explained why that was reversed. Step 8 settled it: every tone
+except `settled` wears `mark-pen-flat` - `neutral`, `info`, `brand`, `accent`, `positive`,
+`negative` and `warning` are the marks that repeat down a table, a tree or a list of cards, and the
+roughened outline is the part that yields there. `settled` wears only `mark-pen`'s defaults: the
+`highlighter` wash, pooled toward `brand`, with the rough outline. Its one call site is the
+landing's lone stamp at `sm`, which stays the unchanged control this spec promised in _Visual change
+expected_. So a mark is flat because of what it means and where that meaning repeats, never because
+of how large it is.
+
+**The geometry kept the box's metrics.** Step 9 asked to replace `h-5`/`h-6` and the horizontal
+padding with "the metrics the mark needs". Measured against the mark, those metrics are the ones the
+stamp always had, so they stay: `sm` is `h-5 px-1.5 text-micro tracking-label uppercase` (20px) and
+`md` is `h-6 px-2 text-caption` (24px). What changed is around the box, not in it:
+
+- **The base recipe is the mark.** `mark-pen text-ink border border-transparent`, and a tone adds
+  its `pen-*` utility and, except `settled`, `mark-pen-flat`. The word is `ink` in every tone.
+- **The one-pixel border stays, transparent.** Under `forced-colors: active` `mark-pen` paints it
+  `CanvasText` on every tone, `settled` included (Q6), and because the border already exists the
+  mode costs no layout shift.
+- **The minimum inline gap is the badge's own.** Every badge carries `me-[1.25ch]`: its trailing
+  bleed (`0.75ch`), the next badge's leading bleed (`0.25ch`) and `0.25ch` of paper between them.
+  The same room keeps a cell's end edge from shearing the run. It is room beside the badge, not
+  padding inside it, which is what the _UI/UX_ anatomy asked for.
+- **`info` dropped `rowWashPromote`.** It has a ground of its own now; the export stays for
+  `rowWashSecondary`.
+- **Only one compensation moved.** Both were re-derived against the mark. The transaction row's
+  nudge went from `-top-0.5` to `-top-px`, measured in the browser: `-top-0.5` put the `sm` word
+  1.25px above the caption's baseline, `-top-px` puts it within 0.25px. The landing wrapper
+  (`sm:ms-1 max-sm:block`) needed no change, because the stamp's box did not move; the stamp now
+  carries `me-[1.25ch]` like every badge, and that room falls at the end of its line. No API,
+  other call site or copy changed.
+
+**The ADR is 0028, not 0022.** `docs/adr/0022-ci-and-agents-run-only-on-the-vps-pool.md` took 0022
+before Phase 4 ran, so Step 13's file is `docs/adr/0028-the-mark-is-the-badge.md` and every
+reference above now names it. The `numOctaves="4"` observation from the Phase 1 amendment is recorded
+there and not acted on: the one rough mark keeps its look.

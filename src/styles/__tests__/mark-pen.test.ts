@@ -151,3 +151,14 @@ it.each(PENS)(
     expect(css).toContain(`.${utility}.mark-pen`)
   },
 )
+
+it('keeps a one-pixel system-colour rule when forced colours drop the wash', async () => {
+  const css = await markPenCss()
+
+  // Forced colours drop the pseudo-elements' paint for every tone at once, so
+  // the rule lives on `mark-pen` itself rather than on a tone (Q6): a word in a
+  // table cell never degrades to bare text, `settled` included.
+  expect(css).toMatch(
+    /@media \(forced-colors: active\) \{ border: 1px solid CanvasText;? \}/,
+  )
+})

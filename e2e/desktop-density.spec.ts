@@ -290,7 +290,7 @@ const RAIL_TRACK = 480
  * scrolled.
  *
  * `badgeVariants` is quoted rather than imported for the `import.meta.glob` reason `support/app.ts`
- * sets out — the source of truth is `src/components/ui/badge.tsx:9,37` with `tone="negative"`
+ * sets out — the source of truth is `badgeVariants` in `src/components/ui/badge.tsx` with `tone="negative"`
  * (`recurring/period-status.tsx:26`), and the words are `recurring.status.overdue` and
  * `recurring.periods.col.status` from the two catalogues.
  */
@@ -302,13 +302,13 @@ const STATUS_COLUMN: Record<
     header: 'Status',
     badge: 'Overdue',
     badgeClass:
-      'inline-flex shrink-0 items-center gap-1 rounded-sm border font-semibold whitespace-nowrap h-6 px-2 text-caption border-transparent bg-negative-soft text-negative',
+      'mark-pen inline-flex shrink-0 items-center gap-1 rounded-sm border border-transparent font-semibold whitespace-nowrap text-ink me-[1.25ch] [&_svg]:size-3 mark-pen-flat pen-negative h-6 px-2 text-caption',
   },
   pl: {
     header: 'Stan',
     badge: 'Po terminie',
     badgeClass:
-      'inline-flex shrink-0 items-center gap-1 rounded-sm border font-semibold whitespace-nowrap h-6 px-2 text-caption border-transparent bg-negative-soft text-negative',
+      'mark-pen inline-flex shrink-0 items-center gap-1 rounded-sm border border-transparent font-semibold whitespace-nowrap text-ink me-[1.25ch] [&_svg]:size-3 mark-pen-flat pen-negative h-6 px-2 text-caption',
   },
 }
 

@@ -129,8 +129,11 @@ function base64(bytes: ArrayBuffer): string {
  * Compares every character of the longer string regardless of where the first difference is, so
  * the time taken carries no information about the correct value. Length inequality is folded into
  * the accumulator rather than returned early for the same reason.
+ *
+ * Exported for the unsubscribe token (`#/server/email/unsubscribe-token`), which compares an HMAC
+ * the same way; one implementation, so a fix to it reaches both.
  */
-function timingSafeEqual(a: string, b: string): boolean {
+export function timingSafeEqual(a: string, b: string): boolean {
   const length = Math.max(a.length, b.length)
   let difference = a.length ^ b.length
   for (let index = 0; index < length; index += 1) {
