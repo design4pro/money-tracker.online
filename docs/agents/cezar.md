@@ -395,8 +395,9 @@ a human's lever:
   `afk-triage` consumes that label and applies one of `needs-info` / `ready-for-agent` /
   `ready-for-human`. That is the whole point of the ladder, and it is why a filed issue reaches an
   open PR with nobody in it. What keeps it bounded is the filter rather than the label discipline:
-  the implementing automation requires `risk-low` and excludes `risk-high` and `security`, and
-  `afk-triage` routes the last two to `ready-for-human` before either could matter. Grooming never
+  the implementing automation requires `risk-low`, and `afk-triage` promotes `risk-high` or
+  `security` work only on the security and tenancy specialist's approving verdict
+  (`SDLC.md` § Delegated decisions). Grooming never
   applies `ready-for-agent` itself — it does not check that the issue is real, still unfixed, or
   already covered by an open PR, and triage is the step that does.
 
@@ -432,8 +433,7 @@ feature issues** on `issue.labeled` with `changedLabels` `groom` / `autofix` / `
 `pr-autopilot`, which merges into `develop`.
 
 **The intake pair:** **Triage new issues** on `changedLabels` `needs-triage`, and **Implement
-ready-for-agent issues** on `changedLabels` `ready-for-agent`, the latter excluding `risk-high`
-and `security`.
+ready-for-agent issues** on `changedLabels` `ready-for-agent`, the latter requiring `risk-low`.
 
 **The three schedules:** **Spec to tickets** (weekdays 07:00), **Weekly architecture review**
 (Mondays 06:00) and **Weekly lessons** (Fridays 16:00).

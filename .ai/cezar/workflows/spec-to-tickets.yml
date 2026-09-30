@@ -4,7 +4,8 @@
 # skill never edits source files, so the step holds no Edit. It holds Write for the ticket drafts it
 # writes before publishing (the self-check and a dispatched reviewer read them) and for its dispatch
 # notes: without it, run b4bde0ac (2026-09-25) did the work through Bash and still failed on eleven
-# denied Writes. Only the frontier gets `ready-for-agent`.
+# denied Writes. Agent is for the specialist that settles each judgement call
+# (.ai/skills/afk-decide/SKILL.md). Only the frontier gets `ready-for-agent`.
 name: spec-to-tickets
 description: Promote the ticket frontier, then slice at most one merged spec into tracer-bullet tickets (afk-to-tickets).
 steps:
@@ -14,4 +15,4 @@ steps:
   - id: afk-to-tickets
     name: afk-to-tickets
     prompt: '/afk-to-tickets {{task}}'
-    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite]
+    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
