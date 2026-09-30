@@ -1,9 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "description": "Project-scoped Claude Code settings for money-tracker.online. deny holds the few operations nothing recovers from - secrets, generated files, history rewrites, deleted Cloudflare stores - and wins over ask and allow in every mode. ask holds what a developer approves at the keyboard - deploys, remote D1, the hand-mirrored worker-configuration.d.ts; a cezar run uses --permission-mode dontAsk, so there it is refused (ADR 0025). The allow list carries only the tracker operations the om-* pipeline cannot run without. Every other permission rule stays per-developer in the gitignored .claude/settings.local.json.",
-  "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "opus"
-  },
   "permissions": {
     "allow": [
       "Bash(gh pr review:*)",
@@ -48,9 +45,11 @@
     },
     "claude-opus-5": {
       "effortLevel": "high"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "high"
     }
   },
-  "enabledMcpjsonServers": ["polar-sandbox"],
   "hooks": {
     "PreToolUse": [
       {
