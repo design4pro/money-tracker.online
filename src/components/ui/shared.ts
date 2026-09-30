@@ -157,11 +157,8 @@ export const rowWash =
 
 /**
  * The promotion on its own, for text that already names a token of its own.
- *
- * `--color-info` is the case this exists for: it *is* `ink-2`'s value under a
- * different name — "a notice has no verdict, so it is typed in pencil" — so a
- * `Badge tone="info"` on a washed row measures the same 6.73:1 in dark that the
- * grey did, while spelling `text-info` rather than `text-ink-2`.
+ * `rowWashSecondary` is its one consumer; `Badge tone="info"` wore it until the
+ * badge became a mark with a ground of its own.
  */
 export const rowWashPromote =
   'transition-colors duration-fast group-hover/wash:text-ink'

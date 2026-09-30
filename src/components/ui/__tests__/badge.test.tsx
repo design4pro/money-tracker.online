@@ -5,7 +5,7 @@ import { Badge, badgeVariants } from '../badge'
 
 /**
  * `settled` is the control for
- * `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`.
+ * `.ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md`.
  *
  * It is the one badge that already wears the pen mark - on the landing
  * passbook - and the spec's phases are judged against it staying exactly where
@@ -35,6 +35,46 @@ describe('Badge', () => {
     expect(className).toContain('text-ink')
     // The mark is the chrome, so the box that would fight it is transparent.
     expect(className).toContain('border-transparent')
+  })
+
+  // Every other tone wears the same mark in its own pen, with the hue out of the
+  // word. `neutral`/`info` and `accent`/`brand` share a pen because they share
+  // a value (Q10, Q11).
+  it.each([
+    ['neutral', 'pen-neutral'],
+    ['info', 'pen-info'],
+    ['brand', 'pen-brand'],
+    ['accent', 'pen-brand'],
+    ['positive', 'pen-positive'],
+    ['negative', 'pen-negative'],
+    ['warning', 'pen-warning'],
+  ] as const)('marks %s in %s, flat, with the word in ink', (tone, pen) => {
+    for (const size of ['sm', 'md'] as const) {
+      const classes = badgeVariants({ tone, size }).split(' ')
+
+      expect(classes).toEqual(
+        expect.arrayContaining(['mark-pen', 'mark-pen-flat', pen, 'text-ink']),
+      )
+      // The box is gone: no fill, no visible rule, no hue in the word.
+      expect(
+        classes.filter((c) => /^(bg|text)-(?!ink$|micro$|caption$)/.test(c)),
+      ).toEqual([])
+      expect(
+        classes.filter(
+          (c) => c.startsWith('border-') && c !== 'border-transparent',
+        ),
+      ).toEqual([])
+    }
+  })
+
+  it('no longer promotes info on a washed row, now that it has a ground', () => {
+    expect(badgeVariants({ tone: 'info' })).not.toContain('group-hover/wash')
+  })
+
+  it('carries the trailing room its bleed needs', () => {
+    expect(badgeVariants({ tone: 'neutral', size: 'sm' })).toContain(
+      'me-[1.25ch]',
+    )
   })
 
   it('renders its children as the meaning and its icon as decoration', () => {

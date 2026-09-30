@@ -520,14 +520,14 @@
 }
 
 /* --------------------------------------------------------------------------
-   HIGHLIGHTER — the settled mark.
+   HIGHLIGHTER — the mark every badge wears.
 
    A run of highlighter over a typed word. The wash is `--mark-pen-wash` and
    the shade it pools into is `--mark-pen-deepen`; both default to the stamp
    pair, so a caller that sets neither gets the settled mark exactly as it has
    always looked. Two properties rather than two tokens is what lets a second
    tone have a pen of its own instead of a second copy of this rule
-   (`.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`). The default wash is
+   (`.ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md`). The default wash is
    `highlighter` - the stamp wash in light, a lilac pen in dark, because
    `brand-soft` there is the selection tint and a highlighter has to read as a
    pen run over the line, not as a selected row. It is drawn behind the text so the ink stays ink,
@@ -542,8 +542,9 @@
    (12.55:1 light, 7.33:1 dark
    at full strength, measured beside the token); the 75% wash only moves the
    ground toward the page, so the pair never falls below that. In forced
-   colours the pseudo-elements lose their paint and the typed word stands
-   alone, which is what the badge means anyway.
+   colours the pseudo-elements lose their paint for every tone at once, so a
+   one-pixel `CanvasText` rule takes the wash's place: a word in a table cell
+   stays an element rather than degrading to bare text (Q6).
    -------------------------------------------------------------------------- */
 @utility mark-pen {
   --mark-pen-wash: var(--color-highlighter);
@@ -590,6 +591,10 @@
     rotate: 15deg;
     filter: var(--mark-pen-filter);
   }
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
 }
 
 /* The same pen with its roughened outline dropped, for a mark that repeats.
@@ -602,14 +607,12 @@
    60 Hz frame budget spent on one screenful of badges.
 
    So the mark is kept and the outline is what yields, exactly as Q1 of
-   `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md` named it: the wash, the
+   `.ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md` named it: the wash, the
    bleed, the pooled trailing edge and the paused blob all stay, and only the
    roughness goes. One mark standing alone - the landing's `settled` stamp -
-   keeps it, which is why no recipe in `badgeVariants` wears this yet: Q1 names
-   `sm` as where the fallback lands, but `sm` is where the marks that repeat
-   will be, not a synonym for repetition, and today the only `sm` mark in the
-   app is that single stamp. Phase 3 is what puts marks on the rows, and it is
-   what reaches for this. */
+   keeps it, so `badgeVariants` puts this on every tone but `settled` rather
+   than on the `sm` size Q1 named: `sm` is where the marks that repeat are, not
+   a synonym for repetition, and the landing's single stamp is `sm` too. */
 @utility mark-pen-flat {
   /* Compound on purpose. Both utilities set the same custom property on the
      same element, so at equal specificity the winner would be whichever rule
@@ -634,7 +637,7 @@
    `neutral` and `info` share both values (`--color-info` **is**
    `--color-ink-2`), and `accent` has no utility of its own because
    `--color-accent` **is** `--color-brand`, so `pen-brand` is already its pen -
-   Q10 and Q11 of `.ai/specs/2026-09-20-badge-pen-mark-every-tone.md`. `settled`
+   Q10 and Q11 of `.ai/specs/implemented/2026-09-20-badge-pen-mark-every-tone.md`. `settled`
    has none either: it is `mark-pen`'s defaults, and spelling them a second time
    is how they drift.
 
