@@ -24,6 +24,15 @@ GitHub deletes a merged PR's head branch, and a push to it recreates that branch
 It happened on #447 (2026-09-24): the PR was merged while the base-merge gate ran, and the push
 that followed brought `ci/vps-only-runners` back.
 
+## "Approvable" follows the ruleset
+
+A PR is approvable (state matrix row 9) when no review requests changes, no review thread is
+unresolved, and the base branch's ruleset requirements for approvals and code-owner review are met.
+With `required_approving_review_count: 0` and no code-owner review, that holds without any
+approving review: read the ruleset as `.ai/skills/om-approve-merge-pr/SKILL.md` § Rules says. A
+missing approval this run cannot give itself (its own account authored the PR) is not a reason to
+stop at merge-ready under `--allow-merge` when the ruleset requires none.
+
 ## Unattended-run limits
 
 These hold for every skill this run chains, whether or not its own override was read:
