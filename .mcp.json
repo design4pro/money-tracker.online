@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "polar-sandbox": {
-      "type": "http",
-      "url": "https://mcp.polar.sh/mcp/polar-sandbox"
-    }
-  }
-}
