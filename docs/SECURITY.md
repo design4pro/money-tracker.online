@@ -88,6 +88,16 @@ Better Auth, with sessions in the `SESSIONS` KV namespace.
 - `safeRedirect()` guards every `?redirect=` parameter: it must start with a single `/`, and `//`,
   `/\`, control characters and a loop back to `/login` are all rejected. An open redirect on a
   sign-in page is a credential-phishing primitive.
+- **The unsubscribe token sits in a query string.** `/unsubscribe?t=` and `/api/unsubscribe?t=`
+  work without a session, so the signed token reaches Cloudflare's request logs. That is accepted
+  because what a captured token gives away is bounded: it can turn one kind of email off for the
+  person it names, and its page shows the topic and the workspace name and, by rendering invalid
+  once the person has left, whether they are still a member. It exposes no address, no amount and
+  no other member. Our own logger never records the query string of either route: nothing logs
+  the request URL, and `requestFields` records the path only if it is ever wired in
+  (`src/server/observability/__tests__/request-fields.test.ts`). Replacing
+  `UNSUBSCRIBE_TOKEN_SECRET` without carrying the old value into
+  `UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS` revokes every outstanding link at once.
 
 ---
 

@@ -83,6 +83,14 @@ POLAR_SERVER=
 # Resend-compatible REST key. The endpoint itself is the EMAIL_API_URL var in wrangler.jsonc.
 EMAIL_API_KEY=
 
+# Signs the unsubscribe links (`/unsubscribe?t=`, `/api/unsubscribe?t=`). Unset, every link is
+# invalid and the one-click endpoint answers 400. Rotate by moving the old value into
+# UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS, which keeps verifying links already in inboxes; replacing it
+# without that revokes every link at once.
+# Generate: openssl rand -base64 32
+UNSUBSCRIBE_TOKEN_SECRET=
+UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS=
+
 
 # ── Nightly D1 backup to R2 (optional; the cron logs and skips without it) ───
 

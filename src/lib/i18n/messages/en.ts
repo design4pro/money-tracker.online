@@ -1270,6 +1270,13 @@ const messages = {
   'notifications.kind.goalReached.title': 'You reached {goal}',
   'notifications.kind.goalReached.body':
     '{goal} is complete — you put aside {contributed} of {target}.',
+  // A kind named as a topic: the unsubscribe page's sentence today, the preference matrix's row
+  // headers when 21-S3 ships it.
+  'notifications.kind.budgetThresholdCrossed.label': 'Budget thresholds',
+  'notifications.kind.budgetExceeded.label': 'Spent budgets',
+  'notifications.kind.recurringDueSoon.label': 'Upcoming bills',
+  'notifications.kind.recurringOverdue.label': 'Overdue bills',
+  'notifications.kind.goalReached.label': 'Reached goals',
 
   /*
     Email (21-S2).
@@ -1639,6 +1646,21 @@ const messages = {
   'invite.loading': 'Loading this invitation…',
   'invite.notFound': 'This invitation link does not lead anywhere.',
   'invite.goToApp': 'Go to the household',
+
+  /* -- Unsubscribing from an email link ------------------------------------ */
+  'unsubscribe.meta.title': 'Unsubscribe',
+  'unsubscribe.topic.digest': 'the daily summary',
+  'unsubscribe.confirm.title': 'Stop these emails?',
+  'unsubscribe.confirm.body':
+    'You will stop getting emails about {topic} from {workspace}.',
+  'unsubscribe.confirm.action': 'Unsubscribe',
+  'unsubscribe.done.title': 'You are unsubscribed',
+  'unsubscribe.done.body':
+    'You will no longer get emails about {topic} from {workspace}. Notifications inside the app are not affected.',
+  'unsubscribe.invalid.title': 'This link does not work',
+  'unsubscribe.invalid.body':
+    'It may have expired or been copied incompletely. Sign in to change which emails you get.',
+  'unsubscribe.invalid.signIn': 'Sign in',
 
   /* -- The auth screens --------------------------------------------------- */
   'auth.aside.title': 'Every figure, down to the minor unit.',

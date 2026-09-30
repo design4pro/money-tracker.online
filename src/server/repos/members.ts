@@ -56,7 +56,7 @@ import {
   LastOwnerError,
   NotFoundError,
 } from './errors'
-import { assertRole } from './scope'
+import { assertRole, createScope } from './scope'
 import { ownerScopeFor } from './subscriptions'
 import { seatsInUse } from './usage'
 
@@ -195,6 +195,36 @@ export async function isMember(
     .where(allOf(tenantFilter(scope, member), eq(member.userId, userId)))
     .limit(1)
   return rows.length > 0
+}
+
+/**
+ * A scope for one person in one workspace, built from a signed link rather than a session.
+ *
+ * The unsubscribe token (`#/server/email/unsubscribe-token`) names a person and a workspace, and
+ * nobody is signed in to prove either, so this takes a bare {@link Database} — the same necessity,
+ * and the same shape, as `ownerScopeFor` in `./subscriptions`. The principal is the token's person
+ * with the role their `member` row carries today, never an assumed one: the scope acts for them.
+ *
+ * `null` when they are not a member of that workspace, which is also how a token for a workspace
+ * the person has since left stops working.
+ */
+export async function memberScopeFor(
+  db: Database,
+  organizationId: string,
+  userId: string,
+): Promise<TenantScope | null> {
+  const rows = await db
+    .select({ role: member.role })
+    .from(member)
+    .where(
+      and(eq(member.organizationId, organizationId), eq(member.userId, userId)),
+    )
+    .limit(1)
+
+  const row = rows.at(0)
+  if (!row) return null
+
+  return createScope(db, { userId, organizationId, role: roleOf(row.role) })
 }
 
 /**
