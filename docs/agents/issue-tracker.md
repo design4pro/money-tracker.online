@@ -72,7 +72,8 @@ ones; `om-auto-manage-issues` reports which are missing.
 `SDLC.md` → Definition of Ready. In short: a human supplied the problem, the expected outcome and
 how it will be checked, the out-of-scope list, and answered every blocking question; a spec (or the
 Analysis section for a bug) supplies the rest. `om-auto-fix-issue` stops on an issue that fails
-the human tier instead of speccing around the gap.
+the human tier, and that the `readiness-verifier` sub-agent could not resolve, instead of speccing
+around the gap.
 
 ## Dependencies
 

@@ -208,6 +208,13 @@ describe("classify", () => {
     expect(decide({ comments: [...unanswered, human("ready as is", "2026-09-04T00:00:00Z")] }).state).toBe("READY");
   });
 
+  it("takes a newer readiness-verified verdict as the answer, and an older one as nothing", () => {
+    const notReady = [agent("implementation notes"), agent("not ready", "2026-09-03T00:00:00Z")];
+    const verified = (at) => agent("`readiness-verifier` — readiness verified", at);
+    expect(decide({ comments: [...notReady, verified("2026-09-04T00:00:00Z")] }).state).toBe("READY");
+    expect(decide({ comments: [verified("2026-09-02T00:00:00Z"), ...notReady] }).state).toBe("NOT_READY");
+  });
+
   it("does not mistake its own not-ready marker for the human's answer", () => {
     const comments = [
       agent("implementation notes"),

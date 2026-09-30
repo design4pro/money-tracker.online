@@ -39,7 +39,7 @@ Before intake, the work is shaped: `om-discover` establishes the product context
 
 A ticket is ready for implementation when the answers below are on the ticket or in a spec it links. They come in two tiers, because a spec can supply the second but never the first.
 
-**Ticket-level — only a human can supply these:**
+**Ticket-level — a human supplies these, or the readiness verifier resolves them (below):**
 
 - the problem or need, and who has it (a user or a role);
 - the expected outcome, and how it will be checked;
@@ -56,7 +56,7 @@ A ticket is ready for implementation when the answers below are on the ticket or
 - dependencies;
 - a link to the prototype or mockups when the change is user-facing.
 
-For a bug, ready means reproducible: `om-verify-in-repo` is that gate, and the list above applies only to its ticket-level items. Enforcement: `om-prepare-issue` files tickets with these sections; `om-auto-manage-issues` records `READY_STATUS` per issue and posts a not-ready comment naming what is missing; `om-auto-fix-issue`'s feature route stops on a ticket that fails the ticket-level tier instead of speccing around the gap, the way `om-verify-in-repo` stops on a bug that is not real. Spec-level gaps are not a stop — the spec is authored. A maintainer may waive an item by saying so on the ticket.
+For a bug, ready means reproducible: `om-verify-in-repo` is that gate, and the list above applies only to its ticket-level items. Enforcement: `om-prepare-issue` files tickets with these sections; `om-auto-manage-issues` records `READY_STATUS` per issue and posts a not-ready comment naming what is missing; `om-auto-fix-issue`'s feature route stops on a ticket that fails the ticket-level tier instead of speccing around the gap, the way `om-verify-in-repo` stops on a bug that is not real. Spec-level gaps are not a stop — the spec is authored. A maintainer may waive an item by saying so on the ticket. Before either skill stops on a missing ticket-level item, the `readiness-verifier` sub-agent (`.claude/agents/readiness-verifier.md`) reads the ticket, its thread and the repository, and resolves each item from evidence or with a documented assumption; when it resolves them all, its table goes on the ticket as a `readiness verified` comment and the ticket is ready, and a maintainer revokes that with a `veto` reply. It never decides `risk-high` or `security` work, a blocking question nobody answered, a product choice the repository has not made, or a problem statement it would have to invent — those still wait for a human.
 
 **The Definition of Ready is the gate an unattended pipeline is built on.** `READY_STATUS` is the one machine-readable verdict that says a ticket can be worked without asking a person a question, so every automatic hand-off from grooming to triage reads it and nothing downstream re-derives it. A ticket that is not ready is commented on and left alone; it is never handed to an implementing agent on the theory that the agent will work the gap out.
 

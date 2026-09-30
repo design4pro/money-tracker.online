@@ -49,3 +49,37 @@ refuses under `dontAsk` (`.husky/*`, `.claude/settings.json`, `.claude/hooks/*`,
 `.ai/skills/afk-decide/SKILL.md` in the PR and the report, never a `cp` or `sed` workaround and
 never a ticket routed to a human in advance; and the dev server URL is `baseUrl` in
 `.ai/qa/test-env.json`, never anything read from `.dev.vars`.
+
+## Readiness verifier
+
+A ticket that fails the ticket-level tier of the Definition of Ready is not stopped at once. The
+gap is usually one the repository already answers, and a human reading it used to write "ready as
+is"; the `readiness-verifier` sub-agent (`.claude/agents/readiness-verifier.md`) now makes that
+call. This replaces the stop in the feature route's triage gate (`references/fr-triage.md` step 4)
+and nothing else - the bug route, the lock check and the already-implemented check are unchanged.
+
+1. A human waiver on the ticket ("ready as is") still satisfies the tier without the verifier.
+2. A `readiness verified` comment already on the issue, with no human comment newer than it, is the
+   verdict: reuse it and do not run the verifier again.
+3. Otherwise delegate to `readiness-verifier` with the issue number, title, body, labels, author,
+   every comment (author, timestamp, whether it is an agent's) and the missing items. The verifier
+   refuses `risk-high`, `security`, out-of-scope asks and a vetoed verdict itself, so pass every
+   issue and let it decide. With no sub-agent tool on this backend, skip it and stop as the
+   installed skill says - never verify your own triage.
+4. `READINESS: VERIFIED` - post the table as one idempotent comment (find the marker via
+   **list-issue-comments**, update it in place via **update-comment** when the table changed), treat
+   the tier as satisfied, and continue:
+
+   ```markdown
+   🤖 `readiness-verifier` — readiness verified
+
+   The ticket-level Definition of Ready items below were missing. They are resolved here so the
+   pipeline can build this issue without waiting for a human.
+
+   {the verifier's table}
+
+   Reply `veto` to revoke this and send the issue back to a human.
+   ```
+
+5. `READINESS: NEEDS_HUMAN` - post the installed skill's not-ready comment listing only the
+   `NEEDS_HUMAN` rows, with both readings where the verifier named two, and stop with `NOT_READY`.
