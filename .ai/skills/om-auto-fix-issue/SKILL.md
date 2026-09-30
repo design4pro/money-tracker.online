@@ -81,5 +81,7 @@ and nothing else - the bug route, the lock check and the already-implemented che
    Reply `veto` to revoke this and send the issue back to a human.
    ```
 
-5. `READINESS: NEEDS_HUMAN` - post the installed skill's not-ready comment listing only the
-   `NEEDS_HUMAN` rows, with both readings where the verifier named two, and stop with `NOT_READY`.
+5. `READINESS: NEEDS_HUMAN` - settle each row that is a decision through `.ai/skills/afk-decide/SKILL.md`,
+   record it as a Resolved assumptions row and continue. Post the installed skill's not-ready comment
+   and stop with `NOT_READY` only for the rows nobody but the reporter can answer, with both readings
+   where the verifier named two.

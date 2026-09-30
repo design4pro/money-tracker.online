@@ -13,7 +13,7 @@ Extends the installed skill: read `.claude/skills/om-auto-manage-issues/SKILL.md
   skill (`references/enrich-existing-issue.md`) finds a ticket-level item missing, follow
   `.ai/skills/om-auto-fix-issue/SKILL.md` § Readiness verifier: `READINESS: VERIFIED` records
   `READY_STATUS=ready` and posts the `readiness verified` comment instead of the not-ready one;
-  `NEEDS_HUMAN` records `not-ready` and the not-ready comment lists only the `NEEDS_HUMAN` rows.
+  a `NEEDS_HUMAN` row that is a decision is settled through `.ai/skills/afk-decide/SKILL.md` (see "Settle, do not ask" below); only a row nobody but the reporter can answer records `not-ready`, and the not-ready comment lists only those rows.
   A verified issue is ready for every rule below, including the hand-on to `needs-triage`.
 - **Hand the issue on when it is ready.** When the run ends with `READY_STATUS=ready` and the issue
   carries no intake label yet (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`),
