@@ -179,7 +179,13 @@ export function classify(issue, { triggers, runs, prLinks, staleHours, now }) {
   );
   const answered =
     notReady &&
-    comments.some((c) => !isAgentComment(c) && c.createdAt > notReady.createdAt);
+    comments.some(
+      (c) =>
+        c.createdAt > notReady.createdAt &&
+        // A human's reply, or the readiness verifier resolving the gap in the human's place
+        // (SDLC.md § Definition of Ready).
+        (!isAgentComment(c) || c.body.includes("readiness verified")),
+    );
   const hoursIdle = (now - Date.parse(issue.updatedAt)) / 36e5;
 
   const state = (name, next, warning) => ({
