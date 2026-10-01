@@ -56,7 +56,7 @@ A ticket is ready for implementation when the answers below are on the ticket or
 - dependencies;
 - a link to the prototype or mockups when the change is user-facing.
 
-For a bug, ready means reproducible: `om-verify-in-repo` is that gate, and the list above applies only to its ticket-level items. Enforcement: `om-prepare-issue` files tickets with these sections; `om-auto-manage-issues` records `READY_STATUS` per issue and posts a not-ready comment naming what is missing; `om-auto-fix-issue`'s feature route stops on a ticket that fails the ticket-level tier instead of speccing around the gap, the way `om-verify-in-repo` stops on a bug that is not real. Spec-level gaps are not a stop — the spec is authored. A maintainer may waive an item by saying so on the ticket. Before either skill stops on a missing ticket-level item, the `readiness-verifier` sub-agent (`.claude/agents/readiness-verifier.md`) reads the ticket, its thread and the repository, and resolves each item from evidence or with a documented assumption; when it resolves them all, its table goes on the ticket as a `readiness verified` comment and the ticket is ready, and a maintainer revokes that with a `veto` reply. It never decides `risk-high` or `security` work, a blocking question nobody answered, a product choice the repository has not made, or a problem statement it would have to invent — those still wait for a human.
+For a bug, ready means reproducible: `om-verify-in-repo` is that gate, and the list above applies only to its ticket-level items. Enforcement: `om-prepare-issue` files tickets with these sections; `om-auto-manage-issues` records `READY_STATUS` per issue and posts a not-ready comment naming what is missing; `om-auto-fix-issue`'s feature route stops on a ticket that fails the ticket-level tier instead of speccing around the gap, the way `om-verify-in-repo` stops on a bug that is not real. Spec-level gaps are not a stop — the spec is authored. A maintainer may waive an item by saying so on the ticket. Before either skill stops on a missing ticket-level item, the `readiness-verifier` sub-agent (`.claude/agents/readiness-verifier.md`) reads the ticket, its thread and the repository, and resolves each item from evidence or with a documented assumption; when it resolves them all, its table goes on the ticket as a `readiness verified` comment and the ticket is ready, and a maintainer revokes that with a `veto` reply. It never decides `risk-high` or `security` work, a blocking question nobody answered, a product choice the repository has not made, or a problem statement it would have to invent; a decision among those goes to the specialist sub-agent of § Delegated decisions in the same run, and only what nobody but the reporter knows waits for a human.
 
 **The Definition of Ready is the gate an unattended pipeline is built on.** `READY_STATUS` is the one machine-readable verdict that says a ticket can be worked without asking a person a question, so every automatic hand-off from grooming to triage reads it and nothing downstream re-derives it. A ticket that is not ready is commented on and left alone; it is never handed to an implementing agent on the theory that the agent will work the gap out.
 
@@ -77,7 +77,7 @@ Every spec, ticket and agent-sized issue is scoped **Simple, Lovable, Complete**
 - **Lovable**: no rough edge is left "for later" inside that scope. Error states, empty states, docs and tests ship with the change.
 - **Complete**: the slice is useful and verifiable on its own. A change that only works once a later ticket lands is a layer, not a slice: merge it into the slice it serves.
 
-A request that fails the rule is re-scoped (a spec, or tickets), not implemented partially. `afk-triage` and `afk-to-tickets` both gate on this rule: a ticket too large for one fresh agent context goes to `ready-for-human`, never to `ready-for-agent`.
+A request that fails the rule is re-scoped (a spec, or tickets), not implemented partially. `afk-triage` and `afk-to-tickets` both gate on this rule: a ticket too large for one fresh agent context is never `ready-for-agent` as it stands. The skill splits it, on a product owner specialist's verdict (§ Delegated decisions), into a first slice it briefs and follow-up issues it files.
 
 ## Label state machine
 
@@ -117,7 +117,7 @@ When no risk label is set, infer one:
 - `risk-medium` — an ordinary single-area change that ships with tests (also the default reading of unset).
 - `risk-low` — docs-only, test-only, typo, or isolated cosmetic changes.
 
-When signals conflict, pick the higher label and say why in the label comment. A `risk-high` PR is not merely advised to get more scrutiny; it carries the evidence below, and it puts the issue out of reach of every unattended implementing skill:
+When signals conflict, pick the higher label and say why in the label comment. A `risk-high` PR is not merely advised to get more scrutiny; it carries the evidence below, and it sends the issue past a security and tenancy specialist (§ Delegated decisions) before any unattended implementing skill may take it:
 
 | Area behind `risk-high`     | What the PR must carry                                                                                                              |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -134,15 +134,15 @@ Intake labels go on issues only, one at a time, and say who acts on the issue ne
 
 | Label             | Meaning                                                                                                                       | Set by                                                            |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `needs-triage`    | Groomed and ready by the Definition of Ready, but not yet evaluated for an agent                                              | Humans; `afk-architecture-review` for its `Strong` candidates     |
+| `needs-triage`    | Groomed and ready by the Definition of Ready, but not yet evaluated for an agent                                              | Humans; `afk-architecture-review`; `afk-triage` (split follow-up) |
 | `needs-info`      | Waiting on the reporter                                                                                                       | `afk-triage`, humans                                              |
 | `ready-for-agent` | Briefed and safe to implement unattended. Where `## This repository` says so, adding it launches the implementing automation. | `afk-triage`, `afk-to-tickets` (frontier tickets only), humans    |
-| `ready-for-human` | Briefed, but needs a person: security, `risk-high`, a spec, a duplicate, a decline, or a judgement call                       | `afk-triage`, `afk-to-tickets`, `afk-architecture-review`, humans |
+| `ready-for-human` | Briefed, but needs a person: only the cases `.ai/skills/afk-decide/SKILL.md` § 5 reserves, or an issue that should be closed  | `afk-triage`, `afk-to-tickets`, humans                            |
 
 - **Transitions:** an issue labeled `needs-triage` moves to exactly one of `needs-info`, `ready-for-agent` or `ready-for-human`. When the reporter answers a `needs-info` issue, a human moves it back to `needs-triage`, and triage runs again. Re-triaging a decided issue means removing `ready-for-agent` or `ready-for-human` first, then adding `needs-triage`.
 - **Grooming comes first.** `om-auto-manage-issues` owns `issue.opened` and adds the SDLC labels and the Definition of Ready check. `afk-triage` answers the `needs-triage` label instead, so the two never groom one issue at the same time.
-- **Grooming hands the issue on only where the repository wires it.** A finished groom records `READY_STATUS`; the installed `om-auto-manage-issues` applies no intake label, so on its own it stops there. The edge that closes the gap — a groom ending `READY_STATUS=ready` applies `needs-triage`, and nothing else, as its last mutation — lives in the repo-local override, and `## This repository` says whether it is wired here. Where it is not, an issue that arrives through the issue form waits for a human to add an intake or trigger label, and every "the pipeline picks it up" below reads as "a human picks it up". Either way grooming never applies `ready-for-agent` itself: it does not check that the issue is real, still unfixed on the base branch, or already covered by an open PR, and those three checks are what keep `risk-high` and `security` work out of the unattended lane. `afk-architecture-review` also sets `needs-triage`, on the `Strong` candidates it raises itself.
-- **Limits on skills:** automated skills never add `ready-for-agent` to `risk-high` or `security` work, and never close an issue. Consuming `needs-triage` is exactly what `afk-triage` is for, so that one label it may remove; `ready-for-agent` and `ready-for-human` are terminal, and a skill never removes either once a human set it.
+- **Grooming hands the issue on only where the repository wires it.** A finished groom records `READY_STATUS`; the installed `om-auto-manage-issues` applies no intake label, so on its own it stops there. The edge that closes the gap — a groom ending `READY_STATUS=ready` applies `needs-triage`, and nothing else, as its last mutation — lives in the repo-local override, and `## This repository` says whether it is wired here. Where it is not, an issue that arrives through the issue form waits for a human to add an intake or trigger label, and every "the pipeline picks it up" below reads as "a human picks it up". Either way grooming never applies `ready-for-agent` itself: it does not check that the issue is real, still unfixed on the base branch, or already covered by an open PR, and those three checks, with the security and tenancy specialist's verdict, are what stand between `risk-high` or `security` work and the unattended lane. `afk-architecture-review` also sets `needs-triage`, on the candidates it files itself, and `afk-triage` on the follow-up issues of a split.
+- **Limits on skills:** automated skills add `ready-for-agent` to `risk-high` or `security` work only on a security and tenancy specialist's approving verdict, recorded in the brief with its conditions as acceptance criteria. They never close an issue. Consuming `needs-triage` is exactly what `afk-triage` is for, so that one label it may remove; `ready-for-agent` and `ready-for-human` are terminal, and a skill never removes either once a human set it.
 - **Human override:** a human may move any issue to any intake label at any time.
 
 ## Trigger labels
@@ -202,6 +202,10 @@ Two properties bound the whole unattended loop, and both are worth stating plain
 ## Unattended decisions
 
 The `afk-*` skills (`.ai/skills/`) run with no human to ask. Where a person would be consulted, the skill picks the most reversible reasonable option and records it as a row in a **Resolved assumptions** table (`# | Question | Applied default | Why`) in the brief, spec or PR body it writes. Humans review those rows at the PR, and overturning one is an ordinary review finding. Domain terms and decisions follow `afk-domain-modeling`: `CONTEXT.md` is updated in the same change, and ADRs are written only when a decision is hard to reverse, surprising, and a real trade-off.
+
+### Delegated decisions
+
+A choice between options is not a reason to stop or to hand an issue to a person. An unattended skill that would present options, a "Decision for the implementer", a "human's call" or a `ready-for-human` label hands the question to an **independent specialist sub-agent** instead (product owner, software architect, security and tenancy, accessibility and UX, manual tester, test engineer, or configuration guardian), applies the verdict, records it as a Resolved assumptions row, and continues the work in the same run. The protocol, the verdict format and the short list of cases that still need a person are in `.ai/skills/afk-decide/SKILL.md`. A skill that stops on a question this protocol could settle is a defect to fix in the skill.
 
 A state an unattended pipeline can enter needs an exit that does not require a human to type something. When a state's only on-by-default exit is a person noticing it, work accumulates there silently: name the exit when the state is introduced, or do not introduce the state.
 
@@ -336,7 +340,9 @@ anything from anyone else waits for a maintainer to add a trigger label.
 - `implement-ticket` stops when three or more agent PRs already wait in `review`, and that cap is
   shared — the `issue-autofix` output counts against it too, because both ladders publish under the
   same `gh` identity.
-- Neither triage nor implementation touches `risk-high` or `security` work.
+- Triage sends `risk-high` or `security` work to an agent only on a security and tenancy
+  specialist's approving verdict (§ Delegated decisions), and the implementing automation still
+  requires `risk-low` to start by itself. The PR still passes every review and QA gate above.
 - **Governance documents are `risk-high`.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`,
   `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record decisions a human owns, and a
   person reads the decision before merging a change to one. `.github/CODEOWNERS` routes the same

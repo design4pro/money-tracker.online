@@ -1,8 +1,11 @@
 # Started by the `needs-triage` label (docs/agents/cezar-automations.json). afk-triage verifies the
-# report, writes one Agent Brief comment and sets exactly one intake label; its own rules say it
-# never edits code, commits, closes an issue or removes a human's label, so the step holds no Edit
-# and no Write - the grant is the boundary, not a promise in prose. Bash is unallowlisted because
-# the tracker descriptor's operations are `gh` command lines.
+# report, writes one Agent Brief comment, may file the follow-up issues of a split, and sets
+# exactly one intake label; its own rules say it never edits code, commits, closes an issue or
+# removes a human's label, so the step holds no Edit - the grant is the boundary, not a promise in
+# prose. It holds Write for the comment and issue bodies it hands to `gh --body-file` (eight runs
+# were denied exactly that), and Agent for the independent specialist that settles each open
+# question (.ai/skills/afk-decide/SKILL.md, SDLC.md § Delegated decisions). Bash is unallowlisted
+# because the tracker descriptor's operations are `gh` command lines.
 name: triage
 description: Triage one GitHub issue unattended - verify, write an Agent Brief, set one intake label (afk-triage).
 steps:
@@ -12,4 +15,4 @@ steps:
   - id: afk-triage
     name: afk-triage
     prompt: '/afk-triage {{task}}'
-    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
+    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]

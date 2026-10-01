@@ -10,5 +10,6 @@ steps:
   - id: fix
     name: om-auto-fix-pr
     prompt: '/om-auto-fix-pr {{task}}'
-    # `Task` dispatches the review personas in .claude/agents (CODE_REVIEW.md -> Review personas).
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]
+    # `Task` / `Agent` (old and new name of one tool) dispatch the review personas in .claude/agents
+    # (CODE_REVIEW.md -> Review personas).
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task, Agent]

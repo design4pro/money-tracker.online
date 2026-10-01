@@ -1,8 +1,10 @@
 # Mondays, on a schedule (docs/agents/cezar-automations.json). afk-architecture-review reads the
 # last 30 days of hot spots and files at most three refactor issues. Its rules say it is read-only
-# on code and that the only writes are GitHub issues, so the step holds no Edit and no Write. It
-# never applies `ready-for-agent` itself: `Strong` gets `needs-triage` and the ladder continues
-# from there.
+# on code and that the only writes are GitHub issues, so the step holds no Edit. It holds Write for
+# the issue bodies it hands to `gh --body-file` (run 8f1c782d was denied exactly that), and Agent
+# for the specialist that settles a judgement call (.ai/skills/afk-decide/SKILL.md). It never
+# applies `ready-for-agent` itself: every candidate it files gets `needs-triage` and the ladder
+# continues from there.
 name: architecture-review
 description: Find deepening opportunities in recent hot spots and file at most three refactor issues (afk-architecture-review).
 steps:
@@ -12,4 +14,4 @@ steps:
   - id: afk-architecture-review
     name: afk-architecture-review
     prompt: '/afk-architecture-review {{task}}'
-    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
+    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]

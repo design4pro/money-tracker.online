@@ -67,8 +67,10 @@ sentences, and never a secret.
 Auth, sessions, tenant scoping, billing, the ledger and any schema migration are `Ask First`
 territory (`AGENTS.md`) and `risk-high` here (`SDLC.md` § Label state machine, and **Risk here**
 under § This repository). If the diff touches one, say so at
-the top of your report: it needs a person, a second reviewer, and it is out of reach of every
-unattended implementing skill by design. Reporting that is your job; deciding it is not.
+the top of your report: it needs a second reviewer, and an unattended implementing skill takes it
+only on an approving verdict from this lens (`SDLC.md` § Delegated decisions). On a diff, reporting
+that is your job; deciding it is not. When `.ai/skills/afk-decide/SKILL.md` hands you a decision
+brief instead of a diff, deciding is the job: answer in its verdict shape.
 
 ## What you report
 

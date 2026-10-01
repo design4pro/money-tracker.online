@@ -39,6 +39,17 @@ repository. A text that names two or more is ambiguous: stop and ask.
 - Check `docs/agents/out-of-scope.md` before the feature route: a request listed there is closed
   with the row's ADR as the reason, never implemented.
 
+## Unattended-run limits
+
+`.ai/skills/om-pr-autopilot/SKILL.md` § Unattended-run limits applies to this skill when it runs on
+its own too: a lesson goes into a `## Lessons` section of the PR body or the run handoff, never
+into `~/.claude/CLAUDE.md` or any file outside the worktree; a fix that needs a file Claude Code
+refuses under `dontAsk` (`.husky/*`, `.claude/settings.json`, `.claude/hooks/*`,
+`worker-configuration.d.ts`) ends with the exact patch and a configuration guardian verdict from
+`.ai/skills/afk-decide/SKILL.md` in the PR and the report, never a `cp` or `sed` workaround and
+never a ticket routed to a human in advance; and the dev server URL is `baseUrl` in
+`.ai/qa/test-env.json`, never anything read from `.dev.vars`.
+
 ## Readiness verifier
 
 A ticket that fails the ticket-level tier of the Definition of Ready is not stopped at once. The
@@ -70,5 +81,7 @@ and nothing else - the bug route, the lock check and the already-implemented che
    Reply `veto` to revoke this and send the issue back to a human.
    ```
 
-5. `READINESS: NEEDS_HUMAN` - post the installed skill's not-ready comment listing only the
-   `NEEDS_HUMAN` rows, with both readings where the verifier named two, and stop with `NOT_READY`.
+5. `READINESS: NEEDS_HUMAN` - settle each row that is a decision through `.ai/skills/afk-decide/SKILL.md`,
+   record it as a Resolved assumptions row and continue. Post the installed skill's not-ready comment
+   and stop with `NOT_READY` only for the rows nobody but the reporter can answer, with both readings
+   where the verifier named two.
