@@ -428,7 +428,8 @@ feature issues** on `issue.labeled` with `changedLabels` `groom` / `autofix` / `
 **Autopilot new pull requests** on `pull_request.opened`, again with `authors`.
 
 **The merge:** **Merge reviewed agent pull requests** on `pull_request.reviewed`, `anyLabels`
-`merge-queue`, excluding `promotion` (no `authors`: every PR is `rafalwolak`'s); it runs
+`merge-queue`, `authors` `rafalwolak` (keeps dependabot and outside contributors out), excluding
+`promotion`; it runs
 `pr-autopilot`, which merges into `develop`.
 
 **The intake pair:** **Triage new issues** on `changedLabels` `needs-triage`, and **Implement

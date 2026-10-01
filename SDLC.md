@@ -322,9 +322,9 @@ and a merger's manual `/om-close-fixed-issues` matters only between those three 
 Four workflows have **no automation and no schedule**, started by hand from the cockpit:
 `backlog`, `brainstorm`, `implement-spec` and `pr-review`.
 
-The `authors: ["rafalwolak"]` filter on the two `opened` automations is a security gate, not a
-convenience: those runs read the issue or PR body as a prompt and hold Bash with no allowlist, so
-anything from anyone else waits for a maintainer to add a trigger label.
+The `authors: ["rafalwolak"]` filter on the two `opened` automations and on the merge automation is
+a security gate, not a convenience: those runs read the issue or PR body as a prompt and hold Bash
+with no allowlist, so anything from anyone else waits for a maintainer to add a trigger label.
 
 **Guardrails:**
 

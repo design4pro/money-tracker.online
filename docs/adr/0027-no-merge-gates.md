@@ -78,8 +78,9 @@ Open Mercato, runs the same `om-*` skills and the same label vocabulary with non
 The owner retired the `design4pro-agent` account: every agent action runs as `rafalwolak`. That
 changes how this decision tells pull requests apart, not what it decides:
 
-- **Merge reviewed agent pull requests** drops its `authors` filter, which named the retired
-  account and so never fired; `merge-queue` is the signal.
+- **Merge reviewed agent pull requests** swaps its `authors` filter from the retired account to
+  `rafalwolak`, which it never matched; `merge-queue` tells agent pull requests apart, and the
+  author keeps dependabot and outside contributors out of an unattended merge.
 - `implement-ticket` no longer stops at an open PR: its last step runs
   `om-pr-autopilot --allow-merge`, so a ticket goes from `ready-for-agent` to `develop` in one run.
 - The promotion PR can no longer be told apart by author. `promote-develop.yml` opens it with

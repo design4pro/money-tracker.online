@@ -113,10 +113,11 @@
   },
   {
     "name": "Merge reviewed agent pull requests",
-    "description": "A PR that om-auto-review-pr approved into `merge-queue` gets om-pr-autopilot --allow-merge, which merges it into develop through om-approve-merge-pr (ADR 0027). A backstop for the implement chain, which drives its own PR to the merge: a reviewed PR whose chain ended early is picked up here. No `authors` filter: every PR is authored by `rafalwolak`, so `merge-queue` is the signal, and `promotion` in `excludeLabels` keeps the develop-to-main promotion PR out.",
+    "description": "A PR that om-auto-review-pr approved into `merge-queue` gets om-pr-autopilot --allow-merge, which merges it into develop through om-approve-merge-pr (ADR 0027). A backstop for the implement chain, which drives its own PR to the merge: a reviewed PR whose chain ended early is picked up here. `authors` stays: every agent PR is authored by `rafalwolak`, and the filter keeps dependabot and outside contributors out - the housekeeping sweep (om-review-prs) can approve their PRs into `merge-queue`, and this run reads the PR as a prompt while holding Bash with no allowlist. `merge-queue` tells agent PRs apart from the rest, and `promotion` in `excludeLabels` keeps the develop-to-main promotion PR out.",
     "events": ["pull_request.reviewed"],
     "intervalSeconds": 300,
     "filters": {
+      "authors": ["rafalwolak"],
       "anyLabels": ["merge-queue"],
       "excludeLabels": ["in-progress", "changes-requested", "qa", "qa-failed", "blocked", "do-not-merge", "promotion"],
       "lookbackDays": 7,
