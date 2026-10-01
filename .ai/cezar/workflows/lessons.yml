@@ -1,7 +1,8 @@
 # Weekly, on a schedule (docs/agents/cezar-automations.json). afk-lessons turns mistakes repeated
 # across recent PRs into enforced rules and lands them on at most one PR. Unlike the other three
 # afk-* workflows this one writes: it runs `om-pipeline-retro` for the ranked causes and opens
-# its PR through `om-open-pr`, so the grant carries Edit, Write and Skill. A lesson that adds a
+# its PR through `om-open-pr`, so the grant carries Edit, Write and Skill, and Agent for the
+# specialist that settles a judgement call (.ai/skills/afk-decide/SKILL.md). A lesson that adds a
 # test passes the full validation gate before the PR opens.
 name: lessons
 description: Turn mistakes repeated across recent PRs into enforced rules, at most one PR (afk-lessons).
@@ -12,4 +13,4 @@ steps:
   - id: afk-lessons
     name: afk-lessons
     prompt: '/afk-lessons {{task}}'
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]

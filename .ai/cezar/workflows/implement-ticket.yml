@@ -1,6 +1,6 @@
 # The last step of the unattended intake ladder (ADR 0017): `ready-for-agent` on an issue starts
-# this, and it ends at an open, reviewed pull request. Nothing here merges, and no step applies
-# `qa-approved` - the boundary is `SDLC.md` § The automation contract.
+# this, and it ends with the pull request merged into `develop` (or waiting for the owner's
+# `qa-approved` when it is `risk-high`) - the boundary is `SDLC.md` § The automation contract.
 #
 # The gate calls scripts/ci/run-validation.mjs rather than listing commands. The list lives in
 # exactly one place, .ai/agentic.config.json -> validation.commands, and this file used to be the
@@ -12,7 +12,7 @@
 # table. The steps match any line starting `STOP:`, never "the first line", because cezar prepends
 # its own step entries to that file's progress log after every step.
 name: implement-ticket
-description: Implement one ready-for-agent issue test-first from its Agent Brief, pass the validation gate, open a PR and review it. Never merges.
+description: Implement one ready-for-agent issue test-first from its Agent Brief, pass the validation gate, open a PR and drive it through review, QA and CI to the merge into develop.
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
@@ -26,17 +26,21 @@ steps:
 
       Check readiness before claiming. Stop without changing anything if any of these hold:
       - the issue is closed, or carries `in-progress`, `ready-for-human`, `needs-info` or `blocked`;
-      - it has no Agent Brief comment, or the brief says a spec is needed;
+      - it has no Agent Brief comment;
       - an issue listed under "Blocked by" is still open;
       - three or more open PRs labeled `review` are authored by the current `gh` user (WIP limit).
       To stop: append a line `STOP: <reason>` to the file `$CEZ_HANDOFF_FILE`, then end with CEZ:DONE. Later steps grep that file for such a line and skip.
 
       Otherwise implement per om-fix, with these rules:
+      - When the brief's deliverable is a spec (afk-triage briefs a request too large for a few slices that way), write that spec under `.ai/specs/` in the shape of the existing specs instead of code; `afk-to-tickets` slices it once it merges.
       - Test first at the brief's Test seam, through the module's interface: write the failing test, see it fail, then make it pass (afk-codebase-design).
       - Build one complete vertical slice, inside the acceptance criteria and "Out of scope".
       - Use CONTEXT.md terms. Add or update entries for any concept you introduce or rename (afk-domain-modeling).
-      - Append each decision the brief left open to `$CEZ_HANDOFF_FILE` under a `## Resolved assumptions` heading, as a `# | Question | Applied default | Why` row. The PR step reads that table from there.
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+      - Settle each decision the brief left open through `.ai/skills/afk-decide/SKILL.md` instead of stopping, and append each verdict to `$CEZ_HANDOFF_FILE` under a `## Resolved assumptions` heading, as a `# | Question | Applied default | Why` row. The PR step reads that table from there.
+      - For a `risk-high` or `security` issue, the brief must carry the security and tenancy specialist's approving verdict; meet its CONDITIONS as acceptance criteria. Without that verdict, get one through `afk-decide` before claiming.
+      - A lesson worth keeping goes in a `## Lessons` section of `$CEZ_HANDOFF_FILE` and the PR body, never into files outside the worktree (such as `~/.claude/CLAUDE.md`); `afk-lessons` collects it.
+    # Agent: open questions go to an independent specialist sub-agent (.ai/skills/afk-decide/SKILL.md).
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
   - id: gate
     name: Validation gate
     command: grep -q '^STOP:' "$CEZ_HANDOFF_FILE" || node scripts/ci/run-validation.mjs
@@ -50,20 +54,21 @@ steps:
 
       If `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds, print that line and end at once with CEZ:DONE.
 
-      Otherwise open the PR per om-open-pr, with the issue number from the task as the issue id. Copy the `## Resolved assumptions` table out of `$CEZ_HANDOFF_FILE` into the PR body, and reference the issue with `Fixes #<number>`.
+      Otherwise open the PR per om-open-pr, with the issue number from the task as the issue id. Copy the `## Resolved assumptions` table, and the `## Lessons` section when there is one, out of `$CEZ_HANDOFF_FILE` into the PR body, and reference the issue with `Fixes #<number>`.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
-  - id: review
-    name: Review the PR
+  # The chain does not stop at an open PR: om-pr-autopilot reviews, fixes, runs QA, waits for CI and
+  # merges into develop (ADR 0027) - the develop ruleset requires no approving review. It never
+  # merges the develop -> main promotion, and a `risk-high` PR waits for the owner's `qa-approved`.
+  - id: merge
+    name: Drive the PR to the merge into develop
     prompt: |
-      /om-auto-review-pr {{task}}
-
       End at once with CEZ:DONE if either holds:
       - `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds;
       - no PR is open for this branch (`gh pr list --head "$(git branch --show-current)"`).
 
-      Otherwise review that PR per om-auto-review-pr:
-      - Report the Standards axis and the Spec axis separately (CODE_REVIEW.md).
-      - On the Spec axis, check each acceptance criterion from the issue's Agent Brief.
-      - Never merge, and never run om-approve-merge-pr.
-    # `Task` dispatches the review personas in .claude/agents (CODE_REVIEW.md -> Review personas).
-    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task]
+      Otherwise run `/om-pr-autopilot <that PR number> --allow-merge` for the PR of {{task}}:
+      - Review reports the Standards axis and the Spec axis separately (CODE_REVIEW.md), and the Spec axis checks each acceptance criterion from the issue's Agent Brief.
+      - Merge only into `develop`.
+    # `Task` / `Agent` (old and new name of one tool) dispatch the review personas in .claude/agents
+    # (CODE_REVIEW.md -> Review personas).
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task, Agent]

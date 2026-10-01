@@ -406,3 +406,31 @@ that added it, and GraphQL is the read this script actually performs. It is carr
 basis as the `claude` / `claude[bot]` pair already in the list, which is reasoning about the API
 rather than a reading of it. An entry that never turns up costs nothing, so carrying both is the
 safe side of the uncertainty either way.
+
+## Amendment, 2026-09-30: `risk-high` and `security` leave the filter for a specialist's verdict
+
+The 2026-09-17 amendment above makes `excludeLabels` on **Implement ready-for-agent issues** stand
+down on `risk-high` and `security`, so that "the two categories the process reserves for a person
+are unreachable from this trigger". The owner reversed that choice for full autonomy: an unattended
+run no longer leaves a choice between options to a person, it hands the question to an independent
+specialist sub-agent and continues on the verdict (`SDLC.md` § Delegated decisions,
+`.ai/skills/afk-decide/SKILL.md`). `risk-high` and `security` work reaches `ready-for-agent` only on
+the security and tenancy specialist's approving verdict, whose conditions become acceptance
+criteria in the brief, and the two labels are gone from `excludeLabels`.
+
+What still bounds the lane: the automation keeps `allLabels: ["risk-low"]`, so an issue labeled
+`risk-high` earns its brief and `ready-for-agent` and then waits for a person to start it; the WIP
+cap and the review and QA gates in `SDLC.md` are unchanged; and a `security` issue that is
+`risk-low` now starts by itself, which is the case the specialist's verdict exists for.
+
+## Amendment, 2026-10-01: one identity, and the lane runs at every risk level
+
+The owner retired the `design4pro-agent` account: every agent action runs as `rafalwolak`, so the
+dedicated account and its PAT (amendment 2026-09-07) are gone, and the scope guard that PAT gave
+moves to a fine-grained token for the cockpit alone (`docs/agents/cezar.md`, Host identity). The
+implementing automation drops `allLabels: ["risk-low"]`: the security and tenancy specialist's
+approving verdict is the gate for `risk-high` and `security`, and every other judgement call goes
+to a specialist sub-agent (`.ai/skills/afk-decide`). What still bounds the lane: the WIP cap, the
+review inside the chain, and the QA gate - a run signs off below `risk-high` on a QA specialist's
+verdict, and a `risk-high` PR waits for the owner's `qa-approved`. Merging is ADR 0027's, amended
+the same day.

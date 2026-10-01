@@ -3,6 +3,7 @@
 # om-review-prs reviews what waits for review, om-merge-buddy reports what could merge (it never
 # merges), om-close-fixed-issues closes issues whose `Closes #n` PR merged into develop - GitHub
 # does not, because develop is not the default branch. The task text is ignored by all three.
+# Every step holds Write for the report and comment bodies it hands to `gh --body-file`.
 name: housekeeping
 description: Review the queue, report what can merge, close issues whose PR merged into develop.
 steps:
@@ -16,8 +17,8 @@ steps:
   - id: merge-buddy
     name: om-merge-buddy (read-only)
     prompt: '/om-merge-buddy'
-    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
+    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: close-fixed
     name: om-close-fixed-issues
     prompt: '/om-close-fixed-issues --limit 50'
-    allowedTools: [Read, Grep, Glob, Bash, Skill, TodoWrite]
+    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite]

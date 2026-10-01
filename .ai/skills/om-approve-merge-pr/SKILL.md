@@ -33,12 +33,25 @@ request by hand under any title at all.
 
 ## Rules
 
-- A person merges every PR. The label rules in `SDLC.md` (`do-not-merge`, `blocked`,
-  `qa-failed`, `in-progress`, and `needs-qa` without `qa-approved`) are a convention this skill
-  reads and honours; no CI check enforces them (ADR 0027).
-- The `develop` to `main` promotion requires a person's release decision.
+- Merging into `develop` is `pr-autopilot`'s job (`om-pr-autopilot --allow-merge`, ADR 0027); a
+  person merges the rest. The label rules in `SDLC.md` (`do-not-merge`, `blocked`, `qa-failed`,
+  `in-progress`, and `needs-qa` without `qa-approved`) are a convention this skill reads and
+  honours; no CI check enforces them (ADR 0027).
+- The `develop` to `main` promotion requires a person's release decision. An unattended run
+  (`CEZ_TASK_ID` is set, or no person is in the session) merges only a PR whose `baseRefName` is
+  `develop`; any other base, or a PR carrying `promotion`, is reported as merge-ready and left for
+  the owner. Every PR is authored by the owner's one account, so the author tells nothing apart.
   Do not use the installed skill's GitHub `APPROVE` step on an author's own PR; GitHub does not
   permit it.
+- A second review is not a merge requirement (ADR 0027 removed the mandatory second reviewer). An
+  approving review is needed only when the base branch's ruleset asks for one; read it before step
+  3: `gh api "repos/{owner}/{repo}/rules/branches/<baseRefName>" --jq '[.[] | select(.type ==
+  "pull_request") | .parameters] | {approvals: (map(.required_approving_review_count) | max // 0),
+  codeOwners: (map(.require_code_owner_review) | any)}'`. With `approvals: 0` and
+  `codeOwners: false` (true for `develop` today), skip the approval when the run's account
+  authored the PR, and go straight to step 4 without asking. Never report "needs an approving
+  review from someone other than the author" as a blocker then. Only when the ruleset requires
+  approvals or code-owner review and none exists is a missing approval a real blocker.
 - Base `main` and head `develop` → `--merge`. Every other pull request keeps the descriptor's
   `--squash`.
 - A promotion that will not merge cleanly is a back-merge of `main` into `develop` first, never a

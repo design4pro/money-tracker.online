@@ -30,3 +30,14 @@ The claim step stops on a merged or closed PR only at the start. Immediately bef
 command as the push. Anything other than `OPEN` stops the run: do not push, release the claim,
 post one comment saying why the run stopped, and report the commits that were not pushed. A push
 to a merged PR's head recreates the branch GitHub deleted on merge (#447, 2026-09-24).
+
+## Unattended-run limits
+
+`.ai/skills/om-pr-autopilot/SKILL.md` § Unattended-run limits applies to this skill when it runs on
+its own too: a lesson goes into a `## Lessons` section of the PR body or the run handoff, never
+into `~/.claude/CLAUDE.md` or any file outside the worktree; a fix that needs a file Claude Code
+refuses under `dontAsk` (`.husky/*`, `.claude/settings.json`, `.claude/hooks/*`,
+`worker-configuration.d.ts`) ends with the exact patch and a configuration guardian verdict from
+`.ai/skills/afk-decide/SKILL.md` in the PR and the report, never a `cp` or `sed` workaround and
+never a ticket routed to a human in advance; and the dev server URL is `baseUrl` in
+`.ai/qa/test-env.json`, never anything read from `.dev.vars`.

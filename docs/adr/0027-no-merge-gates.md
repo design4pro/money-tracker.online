@@ -72,3 +72,20 @@ Open Mercato, runs the same `om-*` skills and the same label vocabulary with non
   the `ci` pool is running.
 - The repository variables `RISK_APPROVERS`, `QA_APPROVERS`, `CEZAR_REVIEWERS` and
   `AUTO_MERGE_ENABLED` are read by nothing and are deleted from the repository settings.
+
+## Amendment (2026-10-01)
+
+The owner retired the `design4pro-agent` account: every agent action runs as `rafalwolak`. That
+changes how this decision tells pull requests apart, not what it decides:
+
+- **Merge reviewed agent pull requests** swaps its `authors` filter from the retired account to
+  `rafalwolak`, which it never matched; `merge-queue` tells agent pull requests apart, and the
+  author keeps dependabot and outside contributors out of an unattended merge.
+- `implement-ticket` no longer stops at an open PR: its last step runs
+  `om-pr-autopilot --allow-merge`, so a ticket goes from `ready-for-agent` to `develop` in one run.
+- The promotion PR can no longer be told apart by author. `promote-develop.yml` opens it with
+  `promotion` as well as `merge-queue`, every PR automation excludes `promotion`, and
+  `om-approve-merge-pr` merges unattended only into `develop`. A person still merges the
+  promotion.
+- QA below `risk-high` is signed off by the run on a QA specialist's verdict (`SDLC.md`, QA gate);
+  `risk-high` QA stays with the owner.
