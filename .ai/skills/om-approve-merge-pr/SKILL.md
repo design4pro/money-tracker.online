@@ -37,7 +37,10 @@ request by hand under any title at all.
   person merges the rest. The label rules in `SDLC.md` (`do-not-merge`, `blocked`, `qa-failed`,
   `in-progress`, and `needs-qa` without `qa-approved`) are a convention this skill reads and
   honours; no CI check enforces them (ADR 0027).
-- The `develop` to `main` promotion requires a person's release decision.
+- The `develop` to `main` promotion requires a person's release decision. An unattended run
+  (`CEZ_TASK_ID` is set, or no person is in the session) merges only a PR whose `baseRefName` is
+  `develop`; any other base, or a PR carrying `promotion`, is reported as merge-ready and left for
+  the owner. Every PR is authored by the owner's one account, so the author tells nothing apart.
   Do not use the installed skill's GitHub `APPROVE` step on an author's own PR; GitHub does not
   permit it.
 - A second review is not a merge requirement (ADR 0027 removed the mandatory second reviewer). An

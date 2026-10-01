@@ -422,3 +422,15 @@ What still bounds the lane: the automation keeps `allLabels: ["risk-low"]`, so a
 `risk-high` earns its brief and `ready-for-agent` and then waits for a person to start it; the WIP
 cap and the review and QA gates in `SDLC.md` are unchanged; and a `security` issue that is
 `risk-low` now starts by itself, which is the case the specialist's verdict exists for.
+
+## Amendment, 2026-10-01: one identity, and the lane runs at every risk level
+
+The owner retired the `design4pro-agent` account: every agent action runs as `rafalwolak`, so the
+dedicated account and its PAT (amendment 2026-09-07) are gone, and the scope guard that PAT gave
+moves to a fine-grained token for the cockpit alone (`docs/agents/cezar.md`, Host identity). The
+implementing automation drops `allLabels: ["risk-low"]`: the security and tenancy specialist's
+approving verdict is the gate for `risk-high` and `security`, and every other judgement call goes
+to a specialist sub-agent (`.ai/skills/afk-decide`). What still bounds the lane: the WIP cap, the
+review inside the chain, and the QA gate - a run signs off below `risk-high` on a QA specialist's
+verdict, and a `risk-high` PR waits for the owner's `qa-approved`. Merging is ADR 0027's, amended
+the same day.

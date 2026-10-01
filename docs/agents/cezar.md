@@ -74,21 +74,18 @@ add -b` writes the new branch's upstream into the shared config, git's config lo
   `validation.commands` in `.ai/agentic.config.json`, not pre-commit: the first `om-fix-issue`
   run (PR #64) paid for lint-staged, typecheck and the full test run on every commit, and the
   test run flaked under the load of a second worktree.
-- Host identity: the cockpit acts as `design4pro-agent` (bot@design4.pro), a member of the
-  `design4pro` organisation with Write on this repository and on `planned.travel`, nothing else.
-  Its `gh` login lives in its own config directory, next to the developer's: `mkdir -p
-~/.config/gh-agent && GH_CONFIG_DIR=~/.config/gh-agent gh auth login --with-token`, pasting a
-  fine-grained PAT owned by that account (resource owner `design4pro`, only the two repositories,
-  Contents, Issues and Pull requests read/write; **no Workflows, no Administration**: a run cannot
-  push under `.github/workflows/` or delete a label; the organisation approves the token once,
-  under Settings → Personal access tokens). The full permission list, and what a run does for the
-  operations the missing ones would serve, is "Token scopes the pipeline needs" below. The plist
-  sets `GH_CONFIG_DIR` and cezar forwards it, so `gh` inside a run and `git push` over HTTPS (the
-  global credential helper is `gh auth git-credential`, which reads the same variable) both act as
-  the bot, while `~/.config/gh` and the developer's terminal stay the developer's. Commits carry
-  `user.name design4pro-agent` and
-  `user.email bot@design4.pro` from the host clone's local git config, which every worktree
-  shares.
+- Host identity (2026-10-01, owner decision): one GitHub identity. The cockpit acts as the owner,
+  `rafalwolak`, like his own terminal; the `design4pro-agent` account is retired. Agent work is
+  told apart by its pipeline labels and its `cez/` branch, never by author, and the `develop`
+  ruleset needs no approving review, so self-authored PRs merge. The scope guard the bot's token
+  used to give - a fine-grained PAT for only the two repositories with Contents, Issues and Pull
+  requests read/write and **no Workflows, no Administration** - should stay: give the cockpit, and
+  only the cockpit, such a PAT for `rafalwolak` through `GH_TOKEN` in its service environment, so
+  a run cannot push under `.github/workflows/` or change a ruleset while the owner's interactive
+  `gh` keeps its full OAuth scopes. Until that token is in place, runs hold the host's OAuth token
+  (`repo, workflow, admin:org`), which also reads check runs. "Token scopes the pipeline needs"
+  below describes the retired bot token; its probes run against whichever token the cockpit
+  holds once `GH_CONFIG_DIR=~/.config/gh-agent` is dropped from them.
 - Ports: the test environment (`.ai/scripts/test-env-up.sh`, the `om-prepare-test-env` contract)
   takes the first free port from **3011-3020**. 3010 is excluded on purpose: `vite.config.ts`
   binds it with `strictPort`, so it belongs to the developer's own dev server.
@@ -406,14 +403,16 @@ work". That has not been true since `ready-for-agent` was wired to `implement-ti
 amendment 2026-09-17).
 
 **Merge and after.** `pr-autopilot` merges into `develop`: `om-pr-autopilot --allow-merge` ends in
-`om-approve-merge-pr`, which reads the labels and the QA gate first. It runs on a PR a maintainer
-opens and on an agent PR reviewed into `merge-queue`. `om-merge-buddy` reports the rest, and a person merges it - by
-hand, or with GitHub's native `gh pr merge --auto` (ADR 0027). `needs-qa` and `develop` → `main` merge after their respective human
-decisions (`SDLC.md`). The live rulesets have no
+`om-approve-merge-pr`, which reads the labels and the QA gate first. It runs as the last step of
+`implement-ticket`, on a PR a maintainer opens, and on an agent PR reviewed into `merge-queue`.
+`om-merge-buddy` reports the rest, and a person merges it - by hand, or with GitHub's native
+`gh pr merge --auto` (ADR 0027). A `risk-high` `needs-qa` PR waits for the owner's `qa-approved`,
+and `develop` → `main` (carrying `promotion`) is the owner's release decision (`SDLC.md`). The live rulesets have no
 GitHub merge queue rule; the `merge-queue` label is a process state only. After a merge,
 `/om-close-fixed-issues` closes what the merge did not: Cezar has no `pull_request.merged`
 event, and `develop` is not the default branch, so nothing closes natively. Housekeeping runs
-three times a day. Only a human sets `qa-approved`: the blind pair is
+three times a day. `qa-approved` comes from the unattended sign-off below `risk-high` (a QA
+specialist's verdict on the evidence) and from the owner on `risk-high`; the blind pair is
 `node scripts/visual/capture.mjs` (ADR 0016).
 
 ## Automations (`docs/agents/cezar-automations.json`)
@@ -428,12 +427,12 @@ maintainers; **Re-groom on request**, **Fix issues on the autofix label**, **Wri
 feature issues** on `issue.labeled` with `changedLabels` `groom` / `autofix` / `spec`;
 **Autopilot new pull requests** on `pull_request.opened`, again with `authors`.
 
-**The merge:** **Merge reviewed agent pull requests** on `pull_request.reviewed`, `authors`
-`design4pro-agent`, `anyLabels` `merge-queue`; it runs
+**The merge:** **Merge reviewed agent pull requests** on `pull_request.reviewed`, `anyLabels`
+`merge-queue`, excluding `promotion` (no `authors`: every PR is `rafalwolak`'s); it runs
 `pr-autopilot`, which merges into `develop`.
 
 **The intake pair:** **Triage new issues** on `changedLabels` `needs-triage`, and **Implement
-ready-for-agent issues** on `changedLabels` `ready-for-agent`, the latter requiring `risk-low`.
+ready-for-agent issues** on `changedLabels` `ready-for-agent`, at every risk level.
 
 **The three schedules:** **Spec to tickets** (weekdays 07:00), **Weekly architecture review**
 (Mondays 06:00) and **Weekly lessons** (Fridays 16:00).
@@ -445,11 +444,11 @@ by itself, so an external report is groomed when a maintainer adds `groom`. The 
 removes its own command label as its first tracker mutation, so a label still present means nobody
 picked the issue up.
 
-Agent PRs (authored by `design4pro-agent`, already reviewed inside their own chain) and Dependabot
-never enter the autopilot, and the pipeline labels stay excluded because the poller re-checks labels
+Agent PRs (opened carrying `review` and driven to the merge inside their own chain) and Dependabot
+never enter the autopilot, the promotion PR (`promotion`) enters no automation, and the pipeline labels stay excluded because the poller re-checks labels
 on every poll: while the cockpit still ran under the maintainer's `gh`, the first `om-fix-issue` run
 got a second review the moment its `in-progress` lock lifted. Every filter excludes `in-progress`;
-`lookbackDays: 3` and `maxRecords` 5-10 bound a mistaken burst to a handful of runs. The poller
+`lookbackDays: 7` and `maxRecords: 25` bound a mistaken burst while still reaching a week of events. The poller
 runs unless the service env sets `CEZ_AUTOMATIONS=0` (the default since 0.11.0; the plist's
 explicit `1` changes nothing), and a 409 from the API says it is off.
 
