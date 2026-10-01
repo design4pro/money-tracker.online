@@ -77,9 +77,10 @@ A human who disagrees overturns the row in review. That is an ordinary review fi
 
 Only what no agent in this pipeline can do:
 - an action that needs a person's own credentials, account settings, payment, or a legal commitment;
-- merging a PR, closing an issue, or removing a label a human set;
+- merging the `develop` -> `main` promotion (a merge into `develop` is the pipeline's own, `om-pr-autopilot --allow-merge`), closing an issue, or removing a label a human set;
+- QA sign-off on a `risk-high` PR: the run attaches the evidence and the specialist's verdict, and the owner applies `qa-approved`;
 - information only the reporter has (`needs-info`): a repro, a version, what they expected;
-- a platform limit, such as GitHub refusing to let the author approve their own PR;
+- a platform limit, such as a ruleset that requires a review the run's own account cannot give (the `develop` ruleset requires none, so self-approval is never a blocker there);
 - a write Claude Code refuses under `dontAsk` (protected configuration). Put the exact patch and the guardian's verdict in the report or PR, so applying it is one step for a human.
 
 Everything else is decided here.

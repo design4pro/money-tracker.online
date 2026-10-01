@@ -2,8 +2,8 @@ name: Promote develop
 
 # Git Flow's promotion leg, kept open automatically: after every push to `develop` - which is
 # every merge into staging - this opens the `develop` → `main` pull request if one is not already
-# open, and otherwise leaves the existing one alone. It never merges anything; a human still
-# reviews and merges, and merging is what deploys production (ci.yml's `deploy · production`, behind
+# open, and otherwise leaves the existing one alone. It never merges anything; the owner
+# reviews and merges it, and merging is what deploys production (ci.yml's `deploy · production`, behind
 # a green CI run on `main`).
 #
 # ADR 0003 names the drift between the two long-lived branches as the cost of this flow, and
@@ -39,6 +39,13 @@ name: Promote develop
 # `pull requests: write` as well as to `issues: write`, so it is covered by the permission this
 # token already needs to open the pull request at all, and by the job's `permissions:` block on the
 # GITHUB_TOKEN fallback path. Neither path needs a permission widened for it.
+#
+# `--label promotion` is what keeps the pipeline's own merge away from it. Every pull request
+# here - agent or human, this one included - is authored by the owner's one account, and the
+# pipeline merges into `develop` on its own (ADR 0027, amended 2026-10-01), so neither the author
+# nor `merge-queue` tells the release apart. Every cezar PR automation excludes `promotion`, and
+# the merge skills merge unattended only into `develop`. The label already exists in the
+# repository (creating one would need `issues: write`); an already open promotion gets it too.
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -83,6 +90,9 @@ jobs:
 
           existing=$(gh pr list --base main --head develop --state open --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
+            # REST, not `gh pr edit`: that one also queries the retired Projects (classic) API and
+            # fails on some gh versions, which under `set -e` would fail the whole job.
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${existing}/labels" -f 'labels[]=promotion' > /dev/null
             echo "::notice title=Promotion pull request::#${existing} is already open and now carries this commit."
             exit 0
           fi
@@ -106,8 +116,8 @@ jobs:
             '> ancestral link to what it flattened, so the next promotion re-proposes these same' \
             '> commits - see ADR 0003, amendment 2026-09-09.' \
             '' \
-            'Merging this deploys **production**. It stays open and keeps collecting commits until a' \
-            'human merges it, so the diff between staging and production is always one click away.' \
+            'Merging this deploys **production**. It stays open and keeps collecting commits until the' \
+            'owner merges it, so the diff between staging and production is always one click away.' \
             '' \
             'Before merging, check that staging has actually been exercised:' \
             '<https://staging.money-tracker.online>.' \
@@ -121,4 +131,5 @@ jobs:
             --head develop \
             --title 'chore(release): promote develop to main' \
             --label merge-queue \
+            --label promotion \
             --body "$body"

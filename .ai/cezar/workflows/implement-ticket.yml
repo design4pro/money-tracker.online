@@ -1,6 +1,6 @@
 # The last step of the unattended intake ladder (ADR 0017): `ready-for-agent` on an issue starts
-# this, and it ends at an open, reviewed pull request. Nothing here merges, and no step applies
-# `qa-approved` - the boundary is `SDLC.md` § The automation contract.
+# this, and it ends with the pull request merged into `develop` (or waiting for the owner's
+# `qa-approved` when it is `risk-high`) - the boundary is `SDLC.md` § The automation contract.
 #
 # The gate calls scripts/ci/run-validation.mjs rather than listing commands. The list lives in
 # exactly one place, .ai/agentic.config.json -> validation.commands, and this file used to be the
@@ -12,7 +12,7 @@
 # table. The steps match any line starting `STOP:`, never "the first line", because cezar prepends
 # its own step entries to that file's progress log after every step.
 name: implement-ticket
-description: Implement one ready-for-agent issue test-first from its Agent Brief, pass the validation gate, open a PR and review it. Never merges.
+description: Implement one ready-for-agent issue test-first from its Agent Brief, pass the validation gate, open a PR and drive it through review, QA and CI to the merge into develop.
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
@@ -56,19 +56,19 @@ steps:
 
       Otherwise open the PR per om-open-pr, with the issue number from the task as the issue id. Copy the `## Resolved assumptions` table, and the `## Lessons` section when there is one, out of `$CEZ_HANDOFF_FILE` into the PR body, and reference the issue with `Fixes #<number>`.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
-  - id: review
-    name: Review the PR
+  # The chain does not stop at an open PR: om-pr-autopilot reviews, fixes, runs QA, waits for CI and
+  # merges into develop (ADR 0027) - the develop ruleset requires no approving review. It never
+  # merges the develop -> main promotion, and a `risk-high` PR waits for the owner's `qa-approved`.
+  - id: merge
+    name: Drive the PR to the merge into develop
     prompt: |
-      /om-auto-review-pr {{task}}
-
       End at once with CEZ:DONE if either holds:
       - `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds;
       - no PR is open for this branch (`gh pr list --head "$(git branch --show-current)"`).
 
-      Otherwise review that PR per om-auto-review-pr:
-      - Report the Standards axis and the Spec axis separately (CODE_REVIEW.md).
-      - On the Spec axis, check each acceptance criterion from the issue's Agent Brief.
-      - Never merge, and never run om-approve-merge-pr.
+      Otherwise run `/om-pr-autopilot <that PR number> --allow-merge` for the PR of {{task}}:
+      - Review reports the Standards axis and the Spec axis separately (CODE_REVIEW.md), and the Spec axis checks each acceptance criterion from the issue's Agent Brief.
+      - Merge only into `develop`.
     # `Task` / `Agent` (old and new name of one tool) dispatch the review personas in .claude/agents
     # (CODE_REVIEW.md -> Review personas).
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task, Agent]

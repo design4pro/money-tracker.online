@@ -33,6 +33,10 @@ approving review: read the ruleset as `.ai/skills/om-approve-merge-pr/SKILL.md` 
 missing approval this run cannot give itself (its own account authored the PR) is not a reason to
 stop at merge-ready under `--allow-merge` when the ruleset requires none.
 
+`--allow-merge` means a merge into `develop` only. A PR whose base is not `develop`, or that
+carries `promotion`, ends at merge-ready under `--allow-merge` too: the `develop` -> `main`
+promotion deploys production and is the owner's to merge.
+
 ## Unattended-run limits
 
 These hold for every skill this run chains, whether or not its own override was read:

@@ -26,7 +26,8 @@ node scripts/visual/capture.mjs --url http://127.0.0.1:3010/<route> --out <scrat
 ```
 
 Frames belong outside the repository. Evidence from `om-auto-qa-pr` complements the pair; it never
-replaces it, and only a person applies `qa-approved`.
+replaces it. `qa-approved` comes from the unattended sign-off in `om-auto-qa-pr` below `risk-high`,
+and from the owner on a `risk-high` PR - never from a review.
 
 ## Review personas
 

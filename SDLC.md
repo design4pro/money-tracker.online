@@ -169,6 +169,7 @@ The one hard rule of this process: **a PR carrying `needs-qa` must not merge unt
 - `skip-qa` is the explicit opt-out for docs-only, dependency-only, CI-only, test-only, and similarly low-risk non-user-facing changes. Never combine it with `needs-qa`.
 - `qa-failed`, `do-not-merge`, and `blocked` are hard blocks regardless of every other signal. An active `qa` pipeline label means a tester is on the PR right now — never merge under an active tester.
 - The gate is satisfied when a QA reviewer tests the PR and applies `qa-approved`.
+- **Unattended sign-off**: below `risk-high`, the unattended run is the QA reviewer. `om-auto-qa-pr --self-qa-signoff` attaches the evidence, a QA specialist sub-agent judges it (`.ai/skills/afk-decide/SKILL.md`), and on its approving verdict the run applies `qa-approved` + `qa-self-verified` under the self-QA exception below. A `risk-high` PR gets the same evidence and verdict, and the owner applies `qa-approved`.
 - **Self-QA exception**: when no QA reviewer has capacity in time, any engineer may sign off instead, on a `risk-low` or `risk-medium` PR only — but only by (1) checking the PR out and running it locally, (2) exercising the affected flow, and (3) attaching evidence to the PR that names the scenario exercised, the environment, the test data, the observed result, and the negative cases tried. Then apply both `qa-approved` (so the merge skills treat QA as done) and `qa-self-verified` (so the exception is auditable). No evidence, no `qa-approved`.
 - **No self-QA on `risk-high`.** A PR labeled `risk-high`, or one whose diff touches auth, sessions, data scoping, money, schema migrations, or shared contracts (the `risk-high` inference above), needs a QA reviewer, or a maintainer's explicit exception stated on the PR.
 
@@ -192,7 +193,7 @@ None of this touches the merge rules. Reporting early is safe; merging early is 
 
 ## The automation contract
 
-The `om-auto-*` skills run this process unattended and are chainable: each accepts the artifact the previous one produced (an issue id, a spec path, or a PR number from the `PR: #<number> (link: <url>)` reference line every PR-producing skill emits), and each detects work already started — an open PR referencing the issue or plan — and continues on it rather than opening a duplicate. A completed autonomous run leaves a **ready** (non-draft), fully labeled PR — one pipeline label, category, QA meta, one priority, one risk — with a run-summary comment and, for user-facing changes, screenshots from the working app attached as PR evidence. Draft PRs are reserved for explicitly incomplete states: spec-only design PRs, interrupted hand-offs, or autonomous defaults flagged for human confirmation. Automation never applies `qa-approved`.
+The `om-auto-*` skills run this process unattended and are chainable: each accepts the artifact the previous one produced (an issue id, a spec path, or a PR number from the `PR: #<number> (link: <url>)` reference line every PR-producing skill emits), and each detects work already started — an open PR referencing the issue or plan — and continues on it rather than opening a duplicate. A completed autonomous run leaves a **ready** (non-draft), fully labeled PR — one pipeline label, category, QA meta, one priority, one risk — with a run-summary comment and, for user-facing changes, screenshots from the working app attached as PR evidence. Draft PRs are reserved for explicitly incomplete states: spec-only design PRs, interrupted hand-offs, or autonomous defaults flagged for human confirmation. Automation applies `qa-approved` only through the unattended sign-off in the QA gate, never on a `risk-high` PR.
 
 Two properties bound the whole unattended loop, and both are worth stating plainly because they are what make it safe to leave running:
 
@@ -268,11 +269,12 @@ Three amendment rules are specific to this document's shape:
   `needs-triage` when a groom ends `READY_STATUS=ready` on an issue that carries no intake label
   yet, so the ladder runs from a filed issue to an open PR with nobody in it: groom -> triage ->
   `implement-ticket`. It is event-driven only — an issue already carrying an intake label is left
-  alone, and no run sweeps the existing backlog. The implementing automation additionally filters
-  on `allLabels: ["risk-low"]`, so a `risk-medium` issue still earns a full Agent Brief and
-  `ready-for-agent` and then waits for a person to start it. The ladder ends at a reviewed PR in
-  `merge-queue`, which **Merge reviewed agent pull requests** merges into `develop`; no automation
-  applies `qa-approved`.
+  alone, and no run sweeps the existing backlog. The implementing automation has no risk filter:
+  `risk-high` and `security` reach `ready-for-agent` only on the security and tenancy specialist's
+  approving verdict. The ladder ends with `implement-ticket` running
+  `om-pr-autopilot --allow-merge`, which merges the PR into `develop`; QA below `risk-high` is
+  signed off by the run on a specialist's verdict, and a `risk-high` PR waits for the owner's
+  `qa-approved`.
 - **Risk here.** `risk-high` means anything touching auth, tenant scoping, money, the ledger,
   billing, a migration, a protected decision document or a merge-policy surface. The label is
   triage information for the reviewer, not a gate. `docs/MONEY.md` is not background reading: representation, rounding and
@@ -283,11 +285,10 @@ Three amendment rules are specific to this document's shape:
   dependency bumps carry `skip-qa`. A `needs-qa` PR merges only after `qa-approved`. The QA
   reviewer takes the blind pair with
   `node scripts/visual/capture.mjs` at 360x800 and 1280x900 in both themes (ADR 0016);
-  `om-auto-qa-pr` evidence complements it and never replaces it. Its `--self-qa-signoff` flag is
-  never used here: the shared half above permits a self-QA sign-off below `risk-high`, but the
-  automation contract's "Automation never applies `qa-approved`" is the stricter rule, and the
-  stricter rule wins. A self-QA sign-off in this repository is a person applying two labels after
-  reading the evidence - the skill may produce the evidence, never the grant.
+  `om-auto-qa-pr` evidence complements it and never replaces it. An unattended run passes
+  `--self-qa-signoff` and signs off below `risk-high` on a QA specialist's approving verdict (the
+  unattended sign-off in the QA gate above, owner decision 2026-10-01); on `risk-high` the skill
+  produces the evidence and the owner grants `qa-approved`.
 - **What a ticket contains** beyond the Definition of Ready: `docs/agents/issue-tracker.md` (tenant
   isolation test, money invariant, visual change expected).
 
@@ -321,21 +322,23 @@ and a merger's manual `/om-close-fixed-issues` matters only between those three 
 Four workflows have **no automation and no schedule**, started by hand from the cockpit:
 `backlog`, `brainstorm`, `implement-spec` and `pr-review`.
 
-The `authors: ["rafalwolak"]` filter on the two `opened` automations is a security gate, not a
-convenience: those runs read the issue or PR body as a prompt and hold Bash with no allowlist, so
-anything from anyone else waits for a maintainer to add a trigger label.
+The `authors: ["rafalwolak"]` filter on the two `opened` automations and on the merge automation is
+a security gate, not a convenience: those runs read the issue or PR body as a prompt and hold Bash
+with no allowlist, so anything from anyone else waits for a maintainer to add a trigger label.
 
 **Guardrails:**
 
-- `pr-autopilot` merges into `develop` with `om-pr-autopilot --allow-merge`: a PR a maintainer
-  opened, and an agent PR reviewed into `merge-queue` (ADR 0027). A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
+- Cezar merges into `develop` with `om-pr-autopilot --allow-merge`: the last step of
+  `implement-ticket`, a PR a maintainer opened, and an agent PR reviewed into `merge-queue`
+  (ADR 0027, amended 2026-10-01). It never merges into `main`: the `develop` -> `main` promotion
+  carries `promotion` and is the owner's. A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
   land it once the required checks pass. The rulesets require only the three CI checks (`docs/agents/cezar.md`);
   every label rule in this document is a convention that `om-merge-buddy` and
   `om-approve-merge-pr` read and the person merging honours, and nothing in CI enforces it
   (ADR 0027). The process label `merge-queue` is not a GitHub merge queue entry.
 - A `risk-high` PR gets a deeper review and no self-QA: when it is `needs-qa`, a human QA reviewer
-  applies `qa-approved`. A `needs-qa` PR waits for
-  `qa-approved` from a human QA reviewer. Promotion from `develop` to `main` merges after the
+  applies `qa-approved`. Below `risk-high`, a `needs-qa` PR waits for `qa-approved` from the
+  unattended sign-off or a QA reviewer. Promotion from `develop` to `main` merges after the
   release decision.
 - `implement-ticket` stops when three or more agent PRs already wait in `review`, and that cap is
   shared — the `issue-autofix` output counts against it too, because both ladders publish under the

@@ -40,7 +40,14 @@ stored minor-unit value.
 
 ## Rules
 
-- Evidence only. Never apply `qa-approved`; `--self-qa-signoff` is not used in this repository.
+- Sign-off follows the installed skill's `--self-qa-signoff` rules, and an unattended run always
+  passes that flag. Before applying `qa-approved` + `qa-self-verified`, hand the frames and the
+  report to the `manual-tester` sub-agent (with `accessibility-specialist` when the change touches
+  layout or copy) through `.ai/skills/afk-decide/SKILL.md`, and sign off only on its approving
+  verdict, quoted in the evidence comment. A `risk-high` PR keeps the installed skill's rule: post
+  the evidence and the verdict, withhold the sign-off, and leave `qa-approved` to the owner (a
+  security specialist's verdict, 2026-10-01: money, ledger, auth and migrations break silently,
+  and those PRs are few).
 - Frames go to `.ai/qa/artifacts_<runId>/` (gitignored). A PNG anywhere else in the repository is a
   defect.
 - No secret from `.dev.vars` or `.ai/qa/test-env.env` enters a screenshot or the report.
