@@ -270,7 +270,7 @@ export function classify(
       "IN_REVIEW",
       open.length
         ? `${open.map((pr) => `#${pr.number}`).join(", ")} open - drive it with \`/om-pr-autopilot ${open[0].number}\`.`
-        : `${prs.map((pr) => `#${pr.number}`).join(", ")} merged but the issue is still open - \`/om-close-fixed-issues\` closes it, or a person reopens the work.`,
+        : `${prs.map((pr) => `#${pr.number}`).join(", ")} merged but the issue is still open - \`/om-close-fixed-issues\` closes it when the PR carries a closing keyword; otherwise a person closes it, or leaves it open if the fix was partial.`,
       warning,
     );
   }
