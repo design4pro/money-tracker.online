@@ -3,8 +3,8 @@
 Status: accepted
 Date: 2026-10-02
 Amends: ADR 0029 (the schedule that starts implementation, the WIP limit, who clears a hold, and
-which issues the retired `design4pro-agent` account opened are never picked), ADR 0027 (a spec PR an
-agent wrote merges without a person).
+which issues the retired `design4pro-agent` account opened are never picked), ADR 0027 (a spec PR
+`afk-plan-to-spec` wrote merges without a person; no other spec-only PR does).
 
 ## Context
 
@@ -62,7 +62,11 @@ exists, and a trigger per event cannot see a difference.
    software architect, and the security, accessibility and UX, and configuration specialists where the
    spec touches them) approve it before the PR is opened. The `plan-to-spec` workflow's last step,
    `om-pr-autopilot --allow-merge`, merges the design-only PR once CI is green, into `develop` only
-   (ADR 0027). A spec so written has no issue yet, so `.ai/specs/AGENTS.md` lets a `Plan` row
+   (ADR 0027). The installed autopilot leaves a spec-only PR draft for a person, so
+   `.ai/skills/om-pr-autopilot/SKILL.md` names the one exception: the PR this skill opens (branch
+   `spec/<slug>`, the panel's verdicts in the body, a `Plan` row in the spec, ready for review, no
+   `blocked`), and the docs-only PR that marks delivered stages. The `spec` workflow's spec PR keeps its
+   human merge. A spec so written has no issue yet, so `.ai/specs/AGENTS.md` lets a `Plan` row
    (`<stage> (docs/plans/<file>.md)`) stand in for the `Issue` a `ready` spec otherwise needs. The next
    tick slices it. A stage the code already delivers gets no spec: the skill adds a line
    `Delivered: <date> - <evidence>` under its heading, and under every other uncovered stage of that plan

@@ -5,7 +5,7 @@
 # afk-plan-to-spec verifies the stage against the code, settles every open question through an
 # independent specialist (.ai/skills/afk-decide/SKILL.md), writes a `ready` spec under .ai/specs/ and
 # has a specialist panel review it. The PR and the merge are the same chain implement-ticket ends
-# with: the spec PR is design-only (`skip-qa`), the develop ruleset requires no approving review, and
+# with: the spec PR is design-only (`skip-qa`) and ready for review, the develop ruleset requires no approving review, and
 # om-pr-autopilot --allow-merge merges it into develop once CI is green (ADR 0027, ADR 0030). The
 # next tick then slices the merged spec (spec-to-tickets).
 # A stage the code already delivers gets no spec: the skill marks it, and every other uncovered stage
@@ -49,7 +49,7 @@ steps:
 
       If `grep -q '^DELIVERED:' "$CEZ_HANDOFF_FILE"` succeeds, no spec was written. Open the docs-only PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `docs/plan-delivered-<plan slug>` (the skill's commit is already on it), labels `documentation`, `skip-qa`, `priority-low` and `risk-low`, and a body that lists each stage id of the `DELIVERED:` line with its evidence line from the plan. There is no issue to reference. Then end with CEZ:DONE.
 
-      Otherwise open the spec PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `spec/<slug>`, design-only, labels `review`, `documentation`, `skip-qa`, one priority and one risk, and the stage, the panel's verdicts and the Resolved assumptions table in the body. There is no issue to reference. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
+      Otherwise open the spec PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `spec/<slug>`, design-only and ready for review (not a draft), labels `review`, `documentation`, `skip-qa`, one priority and one risk, and the stage, the panel's verdicts and the Resolved assumptions table in the body. There is no issue to reference. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: merge
     name: Drive the PR to the merge into develop
