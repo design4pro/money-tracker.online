@@ -8,7 +8,7 @@ description: Interactive om-brainstorm on an idea; ends with a routing decision 
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+    command: bash .ai/scripts/bootstrap.sh
   - id: brainstorm
     name: om-brainstorm
     prompt: '/om-brainstorm {{task}}'

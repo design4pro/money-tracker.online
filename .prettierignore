@@ -39,12 +39,14 @@ test-results
 .ai/cezar/workflows/issue-autofix.yml
 .ai/cezar/workflows/issue-groom.yml
 .ai/cezar/workflows/lessons.yml
+.ai/cezar/workflows/plan-to-spec.yml
 .ai/cezar/workflows/pr-autopilot.yml
 .ai/cezar/workflows/pr-fix.yml
 .ai/cezar/workflows/pr-review.yml
 .ai/cezar/workflows/spec-to-tickets.yml
 .ai/cezar/workflows/spec.yml
 .ai/cezar/workflows/triage.yml
+.ai/cezar/workflows/unblock.yml
 .ai/scripts/__tests__/backlog-status.test.mjs
 .ai/scripts/backlog-status.mjs
 .ai/scripts/cez-automations.sh
@@ -55,8 +57,10 @@ test-results
 .ai/skills/afk-decide/SKILL.md
 .ai/skills/afk-domain-modeling/SKILL.md
 .ai/skills/afk-lessons/SKILL.md
+.ai/skills/afk-plan-to-spec/SKILL.md
 .ai/skills/afk-to-tickets/SKILL.md
 .ai/skills/afk-triage/SKILL.md
+.ai/skills/afk-unblock/SKILL.md
 .ai/trackers/github.md
 .claude/hooks/format-file.sh
 .claude/settings.json

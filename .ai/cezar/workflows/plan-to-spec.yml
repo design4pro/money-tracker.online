@@ -1,0 +1,57 @@
+# Started by the Reconciler (docs/agents/cezar.md, ADR 0030) when `node .ai/scripts/backlog-status.mjs
+# --plan` lists a `write-spec` action - the first stage of docs/plans/ that no spec and no issue
+# mentions, while no spec waits to be sliced and no PR adds one - or by a person from the cockpit with
+# a stage. The task names the stage and its plan file. afk-plan-to-spec verifies the stage against the
+# code, settles every open question through an independent specialist (.ai/skills/afk-decide/SKILL.md),
+# writes a `ready` spec under .ai/specs/ and has a specialist panel review it. The PR and the merge
+# are the same chain implement-ticket ends with: the spec PR is design-only (`skip-qa`), the develop
+# ruleset requires no approving review, and om-pr-autopilot --allow-merge merges it into develop once
+# CI is green (ADR 0027, ADR 0030). The next tick then slices the merged spec (spec-to-tickets).
+# `steps` form rather than the `skills:` shorthand, because the shorthand runs with the default tool
+# list, which has no `Agent`.
+#
+# `$CEZ_HANDOFF_FILE` carries the `STAGE:` line and, when the run ends without a spec to merge, the
+# `STOP:` line the later steps match anywhere in the file (cezar prepends its own entries to it).
+name: plan-to-spec
+description: Write the spec for one plan stage, have a specialist panel review it, and land it on a design-only PR the pipeline merges (afk-plan-to-spec).
+steps:
+  - id: bootstrap
+    name: Install dependencies and generate the route tree
+    # The spec index is generated with the repository's own toolchain, so this needs dependencies.
+    command: bash .ai/scripts/bootstrap.sh
+  - id: write
+    name: afk-plan-to-spec
+    prompt: |
+      /afk-plan-to-spec {{task}}
+
+      Append a line `STAGE: <stage id>` to the file `$CEZ_HANDOFF_FILE`; later steps read it. When the skill ends without a committed spec - `NO_ACTION_NEEDED`, an issue filed as human-only, or a spec the panel would not approve - append a line `STOP: <reason>`, then end with CEZ:DONE. Later steps grep that file for such a line and skip.
+    # Agent: the open questions and the panel's verdicts go to independent specialist sub-agents.
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
+  - id: gate
+    name: Spec index gate
+    # Everything under .ai/specs/ is committed and the generated index matches the specs. The full
+    # validation gate runs in CI on the PR; a design-only change has nothing else to retry here.
+    command: pnpm generate-spec-index && git diff --exit-code -- .ai/specs/
+    onFail:
+      retry: write
+      max: 2
+  - id: pr
+    name: Open the spec PR
+    prompt: |
+      /om-open-pr {{task}}
+
+      If `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds, print that line and end at once with CEZ:DONE.
+
+      Otherwise open the spec PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `spec/<slug>`, design-only, labels `review`, `documentation`, `skip-qa`, one priority and one risk, and the stage, the panel's verdicts and the Resolved assumptions table in the body. There is no issue to reference. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
+  - id: merge
+    name: Drive the PR to the merge into develop
+    prompt: |
+      End at once with CEZ:DONE if either holds:
+      - `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds;
+      - no PR is open for this branch (`gh pr list --head "$(git branch --show-current)"`).
+
+      Otherwise run `/om-pr-autopilot <that PR number> --allow-merge` for the PR of {{task}}. The PR is design-only and `skip-qa`: no browser. Merge only into `develop`.
+    # `Task` / `Agent` (old and new name of one tool) dispatch the review personas in .claude/agents
+    # (CODE_REVIEW.md -> Review personas).
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Task, Agent]
