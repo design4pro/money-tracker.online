@@ -56,14 +56,19 @@ exists, and a trigger per event cannot see a difference.
    `do-not-merge` and `do-not-close` are never offered. `afk-triage` and `afk-decide` write
    `🤖 HUMAN-ONLY:` on every hold that is a person's, so the Reconciler does not spend a run on it.
 4. **An agent writes the spec for a plan stage, and a panel reviews it.** `afk-plan-to-spec` takes the
-   first stage of `docs/plans/` that no spec and no issue mentions, verifies it against the code, settles
+   first stage of `docs/plans/` that no spec and no issue mentions and its plan does not mark
+   `Delivered:`, verifies it against the code, settles
    every open question through a specialist, writes a `ready` spec, and has a panel (product owner,
    software architect, and the security, accessibility and UX, and configuration specialists where the
    spec touches them) approve it before the PR is opened. The `plan-to-spec` workflow's last step,
    `om-pr-autopilot --allow-merge`, merges the design-only PR once CI is green, into `develop` only
    (ADR 0027). A spec so written has no issue yet, so `.ai/specs/AGENTS.md` lets a `Plan` row
    (`<stage> (docs/plans/<file>.md)`) stand in for the `Issue` a `ready` spec otherwise needs. The next
-   tick slices it.
+   tick slices it. A stage the code already delivers gets no spec: the skill adds a line
+   `Delivered: <date> - <evidence>` under its heading, and under every other uncovered stage of that plan
+   the code delivers, and lands it on a docs-only PR that merges the same way. `--plan` skips a stage so
+   marked. Without the line the run would end with nothing covering the stage, and the Reconciler would
+   pick it again after its cooldown, so the queue would never move past it.
 5. **Slicing has no age window.** The oldest `ready` spec directly in `.ai/specs/` that no issue, open or
    closed, opens with `Spec: <path>` is sliced.
 6. **The retired agent account is trusted.** `design4pro-agent` can file nothing new (ADR 0027,
@@ -94,6 +99,9 @@ exists, and a trigger per event cannot see a difference.
 - A plan stage id is unique across `docs/plans/` today, but two plan files could share one, so a mention
   of an id that two files share covers the stage only when it also names the plan file. No plan is
   marked frozen; `afk-plan-to-spec` refuses the stages of one that is.
+- A `Delivered:` line is a claim nothing re-checks, and a wrong one hides the stage from the queue. The
+  evidence is on the line and on the docs-only PR, which merges without a panel; deleting the line puts
+  the stage back. A partly delivered stage is never marked: it gets a spec for what is left.
 - Until the schedules are removed, `implement-ticket` and `spec-to-tickets` can be started by a
   schedule and by the Reconciler. Both check what holds an issue before they claim it, and the
   Reconciler drops a candidate a live run already holds, so the worst case is a run that stops.

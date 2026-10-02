@@ -1,17 +1,22 @@
 # Started by the Reconciler (docs/agents/cezar.md, ADR 0030) when `node .ai/scripts/backlog-status.mjs
 # --plan` lists a `write-spec` action - the first stage of docs/plans/ that no spec and no issue
-# mentions, while no spec waits to be sliced and no PR adds one - or by a person from the cockpit with
-# a stage. The task names the stage and its plan file. afk-plan-to-spec verifies the stage against the
-# code, settles every open question through an independent specialist (.ai/skills/afk-decide/SKILL.md),
-# writes a `ready` spec under .ai/specs/ and has a specialist panel review it. The PR and the merge
-# are the same chain implement-ticket ends with: the spec PR is design-only (`skip-qa`), the develop
-# ruleset requires no approving review, and om-pr-autopilot --allow-merge merges it into develop once
-# CI is green (ADR 0027, ADR 0030). The next tick then slices the merged spec (spec-to-tickets).
+# mentions and its plan does not mark `Delivered:`, while no spec waits to be sliced and no PR adds one -
+# or by a person from the cockpit with a stage. The task names the stage and its plan file.
+# afk-plan-to-spec verifies the stage against the code, settles every open question through an
+# independent specialist (.ai/skills/afk-decide/SKILL.md), writes a `ready` spec under .ai/specs/ and
+# has a specialist panel review it. The PR and the merge are the same chain implement-ticket ends
+# with: the spec PR is design-only (`skip-qa`), the develop ruleset requires no approving review, and
+# om-pr-autopilot --allow-merge merges it into develop once CI is green (ADR 0027, ADR 0030). The
+# next tick then slices the merged spec (spec-to-tickets).
+# A stage the code already delivers gets no spec: the skill marks it, and every other uncovered stage
+# of the plan the code delivers, with a `Delivered:` line in the plan, and the run opens a docs-only
+# PR for that instead. Without the marker the stage would be picked again after every cooldown.
 # `steps` form rather than the `skills:` shorthand, because the shorthand runs with the default tool
 # list, which has no `Agent`.
 #
-# `$CEZ_HANDOFF_FILE` carries the `STAGE:` line and, when the run ends without a spec to merge, the
-# `STOP:` line the later steps match anywhere in the file (cezar prepends its own entries to it).
+# `$CEZ_HANDOFF_FILE` carries the `STAGE:` line and then either a `DELIVERED:` line (stages marked in the
+# plan, a docs-only PR to open) or, when the run ends with nothing to merge, a `STOP:` line. The later
+# steps match them anywhere in the file (cezar prepends its own entries to it).
 name: plan-to-spec
 description: Write the spec for one plan stage, have a specialist panel review it, and land it on a design-only PR the pipeline merges (afk-plan-to-spec).
 steps:
@@ -24,7 +29,7 @@ steps:
     prompt: |
       /afk-plan-to-spec {{task}}
 
-      Append a line `STAGE: <stage id>` to the file `$CEZ_HANDOFF_FILE`; later steps read it. When the skill ends without a committed spec - `NO_ACTION_NEEDED`, an issue filed as human-only, or a spec the panel would not approve - append a line `STOP: <reason>`, then end with CEZ:DONE. Later steps grep that file for such a line and skip.
+      Append a line `STAGE: <stage id>` to the file `$CEZ_HANDOFF_FILE`; later steps read it. When the skill marked delivered stages in the plan instead of writing a spec (its step 2a), append a line `DELIVERED: <the stage ids, comma separated>`, then end with CEZ:DONE. When the skill ends without a committed spec or marker - `NO_ACTION_NEEDED`, an issue filed as human-only, or a spec the panel would not approve - append a line `STOP: <reason>`, then end with CEZ:DONE. Later steps grep that file for `STOP:` and skip, and for `DELIVERED:` and open the docs PR.
     # Agent: the open questions and the panel's verdicts go to independent specialist sub-agents.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
   - id: gate
@@ -41,6 +46,8 @@ steps:
       /om-open-pr {{task}}
 
       If `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds, print that line and end at once with CEZ:DONE.
+
+      If `grep -q '^DELIVERED:' "$CEZ_HANDOFF_FILE"` succeeds, no spec was written. Open the docs-only PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `docs/plan-delivered-<plan slug>` (the skill's commit is already on it), labels `documentation`, `skip-qa`, `priority-low` and `risk-low`, and a body that lists each stage id of the `DELIVERED:` line with its evidence line from the plan. There is no issue to reference. Then end with CEZ:DONE.
 
       Otherwise open the spec PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `spec/<slug>`, design-only, labels `review`, `documentation`, `skip-qa`, one priority and one risk, and the stage, the panel's verdicts and the Resolved assumptions table in the body. There is no issue to reference. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]

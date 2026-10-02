@@ -1,6 +1,6 @@
 ---
 name: afk-plan-to-spec
-description: Write the spec for one plan stage from docs/plans/ unattended - verify the stage against the code, settle every open question through a specialist, write a `ready` spec under .ai/specs/, have a specialist panel review it, and land it on a design-only PR the pipeline merges. Use when the Reconciler names a `write-spec` action, or when asked to write the spec for a plan stage.
+description: Write the spec for one plan stage from docs/plans/ unattended - verify the stage against the code, settle every open question through a specialist, write a `ready` spec under .ai/specs/, have a specialist panel review it, and land it on a design-only PR the pipeline merges. A stage the code already delivers is marked `Delivered:` in its plan instead of getting a spec. Use when the Reconciler names a `write-spec` action, or when asked to write the spec for a plan stage.
 ---
 
 # AFK plan to spec
@@ -23,14 +23,24 @@ The task names a stage id and its plan file (`Write the spec for plan stage 06-S
 
 - the stage heading `## Stage <id>` is not in that file;
 - the plan file is **frozen**: `docs/plans/README.md` (or the file itself) says it was superseded or migrated elsewhere, so the tracker or the newer document is the authority and a spec here would contradict it. No plan is marked so today; honour the mark when one is;
-- the stage is already covered. A stage is covered when its id appears in any file under `.ai/specs/` (any depth), in the title or body of any issue, open or closed (**search-issues**), or in an open PR (**search-prs**; a branch `spec/<slug>` for it counts). When two plan files share an id, the mention must also name the plan file;
+- the stage is already covered. A stage is covered when its id appears in any file under `.ai/specs/` (any depth), in the title or body of any issue, open or closed (**search-issues**), or in an open PR (**search-prs**; a branch `spec/<slug>` for it counts), or when its section of the plan holds a line that starts `Delivered:` (step 2a). When two plan files share an id, the mention must also name the plan file;
 - an open PR already adds a spec: one spec is in flight at a time, so the review order and the plan's wave order stay the same thing.
 
 A spec for this stage that exists only in your own worktree (uncommitted, or on the branch this run made) is the previous attempt of this run, not a reason to stop: when the gate step failed, the run starts this step again. Read the handoff file, and continue from that spec, fixing what the gate reported.
 
 ## 2. Verify the stage against the code
 
-The plan was written before the code. Read the stage block (`docs/plans/TEMPLATE.md` is its shape: owned paths, data change, server functions, UI, quota, tenant-isolation test, money invariant, verification) and then check each claim in it against the repository: what already exists, what an earlier stage or an ADR changed, and which paths the stage still owns. Verification follows `docs/plans/98-verification-protocol.md`. The spec describes the work that is **left**, in today's terms; a stage the code already delivers is not a spec, and ends the run with `NO_ACTION_NEEDED` and the evidence.
+The plan was written before the code. Read the stage block (`docs/plans/TEMPLATE.md` is its shape: owned paths, data change, server functions, UI, quota, tenant-isolation test, money invariant, verification) and then check each claim in it against the repository: what already exists, what an earlier stage or an ADR changed, and which paths the stage still owns. Verification follows `docs/plans/98-verification-protocol.md`. The spec describes the work that is **left**, in today's terms. A stage the code already delivers is not a spec but a plan that has fallen behind the code, and step 2a marks it. **A partly delivered stage is not delivered**: it gets a spec for what is left (steps 3 to 6), with the delivered part named in the first section.
+
+## 2a. Mark the stages the code already delivers
+
+Run this step when every claim of the named stage already holds: each owned path exists and does what the stage says, the tests it names exist, and its reference rows say what the code now does. A spec would only restate finished work, and ending with `NO_ACTION_NEEDED` leaves nothing that covers the stage, so the Reconciler picks it again after its cooldown and the queue never moves past it.
+
+1. Check every other uncovered stage of the same plan file the same way, in plan order: not covered as in step 1, and judged against the code, the tests and the merged PRs (**search-prs** with the state merged, `git log` on the owned paths). Judge each on its own; a stage the code delivers only in part is left as it is for a later run.
+2. Directly under the `## Stage` heading of each delivered stage, add one line: `Delivered: <YYYY-MM-DD> - <one-line evidence: the paths, tests or PR that deliver it>`, dated today. `backlog-status.mjs --plan` reads it and stops offering the stage. Change nothing else in the plan.
+3. Commit on a branch `docs/plan-delivered-<plan-slug>` (the plan file's name without `.md`), message `docs(plans): mark the delivered stages of <plan file>`, and open a docs-only PR (step 6). No spec and no panel: the evidence on each line is what a reviewer checks.
+
+A marker is a claim nothing re-checks, and a wrong one hides the stage: mark only what the evidence proves. Where it does not, the stage is not delivered.
 
 ## 3. Settle the open questions
 
@@ -72,8 +82,8 @@ Before the PR is opened, put the spec in front of independent specialists throug
 
 ## 6. Open the PR
 
-The workflow's gate step runs first and its `pr` step opens the PR; run on its own, do it yourself, the same way. Open it as `om-open-pr` and the extension of `om-auto-write-spec` say: design-only, labels `review`, `documentation`, `skip-qa`, one priority, one risk (`risk-low` unless the panel said otherwise), and no `Refs #n` because there is no issue yet. The body carries the stage, the panel's verdicts and the Resolved assumptions table. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
+The workflow's gate step runs first and its `pr` step opens the PR; run on its own, do it yourself, the same way. A docs-only PR (step 2a) takes the labels `documentation`, `skip-qa`, `priority-low` and `risk-low`, and a body that lists each stage id with its evidence line; it has no spec, so there is no `Spec PR` row and no index to regenerate. A spec PR: open it as `om-open-pr` and the extension of `om-auto-write-spec` say: design-only, labels `review`, `documentation`, `skip-qa`, one priority, one risk (`risk-low` unless the panel said otherwise), and no `Refs #n` because there is no issue yet. The body carries the stage, the panel's verdicts and the Resolved assumptions table. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
 
 ## Done when
 
-The spec is committed with its panel verdicts recorded and the metadata table complete (and, run on its own, on an open PR), or the run ended with `NO_ACTION_NEEDED` and a reason, or an issue filed as `human-only`. Finish with `Spec: .ai/specs/<file>.md` and `PR: #<n>`.
+The spec is committed with its panel verdicts recorded and the metadata table complete (and, run on its own, on an open PR), or the delivered stages are marked in the plan on a docs-only PR, or the run ended with `NO_ACTION_NEEDED` and a reason, or an issue filed as `human-only`. Finish with `Spec: .ai/specs/<file>.md` and `PR: #<n>`, or, for the marked stages, `Delivered: <stage ids>` and `PR: #<n>`.
