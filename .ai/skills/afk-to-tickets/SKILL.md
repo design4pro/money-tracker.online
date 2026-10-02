@@ -20,8 +20,10 @@ Load `.ai/agentic.config.json` and `.ai/trackers/github.md`, and use their opera
 ## 1. Pick the spec
 
 - When the task names a spec path or an issue, use that.
-- Otherwise, look at specs added under `.ai/specs/` on the base branch in the last 14 days: `git log --diff-filter=A --since="14 days ago" --name-only -- .ai/specs/`. Pick the oldest one that has no parent issue (**search-issues** for its path).
-- Skip specs whose status says draft or superseded.
+- Otherwise, take the oldest spec directly in `.ai/specs/` (not `implemented/` or `archived/`) whose `Status` is `ready` and that has no parent issue: no issue, open or closed, whose body starts with `Spec: <spec path>` (**search-issues** with `--state all`). The Reconciler picks by exactly this rule (`node .ai/scripts/backlog-status.mjs --plan`, the `slice` action), so there is no age window: a spec that merged last month is as sliceable as one that merged today.
+- Skip a spec whose status is `draft` or `in-progress`, or that is in `implemented/` or `archived/`.
+- A spec with a `Plan` row was written from a plan stage (`afk-plan-to-spec`) and has no `Issue` yet: the parent you file here is its first. Say the stage in the parent's checklist.
+- Stop with `NO_ACTION_NEEDED` when a run, or an open PR, is already slicing it.
 - No candidate: finish with `NO_ACTION_NEEDED`.
 
 ## 2. Draft the slices

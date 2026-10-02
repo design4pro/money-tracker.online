@@ -1,0 +1,21 @@
+# Started by the Reconciler (docs/agents/cezar.md, ADR 0030) when `node .ai/scripts/backlog-status.mjs
+# --plan` lists an `unblock` action - an issue with a `blocked` hold or an unanswered not-ready or
+# `STOP:` comment that an agent left, and no `HUMAN-ONLY:` comment - or by a person from the cockpit
+# on one issue. afk-unblock asks an independent specialist whether the hold can be lifted
+# (.ai/skills/afk-decide/SKILL.md) and then either lifts it with a `🤖 RESOLVED:` comment or hands it
+# back with a `🤖 HUMAN-ONLY:` one. `steps` form rather than the `skills:` shorthand, because the
+# shorthand runs with the default tool list, which has no `Agent`.
+# No bootstrap step on purpose: the skill reads the tracker and the code and edits no source file, so
+# a run that is cheap to start is one that fits between two ticks. It holds Write, not Edit, for the
+# comment and issue-body drafts it hands to `gh --body-file`; Bash is unallowlisted because the
+# tracker descriptor's operations are `gh` command lines.
+name: unblock
+description: Lift an agent-set hold on one issue on a specialist's verdict, or hand it to a person with a HUMAN-ONLY comment (afk-unblock).
+steps:
+  - id: afk-unblock
+    name: afk-unblock
+    prompt: |
+      /afk-unblock {{task}}
+
+      Resolve the hold on that one issue and no other. The skill lists when to stop; stop with NO_ACTION_NEEDED rather than guess. Lift a hold only on a specialist's verdict or a checked fact, never on your own reading of the comment, and never touch one a person set or took over. Every outcome is exactly one comment: `🤖 RESOLVED:` or `🤖 HUMAN-ONLY:`.
+    allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]

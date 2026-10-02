@@ -6,7 +6,7 @@ description: om-auto-review-pr --autofix on one PR - code review, pipeline label
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+    command: bash .ai/scripts/bootstrap.sh
   - id: review
     name: om-auto-review-pr
     prompt: '/om-auto-review-pr {{task}} --autofix'
