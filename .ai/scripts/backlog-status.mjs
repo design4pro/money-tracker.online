@@ -463,6 +463,10 @@ export function unslicedSpecs(specs, issues) {
  * an id two plan files both use: for those an id alone does not say which stage a mention covers.
  * (No two plans share an id today; the check costs one line and stops the next collision from
  * silently covering the wrong stage.)
+ *
+ * `delivered` marks a stage the code already carries: its section, from the heading to the next
+ * `## ` heading, holds a line that starts `Delivered:`. `afk-plan-to-spec` writes that line, and
+ * `pickStage` then leaves the stage alone: no spec is left to write for it.
  */
 export function planStages(planFiles) {
   const stages = [];
@@ -470,8 +474,16 @@ export function planStages(planFiles) {
     .filter((file) => /^\d{2}-[a-z0-9-]+\.md$/.test(file.name))
     .sort((a, b) => a.name.localeCompare(b.name));
   for (const plan of plans)
-    for (const match of stripCode(plan.text).matchAll(/^##\s+Stage\s+(\d{2}-S\d+[a-z]?)\b/gm))
-      stages.push({ id: match[1], file: `${PLANS}/${plan.name}`, ambiguous: false });
+    for (const section of stripCode(plan.text).split(/^(?=##\s)/m)) {
+      const heading = section.match(/^##\s+Stage\s+(\d{2}-S\d+[a-z]?)\b/);
+      if (heading)
+        stages.push({
+          id: heading[1],
+          file: `${PLANS}/${plan.name}`,
+          ambiguous: false,
+          delivered: /^Delivered:/m.test(section),
+        });
+    }
   for (const stage of stages)
     stage.ambiguous = stages.some((other) => other.id === stage.id && other.file !== stage.file);
   return stages;
@@ -488,15 +500,18 @@ export function coversStage(text, stage) {
 }
 
 /**
- * The first plan stage no spec and no issue, open or closed, mentions, and no run is writing: the
- * next stage whose spec nobody has started. An issue counts because a stage held back by a decision
- * only a person can take is filed as one (afk-plan-to-spec), and that is as covered as a spec.
- * `corpus` is the text of every spec at any depth plus every issue's title and body.
+ * The first plan stage no spec and no issue, open or closed, mentions, that is not marked
+ * `Delivered:` in its plan, and no run is writing: the next stage whose spec nobody has started.
+ * An issue counts because a stage held back by a decision only a person can take is filed as one
+ * (afk-plan-to-spec), and that is as covered as a spec; the marker covers a stage the code already
+ * delivers, which has no spec to write. `corpus` is the text of every spec at any depth plus every
+ * issue's title and body.
  */
 export function pickStage({ stages, corpus, activeTasks }) {
   return (
     stages.find(
       (stage) =>
+        !stage.delivered &&
         !corpus.some((text) => coversStage(text, stage)) &&
         !activeTasks.some((task) => coversStage(task, stage)),
     ) ?? null
@@ -537,11 +552,11 @@ const issueText = (issue) => `${issue.title ?? ""}\n${issue.body ?? ""}`;
  * - unblock: the first issue in report order whose hold or not-ready comment an agent may lift;
  * - triage: the first NEEDS_TRIAGE issue in report order;
  * - slice: the oldest `ready` spec with no parent issue (`unslicedSpecs`);
- * - write-spec: the first stage of `docs/plans/` nothing covers (`pickStage`), but only while no PR
- *   adds a spec and there is no slice candidate. A spec a run is already slicing is not a
- *   candidate, so the next stage is written meanwhile; a spec that waits for a run is, and holds it
- *   back. One spec ahead of the slicing at a time keeps the review panel's merge order and the
- *   plan's wave order the same thing.
+ * - write-spec: the first stage of `docs/plans/` nothing covers and its plan does not mark
+ *   `Delivered:` (`pickStage`), but only while no PR adds a spec and there is no slice candidate.
+ *   A spec a run is already slicing is not a candidate, so the next stage is written meanwhile; a
+ *   spec that waits for a run is, and holds it back. One spec ahead of the slicing at a time keeps
+ *   the review panel's merge order and the plan's wave order the same thing.
  *
  * Every candidate is dropped while a run already holds it: an issue by its `issueNumber`, a spec
  * path or a stage id by the task text of the live runs.

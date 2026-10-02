@@ -29,7 +29,9 @@ A stage's twelve headings are shaped to fill an issue body (`docs/agents/issue-t
 `om-prepare-issue` writes one issue per stage with the category, priority and risk labels;
 dependencies between stages are stated in the body (`Blocked by #n`), not as native sub-issues,
 and a stage is picked up only when the issues it names are closed. When a plan and an
-already-worked issue disagree, the issue wins and the plan is amended to say so.
+already-worked issue disagree, the issue wins and the plan is amended to say so. A stage the code
+already delivers carries one line under its `## Stage` heading, `Delivered: <YYYY-MM-DD> - <evidence>`
+(`TEMPLATE.md`); the Reconciler offers no spec for it.
 
 ---
 

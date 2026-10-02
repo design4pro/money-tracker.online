@@ -279,7 +279,7 @@ workflow and task text to send:
 | `unblock`    | the first issue whose `blocked` hold, or unanswered not-ready or `STOP:` comment, an agent left and that does not say `HUMAN-ONLY:` | `unblock`          |
 | `triage`     | the first issue that needs an Agent Brief or a category, priority or risk label                                                     | `triage`           |
 | `slice`      | the oldest `ready` spec directly in `.ai/specs/` that no issue (open or closed) opens with `Spec: <path>`                           | `spec-to-tickets`  |
-| `write-spec` | the first stage of `docs/plans/` no spec and no issue mentions, only while no PR adds a spec and no spec waits to be sliced         | `plan-to-spec`     |
+| `write-spec` | the first stage of `docs/plans/` no spec, issue or `Delivered:` line covers, while no PR adds a spec and no spec waits to be sliced | `plan-to-spec`     |
 
 Every candidate is dropped while a cockpit run already holds it: an issue by its `issueNumber`, a spec path or a stage
 id by the run's task text. A run holds it while it is `queued`, `running` or `waiting`, and a `failed` run holds it

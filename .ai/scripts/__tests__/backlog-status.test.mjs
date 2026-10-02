@@ -680,6 +680,44 @@ describe("planStages", () => {
       ["13-S1", true],
     ]);
   });
+
+  describe("a Delivered: line", () => {
+    const delivered = (id, line = "Delivered: 2026-10-02 - src/lib/money.ts") =>
+      `## Stage ${id} \u2014 something\n\nbody\n\n${line}\n`;
+    const deliveredOf = (text) => planStages([{ name: "04-x.md", text }]).map((s) => [s.id, s.delivered]);
+
+    it("marks the stage whose section holds it, and only that stage", () => {
+      const text = `${delivered("04-S1")}\n${delivered("04-S2", "no marker here")}`;
+      expect(deliveredOf(text)).toEqual([
+        ["04-S1", true],
+        ["04-S2", false],
+      ]);
+    });
+
+    it("ends a section at the next level-two heading, not at a level-three one", () => {
+      const sub = "## Stage 04-S1 \u2014 a\n\n### Notes\n\nDelivered: 2026-10-02 - done\n";
+      expect(deliveredOf(sub)).toEqual([["04-S1", true]]);
+      const after = "## Stage 04-S1 \u2014 a\n\nbody\n\n## Notes\n\nDelivered: 2026-10-02 - done\n";
+      expect(deliveredOf(after)).toEqual([["04-S1", false]]);
+    });
+
+    it("does not count a quotation in a code fence or a code span, or a line that merely mentions it", () => {
+      const fenced = "## Stage 04-S1 \u2014 a\n\n```md\nDelivered: 2026-10-02 - sample\n```\n";
+      const span = "## Stage 04-S1 \u2014 a\n\n`Delivered:` is the marker.\n";
+      const inline = "## Stage 04-S1 \u2014 a\n\nNot yet. Delivered: soon\n";
+      for (const text of [fenced, span, inline]) expect(deliveredOf(text)).toEqual([["04-S1", false]]);
+    });
+
+    it("does not read a heading inside a code fence as the end of the section", () => {
+      const text = "## Stage 04-S1 \u2014 a\n\n```md\n## Notes\n```\n\nDelivered: 2026-10-02 - done\n";
+      expect(deliveredOf(text)).toEqual([["04-S1", true]]);
+    });
+
+    it("keeps an evidence line that quotes paths in code spans", () => {
+      const text = delivered("04-S1", "Delivered: 2026-10-02 - `src/lib/money.ts`, `plans.test.ts`");
+      expect(deliveredOf(text)).toEqual([["04-S1", true]]);
+    });
+  });
 });
 
 describe("coversStage", () => {
@@ -726,6 +764,36 @@ describe("pickStage", () => {
 
   it("is null for a repository without plans", () => {
     expect(pickStage({ stages: [], corpus: [], activeTasks: [] })).toBeNull();
+  });
+
+  it("skips a delivered stage and takes the next one nothing covers", () => {
+    const marked = [{ ...stages[0], delivered: true }, stages[1], stages[2]];
+    expect(pickStage({ stages: marked, corpus: [], activeTasks: [] })?.id).toBe("01-S2");
+  });
+
+  it("is null once every stage is covered or delivered", () => {
+    const marked = [{ ...stages[0], delivered: true }, stages[1], { ...stages[2], delivered: true }];
+    expect(pickStage({ stages: marked, corpus: ["01-S2"], activeTasks: [] })).toBeNull();
+  });
+
+  it("reads the marker from the plan text, so the next uncovered stage is picked", () => {
+    const text = "## Stage 05-S1 \u2014 a\n\nDelivered: 2026-10-02 - done\n\n## Stage 05-S2 \u2014 b\n\nbody\n";
+    const parsed = planStages([{ name: "05-x.md", text }]);
+    expect(pickStage({ stages: parsed, corpus: [], activeTasks: [] })?.id).toBe("05-S2");
+  });
+
+  it("marks only the stage in its own file when two plan files share an id", () => {
+    const gallery = "## Stage 13-S1 \u2014 a\n\nDelivered: 2026-10-02 - done\n";
+    const studio = "## Stage 13-S1 \u2014 b\n\nbody\n";
+    const parsed = planStages([
+      { name: "13-gallery.md", text: gallery },
+      { name: "13-studio.md", text: studio },
+    ]);
+    const open = { stages: parsed, activeTasks: [] };
+    expect(pickStage({ ...open, corpus: [] })?.file).toBe("docs/plans/13-studio.md");
+    // A bare id still does not cover the shared stage: the plan file has to be named as well.
+    expect(pickStage({ ...open, corpus: ["Stage 13-S1"] })?.file).toBe("docs/plans/13-studio.md");
+    expect(pickStage({ ...open, corpus: ["Stage 13-S1 of docs/plans/13-studio.md"] })).toBeNull();
   });
 });
 
@@ -856,6 +924,12 @@ describe("buildPlan", () => {
       stages: [stage],
     });
     expect(plan.actions.map((a) => a.kind)).toEqual(["write-spec"]);
+  });
+
+  it("names the next stage once the first is marked delivered in the plan", () => {
+    const next = { id: "04-S4", file: "docs/plans/04-budget.md", ambiguous: false };
+    const plan = buildPlan({ ...base, stages: [{ ...stage, delivered: true }, next] });
+    expect(plan.actions.map((a) => a.target)).toEqual(["04-S4"]);
   });
 
   it("writes no spec while an open PR adds one, and none while a run writes that stage", () => {
