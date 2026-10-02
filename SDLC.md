@@ -328,7 +328,7 @@ what `backlog-status.mjs` trusts, so such an issue is never picked by the schedu
 
 - Cezar merges into `develop` with `om-pr-autopilot --allow-merge`: the last step of
   `implement-ticket` and of `plan-to-spec` (a spec PR the specialist panel approved, or the docs-only PR that marks delivered plan stages, ADR 0030), a PR a maintainer opened, and an agent PR reviewed into `merge-queue`
-  (ADR 0027, amended 2026-10-01). It never merges into `main`: the `develop` -> `main` promotion
+  (ADR 0027, amended 2026-10-01). A spec PR `implement-ticket` writes for a spec task is not among them: it is spec-only with an `Issue` row and no `Plan` row, so a person merges it. It never merges into `main`: the `develop` -> `main` promotion
   carries `do-not-merge` (ADR 0029) and is the owner's. A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
   land it once the required checks pass. The rulesets require only the three CI checks (`docs/agents/cezar.md`);
   every label rule in this document is a convention that `om-merge-buddy` and

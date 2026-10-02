@@ -53,8 +53,8 @@ it. One kind is the exception, because a specialist panel has approved it before
   puts `blocked` on it);
 - it does not carry `blocked`, `do-not-merge` or any other hold.
 
-Every other spec-only PR keeps the person's merge, the `spec` workflow's (`Refs #n`, an `Issue` row)
-among them. A docs-only PR on a `docs/plan-delivered-<slug>` branch (`afk-plan-to-spec` marking
+Every other spec-only PR keeps the person's merge, the `spec` workflow's and a spec task's
+(`implement-ticket`; an `Issue` row and no `Plan` row) among them. A docs-only PR on a `docs/plan-delivered-<slug>` branch (`afk-plan-to-spec` marking
 stages the code already delivers) is not a spec-only PR: no draft-by-intent applies, and it merges
 under `--allow-merge` like any docs-only PR.
 
