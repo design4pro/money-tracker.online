@@ -29,7 +29,7 @@ steps:
 
       This workflow has no om-root-cause step: the issue's `## Agent Brief` (a triage comment, or the body of a ticket `afk-to-tickets` filed) is your brief.
 
-      Pick the issue. When the task names an issue number, that is the issue. Otherwise run `node .ai/scripts/backlog-status.mjs --next`: it prints the number of the one issue to implement, or nothing when no issue is ready or three PRs are already waiting for a person (the WIP limit: `needs-qa` without `qa-approved`, `risk-high`, `security` or `blocked`; a PR the pipeline merges itself does not count). Append a line `ISSUE: #<number>` to the file `$CEZ_HANDOFF_FILE`; later steps read it.
+      Pick the issue. When the task names an issue number, that is the issue. Otherwise run `node .ai/scripts/backlog-status.mjs --next`: it prints the number of the one issue to implement, or nothing when no issue is ready or three PRs are already waiting for a person (the WIP limit: `needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours; a PR the pipeline merges itself does not count). Append a line `ISSUE: #<number>` to the file `$CEZ_HANDOFF_FILE`; later steps read it.
 
       Check readiness before claiming. Stop without changing anything if any of these hold:
       - `--next` printed nothing;
