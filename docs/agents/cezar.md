@@ -515,10 +515,12 @@ claiming issues the new ones handle.
    ```bash
    gh issue list --state open --limit 100 --json number,labels \
      --jq '.[] | "\(.number) \([.labels[].name] | join(","))"'
-   # per issue: gh issue edit <n> --remove-label "status: <x>,type: bug" --add-label bug
+   # per issue, through REST (`gh issue edit` aborts on an old `gh`): DELETE
+   # repos/{owner}/{repo}/issues/<n>/labels/<old label> for each old label, then POST
+   # repos/{owner}/{repo}/issues/<n>/labels -f "labels[]=bug" with `gh api -X`
    # type: bug → bug; type: enhancement, type: feature → feature; type: maintenance → refactor
    # a held issue → blocked; everything else loses its status: label without replacement
-   # open Dependabot PRs: --remove-label "type: maintenance" --add-label dependencies
+   # open Dependabot PRs: the same, with "type: maintenance" out and dependencies in
    for l in 'status: triage' 'status: needs-info' 'status: backlog' 'status: queued' \
      'status: ready' 'status: in-progress' 'status: review' 'status: needs-human' \
      'run: triage' 'run: implement' 'type: bug' 'type: enhancement' 'type: feature' \

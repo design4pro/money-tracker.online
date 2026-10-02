@@ -62,6 +62,10 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
   says; the reviewer opens each one (#159, #191, #304, #308, #310, #319). A backticked path in an
   agent-facing document is checked by `.ai/scripts/__tests__/doc-paths.test.mjs`; jobs, labels,
   automations and what a named thing does stay the reviewer's to open (#386, #421, #441).
+- **A restated rule moves everywhere it is stated.** A PR that changes a rule, a gate, what a label
+  means or who may do what searches the old wording across `*.md`, `*.yml`, `*.json`, the skill
+  overrides and the workflow comments, and updates or removes every hit. Two documents that now
+  disagree send an unattended run the wrong way (#386, #441, #493, #495).
 
 ## Review personas
 
@@ -93,7 +97,7 @@ Dispatching needs the `Task` tool. Every step in `.ai/cezar/workflows/` that rea
 | Severity | What lands here                                                                                                                                                                                                                                                                                                                                                                                          |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | blocker  | Any money or tenancy rule above; a missing Zod parse; a client-side-only permission check; a missing tenant-isolation or money-invariant case; a key in one locale only; a hand-edited generated file; a non-additive migration; an added suppression, skip or deleted test; a clean-room violation; a bank connector (ADR 0008); a new dependency; a broken protected surface without its required path |
-| major    | An AA accessibility regression; a blanket AAA claim; slow work run inline; a second implementation of an owned concept (SPEC §8); a missing loading, empty or error state; a behaviour change without a failing-first test; a written figure that no command reproduces; a document naming something that does not exist or does not do what it says                                                     |
+| major    | An AA accessibility regression; a blanket AAA claim; slow work run inline; a second implementation of an owned concept (SPEC §8); a missing loading, empty or error state; a behaviour change without a failing-first test; a written figure that no command reproduces; a document naming something that does not exist or does not do what it says, or a restated rule left out of step                |
 | minor    | `TODO`, `console.log`, commented-out code, placeholder copy; a scope or naming convention missed; a docblock whose wording has drifted from the code while everything it names still exists and does what it says (a false claim is major)                                                                                                                                                               |
 | nit      | Style the linter does not enforce                                                                                                                                                                                                                                                                                                                                                                        |
 
