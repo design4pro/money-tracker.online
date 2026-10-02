@@ -87,7 +87,7 @@ Pipeline labels are mutually exclusive: a PR carries at most one, and it names w
 - The reviewer moves it: request changes → `changes-requested`; after fixes it returns to `review`; approval → `merge-queue`.
 - `merge-queue` is routing, not proof of QA: a `needs-qa` PR legitimately sits there until QA signs off. The label is this state machine's and is not GitHub's merge queue: a PR carrying it is waiting for the merge step `## This repository` describes, and only that step puts it in whatever queue GitHub runs.
 - Only a QA reviewer sets the `qa` pipeline label. They move a queued `needs-qa` PR from `merge-queue` to `qa` while testing, then back to `merge-queue` with `qa-approved` on pass, or to `qa-failed` on failure. Automated skills request QA with `needs-qa`; they never set `qa`.
-- `blocked` and `do-not-merge` stop the flow wherever it is. A skill may set `blocked` on an issue with a 🤖 comment naming what a person must do; only a person clears either.
+- `blocked` and `do-not-merge` stop the flow wherever it is. A skill may set `blocked` on an issue with a 🤖 comment naming what a person must do; only a person clears either. `set_pipeline_label` never removes `blocked`, so a PR a review skill blocked stays blocked until a person clears it; that is deliberate.
 
 | Group    | Labels                                                                                     | Exclusivity                   | Meaning                            |
 | -------- | ------------------------------------------------------------------------------------------ | ----------------------------- | ---------------------------------- |
@@ -130,7 +130,7 @@ When signals conflict, pick the higher label and say why in the label comment. A
 
 No label says an issue is ready, and no label starts a run. The taxonomy above is the whole vocabulary; readiness is computed.
 
-An issue is **ready** when all of these hold: it is open; a maintainer opened it (the `authors` gate of the issue automations) and it was not filed from production error data (a `sentry-issue` marker); its body or a maintainer's comment carries an `## Agent Brief`; it has a category, a priority and a risk label; every issue under its `Blocked by` is closed; no open PR addresses it; no 🤖 not-ready or `STOP:` comment waits for an answer; and it carries none of `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. `.ai/scripts/backlog-status.mjs` is the one implementation of that rule. It prints the report a person reads, and with `--next` it picks the issue the scheduled `implement-ticket` run takes: highest priority first, then oldest, and nothing while three agent PRs are open - every open PR a maintainer authored except one carrying `do-not-merge`, drafts and blocked ones included, so a stalled PR cannot slip past the cap.
+An issue is **ready** when all of these hold: it is open; a maintainer opened it (the `authors` gate of the issue automations) and it was not filed from production error data (a `sentry-issue` marker); its body or a maintainer's comment carries an `## Agent Brief`; it has a category, a priority and a risk label; every issue under its `Blocked by` is closed; no PR addresses it, open or merged and not yet closed (`develop` is not the default branch, so a merge does not close the issue by itself); no 🤖 not-ready or `STOP:` comment waits for an answer; and it carries none of `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. `.ai/scripts/backlog-status.mjs` is the one implementation of that rule. It prints the report a person reads, and with `--next` it picks the issue the scheduled `implement-ticket` run takes: highest priority first, then oldest, and nothing while three agent PRs are open - every open PR a maintainer authored except the `develop` -> `main` promotion (base `main`), drafts, blocked and `do-not-merge` ones included, so a stalled PR cannot slip past the cap.
 
 - **How an issue gets there.** Opening it starts grooming and triage in one run: `om-auto-manage-issues` adds the SDLC labels, the Definition of Ready check and implementation notes, then `afk-triage` writes the Agent Brief, or puts a `blocked` hold on it with a comment naming the one thing a person must do. One run, two steps, so the two never race on the same labels. `afk-to-tickets` files tickets whose body is their brief.
 - **How it leaves a hold.** A person removes `blocked`, and that event grooms and triages the issue again.
@@ -311,7 +311,7 @@ what `backlog-status.mjs` trusts, so such an issue is never picked by the schedu
   unattended sign-off or a QA reviewer. Promotion from `develop` to `main` merges after the
   release decision.
 - `backlog-status.mjs --next` picks nothing while three agent PRs are open - every open PR a
-  maintainer authored except the `do-not-merge` promotion - and that cap is shared: a
+  maintainer authored except the promotion (base `main`) - and that cap is shared: a
   cockpit-started `issue-autofix` PR counts against it too, because every run publishes under the
   same `gh` identity.
 - Triage sends `risk-high` or `security` work to an agent only on a security and tenancy

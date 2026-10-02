@@ -27,14 +27,14 @@ through `backlog-status.mjs --next`, as long as fewer than three agent PRs are o
 | `BLOCKED`      | `blocked`, `do-not-merge` or `do-not-close` - a person's hold               | A person clears it, as the 🤖 comment asks    |
 | `RUNNING`      | An agent holds the claim (`in-progress`)                                    | Wait                                          |
 | `QUEUED`       | The cockpit has a queued or running run for it                             | Wait                                          |
-| `STUCK`        | A claim gone stale                                                          | Check the run, then remove `in-progress`      |
-| `IN_REVIEW`    | An open pull request addresses it                                           | `/om-pr-autopilot <pr>`                       |
+| `STUCK`        | A claim gone stale                                                          | Check the run, then remove `in-progress` over REST |
+| `IN_REVIEW`    | A pull request addresses it, open or merged and not yet closed              | `/om-pr-autopilot <pr>`, or `/om-close-fixed-issues` once merged |
 | `TRACKING`     | A spec parent `afk-to-tickets` filed (`Spec: .ai/specs/...`)                | Nothing - its tickets carry the work          |
 | `WAITING`      | An issue under its `## Blocked by` is still open                            | Nothing - the schedule takes it once it closes |
 | `NOT_READY`    | An unanswered 🤖 not-ready comment, or `implement-ticket`'s `STOP:` comment | Answer it, then `issue-groom` from the cockpit |
 | `EXTERNAL`     | Opened by someone the `authors` gate does not trust, or filed from Sentry   | A person reads it first                       |
 | `NEEDS_TRIAGE` | No Agent Brief, or no category, priority or risk label                      | `issue-groom` from the cockpit                |
-| `READY`        | Briefed, labelled, unblocked, unclaimed, no open PR                         | Nothing - the schedule takes it               |
+| `READY`        | Briefed, labelled, unblocked, unclaimed, no open or merged-unclosed PR      | Nothing - the schedule takes it               |
 
 ## Flow health
 

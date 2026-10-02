@@ -38,15 +38,15 @@ and a person's hold is `blocked`, `do-not-merge` or `do-not-close`. The owner's 
    when it was opened by an author the issue automations' `authors` gate trusts and does not carry
    the `sentry-issue` marker, carries an `## Agent Brief` (in a trusted author's comment, written
    by `afk-triage`, or in the body of a ticket `afk-to-tickets` filed), has a category, a priority
-   and a risk, every issue it names under "Blocked by" is closed, no open PR addresses it, no 🤖
+   and a risk, every issue it names under "Blocked by" is closed, no PR addresses it (open, or merged into `develop` and not yet closed), no 🤖
    not-ready or `STOP:` comment waits for an answer (so an issue `implement-ticket` refused is not
    picked again every tick), and it carries no `blocked`, `do-not-merge`, `do-not-close` or
    `in-progress`.
 3. **A schedule starts implementation.** "Implement the next ready issue" runs `implement-ticket`
    every two hours. Its first step asks `node .ai/scripts/backlog-status.mjs --next` for the one
    highest-priority, oldest ready issue, and the script answers nothing while three agent PRs are
-   still open (the WIP limit) - every open PR the maintainer authored except the `do-not-merge`
-   promotion, so a stalled draft counts as much as one in `review`. The schedule replaces
+   still open (the WIP limit) - every open PR the maintainer authored except the promotion (base
+   `main`, which carries `do-not-merge`), so a stalled draft counts as much as one in `review`. The schedule replaces
    `ready-for-agent`, `autofix` and the ticket frontier `afk-to-tickets` used to promote: a ticket
    becomes ready the moment its blockers close.
 4. **New issues are groomed and triaged in one run.** `issue.opened` by the maintainer runs

@@ -389,7 +389,7 @@ No label starts a run (ADR 0029). Code-writing work starts in exactly two ways:
   `node .ai/scripts/backlog-status.mjs --next` for the one highest-priority, oldest ready issue
   (`SDLC.md` § Readiness). Ready means an Agent Brief from `afk-triage` (or in the body of a ticket
   `afk-to-tickets` filed), a category, a priority and a risk, every "Blocked by" issue closed, no
-  open PR, and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. The script answers
+  open or merged-but-unclosed PR, and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. The script answers
   nothing while three agent PRs are open. That is why a filed issue reaches an open PR with nobody
   in it, and what keeps it bounded is the readiness rule rather than a label: `afk-triage` writes
   a brief for `risk-high` or `security` work only on the security and tenancy specialist's

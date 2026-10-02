@@ -24,8 +24,9 @@ Resolve the issue number from the task. **get-issue** with its body, labels, ass
 - its body carries a `<!-- sentry-issue:` marker: it was filed from production error data, which is never groomed, briefed or auto-picked, whoever filed it (`.ai/scripts/backlog-status.mjs` reports it EXTERNAL);
 - it carries `in-progress`, `do-not-close`, `blocked` or `do-not-merge`;
 - its body starts with `Spec: .ai/specs/` (a parent afk-to-tickets filed: its tickets carry the work);
-- its body or a comment already has an `## Agent Brief` and no 🤖 not-ready comment is newer than it (when one is, settle that gap and post a new brief);
-- it has a `## Triage Notes` comment the author has not answered since.
+- its body or a comment already has an `## Agent Brief` and no 🤖 not-ready comment is newer than it (when one is, settle that gap and post a new brief).
+
+A hold always carries `blocked`, so an issue with `## Triage Notes` and no `blocked` is one a person just released: groom it again, whether or not they commented.
 
 ## 2. Gather evidence
 
