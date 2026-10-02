@@ -43,6 +43,7 @@ import {
   intakeSpans,
   isAlive,
   linkOpenPrs,
+  marksDeliveredStages,
   parseArgs,
   pickNext,
   pickStage,
@@ -853,6 +854,21 @@ describe("addsSpec", () => {
   });
 });
 
+describe("marksDeliveredStages", () => {
+  it("is true for the docs-only PR afk-plan-to-spec opens, whatever the plan slug", () => {
+    expect(marksDeliveredStages({ headRefName: "docs/plan-delivered-00-foundations" })).toBe(true);
+    expect(marksDeliveredStages({ headRefName: "docs/plan-delivered-" })).toBe(true);
+  });
+
+  it("is false for every other branch, including a person's edit of a plan", () => {
+    expect(marksDeliveredStages({ headRefName: "docs/plans-00-foundations" })).toBe(false);
+    expect(marksDeliveredStages({ headRefName: "docs/plan-update-00-foundations" })).toBe(false);
+    expect(marksDeliveredStages({ headRefName: "spec/budget-split" })).toBe(false);
+    expect(marksDeliveredStages({ headRefName: "feat/x", files: [{ path: "docs/plans/01-x.md" }] })).toBe(false);
+    expect(marksDeliveredStages({})).toBe(false);
+  });
+});
+
 describe("buildPlan", () => {
   const row = (number, state, over = {}) => ({ number, state, labels: ["priority-medium"], canUnblock: false, ...over });
   const spec = (name) => ({ path: `.ai/specs/${name}.md`, text: "| **Status** | ready |\n" });
@@ -974,6 +990,18 @@ describe("buildPlan", () => {
     expect(buildPlan({ ...base, stages: [stage], openPrs: [adding] }).actions).toEqual([]);
     const writing = ["Write the spec for plan stage 04-S3 (docs/plans/04-budget.md)."];
     expect(buildPlan({ ...base, stages: [stage], activeTasks: writing }).actions).toEqual([]);
+  });
+
+  it("writes no spec while the PR that marks delivered stages is open, but does for a person's plan edit", () => {
+    const marking = { headRefName: "docs/plan-delivered-04-budget", files: [] };
+    expect(buildPlan({ ...base, stages: [stage], openPrs: [marking] }).actions).toEqual([]);
+    const planEdit = {
+      headRefName: "docs/budget-wording",
+      files: [{ path: "docs/plans/04-budget.md", additions: 3, deletions: 1 }],
+    };
+    expect(buildPlan({ ...base, stages: [stage], openPrs: [planEdit] }).actions.map((a) => a.kind)).toEqual([
+      "write-spec",
+    ]);
   });
 
   it("counts a spec or an issue that mentions the stage as covering it", () => {
