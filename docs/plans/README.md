@@ -21,8 +21,8 @@ docs/plans/NN-area.md   →   spec in .ai/specs/ (`om-spec-writing`; its Phasing
                                                         ↓
                                      one issue per stage (`om-prepare-issue`), in stage order
                                                         ↓
-                                     a human adds `autofix` to one issue (or hands it to
-                                     `issue-autofix` from the cockpit)
+                                     the two-hourly schedule implements the next ready one
+                                     (or a person hands it to `issue-autofix` from the cockpit)
 ```
 
 A stage's twelve headings are shaped to fill an issue body (`docs/agents/issue-tracker.md`).

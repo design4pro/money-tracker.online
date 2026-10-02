@@ -1,13 +1,13 @@
-# Weekday mornings, on a schedule (docs/agents/cezar-automations.json). afk-to-tickets promotes the
-# ticket frontier, then slices at most one newly merged spec into vertical tickets. It reads
+# Weekday mornings, on a schedule (docs/agents/cezar-automations.json). afk-to-tickets slices at most
+# one newly merged spec into vertical tickets, each carrying its Agent Brief in the body. It reads
 # `.ai/specs/`, CONTEXT.md and the two afk-*-design skills, and publishes only GitHub issues. The
 # skill never edits source files, so the step holds no Edit. It holds Write for the ticket drafts it
 # writes before publishing (the self-check and a dispatched reviewer read them) and for its dispatch
 # notes: without it, run b4bde0ac (2026-09-25) did the work through Bash and still failed on eleven
 # denied Writes. Agent is for the specialist that settles each judgement call
-# (.ai/skills/afk-decide/SKILL.md). Only the frontier gets `ready-for-agent`.
+# (.ai/skills/afk-decide/SKILL.md). No label marks a ticket ready (ADR 0029).
 name: spec-to-tickets
-description: Promote the ticket frontier, then slice at most one merged spec into tracer-bullet tickets (afk-to-tickets).
+description: Slice at most one merged spec into tracer-bullet tickets, each carrying its Agent Brief (afk-to-tickets).
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree

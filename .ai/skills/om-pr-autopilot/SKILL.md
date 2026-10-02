@@ -34,7 +34,7 @@ missing approval this run cannot give itself (its own account authored the PR) i
 stop at merge-ready under `--allow-merge` when the ruleset requires none.
 
 `--allow-merge` means a merge into `develop` only. A PR whose base is not `develop`, or that
-carries `promotion`, ends at merge-ready under `--allow-merge` too: the `develop` -> `main`
+carries `do-not-merge`, ends at merge-ready under `--allow-merge` too: the `develop` -> `main`
 promotion deploys production and is the owner's to merge.
 
 ## Unattended-run limits
