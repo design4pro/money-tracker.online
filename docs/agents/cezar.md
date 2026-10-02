@@ -403,7 +403,7 @@ No label starts a run (ADR 0029). Code-writing work starts in exactly three ways
   `afk-to-tickets` filed), a category, a priority and a risk, every "Blocked by" issue closed, no
   open or merged-but-unclosed PR, and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. The script answers
   nothing while three PRs are waiting for a person (`needs-qa` without `qa-approved`, `risk-high`,
-  `security`, `blocked`, `do-not-merge`). That is why a filed issue reaches an open PR with nobody
+  `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours). That is why a filed issue reaches an open PR with nobody
   in it, and what keeps it bounded is the readiness rule rather than a label: `afk-triage` writes
   a brief for `risk-high` or `security` work only on the security and tenancy specialist's
   approving verdict (`SDLC.md` § Delegated decisions), and grooming never writes one itself - it

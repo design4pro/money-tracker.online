@@ -21,7 +21,7 @@ no request is the whole backlog.
 No label marks an issue ready or starts a run (ADR 0029). Readiness is the script's rule, and the
 scheduled "Implement the next ready issue" automation takes the first `READY` issue every two hours
 through `backlog-status.mjs --next`, as long as fewer than three PRs are waiting for a person (`needs-qa`
-without `qa-approved`, `risk-high`, `security`, `blocked` or `do-not-merge`). `backlog-status.mjs --plan` is the same judgement as
+without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours). `backlog-status.mjs --plan` is the same judgement as
 a list of actions for the Reconciler (ADR 0030); this report never starts one.
 
 | State          | Means                                                                       | Next step                                     |

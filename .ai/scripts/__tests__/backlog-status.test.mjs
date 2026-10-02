@@ -22,6 +22,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CHANGES_REQUESTED_PARKED_HOURS,
   PLAN_WORKFLOWS,
   RETIRED_AGENT_LOGINS,
   WIP_LIMIT,
@@ -460,6 +461,32 @@ describe("waitsForPerson", () => {
   it("still waits for a person when a high-risk PR also has QA approved", () => {
     expect(waitsForPerson(pr("risk-high", "needs-qa", "qa-approved"))).toBe(true);
   });
+
+  describe("a changes-requested PR", () => {
+    const idle = (hours, ...names) => ({
+      ...pr(...names),
+      updatedAt: new Date(NOW - hours * 36e5).toISOString(),
+    });
+
+    it("is on its way to the merge while it is fresh", () => {
+      expect(waitsForPerson(idle(1, "changes-requested"), NOW)).toBe(false);
+      expect(waitsForPerson(idle(CHANGES_REQUESTED_PARKED_HOURS - 0.01, "changes-requested"), NOW)).toBe(
+        false,
+      );
+    });
+
+    it("waits for a person once nobody has touched it for 24 hours", () => {
+      expect(CHANGES_REQUESTED_PARKED_HOURS).toBe(24);
+      expect(waitsForPerson(idle(24, "changes-requested"), NOW)).toBe(true);
+      expect(waitsForPerson(idle(72, "changes-requested", "risk-low"), NOW)).toBe(true);
+    });
+
+    it("is parked only by its own label, and only when the age is known", () => {
+      expect(waitsForPerson(idle(72, "review"), NOW)).toBe(false);
+      expect(waitsForPerson(pr("changes-requested"), NOW)).toBe(false);
+      expect(waitsForPerson(idle(72, "changes-requested"))).toBe(false);
+    });
+  });
 });
 
 describe("countWip", () => {
@@ -497,6 +524,16 @@ describe("countWip", () => {
 
   it("still counts an agent PR a person put a do-not-merge hold on", () => {
     expect(countWip([pr(["review", "do-not-merge"])], trusted)).toBe(1);
+  });
+
+  it("counts a trusted changes-requested PR left for 24 hours, and not a fresh one", () => {
+    const idle = (hours, login = "rafalwolak", baseRefName = "develop") => ({
+      ...pr(["changes-requested"], login, baseRefName),
+      updatedAt: new Date(NOW - hours * 36e5).toISOString(),
+    });
+    expect(countWip([idle(2), idle(23)], trusted, NOW)).toBe(0);
+    expect(countWip([idle(2), idle(24), idle(50)], trusted, NOW)).toBe(2);
+    expect(countWip([idle(50, "dependabot[bot]"), idle(50, "rafalwolak", "main")], trusted, NOW)).toBe(0);
   });
 });
 

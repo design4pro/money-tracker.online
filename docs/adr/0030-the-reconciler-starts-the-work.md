@@ -43,8 +43,10 @@ exists, and a trigger per event cannot see a difference.
    they are until the Reconciler has run alone for a while.
 2. **WIP counts what only a person can clear.** Open PRs by a trusted author, except the promotion (base
    `main`), that are `needs-qa` without `qa-approved`, or `risk-high`, `security`, `blocked` or
-   `do-not-merge` (a person's hold on an agent PR still waits for review). The limit stays three. A PR the
-   pipeline merges by itself is not inventory.
+   `do-not-merge` (a person's hold on an agent PR still waits for review), or `changes-requested` with no
+   update for 24 hours (an autopilot that stopped at `changes-requested` is parked on a decision no run is
+   making, and `--plan` reads each PR's `updatedAt` to see it). The limit stays three. A PR the pipeline
+   merges by itself is not inventory.
 3. **An agent lifts what an agent set, on a specialist's verdict.** `afk-unblock` takes a `blocked`
    hold, or an unanswered not-ready or `STOP:` comment, and asks an independent specialist
    (`afk-decide`) whether it can be lifted; it lifts it with a `🤖 RESOLVED:` comment, which
