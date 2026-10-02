@@ -13,7 +13,7 @@ file is what an issue must contain and how it is written. The `status:`/`run:` v
 
 ```bash
 gh issue list --state open --json number,title,labels,body
-gh issue view <n> --comments
+gh issue view <n> --json title,body,labels,comments
 ```
 
 ## Writing
