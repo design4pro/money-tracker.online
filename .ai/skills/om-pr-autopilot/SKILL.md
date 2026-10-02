@@ -37,6 +37,27 @@ stop at merge-ready under `--allow-merge` when the ruleset requires none.
 carries `do-not-merge`, ends at merge-ready under `--allow-merge` too: the `develop` -> `main`
 promotion deploys production and is the owner's to merge.
 
+## A spec PR the plan-to-spec run opened merges
+
+The installed skill treats a spec-only design PR as draft-by-intent
+(`.claude/skills/om-pr-autopilot/references/state-matrix.md`, `.claude/skills/om-auto-fix-pr/references/pr-finalize.md`),
+and `om-approve-merge-pr` refuses a draft, so a spec-only PR ends at merge-ready and a person merges
+it. One kind is the exception, because a specialist panel has approved it before the PR exists
+(ADR 0030, which amends ADR 0027): a spec-only PR that **all** of these describe merges under
+`--allow-merge` like any other PR into `develop`:
+
+- its branch is `spec/<slug>` and the `plan-to-spec` workflow or `afk-plan-to-spec` opened it: the
+  panel's verdicts and a Resolved assumptions table are in its body, and its spec's metadata table
+  has a `Plan` row where an `Issue` row would be;
+- it is ready for review (a draft is the not-approved path of `afk-plan-to-spec` step 5, which also
+  puts `blocked` on it);
+- it does not carry `blocked`, `do-not-merge` or any other hold.
+
+Every other spec-only PR keeps the person's merge, the `spec` workflow's (`Refs #n`, an `Issue` row)
+among them. A docs-only PR on a `docs/plan-delivered-<slug>` branch (`afk-plan-to-spec` marking
+stages the code already delivers) is not a spec-only PR: no draft-by-intent applies, and it merges
+under `--allow-merge` like any docs-only PR.
+
 ## Unattended-run limits
 
 These hold for every skill this run chains, whether or not its own override was read:

@@ -418,7 +418,7 @@ Until ADR 0029 this section described two label ladders: the command labels `gro
 
 **Merge and after.** `pr-autopilot` merges into `develop`: `om-pr-autopilot --allow-merge` ends in
 `om-approve-merge-pr`, which reads the labels and the QA gate first. It runs as the last step of
-`implement-ticket`, on a PR a maintainer opens, and on an agent PR reviewed into `merge-queue`.
+`implement-ticket` and `plan-to-spec`, on a PR a maintainer opens, and on an agent PR reviewed into `merge-queue`.
 `om-merge-buddy` reports the rest, and a person merges it - by hand, or with GitHub's native
 `gh pr merge --auto` (ADR 0027). A `risk-high` `needs-qa` PR waits for the owner's `qa-approved`,
 and `develop` → `main` (carrying `do-not-merge`, ADR 0029) is the owner's release decision (`SDLC.md`). The live rulesets have no
