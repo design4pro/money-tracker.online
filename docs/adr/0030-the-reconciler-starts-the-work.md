@@ -73,7 +73,8 @@ exists, and a trigger per event cannot see a difference.
    tick slices it. A stage the code already delivers gets no spec: the skill adds a line
    `Delivered: <date> - <evidence>` under its heading, and under every other uncovered stage of that plan
    the code delivers, and lands it on a docs-only PR that merges the same way. `--plan` skips a stage so
-   marked. Without the line the run would end with nothing covering the stage, and the Reconciler would
+   marked, and names no stage while a `docs/plan-delivered-*` PR is open, because the line is not in the
+   plan until it merges (a person's PR that edits a plan does not hold it). Without the line the run would end with nothing covering the stage, and the Reconciler would
    pick it again after its cooldown, so the queue would never move past it.
 5. **Slicing has no age window.** The oldest `ready` spec directly in `.ai/specs/` that no issue, open or
    closed, opens with `Spec: <path>` is sliced.

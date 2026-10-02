@@ -546,6 +546,15 @@ export const addsSpec = (pr) =>
       file.deletions === 0,
   );
 
+/**
+ * Whether an open PR is the docs-only PR `afk-plan-to-spec` opens to mark stages the code already
+ * delivers. Until it merges the plan has no `Delivered:` line, so `--plan` would name the same stage
+ * again on the next tick. Only that branch prefix counts: any other PR touching `docs/plans/` is a
+ * person's edit of a plan, and must not stall the queue.
+ */
+export const marksDeliveredStages = (pr) =>
+  String(pr.headRefName ?? "").startsWith("docs/plan-delivered-");
+
 /** The workflow each kind of action starts, in the order `--plan` lists them. */
 export const PLAN_WORKFLOWS = {
   implement: "implement-ticket",
@@ -566,7 +575,8 @@ const issueText = (issue) => `${issue.title ?? ""}\n${issue.body ?? ""}`;
  * - triage: the first NEEDS_TRIAGE issue in report order;
  * - slice: the oldest `ready` spec with no parent issue (`unslicedSpecs`);
  * - write-spec: the first stage of `docs/plans/` nothing covers and its plan does not mark
- *   `Delivered:` (`pickStage`), but only while no PR adds a spec and there is no slice candidate.
+ *   `Delivered:` (`pickStage`), but only while no PR adds a spec or marks stages delivered
+ *   (`marksDeliveredStages`) and there is no slice candidate.
  *   A spec a run is already slicing is not a candidate, so the next stage is written meanwhile; a
  *   spec that waits for a run is, and holds it back. One spec ahead of the slicing at a time keeps
  *   the review panel's merge order and the plan's wave order the same thing.
@@ -610,7 +620,7 @@ export function buildPlan({
     });
 
   const stage =
-    slice === undefined && !openPrs.some(addsSpec)
+    slice === undefined && !openPrs.some((pr) => addsSpec(pr) || marksDeliveredStages(pr))
       ? pickStage({ stages, corpus: [...specCorpus, ...allIssues.map(issueText)], activeTasks })
       : null;
   if (stage)

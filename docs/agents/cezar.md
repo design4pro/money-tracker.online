@@ -514,7 +514,9 @@ they are.
 `write-spec` names the first stage of `docs/plans/` that no spec (at any depth), no issue (open or closed) and no
 live run mentions, and whose section in the plan holds no line starting `Delivered:`. `plan-to-spec` writes that
 line, on a docs-only PR, for a stage the code already delivers instead of writing a spec; without it the stage
-would be picked again after every cooldown and the queue would never move past it.
+would be picked again after every cooldown and the queue would never move past it. Until that PR (branch
+`docs/plan-delivered-<plan>`) merges the plan has no line yet, so `write-spec` waits while one is open, as it
+does while a PR adds a spec; any other PR that edits a plan does not hold it.
 
 Everything the rules need is in the output of the `gh` list calls, the specs and plans in the checkout, and
 `.ai/cezar/runs.json`; it reads no network beyond that and writes nothing. A candidate is dropped while a

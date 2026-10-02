@@ -1,6 +1,6 @@
 # Started by the Reconciler (docs/agents/cezar.md, ADR 0030) when `node .ai/scripts/backlog-status.mjs
 # --plan` lists a `write-spec` action - the first stage of docs/plans/ that no spec and no issue
-# mentions and its plan does not mark `Delivered:`, while no spec waits to be sliced and no PR adds one -
+# mentions and its plan does not mark `Delivered:`, while no spec waits to be sliced and no PR adds one or marks stages delivered -
 # or by a person from the cockpit with a stage. The task names the stage and its plan file.
 # afk-plan-to-spec verifies the stage against the code, settles every open question through an
 # independent specialist (.ai/skills/afk-decide/SKILL.md), writes a `ready` spec under .ai/specs/ and

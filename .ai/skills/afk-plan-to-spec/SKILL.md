@@ -24,7 +24,7 @@ The task names a stage id and its plan file (`Write the spec for plan stage 06-S
 - the stage heading `## Stage <id>` is not in that file;
 - the plan file is **frozen**: `docs/plans/README.md` (or the file itself) says it was superseded or migrated elsewhere, so the tracker or the newer document is the authority and a spec here would contradict it. No plan is marked so today; honour the mark when one is;
 - the stage is already covered. A stage is covered when its id appears in any file under `.ai/specs/` (any depth), in the title or body of any issue, open or closed (**search-issues**), or in an open PR (**search-prs**; a branch `spec/<slug>` for it counts), or when its section of the plan holds a line that starts `Delivered:` (step 2a). When two plan files share an id, the mention must also name the plan file;
-- an open PR already adds a spec: one spec is in flight at a time, so the review order and the plan's wave order stay the same thing.
+- an open PR already adds a spec, or marks stages delivered (a branch `docs/plan-delivered-*`): one is in flight at a time, so the review order and the plan's wave order stay the same thing.
 
 A spec for this stage that exists only in your own worktree (uncommitted, or on the branch this run made) is the previous attempt of this run, not a reason to stop: when the gate step failed, the run starts this step again. Read the handoff file, and continue from that spec, fixing what the gate reported.
 
