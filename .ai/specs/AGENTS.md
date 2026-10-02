@@ -38,7 +38,15 @@ Directly under the `H1`, before the first section, exactly these four rows in th
 left blank so that an empty cell always means somebody forgot. `Implementation` lists the pull
 requests in the order they merged.
 
-An **archived** spec carries a fifth row, and only an archived spec may:
+A spec written from a plan stage (`afk-plan-to-spec`) carries a fifth row, after those four, naming
+the stage and the plan file that holds it: `| **Plan** | 04-S3 (docs/plans/04-budget-and-currencies.md) |`.
+Such a spec is `ready` the moment its pull request merges and has no issue yet, because
+`afk-to-tickets` files the parent issue when it slices it, so the stage stands in for the `Issue` a
+`ready` spec otherwise needs. Older specs have no `Plan` row and need none. Nothing here parses the
+row: `pnpm generate-spec-index` reads the fields it knows and ignores the rest, and the Reconciler
+finds the stage by the id in the spec's text (`backlog-status.mjs --plan`, ADR 0030).
+
+An **archived** spec carries a `Superseded by` row, last, and only an archived spec may:
 
 ```markdown
 | **Superseded by** | #382 |
@@ -84,7 +92,7 @@ in-progress` and the built pull requests listed.
 
 ## Never
 
-- A spec at `ready` or `in-progress` with no issue. That is precisely how
+- A spec at `ready` or `in-progress` with neither an issue nor a `Plan` row. That is precisely how
   `2026-09-08-design-system-plan-reconciliation.md` sat merged and unbuilt for two days with nothing
   to schedule it from, until #201 was filed.
 - A spec at `implemented` with an empty `Implementation`. "It shipped" that names nothing that
