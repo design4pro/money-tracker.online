@@ -87,7 +87,7 @@ Pipeline labels are mutually exclusive: a PR carries at most one, and it names w
 - The reviewer moves it: request changes → `changes-requested`; after fixes it returns to `review`; approval → `merge-queue`.
 - `merge-queue` is routing, not proof of QA: a `needs-qa` PR legitimately sits there until QA signs off. The label is this state machine's and is not GitHub's merge queue: a PR carrying it is waiting for the merge step `## This repository` describes, and only that step puts it in whatever queue GitHub runs.
 - Only a QA reviewer sets the `qa` pipeline label. They move a queued `needs-qa` PR from `merge-queue` to `qa` while testing, then back to `merge-queue` with `qa-approved` on pass, or to `qa-failed` on failure. Automated skills request QA with `needs-qa`; they never set `qa`.
-- `blocked` and `do-not-merge` stop the flow wherever it is. A skill may set `blocked` on an issue with a 🤖 comment naming what a person must do; only a person clears either. `set_pipeline_label` never removes `blocked`, so a PR a review skill blocked stays blocked until a person clears it; that is deliberate.
+- `blocked` and `do-not-merge` stop the flow wherever it is. A skill may set `blocked` on an issue with a 🤖 comment naming what a person must do. `do-not-merge` and `do-not-close` are a person's to clear. A `blocked` an agent set can also be lifted by `afk-unblock` on an independent specialist's verdict (§ Readiness, ADR 0030); one a person set, or took over by commenting after it, stays. `set_pipeline_label` never removes `blocked`, so a PR a review skill blocked stays blocked until a person clears it; that is deliberate.
 
 | Group    | Labels                                                                                     | Exclusivity                   | Meaning                            |
 | -------- | ------------------------------------------------------------------------------------------ | ----------------------------- | ---------------------------------- |
@@ -130,11 +130,11 @@ When signals conflict, pick the higher label and say why in the label comment. A
 
 No label says an issue is ready, and no label starts a run. The taxonomy above is the whole vocabulary; readiness is computed.
 
-An issue is **ready** when all of these hold: it is open; a maintainer opened it (the `authors` gate of the issue automations) and it was not filed from production error data (a `sentry-issue` marker); its body or a maintainer's comment carries an `## Agent Brief`; it has a category, a priority and a risk label; every issue under its `Blocked by` is closed; no PR addresses it, open or merged and not yet closed (`develop` is not the default branch, so a merge does not close the issue by itself; an issue a person deliberately reopens after its PR merged stays out of `--next` until that PR ages out of the 30 most recent merged ones, or a person starts the run from the cockpit); no 🤖 not-ready or `STOP:` comment waits for an answer; and it carries none of `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. `.ai/scripts/backlog-status.mjs` is the one implementation of that rule. It prints the report a person reads, and with `--next` it picks the issue the scheduled `implement-ticket` run takes: highest priority first, then oldest, and nothing while three agent PRs are open - every open PR a maintainer authored except the `develop` -> `main` promotion (base `main`), drafts, blocked and `do-not-merge` ones included, so a stalled PR cannot slip past the cap.
+An issue is **ready** when all of these hold: it is open; a maintainer opened it (the `authors` gate of the issue automations) and it was not filed from production error data (a `sentry-issue` marker); its body or a maintainer's comment carries an `## Agent Brief`; it has a category, a priority and a risk label; every issue under its `Blocked by` is closed; no PR addresses it, open or merged and not yet closed (`develop` is not the default branch, so a merge does not close the issue by itself; an issue a person deliberately reopens after its PR merged stays out of `--next` until that PR ages out of the 30 most recent merged ones, or a person starts the run from the cockpit); no 🤖 not-ready or `STOP:` comment waits for an answer; and it carries none of `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. A later trusted `🤖 RESOLVED:` comment (what `afk-unblock` posts) answers a not-ready or `STOP:` comment, as a human reply does. A comment that says `HUMAN-ONLY:` names what only a person can do, and no run is started on that issue. `.ai/scripts/backlog-status.mjs` is the one implementation of that rule. It prints the report a person reads, with `--next` it picks the issue the next `implement-ticket` run takes: highest priority first, then oldest, and nothing while three PRs are **waiting for a person**, and with `--plan` it lists everything the Reconciler may start right now (§ The Reconciler, ADR 0030). A PR waits for a person when it is open, by a maintainer, not the `develop` -> `main` promotion (base `main`), and it is `needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked` or `do-not-merge`: those are the PRs only a person can move. A PR the pipeline merges by itself (`review`, `changes-requested`, `merge-queue`, a plain draft) is not inventory, so it does not hold back the next implementation. Trusted authors are the `authors` gates of the issue automations plus the retired `design4pro-agent`, every issue of which came out of an agent run (ADR 0027, amendment of 2026-10-01).
 
-- **How an issue gets there.** Opening it starts grooming and triage in one run: `om-auto-manage-issues` adds the SDLC labels, the Definition of Ready check and implementation notes, then `afk-triage` writes the Agent Brief, or puts a `blocked` hold on it with a comment naming the one thing a person must do. One run, two steps, so the two never race on the same labels. `afk-to-tickets` files tickets whose body is their brief.
-- **How it leaves a hold.** A person removes `blocked`, and that event grooms and triages the issue again.
-- **Limits on skills:** an implementing run takes `risk-high` or `security` work only on a security and tenancy specialist's approving verdict, recorded with its conditions as acceptance criteria, and it re-derives the risk from the area the brief touches rather than trusting the label. Skills never close an issue and never remove a hold a person set.
+- **How an issue gets there.** Opening it starts grooming and triage in one run: `om-auto-manage-issues` adds the SDLC labels, the Definition of Ready check and implementation notes, then `afk-triage` writes the Agent Brief, or puts a `blocked` hold on it with a comment that starts `🤖 HUMAN-ONLY:` and names the one thing a person must do. One run, two steps, so the two never race on the same labels. `afk-to-tickets` files tickets whose body is their brief; `afk-plan-to-spec` writes the spec for a stage of `docs/plans/` that nothing covers yet, which `afk-to-tickets` then slices.
+- **How it leaves a hold.** A hold an agent set that does not say `HUMAN-ONLY:` is offered to `afk-unblock`, which asks a specialist (§ Delegated decisions): on a verdict it removes `blocked` and posts `🤖 RESOLVED:`, otherwise it posts `🤖 HUMAN-ONLY:` and leaves the hold. A hold a person set, or a person commented on last, and a `HUMAN-ONLY:` one stay until a person removes `blocked`; that event grooms and triages the issue again.
+- **Limits on skills:** an implementing run takes `risk-high` or `security` work only on a security and tenancy specialist's approving verdict, recorded with its conditions as acceptance criteria, and it re-derives the risk from the area the brief touches rather than trusting the label. Skills never close an issue and never remove a hold a person set or took over; they lift only what an agent set, and only on a specialist's verdict or a checked fact.
 - **Human override:** a person starts any workflow on any issue from the cockpit at any time.
 
 ## The QA gate
@@ -175,7 +175,7 @@ The `om-auto-*` skills run this process unattended and are chainable: each accep
 Two properties bound the whole unattended loop, and both are worth stating plainly because they are what make it safe to leave running:
 
 - **Merge policy is repository-specific.** The pipeline's output is a reviewed PR; `## This repository` states who merges a reviewed PR and how.
-- **The cap is on inventory, not on rate.** The scheduled pick takes nothing while three agent PRs are open, so a burst of intake cannot outrun review capacity. Raising throughput means reviewing, not tuning the schedule.
+- **The cap is on inventory, not on rate.** `--next` and `--plan` start no implementation while three PRs wait for a person (`needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked`), so a burst of intake cannot outrun the review only a person can give. Raising throughput means reviewing those PRs, not tuning the schedule.
 
 ## Unattended decisions
 
@@ -240,13 +240,14 @@ Three amendment rules are specific to this document's shape:
   with **a merge commit** and no queue (ADR 0003).
 - **Who starts a run.** No label does (ADR 0029). An issue a maintainer opens is groomed and
   triaged on the event (`issue-groom`: `om-auto-manage-issues`, then `afk-triage`); a ready issue
-  is implemented by the two-hour schedule, which asks `backlog-status.mjs --next` for it; a PR is
-  driven by its own automations. A person can start any workflow from the cockpit. The pipeline
+  is implemented by the two-hour schedule, which asks `backlog-status.mjs --next` for it, or by the
+  Reconciler (§ The Reconciler); a PR is driven by its own automations. A person can start any
+  workflow from the cockpit. The pipeline
   runs from a filed issue to a merged PR with nobody in it, and `implement-ticket` ends by running
   `om-pr-autopilot --allow-merge`, which merges the PR into `develop`; QA below `risk-high` is
   signed off by the run on a specialist's verdict, and a `risk-high` PR waits for the owner's
-  `qa-approved`. It is event-driven and scheduled only: no run sweeps the backlog of issues opened
-  before an Agent Brief existed, so those wait for a person to start `issue-groom` on them.
+  `qa-approved`. Beyond events and schedules, the Reconciler sweeps the backlog: it triages, one at
+  a time, an issue opened before an Agent Brief existed.
 - **Risk here.** `risk-high` means anything touching auth, tenant scoping, money, the ledger,
   billing, a migration, a protected decision document or a merge-policy surface. The label is
   triage information for the reviewer, not a gate. `docs/MONEY.md` is not background reading: representation, rounding and
@@ -263,6 +264,31 @@ Three amendment rules are specific to this document's shape:
   produces the evidence and the owner grants `qa-approved`.
 - **What a ticket contains** beyond the Definition of Ready: `docs/agents/issue-tracker.md` (tenant
   isolation test, money invariant, visual change expected).
+
+### The Reconciler
+
+The Reconciler is a level-triggered loop on the cezar host (a cron every ten minutes; `docs/agents/cezar.md`
+§ The Reconciler, ADR 0030). It starts work only when there is work and a free `maxParallel` slot, and it repairs a
+run that failed by continuing it. What there is to do is not decided in the cron: it asks
+`node .ai/scripts/backlog-status.mjs --plan`, which prints at most one action per kind, in this order, each with the
+workflow and task text to send:
+
+| Kind         | Candidate                                                                                                                           | Workflow           |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `implement`  | the issue `--next` picks (nothing at the WIP limit)                                                                                 | `implement-ticket` |
+| `unblock`    | the first issue whose `blocked` hold, or unanswered not-ready or `STOP:` comment, an agent left and that does not say `HUMAN-ONLY:` | `unblock`          |
+| `triage`     | the first issue that needs an Agent Brief or a category, priority or risk label                                                     | `triage`           |
+| `slice`      | the oldest `ready` spec directly in `.ai/specs/` that no issue (open or closed) opens with `Spec: <path>`                           | `spec-to-tickets`  |
+| `write-spec` | the first stage of `docs/plans/` no spec and no issue mentions, only while no PR adds a spec and no spec waits to be sliced         | `plan-to-spec`     |
+
+Every candidate is dropped while a cockpit run already holds it: an issue by its `issueNumber`, a spec path or a stage
+id by the run's task text. A run holds it while it is `queued`, `running` or `waiting`, and a `failed` run holds it
+while `autoResumeAt` says the cockpit resumes it by itself. Nothing in it is an engine feature: the cron, the
+cockpit API and these scripts and workflows are all there is.
+
+Two limits keep it from running away. WIP is counted as in § Readiness: only PRs a person has to clear. And the
+pipeline never asks a person a question it can put to a specialist: a person is named by a `HUMAN-ONLY:` comment, which
+is also what stops the Reconciler from starting the same run again.
 
 ### Automations
 
@@ -288,8 +314,10 @@ why this paragraph used to say the opposite. So the review sweep and post-merge 
 run unattended; an issue whose PR merged closes at the next run rather than waiting for a person,
 and a merger's manual `/om-close-fixed-issues` matters only between those three runs.
 
-Seven workflows have **no automation and no schedule**, started by hand from the cockpit:
-`backlog`, `brainstorm`, `implement-spec`, `pr-review`, `issue-autofix`, `spec` and `triage`.
+Nine workflows have **no automation and no schedule**: `backlog`, `brainstorm`, `implement-spec`,
+`pr-review`, `issue-autofix`, `spec`, `triage`, `unblock` and `plan-to-spec`. The Reconciler (§ The
+Reconciler) starts `triage`, `unblock` and `plan-to-spec`, and `implement-ticket` and
+`spec-to-tickets` too; a person starts any workflow from the cockpit.
 
 The `authors: ["rafalwolak"]` filter on the issue and PR automations is a security gate, not a
 convenience: those runs read the issue or PR body as a prompt and hold Bash with no allowlist, so
@@ -299,7 +327,7 @@ what `backlog-status.mjs` trusts, so such an issue is never picked by the schedu
 **Guardrails:**
 
 - Cezar merges into `develop` with `om-pr-autopilot --allow-merge`: the last step of
-  `implement-ticket`, a PR a maintainer opened, and an agent PR reviewed into `merge-queue`
+  `implement-ticket` and of `plan-to-spec` (a spec PR the specialist panel approved, ADR 0030), a PR a maintainer opened, and an agent PR reviewed into `merge-queue`
   (ADR 0027, amended 2026-10-01). It never merges into `main`: the `develop` -> `main` promotion
   carries `do-not-merge` (ADR 0029) and is the owner's. A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
   land it once the required checks pass. The rulesets require only the three CI checks (`docs/agents/cezar.md`);
@@ -310,10 +338,11 @@ what `backlog-status.mjs` trusts, so such an issue is never picked by the schedu
   applies `qa-approved`. Below `risk-high`, a `needs-qa` PR waits for `qa-approved` from the
   unattended sign-off or a QA reviewer. Promotion from `develop` to `main` merges after the
   release decision.
-- `backlog-status.mjs --next` picks nothing while three agent PRs are open - every open PR a
-  maintainer authored except the promotion (base `main`) - and that cap is shared: a
-  cockpit-started `issue-autofix` PR counts against it too, because every run publishes under the
-  same `gh` identity.
+- `backlog-status.mjs --next` and `--plan` pick no implementation while three PRs are waiting for
+  a person (`needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`), and
+  that cap is shared: a cockpit-started `issue-autofix` PR counts against it too, because every run
+  publishes under the same `gh` identity. A PR the pipeline merges by itself does not count (ADR 0030),
+  and neither does the promotion (base `main`).
 - Triage sends `risk-high` or `security` work to an agent only on a security and tenancy
   specialist's approving verdict (§ Delegated decisions), and the implementing automation still
   requires `risk-low` to start by itself. The PR still passes every review and QA gate above.

@@ -307,13 +307,19 @@ and review of every pull request are the gate.
 
 ## Workflows (`.ai/cezar/workflows/`)
 
-Most workflows are a setup step (`HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm
-generate-routes`) and one agent step whose prompt is the skill as a slash command
-(`/om-… {{task}}`). `allowedTools` is the full set for skills that write code and drops
+Most workflows are a setup step (`bash .ai/scripts/bootstrap.sh`) and one agent step whose prompt is
+the skill as a slash command (`/om-… {{task}}`). `allowedTools` is the full set for skills that write code and drops
 `Edit`/`Write` for the ones that must not.
 
+The setup step is a script, not the one-liner it replaces (`HUSKY=0 pnpm install --frozen-lockfile
+--prefer-offline && pnpm generate-routes`), because a check step cannot retry itself and one
+registry error used to end a run before any agent started. `bootstrap.sh` installs with up to three
+attempts, 30 and 60 seconds apart, then generates the route tree; a real failure (a lockfile that
+does not match) fails all three the same way (ADR 0030). `HUSKY=0` stays: it keeps `prepare: husky`
+from rewriting `core.hooksPath` in the clone every worktree shares.
+
 **Two things that sentence used to claim, and should not.** It said the tree is "the same nine
-workflows as `planned.travel`": there are fifteen here, and the six that arrived with the `afk-*`
+workflows as `planned.travel`": there are seventeen here, and the six that arrived with the `afk-*`
 unattended issue pipeline had no counterpart there at the time. And it said `/om-…` rather than `skill:` because the
 slash form "would load the thin `.ai/skills/` override alone" — reading cezar 0.11.1 says
 otherwise. `expandRegistrySlashSkillText` resolves `/name` through the same registry `skill:` uses
@@ -323,9 +329,10 @@ convention, not a fix. What actually keeps the chain working is that every `.ai/
 override names its installed `.claude/skills/<name>/SKILL.md` in its opening line and every
 workflow grants `Read`, so the agent can follow the pointer.
 
-`backlog` deliberately has no bootstrap step: it is plain node plus `gh`, and a report that is
-cheap to start is one a human actually starts. The four `afk-*` workflows have none either, but
-not deliberately — see the note under the table.
+`backlog` and `unblock` deliberately have no bootstrap step: they are plain node plus `gh` (and,
+for `unblock`, reading the tracker and the code), and a run that is cheap to start is one that fits
+between two Reconciler ticks. The four older `afk-*` workflows had none either, but not
+deliberately — see the note under the table.
 
 | Workflow              | Agent step                                                                 | Started by                                                                                                                                                                                 |
 | --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -339,13 +346,15 @@ not deliberately — see the note under the table.
 | `housekeeping`        | `/om-review-prs`, `/om-merge-buddy`, `/om-close-fixed-issues --limit 50`   | launchd `dev.money-tracker.housekeeping` → `.ai/scripts/housekeeping.sh`, weekdays 07:00/12:00/17:00, or a human                                                                           |
 | `brainstorm`          | `/om-brainstorm {{task}}`, **Autonomous off**                              | a human, from the cockpit, with the idea as the task                                                                                                                                       |
 | `backlog`             | `/backlog {{task}}`, no bootstrap, **Worktree off**                        | a human, from the cockpit, or `cezar run "<filter>" --workflow backlog`                                                                                                                    |
-| `implement-ticket`    | `/om-fix` from the Agent Brief → gate → `/om-open-pr` → `/om-pr-autopilot` | automation **Implement the next ready issue** (schedule, every 2 hours), or a human with an issue number                                                                                   |
-| `triage`              | `/afk-triage {{task}}`                                                     | a human, from the cockpit; the automations run it as the second step of `issue-groom`                                                                                                      |
-| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                                 | automation **Spec to tickets**, weekdays 07:00                                                                                                                                             |
+| `unblock`             | `/afk-unblock {{task}}`, no bootstrap                                      | the Reconciler (`unblock` action), or a human, from the cockpit, on an issue number                                                                                                        |
+| `plan-to-spec`        | `/afk-plan-to-spec {{task}}` → gate → `/om-open-pr` → `/om-pr-autopilot`   | the Reconciler (`write-spec` action), or a human with a stage id                                                                                                                           |
+| `implement-ticket`    | `/om-fix` from the Agent Brief → gate → `/om-open-pr` → `/om-pr-autopilot` | the Reconciler (`implement` action), automation **Implement the next ready issue** (schedule, every 2 hours), or a human with an issue number                                              |
+| `triage`              | `/afk-triage {{task}}`                                                     | the Reconciler (`triage` action) or a human, from the cockpit; the automations run it as the second step of `issue-groom`                                                                  |
+| `spec-to-tickets`     | `/afk-to-tickets {{task}}`                                                 | the Reconciler (`slice` action), automation **Spec to tickets**, weekdays 07:00, or a human with a spec path                                                                               |
 | `architecture-review` | `/afk-architecture-review {{task}}`                                        | automation **Weekly architecture review**, Mondays 06:00                                                                                                                                   |
 | `lessons`             | `/afk-lessons {{task}}`                                                    | automation **Weekly lessons**, Fridays 16:00                                                                                                                                               |
 
-The last five rows were shaped unlike the ten above them until 2026-09-20, and it was a defect
+The five rows from `implement-ticket` to `lessons` were shaped unlike the rows above them until 2026-09-20, and it was a defect
 rather than a style. Four were the three-line `skills:` shorthand, so they carried no bootstrap
 step and cezar's `DEFAULT_ALLOWED_TOOLS` — `[Read, Edit, Write, Grep, Glob, Bash]`,
 which both over-granted (`triage` and `architecture-review` are documented read-only) and
@@ -377,11 +386,14 @@ The task text an event automation sends is the issue or PR number alone (`{{gith
 second token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled
 `Fix GitHub issue #<n>: <title>` is safe only because the `om-auto-fix-issue` override treats a
 text naming exactly one issue of this repository as an issue reference. The implement schedule
-sends no number: `implement-ticket` asks `node .ai/scripts/backlog-status.mjs --next` for one. From
-the cockpit type the same: a number, a spec path, or for `brainstorm` the idea.
+sends no number: `implement-ticket` asks `node .ai/scripts/backlog-status.mjs --next` for one. The
+Reconciler sends the task text `--plan` prints (`Implement issue #123.`, `Resolve the hold on issue
+#45.`, `Triage issue #67.`, `Slice the spec .ai/specs/<file>.md into tickets.`, `Write the spec for
+plan stage 02-S3 (docs/plans/02-places-and-maps.md).`). From the cockpit type the same: a number, a
+spec path, a stage id, or for `brainstorm` the idea.
 
 **Starting a run.** GitHub tab → issue → "Hand this to the agent" → workflow → the task box.
-No label starts a run (ADR 0029). Code-writing work starts in exactly two ways:
+No label starts a run (ADR 0029). Code-writing work starts in exactly three ways:
 
 - **A person**, from the cockpit, with any workflow on any issue - `issue-autofix`, `spec` and
   `triage` have no automation and exist for this.
@@ -390,12 +402,15 @@ No label starts a run (ADR 0029). Code-writing work starts in exactly two ways:
   (`SDLC.md` § Readiness). Ready means an Agent Brief from `afk-triage` (or in the body of a ticket
   `afk-to-tickets` filed), a category, a priority and a risk, every "Blocked by" issue closed, no
   open or merged-but-unclosed PR, and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. The script answers
-  nothing while three agent PRs are open. That is why a filed issue reaches an open PR with nobody
+  nothing while three PRs are waiting for a person (`needs-qa` without `qa-approved`, `risk-high`,
+  `security`, `blocked`, `do-not-merge`). That is why a filed issue reaches an open PR with nobody
   in it, and what keeps it bounded is the readiness rule rather than a label: `afk-triage` writes
   a brief for `risk-high` or `security` work only on the security and tenancy specialist's
   approving verdict (`SDLC.md` § Delegated decisions), and grooming never writes one itself - it
   does not check that the issue is real, still unfixed, or already covered by an open PR, and
   triage is the step that does.
+- **The Reconciler** - every ten minutes it starts what `backlog-status.mjs --plan` lists (§ The
+  Reconciler).
 
 Until ADR 0029 this section described two label ladders: the command labels `groom`, `autofix` and
 `spec`, and the intake labels from `needs-triage` to `ready-for-agent` (ADR 0017, amendment
@@ -459,6 +474,48 @@ A review or autopilot run checks out the PR's head, `.claude/` included: a branc
 ADR 0025 still carries the guard hooks, and a branch cut before the om cutover (`f2a258e`) carries
 a `git-guardrails.sh` that blocks every GitHub write in agent mode, so the run ends in a question
 nobody answers (PR #67, 2026-09-07). Merge `develop` into such a branch before opening the PR.
+
+## The Reconciler
+
+The schedules above start a job on a clock. The Reconciler starts a job when there is one: a host cron, every
+ten minutes, that asks `node .ai/scripts/backlog-status.mjs --plan` what there is to start and starts it, inside
+`maxParallel`. ADR 0030 records why; `SDLC.md` § The Reconciler is the table of what it may start. This
+repository owns the contract and the workflows it names; the cron and the repair of failed runs live on the
+host, in `design4pro/cezar` (`host/reconciler`, its ADR 0009), with no Cezar engine change.
+
+`--plan` prints one JSON document and exits 0, whatever it finds:
+
+```json
+{
+  "wip": { "waitingForPerson": 1, "limit": 3 },
+  "actions": [
+    {
+      "kind": "unblock",
+      "target": "#45",
+      "workflow": "unblock",
+      "task": "Resolve the hold on issue #45."
+    },
+    {
+      "kind": "triage",
+      "target": "#67",
+      "workflow": "triage",
+      "task": "Triage issue #67."
+    }
+  ]
+}
+```
+
+At most one action per kind, in the order implement, unblock, triage, slice, write-spec; a kind with no
+candidate is left out, and a repository with nothing to do prints `"actions": []`. `target` is an issue
+(`#123`), a spec path (`.ai/specs/<file>.md`) or a plan stage id (`02-S3`). `--plan` is a separate output from
+`--json`, `--next` and `--flow`, and combining them is an error. The Reconciler sends `workflow` and `task` as
+they are.
+
+Everything the rules need is in the output of the `gh` list calls, the specs and plans in the checkout, and
+`.ai/cezar/runs.json`; it reads no network beyond that and writes nothing. A candidate is dropped while a
+cockpit run holds it (`queued`, `running` or `waiting`, or `failed` with `autoResumeAt`): an issue by its
+`issueNumber`, a spec path or a stage id by the run's task text. Because `runs.json` is gitignored, run it
+from the main checkout, as the cron does, not from a worktree.
 
 ## Prompt templates (`docs/agents/cezar-prompt-templates.json`)
 
