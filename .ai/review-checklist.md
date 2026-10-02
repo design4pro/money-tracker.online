@@ -53,3 +53,5 @@ every agent branch used to be held to by `scripts/agent/floor-guard.mjs`.
       headline total agrees with the table beneath it.
 - [ ] Every file, job, test, label, automation or mechanism a document or comment names exists on
       this branch and does what the text says.
+- [ ] A rule, gate or label meaning the change alters is updated in every document, skill override,
+      workflow comment and config that restates it: the old wording was searched for, not remembered.

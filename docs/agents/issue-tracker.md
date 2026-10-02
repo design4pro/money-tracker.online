@@ -13,7 +13,7 @@ file is what an issue must contain and how it is written. The `status:`/`run:` v
 
 ```bash
 gh issue list --state open --json number,title,labels,body
-gh issue view <n> --comments
+gh issue view <n> --json title,body,labels,comments
 ```
 
 ## Writing
@@ -35,7 +35,7 @@ ad-hoc `gh` calls, so every label lands through a guard and every comment carrie
 
 ```bash
 gh issue comment <n> --body-file <file>
-gh issue edit <n> --add-label "bug,priority-high,risk-medium"
+gh api -X POST repos/<owner>/<repo>/issues/<n>/labels -f "labels[]=bug" -f "labels[]=priority-high" -f "labels[]=risk-medium"
 gh issue close <n> --comment "<why>"
 ```
 
