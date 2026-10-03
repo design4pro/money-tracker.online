@@ -9,63 +9,84 @@
  *
  * Both of those shipped once and are pinned below: `linkOpenPrs` keeps *which* signal matched, and
  * a branch-only link is a question rather than an instruction.
+ *
+ * Since ADR 0029 the same judgement is also a pick: `--next` names the issue a scheduled run
+ * implements with nobody watching, so the cases that keep an issue OUT of READY - an author no
+ * automation trusts, a brief a stranger wrote, an open blocker, the WIP limit - matter most.
+ *
+ * Since ADR 0030 `--plan` is five picks at once, for the Reconciler: the cases that matter there are
+ * the ones that would start a second run on work a run already holds, slice a spec twice, or lift a
+ * hold a person set.
  */
 
 import { describe, expect, it } from "vitest";
 
 import {
+  CHANGES_REQUESTED_PARKED_HOURS,
+  PLAN_WORKFLOWS,
+  RETIRED_AGENT_LOGINS,
+  WIP_LIMIT,
+  addsSpec,
+  blockedBy,
   branchIssue,
+  buildPlan,
   classify,
   closeKeywordTargets,
+  countWip,
+  coversStage,
   automationLaunches,
-  firstLabelledAt,
+  firstBriefAt,
   firstPrSpans,
   flowReport,
   gateRetries,
   humanHours,
   intakeSpans,
+  isAlive,
   linkOpenPrs,
+  marksDeliveredStages,
   parseArgs,
+  pickNext,
+  pickStage,
+  planStages,
+  readTrusted,
+  runsByIssue,
   sample,
   spanSummary,
+  specStatus,
   staleClaims,
-  readTriggers,
   sortIssues,
+  trustedAuthors,
+  unslicedSpecs,
+  waitsForPerson,
 } from "../backlog-status.mjs";
 
 const NOW = Date.parse("2026-09-13T12:00:00Z");
+const OWNER = { login: "rafalwolak" };
 
 const AUTOMATIONS = [
-  {
-    name: "Fix issues on the autofix label",
-    filters: { changedLabels: ["autofix"], excludeLabels: ["in-progress", "blocked"] },
-    task: { workflow: "issue-autofix" },
-  },
-  {
-    name: "Write a spec for feature issues",
-    filters: { changedLabels: ["spec"], allLabels: ["feature"], excludeLabels: [] },
-    task: { workflow: "spec" },
-  },
-  {
-    name: "Resolve blocking review threads",
-    filters: { includePullRequests: true, changedLabels: ["review-threads"] },
-    task: { workflow: "pr-fix" },
-  },
+  { name: "Groom", events: ["issue.opened"], filters: { authors: ["rafalwolak"] } },
+  { name: "Ungated", events: ["issue.labeled"], filters: {} },
+  { name: "Autopilot", events: ["pull_request.opened"], filters: { authors: ["someone-else"] } },
 ];
 
-const triggers = new Map([
-  ["autofix", { workflow: "issue-autofix", requires: [], excludes: ["in-progress", "blocked"] }],
-  ["spec", { workflow: "spec", requires: ["feature"], excludes: [] }],
-]);
+const trusted = new Set(["rafalwolak"]);
 
-const agent = (body, createdAt = "2026-09-01T00:00:00Z") => ({ body: `🤖 ${body}`, createdAt });
-const human = (body, createdAt = "2026-09-02T00:00:00Z") => ({ body, createdAt });
+const sdlcLabels = {
+  category: ["bug", "feature"],
+  priority: ["priority-low", "priority-medium", "priority-high"],
+  risk: ["risk-low", "risk-high"],
+};
+
+const BRIEF = "## Agent Brief\n\n**Category:** bug";
+const agent = (body, createdAt = "2026-09-01T00:00:00Z") => ({ body: `🤖 ${body}`, createdAt, author: OWNER });
+const human = (body, createdAt = "2026-09-02T00:00:00Z", author = OWNER) => ({ body, createdAt, author });
 
 const issue = (over = {}) => ({
   number: 42,
   title: "an issue",
-  labels: [{ name: "bug" }],
-  comments: [agent("implementation notes")],
+  author: OWNER,
+  labels: [{ name: "bug" }, { name: "priority-medium" }, { name: "risk-low" }],
+  comments: [agent(`triage\n\n${BRIEF}`)],
   body: "",
   updatedAt: "2026-09-13T11:00:00Z",
   ...over,
@@ -73,7 +94,9 @@ const issue = (over = {}) => ({
 
 const decide = (over = {}, context = {}) =>
   classify(issue(over), {
-    triggers,
+    trusted,
+    sdlcLabels,
+    openIssues: new Set(),
     runs: new Map(),
     prLinks: new Map(),
     staleHours: 24,
@@ -81,19 +104,24 @@ const decide = (over = {}, context = {}) =>
     ...context,
   });
 
-describe("readTriggers", () => {
-  it("maps every issue trigger to its workflow, its requirements and its stand-downs", () => {
-    const read = readTriggers(AUTOMATIONS);
-    expect(read.get("autofix")).toEqual({
-      workflow: "issue-autofix",
-      requires: [],
-      excludes: ["in-progress", "blocked"],
-    });
-    expect(read.get("spec").requires).toEqual(["feature"]);
+describe("readTrusted", () => {
+  it("trusts the authors gating an issue automation", () => {
+    expect(readTrusted(AUTOMATIONS)).toEqual(new Set(["rafalwolak"]));
   });
 
-  it("skips an automation that watches pull requests, which carry no issue state", () => {
-    expect(readTriggers(AUTOMATIONS).has("review-threads")).toBe(false);
+  it("trusts nobody when no issue automation is gated", () => {
+    expect(readTrusted([AUTOMATIONS[1]]).size).toBe(0);
+  });
+});
+
+describe("trustedAuthors", () => {
+  it("adds the retired agent account to the gated logins", () => {
+    expect(RETIRED_AGENT_LOGINS).toEqual(["design4pro-agent"]);
+    expect(trustedAuthors(AUTOMATIONS)).toEqual(new Set(["rafalwolak", "design4pro-agent"]));
+  });
+
+  it("still trusts nobody when no issue automation is gated", () => {
+    expect(trustedAuthors([AUTOMATIONS[1]]).size).toBe(0);
   });
 });
 
@@ -149,6 +177,13 @@ describe("linkOpenPrs", () => {
     expect(links.get(5)[0].viaKeyword).toBe(true);
   });
 
+  it("flags a merged pull request, so the issue it addresses is not taken again", () => {
+    const links = linkOpenPrs([
+      { number: 9, title: "t", body: "Closes #5", headRefName: "feat/issue-5-thing", merged: true },
+    ]);
+    expect(links.get(5)).toEqual([{ number: 9, title: "t", viaKeyword: true, merged: true }]);
+  });
+
   it("links an issue the body closes but the branch does not name", () => {
     const links = linkOpenPrs([
       { number: 8, title: "t", body: "Closes #5\nCloses #6", headRefName: "feat/issue-5-thing" },
@@ -157,10 +192,24 @@ describe("linkOpenPrs", () => {
   });
 });
 
+describe("blockedBy", () => {
+  it("reads the issues under the ticket's Blocked by heading, up to the next heading", () => {
+    expect(blockedBy("## Acceptance\n- see #3\n\n## Blocked by\n- #12\n- #13\n\n## Notes\n#99")).toEqual([12, 13]);
+  });
+
+  it("lists nothing for a ticket that can start immediately, or has no section", () => {
+    expect(blockedBy("## Blocked by\n- None - can start immediately")).toEqual([]);
+    expect(blockedBy("fixes a thing, see #4")).toEqual([]);
+  });
+});
+
 describe("classify", () => {
-  it("puts a hard block ahead of everything, including a claim", () => {
-    const seen = decide({ labels: [{ name: "blocked" }, { name: "in-progress" }] });
-    expect(seen.state).toBe("BLOCKED");
+  it("puts a hold ahead of everything, including a claim", () => {
+    for (const hold of ["blocked", "do-not-merge", "do-not-close"]) {
+      const seen = decide({ labels: [{ name: hold }, { name: "in-progress" }] });
+      expect(seen.state).toBe("BLOCKED");
+      expect(seen.next).toContain(hold);
+    }
   });
 
   it("reads a fresh claim as running and a stale one as stuck", () => {
@@ -170,28 +219,37 @@ describe("classify", () => {
     ).toBe("STUCK");
   });
 
-  it("is queued only when a run actually holds the trigger", () => {
-    const runs = new Map([[42, { status: "queued", workflow: "issue-autofix" }]]);
-    expect(decide({ labels: [{ name: "autofix" }] }, { runs }).state).toBe("QUEUED");
-    expect(decide({ labels: [{ name: "autofix" }] }).state).toBe("STUCK");
+  it("tells a stuck claim's owner to clear it over REST, since gh issue edit aborts on this host", () => {
+    const { next } = decide({ labels: [{ name: "in-progress" }], updatedAt: "2026-09-10T11:00:00Z" });
+    expect(next).toContain("gh api -X DELETE");
+    expect(next).not.toContain("gh issue edit");
   });
 
-  it("reports a trigger its own stand-down label voids", () => {
-    const seen = decide({ labels: [{ name: "autofix" }, { name: "blocked" }] });
-    expect(seen.state).toBe("BLOCKED");
+  it("is queued while a cockpit run holds it", () => {
+    const runs = new Map([[42, { status: "queued", workflow: "implement-ticket" }]]);
+    expect(decide({}, { runs }).state).toBe("QUEUED");
   });
 
-  it("reports a trigger missing the label its automation requires", () => {
-    const seen = decide({ labels: [{ name: "spec" }] });
-    expect(seen.state).toBe("STUCK");
-    expect(seen.next).toContain("--add-label feature");
-  });
-
-  it("sends an issue with an open pull request to review, not to grooming", () => {
+  it("sends an issue with an open pull request to review, not to triage", () => {
     const prLinks = new Map([[42, [{ number: 269, title: "t", viaKeyword: true }]]]);
     const seen = decide({ comments: [] }, { prLinks });
     expect(seen.state).toBe("IN_REVIEW");
     expect(seen.warning).toBeNull();
+  });
+
+  it("keeps an issue whose PR merged into develop out of the ready pool until it is closed", () => {
+    const prLinks = new Map([[42, [{ number: 270, title: "t", viaKeyword: true, merged: true }]]]);
+    const seen = decide({}, { prLinks });
+    expect(seen.state).toBe("IN_REVIEW");
+    expect(seen.next).toContain("merged but the issue is still open");
+    expect(seen.next).toContain("/om-close-fixed-issues");
+  });
+
+  it("drives the open PR when a merged one also names the issue", () => {
+    const prLinks = new Map([
+      [42, [{ number: 270, title: "t", viaKeyword: true, merged: true }, { number: 271, title: "t", viaKeyword: true }]],
+    ]);
+    expect(decide({}, { prLinks }).next).toBe("#271 open - drive it with `/om-pr-autopilot 271`.");
   });
 
   it("asks about a branch-only link instead of prescribing a closing keyword", () => {
@@ -202,43 +260,232 @@ describe("classify", () => {
     expect(seen.warning).toContain("if it is a partial fix, nothing to change");
   });
 
+  it("tracks a spec parent instead of asking to triage it", () => {
+    expect(decide({ comments: [], body: "Spec: .ai/specs/2026-09-01-x.md\n\n- [ ] #43" }).state).toBe("TRACKING");
+  });
+
+  it("waits while an issue it is blocked by is open, and is ready once it closes", () => {
+    const body = "## Blocked by\n- #7";
+    expect(decide({ body }, { openIssues: new Set([7]) }).state).toBe("WAITING");
+    expect(decide({ body }).state).toBe("READY");
+  });
+
   it("holds a not-ready issue until a human answers it", () => {
-    const unanswered = [agent("implementation notes"), agent("not ready", "2026-09-03T00:00:00Z")];
+    const unanswered = [agent(`triage\n\n${BRIEF}`), agent("not ready", "2026-09-03T00:00:00Z")];
     expect(decide({ comments: unanswered }).state).toBe("NOT_READY");
     expect(decide({ comments: [...unanswered, human("ready as is", "2026-09-04T00:00:00Z")] }).state).toBe("READY");
   });
 
   it("takes a newer readiness-verified verdict as the answer, and an older one as nothing", () => {
-    const notReady = [agent("implementation notes"), agent("not ready", "2026-09-03T00:00:00Z")];
+    const notReady = [agent(`triage\n\n${BRIEF}`), agent("not ready", "2026-09-03T00:00:00Z")];
     const verified = (at) => agent("`readiness-verifier` — readiness verified", at);
     expect(decide({ comments: [...notReady, verified("2026-09-04T00:00:00Z")] }).state).toBe("READY");
     expect(decide({ comments: [verified("2026-09-02T00:00:00Z"), ...notReady] }).state).toBe("NOT_READY");
   });
 
-  it("does not mistake its own not-ready marker for the human's answer", () => {
+  it("does not pick an issue implement-ticket stopped on until someone answers", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop] }).state).toBe("NOT_READY");
+    expect(
+      decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, human("seam: the accounts repo", "2026-09-06T00:00:00Z")] }).state,
+    ).toBe("READY");
+  });
+
+  it("does not mistake a skill's own comment after a not-ready marker for the answer", () => {
     const comments = [
-      agent("implementation notes"),
+      agent(`triage\n\n${BRIEF}`),
       agent("not ready", "2026-09-03T00:00:00Z"),
       agent("labels applied", "2026-09-04T00:00:00Z"),
     ];
     expect(decide({ comments }).state).toBe("NOT_READY");
   });
 
-  it("routes a feature with no covering spec to the spec trigger", () => {
-    expect(decide({ labels: [{ name: "feature" }], comments: [] }).state).toBe("NEEDS_SPEC");
-    expect(
-      decide({ labels: [{ name: "feature" }], body: "Spec: .ai/specs/2026-09-01-x.md" }).state,
-    ).toBe("READY");
+  it("reads an afk-triage Triage Notes comment as a skill's, not a trusted person's answer", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    const notes = human("> *This was generated by AI during triage.*\n\n## Triage Notes", "2026-09-06T00:00:00Z");
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, notes] }).state).toBe("NOT_READY");
   });
 
-  it("asks for grooming before work when nothing groomed it", () => {
-    expect(decide({ comments: [] }).state).toBe("NEEDS_GROOM");
+  it("does not take an untrusted reply as the answer to a STOP", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    const stranger = human("+1", "2026-09-06T00:00:00Z", { login: "someone-else" });
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, stranger] }).state).toBe("NOT_READY");
   });
 
-  it("calls a groomed, unclaimed, unblocked issue ready", () => {
-    const seen = decide();
-    expect(seen.state).toBe("READY");
-    expect(seen.next).toContain("--add-label autofix");
+  it("takes a newer Agent Brief as the answer, since afk-triage settles the gap into one", () => {
+    const comments = [agent("not ready", "2026-09-03T00:00:00Z"), agent(`triage\n\n${BRIEF}`, "2026-09-04T00:00:00Z")];
+    expect(decide({ comments }).state).toBe("READY");
+  });
+
+  it("takes a later trusted RESOLVED comment as the answer, even when it quotes the STOP it answers", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    const resolved = agent(
+      "RESOLVED: the specialist panel chose the accounts repo as the seam (answers `STOP: the brief names no test seam`)",
+      "2026-09-06T00:00:00Z",
+    );
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, resolved] }).state).toBe("READY");
+    // the RESOLVED comment is the answer, never the question: alone it does not park the issue
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), resolved] }).state).toBe("READY");
+  });
+
+  it("does not take an untrusted RESOLVED comment as the answer", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    const forged = { ...agent("RESOLVED: fine", "2026-09-06T00:00:00Z"), author: { login: "someone-else" } };
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, forged] }).state).toBe("NOT_READY");
+  });
+
+  describe("canUnblock", () => {
+    const AI_TRIAGE = "> _This was generated by AI during triage._\n\nBlocked: needs a decision on the chart library.";
+    const blocked = (comments, labels = ["blocked"], over = {}) =>
+      decide({ labels: labels.map((name) => ({ name })), comments, ...over });
+
+    it("offers a hold an agent set: `blocked` alone, and the last comment is an agent's", () => {
+      const seen = blocked([agent("`om-prepare-issue` - waiting on the chart library decision")]);
+      expect(seen.state).toBe("BLOCKED");
+      expect(seen.canUnblock).toBe(true);
+      expect(seen.next).toContain("unblock");
+    });
+
+    it("reads an afk-triage comment, which opens with the AI quote, as an agent's", () => {
+      expect(blocked([{ body: AI_TRIAGE, createdAt: "2026-09-02T00:00:00Z", author: OWNER }]).canUnblock).toBe(true);
+    });
+
+    it("leaves a hold a person took over: a human comment after the agent's is the last word", () => {
+      const seen = blocked([agent("waiting on the decision"), human("keep it blocked until Friday", "2026-09-03T00:00:00Z")]);
+      expect(seen.canUnblock).toBe(false);
+      expect(seen.next).toContain("A person clears");
+    });
+
+    it("leaves a hold nobody explained, since there is nothing to lift", () => {
+      expect(blocked([]).canUnblock).toBe(false);
+    });
+
+    it("leaves a comment that says HUMAN-ONLY to the person", () => {
+      expect(blocked([agent("HUMAN-ONLY: the owner decides the budget")]).canUnblock).toBe(false);
+    });
+
+    it("never lifts do-not-merge or do-not-close, nor blocked beside another hold", () => {
+      const note = [agent("waiting on the decision")];
+      expect(blocked(note, ["do-not-merge"]).canUnblock).toBe(false);
+      expect(blocked(note, ["do-not-close"]).canUnblock).toBe(false);
+      expect(blocked(note, ["blocked", "do-not-merge"]).canUnblock).toBe(false);
+    });
+
+    it("never offers an issue an outsider opened or a Sentry ticket", () => {
+      const note = [agent("waiting on the decision")];
+      expect(blocked(note, ["blocked"], { author: { login: "someone-else" } }).canUnblock).toBe(false);
+      expect(blocked(note, ["blocked"], { body: "<!-- sentry-issue: 123 -->" }).canUnblock).toBe(false);
+    });
+
+    it("offers an unanswered not-ready or STOP comment, and leaves a HUMAN-ONLY one", () => {
+      const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+      expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop] }).canUnblock).toBe(true);
+      const handedBack = agent("HUMAN-ONLY: the seam is the owner's call", "2026-09-06T00:00:00Z");
+      const seen = decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, handedBack] });
+      expect(seen.state).toBe("NOT_READY");
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("offers nothing on a state that is not a hold or a not-ready", () => {
+      expect(decide().canUnblock).toBe(false);
+    });
+
+    it("does not take an outsider's comment for the explanation of a hold", () => {
+      const outsider = { ...agent("hi", "2026-09-03T00:00:00Z"), author: { login: "someone-else" } };
+      const seen = blocked([agent("waiting on the decision"), human("keep it blocked", "2026-09-02T00:00:00Z"), outsider]);
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("does not lift a blocked a person set after an Agent Brief or a RESOLVED comment", () => {
+      expect(blocked([agent(`triage\n\n${BRIEF}`)]).canUnblock).toBe(false);
+      expect(blocked([agent("RESOLVED: the panel chose the accounts repo")]).canUnblock).toBe(false);
+    });
+
+    it("does not take an outsider's HUMAN-ONLY comment for a hand-back", () => {
+      const outsider = { ...agent("HUMAN-ONLY: no", "2026-09-03T00:00:00Z"), author: { login: "someone-else" } };
+      expect(blocked([agent("waiting on the decision"), outsider]).canUnblock).toBe(false);
+      const seen = decide({ comments: [agent(`triage\n\n${BRIEF}`), outsider] });
+      expect(seen.state).toBe("READY");
+    });
+  });
+
+  describe("HUMAN-ONLY", () => {
+    const humanOnlyBody = "🤖 HUMAN-ONLY: decide the budget\n\nStage 06-S3 needs it.";
+
+    it("holds out of automation an issue a trusted author opened with the marker in its body", () => {
+      const seen = decide({ body: humanOnlyBody, createdAt: "2026-08-30T00:00:00Z" });
+      expect(seen.state).toBe("NOT_READY");
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("holds out of automation a briefed issue that a trusted agent's comment hands to a person", () => {
+      const seen = decide({ comments: [agent(`triage\n\n${BRIEF}`), agent("HUMAN-ONLY: the owner decides", "2026-09-03T00:00:00Z")] });
+      expect(seen.state).toBe("NOT_READY");
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("keeps a HUMAN-ONLY comment older than an unanswered STOP with the person", () => {
+      const comments = [
+        agent(`triage\n\n${BRIEF}`),
+        agent("HUMAN-ONLY: the owner decides", "2026-09-03T00:00:00Z"),
+        agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z"),
+      ];
+      const seen = decide({ comments });
+      expect(seen.state).toBe("NOT_READY");
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("gives the issue back once a trusted person comments after the marker", () => {
+      const comments = [
+        agent(`triage\n\n${BRIEF}`),
+        agent("HUMAN-ONLY: the owner decides", "2026-09-03T00:00:00Z"),
+        human("decided: 20 EUR", "2026-09-04T00:00:00Z"),
+      ];
+      expect(decide({ comments }).state).toBe("READY");
+      expect(decide({ body: `${humanOnlyBody}\n\n${BRIEF}`, createdAt: "2026-08-30T00:00:00Z", comments: [human("decided", "2026-09-04T00:00:00Z")] }).state).toBe("READY");
+    });
+
+    it("ignores a body that only quotes the word, and one an outsider wrote", () => {
+      expect(decide({ comments: [agent(`triage\n\n${BRIEF}`)], body: "The rule says `HUMAN-ONLY:` is a marker." }).state).toBe("READY");
+      expect(decide({ body: humanOnlyBody, createdAt: "2026-08-30T00:00:00Z", author: { login: "someone-else" } }).state).toBe("EXTERNAL");
+    });
+  });
+
+  it("never makes an issue someone else opened ready, whatever it carries", () => {
+    const stranger = { login: "github-actions" };
+    const seen = decide({ author: stranger, body: BRIEF });
+    expect(seen.state).toBe("EXTERNAL");
+    expect(seen.next).toContain("github-actions");
+  });
+
+  it("never makes a Sentry ticket ready, even one the maintainer filed", () => {
+    const seen = decide({ body: `<!-- sentry-issue: MONEY-TRACKER-4KQ -->\n\n${BRIEF}` });
+    expect(seen.state).toBe("EXTERNAL");
+    expect(seen.next).toContain("Sentry");
+  });
+
+  it("does not count a brief an untrusted commenter wrote", () => {
+    const comments = [human(BRIEF, "2026-09-02T00:00:00Z", { login: "drive-by" })];
+    expect(decide({ comments }).state).toBe("NEEDS_TRIAGE");
+  });
+
+  it("takes a brief from the body of a ticket the maintainer filed", () => {
+    expect(decide({ comments: [], body: `> *This was generated by AI.*\n\n${BRIEF}` }).state).toBe("READY");
+  });
+
+  it("does not read a brief heading quoted as code", () => {
+    expect(decide({ comments: [], body: "```\n## Agent Brief\n```" }).state).toBe("NEEDS_TRIAGE");
+  });
+
+  it("needs triage when the brief or an SDLC label group is missing, and names what", () => {
+    expect(decide({ comments: [] }).next).toContain("No Agent Brief yet");
+    const seen = decide({ labels: [{ name: "bug" }] });
+    expect(seen.state).toBe("NEEDS_TRIAGE");
+    expect(seen.next).toContain("No priority label, risk label yet");
+  });
+
+  it("calls a briefed, labelled, unclaimed, unblocked issue ready", () => {
+    expect(decide().state).toBe("READY");
   });
 });
 
@@ -254,17 +501,150 @@ describe("sortIssues", () => {
   });
 });
 
+describe("waitsForPerson", () => {
+  const pr = (...names) => ({ labels: names.map((name) => ({ name })) });
+
+  it("waits for a person on QA nobody has signed, a high-risk or security diff, or a hold", () => {
+    expect(waitsForPerson(pr("needs-qa"))).toBe(true);
+    expect(waitsForPerson(pr("risk-high"))).toBe(true);
+    expect(waitsForPerson(pr("security"))).toBe(true);
+    expect(waitsForPerson(pr("blocked"))).toBe(true);
+    expect(waitsForPerson(pr("do-not-merge"))).toBe(true);
+  });
+
+  it("does not wait once QA is approved, nor for a PR the pipeline merges by itself", () => {
+    expect(waitsForPerson(pr("needs-qa", "qa-approved"))).toBe(false);
+    expect(waitsForPerson(pr("review"))).toBe(false);
+    expect(waitsForPerson(pr("risk-low", "merge-queue"))).toBe(false);
+    expect(waitsForPerson(pr())).toBe(false);
+  });
+
+  it("still waits for a person when a high-risk PR also has QA approved", () => {
+    expect(waitsForPerson(pr("risk-high", "needs-qa", "qa-approved"))).toBe(true);
+  });
+
+  describe("a changes-requested PR", () => {
+    const idle = (hours, ...names) => ({
+      ...pr(...names),
+      updatedAt: new Date(NOW - hours * 36e5).toISOString(),
+    });
+
+    it("is on its way to the merge while it is fresh", () => {
+      expect(waitsForPerson(idle(1, "changes-requested"), NOW)).toBe(false);
+      expect(waitsForPerson(idle(CHANGES_REQUESTED_PARKED_HOURS - 0.01, "changes-requested"), NOW)).toBe(
+        false,
+      );
+    });
+
+    it("waits for a person once nobody has touched it for 24 hours", () => {
+      expect(CHANGES_REQUESTED_PARKED_HOURS).toBe(24);
+      expect(waitsForPerson(idle(24, "changes-requested"), NOW)).toBe(true);
+      expect(waitsForPerson(idle(72, "changes-requested", "risk-low"), NOW)).toBe(true);
+    });
+
+    it("is parked only by its own label, and only when the age is known", () => {
+      expect(waitsForPerson(idle(72, "review"), NOW)).toBe(false);
+      expect(waitsForPerson(pr("changes-requested"), NOW)).toBe(false);
+      expect(waitsForPerson(idle(72, "changes-requested"))).toBe(false);
+    });
+  });
+});
+
+describe("countWip", () => {
+  const pr = (labels, login = "rafalwolak", baseRefName = "develop") => ({
+    author: { login },
+    labels: labels.map((name) => ({ name })),
+    baseRefName,
+  });
+
+  it("counts only the trusted PRs a person has to clear, not the ones the pipeline merges", () => {
+    const prs = [
+      pr(["review"]),
+      pr([]),
+      pr(["changes-requested", "risk-low"]),
+      pr(["needs-qa"]),
+      pr(["risk-high"]),
+      pr(["security"]),
+      pr(["blocked"]),
+      pr(["needs-qa", "qa-approved"]),
+      pr(["review"], "dependabot[bot]"),
+      pr(["do-not-merge"], "rafalwolak", "main"),
+    ];
+    expect(countWip(prs, trusted)).toBe(4);
+  });
+
+  it("skips the promotion and another author's PR, and counts the retired agent's once it is trusted", () => {
+    const prs = [
+      pr(["risk-high", "do-not-merge"], "rafalwolak", "main"),
+      pr(["risk-high"], "dependabot[bot]"),
+      pr(["risk-high"], "design4pro-agent"),
+    ];
+    expect(countWip(prs, trusted)).toBe(0);
+    expect(countWip(prs, trustedAuthors(AUTOMATIONS))).toBe(1);
+  });
+
+  it("still counts an agent PR a person put a do-not-merge hold on", () => {
+    expect(countWip([pr(["review", "do-not-merge"])], trusted)).toBe(1);
+  });
+
+  it("counts a trusted changes-requested PR left for 24 hours, and not a fresh one", () => {
+    const idle = (hours, login = "rafalwolak", baseRefName = "develop") => ({
+      ...pr(["changes-requested"], login, baseRefName),
+      updatedAt: new Date(NOW - hours * 36e5).toISOString(),
+    });
+    expect(countWip([idle(2), idle(23)], trusted, NOW)).toBe(0);
+    expect(countWip([idle(2), idle(24), idle(50)], trusted, NOW)).toBe(2);
+    expect(countWip([idle(50, "dependabot[bot]"), idle(50, "rafalwolak", "main")], trusted, NOW)).toBe(0);
+  });
+});
+
+describe("pickNext", () => {
+  const rows = sortIssues([
+    { number: 5, state: "READY", labels: ["priority-low"] },
+    { number: 9, state: "READY", labels: ["priority-high"] },
+    { number: 1, state: "NEEDS_TRIAGE", labels: ["priority-extreme"] },
+  ]);
+
+  it("takes the highest-priority ready issue, then the oldest", () => {
+    expect(pickNext(rows, 0)).toBe(9);
+  });
+
+  it("takes nothing at the WIP limit", () => {
+    expect(pickNext(rows, WIP_LIMIT - 1)).toBe(9);
+    expect(pickNext(rows, WIP_LIMIT)).toBeNull();
+  });
+
+  it("takes nothing when nothing is ready", () => {
+    expect(pickNext(rows.filter((row) => row.state !== "READY"), 0)).toBeNull();
+  });
+});
+
 describe("parseArgs", () => {
   it("defaults to text output and a 24-hour threshold", () => {
-    expect(parseArgs([])).toEqual({ asJson: false, staleHours: 24, flow: false });
+    expect(parseArgs([])).toEqual({ asJson: false, next: false, plan: false, staleHours: 24, flow: false });
   });
 
   it("reads --json and --stale-hours in either order", () => {
     expect(parseArgs(["--stale-hours", "6", "--json"])).toEqual({
       asJson: true,
+      next: false,
+      plan: false,
       staleHours: 6,
       flow: false,
     });
+  });
+
+  it("reads --next, and refuses it together with --json or --flow", () => {
+    expect(parseArgs(["--next"]).next).toBe(true);
+    expect(() => parseArgs(["--next", "--json"])).toThrow(/its own output/);
+    expect(() => parseArgs(["--flow", "--next"])).toThrow(/its own output/);
+  });
+
+  it("reads --plan, and refuses it together with --json, --next or --flow", () => {
+    expect(parseArgs(["--plan"]).plan).toBe(true);
+    expect(() => parseArgs(["--plan", "--json"])).toThrow(/its own output/);
+    expect(() => parseArgs(["--next", "--plan"])).toThrow(/its own output/);
+    expect(() => parseArgs(["--plan", "--flow"])).toThrow(/its own output/);
   });
 
   it("rejects a stray positional instead of taking it as the threshold", () => {
@@ -287,6 +667,8 @@ describe("parseArgs --flow", () => {
   it("carries --json into the flow report", () => {
     expect(parseArgs(["--flow", "--json"])).toEqual({
       asJson: true,
+      next: false,
+      plan: false,
       staleHours: 24,
       flow: true,
     });
@@ -301,9 +683,407 @@ describe("parseArgs --flow", () => {
   });
 });
 
+describe("isAlive and runsByIssue", () => {
+  it.each(["queued", "running", "waiting"])("holds an issue while the run is %s", (status) => {
+    expect(isAlive({ status })).toBe(true);
+  });
+
+  it("lets go of a finished, cancelled, reviewed or failed run, but not a failed one that resumes by itself", () => {
+    // `review` is terminal in cezar's engine, so it keeps the meaning ACTIVE_RUN_STATES gives it.
+    for (const status of ["done", "cancelled", "review", "failed"]) expect(isAlive({ status })).toBe(false);
+    expect(isAlive({ status: "failed", autoResumeAt: "2026-10-02T12:00:00Z" })).toBe(true);
+  });
+
+  it("keys the live runs by the issue they work on and skips the rest", () => {
+    const runs = runsByIssue([
+      { status: "running", workflow: "implement-ticket", issueNumber: 7 },
+      { status: "done", workflow: "implement-ticket", issueNumber: 8 },
+      { status: "waiting", workflow: "triage", issueNumber: "9" },
+      { status: "running", workflow: "spec-to-tickets" },
+    ]);
+    expect([...runs.keys()]).toEqual([7, 9]);
+    expect(runs.get(9)).toEqual({ status: "waiting", workflow: "triage" });
+  });
+});
+
+describe("specStatus", () => {
+  const table = (status) => `# Title\n\n| | |\n| --- | --- |\n| **Status** | ${status} |\n| **Issue** | none |\n`;
+
+  it("reads the Status row of the metadata table", () => {
+    expect(specStatus(table("ready"))).toBe("ready");
+    expect(specStatus(table("draft"))).toBe("draft");
+  });
+
+  it("is null for a document without one", () => {
+    expect(specStatus("# Title\n\nno table")).toBeNull();
+  });
+});
+
+describe("unslicedSpecs", () => {
+  const spec = (name, status) => ({
+    path: `.ai/specs/${name}.md`,
+    text: `| **Status** | ${status} |\n`,
+  });
+
+  it("takes the ready specs nobody sliced, oldest first by file name", () => {
+    const specs = [spec("2026-09-20-b", "ready"), spec("2026-09-10-a", "ready"), spec("2026-09-01-c", "draft")];
+    expect(unslicedSpecs(specs, []).map((s) => s.path)).toEqual([
+      ".ai/specs/2026-09-10-a.md",
+      ".ai/specs/2026-09-20-b.md",
+    ]);
+  });
+
+  it("skips a spec whose parent issue exists, open or closed, and has no age window", () => {
+    const specs = [spec("2026-01-01-old", "ready"), spec("2026-09-20-new", "ready")];
+    const issues = [{ number: 1, body: "Spec: .ai/specs/2026-01-01-old.md\n\nTracking." }];
+    expect(unslicedSpecs(specs, issues).map((s) => s.path)).toEqual([".ai/specs/2026-09-20-new.md"]);
+  });
+
+  it("does not read a mention in the middle of a body as the parent", () => {
+    const specs = [spec("2026-09-20-new", "ready")];
+    const issues = [{ number: 2, body: "See Spec: .ai/specs/2026-09-20-new.md for context" }];
+    expect(unslicedSpecs(specs, issues)).toHaveLength(1);
+  });
+});
+
+describe("planStages", () => {
+  const plan = (name, ...ids) => ({
+    name,
+    text: ids.map((id) => `## Stage ${id} \u2014 something\n\nbody\n`).join("\n"),
+  });
+
+  it("lists the stages in file-name order, then document order", () => {
+    const stages = planStages([
+      plan("02-places.md", "02-S1", "02-S2"),
+      plan("01-trips.md", "01-S1", "01-S9a"),
+    ]);
+    expect(stages.map((stage) => stage.id)).toEqual(["01-S1", "01-S9a", "02-S1", "02-S2"]);
+    expect(stages[0].file).toBe("docs/plans/01-trips.md");
+  });
+
+  it("reads only NN-name.md files, and skips a heading inside a code sample", () => {
+    const stages = planStages([
+      { name: "README.md", text: "## Stage 00-S1 \u2014 not a plan\n" },
+      { name: "TEMPLATE.md", text: "## Stage 00-S2\n" },
+      { name: "03-x.md", text: "```md\n## Stage 03-S9 \u2014 a sample\n```\n\n## Stage 03-S1 \u2014 real\n" },
+    ]);
+    expect(stages.map((stage) => stage.id)).toEqual(["03-S1"]);
+  });
+
+  it("marks an id two plan files both use as ambiguous", () => {
+    const stages = planStages([plan("13-gallery.md", "13-S1", "13-S2"), plan("13-studio.md", "13-S1")]);
+    expect(stages.map((stage) => [stage.id, stage.ambiguous])).toEqual([
+      ["13-S1", true],
+      ["13-S2", false],
+      ["13-S1", true],
+    ]);
+  });
+
+  describe("a Delivered: line", () => {
+    const delivered = (id, line = "Delivered: 2026-10-02 - src/lib/money.ts") =>
+      `## Stage ${id} \u2014 something\n\nbody\n\n${line}\n`;
+    const deliveredOf = (text) => planStages([{ name: "04-x.md", text }]).map((s) => [s.id, s.delivered]);
+
+    it("marks the stage whose section holds it, and only that stage", () => {
+      const text = `${delivered("04-S1")}\n${delivered("04-S2", "no marker here")}`;
+      expect(deliveredOf(text)).toEqual([
+        ["04-S1", true],
+        ["04-S2", false],
+      ]);
+    });
+
+    it("ends a section at the next level-two heading, not at a level-three one", () => {
+      const sub = "## Stage 04-S1 \u2014 a\n\n### Notes\n\nDelivered: 2026-10-02 - done\n";
+      expect(deliveredOf(sub)).toEqual([["04-S1", true]]);
+      const after = "## Stage 04-S1 \u2014 a\n\nbody\n\n## Notes\n\nDelivered: 2026-10-02 - done\n";
+      expect(deliveredOf(after)).toEqual([["04-S1", false]]);
+    });
+
+    it("does not count a quotation in a code fence or a code span, or a line that merely mentions it", () => {
+      const fenced = "## Stage 04-S1 \u2014 a\n\n```md\nDelivered: 2026-10-02 - sample\n```\n";
+      const span = "## Stage 04-S1 \u2014 a\n\n`Delivered:` is the marker.\n";
+      const inline = "## Stage 04-S1 \u2014 a\n\nNot yet. Delivered: soon\n";
+      for (const text of [fenced, span, inline]) expect(deliveredOf(text)).toEqual([["04-S1", false]]);
+    });
+
+    it("does not read a heading inside a code fence as the end of the section", () => {
+      const text = "## Stage 04-S1 \u2014 a\n\n```md\n## Notes\n```\n\nDelivered: 2026-10-02 - done\n";
+      expect(deliveredOf(text)).toEqual([["04-S1", true]]);
+    });
+
+    it("keeps an evidence line that quotes paths in code spans", () => {
+      const text = delivered("04-S1", "Delivered: 2026-10-02 - `src/lib/money.ts`, `plans.test.ts`");
+      expect(deliveredOf(text)).toEqual([["04-S1", true]]);
+    });
+  });
+});
+
+describe("coversStage", () => {
+  const stage = { id: "02-S1", file: "docs/plans/02-places.md", ambiguous: false };
+
+  it("covers a stage by its id, and a slice of it by the letter that follows", () => {
+    expect(coversStage("Stage 02-S1 of the plan", stage)).toBe(true);
+    expect(coversStage("`02-S1a` - the first slice", stage)).toBe(true);
+  });
+
+  it("does not take a longer number or a longer word for the id", () => {
+    expect(coversStage("Stage 02-S10", stage)).toBe(false);
+    expect(coversStage("a102-S1", stage)).toBe(false);
+    expect(coversStage("nothing here", stage)).toBe(false);
+  });
+
+  it("needs the plan file as well for an ambiguous id", () => {
+    const shared = { id: "13-S1", file: "docs/plans/13-gallery.md", ambiguous: true };
+    expect(coversStage("Stage 13-S1", shared)).toBe(false);
+    expect(coversStage("Stage 13-S1 of docs/plans/13-gallery.md", shared)).toBe(true);
+    expect(coversStage("Stage 13-S1 of docs/plans/13-studio.md", shared)).toBe(false);
+  });
+});
+
+describe("pickStage", () => {
+  const stages = [
+    { id: "01-S1", file: "docs/plans/01-a.md", ambiguous: false },
+    { id: "01-S2", file: "docs/plans/01-a.md", ambiguous: false },
+    { id: "02-S1", file: "docs/plans/02-b.md", ambiguous: false },
+  ];
+
+  it("takes the first stage nothing covers", () => {
+    expect(pickStage({ stages, corpus: ["Stage 01-S1 spec"], activeTasks: [] })?.id).toBe("01-S2");
+  });
+
+  it("skips a stage a run is writing, whose task text names it", () => {
+    const activeTasks = ["Write the spec for plan stage 01-S2 (docs/plans/01-a.md)."];
+    expect(pickStage({ stages, corpus: ["01-S1"], activeTasks })?.id).toBe("02-S1");
+  });
+
+  it("is null once every stage is covered", () => {
+    expect(pickStage({ stages, corpus: ["01-S1 01-S2 02-S1"], activeTasks: [] })).toBeNull();
+  });
+
+  it("is null for a repository without plans", () => {
+    expect(pickStage({ stages: [], corpus: [], activeTasks: [] })).toBeNull();
+  });
+
+  it("skips a delivered stage and takes the next one nothing covers", () => {
+    const marked = [{ ...stages[0], delivered: true }, stages[1], stages[2]];
+    expect(pickStage({ stages: marked, corpus: [], activeTasks: [] })?.id).toBe("01-S2");
+  });
+
+  it("is null once every stage is covered or delivered", () => {
+    const marked = [{ ...stages[0], delivered: true }, stages[1], { ...stages[2], delivered: true }];
+    expect(pickStage({ stages: marked, corpus: ["01-S2"], activeTasks: [] })).toBeNull();
+  });
+
+  it("reads the marker from the plan text, so the next uncovered stage is picked", () => {
+    const text = "## Stage 05-S1 \u2014 a\n\nDelivered: 2026-10-02 - done\n\n## Stage 05-S2 \u2014 b\n\nbody\n";
+    const parsed = planStages([{ name: "05-x.md", text }]);
+    expect(pickStage({ stages: parsed, corpus: [], activeTasks: [] })?.id).toBe("05-S2");
+  });
+
+  it("marks only the stage in its own file when two plan files share an id", () => {
+    const gallery = "## Stage 13-S1 \u2014 a\n\nDelivered: 2026-10-02 - done\n";
+    const studio = "## Stage 13-S1 \u2014 b\n\nbody\n";
+    const parsed = planStages([
+      { name: "13-gallery.md", text: gallery },
+      { name: "13-studio.md", text: studio },
+    ]);
+    const open = { stages: parsed, activeTasks: [] };
+    expect(pickStage({ ...open, corpus: [] })?.file).toBe("docs/plans/13-studio.md");
+    // A bare id still does not cover the shared stage: the plan file has to be named as well.
+    expect(pickStage({ ...open, corpus: ["Stage 13-S1"] })?.file).toBe("docs/plans/13-studio.md");
+    expect(pickStage({ ...open, corpus: ["Stage 13-S1 of docs/plans/13-studio.md"] })).toBeNull();
+  });
+});
+
+describe("addsSpec", () => {
+  const pr = (...files) => ({ files });
+  const file = (path, additions, deletions) => ({ path, additions, deletions });
+
+  it("is true for a PR that adds a spec document", () => {
+    expect(addsSpec(pr(file(".ai/specs/2026-10-02-x.md", 80, 0)))).toBe(true);
+  });
+
+  it("is false for a status flip or a move, which delete the line they replace", () => {
+    expect(addsSpec(pr(file(".ai/specs/2026-10-02-x.md", 1, 1)))).toBe(false);
+  });
+
+  it("is false for the index, the agent rules and files outside .ai/specs", () => {
+    expect(addsSpec(pr(file(".ai/specs/README.md", 3, 0), file(".ai/specs/AGENTS.md", 2, 0)))).toBe(false);
+    expect(addsSpec(pr(file("docs/plans/01-x.md", 10, 0)))).toBe(false);
+    expect(addsSpec({})).toBe(false);
+  });
+});
+
+describe("marksDeliveredStages", () => {
+  it("is true for the docs-only PR afk-plan-to-spec opens, whatever the plan slug", () => {
+    expect(marksDeliveredStages({ headRefName: "docs/plan-delivered-00-foundations" })).toBe(true);
+    expect(marksDeliveredStages({ headRefName: "docs/plan-delivered-" })).toBe(true);
+  });
+
+  it("is false for every other branch, including a person's edit of a plan", () => {
+    expect(marksDeliveredStages({ headRefName: "docs/plans-00-foundations" })).toBe(false);
+    expect(marksDeliveredStages({ headRefName: "docs/plan-update-00-foundations" })).toBe(false);
+    expect(marksDeliveredStages({ headRefName: "spec/budget-split" })).toBe(false);
+    expect(marksDeliveredStages({ headRefName: "feat/x", files: [{ path: "docs/plans/01-x.md" }] })).toBe(false);
+    expect(marksDeliveredStages({})).toBe(false);
+  });
+});
+
+describe("buildPlan", () => {
+  const row = (number, state, over = {}) => ({ number, state, labels: ["priority-medium"], canUnblock: false, ...over });
+  const spec = (name) => ({ path: `.ai/specs/${name}.md`, text: "| **Status** | ready |\n" });
+  const stage = { id: "04-S3", file: "docs/plans/04-budget.md", ambiguous: false };
+  const base = {
+    issues: [],
+    wip: 0,
+    runs: new Map(),
+    activeTasks: [],
+    specs: [],
+    stages: [],
+    allIssues: [],
+    specCorpus: [],
+    openPrs: [],
+  };
+
+  it("lists nothing, with the WIP state, when there is nothing to do", () => {
+    expect(buildPlan(base)).toEqual({ wip: { waitingForPerson: 0, limit: WIP_LIMIT }, actions: [] });
+  });
+
+  it("names the five kinds in order, one action each, with the workflow and task text the Reconciler runs", () => {
+    const plan = buildPlan({
+      ...base,
+      issues: sortIssues([
+        row(7, "READY"),
+        row(45, "BLOCKED", { canUnblock: true }),
+        row(67, "NEEDS_TRIAGE"),
+        row(68, "NEEDS_TRIAGE"),
+      ]),
+      specs: [],
+      stages: [stage],
+    });
+    expect(plan.actions).toEqual([
+      { kind: "implement", target: "#7", workflow: "implement-ticket", task: "Implement issue #7." },
+      { kind: "unblock", target: "#45", workflow: "unblock", task: "Resolve the hold on issue #45." },
+      { kind: "triage", target: "#67", workflow: "triage", task: "Triage issue #67." },
+      {
+        kind: "write-spec",
+        target: "04-S3",
+        workflow: "plan-to-spec",
+        task: "Write the spec for plan stage 04-S3 (docs/plans/04-budget.md).",
+      },
+    ]);
+    expect(Object.values(PLAN_WORKFLOWS)).toEqual([
+      "implement-ticket",
+      "unblock",
+      "triage",
+      "spec-to-tickets",
+      "plan-to-spec",
+    ]);
+  });
+
+  it("implements nothing at the WIP limit, but still triages and unblocks", () => {
+    const plan = buildPlan({
+      ...base,
+      wip: WIP_LIMIT,
+      issues: sortIssues([row(7, "READY"), row(67, "NEEDS_TRIAGE")]),
+    });
+    expect(plan.wip).toEqual({ waitingForPerson: WIP_LIMIT, limit: WIP_LIMIT });
+    expect(plan.actions.map((a) => a.kind)).toEqual(["triage"]);
+  });
+
+  it("never starts a second run on an issue a run already holds", () => {
+    const runs = new Map([[45, { status: "waiting", workflow: "unblock" }], [67, { status: "running", workflow: "triage" }]]);
+    const plan = buildPlan({
+      ...base,
+      runs,
+      issues: sortIssues([row(45, "BLOCKED", { canUnblock: true }), row(67, "NEEDS_TRIAGE"), row(68, "NEEDS_TRIAGE")]),
+    });
+    expect(plan.actions).toEqual([
+      { kind: "triage", target: "#68", workflow: "triage", task: "Triage issue #68." },
+    ]);
+  });
+
+  it("slices the oldest unsliced ready spec, and writes no spec while one waits", () => {
+    const plan = buildPlan({
+      ...base,
+      specs: [spec("2026-09-20-b"), spec("2026-09-10-a")],
+      stages: [stage],
+    });
+    expect(plan.actions).toEqual([
+      {
+        kind: "slice",
+        target: ".ai/specs/2026-09-10-a.md",
+        workflow: "spec-to-tickets",
+        task: "Slice the spec .ai/specs/2026-09-10-a.md into tickets.",
+      },
+    ]);
+  });
+
+  it("skips a spec a run is slicing and offers the next one, without writing a spec meanwhile", () => {
+    const plan = buildPlan({
+      ...base,
+      activeTasks: ["Slice the spec .ai/specs/2026-09-10-a.md into tickets."],
+      specs: [spec("2026-09-20-b"), spec("2026-09-10-a")],
+      stages: [stage],
+    });
+    expect(plan.actions.map((a) => a.target)).toEqual([".ai/specs/2026-09-20-b.md"]);
+  });
+
+  it("writes the next spec while a run slices the only unsliced one, which is no longer a candidate", () => {
+    const plan = buildPlan({
+      ...base,
+      activeTasks: ["Slice the spec .ai/specs/2026-09-10-a.md into tickets."],
+      specs: [spec("2026-09-10-a")],
+      stages: [stage],
+    });
+    expect(plan.actions.map((a) => a.kind)).toEqual(["write-spec"]);
+  });
+
+  it("names the next stage once the first is marked delivered in the plan", () => {
+    const next = { id: "04-S4", file: "docs/plans/04-budget.md", ambiguous: false };
+    const plan = buildPlan({ ...base, stages: [{ ...stage, delivered: true }, next] });
+    expect(plan.actions.map((a) => a.target)).toEqual(["04-S4"]);
+  });
+
+  it("writes no spec while an open PR adds one, and none while a run writes that stage", () => {
+    const adding = { files: [{ path: ".ai/specs/2026-10-02-x.md", additions: 90, deletions: 0 }] };
+    expect(buildPlan({ ...base, stages: [stage], openPrs: [adding] }).actions).toEqual([]);
+    const writing = ["Write the spec for plan stage 04-S3 (docs/plans/04-budget.md)."];
+    expect(buildPlan({ ...base, stages: [stage], activeTasks: writing }).actions).toEqual([]);
+  });
+
+  it("writes no spec while the PR that marks delivered stages is open, but does for a person's plan edit", () => {
+    const marking = { headRefName: "docs/plan-delivered-04-budget", files: [] };
+    expect(buildPlan({ ...base, stages: [stage], openPrs: [marking] }).actions).toEqual([]);
+    const planEdit = {
+      headRefName: "docs/budget-wording",
+      files: [{ path: "docs/plans/04-budget.md", additions: 3, deletions: 1 }],
+    };
+    expect(buildPlan({ ...base, stages: [stage], openPrs: [planEdit] }).actions.map((a) => a.kind)).toEqual([
+      "write-spec",
+    ]);
+  });
+
+  it("counts a spec or an issue that mentions the stage as covering it", () => {
+    expect(buildPlan({ ...base, stages: [stage], specCorpus: ["covers 04-S3"] }).actions).toEqual([]);
+    const issue = { number: 3, title: "04-S3 budget split", body: "" };
+    expect(buildPlan({ ...base, stages: [stage], allIssues: [issue] }).actions).toEqual([]);
+  });
+});
+
 const AUTOMATION_DEFS = [
-  { name: "Groom new issues", task: { workflow: "issue-groom" } },
-  { name: "Re-groom on request", task: { workflow: "issue-groom" } },
+  {
+    name: "Groom and triage new issues",
+    events: ["issue.opened"],
+    filters: { authors: ["rafalwolak"] },
+    task: { workflow: "issue-groom" },
+  },
+  {
+    name: "Re-triage when a hold is cleared",
+    events: ["issue.unlabeled"],
+    filters: { authors: ["rafalwolak"] },
+    task: { workflow: "issue-groom" },
+  },
   { name: "Weekly architecture review", task: { workflow: "architecture-review" } },
 ];
 
@@ -332,7 +1112,7 @@ describe("automationLaunches", () => {
     const groom = rows.find((row) => row.workflow === "issue-groom");
     expect(groom).toEqual({
       workflow: "issue-groom",
-      names: ["Groom new issues", "Re-groom on request"],
+      names: ["Groom and triage new issues", "Re-triage when a hold is cleared"],
       launches: 2,
       lastAt: "2026-09-20T10:00:00Z",
     });
@@ -432,56 +1212,77 @@ describe("spanSummary", () => {
   });
 });
 
-const labelled = (number, createdAt, events) => ({
+const STRANGER = { login: "drive-by" };
+const briefed = (number, createdAt, { author = OWNER, body = "", comments = [] } = {}) => ({
   number,
   createdAt,
-  timeline: events.map(([at, label]) => ({ at, label })),
+  author,
+  body,
+  comments: comments.map(([at, text, by = OWNER]) => ({ createdAt: at, body: text, author: by })),
 });
 
-describe("firstLabelledAt", () => {
-  it("takes the earliest application when a label was removed and re-applied", () => {
-    const issue = labelled(1, "2026-09-13T00:00:00Z", [
-      ["2026-09-13T05:00:00Z", "needs-triage"],
-      ["2026-09-13T01:00:00Z", "needs-triage"],
-    ]);
-    expect(firstLabelledAt(issue, "needs-triage")).toBe("2026-09-13T01:00:00Z");
+describe("firstBriefAt", () => {
+  it("takes the earliest trusted comment carrying a brief", () => {
+    const issue = briefed(1, "2026-09-13T00:00:00Z", {
+      comments: [
+        ["2026-09-13T05:00:00Z", `🤖 triage\n\n${BRIEF}`],
+        ["2026-09-13T01:00:00Z", `🤖 triage\n\n${BRIEF}`],
+      ],
+    });
+    expect(firstBriefAt(issue, trusted)).toBe("2026-09-13T01:00:00Z");
   });
 
-  it("answers null for a label the issue never carried", () => {
-    expect(firstLabelledAt(labelled(1, "2026-09-13T00:00:00Z", []), "needs-triage")).toBeNull();
+  it("takes the opening of a ticket the maintainer filed with its brief in the body", () => {
+    expect(firstBriefAt(briefed(1, "2026-09-13T00:00:00Z", { body: BRIEF }), trusted)).toBe(
+      "2026-09-13T00:00:00Z",
+    );
+  });
+
+  it("answers null when only a stranger wrote a brief, or nobody did", () => {
+    const stranger = briefed(1, "2026-09-13T00:00:00Z", {
+      body: BRIEF,
+      author: STRANGER,
+      comments: [["2026-09-13T01:00:00Z", BRIEF, STRANGER]],
+    });
+    expect(firstBriefAt(stranger, trusted)).toBeNull();
+    expect(firstBriefAt(briefed(2, "2026-09-13T00:00:00Z"), trusted)).toBeNull();
   });
 });
 
 describe("intakeSpans", () => {
-  it("measures from the issue opening to the first needs-triage", () => {
+  it("measures from the issue opening to its first Agent Brief", () => {
     expect(
-      intakeSpans([
-        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T00:00:02Z", "needs-triage"]]),
-      ]),
-    ).toEqual([{ number: 1, from: "2026-09-13T00:00:00Z", to: "2026-09-13T00:00:02Z" }]);
+      intakeSpans(
+        [briefed(1, "2026-09-13T00:00:00Z", { comments: [["2026-09-13T00:20:00Z", `🤖 triage\n\n${BRIEF}`]] })],
+        trusted,
+      ),
+    ).toEqual([{ number: 1, from: "2026-09-13T00:00:00Z", to: "2026-09-13T00:20:00Z" }]);
   });
 
-  it("leaves out an issue a human routed straight past triage", () => {
+  it("leaves out a ticket filed with its brief, and an issue no automation will groom", () => {
     expect(
-      intakeSpans([
-        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "ready-for-agent"]]),
-        labelled(2, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "ready-for-human"]]),
-      ]),
+      intakeSpans(
+        [
+          briefed(1, "2026-09-13T00:00:00Z", { body: BRIEF }),
+          briefed(2, "2026-09-13T00:00:00Z", { author: STRANGER }),
+        ],
+        trusted,
+      ),
     ).toEqual([]);
   });
 
-  it("keeps an unlabelled issue as pending: that is the bridge not firing", () => {
-    expect(intakeSpans([labelled(3, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "bug"]])])).toEqual(
-      [{ number: 3, from: "2026-09-13T00:00:00Z", to: null }],
-    );
+  it("keeps an unbriefed maintainer issue as pending: that is the groom run not firing", () => {
+    expect(intakeSpans([briefed(3, "2026-09-13T00:00:00Z")], trusted)).toEqual([
+      { number: 3, from: "2026-09-13T00:00:00Z", to: null },
+    ]);
   });
 });
 
 describe("firstPrSpans", () => {
   const issues = [
-    labelled(339, "2026-09-19T00:00:00Z", [["2026-09-19T00:43:34Z", "ready-for-agent"]]),
-    labelled(400, "2026-09-19T00:00:00Z", [["2026-09-19T00:00:00Z", "ready-for-agent"]]),
-    labelled(500, "2026-09-19T00:00:00Z", [["2026-09-19T00:00:00Z", "needs-triage"]]),
+    briefed(339, "2026-09-19T00:00:00Z", { comments: [["2026-09-19T00:43:34Z", `🤖 triage\n\n${BRIEF}`]] }),
+    briefed(400, "2026-09-19T00:00:00Z", { body: BRIEF }),
+    briefed(500, "2026-09-19T00:00:00Z"),
   ];
 
   it("measures to the earliest linked pull request, whatever branch it was cut on", () => {
@@ -489,16 +1290,20 @@ describe("firstPrSpans", () => {
       { number: 340, title: "fix(shell): remount (#339)", body: "Closes #339", headRefName: "cez/781957ae", createdAt: "2026-09-19T01:15:30Z" },
       { number: 341, title: "later", body: "Closes #339", headRefName: "cez/other", createdAt: "2026-09-19T09:00:00Z" },
     ];
-    const spans = firstPrSpans(issues, linkOpenPrs(prs), new Map(prs.map((pr) => [pr.number, pr.createdAt])));
-    expect(spans.find((span) => span.number === 339).to).toBe("2026-09-19T01:15:30Z");
+    const spans = firstPrSpans(issues, linkOpenPrs(prs), new Map(prs.map((pr) => [pr.number, pr.createdAt])), trusted);
+    expect(spans.find((span) => span.number === 339)).toEqual({
+      number: 339,
+      from: "2026-09-19T00:43:34Z",
+      to: "2026-09-19T01:15:30Z",
+    });
   });
 
-  it("skips an issue that never reached ready-for-agent", () => {
-    expect(firstPrSpans(issues, new Map(), new Map()).map((span) => span.number)).toEqual([339, 400]);
+  it("skips an issue that never got an Agent Brief", () => {
+    expect(firstPrSpans(issues, new Map(), new Map(), trusted).map((span) => span.number)).toEqual([339, 400]);
   });
 
-  it("leaves a ready issue with no pull request open-ended", () => {
-    expect(firstPrSpans(issues, new Map(), new Map()).every((span) => span.to === null)).toBe(true);
+  it("leaves a briefed issue with no pull request open-ended", () => {
+    expect(firstPrSpans(issues, new Map(), new Map(), trusted).every((span) => span.to === null)).toBe(true);
   });
 });
 
@@ -614,7 +1419,7 @@ describe("flowReport without a visible runs.json", () => {
       runs: [],
       automations: AUTOMATION_DEFS,
       issues: [
-        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T00:00:02Z", "needs-triage"]]),
+        briefed(1, "2026-09-13T00:00:00Z", { comments: [["2026-09-13T00:00:02Z", `🤖 triage\n\n${BRIEF}`]] }),
       ],
       prs: [],
       prLinks: new Map(),

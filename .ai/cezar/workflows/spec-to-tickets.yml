@@ -1,18 +1,24 @@
-# Weekday mornings, on a schedule (docs/agents/cezar-automations.json). afk-to-tickets promotes the
-# ticket frontier, then slices at most one newly merged spec into vertical tickets. It reads
-# `.ai/specs/`, CONTEXT.md and the two afk-*-design skills, and publishes only GitHub issues. The
+# Started by the Reconciler (docs/agents/cezar.md, ADR 0030) with `Slice the spec <path> into
+# tickets.` when `node .ai/scripts/backlog-status.mjs --plan` lists a `slice` action - the oldest
+# `ready` spec directly in .ai/specs/ that no issue's body opens with `Spec: <path>` - on weekday
+# mornings by a schedule (docs/agents/cezar-automations.json), or by a person from the cockpit.
+# afk-to-tickets slices at most one merged spec into vertical tickets, each carrying its Agent
+# Brief in the body. It reads `.ai/specs/`, CONTEXT.md and the two afk-*-design skills, and publishes only GitHub issues. The
 # skill never edits source files, so the step holds no Edit. It holds Write for the ticket drafts it
 # writes before publishing (the self-check and a dispatched reviewer read them) and for its dispatch
 # notes: without it, run b4bde0ac (2026-09-25) did the work through Bash and still failed on eleven
 # denied Writes. Agent is for the specialist that settles each judgement call
-# (.ai/skills/afk-decide/SKILL.md). Only the frontier gets `ready-for-agent`.
+# (.ai/skills/afk-decide/SKILL.md). No label marks a ticket ready (ADR 0029).
 name: spec-to-tickets
-description: Promote the ticket frontier, then slice at most one merged spec into tracer-bullet tickets (afk-to-tickets).
+description: Slice at most one merged spec into tracer-bullet tickets, each carrying its Agent Brief (afk-to-tickets).
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+    command: bash .ai/scripts/bootstrap.sh
   - id: afk-to-tickets
     name: afk-to-tickets
-    prompt: '/afk-to-tickets {{task}}'
+    prompt: |
+      /afk-to-tickets {{task}}
+
+      Slice that one spec and no other. The parent issue's body must open with `Spec: <spec path>` on its first line: that line is how the Reconciler knows the spec is sliced, and a spec without it is sliced again on the next tick. Settle every judgement call through a specialist (afk-decide); the skill lists when to stop, and `NO_ACTION_NEEDED` is the right ending when the spec already has a parent.
     allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]

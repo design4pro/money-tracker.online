@@ -1,12 +1,13 @@
-# A human added `spec` to a `feature` issue. om-auto-write-spec writes .ai/specs/<date>-<slug>.md
-# and lands it on a design-only PR (`spec/<slug>`) for a human to review; implementation is a
-# separate run (implement-spec) once that PR merges (ADR 0017).
+# Started by a person from the cockpit on one `feature` issue. om-auto-write-spec writes
+# .ai/specs/<date>-<slug>.md and lands it on a design-only PR (`spec/<slug>`) for a human to review;
+# implementation is a separate run (implement-spec) once that PR merges (ADR 0017). The unattended
+# lane writes a spec through implement-ticket when triage briefs one (ADR 0029).
 name: spec
-description: Human added `spec`; om-auto-write-spec turns the feature issue into a spec file on a design-only PR.
+description: om-auto-write-spec turns one feature issue into a spec file on a design-only PR; started from the cockpit.
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+    command: bash .ai/scripts/bootstrap.sh
   - id: spec
     name: om-auto-write-spec
     prompt: '/om-auto-write-spec {{task}}'

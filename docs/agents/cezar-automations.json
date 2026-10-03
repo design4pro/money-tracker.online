@@ -1,12 +1,12 @@
 [
   {
-    "name": "Groom new issues",
-    "description": "A maintainer opens an issue; om-auto-manage-issues adds SDLC labels, a Definition of Ready check and implementation notes (ADR 0017). `authors` is the gate: the run holds Bash with no allowlist, so an issue from anyone else is groomed only when a maintainer adds `groom`. Issues a run holds or a human put on hold never match. Every agent files its issues as `rafalwolak` too (one identity, no bot account), so `authors` cannot tell them apart: an issue that already carries an intake label was filed by a skill that decided its state, and grooming it would race triage on its labels - `excludeLabels` stands down on all four.",
+    "name": "Groom and triage new issues",
+    "description": "A maintainer opens an issue; issue-groom runs om-auto-manage-issues (SDLC labels, the Definition of Ready check, implementation notes) and then afk-triage (an Agent Brief, or `blocked` with a comment naming what a person must do), in one run so the two never race on the same labels (ADR 0017, ADR 0029). `authors` is the gate: both steps hold Bash with no allowlist and read the issue body, so an issue from anyone else is never groomed by automation. Every agent files its issues as `rafalwolak` too (one identity, no bot account), and that is intended: a follow-up afk-triage or afk-architecture-review files is groomed and triaged here like any other, and afk-triage stops at once on an issue that already carries an Agent Brief. Issues a run holds or a person put on hold never match.",
     "events": ["issue.opened"],
     "intervalSeconds": 120,
     "filters": {
       "authors": ["rafalwolak"],
-      "excludeLabels": ["in-progress", "blocked", "do-not-close", "needs-triage", "ready-for-agent", "ready-for-human", "needs-info"],
+      "excludeLabels": ["in-progress", "blocked", "do-not-close"],
       "lookbackDays": 7,
       "maxRecords": 25
     },
@@ -20,15 +20,16 @@
     }
   },
   {
-    "name": "Re-groom on request",
-    "description": "A label only a collaborator can set: `groom` re-runs om-auto-manage-issues on one issue (an external report a maintainer vouches for, an edit, a reply). The override removes the label first.",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 120,
+    "name": "Re-triage when a hold is cleared",
+    "description": "A person removes `blocked` from an issue - the thing it waited on is done or answered - and issue-groom grooms and triages it again, so the issue reaches an Agent Brief without anyone starting a run (ADR 0029). Same `authors` gate as above.",
+    "events": ["issue.unlabeled"],
+    "intervalSeconds": 300,
     "filters": {
-      "changedLabels": ["groom"],
-      "excludeLabels": ["in-progress"],
+      "authors": ["rafalwolak"],
+      "changedLabels": ["blocked"],
+      "excludeLabels": ["in-progress", "blocked", "do-not-close"],
       "lookbackDays": 7,
-      "maxRecords": 25
+      "maxRecords": 10
     },
     "task": {
       "prompt": "{{github.number}}",
@@ -40,40 +41,13 @@
     }
   },
   {
-    "name": "Fix issues on the autofix label",
-    "description": "A human adds `autofix`; om-auto-fix-issue drives the issue to a reviewed PR on develop (ADR 0017). Held, blocked, do-not-merge or spec-pending issues never match.",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 120,
-    "filters": {
-      "changedLabels": ["autofix"],
-      "excludeLabels": ["in-progress", "blocked", "do-not-merge", "spec"],
-      "lookbackDays": 7,
-      "maxRecords": 25
-    },
+    "name": "Implement the next ready issue",
+    "description": "Every two hours implement-ticket takes the one highest-priority, oldest ready issue - opened by the maintainer, carrying an Agent Brief, a category, a priority and a risk, with every \"Blocked by\" issue closed, no open or merged-unclosed PR and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress` - as `node .ai/scripts/backlog-status.mjs --next` picks it, implements it test-first, gates it, opens the PR and drives it through review, QA and CI to the merge into develop by om-pr-autopilot --allow-merge (ADR 0027, ADR 0029). The script answers nothing while three agent PRs are open, so one tick starts at most one issue and the queue never outruns review. `risk-high` and `security` issues are not skipped: implement-ticket re-derives the risk from the area and claims one only on the security and tenancy specialist's approving verdict (SDLC.md § Delegated decisions), and a `risk-high` PR waits for the owner's `qa-approved`. A schedule rather than an event: a ticket becomes ready when its blockers close, and no GitHub event says so.",
+    "kind": "schedule",
+    "schedule": { "type": "hours", "every": 2 },
     "task": {
-      "prompt": "{{github.number}}",
-      "workflow": "issue-autofix",
-      "autonomous": true,
-      "worktree": true,
-      "variants": 1,
-      "generateFollowups": false
-    }
-  },
-  {
-    "name": "Write a spec for feature issues",
-    "description": "A human adds `spec` to a `feature` issue; om-auto-write-spec lands .ai/specs/<date>-<slug>.md on a design-only PR (ADR 0017).",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 120,
-    "filters": {
-      "changedLabels": ["spec"],
-      "allLabels": ["feature"],
-      "excludeLabels": ["in-progress", "blocked"],
-      "lookbackDays": 7,
-      "maxRecords": 25
-    },
-    "task": {
-      "prompt": "{{github.number}}",
-      "workflow": "spec",
+      "prompt": "Implement the next ready issue in {{project}} ({{date}}).",
+      "workflow": "implement-ticket",
       "autonomous": true,
       "worktree": true,
       "variants": 1,
@@ -82,7 +56,7 @@
   },
   {
     "name": "Autopilot new pull requests",
-    "description": "A PR opened as `rafalwolak` gets om-pr-autopilot, which diagnoses it and runs the right chain through to the merge into develop (ADR 0027). There is one GitHub identity: every agent PR is authored by `rafalwolak` too, so the author filter only keeps dependabot and outside contributors out. Agent PRs are told apart by their pipeline labels instead: om-open-pr opens one carrying `review` inside its own chain (implement-ticket, issue-autofix), so `excludeLabels` stands down on `review` and every later pipeline label rather than race that chain. The standing develop-to-main promotion PR is opened with the owner's token too, and no filter here reads the base branch, so .github/workflows/promote-develop.yml opens it carrying `merge-queue` and `promotion`, and both are excluded: an unattended run never merges the release.",
+    "description": "A PR opened as `rafalwolak` gets om-pr-autopilot, which diagnoses it and runs the right chain through to the merge into develop (ADR 0027). There is one GitHub identity: every agent PR is authored by `rafalwolak` too, so the author filter only keeps dependabot and outside contributors out. Agent PRs are told apart by their pipeline labels instead: om-open-pr opens one carrying `review` inside its own chain (implement-ticket, issue-autofix), so `excludeLabels` stands down on `review` and every later pipeline label rather than race that chain. The standing develop-to-main promotion PR is opened with the owner's token too, and no filter here reads the base branch, so .github/workflows/promote-develop.yml opens it carrying `do-not-merge`, which is excluded: an unattended run never touches the release (ADR 0029).",
     "events": ["pull_request.opened"],
     "intervalSeconds": 300,
     "filters": {
@@ -96,8 +70,7 @@
         "qa-failed",
         "blocked",
         "do-not-merge",
-        "ci-monitoring",
-        "promotion"
+        "ci-monitoring"
       ],
       "lookbackDays": 7,
       "maxRecords": 25
@@ -113,13 +86,13 @@
   },
   {
     "name": "Merge reviewed agent pull requests",
-    "description": "A PR that om-auto-review-pr approved into `merge-queue` gets om-pr-autopilot --allow-merge, which merges it into develop through om-approve-merge-pr (ADR 0027). A backstop for the implement chain, which drives its own PR to the merge: a reviewed PR whose chain ended early is picked up here. `authors` stays: every agent PR is authored by `rafalwolak`, and the filter keeps dependabot and outside contributors out - the housekeeping sweep (om-review-prs) can approve their PRs into `merge-queue`, and this run reads the PR as a prompt while holding Bash with no allowlist. `merge-queue` tells agent PRs apart from the rest, and `promotion` in `excludeLabels` keeps the develop-to-main promotion PR out.",
+    "description": "A PR that om-auto-review-pr approved into `merge-queue` gets om-pr-autopilot --allow-merge, which merges it into develop through om-approve-merge-pr (ADR 0027). A backstop for the implement chain, which drives its own PR to the merge: a reviewed PR whose chain ended early is picked up here. `authors` stays: every agent PR is authored by `rafalwolak`, and the filter keeps dependabot and outside contributors out - the housekeeping sweep (om-review-prs) can approve their PRs into `merge-queue`, and this run reads the PR as a prompt while holding Bash with no allowlist. `merge-queue` tells agent PRs apart from the rest. The develop-to-main promotion PR carries `do-not-merge` and never `merge-queue`, so it never matches (ADR 0029).",
     "events": ["pull_request.reviewed"],
     "intervalSeconds": 300,
     "filters": {
       "authors": ["rafalwolak"],
       "anyLabels": ["merge-queue"],
-      "excludeLabels": ["in-progress", "changes-requested", "qa", "qa-failed", "blocked", "do-not-merge", "promotion"],
+      "excludeLabels": ["in-progress", "changes-requested", "qa", "qa-failed", "blocked", "do-not-merge"],
       "lookbackDays": 7,
       "maxRecords": 25
     },
@@ -133,50 +106,12 @@
     }
   },
   {
-    "name": "Triage new issues",
-    "description": "A human adds `needs-triage`; afk-triage verifies the report, writes an Agent Brief comment and sets exactly one intake label. The label is the gate - only a collaborator can set one - which is also why this does not fire on `issue.opened` the way it does in cezar: om-auto-manage-issues already owns that event here, and two autonomous runs grooming the same fresh issue would race on its labels. Groom first, then ask for a brief.",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 600,
-    "filters": {
-      "changedLabels": ["needs-triage"],
-      "excludeLabels": ["in-progress", "do-not-close", "blocked", "needs-info", "ready-for-agent", "ready-for-human"],
-      "maxRecords": 25,
-      "lookbackDays": 7
-    },
-    "task": {
-      "prompt": "Triage issue #{{github.number}} ({{github.url}}).",
-      "workflow": "triage",
-      "worktree": true,
-      "autonomous": true,
-      "generateFollowups": false
-    }
-  },
-  {
-    "name": "Implement ready-for-agent issues",
-    "description": "An issue labeled `ready-for-agent` is implemented test-first in a worktree from its Agent Brief, gated, opened as a PR, and driven through review, QA and CI to the merge into develop by om-pr-autopilot --allow-merge (a `risk-high` PR waits there for the owner's `qa-approved`). Distinct from \"Fix issues on the autofix label\", which drives an ungroomed issue end to end - these two never contend for the same issue because they watch different labels. No risk filter: `risk-high` and `security` reach `ready-for-agent` only on the security and tenancy specialist's approving verdict (SDLC.md § Delegated decisions), and every risk level starts by itself.",
-    "events": ["issue.labeled"],
-    "intervalSeconds": 600,
-    "filters": {
-      "changedLabels": ["ready-for-agent"],
-      "excludeLabels": ["in-progress", "ready-for-human", "needs-info", "blocked", "do-not-merge"],
-      "maxRecords": 25,
-      "lookbackDays": 7
-    },
-    "task": {
-      "prompt": "Implement issue #{{github.number}} ({{github.url}}).",
-      "workflow": "implement-ticket",
-      "worktree": true,
-      "autonomous": true,
-      "generateFollowups": false
-    }
-  },
-  {
     "name": "Spec to tickets",
-    "description": "Weekday mornings: afk-to-tickets promotes the ticket frontier, then slices at most one newly merged spec into vertical tickets. Schedule rather than an event, so it never races the issue pipeline above: it reads `.ai/specs/` and the open tree, and only the frontier gets `ready-for-agent`. Idempotent - a spec that already has a parent issue is skipped.",
+    "description": "Weekday mornings: afk-to-tickets slices at most one newly merged spec into vertical tickets, each carrying its Agent Brief in the body. Schedule rather than an event, so it never races the issue pipeline above. A ticket with no open blocker is ready at once, and \"Implement the next ready issue\" takes it; the rest become ready as their blockers close (ADR 0029). Idempotent - a spec that already has a parent issue is skipped.",
     "kind": "schedule",
     "schedule": { "type": "weekdays", "hour": 7, "minute": 0 },
     "task": {
-      "prompt": "Run the afk-to-tickets skill for {{project}} on {{date}}: promote the frontier, then slice at most one unsliced spec.",
+      "prompt": "Run the afk-to-tickets skill for {{project}} on {{date}}: slice at most one unsliced spec.",
       "workflow": "spec-to-tickets",
       "autonomous": true,
       "worktree": true,
@@ -186,7 +121,7 @@
   },
   {
     "name": "Weekly architecture review",
-    "description": "Mondays: afk-architecture-review reads the last 30 days of hot spots and files at most three refactor issues, each with a recommendation strength. Read-only on code - the only writes are issues, and it never applies `ready-for-agent` itself: every candidate it files gets `needs-triage` so triage writes the brief, and a judgement call is settled by a specialist sub-agent (`.ai/skills/afk-decide/SKILL.md`). It reads `.ai/skills/afk-codebase-design/SKILL.md` for its vocabulary - the shared half, kept identical by hand across the repositories that use this pipeline - and this repository's own seams are in the override beside it.",
+    "description": "Mondays: afk-architecture-review reads the last 30 days of hot spots and files at most three refactor issues, each with a recommendation strength. Read-only on code - the only writes are issues, which \"Groom and triage new issues\" then grooms and briefs like any other, and a judgement call is settled by a specialist sub-agent (`.ai/skills/afk-decide/SKILL.md`). It reads `.ai/skills/afk-codebase-design/SKILL.md` for its vocabulary - the shared half, kept identical by hand across the repositories that use this pipeline - and this repository's own seams are in the override beside it.",
     "kind": "schedule",
     "schedule": { "type": "weekly", "day": 1, "hour": 6, "minute": 0 },
     "task": {

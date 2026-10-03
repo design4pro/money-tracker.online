@@ -7,13 +7,13 @@ description: Settle an open question unattended by delegating it to an independe
 
 **These instructions are already in your system prompt, or you were pointed at this file.** Never call the `Skill` tool for an `afk-*` skill - a repo-local skill is not in the agent's registry, so the call fails with `Unknown skill`.
 
-An unattended run has no human to ask. A choice between options is not a reason to stop, label `ready-for-human`, or leave "a human's call" in a ticket: it is a question for a specialist. You ask one, apply the answer, record it, and keep working.
+An unattended run has no human to ask. A choice between options is not a reason to stop, put a `blocked` hold on an issue, or leave "a human's call" in a ticket: it is a question for a specialist. You ask one, apply the answer, record it, and keep working.
 
 ## 1. When to use it
 
 Use it every time you are about to do any of these:
 - post options, a "Decision for the implementer", a "human's call" or a "Why not an agent" line;
-- pick `ready-for-human`, `needs-info` or `not-ready` for any reason other than those in step 5;
+- add `blocked` or record `not-ready` for any reason other than those in step 5;
 - stop a run because a product, design, architecture, scope, risk or security question is open.
 
 Do not use it for a question that has one defensible answer in the code, the spec, an ADR or `CONTEXT.md`. Read those first and apply what they say.
@@ -79,9 +79,11 @@ Only what no agent in this pipeline can do:
 - an action that needs a person's own credentials, account settings, payment, or a legal commitment;
 - merging the `develop` -> `main` promotion (a merge into `develop` is the pipeline's own, `om-pr-autopilot --allow-merge`), closing an issue, or removing a label a human set;
 - QA sign-off on a `risk-high` PR: the run attaches the evidence and the specialist's verdict, and the owner applies `qa-approved`;
-- information only the reporter has (`needs-info`): a repro, a version, what they expected;
+- information only the reporter has: a repro, a version, what they expected;
 - a platform limit, such as a ruleset that requires a review the run's own account cannot give (the `develop` ruleset requires none, so self-approval is never a blocker there);
 - a write Claude Code refuses under `dontAsk` (protected configuration). Put the exact patch and the guardian's verdict in the report or PR, so applying it is one step for a human.
+
+Every comment that hands a matter to a person starts with `🤖 HUMAN-ONLY: <the one thing a person must do>`. That marker is what stops the Reconciler (ADR 0030) from launching `afk-unblock` on the hold again: an agent-set `blocked` without it is offered to a specialist, which is a wasted run when the matter is one of these. A hold or a `STOP:` an agent set for any other reason is lifted by `afk-unblock` on a specialist's verdict.
 
 Everything else is decided here.
 

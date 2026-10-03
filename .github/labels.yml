@@ -5,7 +5,10 @@
 # `.ai/agentic.config.json` declares under `labels`, group for group - that file is what the skills
 # read, so a label it declares and this file omits is a label the issue forms cannot apply, and a
 # label this file invents is one no skill will act on. It replaced the 18
-# `status:`/`run:`/`type:` labels of ADR 0014.
+# `status:`/`run:`/`type:` labels of ADR 0014. No label says an issue is ready or starts a run:
+# the intake, command and `promotion` labels were retired by
+# docs/adr/0029-open-mercato-labels-only.md, and readiness is computed by
+# .ai/scripts/backlog-status.mjs.
 #
 # This file is documentation, not automation: nothing syncs it. It exists because the issue forms
 # under .github/ISSUE_TEMPLATE/ apply labels by name, and GitHub silently drops a label that does
@@ -17,7 +20,10 @@
 # and descriptions, so this file states meaning and nothing else.
 
 # ── pipeline: where a pull request stands, at most one at a time ──────────────────────────────
-# Written by the review, QA and merge skills. `blocked` and `do-not-merge` are a human's hold.
+# Written by the review, QA and merge skills. `blocked` and `do-not-merge` are a person's hold:
+# a skill may set `blocked` on an issue with a comment naming what a person must do, and the
+# develop -> main promotion carries `do-not-merge`. A person clears `do-not-merge` and a `blocked`
+# they set; `afk-unblock` may lift a `blocked` an agent set, on a specialist's verdict (ADR 0030).
 pipeline:
   - name: review
     description: 'Ready for review, or under review by om-auto-review-pr.'
@@ -30,7 +36,7 @@ pipeline:
   - name: merge-queue
     description: 'Reviewed and, if it needed QA, approved. pr-autopilot merges it into develop, or a human does.'
   - name: blocked
-    description: 'Waits on something outside the pull request. The comment says what.'
+    description: 'A hold on an issue or pull request. The comment says what a person must do; afk-unblock may lift one an agent set.'
   - name: do-not-merge
     description: 'A human hold. No skill merges, and the autopilot stays out.'
 
@@ -77,32 +83,6 @@ risk:
   - name: risk-low
   - name: risk-medium
   - name: risk-high
-
-# ── intake: who acts on an issue next, at most one at a time ──────────────────────────────────
-# Issues only, and they come before the PR pipeline above. Skills never add `ready-for-agent` to
-# `risk-high` or `security` work.
-intake:
-  - name: needs-triage
-    description: 'Groomed and ready by the Definition of Ready, but not yet evaluated for an agent.'
-  - name: needs-info
-    description: 'Waiting on the reporter. A human moves it back to needs-triage once answered.'
-  - name: ready-for-agent
-    description: 'Briefed and safe to implement unattended. Where SDLC.md says so, adding it launches a run.'
-  - name: ready-for-human
-    description: 'Briefed, but needs a person: security, risk-high, a spec, a duplicate or a judgement call.'
-
-# ── command: an instruction to start one run now, not a state ─────────────────────────────────
-# The skill's repo-local override removes the label as its first mutation, so one still present is
-# a run nobody took. Never file an issue with its own trigger already attached.
-command:
-  - name: groom
-    description: 'Starts om-auto-manage-issues on one issue: labels, Definition of Ready, implementation notes.'
-  - name: autofix
-    description: 'Starts om-auto-fix-issue. The human express lane past triage.'
-  - name: spec
-    description: 'Starts om-auto-write-spec on a feature issue. The spec lands on a design-only PR.'
-  - name: review-threads
-    description: 'Starts om-auto-fix-pr on one PR. The review job applies it; no human does.'
 
 # ── outside: honoured by the skills, owned by nothing above ───────────────────────────────────
 outside:

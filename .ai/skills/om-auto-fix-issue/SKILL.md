@@ -29,10 +29,8 @@ repository. A text that names two or more is ambiguous: stop and ask.
 
 ## Rules
 
-- `autofix` is the human "start" label a Cezar automation reacts to. Remove it from the issue as
-  the **first** tracker mutation of the run (via `remove_issue_label`), before triage, so a
-  still-present `autofix` always means "nobody picked this up". Never add `autofix`, `spec` or
-  `groom` to any issue.
+- No label starts this skill (ADR 0029): a person starts the `issue-autofix` workflow from the
+  Cezar cockpit. Never add a label outside the Open Mercato taxonomy (`.ai/trackers/github.md`).
 - Branch `fix/issue-<n>-<slug>` or `feat/issue-<n>-<slug>`, cut from `origin/develop`.
 - The PR body carries `Closes #<n>`. Merging into `develop` does not close the issue natively;
   `om-close-fixed-issues` does, after the merge.

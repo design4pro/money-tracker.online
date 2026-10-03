@@ -26,6 +26,10 @@ Nothing else. No appendices, no glossary, no status log; the wave order lives in
   checker parses that exact shape.
 - **The clean-room rule of `docs/SPEC.md` §1 applies to every word of a stage.** The reference
   product is never named and nothing is carried across from it.
+- **A finished stage carries one `Delivered:` line.** When the code already delivers a stage,
+  `afk-plan-to-spec` adds `Delivered: <YYYY-MM-DD> - <evidence: the paths, tests or PR>` directly under its
+  `## Stage` heading. It is not a `###` heading and it is the only status a plan records;
+  `backlog-status.mjs --plan` skips a stage that has one. A stage delivered in part has none.
 - **The stage is the unit of ownership, the run is not.** A stage that cannot be finished by one
   agent in one run is two stages.
 - **`### Money invariant` is mandatory and is never skipped.** In this product the arithmetic

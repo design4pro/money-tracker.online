@@ -2,15 +2,14 @@
 # last 30 days of hot spots and files at most three refactor issues. Its rules say it is read-only
 # on code and that the only writes are GitHub issues, so the step holds no Edit. It holds Write for
 # the issue bodies it hands to `gh --body-file` (run 8f1c782d was denied exactly that), and Agent
-# for the specialist that settles a judgement call (.ai/skills/afk-decide/SKILL.md). It never
-# applies `ready-for-agent` itself: every candidate it files gets `needs-triage` and the ladder
-# continues from there.
+# for the specialist that settles a judgement call (.ai/skills/afk-decide/SKILL.md). Every issue it
+# files is groomed and triaged like any other by "Groom and triage new issues" (ADR 0029).
 name: architecture-review
 description: Find deepening opportunities in recent hot spots and file at most three refactor issues (afk-architecture-review).
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+    command: bash .ai/scripts/bootstrap.sh
   - id: afk-architecture-review
     name: afk-architecture-review
     prompt: '/afk-architecture-review {{task}}'

@@ -36,10 +36,10 @@ function definition(name, extra = {}) {
   return {
     name,
     description: `${name} description`,
-    events: ['issue.labeled'],
+    events: ['issue.opened'],
     intervalSeconds: 600,
-    filters: { changedLabels: ['ready-for-agent'] },
-    task: { workflow: 'implement-ticket', autonomous: true },
+    filters: { authors: ['rafalwolak'] },
+    task: { workflow: 'issue-groom', autonomous: true },
     ...extra,
   }
 }
@@ -144,7 +144,7 @@ describe('cez-automations.sh', () => {
   })
 
   it('keeps a cockpit pause when the definition says nothing about enabled', async () => {
-    const def = definition('Implement ready-for-agent issues')
+    const def = definition('Implement the next ready issue')
     const result = await run([def], [held(def, { id: 'a1', enabled: false })])
     expect(result.status).toBe(0)
     expect(put(result)).toHaveLength(1)
@@ -152,13 +152,13 @@ describe('cez-automations.sh', () => {
   })
 
   it('says on stderr that a paused automation stays paused', async () => {
-    const def = definition('Implement ready-for-agent issues')
+    const def = definition('Implement the next ready issue')
     const result = await run([def], [held(def, { id: 'a1', enabled: false })])
     expect(result.stderr).toContain('stays disabled')
   })
 
   it('leaves an enabled automation enabled', async () => {
-    const def = definition('Triage new issues')
+    const def = definition('Groom and triage new issues')
     const result = await run([def], [held(def, { id: 'a2', enabled: true })])
     expect(put(result)[0].body.enabled).toBe(true)
     expect(result.stderr).not.toContain('stays disabled')
@@ -184,7 +184,7 @@ describe('cez-automations.sh', () => {
   })
 
   it('sends the expected revision the cockpit reported', async () => {
-    const def = definition('Triage new issues')
+    const def = definition('Groom and triage new issues')
     const result = await run([def], [held(def, { id: 'a2', enabled: true })])
     expect(put(result)[0].body.expectedRevision).toBe(7)
   })
@@ -263,7 +263,7 @@ describe('cez-automations.sh', () => {
   })
 
   it('reports no drift when the cockpit already matches the file', async () => {
-    const def = definition('Triage new issues')
+    const def = definition('Groom and triage new issues')
     const result = await run([def], [held(def, { id: 'a2', enabled: true })])
     expect(result.stderr).not.toContain('drift in')
   })
@@ -286,7 +286,7 @@ describe('cez-automations.sh', () => {
   })
 
   it('applies every definition even when the first one has not drifted', async () => {
-    const first = definition('Triage new issues')
+    const first = definition('Groom and triage new issues')
     const second = definition('Weekly lessons', { intervalSeconds: 60 })
     const result = await run(
       [first, second],
@@ -303,7 +303,7 @@ describe('cez-automations.sh', () => {
   })
 
   it('changes nothing under --dry-run', async () => {
-    const def = definition('Implement ready-for-agent issues')
+    const def = definition('Implement the next ready issue')
     const result = await run(
       [def],
       [held(def, { id: 'a1', enabled: false })],
@@ -312,7 +312,7 @@ describe('cez-automations.sh', () => {
     expect(result.status).toBe(0)
     expect(put(result)).toHaveLength(0)
     expect(result.stderr).toContain(
-      'would update Implement ready-for-agent issues',
+      'would update Implement the next ready issue',
     )
   })
 

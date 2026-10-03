@@ -1,18 +1,24 @@
-# Started by the `needs-triage` label (docs/agents/cezar-automations.json). afk-triage verifies the
-# report, writes one Agent Brief comment, may file the follow-up issues of a split, and sets
-# exactly one intake label; its own rules say it never edits code, commits, closes an issue or
-# removes a human's label, so the step holds no Edit - the grant is the boundary, not a promise in
+# Started by the Reconciler (docs/agents/cezar.md, ADR 0030) with `Triage issue #<n>.` when
+# `node .ai/scripts/backlog-status.mjs --plan` lists a `triage` action - the first issue that has no
+# Agent Brief or no category, priority or risk label - or by a person from the cockpit; the
+# automations run afk-triage as the second step of issue-groom (ADR 0029).
+# afk-triage verifies the report, then writes one Agent Brief comment or puts a `blocked` hold on
+# the issue, and may file the follow-up issues of a split; its own rules say it never edits code,
+# commits, closes an issue or removes a human's label, so the step holds no Edit - the grant is the boundary, not a promise in
 # prose. It holds Write for the comment and issue bodies it hands to `gh --body-file` (eight runs
 # were denied exactly that), and Agent for the independent specialist that settles each open
 # question (.ai/skills/afk-decide/SKILL.md, SDLC.md § Delegated decisions). Bash is unallowlisted
 # because the tracker descriptor's operations are `gh` command lines.
 name: triage
-description: Triage one GitHub issue unattended - verify, write an Agent Brief, set one intake label (afk-triage).
+description: Triage one GitHub issue unattended - verify, then write an Agent Brief or put a hold on it (afk-triage).
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+    command: bash .ai/scripts/bootstrap.sh
   - id: afk-triage
     name: afk-triage
-    prompt: '/afk-triage {{task}}'
+    prompt: |
+      /afk-triage {{task}}
+
+      Triage that one issue and no other. Settle every judgement call through a specialist (afk-decide), and put a hold only on what afk-decide § 5 reserves for a person, in a comment whose first line is `🤖 HUMAN-ONLY: <what a person must do>`. The skill lists when to stop; stop with NO_ACTION_NEEDED rather than guess.
     allowedTools: [Read, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
