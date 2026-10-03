@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest'
 
 const WORKFLOW_DIR = '.ai/cezar/workflows'
 const CONFIG_PATH = '.ai/agentic.config.json'
+const SETTINGS_PATH = '.claude/settings.json'
 
 const files = readdirSync(WORKFLOW_DIR)
   .filter((name) => name.endsWith('.yml'))
@@ -38,6 +39,55 @@ function steps(text) {
       id: block.split('\n', 1)[0].trim(),
       block: `  - id: ${block}`,
     }))
+}
+
+/**
+ * The `command:` and `prompt:` values of a step block: the inline value, or for a `|` / `>` block
+ * scalar every following line indented deeper than the key.
+ */
+function stepTexts(block) {
+  const lines = block.split('\n')
+  const texts = []
+  lines.forEach((line, i) => {
+    const key = /^( +)(?:command|prompt): ?(.*)$/.exec(line)
+    if (!key) return
+    const [, indent, value] = key
+    if (!/^[|>]/.test(value)) {
+      texts.push(value)
+      return
+    }
+    const body = []
+    for (const next of lines.slice(i + 1)) {
+      if (next.trim() && !next.startsWith(`${indent} `)) break
+      body.push(next)
+    }
+    texts.push(body.join('\n'))
+  })
+  return texts
+}
+
+/**
+ * One `Bash(...)` deny pattern as a regex over a single command: `*` matches anything, and a
+ * trailing `:*` makes the rest a prefix match.
+ */
+function denyPatternToRegex(pattern) {
+  const prefix = pattern.endsWith(':*')
+  const body = (prefix ? pattern.slice(0, -2) : pattern)
+    .split('*')
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.*')
+  return new RegExp(`^${body}${prefix ? '' : '$'}`)
+}
+
+/**
+ * Every command a text could run: split at newlines, backticks and shell separators, then every
+ * word-suffix of each piece, so a command named mid-sentence in a prompt is a candidate too.
+ */
+function commandCandidates(text) {
+  return text.split(/\n|`|&&|\|\||[;|]|\$\(/).flatMap((piece) => {
+    const words = piece.trim().split(/\s+/).filter(Boolean)
+    return words.map((_, i) => words.slice(i).join(' '))
+  })
 }
 
 describe('cezar workflows', () => {
@@ -109,5 +159,63 @@ describe('cezar workflows', () => {
       }
     }
     expect(restated).toEqual([])
+  })
+
+  it('runs no command that permissions.deny refuses', () => {
+    // A cezar run is `--permission-mode dontAsk`, so the first denied command ends it as failed:
+    // run d232173a (#499) died on `git reset --hard`. A workflow must never prescribe one.
+    const denied = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'))
+      .permissions.deny.map((rule) => /^Bash\((.*)\)$/.exec(rule)?.[1])
+      .filter(Boolean)
+      .map((pattern) => ({ pattern, regex: denyPatternToRegex(pattern) }))
+    expect(denied.length).toBeGreaterThan(0)
+
+    const hits = []
+    for (const file of files) {
+      for (const step of steps(file.text)) {
+        for (const candidate of stepTexts(step.block).flatMap(
+          commandCandidates,
+        )) {
+          for (const { pattern, regex } of denied) {
+            if (regex.test(candidate))
+              hits.push(`${file.name} step "${step.id}": ${pattern}`)
+          }
+        }
+      }
+    }
+    expect(hits).toEqual([])
+  })
+})
+
+describe('denyPatternToRegex', () => {
+  it('turns `*` into a wildcard over the whole command', () => {
+    const regex = denyPatternToRegex('git reset --hard*')
+    expect(regex.test('git reset --hard origin/feat/x')).toBe(true)
+    expect(regex.test('git reset --hard')).toBe(true)
+    expect(regex.test('git reset --soft HEAD~1')).toBe(false)
+    expect(regex.test('echo git reset --hard')).toBe(false)
+  })
+
+  it('matches a wildcard in the middle and at the start', () => {
+    expect(
+      denyPatternToRegex('git push *--force*').test(
+        'git push origin --force-with-lease',
+      ),
+    ).toBe(true)
+    expect(
+      denyPatternToRegex('*wrangler delete*').test('pnpm wrangler delete'),
+    ).toBe(true)
+  })
+
+  it('treats a `:*` suffix as a prefix match', () => {
+    const regex = denyPatternToRegex('gh repo delete:*')
+    expect(regex.test('gh repo delete design4pro/x --yes')).toBe(true)
+    expect(regex.test('gh repo view')).toBe(false)
+  })
+
+  it('escapes regex metacharacters', () => {
+    const regex = denyPatternToRegex('rm -rf $HOME:*')
+    expect(regex.test('rm -rf $HOME/x')).toBe(true)
+    expect(regex.test('rm -rf HOME')).toBe(false)
   })
 })
