@@ -112,6 +112,15 @@ command ends an unattended run at once (`dontAsk`), so never try one to see. Run
   the branch instead, or push the result as a new branch.
 - A hook that fails: fix what it reports, never `--no-verify`.
 
+`permissions.deny` also refuses reading `.env*`, `.dev.vars*` and `.ai/qa/test-env.env`, through
+Bash as well: `cat`, `head`, `sed`, `grep` or `less`, redacted or not, ends the run the same way
+(planned.travel run b6eb30ef died on `cat .ai/qa/test-env.env | sed 's/=.*/=<redacted>/'`). Never
+open one. A test-env login is a reference: the role and its `passwordEnv` name are in
+`.ai/qa/test-env.json` (`credentials`); load the values with
+`set -a; . "$(jq -r .credentialsFile .ai/qa/test-env.json)"; set +a` and write
+`"$TEST_OWNER_PASSWORD"` in the command (`om-auto-qa-pr` `references/boot-env.md`). Sourcing the
+file is allowed; printing a value is not.
+
 ## Task Router
 
 | When the task involves…                        | Read first                                                                                                       | Key rules                                                                                                                                                                                                                                                                        |
