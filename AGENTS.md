@@ -97,6 +97,21 @@ files (ADR 0021). They are still in `.prettierignore`, so keep the formatting yo
 `dontAsk` turns into a refusal (ADR 0025). A cezar run is otherwise not restricted: it edits its
 own skills, workflows and gate on a branch, and the review is what judges that.
 
+`permissions.deny` also refuses force-pushing, `git reset --hard` and `--no-verify`, and a refused
+command ends an unattended run at once (`dontAsk`), so never try one to see. Run d232173a died on
+`git reset --hard`. Use the allowed equivalent:
+
+- Moving a worktree to a PR head: `git status` first, then `git fetch origin <head>` and
+  `git checkout -B <head> origin/<head>`, which keeps uncommitted changes or refuses on a
+  conflict, never discarding them. It does reset the branch, so a local commit that is not on
+  `origin/<head>` (`git status` says "ahead") must be pushed or put on a new branch first. It also
+  refuses when another worktree already holds `<head>` (see `git worktree list`): on a clean task
+  branch run `git merge --ff-only origin/<head>` instead (it refuses when the branch is not an
+  ancestor of `origin/<head>`), and push with `git push origin HEAD:refs/heads/<head>`.
+- A branch you rebased: never force-push (`--force-with-lease` is denied too). Merge the base into
+  the branch instead, or push the result as a new branch.
+- A hook that fails: fix what it reports, never `--no-verify`.
+
 ## Task Router
 
 | When the task involves…                        | Read first                                                                                                       | Key rules                                                                                                                                                                                                                                                                        |

@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest'
 
 const WORKFLOW_DIR = '.ai/cezar/workflows'
 const CONFIG_PATH = '.ai/agentic.config.json'
+const SETTINGS_PATH = '.claude/settings.json'
 
 const files = readdirSync(WORKFLOW_DIR)
   .filter((name) => name.endsWith('.yml'))
@@ -38,6 +39,69 @@ function steps(text) {
       id: block.split('\n', 1)[0].trim(),
       block: `  - id: ${block}`,
     }))
+}
+
+/**
+ * The `command:` and `prompt:` values of a step block: the inline value, or for a `|` / `>` block
+ * scalar every following line indented deeper than the key.
+ */
+function stepTexts(block) {
+  const lines = block.split('\n')
+  const texts = []
+  lines.forEach((line, i) => {
+    const key = /^( +)(?:command|prompt): ?(.*)$/.exec(line)
+    if (!key) return
+    const [, indent, value] = key
+    if (!/^[|>]/.test(value)) {
+      texts.push(value)
+      return
+    }
+    const body = []
+    for (const next of lines.slice(i + 1)) {
+      if (next.trim() && !next.startsWith(`${indent} `)) break
+      body.push(next)
+    }
+    texts.push(body.join('\n'))
+  })
+  return texts
+}
+
+/**
+ * The deny patterns a step block would trip. Limits: a plain scalar folded over several lines is
+ * read one line at a time, and prose that merely names a denied command ("never run `git reset
+ * --hard`") is reported too, so a workflow states the rule without spelling the command.
+ */
+function deniedPatternsIn(block, denied) {
+  return stepTexts(block)
+    .flatMap(commandCandidates)
+    .flatMap((candidate) =>
+      denied.filter(({ regex }) => regex.test(candidate)).map((d) => d.pattern),
+    )
+}
+
+/**
+ * One `Bash(...)` deny pattern as a regex over a single command: `*` matches anything, and a
+ * trailing `:*` makes the rest a prefix match.
+ */
+function denyPatternToRegex(pattern) {
+  const prefix = pattern.endsWith(':*')
+  const body = (prefix ? pattern.slice(0, -2) : pattern)
+    .split('*')
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.*')
+  return new RegExp(`^${body}${prefix ? '' : '$'}`)
+}
+
+/**
+ * Every command a text could run: split at newlines, backticks, quotes and shell separators, then
+ * every word-suffix of each piece, so a command named mid-sentence in a prompt, or inside
+ * `sh -c "..."`, is a candidate too.
+ */
+function commandCandidates(text) {
+  return text.split(/\n|`|['"]|&&|\|\||[;|]|\$\(/).flatMap((piece) => {
+    const words = piece.trim().split(/\s+/).filter(Boolean)
+    return words.map((_, i) => words.slice(i).join(' '))
+  })
 }
 
 describe('cezar workflows', () => {
@@ -109,5 +173,95 @@ describe('cezar workflows', () => {
       }
     }
     expect(restated).toEqual([])
+  })
+
+  it('runs no command that permissions.deny refuses', () => {
+    // A cezar run is `--permission-mode dontAsk`, so the first denied command ends it as failed:
+    // run d232173a (#499) died on `git reset --hard`. A workflow must never prescribe one.
+    const denied = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'))
+      .permissions.deny.map((rule) => /^Bash\((.*)\)$/.exec(rule)?.[1])
+      .filter(Boolean)
+      .map((pattern) => ({ pattern, regex: denyPatternToRegex(pattern) }))
+    expect(denied.length).toBeGreaterThan(0)
+
+    const hits = []
+    let scanned = 0
+    for (const file of files) {
+      for (const step of steps(file.text)) {
+        scanned += stepTexts(step.block).length
+        for (const pattern of deniedPatternsIn(step.block, denied)) {
+          hits.push(`${file.name} step "${step.id}": ${pattern}`)
+        }
+      }
+    }
+    // A guard on the guard: a format change that stops stepTexts reading anything would otherwise
+    // make this pass with nothing scanned.
+    expect(scanned).toBeGreaterThan(0)
+    expect(hits).toEqual([])
+  })
+})
+
+describe('denyPatternToRegex', () => {
+  it('turns `*` into a wildcard over the whole command', () => {
+    const regex = denyPatternToRegex('git reset --hard*')
+    expect(regex.test('git reset --hard origin/feat/x')).toBe(true)
+    expect(regex.test('git reset --hard')).toBe(true)
+    expect(regex.test('git reset --soft HEAD~1')).toBe(false)
+    expect(regex.test('echo git reset --hard')).toBe(false)
+  })
+
+  it('matches a wildcard in the middle and at the start', () => {
+    expect(
+      denyPatternToRegex('git push *--force*').test(
+        'git push origin --force-with-lease',
+      ),
+    ).toBe(true)
+    expect(
+      denyPatternToRegex('*wrangler delete*').test('pnpm wrangler delete'),
+    ).toBe(true)
+  })
+
+  it('treats a `:*` suffix as a prefix match', () => {
+    const regex = denyPatternToRegex('gh repo delete:*')
+    expect(regex.test('gh repo delete design4pro/x --yes')).toBe(true)
+    expect(regex.test('gh repo view')).toBe(false)
+  })
+
+  it('escapes regex metacharacters', () => {
+    const regex = denyPatternToRegex('rm -rf $HOME:*')
+    expect(regex.test('rm -rf $HOME/x')).toBe(true)
+    expect(regex.test('rm -rf HOME')).toBe(false)
+  })
+})
+
+describe('deniedPatternsIn', () => {
+  const denied = ['git reset --hard*', 'git push *--force*'].map((pattern) => ({
+    pattern,
+    regex: denyPatternToRegex(pattern),
+  }))
+
+  it('reports a denied command in an inline command', () => {
+    const block = '  - id: sync\n    command: git reset --hard origin/x\n'
+    expect(deniedPatternsIn(block, denied)).toEqual(['git reset --hard*'])
+  })
+
+  it('reports a denied command inside a block prompt, backticked or quoted', () => {
+    const block = [
+      '  - id: sync',
+      '    prompt: |',
+      '      Move to the head with `git reset --hard origin/x`,',
+      '      or run sh -c "git push origin --force-with-lease".',
+      '    allowedTools: [Bash]',
+    ].join('\n')
+    expect(deniedPatternsIn(block, denied)).toEqual([
+      'git reset --hard*',
+      'git push *--force*',
+    ])
+  })
+
+  it('reports nothing for the allowed equivalent', () => {
+    const block =
+      '  - id: sync\n    command: git fetch origin x && git checkout -B x origin/x\n'
+    expect(deniedPatternsIn(block, denied)).toEqual([])
   })
 })

@@ -74,5 +74,13 @@ These hold for every skill this run chains, whether or not its own override was 
   write through `cp`, `sed`, a heredoc or another path, and never route the whole ticket to a human
   in advance because one file is protected: #480-#482 went to a human only for
   `worker-configuration.d.ts` (run ee7c7d1a).
+- **A denied command ends the run, so never try one.** `permissions.deny` in
+  `.claude/settings.json` refuses it and `dontAsk` turns the refusal into a failed run: run d232173a
+  (#499) died on `git reset --hard origin/<head>`. Use the allowed equivalent (AGENTS.md): move a
+  worktree to a PR head with `git status`, `git fetch origin <head>`, then
+  `git checkout -B <head> origin/<head>` (when another worktree holds `<head>`, a clean task
+  branch takes `git merge --ff-only origin/<head>`); after a rebase, merge the base or push a new
+  branch instead of force-pushing (`--force-with-lease` included); fix what a hook reports instead
+  of using `--no-verify`.
 - **The dev server URL is `baseUrl` in `.ai/qa/test-env.json`** (`om-prepare-test-env` writes it).
   Never derive it from `.dev.vars`, which the agent never reads.
