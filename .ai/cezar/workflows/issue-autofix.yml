@@ -8,7 +8,7 @@ description: om-auto-fix-issue drives one issue to a reviewed draft-then-ready P
 steps:
   - id: bootstrap
     name: Install dependencies and generate the route tree
-    command: HUSKY=0 pnpm install --frozen-lockfile --prefer-offline && pnpm generate-routes
+    command: bash .ai/scripts/bootstrap.sh
   - id: fix
     name: om-auto-fix-issue
     prompt: '/om-auto-fix-issue {{task}}'

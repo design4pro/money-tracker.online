@@ -138,13 +138,15 @@ own skills, workflows and gate on a branch, and the review is what judges that.
   skill; they never relax its safety rules.
 - Repo-local skills: `verifying-changes`, `i18n-messages`, `tdd` (`.claude/skills/`).
 - The `afk-*` skills under `.ai/skills/` run the unattended issue pipeline: `afk-triage` (one issue
-  to an Agent Brief, or a `blocked` hold), `afk-to-tickets` (a merged spec to tracer-bullet
-  tickets), `afk-architecture-review` (weekly), `afk-lessons` (weekly), `afk-domain-modeling`
-  (`CONTEXT.md` and ADR discipline) and `afk-codebase-design` (the design vocabulary — module,
-  interface, depth, seam, adapter, the deletion test). **None of them is installed as a skill**, so
-  read the file at `.ai/skills/<name>/SKILL.md`; the `Skill` tool cannot reach it and answers
-  `Unknown skill`. All six were rendered by `design4pro/agent-kit`; since ADR 0021 they are
-  ordinary files, edited here.
+  to an Agent Brief, or a `blocked` hold), `afk-unblock` (a hold an agent set, lifted on a
+  specialist's verdict), `afk-plan-to-spec` (one `docs/plans/` stage to a reviewed spec),
+  `afk-to-tickets` (a merged spec to tracer-bullet tickets), `afk-architecture-review` (weekly),
+  `afk-lessons` (weekly), `afk-domain-modeling` (`CONTEXT.md` and ADR discipline) and
+  `afk-codebase-design` (the design vocabulary — module, interface, depth, seam, adapter, the
+  deletion test). **None of them is installed as a skill**, so read the file at
+  `.ai/skills/<name>/SKILL.md`; the `Skill` tool cannot reach it and answers `Unknown skill`. The
+  first six were rendered by `design4pro/agent-kit`; since ADR 0021 they are ordinary files, edited
+  here, and `afk-unblock` and `afk-plan-to-spec` were written here (ADR 0030).
 - `afk-codebase-design` comes in two halves. `.ai/skills/afk-codebase-design/SKILL.md` is the shared
   one: the vocabulary and the rules, which `afk-triage`, `afk-to-tickets` and
   `afk-architecture-review` all read by that literal path. This repository's house idiom, seam

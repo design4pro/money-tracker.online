@@ -20,11 +20,13 @@ no request is the whole backlog.
 
 No label marks an issue ready or starts a run (ADR 0029). Readiness is the script's rule, and the
 scheduled "Implement the next ready issue" automation takes the first `READY` issue every two hours
-through `backlog-status.mjs --next`, as long as fewer than three agent PRs are open.
+through `backlog-status.mjs --next`, as long as fewer than three PRs are waiting for a person (`needs-qa`
+without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours). `backlog-status.mjs --plan` is the same judgement as
+a list of actions for the Reconciler (ADR 0030); this report never starts one.
 
 | State          | Means                                                                       | Next step                                     |
 | -------------- | --------------------------------------------------------------------------- | --------------------------------------------- |
-| `BLOCKED`      | `blocked`, `do-not-merge` or `do-not-close` - a person's hold               | A person clears it, as the 🤖 comment asks    |
+| `BLOCKED`      | `blocked`, `do-not-merge` or `do-not-close` - a person's hold, or a `blocked` an agent set that `afk-unblock` may lift | A person clears it, as the 🤖 comment asks; for an agent's `blocked` the `unblock` run |
 | `RUNNING`      | An agent holds the claim (`in-progress`)                                    | Wait                                          |
 | `QUEUED`       | The cockpit has a queued or running run for it                             | Wait                                          |
 | `STUCK`        | A claim gone stale                                                          | Check the run, then remove `in-progress` over REST |

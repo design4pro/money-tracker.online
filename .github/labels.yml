@@ -22,7 +22,8 @@
 # ── pipeline: where a pull request stands, at most one at a time ──────────────────────────────
 # Written by the review, QA and merge skills. `blocked` and `do-not-merge` are a person's hold:
 # a skill may set `blocked` on an issue with a comment naming what a person must do, and the
-# develop -> main promotion carries `do-not-merge`; only a person clears either.
+# develop -> main promotion carries `do-not-merge`. A person clears `do-not-merge` and a `blocked`
+# they set; `afk-unblock` may lift a `blocked` an agent set, on a specialist's verdict (ADR 0030).
 pipeline:
   - name: review
     description: 'Ready for review, or under review by om-auto-review-pr.'
@@ -35,7 +36,7 @@ pipeline:
   - name: merge-queue
     description: 'Reviewed and, if it needed QA, approved. pr-autopilot merges it into develop, or a human does.'
   - name: blocked
-    description: 'A hold on an issue or pull request; only a person clears it. The comment says what they must do.'
+    description: 'A hold on an issue or pull request. The comment says what a person must do; afk-unblock may lift one an agent set.'
   - name: do-not-merge
     description: 'A human hold. No skill merges, and the autopilot stays out.'
 

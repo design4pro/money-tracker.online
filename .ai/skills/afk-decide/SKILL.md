@@ -83,6 +83,8 @@ Only what no agent in this pipeline can do:
 - a platform limit, such as a ruleset that requires a review the run's own account cannot give (the `develop` ruleset requires none, so self-approval is never a blocker there);
 - a write Claude Code refuses under `dontAsk` (protected configuration). Put the exact patch and the guardian's verdict in the report or PR, so applying it is one step for a human.
 
+Every comment that hands a matter to a person starts with `🤖 HUMAN-ONLY: <the one thing a person must do>`. That marker is what stops the Reconciler (ADR 0030) from launching `afk-unblock` on the hold again: an agent-set `blocked` without it is offered to a specialist, which is a wasted run when the matter is one of these. A hold or a `STOP:` an agent set for any other reason is lifted by `afk-unblock` on a specialist's verdict.
+
 Everything else is decided here.
 
 ## Done when

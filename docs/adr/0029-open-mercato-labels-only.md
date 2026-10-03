@@ -6,6 +6,8 @@ Amends: ADR 0017 (the `groom` / `autofix` / `spec` command labels, the intake la
 2026-09-17 amendments and `review-threads` are gone), ADR 0027 (the promotion carries
 `do-not-merge`, not `promotion`). ADR 0014, which first named `ready-for-agent`, is already
 superseded by ADR 0017.
+Amended by: ADR 0030 (the Reconciler starts implementation; the WIP limit counts only PRs that wait
+for a person; an agent may lift a hold an agent set).
 
 ## Context
 
