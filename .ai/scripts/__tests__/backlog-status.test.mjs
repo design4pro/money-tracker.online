@@ -389,6 +389,66 @@ describe("classify", () => {
     it("offers nothing on a state that is not a hold or a not-ready", () => {
       expect(decide().canUnblock).toBe(false);
     });
+
+    it("does not take an outsider's comment for the explanation of a hold", () => {
+      const outsider = { ...agent("hi", "2026-09-03T00:00:00Z"), author: { login: "someone-else" } };
+      const seen = blocked([agent("waiting on the decision"), human("keep it blocked", "2026-09-02T00:00:00Z"), outsider]);
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("does not lift a blocked a person set after an Agent Brief or a RESOLVED comment", () => {
+      expect(blocked([agent(`triage\n\n${BRIEF}`)]).canUnblock).toBe(false);
+      expect(blocked([agent("RESOLVED: the panel chose the accounts repo")]).canUnblock).toBe(false);
+    });
+
+    it("does not take an outsider's HUMAN-ONLY comment for a hand-back", () => {
+      const outsider = { ...agent("HUMAN-ONLY: no", "2026-09-03T00:00:00Z"), author: { login: "someone-else" } };
+      expect(blocked([agent("waiting on the decision"), outsider]).canUnblock).toBe(false);
+      const seen = decide({ comments: [agent(`triage\n\n${BRIEF}`), outsider] });
+      expect(seen.state).toBe("READY");
+    });
+  });
+
+  describe("HUMAN-ONLY", () => {
+    const humanOnlyBody = "🤖 HUMAN-ONLY: decide the budget\n\nStage 06-S3 needs it.";
+
+    it("holds out of automation an issue a trusted author opened with the marker in its body", () => {
+      const seen = decide({ body: humanOnlyBody, createdAt: "2026-08-30T00:00:00Z" });
+      expect(seen.state).toBe("NOT_READY");
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("holds out of automation a briefed issue that a trusted agent's comment hands to a person", () => {
+      const seen = decide({ comments: [agent(`triage\n\n${BRIEF}`), agent("HUMAN-ONLY: the owner decides", "2026-09-03T00:00:00Z")] });
+      expect(seen.state).toBe("NOT_READY");
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("keeps a HUMAN-ONLY comment older than an unanswered STOP with the person", () => {
+      const comments = [
+        agent(`triage\n\n${BRIEF}`),
+        agent("HUMAN-ONLY: the owner decides", "2026-09-03T00:00:00Z"),
+        agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z"),
+      ];
+      const seen = decide({ comments });
+      expect(seen.state).toBe("NOT_READY");
+      expect(seen.canUnblock).toBe(false);
+    });
+
+    it("gives the issue back once a trusted person comments after the marker", () => {
+      const comments = [
+        agent(`triage\n\n${BRIEF}`),
+        agent("HUMAN-ONLY: the owner decides", "2026-09-03T00:00:00Z"),
+        human("decided: 20 EUR", "2026-09-04T00:00:00Z"),
+      ];
+      expect(decide({ comments }).state).toBe("READY");
+      expect(decide({ body: `${humanOnlyBody}\n\n${BRIEF}`, createdAt: "2026-08-30T00:00:00Z", comments: [human("decided", "2026-09-04T00:00:00Z")] }).state).toBe("READY");
+    });
+
+    it("ignores a body that only quotes the word, and one an outsider wrote", () => {
+      expect(decide({ comments: [agent(`triage\n\n${BRIEF}`)], body: "The rule says `HUMAN-ONLY:` is a marker." }).state).toBe("READY");
+      expect(decide({ body: humanOnlyBody, createdAt: "2026-08-30T00:00:00Z", author: { login: "someone-else" } }).state).toBe("EXTERNAL");
+    });
   });
 
   it("never makes an issue someone else opened ready, whatever it carries", () => {

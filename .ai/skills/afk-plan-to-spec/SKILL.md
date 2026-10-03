@@ -86,4 +86,4 @@ The workflow's gate step runs first and its `pr` step opens the PR; run on its o
 
 ## Done when
 
-The spec is committed with its panel verdicts recorded and the metadata table complete (and, run on its own, on an open PR), or the delivered stages are marked in the plan on a docs-only PR, or the run ended with `NO_ACTION_NEEDED` and a reason, or an issue filed as `human-only`. Finish with `Spec: .ai/specs/<file>.md` and `PR: #<n>`, or, for the marked stages, `Delivered: <stage ids>` and `PR: #<n>`.
+The spec is committed with its panel verdicts recorded and the metadata table complete (and, run on its own, on an open PR), or the delivered stages are marked in the plan on a docs-only PR, or the run ended with `NO_ACTION_NEEDED` and a reason, or an issue filed as `human-only`, or the spec the panel would not approve sits on a draft `blocked` PR with its `🤖 HUMAN-ONLY:` comment. Finish with `Spec: .ai/specs/<file>.md` and `PR: #<n>`, or, for the marked stages, `Delivered: <stage ids>` and `PR: #<n>`.

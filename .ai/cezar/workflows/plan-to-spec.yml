@@ -14,9 +14,11 @@
 # `steps` form rather than the `skills:` shorthand, because the shorthand runs with the default tool
 # list, which has no `Agent`.
 #
-# `$CEZ_HANDOFF_FILE` carries the `STAGE:` line and then either a `DELIVERED:` line (stages marked in the
-# plan, a docs-only PR to open) or, when the run ends with nothing to merge, a `STOP:` line. The later
-# steps match them anywhere in the file (cezar prepends its own entries to it).
+# `$CEZ_HANDOFF_FILE` carries the `STAGE:` line and then one of a `DELIVERED:` line (stages marked in the
+# plan, a docs-only PR to open), an `UNAPPROVED:` line (a committed spec the panel would not approve:
+# its PR opens as a draft held by a person, so the stage stays covered and is not written again) or,
+# when the run ends with nothing to commit, a `STOP:` line. The later steps match them anywhere in the
+# file (cezar prepends its own entries to it).
 name: plan-to-spec
 description: Write the spec for one plan stage, have a specialist panel review it, and land it on a design-only PR the pipeline merges (afk-plan-to-spec).
 steps:
@@ -29,7 +31,7 @@ steps:
     prompt: |
       /afk-plan-to-spec {{task}}
 
-      Append a line `STAGE: <stage id>` to the file `$CEZ_HANDOFF_FILE`; later steps read it. When the skill marked delivered stages in the plan instead of writing a spec (its step 2a), append a line `DELIVERED: <the stage ids, comma separated>`, then end with CEZ:DONE. When the skill ends without a committed spec or marker - `NO_ACTION_NEEDED`, an issue filed as human-only, or a spec the panel would not approve - append a line `STOP: <reason>`, then end with CEZ:DONE. Later steps grep that file for `STOP:` and skip, and for `DELIVERED:` and open the docs PR.
+      Append a line `STAGE: <stage id>` to the file `$CEZ_HANDOFF_FILE`; later steps read it. When the skill marked delivered stages in the plan instead of writing a spec (its step 2a), append a line `DELIVERED: <the stage ids, comma separated>`, then end with CEZ:DONE. When the skill committed a spec the panel would not approve (its step 5: still **revise** after the second round, or a security reviewer that does not approve), append a line `UNAPPROVED: <the verdict and the one thing a person must settle>`, then end with CEZ:DONE; the spec stays committed on its `spec/<slug>` branch. When the skill ends without a committed spec or marker - `NO_ACTION_NEEDED` or an issue filed as human-only - append a line `STOP: <reason>`, then end with CEZ:DONE. Later steps grep that file for `STOP:` and skip, for `DELIVERED:` and open the docs PR, and for `UNAPPROVED:` and open the draft PR.
     # Agent: the open questions and the panel's verdicts go to independent specialist sub-agents.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
   - id: gate
@@ -49,13 +51,15 @@ steps:
 
       If `grep -q '^DELIVERED:' "$CEZ_HANDOFF_FILE"` succeeds, no spec was written. Open the docs-only PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `docs/plan-delivered-<plan slug>` (the skill's commit is already on it), labels `documentation`, `skip-qa`, `priority-low` and `risk-low`, and a body that lists each stage id of the `DELIVERED:` line with its evidence line from the plan. There is no issue to reference. Then end with CEZ:DONE.
 
+      If `grep -q '^UNAPPROVED:' "$CEZ_HANDOFF_FILE"` succeeds, the panel would not approve the spec. Open its PR anyway per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 5: branch `spec/<slug>`, a **draft**, labels `blocked`, `documentation`, `skip-qa`, one priority and one risk (never `review`), and the stage, the panel's verdicts and the Resolved assumptions table in the body. Then post on it one comment whose first line is exactly `🤖 HUMAN-ONLY: <the one thing a person must settle>` (the `UNAPPROVED:` line has it), and end with CEZ:DONE. The open PR adds a spec, so the Reconciler does not offer the stage again.
+
       Otherwise open the spec PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `spec/<slug>`, design-only and ready for review (not a draft), labels `review`, `documentation`, `skip-qa`, one priority and one risk, and the stage, the panel's verdicts and the Resolved assumptions table in the body. There is no issue to reference. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   - id: merge
     name: Drive the PR to the merge into develop
     prompt: |
-      End at once with CEZ:DONE if either holds:
-      - `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` succeeds;
+      End at once with CEZ:DONE if any holds:
+      - `grep -q '^STOP:' "$CEZ_HANDOFF_FILE"` or `grep -q '^UNAPPROVED:' "$CEZ_HANDOFF_FILE"` succeeds (the unapproved spec's draft PR is a person's);
       - no PR is open for this branch (`gh pr list --head "$(git branch --show-current)"`).
 
       Otherwise run `/om-pr-autopilot <that PR number> --allow-merge` for the PR of {{task}}. The PR is design-only and `skip-qa`: no browser. Merge only into `develop`.
