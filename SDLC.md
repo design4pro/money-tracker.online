@@ -295,16 +295,19 @@ is also what stops the Reconciler from starting the same run again.
 Workflows live in `.ai/cezar/workflows/`; the committed definitions are
 `docs/agents/cezar-automations.json`, applied with `.ai/scripts/cez-automations.sh`.
 
-| Automation                         | Trigger                               | Workflow                                               |
-| ---------------------------------- | ------------------------------------- | ------------------------------------------------------ |
-| Groom and triage new issues        | `issue.opened` by a maintainer        | `issue-groom` (`om-auto-manage-issues` + `afk-triage`) |
-| Re-triage when a hold is cleared   | `blocked` removed                     | `issue-groom`                                          |
-| Implement the next ready issue     | every 2 hours                         | `implement-ticket` (`backlog-status.mjs --next`)       |
-| Autopilot new pull requests        | `pull_request.opened` by a maintainer | `pr-autopilot`                                         |
-| Merge reviewed agent pull requests | agent PR reviewed into `merge-queue`  | `pr-autopilot`                                         |
-| Spec to tickets                    | weekdays 07:00                        | `spec-to-tickets` (`afk-to-tickets`)                   |
-| Weekly architecture review         | Mondays 06:00                         | `architecture-review` (`afk-architecture-review`)      |
-| Weekly lessons                     | Fridays 16:00                         | `lessons` (`afk-lessons`)                              |
+| Automation                         | Trigger                               | Workflow                                          |
+| ---------------------------------- | ------------------------------------- | ------------------------------------------------- |
+| Autopilot new pull requests        | `pull_request.opened` by a maintainer | `pr-autopilot`                                    |
+| Merge reviewed agent pull requests | agent PR reviewed into `merge-queue`  | `pr-autopilot`                                    |
+| Weekly architecture review         | Mondays 06:00                         | `architecture-review` (`afk-architecture-review`) |
+| Weekly lessons                     | Fridays 16:00                         | `lessons` (`afk-lessons`)                         |
+
+The Reconciler (§ The Reconciler) starts triage, implementation, slicing and unblocking. The
+automations that used to start the same work - **Implement the next ready issue** and **Spec to
+tickets** on a schedule, **Groom and triage new issues** and **Re-triage when a hold is cleared** on
+an issue event - are retired, because each would start an issue or a spec a second time. The two
+issue ones stay in the file with `"enabled": false`: their `authors` gate is the trusted-author list
+`backlog-status.mjs` reads, and without it the Reconciler would start nothing.
 
 `housekeeping` (`om-review-prs`, `om-merge-buddy` report, `om-close-fixed-issues`) has **no cezar
 automation but does run on a schedule**: the launchd agent `dev.money-tracker.housekeeping` calls
@@ -314,15 +317,22 @@ why this paragraph used to say the opposite. So the review sweep and post-merge 
 run unattended; an issue whose PR merged closes at the next run rather than waiting for a person,
 and a merger's manual `/om-close-fixed-issues` matters only between those three runs.
 
-Nine workflows have **no automation and no schedule**: `backlog`, `brainstorm`, `implement-spec`,
-`pr-review`, `issue-autofix`, `spec`, `triage`, `unblock` and `plan-to-spec`. The Reconciler (§ The
-Reconciler) starts `triage`, `unblock` and `plan-to-spec`, and `implement-ticket` and
-`spec-to-tickets` too; a person starts any workflow from the cockpit.
+Twelve workflows have **no automation and no schedule**: `backlog`, `brainstorm`, `implement-spec`,
+`pr-review`, `issue-autofix`, `issue-groom`, `spec`, `triage`, `unblock`, `plan-to-spec`,
+`implement-ticket` and `spec-to-tickets`. The Reconciler (§ The Reconciler) starts `triage`,
+`unblock`, `plan-to-spec`, `implement-ticket` and `spec-to-tickets`; a person starts any workflow
+from the cockpit.
 
 The `authors: ["rafalwolak"]` filter on the issue and PR automations is a security gate, not a
 convenience: those runs read the issue or PR body as a prompt and hold Bash with no allowlist, so
 anything from anyone else waits for a maintainer to start a run from the cockpit. The same list is
-what `backlog-status.mjs` trusts, so such an issue is never picked by the schedule either.
+what `backlog-status.mjs` trusts, so such an issue is never picked by the Reconciler either.
+
+Applying the retirement on the host: the Reconciler's sync re-applies the file without `--prune`,
+which disables the two issue automations and lists the two schedules as `not in file`. Disable
+**Implement the next ready issue** and **Spec to tickets** in the cockpit (Automations), then run
+`.ai/scripts/cez-automations.sh --dry-run --prune` and `.ai/scripts/cez-automations.sh --prune`:
+the script refuses to delete an enabled stray.
 
 **Guardrails:**
 

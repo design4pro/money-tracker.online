@@ -1,7 +1,8 @@
 [
   {
     "name": "Groom and triage new issues",
-    "description": "A maintainer opens an issue; issue-groom runs om-auto-manage-issues (SDLC labels, the Definition of Ready check, implementation notes) and then afk-triage (an Agent Brief, or `blocked` with a comment naming what a person must do), in one run so the two never race on the same labels (ADR 0017, ADR 0029). `authors` is the gate: both steps hold Bash with no allowlist and read the issue body, so an issue from anyone else is never groomed by automation. Every agent files its issues as `rafalwolak` too (one identity, no bot account), and that is intended: a follow-up afk-triage or afk-architecture-review files is groomed and triaged here like any other, and afk-triage stops at once on an issue that already carries an Agent Brief. Issues a run holds or a person put on hold never match.",
+    "description": "Retired and kept disabled for its `authors` gate alone (ADR 0030). The Reconciler starts triage from `backlog-status.mjs --plan`, so this event would start the same issue a second time. The definition stays because `backlog-status.mjs` and afk-unblock read the trusted authors from the `authors` gates of the issue automations, and a repository whose automations gate nobody trusts nobody: without it the Reconciler would start nothing. Enabled, it ran issue-groom (om-auto-manage-issues, then afk-triage) on an issue a maintainer opened.",
+    "enabled": false,
     "events": ["issue.opened"],
     "intervalSeconds": 120,
     "filters": {
@@ -21,7 +22,8 @@
   },
   {
     "name": "Re-triage when a hold is cleared",
-    "description": "A person removes `blocked` from an issue - the thing it waited on is done or answered - and issue-groom grooms and triages it again, so the issue reaches an Agent Brief without anyone starting a run (ADR 0029). Same `authors` gate as above.",
+    "description": "Retired and kept disabled for its `authors` gate alone, like the one above (ADR 0030). The Reconciler starts unblock and triage from `backlog-status.mjs --plan`, so this event would start the same issue a second time. Enabled, it ran issue-groom again when a person removed `blocked` from an issue.",
+    "enabled": false,
     "events": ["issue.unlabeled"],
     "intervalSeconds": 300,
     "filters": {
@@ -34,20 +36,6 @@
     "task": {
       "prompt": "{{github.number}}",
       "workflow": "issue-groom",
-      "autonomous": true,
-      "worktree": true,
-      "variants": 1,
-      "generateFollowups": false
-    }
-  },
-  {
-    "name": "Implement the next ready issue",
-    "description": "Every two hours implement-ticket takes the one highest-priority, oldest ready issue - opened by the maintainer, carrying an Agent Brief, a category, a priority and a risk, with every \"Blocked by\" issue closed, no open or merged-unclosed PR and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress` - as `node .ai/scripts/backlog-status.mjs --next` picks it, implements it test-first, gates it, opens the PR and drives it through review, QA and CI to the merge into develop by om-pr-autopilot --allow-merge (ADR 0027, ADR 0029). The script answers nothing while three agent PRs are open, so one tick starts at most one issue and the queue never outruns review. `risk-high` and `security` issues are not skipped: implement-ticket re-derives the risk from the area and claims one only on the security and tenancy specialist's approving verdict (SDLC.md § Delegated decisions), and a `risk-high` PR waits for the owner's `qa-approved`. A schedule rather than an event: a ticket becomes ready when its blockers close, and no GitHub event says so.",
-    "kind": "schedule",
-    "schedule": { "type": "hours", "every": 2 },
-    "task": {
-      "prompt": "Implement the next ready issue in {{project}} ({{date}}).",
-      "workflow": "implement-ticket",
       "autonomous": true,
       "worktree": true,
       "variants": 1,
@@ -106,22 +94,8 @@
     }
   },
   {
-    "name": "Spec to tickets",
-    "description": "Weekday mornings: afk-to-tickets slices at most one newly merged spec into vertical tickets, each carrying its Agent Brief in the body. Schedule rather than an event, so it never races the issue pipeline above. A ticket with no open blocker is ready at once, and \"Implement the next ready issue\" takes it; the rest become ready as their blockers close (ADR 0029). Idempotent - a spec that already has a parent issue is skipped.",
-    "kind": "schedule",
-    "schedule": { "type": "weekdays", "hour": 7, "minute": 0 },
-    "task": {
-      "prompt": "Run the afk-to-tickets skill for {{project}} on {{date}}: slice at most one unsliced spec.",
-      "workflow": "spec-to-tickets",
-      "autonomous": true,
-      "worktree": true,
-      "variants": 1,
-      "generateFollowups": false
-    }
-  },
-  {
     "name": "Weekly architecture review",
-    "description": "Mondays: afk-architecture-review reads the last 30 days of hot spots and files at most three refactor issues, each with a recommendation strength. Read-only on code - the only writes are issues, which \"Groom and triage new issues\" then grooms and briefs like any other, and a judgement call is settled by a specialist sub-agent (`.ai/skills/afk-decide/SKILL.md`). It reads `.ai/skills/afk-codebase-design/SKILL.md` for its vocabulary - the shared half, kept identical by hand across the repositories that use this pipeline - and this repository's own seams are in the override beside it.",
+    "description": "Mondays: afk-architecture-review reads the last 30 days of hot spots and files at most three refactor issues, each with a recommendation strength. Read-only on code - the only writes are issues, which the Reconciler then triages like any other, and a judgement call is settled by a specialist sub-agent (`.ai/skills/afk-decide/SKILL.md`). It reads `.ai/skills/afk-codebase-design/SKILL.md` for its vocabulary - the shared half, kept identical by hand across the repositories that use this pipeline - and this repository's own seams are in the override beside it.",
     "kind": "schedule",
     "schedule": { "type": "weekly", "day": 1, "hour": 6, "minute": 0 },
     "task": {

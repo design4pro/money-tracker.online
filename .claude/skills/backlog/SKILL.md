@@ -19,8 +19,8 @@ no request is the whole backlog.
 ## States the script reports
 
 No label marks an issue ready or starts a run (ADR 0029). Readiness is the script's rule, and the
-scheduled "Implement the next ready issue" automation takes the first `READY` issue every two hours
-through `backlog-status.mjs --next`, as long as fewer than three PRs are waiting for a person (`needs-qa`
+Reconciler's `implement` action takes the first `READY` issue (ADR 0030)
+through `backlog-status.mjs --plan`, as long as fewer than three PRs are waiting for a person (`needs-qa`
 without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours). `backlog-status.mjs --plan` is the same judgement as
 a list of actions for the Reconciler (ADR 0030); this report never starts one.
 
@@ -79,7 +79,7 @@ Reading it:
   design. Read the count as a backlog of untriaged work for a human, and read the *recent* numbers
   as the run's health. Only issues a trusted author opened without a brief in the body are counted.
 - **Time to first PR includes the queue.** A ticket waits for its blockers, and every ready issue
-  waits for the two-hourly schedule and the WIP limit, inside that span.
+  waits for a Reconciler tick and the WIP limit, inside that span.
 - **Poll counts are absent on purpose.** The cockpit holds them in memory and commits them nowhere,
   so the report names the gap instead of printing a zero it did not measure. If someone needs
   polls, that is the live cockpit, not this script.

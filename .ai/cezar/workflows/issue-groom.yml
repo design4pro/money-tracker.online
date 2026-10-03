@@ -1,4 +1,5 @@
-# Every issue a maintainer opens, and every issue a person takes `blocked` off, is groomed and
+# Started by a person from the cockpit. Its two automations are retired and kept disabled: the
+# Reconciler starts `triage` and `unblock` instead (ADR 0030). The issue is groomed and
 # triaged in one run (ADR 0029): om-auto-manage-issues adds the SDLC labels (category, priority,
 # risk), the Definition of Ready check and a read-only implementation-prep comment (ADR 0017), then
 # afk-triage writes the Agent Brief that makes it ready - or `blocked` with a comment naming the

@@ -1,7 +1,7 @@
 # Started by the Reconciler (docs/agents/cezar.md, ADR 0030) with `Slice the spec <path> into
 # tickets.` when `node .ai/scripts/backlog-status.mjs --plan` lists a `slice` action - the oldest
-# `ready` spec directly in .ai/specs/ that no issue's body opens with `Spec: <path>` - on weekday
-# mornings by a schedule (docs/agents/cezar-automations.json), or by a person from the cockpit.
+# `ready` spec directly in .ai/specs/ that no issue's body opens with `Spec: <path>` - or by a
+# person from the cockpit.
 # afk-to-tickets slices at most one merged spec into vertical tickets, each carrying its Agent
 # Brief in the body. It reads `.ai/specs/`, CONTEXT.md and the two afk-*-design skills, and publishes only GitHub issues. The
 # skill never edits source files, so the step holds no Edit. It holds Write for the ticket drafts it

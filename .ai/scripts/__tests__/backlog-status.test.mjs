@@ -19,6 +19,8 @@
  * hold a person set.
  */
 
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -122,6 +124,15 @@ describe("trustedAuthors", () => {
 
   it("still trusts nobody when no issue automation is gated", () => {
     expect(trustedAuthors([AUTOMATIONS[1]]).size).toBe(0);
+  });
+
+  // The Reconciler replaced the issue automations, but they stay in the file, disabled, because
+  // their `authors` gate is this list: removing them would leave the Reconciler nothing to start.
+  it("trusts the maintainer through the committed definitions", () => {
+    const committed = JSON.parse(
+      readFileSync(new URL("../../../docs/agents/cezar-automations.json", import.meta.url), "utf8"),
+    );
+    expect(trustedAuthors(committed)).toContain("rafalwolak");
   });
 });
 
