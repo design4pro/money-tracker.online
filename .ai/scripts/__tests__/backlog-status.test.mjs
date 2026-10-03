@@ -9,16 +9,23 @@
  *
  * Both of those shipped once and are pinned below: `linkOpenPrs` keeps *which* signal matched, and
  * a branch-only link is a question rather than an instruction.
+ *
+ * Since ADR 0029 the same judgement is also a pick: `--next` names the issue a scheduled run
+ * implements with nobody watching, so the cases that keep an issue OUT of READY - an author no
+ * automation trusts, a brief a stranger wrote, an open blocker, the WIP limit - matter most.
  */
 
 import { describe, expect, it } from "vitest";
 
 import {
+  WIP_LIMIT,
+  blockedBy,
   branchIssue,
   classify,
   closeKeywordTargets,
+  countWip,
   automationLaunches,
-  firstLabelledAt,
+  firstBriefAt,
   firstPrSpans,
   flowReport,
   gateRetries,
@@ -26,46 +33,41 @@ import {
   intakeSpans,
   linkOpenPrs,
   parseArgs,
+  pickNext,
+  readTrusted,
   sample,
   spanSummary,
   staleClaims,
-  readTriggers,
   sortIssues,
 } from "../backlog-status.mjs";
 
 const NOW = Date.parse("2026-09-13T12:00:00Z");
+const OWNER = { login: "rafalwolak" };
 
 const AUTOMATIONS = [
-  {
-    name: "Fix issues on the autofix label",
-    filters: { changedLabels: ["autofix"], excludeLabels: ["in-progress", "blocked"] },
-    task: { workflow: "issue-autofix" },
-  },
-  {
-    name: "Write a spec for feature issues",
-    filters: { changedLabels: ["spec"], allLabels: ["feature"], excludeLabels: [] },
-    task: { workflow: "spec" },
-  },
-  {
-    name: "Resolve blocking review threads",
-    filters: { includePullRequests: true, changedLabels: ["review-threads"] },
-    task: { workflow: "pr-fix" },
-  },
+  { name: "Groom", events: ["issue.opened"], filters: { authors: ["rafalwolak"] } },
+  { name: "Ungated", events: ["issue.labeled"], filters: {} },
+  { name: "Autopilot", events: ["pull_request.opened"], filters: { authors: ["someone-else"] } },
 ];
 
-const triggers = new Map([
-  ["autofix", { workflow: "issue-autofix", requires: [], excludes: ["in-progress", "blocked"] }],
-  ["spec", { workflow: "spec", requires: ["feature"], excludes: [] }],
-]);
+const trusted = new Set(["rafalwolak"]);
 
-const agent = (body, createdAt = "2026-09-01T00:00:00Z") => ({ body: `🤖 ${body}`, createdAt });
-const human = (body, createdAt = "2026-09-02T00:00:00Z") => ({ body, createdAt });
+const sdlcLabels = {
+  category: ["bug", "feature"],
+  priority: ["priority-low", "priority-medium", "priority-high"],
+  risk: ["risk-low", "risk-high"],
+};
+
+const BRIEF = "## Agent Brief\n\n**Category:** bug";
+const agent = (body, createdAt = "2026-09-01T00:00:00Z") => ({ body: `🤖 ${body}`, createdAt, author: OWNER });
+const human = (body, createdAt = "2026-09-02T00:00:00Z", author = OWNER) => ({ body, createdAt, author });
 
 const issue = (over = {}) => ({
   number: 42,
   title: "an issue",
-  labels: [{ name: "bug" }],
-  comments: [agent("implementation notes")],
+  author: OWNER,
+  labels: [{ name: "bug" }, { name: "priority-medium" }, { name: "risk-low" }],
+  comments: [agent(`triage\n\n${BRIEF}`)],
   body: "",
   updatedAt: "2026-09-13T11:00:00Z",
   ...over,
@@ -73,7 +75,9 @@ const issue = (over = {}) => ({
 
 const decide = (over = {}, context = {}) =>
   classify(issue(over), {
-    triggers,
+    trusted,
+    sdlcLabels,
+    openIssues: new Set(),
     runs: new Map(),
     prLinks: new Map(),
     staleHours: 24,
@@ -81,19 +85,13 @@ const decide = (over = {}, context = {}) =>
     ...context,
   });
 
-describe("readTriggers", () => {
-  it("maps every issue trigger to its workflow, its requirements and its stand-downs", () => {
-    const read = readTriggers(AUTOMATIONS);
-    expect(read.get("autofix")).toEqual({
-      workflow: "issue-autofix",
-      requires: [],
-      excludes: ["in-progress", "blocked"],
-    });
-    expect(read.get("spec").requires).toEqual(["feature"]);
+describe("readTrusted", () => {
+  it("trusts the authors gating an issue automation", () => {
+    expect(readTrusted(AUTOMATIONS)).toEqual(new Set(["rafalwolak"]));
   });
 
-  it("skips an automation that watches pull requests, which carry no issue state", () => {
-    expect(readTriggers(AUTOMATIONS).has("review-threads")).toBe(false);
+  it("trusts nobody when no issue automation is gated", () => {
+    expect(readTrusted([AUTOMATIONS[1]]).size).toBe(0);
   });
 });
 
@@ -149,6 +147,13 @@ describe("linkOpenPrs", () => {
     expect(links.get(5)[0].viaKeyword).toBe(true);
   });
 
+  it("flags a merged pull request, so the issue it addresses is not taken again", () => {
+    const links = linkOpenPrs([
+      { number: 9, title: "t", body: "Closes #5", headRefName: "feat/issue-5-thing", merged: true },
+    ]);
+    expect(links.get(5)).toEqual([{ number: 9, title: "t", viaKeyword: true, merged: true }]);
+  });
+
   it("links an issue the body closes but the branch does not name", () => {
     const links = linkOpenPrs([
       { number: 8, title: "t", body: "Closes #5\nCloses #6", headRefName: "feat/issue-5-thing" },
@@ -157,10 +162,24 @@ describe("linkOpenPrs", () => {
   });
 });
 
+describe("blockedBy", () => {
+  it("reads the issues under the ticket's Blocked by heading, up to the next heading", () => {
+    expect(blockedBy("## Acceptance\n- see #3\n\n## Blocked by\n- #12\n- #13\n\n## Notes\n#99")).toEqual([12, 13]);
+  });
+
+  it("lists nothing for a ticket that can start immediately, or has no section", () => {
+    expect(blockedBy("## Blocked by\n- None - can start immediately")).toEqual([]);
+    expect(blockedBy("fixes a thing, see #4")).toEqual([]);
+  });
+});
+
 describe("classify", () => {
-  it("puts a hard block ahead of everything, including a claim", () => {
-    const seen = decide({ labels: [{ name: "blocked" }, { name: "in-progress" }] });
-    expect(seen.state).toBe("BLOCKED");
+  it("puts a hold ahead of everything, including a claim", () => {
+    for (const hold of ["blocked", "do-not-merge", "do-not-close"]) {
+      const seen = decide({ labels: [{ name: hold }, { name: "in-progress" }] });
+      expect(seen.state).toBe("BLOCKED");
+      expect(seen.next).toContain(hold);
+    }
   });
 
   it("reads a fresh claim as running and a stale one as stuck", () => {
@@ -170,28 +189,37 @@ describe("classify", () => {
     ).toBe("STUCK");
   });
 
-  it("is queued only when a run actually holds the trigger", () => {
-    const runs = new Map([[42, { status: "queued", workflow: "issue-autofix" }]]);
-    expect(decide({ labels: [{ name: "autofix" }] }, { runs }).state).toBe("QUEUED");
-    expect(decide({ labels: [{ name: "autofix" }] }).state).toBe("STUCK");
+  it("tells a stuck claim's owner to clear it over REST, since gh issue edit aborts on this host", () => {
+    const { next } = decide({ labels: [{ name: "in-progress" }], updatedAt: "2026-09-10T11:00:00Z" });
+    expect(next).toContain("gh api -X DELETE");
+    expect(next).not.toContain("gh issue edit");
   });
 
-  it("reports a trigger its own stand-down label voids", () => {
-    const seen = decide({ labels: [{ name: "autofix" }, { name: "blocked" }] });
-    expect(seen.state).toBe("BLOCKED");
+  it("is queued while a cockpit run holds it", () => {
+    const runs = new Map([[42, { status: "queued", workflow: "implement-ticket" }]]);
+    expect(decide({}, { runs }).state).toBe("QUEUED");
   });
 
-  it("reports a trigger missing the label its automation requires", () => {
-    const seen = decide({ labels: [{ name: "spec" }] });
-    expect(seen.state).toBe("STUCK");
-    expect(seen.next).toContain("--add-label feature");
-  });
-
-  it("sends an issue with an open pull request to review, not to grooming", () => {
+  it("sends an issue with an open pull request to review, not to triage", () => {
     const prLinks = new Map([[42, [{ number: 269, title: "t", viaKeyword: true }]]]);
     const seen = decide({ comments: [] }, { prLinks });
     expect(seen.state).toBe("IN_REVIEW");
     expect(seen.warning).toBeNull();
+  });
+
+  it("keeps an issue whose PR merged into develop out of the ready pool until it is closed", () => {
+    const prLinks = new Map([[42, [{ number: 270, title: "t", viaKeyword: true, merged: true }]]]);
+    const seen = decide({}, { prLinks });
+    expect(seen.state).toBe("IN_REVIEW");
+    expect(seen.next).toContain("merged but the issue is still open");
+    expect(seen.next).toContain("/om-close-fixed-issues");
+  });
+
+  it("drives the open PR when a merged one also names the issue", () => {
+    const prLinks = new Map([
+      [42, [{ number: 270, title: "t", viaKeyword: true, merged: true }, { number: 271, title: "t", viaKeyword: true }]],
+    ]);
+    expect(decide({}, { prLinks }).next).toBe("#271 open - drive it with `/om-pr-autopilot 271`.");
   });
 
   it("asks about a branch-only link instead of prescribing a closing keyword", () => {
@@ -202,43 +230,98 @@ describe("classify", () => {
     expect(seen.warning).toContain("if it is a partial fix, nothing to change");
   });
 
+  it("tracks a spec parent instead of asking to triage it", () => {
+    expect(decide({ comments: [], body: "Spec: .ai/specs/2026-09-01-x.md\n\n- [ ] #43" }).state).toBe("TRACKING");
+  });
+
+  it("waits while an issue it is blocked by is open, and is ready once it closes", () => {
+    const body = "## Blocked by\n- #7";
+    expect(decide({ body }, { openIssues: new Set([7]) }).state).toBe("WAITING");
+    expect(decide({ body }).state).toBe("READY");
+  });
+
   it("holds a not-ready issue until a human answers it", () => {
-    const unanswered = [agent("implementation notes"), agent("not ready", "2026-09-03T00:00:00Z")];
+    const unanswered = [agent(`triage\n\n${BRIEF}`), agent("not ready", "2026-09-03T00:00:00Z")];
     expect(decide({ comments: unanswered }).state).toBe("NOT_READY");
     expect(decide({ comments: [...unanswered, human("ready as is", "2026-09-04T00:00:00Z")] }).state).toBe("READY");
   });
 
   it("takes a newer readiness-verified verdict as the answer, and an older one as nothing", () => {
-    const notReady = [agent("implementation notes"), agent("not ready", "2026-09-03T00:00:00Z")];
+    const notReady = [agent(`triage\n\n${BRIEF}`), agent("not ready", "2026-09-03T00:00:00Z")];
     const verified = (at) => agent("`readiness-verifier` — readiness verified", at);
     expect(decide({ comments: [...notReady, verified("2026-09-04T00:00:00Z")] }).state).toBe("READY");
     expect(decide({ comments: [verified("2026-09-02T00:00:00Z"), ...notReady] }).state).toBe("NOT_READY");
   });
 
-  it("does not mistake its own not-ready marker for the human's answer", () => {
+  it("does not pick an issue implement-ticket stopped on until someone answers", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop] }).state).toBe("NOT_READY");
+    expect(
+      decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, human("seam: the accounts repo", "2026-09-06T00:00:00Z")] }).state,
+    ).toBe("READY");
+  });
+
+  it("does not mistake a skill's own comment after a not-ready marker for the answer", () => {
     const comments = [
-      agent("implementation notes"),
+      agent(`triage\n\n${BRIEF}`),
       agent("not ready", "2026-09-03T00:00:00Z"),
       agent("labels applied", "2026-09-04T00:00:00Z"),
     ];
     expect(decide({ comments }).state).toBe("NOT_READY");
   });
 
-  it("routes a feature with no covering spec to the spec trigger", () => {
-    expect(decide({ labels: [{ name: "feature" }], comments: [] }).state).toBe("NEEDS_SPEC");
-    expect(
-      decide({ labels: [{ name: "feature" }], body: "Spec: .ai/specs/2026-09-01-x.md" }).state,
-    ).toBe("READY");
+  it("reads an afk-triage Triage Notes comment as a skill's, not a trusted person's answer", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    const notes = human("> *This was generated by AI during triage.*\n\n## Triage Notes", "2026-09-06T00:00:00Z");
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, notes] }).state).toBe("NOT_READY");
   });
 
-  it("asks for grooming before work when nothing groomed it", () => {
-    expect(decide({ comments: [] }).state).toBe("NEEDS_GROOM");
+  it("does not take an untrusted reply as the answer to a STOP", () => {
+    const stop = agent("`implement-ticket` STOP: the brief names no test seam", "2026-09-05T00:00:00Z");
+    const stranger = human("+1", "2026-09-06T00:00:00Z", { login: "someone-else" });
+    expect(decide({ comments: [agent(`triage\n\n${BRIEF}`), stop, stranger] }).state).toBe("NOT_READY");
   });
 
-  it("calls a groomed, unclaimed, unblocked issue ready", () => {
-    const seen = decide();
-    expect(seen.state).toBe("READY");
-    expect(seen.next).toContain("--add-label autofix");
+  it("takes a newer Agent Brief as the answer, since afk-triage settles the gap into one", () => {
+    const comments = [agent("not ready", "2026-09-03T00:00:00Z"), agent(`triage\n\n${BRIEF}`, "2026-09-04T00:00:00Z")];
+    expect(decide({ comments }).state).toBe("READY");
+  });
+
+  it("never makes an issue someone else opened ready, whatever it carries", () => {
+    const stranger = { login: "github-actions" };
+    const seen = decide({ author: stranger, body: BRIEF });
+    expect(seen.state).toBe("EXTERNAL");
+    expect(seen.next).toContain("github-actions");
+  });
+
+  it("never makes a Sentry ticket ready, even one the maintainer filed", () => {
+    const seen = decide({ body: `<!-- sentry-issue: MONEY-TRACKER-4KQ -->\n\n${BRIEF}` });
+    expect(seen.state).toBe("EXTERNAL");
+    expect(seen.next).toContain("Sentry");
+  });
+
+  it("does not count a brief an untrusted commenter wrote", () => {
+    const comments = [human(BRIEF, "2026-09-02T00:00:00Z", { login: "drive-by" })];
+    expect(decide({ comments }).state).toBe("NEEDS_TRIAGE");
+  });
+
+  it("takes a brief from the body of a ticket the maintainer filed", () => {
+    expect(decide({ comments: [], body: `> *This was generated by AI.*\n\n${BRIEF}` }).state).toBe("READY");
+  });
+
+  it("does not read a brief heading quoted as code", () => {
+    expect(decide({ comments: [], body: "```\n## Agent Brief\n```" }).state).toBe("NEEDS_TRIAGE");
+  });
+
+  it("needs triage when the brief or an SDLC label group is missing, and names what", () => {
+    expect(decide({ comments: [] }).next).toContain("No Agent Brief yet");
+    const seen = decide({ labels: [{ name: "bug" }] });
+    expect(seen.state).toBe("NEEDS_TRIAGE");
+    expect(seen.next).toContain("No priority label, risk label yet");
+  });
+
+  it("calls a briefed, labelled, unclaimed, unblocked issue ready", () => {
+    expect(decide().state).toBe("READY");
   });
 });
 
@@ -254,17 +337,68 @@ describe("sortIssues", () => {
   });
 });
 
+describe("countWip", () => {
+  const pr = (labels, login = "rafalwolak", baseRefName = "develop") => ({
+    author: { login },
+    labels: labels.map((name) => ({ name })),
+    baseRefName,
+  });
+
+  it("counts every open trusted PR, unlabelled drafts included, but not the promotion", () => {
+    const prs = [
+      pr(["review"]),
+      pr(["blocked"]),
+      pr([]),
+      pr(["review"], "dependabot[bot]"),
+      pr(["do-not-merge"], "rafalwolak", "main"),
+    ];
+    expect(countWip(prs, trusted)).toBe(3);
+  });
+
+  it("still counts an agent PR a person put a do-not-merge hold on", () => {
+    expect(countWip([pr(["review", "do-not-merge"])], trusted)).toBe(1);
+  });
+});
+
+describe("pickNext", () => {
+  const rows = sortIssues([
+    { number: 5, state: "READY", labels: ["priority-low"] },
+    { number: 9, state: "READY", labels: ["priority-high"] },
+    { number: 1, state: "NEEDS_TRIAGE", labels: ["priority-extreme"] },
+  ]);
+
+  it("takes the highest-priority ready issue, then the oldest", () => {
+    expect(pickNext(rows, 0)).toBe(9);
+  });
+
+  it("takes nothing at the WIP limit", () => {
+    expect(pickNext(rows, WIP_LIMIT - 1)).toBe(9);
+    expect(pickNext(rows, WIP_LIMIT)).toBeNull();
+  });
+
+  it("takes nothing when nothing is ready", () => {
+    expect(pickNext(rows.filter((row) => row.state !== "READY"), 0)).toBeNull();
+  });
+});
+
 describe("parseArgs", () => {
   it("defaults to text output and a 24-hour threshold", () => {
-    expect(parseArgs([])).toEqual({ asJson: false, staleHours: 24, flow: false });
+    expect(parseArgs([])).toEqual({ asJson: false, next: false, staleHours: 24, flow: false });
   });
 
   it("reads --json and --stale-hours in either order", () => {
     expect(parseArgs(["--stale-hours", "6", "--json"])).toEqual({
       asJson: true,
+      next: false,
       staleHours: 6,
       flow: false,
     });
+  });
+
+  it("reads --next, and refuses it together with --json or --flow", () => {
+    expect(parseArgs(["--next"]).next).toBe(true);
+    expect(() => parseArgs(["--next", "--json"])).toThrow(/its own output/);
+    expect(() => parseArgs(["--flow", "--next"])).toThrow(/its own output/);
   });
 
   it("rejects a stray positional instead of taking it as the threshold", () => {
@@ -287,6 +421,7 @@ describe("parseArgs --flow", () => {
   it("carries --json into the flow report", () => {
     expect(parseArgs(["--flow", "--json"])).toEqual({
       asJson: true,
+      next: false,
       staleHours: 24,
       flow: true,
     });
@@ -302,8 +437,18 @@ describe("parseArgs --flow", () => {
 });
 
 const AUTOMATION_DEFS = [
-  { name: "Groom new issues", task: { workflow: "issue-groom" } },
-  { name: "Re-groom on request", task: { workflow: "issue-groom" } },
+  {
+    name: "Groom and triage new issues",
+    events: ["issue.opened"],
+    filters: { authors: ["rafalwolak"] },
+    task: { workflow: "issue-groom" },
+  },
+  {
+    name: "Re-triage when a hold is cleared",
+    events: ["issue.unlabeled"],
+    filters: { authors: ["rafalwolak"] },
+    task: { workflow: "issue-groom" },
+  },
   { name: "Weekly architecture review", task: { workflow: "architecture-review" } },
 ];
 
@@ -332,7 +477,7 @@ describe("automationLaunches", () => {
     const groom = rows.find((row) => row.workflow === "issue-groom");
     expect(groom).toEqual({
       workflow: "issue-groom",
-      names: ["Groom new issues", "Re-groom on request"],
+      names: ["Groom and triage new issues", "Re-triage when a hold is cleared"],
       launches: 2,
       lastAt: "2026-09-20T10:00:00Z",
     });
@@ -432,56 +577,77 @@ describe("spanSummary", () => {
   });
 });
 
-const labelled = (number, createdAt, events) => ({
+const STRANGER = { login: "drive-by" };
+const briefed = (number, createdAt, { author = OWNER, body = "", comments = [] } = {}) => ({
   number,
   createdAt,
-  timeline: events.map(([at, label]) => ({ at, label })),
+  author,
+  body,
+  comments: comments.map(([at, text, by = OWNER]) => ({ createdAt: at, body: text, author: by })),
 });
 
-describe("firstLabelledAt", () => {
-  it("takes the earliest application when a label was removed and re-applied", () => {
-    const issue = labelled(1, "2026-09-13T00:00:00Z", [
-      ["2026-09-13T05:00:00Z", "needs-triage"],
-      ["2026-09-13T01:00:00Z", "needs-triage"],
-    ]);
-    expect(firstLabelledAt(issue, "needs-triage")).toBe("2026-09-13T01:00:00Z");
+describe("firstBriefAt", () => {
+  it("takes the earliest trusted comment carrying a brief", () => {
+    const issue = briefed(1, "2026-09-13T00:00:00Z", {
+      comments: [
+        ["2026-09-13T05:00:00Z", `🤖 triage\n\n${BRIEF}`],
+        ["2026-09-13T01:00:00Z", `🤖 triage\n\n${BRIEF}`],
+      ],
+    });
+    expect(firstBriefAt(issue, trusted)).toBe("2026-09-13T01:00:00Z");
   });
 
-  it("answers null for a label the issue never carried", () => {
-    expect(firstLabelledAt(labelled(1, "2026-09-13T00:00:00Z", []), "needs-triage")).toBeNull();
+  it("takes the opening of a ticket the maintainer filed with its brief in the body", () => {
+    expect(firstBriefAt(briefed(1, "2026-09-13T00:00:00Z", { body: BRIEF }), trusted)).toBe(
+      "2026-09-13T00:00:00Z",
+    );
+  });
+
+  it("answers null when only a stranger wrote a brief, or nobody did", () => {
+    const stranger = briefed(1, "2026-09-13T00:00:00Z", {
+      body: BRIEF,
+      author: STRANGER,
+      comments: [["2026-09-13T01:00:00Z", BRIEF, STRANGER]],
+    });
+    expect(firstBriefAt(stranger, trusted)).toBeNull();
+    expect(firstBriefAt(briefed(2, "2026-09-13T00:00:00Z"), trusted)).toBeNull();
   });
 });
 
 describe("intakeSpans", () => {
-  it("measures from the issue opening to the first needs-triage", () => {
+  it("measures from the issue opening to its first Agent Brief", () => {
     expect(
-      intakeSpans([
-        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T00:00:02Z", "needs-triage"]]),
-      ]),
-    ).toEqual([{ number: 1, from: "2026-09-13T00:00:00Z", to: "2026-09-13T00:00:02Z" }]);
+      intakeSpans(
+        [briefed(1, "2026-09-13T00:00:00Z", { comments: [["2026-09-13T00:20:00Z", `🤖 triage\n\n${BRIEF}`]] })],
+        trusted,
+      ),
+    ).toEqual([{ number: 1, from: "2026-09-13T00:00:00Z", to: "2026-09-13T00:20:00Z" }]);
   });
 
-  it("leaves out an issue a human routed straight past triage", () => {
+  it("leaves out a ticket filed with its brief, and an issue no automation will groom", () => {
     expect(
-      intakeSpans([
-        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "ready-for-agent"]]),
-        labelled(2, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "ready-for-human"]]),
-      ]),
+      intakeSpans(
+        [
+          briefed(1, "2026-09-13T00:00:00Z", { body: BRIEF }),
+          briefed(2, "2026-09-13T00:00:00Z", { author: STRANGER }),
+        ],
+        trusted,
+      ),
     ).toEqual([]);
   });
 
-  it("keeps an unlabelled issue as pending: that is the bridge not firing", () => {
-    expect(intakeSpans([labelled(3, "2026-09-13T00:00:00Z", [["2026-09-13T01:00:00Z", "bug"]])])).toEqual(
-      [{ number: 3, from: "2026-09-13T00:00:00Z", to: null }],
-    );
+  it("keeps an unbriefed maintainer issue as pending: that is the groom run not firing", () => {
+    expect(intakeSpans([briefed(3, "2026-09-13T00:00:00Z")], trusted)).toEqual([
+      { number: 3, from: "2026-09-13T00:00:00Z", to: null },
+    ]);
   });
 });
 
 describe("firstPrSpans", () => {
   const issues = [
-    labelled(339, "2026-09-19T00:00:00Z", [["2026-09-19T00:43:34Z", "ready-for-agent"]]),
-    labelled(400, "2026-09-19T00:00:00Z", [["2026-09-19T00:00:00Z", "ready-for-agent"]]),
-    labelled(500, "2026-09-19T00:00:00Z", [["2026-09-19T00:00:00Z", "needs-triage"]]),
+    briefed(339, "2026-09-19T00:00:00Z", { comments: [["2026-09-19T00:43:34Z", `🤖 triage\n\n${BRIEF}`]] }),
+    briefed(400, "2026-09-19T00:00:00Z", { body: BRIEF }),
+    briefed(500, "2026-09-19T00:00:00Z"),
   ];
 
   it("measures to the earliest linked pull request, whatever branch it was cut on", () => {
@@ -489,16 +655,20 @@ describe("firstPrSpans", () => {
       { number: 340, title: "fix(shell): remount (#339)", body: "Closes #339", headRefName: "cez/781957ae", createdAt: "2026-09-19T01:15:30Z" },
       { number: 341, title: "later", body: "Closes #339", headRefName: "cez/other", createdAt: "2026-09-19T09:00:00Z" },
     ];
-    const spans = firstPrSpans(issues, linkOpenPrs(prs), new Map(prs.map((pr) => [pr.number, pr.createdAt])));
-    expect(spans.find((span) => span.number === 339).to).toBe("2026-09-19T01:15:30Z");
+    const spans = firstPrSpans(issues, linkOpenPrs(prs), new Map(prs.map((pr) => [pr.number, pr.createdAt])), trusted);
+    expect(spans.find((span) => span.number === 339)).toEqual({
+      number: 339,
+      from: "2026-09-19T00:43:34Z",
+      to: "2026-09-19T01:15:30Z",
+    });
   });
 
-  it("skips an issue that never reached ready-for-agent", () => {
-    expect(firstPrSpans(issues, new Map(), new Map()).map((span) => span.number)).toEqual([339, 400]);
+  it("skips an issue that never got an Agent Brief", () => {
+    expect(firstPrSpans(issues, new Map(), new Map(), trusted).map((span) => span.number)).toEqual([339, 400]);
   });
 
-  it("leaves a ready issue with no pull request open-ended", () => {
-    expect(firstPrSpans(issues, new Map(), new Map()).every((span) => span.to === null)).toBe(true);
+  it("leaves a briefed issue with no pull request open-ended", () => {
+    expect(firstPrSpans(issues, new Map(), new Map(), trusted).every((span) => span.to === null)).toBe(true);
   });
 });
 
@@ -614,7 +784,7 @@ describe("flowReport without a visible runs.json", () => {
       runs: [],
       automations: AUTOMATION_DEFS,
       issues: [
-        labelled(1, "2026-09-13T00:00:00Z", [["2026-09-13T00:00:02Z", "needs-triage"]]),
+        briefed(1, "2026-09-13T00:00:00Z", { comments: [["2026-09-13T00:00:02Z", `🤖 triage\n\n${BRIEF}`]] }),
       ],
       prs: [],
       prLinks: new Map(),

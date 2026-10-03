@@ -32,20 +32,18 @@ name: Promote develop
 # labelled itself `merge-queue` - the very label that, applied at creation, would have stood the
 # run down (design4pro/planned.travel#380).
 #
-# `--label merge-queue` below is that stand-down, and it is the honest label rather than a
-# convenient one: SDLC.md calls `merge-queue` routing rather than proof of QA, and "green, waiting
-# on a human" is what a promotion pull request is from the moment it opens. It silences nothing
-# else. Labelling a pull request goes through the issues endpoint, which GitHub grants to
-# `pull requests: write` as well as to `issues: write`, so it is covered by the permission this
+# `--label do-not-merge` below is that stand-down (ADR 0029). Every pull request here - agent or
+# human, this one included - is authored by the owner's one account, and the pipeline merges into
+# `develop` on its own (ADR 0027), so the author does not tell the release apart. Every cezar PR
+# automation excludes `do-not-merge` (docs/agents/cezar-automations.json), om-approve-merge-pr
+# refuses it, and set_pipeline_label never removes it (.ai/trackers/github.md). No CI check reads
+# it, so the owner merges as before. It is put back on an already open promotion on every run, and
+# the `merge-queue` an older run left there is taken off, so the guard holds from the first run
+# after this change. Labelling a pull request goes through the issues endpoint, which GitHub grants
+# to `pull requests: write` as well as to `issues: write`, so it is covered by the permission this
 # token already needs to open the pull request at all, and by the job's `permissions:` block on the
-# GITHUB_TOKEN fallback path. Neither path needs a permission widened for it.
-#
-# `--label promotion` is what keeps the pipeline's own merge away from it. Every pull request
-# here - agent or human, this one included - is authored by the owner's one account, and the
-# pipeline merges into `develop` on its own (ADR 0027, amended 2026-10-01), so neither the author
-# nor `merge-queue` tells the release apart. Every cezar PR automation excludes `promotion`, and
-# the merge skills merge unattended only into `develop`. The label already exists in the
-# repository (creating one would need `issues: write`); an already open promotion gets it too.
+# GITHUB_TOKEN fallback path. The label already exists in the repository (creating one would need
+# `issues: write`).
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -92,7 +90,9 @@ jobs:
           if [ -n "$existing" ]; then
             # REST, not `gh pr edit`: that one also queries the retired Projects (classic) API and
             # fails on some gh versions, which under `set -e` would fail the whole job.
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${existing}/labels" -f 'labels[]=promotion' > /dev/null
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${existing}/labels" -f 'labels[]=do-not-merge' > /dev/null
+            # 404 when the label is not there, which is every run after the first.
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/issues/${existing}/labels/merge-queue" > /dev/null 2>&1 || true
             echo "::notice title=Promotion pull request::#${existing} is already open and now carries this commit."
             exit 0
           fi
@@ -130,6 +130,5 @@ jobs:
             --base main \
             --head develop \
             --title 'chore(release): promote develop to main' \
-            --label merge-queue \
-            --label promotion \
+            --label do-not-merge \
             --body "$body"

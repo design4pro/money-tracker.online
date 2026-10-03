@@ -1,15 +1,14 @@
 # Started by a human from the cockpit, or `cezar run "<filter>" --workflow backlog`. The `backlog`
 # skill (.claude/skills/backlog/SKILL.md) runs .ai/scripts/backlog-status.mjs and reads the result:
-# the counts per state, the READY set in priority order, and the one command that moves each issue.
-# It never applies a label - `groom`, `autofix` and `spec` are human triggers (SDLC.md) - so the
-# step holds Bash but neither Edit nor Write (ADR 0017).
+# the counts per state, the READY set in the order the scheduled implement-ticket run takes it, and
+# the one step that moves each issue. It never applies a label - no label starts work (ADR 0029) -
+# so the step holds Bash but neither Edit nor Write (ADR 0017).
 #
 # Start it with Worktree OFF. `.ai/cezar/runs.json` is gitignored, so it exists only in the main
-# checkout; in a worktree the script reads no queue at all and every issue carrying a trigger label
-# reports STUCK ("no run picked it up") where QUEUED is the truth. A workflow file cannot pin that:
-# cezar's workflow schema has no `worktree` field, it is a property of the run. The skill therefore
-# probes for the file and reports the queue as invisible rather than reporting a STUCK it cannot
-# tell from a QUEUED.
+# checkout; in a worktree the script reads no queue at all, and an issue a run has queued but not
+# yet claimed reports READY where QUEUED is the truth. A workflow file cannot pin that: cezar's
+# workflow schema has no `worktree` field, it is a property of the run. The skill therefore probes
+# for the file and says the queue is invisible.
 #
 # No bootstrap step on purpose: backlog-status.mjs is plain node plus `gh`, so nothing here needs
 # dependencies, and a report that is cheap to start is one a human actually starts.

@@ -8,7 +8,7 @@
 # it. What the file does not state, the cockpit keeps: an update used to send `enabled: true`
 # unconditionally, so every apply released whatever brake a person had pulled. That is the mistake
 # --prune already refuses to make with an enabled stray, in the other direction, and it matters
-# more now that the intake ladder runs unattended - pausing an automation in the cockpit is the
+# more now that the issue pipeline runs unattended - pausing an automation in the cockpit is the
 # emergency stop. An update that leaves one paused says so on stderr, so a pause is never silent.
 #
 #   .ai/scripts/cez-automations.sh [--dry-run] [--prune]

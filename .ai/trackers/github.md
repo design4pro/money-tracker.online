@@ -98,11 +98,17 @@ remove_issue_label() { remove_label "$1" "$2"; }
 # mutual exclusion silently does not hold. Splitting on newlines through `read` behaves
 # identically in sh, bash and zsh; the trailing newline from `printf` matters, because
 # `read` returns non-zero on an unterminated last line and drops it.
+#
+# `blocked` and `do-not-merge` are never removed here: they are a person's hold, and only a person
+# clears them (SDLC.md § Label state machine). The develop -> main promotion PR rests on
+# `do-not-merge`, so a review run that swapped it for `merge-queue` would hand the release to the
+# unattended merge.
 set_pipeline_label() {
   if [ "$LABELS_ENABLED" != "true" ]; then return 0; fi
   printf '%s\n' "$PIPELINE_LABELS" | tr ' ' '\n' | while IFS= read -r label; do
     [ -z "$label" ] && continue
     [ "$label" = "$2" ] && continue
+    case "$label" in blocked|do-not-merge) continue ;; esac
     remove_label "$label" "$1"
   done
   apply_label "$2" "$1"
@@ -543,18 +549,4 @@ gh label create risk-high         --color b60205 --description "Wide blast radiu
 
 Four of those are load-bearing on a pull request rather than descriptive. `do-not-merge`, `blocked` and `qa-failed` block a merge on their own, and `needs-qa` blocks until `qa-approved` joins it. The merge skills read them before merging and the person merging honours them, so applying one of them is the act that stops the merge. Nothing in CI enforces them (ADR 0027).
 
-The three command labels that start a Cezar automation (`docs/agents/cezar-automations.json`) are
-set by a human. Only a collaborator or an Actions token can set a label, which is what gates the `issue.labeled`
-triggers; the skill that reacts removes its own label as its first mutation, so
-a label still present means nobody picked the item up. No skill ever adds one.
-
-`spec` is the exception to that last diagnosis. **Write a spec for feature issues** filters on `allLabels: ["feature"]`,
-alone among the four, so on an issue that is not labelled `feature` the label sits there because no
-run was ever going to start - not because one stalled, which is where the sentence above would
-otherwise send you looking. All three go on an issue:
-
-```bash
-gh label create groom          --color 5319e7 --description "Human trigger: re-run om-auto-manage-issues on this issue (Cezar automation)"
-gh label create autofix        --color 5319e7 --description "Human trigger: start om-auto-fix-issue on this issue (Cezar automation)"
-gh label create spec           --color 5319e7 --description "Human trigger: write a spec PR with om-auto-write-spec (Cezar automation)"
-```
+That list is the whole vocabulary: no intake, trigger or command label exists beside it (ADR 0029). A label no Open Mercato skill reads is never created. A run is started by an event or a schedule in `docs/agents/cezar-automations.json`, or by a person from the Cezar cockpit.

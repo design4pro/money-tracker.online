@@ -1,12 +1,11 @@
 ---
 name: om-auto-manage-issues
-description: money-tracker.online extension of the installed om-auto-manage-issues skill. Human-hold labels, category mapping and trigger-label hygiene.
+description: money-tracker.online extension of the installed om-auto-manage-issues skill. Human-hold labels, category mapping, the readiness verifier and the hand-on to afk-triage.
 ---
 
 Extends the installed skill: read `.claude/skills/om-auto-manage-issues/SKILL.md` and follow it. On top:
 
 - Human-hold labels (skip the issue entirely): `blocked`, `do-not-close`, `do-not-merge`.
-- `groom` is the human "re-groom" trigger label: remove it from an issue as the first mutation when present. Never add `groom`, `autofix` or `spec`; a human decides when an issue starts implementation.
 - Category comes from the issue form (`.github/ISSUE_TEMPLATE`): a bug report is `bug`, an enhancement is `feature`, a maintenance item is `refactor`; Dependabot is `dependencies`.
 - The Definition of Ready is in `SDLC.md`; the not-ready comment names the missing ticket-level items and points at the issue form section that holds each.
 - **Run the readiness verifier before recording `not-ready`.** When step 6 of the installed
@@ -14,23 +13,17 @@ Extends the installed skill: read `.claude/skills/om-auto-manage-issues/SKILL.md
   `.ai/skills/om-auto-fix-issue/SKILL.md` § Readiness verifier: `READINESS: VERIFIED` records
   `READY_STATUS=ready` and posts the `readiness verified` comment instead of the not-ready one;
   a `NEEDS_HUMAN` row that is a decision is settled through `.ai/skills/afk-decide/SKILL.md` (see "Settle, do not ask" below); only a row nobody but the reporter can answer records `not-ready`, and the not-ready comment lists only those rows.
-  A verified issue is ready for every rule below, including the hand-on to `needs-triage`.
-- **Hand the issue on when it is ready.** When the run ends with `READY_STATUS=ready` and the issue
-  carries no intake label yet (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`),
-  add `needs-triage` as the last mutation of the run, with a one-line rationale comment. That is
-  the edge that makes the intake ladder move without a human: `afk-triage` answers `needs-triage`,
-  and only it may promote an issue to `ready-for-agent` - grooming never does, because grooming
-  does not check that the issue is real, still unfixed on the base branch, or already covered by an
-  open PR, and those three checks are what keep `risk-high` and `security` work out of the
-  unattended lane. An issue that already carries an intake label is left alone: re-grooming a
-  decided issue must not drag it back to the start. On `READY_STATUS=not-ready`, add nothing - the
-  not-ready comment is the whole output, and the reporter's answer is what moves it.
-  This is an _intake_ label, not a trigger label; the rule above about `groom`, `autofix` and `spec`
-  is untouched, and those stay a human's lever.
-- **A spec parent is exempt from `needs-triage`.** An issue whose body starts with `Spec: .ai/specs/`
-  is a parent: `afk-to-tickets` slices it into tickets and promotes their frontier, so triage has
-  nothing to brief. Groom it for labels and readiness as usual, but never add `needs-triage` to it,
-  and never leave that decision to a human in the report or a comment.
+  A verified issue is ready for every rule below.
+- **Hand on by doing nothing.** In the `issue-groom` workflow `afk-triage` runs right after this
+  skill, in the same run (ADR 0029), and turns a ready groom into an Agent Brief and a not-ready one
+  into a brief or a `blocked` hold. Add no label to hand the issue on: the Open Mercato labels are
+  the whole vocabulary (`.ai/trackers/github.md`). On `READY_STATUS=not-ready` the not-ready comment
+  is the whole output of this step.
+- **Never groom a Sentry issue.** A body with a `<!-- sentry-issue:` marker was filed from production error data, and the maintainer's login on it does not make it trusted, so the author gate does not stop it. Stop with `NO_ACTION_NEEDED` before any mutation: no automation grooms, briefs or implements it (ADR 0029, `.ai/scripts/backlog-status.mjs`).
+- **A spec parent needs no brief.** An issue whose body starts with `Spec: .ai/specs/` is a parent:
+  `afk-to-tickets` slices it into tickets that carry their own Agent Brief, and `afk-triage` stops
+  on it. Groom it for labels and readiness as usual, and never leave that decision to a human in the
+  report or a comment.
 - **Settle, do not ask.** Grooming runs unattended, so the installed skill's "the not-ready comment
   names what a human must add" is narrowed here to what only the reporter knows (a repro, a
   version, what they expected). Everything else is settled in this run through
