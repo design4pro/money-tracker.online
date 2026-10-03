@@ -82,5 +82,10 @@ These hold for every skill this run chains, whether or not its own override was 
   branch takes `git merge --ff-only origin/<head>`); after a rebase, merge the base or push a new
   branch instead of force-pushing (`--force-with-lease` included); fix what a hook reports instead
   of using `--no-verify`.
+- **Never open a file `permissions.deny` refuses to read**, not even redacted through `cat` or
+  `sed`: it ends the run the same way (planned.travel run b6eb30ef died on
+  `cat .ai/qa/test-env.env`). The login's `passwordEnv` name is in `.ai/qa/test-env.json`; load the
+  values with `set -a; . "$(jq -r .credentialsFile .ai/qa/test-env.json)"; set +a` and use
+  `"$TEST_OWNER_PASSWORD"` in the command (AGENTS.md).
 - **The dev server URL is `baseUrl` in `.ai/qa/test-env.json`** (`om-prepare-test-env` writes it).
   Never derive it from `.dev.vars`, which the agent never reads.

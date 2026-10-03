@@ -265,3 +265,26 @@ describe('deniedPatternsIn', () => {
     expect(deniedPatternsIn(block, denied)).toEqual([])
   })
 })
+
+// A `Read(...)` deny refuses `cat`, `sed` or `grep` of the file through Bash too, and planned.travel
+// run b6eb30ef (2026-10-03) died on a redacted `cat .ai/qa/test-env.env`. AGENTS.md, which every
+// cezar run loads, names the denied files and the allowed way to use a test-env login; this keeps
+// that paragraph in step with the deny list.
+describe('denied reads', () => {
+  const readDenies = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'))
+    .permissions.deny.map((rule) => /^Read\((.*)\)$/.exec(rule)?.[1])
+    .filter((path) => path && !path.startsWith('!'))
+  const agents = readFileSync('AGENTS.md', 'utf8')
+  const start = agents.indexOf('`permissions.deny` also refuses reading')
+  const rule =
+    start < 0 ? '' : agents.slice(start, agents.indexOf('\n\n', start))
+
+  it('AGENTS.md has the denied-reads paragraph', () => {
+    expect(readDenies.length).toBeGreaterThan(0)
+    expect(rule).not.toBe('')
+  })
+
+  it.each(readDenies)('AGENTS.md names the denied read %s', (path) => {
+    expect(rule).toContain(path)
+  })
+})
