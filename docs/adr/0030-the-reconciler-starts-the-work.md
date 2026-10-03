@@ -112,3 +112,5 @@ exists, and a trigger per event cannot see a difference.
 - Until the schedules are removed, `implement-ticket` and `spec-to-tickets` can be started by a
   schedule and by the Reconciler. Both check what holds an issue before they claim it, and the
   Reconciler drops a candidate a live run already holds, so the worst case is a run that stops.
+
+> **Amended 2026-10-03.** The four automations that start the same work as the Reconciler - **Implement the next ready issue**, **Spec to tickets**, **Groom and triage new issues** and **Re-triage when a hold is cleared** - are retired, because the Reconciler starts that work and each would start an issue a second time; the issue pair stays in `docs/agents/cezar-automations.json` with `"enabled": false` for the `authors` gate decision 6 depends on.

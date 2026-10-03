@@ -1,7 +1,7 @@
 # The last step of the unattended issue pipeline (ADR 0017): started by the Reconciler
 # (docs/agents/cezar.md, ADR 0030) with `Implement issue #<n>.` when
-# `node .ai/scripts/backlog-status.mjs --plan` lists an `implement` action, by "Implement the next
-# ready issue" every two hours with no issue in the task, or by a person from the cockpit with one,
+# `node .ai/scripts/backlog-status.mjs --plan` lists an `implement` action, or by a person from
+# the cockpit with an issue number or none,
 # and it ends with the pull request merged into `develop` (or waiting for the owner's `qa-approved`
 # when it is `risk-high`) - the boundary is `SDLC.md` § The automation contract. There is no label
 # that marks an issue ready (ADR 0029): readiness is computed by .ai/scripts/backlog-status.mjs, the

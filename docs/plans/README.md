@@ -21,7 +21,7 @@ docs/plans/NN-area.md   →   spec in .ai/specs/ (`om-spec-writing`; its Phasing
                                                         ↓
                                      one issue per stage (`om-prepare-issue`), in stage order
                                                         ↓
-                                     the two-hourly schedule implements the next ready one
+                                     the Reconciler implements the next ready one
                                      (or a person hands it to `issue-autofix` from the cockpit)
 ```
 
