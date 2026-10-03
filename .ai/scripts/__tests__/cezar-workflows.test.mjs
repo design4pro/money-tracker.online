@@ -67,6 +67,19 @@ function stepTexts(block) {
 }
 
 /**
+ * The deny patterns a step block would trip. Limits: a plain scalar folded over several lines is
+ * read one line at a time, and prose that merely names a denied command ("never run `git reset
+ * --hard`") is reported too, so a workflow states the rule without spelling the command.
+ */
+function deniedPatternsIn(block, denied) {
+  return stepTexts(block)
+    .flatMap(commandCandidates)
+    .flatMap((candidate) =>
+      denied.filter(({ regex }) => regex.test(candidate)).map((d) => d.pattern),
+    )
+}
+
+/**
  * One `Bash(...)` deny pattern as a regex over a single command: `*` matches anything, and a
  * trailing `:*` makes the rest a prefix match.
  */
@@ -80,11 +93,12 @@ function denyPatternToRegex(pattern) {
 }
 
 /**
- * Every command a text could run: split at newlines, backticks and shell separators, then every
- * word-suffix of each piece, so a command named mid-sentence in a prompt is a candidate too.
+ * Every command a text could run: split at newlines, backticks, quotes and shell separators, then
+ * every word-suffix of each piece, so a command named mid-sentence in a prompt, or inside
+ * `sh -c "..."`, is a candidate too.
  */
 function commandCandidates(text) {
-  return text.split(/\n|`|&&|\|\||[;|]|\$\(/).flatMap((piece) => {
+  return text.split(/\n|`|['"]|&&|\|\||[;|]|\$\(/).flatMap((piece) => {
     const words = piece.trim().split(/\s+/).filter(Boolean)
     return words.map((_, i) => words.slice(i).join(' '))
   })
@@ -171,18 +185,18 @@ describe('cezar workflows', () => {
     expect(denied.length).toBeGreaterThan(0)
 
     const hits = []
+    let scanned = 0
     for (const file of files) {
       for (const step of steps(file.text)) {
-        for (const candidate of stepTexts(step.block).flatMap(
-          commandCandidates,
-        )) {
-          for (const { pattern, regex } of denied) {
-            if (regex.test(candidate))
-              hits.push(`${file.name} step "${step.id}": ${pattern}`)
-          }
+        scanned += stepTexts(step.block).length
+        for (const pattern of deniedPatternsIn(step.block, denied)) {
+          hits.push(`${file.name} step "${step.id}": ${pattern}`)
         }
       }
     }
+    // A guard on the guard: a format change that stops stepTexts reading anything would otherwise
+    // make this pass with nothing scanned.
+    expect(scanned).toBeGreaterThan(0)
     expect(hits).toEqual([])
   })
 })
@@ -217,5 +231,37 @@ describe('denyPatternToRegex', () => {
     const regex = denyPatternToRegex('rm -rf $HOME:*')
     expect(regex.test('rm -rf $HOME/x')).toBe(true)
     expect(regex.test('rm -rf HOME')).toBe(false)
+  })
+})
+
+describe('deniedPatternsIn', () => {
+  const denied = ['git reset --hard*', 'git push *--force*'].map((pattern) => ({
+    pattern,
+    regex: denyPatternToRegex(pattern),
+  }))
+
+  it('reports a denied command in an inline command', () => {
+    const block = '  - id: sync\n    command: git reset --hard origin/x\n'
+    expect(deniedPatternsIn(block, denied)).toEqual(['git reset --hard*'])
+  })
+
+  it('reports a denied command inside a block prompt, backticked or quoted', () => {
+    const block = [
+      '  - id: sync',
+      '    prompt: |',
+      '      Move to the head with `git reset --hard origin/x`,',
+      '      or run sh -c "git push origin --force-with-lease".',
+      '    allowedTools: [Bash]',
+    ].join('\n')
+    expect(deniedPatternsIn(block, denied)).toEqual([
+      'git reset --hard*',
+      'git push *--force*',
+    ])
+  })
+
+  it('reports nothing for the allowed equivalent', () => {
+    const block =
+      '  - id: sync\n    command: git fetch origin x && git checkout -B x origin/x\n'
+    expect(deniedPatternsIn(block, denied)).toEqual([])
   })
 })
