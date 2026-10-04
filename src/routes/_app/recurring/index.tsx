@@ -309,10 +309,14 @@ function RecurringListRoute() {
                   seriesId: period.seriesId,
                   periodStart: period.periodStart,
                 },
-              }).then(() => {
-                toast.success(t('recurring.toast.periodSkipped'))
-                refresh()
               })
+                .then(() => {
+                  toast.success(t('recurring.toast.periodSkipped'))
+                  refresh()
+                })
+                .catch(() => {
+                  toast.error(t('recurring.toast.failed'))
+                })
             }}
           />
         </div>

@@ -132,7 +132,7 @@ function SeriesDetailRoute() {
         candidate.derivedStatus !== 'paid' &&
         candidate.derivedStatus !== 'skipped',
     )
-    return reopened === undefined
+    return reopened === undefined || !detail.series.isActive
       ? { kind: 'none' }
       : { kind: 'markPaid', period: reopened }
   })

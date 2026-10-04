@@ -1806,8 +1806,11 @@ const messages = {
 
   'recurring.period.markPaid': 'Mark paid',
   'recurring.period.markPaid.for': 'Mark the period due {date} as paid',
+  'recurring.period.markPaid.forSeries':
+    'Mark the period due {date} for {series} as paid',
   'recurring.period.skip': 'Skip',
   'recurring.period.skip.for': 'Skip the period due {date}',
+  'recurring.period.skip.forSeries': 'Skip the period due {date} for {series}',
   'recurring.period.revert': 'Undo',
   'recurring.period.revert.for': 'Undo the period due {date}',
 

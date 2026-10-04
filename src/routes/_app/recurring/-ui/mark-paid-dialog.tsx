@@ -176,14 +176,16 @@ export function MarkPaidDialog({
                   {t('recurring.candidates.loading')}
                 </p>
               ) : rows.length === 0 ? (
-                <MarkPaidEmpty
-                  onRecord={() =>
-                    void navigate({
-                      to: '/transactions/new',
-                      search: recordPaymentSearch(series, period, origin),
-                    })
-                  }
-                />
+                failure === null ? (
+                  <MarkPaidEmpty
+                    onRecord={() =>
+                      void navigate({
+                        to: '/transactions/new',
+                        search: recordPaymentSearch(series, period, origin),
+                      })
+                    }
+                  />
+                ) : null
               ) : (
                 <RadioGroup
                   label={t('recurring.markPaid.field')}

@@ -29,7 +29,7 @@ function upcoming(over: Partial<UpcomingPeriod> = {}): UpcomingPeriod {
 const noop = () => undefined
 
 describe('UpcomingPanel', () => {
-  it("puts Mark paid and Skip on every row, named by the row's date", async () => {
+  it("puts Mark paid and Skip on every row, named by the row's date and series", async () => {
     await renderLinkedRecurring(
       <UpcomingPanel
         upcoming={[
@@ -55,7 +55,7 @@ describe('UpcomingPanel', () => {
     ).toHaveLength(2)
     expect(
       screen.getByRole('button', {
-        name: 'Mark the period due Mar 10, 2026 as paid',
+        name: 'Mark the period due Mar 10, 2026 for Gym as paid',
       }),
     ).toBeTruthy()
   })

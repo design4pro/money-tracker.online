@@ -35,6 +35,28 @@ describe('PeriodActions', () => {
     expect(screen.queryByRole('button', { name: /Undo/ })).toBeNull()
   })
 
+  it('names the series too when the surface mixes series', () => {
+    renderRecurring(
+      <PeriodActions
+        period={period()}
+        seriesName="Rent"
+        onMarkPaid={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Mark the period due Mar 1, 2026 for Rent as paid',
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: 'Skip the period due Mar 1, 2026 for Rent',
+      }),
+    ).toBeTruthy()
+  })
+
   it.each(['paid', 'skipped'] as const)(
     'offers only Revert for a %s period',
     (derivedStatus) => {

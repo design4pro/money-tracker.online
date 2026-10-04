@@ -269,6 +269,16 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
     [navigate],
   )
 
+  /** Where Save and Cancel both end: the period this entry was for, else the list. */
+  const leave = useCallback(() => {
+    const back = returnTargetOf(search)
+    if (back === undefined) {
+      goToList()
+    } else {
+      goBack(back)
+    }
+  }, [search, goBack, goToList])
+
   const creation = useMutation({
     mutationFn: (input: {
       readonly entry: TransactionFormValues
@@ -307,12 +317,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
       // second after a successful save is the worst thing this screen can say.
       await refresh()
       if (!input.addAnother) {
-        const back = returnTargetOf(search)
-        if (back === undefined) {
-          goToList()
-        } else {
-          goBack(back)
-        }
+        leave()
         return
       }
       // Everything that describes *this* entry is cleared; everything that describes the sitting —
@@ -359,7 +364,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
           }
           creation.mutate({ entry: values, amountMinor, addAnother })
         }}
-        onCancel={goToList}
+        onCancel={leave}
         isSubmitting={creation.isPending}
         serverError={serverError}
         allowRepeat

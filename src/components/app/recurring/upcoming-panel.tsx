@@ -136,6 +136,7 @@ export function UpcomingPanel({
                   <td className="px-3 py-2">
                     <PeriodActions
                       period={period}
+                      seriesName={period.seriesName}
                       onMarkPaid={() => onMarkPaid(period)}
                       onSkip={() => onSkip(period)}
                     />

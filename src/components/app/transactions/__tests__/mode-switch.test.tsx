@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { I18nProvider } from '#/lib/i18n'
@@ -34,6 +34,13 @@ function renderSwitch(
 }
 
 describe('TransactionsModeSwitch', () => {
+  // A choice made in one test is remembered for the next mount; mount once so every test starts
+  // from a switch that has nothing to restore.
+  beforeEach(() => {
+    renderSwitch('recorded')
+    cleanup()
+  })
+
   it('is a named radio group with Recorded and Planned', () => {
     renderSwitch('recorded')
     const group = screen.getByRole('radiogroup', {
@@ -74,6 +81,22 @@ describe('TransactionsModeSwitch', () => {
     )
     await user.keyboard('{ArrowRight}')
     expect(onChange).toHaveBeenCalledWith('planned')
+  })
+
+  it('puts focus back on the current radio when the next route mounts its own switch', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(
+      <I18nProvider locale="en" messages={en as Catalogue}>
+        <TransactionsModeSwitch mode="recorded" onChange={vi.fn()} />
+      </I18nProvider>,
+    )
+    await user.click(screen.getByRole('radio', { name: 'Planned' }))
+    unmount()
+
+    renderSwitch('planned')
+    expect(document.activeElement).toBe(
+      screen.getByRole('radio', { name: 'Planned' }),
+    )
   })
 
   it('says Recorded and Planned in Polish, and never "ledger"', () => {

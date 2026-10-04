@@ -1829,8 +1829,12 @@ const messages = {
   'recurring.period.markPaid': 'Oznacz jako opłacone',
   'recurring.period.markPaid.for':
     'Oznacz okres z terminem {date} jako opłacony',
+  'recurring.period.markPaid.forSeries':
+    'Oznacz okres z terminem {date} dla {series} jako opłacony',
   'recurring.period.skip': 'Pomiń',
   'recurring.period.skip.for': 'Pomiń okres z terminem {date}',
+  'recurring.period.skip.forSeries':
+    'Pomiń okres z terminem {date} dla {series}',
   'recurring.period.revert': 'Cofnij',
   'recurring.period.revert.for': 'Cofnij okres z terminem {date}',
 

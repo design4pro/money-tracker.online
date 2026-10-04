@@ -21,6 +21,8 @@ import type { PeriodView } from '#/server/repos/recurring'
  * Each is a `<button>`, reachable by Tab in reading order with no hover needed. Three identical
  * *Mark paid* buttons down a column are three identical announcements, so the accessible name
  * carries the due date - *"Mark the period due 1 March as paid"* - which is what tells them apart.
+ * A surface that lists periods of **several series** (the Upcoming panel) also passes the series
+ * name, because two bills due on the same day would otherwise be two identical names.
  *
  * The component draws the buttons and not their cell: the `<td>` belongs to the table that owns
  * its columns, and the callbacks to the route that performs the writes.
@@ -28,6 +30,8 @@ import type { PeriodView } from '#/server/repos/recurring'
 
 export interface PeriodActionsProps {
   readonly period: Pick<PeriodView, 'dueOn' | 'derivedStatus'>
+  /** Named in each button's accessible name when the surface mixes series. */
+  readonly seriesName?: string
   /** Opens the link-a-transaction dialog. Supplied by the route, because it performs a write. */
   readonly onMarkPaid: () => void
   readonly onSkip: () => void
@@ -37,6 +41,7 @@ export interface PeriodActionsProps {
 
 export function PeriodActions({
   period,
+  seriesName,
   onMarkPaid,
   onSkip,
   onRevert,
@@ -65,7 +70,14 @@ export function PeriodActions({
           <Button
             size="sm"
             variant="subtle"
-            aria-label={t('recurring.period.markPaid.for', { date: due })}
+            aria-label={
+              seriesName === undefined
+                ? t('recurring.period.markPaid.for', { date: due })
+                : t('recurring.period.markPaid.forSeries', {
+                    date: due,
+                    series: seriesName,
+                  })
+            }
             onPress={onMarkPaid}
           >
             {t('recurring.period.markPaid')}
@@ -73,7 +85,14 @@ export function PeriodActions({
           <Button
             size="sm"
             variant="ghost"
-            aria-label={t('recurring.period.skip.for', { date: due })}
+            aria-label={
+              seriesName === undefined
+                ? t('recurring.period.skip.for', { date: due })
+                : t('recurring.period.skip.forSeries', {
+                    date: due,
+                    series: seriesName,
+                  })
+            }
             onPress={onSkip}
           >
             {t('recurring.period.skip')}

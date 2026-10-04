@@ -816,7 +816,9 @@ the series detail grid and _Due soon_ on `/recurring`.
   `<button>` reachable by Tab in reading order.
 - **What carries the meaning when the colour does not:** the label is a word, and the accessible
   name carries the row's due date (_"Mark the period due 1 March as paid"_), because a column of
-  identical labels is three identical announcements.
+  identical labels is three identical announcements. A surface that mixes series (_Due soon_)
+  also passes the series name (_"... due 1 March for Rent as paid"_), since two bills can fall due on
+  the same day.
 - **The one thing it is not:** a row menu. The actions are visible buttons on purpose; burying
   _Mark paid_ behind a menu adds a click to the only thing the table is for.
 
