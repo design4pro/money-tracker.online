@@ -434,3 +434,17 @@ to a specialist sub-agent (`.ai/skills/afk-decide`). What still bounds the lane:
 review inside the chain, and the QA gate - a run signs off below `risk-high` on a QA specialist's
 verdict, and a `risk-high` PR waits for the owner's `qa-approved`. Merging is ADR 0027's, amended
 the same day.
+
+## Amendment, 2026-10-04: the token boundary is the table in the cockpit guide, not a list here
+
+**Consequences** > **Security moves** names the token boundary as "(Contents, Issues, Pull requests;
+no Workflows)". That list was already short when it was written and has drifted since: the pipeline
+also needs `Actions: read` (list-runs, get-run, watch-run), `Commit statuses: read` (the status half
+of get-pr-checks) and, later, `Actions: write` (rerun-failed). The text above stays as it was
+written; it is no longer the reading to use.
+
+The current reading is the "Token scopes the pipeline needs" table in `docs/agents/cezar.md`, which
+pairs each permission with the tracker operations it serves and dates the snapshot of what a token
+held. That table describes the retired bot token (amendment 2026-10-01) and says so; its permission
+to operation mapping is the durable half, because GitHub's API fixes it. This ADR does not restate
+the list, so the next scope change edits one place.
