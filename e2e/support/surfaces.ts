@@ -5,7 +5,12 @@ import { storageStateFor } from './session'
 
 import type { AppLocale, AppTheme } from './app'
 import type { SessionId } from './session'
-import type { Browser, BrowserContext, Page } from '@playwright/test'
+import type {
+  Browser,
+  BrowserContext,
+  BrowserContextOptions,
+  Page,
+} from '@playwright/test'
 
 /**
  * The screens a reader cannot avoid, and the one way this suite opens them.
@@ -74,18 +79,29 @@ export const SURFACES: readonly Surface[] = [
  * A context and a hydrated page for one surface, in one theme and one locale.
  *
  * The caller owns the context and must close it — which is why this answers both.
+ *
+ * Playwright applies the running project's `use` options (viewport, `isMobile` and touch, locale,
+ * time zone, colour scheme, the clock pin) to every context `browser.newContext()` creates, so a
+ * scan here runs at the project's own width - 412x915 under `mobile-chromium`. `contextOptions`
+ * is the fixture of that name, passed in and spread first so that a `contextOptions` override in
+ * `use` reaches these scans as well. The storage state comes after it, so the session a surface
+ * names always wins, and the theme and locale applied below stay explicit axes of the caller's
+ * matrix. `accessibility.spec.ts` asserts the resulting width.
  */
 export async function openSurface(
   browser: Browser,
+  contextOptions: BrowserContextOptions,
   surface: Surface,
   theme: AppTheme,
   locale: AppLocale,
 ): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext(
-    surface.session === undefined
-      ? { storageState: { cookies: [], origins: [] } }
-      : { storageState: storageStateFor(surface.session) },
-  )
+  const context = await browser.newContext({
+    ...contextOptions,
+    storageState:
+      surface.session === undefined
+        ? { cookies: [], origins: [] }
+        : storageStateFor(surface.session),
+  })
 
   // Both before the first navigation: the locale is negotiated on the server from this cookie,
   // and the theme is applied by the pre-paint bootstrap script. Applied afterwards, each would
