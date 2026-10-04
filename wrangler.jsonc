@@ -78,7 +78,7 @@
     "FX_FALLBACK": "frankfurter",
     "BACKUP_RETENTION_DAYS": 30,
     "TASK_MAX_ATTEMPTS": 5,
-    "IMPORT_MAX_ROWS": 50000,
+    "IMPORT_MAX_ROWS": 20000,
     "EXPORT_MAX_ROWS": 250000,
   },
 
@@ -206,7 +206,7 @@
         "FX_FALLBACK": "frankfurter",
         "BACKUP_RETENTION_DAYS": 7,
         "TASK_MAX_ATTEMPTS": 3,
-        "IMPORT_MAX_ROWS": 50000,
+        "IMPORT_MAX_ROWS": 20000,
         "EXPORT_MAX_ROWS": 250000,
       },
       "d1_databases": [
