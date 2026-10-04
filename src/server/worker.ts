@@ -42,8 +42,8 @@ import {
   runRecurringReminderSweep,
 } from './cron/recurring'
 import { dbFromEnv } from './db/from-env'
-import { handleBillingEvent } from './queue/handlers/billing-event'
-import { parseTaskMessage } from './queue/messages'
+import { handleTaskBatch } from './queue/dispatch'
+import { taskHandlers } from './queue/handlers'
 import { createKvMarkerStore } from './recurring/markers'
 import { listCronScopes } from './repos/recurring'
 import { loggerFromEnv } from './observability/logger'
@@ -99,58 +99,16 @@ export default {
   },
 
   /**
-   * The task queue consumer.
-   *
-   * Messages are acknowledged or retried **one at a time**, never with `ackAll`: a batch of ten in
-   * which one message throws would otherwise redeliver the nine that already succeeded, and a
-   * redelivered billing event is a second chance to apply one state change.
-   *
-   * A body no handler in this deploy recognises is acknowledged with a warn rather than retried —
-   * five attempts at a message nothing can process reach the dead-letter queue with no more
-   * information than the first attempt had. A handler that *throws* is a different thing: that is
-   * infrastructure, and it is retried.
+   * The task queue consumer: one call, no logic. Acknowledge and retry rules live in
+   * `./queue/dispatch`, and which handler runs for a kind lives in `./queue/handlers`, so a plan
+   * that adds a job kind never edits this file.
    */
   async queue(
     batch: MessageBatch<unknown>,
     env: Cloudflare.Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    const logger: Logger = loggerFromEnv(env, {
-      context: { component: 'queue', route: batch.queue },
-    })
-
-    for (const message of batch.messages) {
-      const task = parseTaskMessage(message.body)
-      if (!task) {
-        logger.warn('queue message has no handler', {
-          queue: batch.queue,
-          messageId: message.id,
-        })
-        message.ack()
-        continue
-      }
-
-      try {
-        const outcome = await handleBillingEvent({
-          db: dbFromEnv(env),
-          eventId: task.eventId,
-          now: new Date(),
-          logger,
-        })
-        logger.debug('queue message handled', { kind: task.kind, outcome })
-        message.ack()
-      } catch (error) {
-        // Reaching here means the handler could not complete for a reason another attempt might
-        // resolve — a database that did not answer. Every *logical* failure is recorded on the
-        // billing event row and acknowledged inside the handler, so a retry here is never a
-        // second attempt at the same rejected payload.
-        logger.error('queue message failed', error, {
-          kind: task.kind,
-          messageId: message.id,
-        })
-        message.retry()
-      }
-    }
+    await handleTaskBatch(batch, env, taskHandlers)
   },
 
   /**
