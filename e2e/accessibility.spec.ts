@@ -12,7 +12,7 @@ import { ACCOUNTS, openSurface, SURFACES } from './support/surfaces'
 
 import type { AppLocale, AppTheme } from './support/app'
 import type { Surface } from './support/surfaces'
-import type { Browser } from '@playwright/test'
+import type { Browser, BrowserContextOptions } from '@playwright/test'
 
 /**
  * `@axe-core/playwright` over the four screens a reader cannot avoid, in both themes and both
@@ -28,11 +28,12 @@ import type { Browser } from '@playwright/test'
  * the accessible name of every control, so a name that was correct in English can be missing in
  * Polish. Scanning one theme in one language is scanning a quarter of the product.
  *
- * Width is *not* a third axis here, and nor does the project's viewport reach these scans:
- * `openSurface` builds its own context with `browser.newContext()`, which inherits none of the
- * project's `use` options, so every project scans these routes at Playwright's default 1280x720.
- * The axe scans at phone width are the `*.visual.spec.ts` panel scans, which run on the `page`
- * fixture under `mobile-chromium`.
+ * Width is *not* a third axis of this matrix, because the project list supplies it: `openSurface`
+ * creates its context under the running project's `use` options, so every scan here runs at that
+ * project's own viewport, locale, time zone and clock pin - 1440x900 under `chromium`, 412x915
+ * under `mobile-chromium`. Theme and locale are applied afterwards and stay explicit. The
+ * `*.visual.spec.ts` panel scans follow the project the same way, through the `page` fixture. The
+ * test after the matrix asserts the width, so a change that stopped it applying is red.
  *
  * ## What counts as a failure
  *
@@ -55,11 +56,18 @@ const LOCALES: readonly AppLocale[] = ['en', 'pl']
 
 async function scan(
   browser: Browser,
+  contextOptions: BrowserContextOptions,
   surface: Surface,
   theme: AppTheme,
   locale: AppLocale,
 ): Promise<void> {
-  const { context, page } = await openSurface(browser, surface, theme, locale)
+  const { context, page } = await openSurface(
+    browser,
+    contextOptions,
+    surface,
+    theme,
+    locale,
+  )
 
   try {
     await expectNoWcagViolations(page, `${surface.name} · ${theme} · ${locale}`)
@@ -74,12 +82,47 @@ test.describe('accessibility', () => {
       for (const locale of LOCALES) {
         test(`${surface.name} has no WCAG A or AA violations · ${theme} · ${locale}`, async ({
           browser,
+          contextOptions,
         }) => {
-          await scan(browser, surface, theme, locale)
+          await scan(browser, contextOptions, surface, theme, locale)
         })
       }
     }
   }
+
+  /**
+   * A scan that follows the project's viewport is a scan whose page is as wide as that viewport.
+   *
+   * This holds the outcome, not the mechanism: it stays green however `openSurface` gets there,
+   * and goes red the day a scan stops running at the project's width, whether through a context
+   * built from explicit options or a change in how Playwright applies `use` to `newContext()`.
+   * It holds for every project, but the claim worth having is the phone one - 412 under
+   * `mobile-chromium` - which is a width no other scan in this file reaches.
+   */
+  test("a scan runs at the project's viewport width", async ({
+    browser,
+    contextOptions,
+  }, testInfo) => {
+    const viewport = testInfo.project.use.viewport
+    expect(
+      viewport,
+      'every project declares the viewport it scans at',
+    ).toBeTruthy()
+
+    const { context, page } = await openSurface(
+      browser,
+      contextOptions,
+      ACCOUNTS,
+      'light',
+      'en',
+    )
+
+    try {
+      expect(await page.evaluate(() => window.innerWidth)).toBe(viewport?.width)
+    } finally {
+      await context.close()
+    }
+  })
 
   /**
    * The positive half of the correction in `isMeterFallbackRoleArtefact`.
@@ -99,9 +142,11 @@ test.describe('accessibility', () => {
    */
   test('the credit meter on accounts announces as a meter, with its whole sentence as the name', async ({
     browser,
+    contextOptions,
   }, testInfo) => {
     const { context, page } = await openSurface(
       browser,
+      contextOptions,
       ACCOUNTS,
       'light',
       'en',

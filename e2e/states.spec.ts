@@ -12,7 +12,7 @@ import en from '#/lib/i18n/messages/en'
 import type { AppLocale, AppTheme } from './support/app'
 import type { Surface } from './support/surfaces'
 import type { MessageKey } from '#/lib/i18n'
-import type { Browser } from '@playwright/test'
+import type { Browser, BrowserContextOptions } from '@playwright/test'
 
 /**
  * Issue #21's actual complaint, answered where the answer can be checked.
@@ -176,27 +176,31 @@ test.describe('an empty screen is still an accessible screen', () => {
   for (const surface of EMPTY_SURFACES) {
     test(`${surface.path} has no WCAG A or AA violations · ${BASE_CELL.theme} · ${BASE_CELL.locale}`, async ({
       browser,
+      contextOptions,
     }) => {
-      await scanEmpty(browser, surfaceOf(surface), BASE_CELL)
+      await scanEmpty(browser, contextOptions, surfaceOf(surface), BASE_CELL)
     })
   }
 
   for (const cell of VARIANT_CELLS) {
     test(`${EMPTY_RECURRING.path} has no WCAG A or AA violations · ${cell.theme} · ${cell.locale}`, async ({
       browser,
+      contextOptions,
     }) => {
-      await scanEmpty(browser, surfaceOf(EMPTY_RECURRING), cell)
+      await scanEmpty(browser, contextOptions, surfaceOf(EMPTY_RECURRING), cell)
     })
   }
 })
 
 async function scanEmpty(
   browser: Browser,
+  contextOptions: BrowserContextOptions,
   surface: Surface,
   cell: Cell,
 ): Promise<void> {
   const { context, page } = await openSurface(
     browser,
+    contextOptions,
     surface,
     cell.theme,
     cell.locale,
