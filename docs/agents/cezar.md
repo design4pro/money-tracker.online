@@ -302,8 +302,9 @@ itself under `CEZ_TASK_ID` (`validation.commands` is the run's gate), and the pr
 
 Agent steps carry no `bashAllowlist` (ADR 0017): the tracker descriptor is shell functions and
 `jq`, and a prefix allowlist would drop label mutations silently. The permission rules above,
-branch protection on `develop` and `main`, the PAT scopes, one worktree per run, `maxParallel: 2`
-and review of every pull request are the gate.
+the rulesets on `develop` and `main` (a pull request, the three required checks, resolved review
+threads), the PAT scopes, one worktree per run, `maxParallel: 2` and review of every pull request
+are the gate.
 
 ## Workflows (`.ai/cezar/workflows/`)
 
