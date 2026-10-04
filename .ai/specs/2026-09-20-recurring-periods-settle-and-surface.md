@@ -1,11 +1,11 @@
 # Settle and surface recurring periods
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #363  |
-| **Spec PR**        | none  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #363        |
+| **Spec PR**        | #364        |
+| **Implementation** | none        |
 
 ## 📝 TLDR
 

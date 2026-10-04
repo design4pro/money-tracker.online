@@ -756,6 +756,9 @@ const messages = {
   'transactions.planned.empty.title': 'Nothing planned',
   'transactions.planned.empty.body':
     'Record an expense with a future date and mark it planned to see it here.',
+  'transactions.mode.label': 'Which entries to show',
+  'transactions.mode.actual': 'Recorded',
+  'transactions.mode.planned': 'Planned',
   /* -- Colours (the eight measured category hues) ------------------------- */
   'colour.blue': 'Blue',
   'colour.teal': 'Teal',
@@ -1813,6 +1816,8 @@ const messages = {
   'recurring.markPaid.placeholder': 'Search your spending',
   'recurring.markPaid.empty':
     'Nothing in this window matches. Record the payment first, then come back.',
+  'recurring.markPaid.record': 'Record the payment',
+  'recurring.markPaid.recordHint': 'We will bring you back here to link it.',
   'recurring.markPaid.confirm': 'Link it',
   'recurring.markPaid.never': 'Marking a period paid never creates an entry.',
   /* -- Automation ----------------------------------------------------------- */

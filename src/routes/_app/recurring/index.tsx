@@ -1,20 +1,19 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus, Search } from 'lucide-react'
 import { z } from 'zod'
 
 import {
-  PeriodStatusBadge,
   RECURRING_PANES,
   RecurringEmptyState,
   RecurringListSkeleton,
   SeriesCard,
+  UpcomingPanel,
 } from '#/components/app/recurring'
 import { SegmentedFilter } from '#/components/app/nav'
 import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, toast } from '#/components/ui'
-import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
-import { formatMoney, makeMoney } from '#/lib/money'
+import { useTranslate } from '#/lib/i18n'
 import { listAccounts } from '#/server/fns/accounts'
 import { listCategories } from '#/server/fns/categories'
 import { listPayees } from '#/server/fns/payees'
@@ -23,14 +22,17 @@ import {
   loadRecurring,
   pauseSeries,
   resumeSeries,
+  skipPeriod,
 } from '#/server/fns/recurring'
 
 import { useDataRefresh } from '../-lib/refresh'
 import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
+import { MarkPaidDialog } from './-ui/mark-paid-dialog'
 import { SeriesActionsMenu } from './-ui/series-actions-menu'
 import { SeriesFormDialog } from './-ui/series-form-dialog'
 
 import type { RecurringSeries } from '#/server/db/types'
+import type { SeriesListRow } from '#/server/fns/recurring'
 import type { UpcomingPeriod } from '#/server/repos/recurring'
 import { pageHead } from '#/routes/-lib/page-title'
 
@@ -50,6 +52,14 @@ import { pageHead } from '#/routes/-lib/page-title'
  * state would make all three lie. `loaderDeps` ties the loader to it, so changing the filter
  * refetches without a manual invalidate.
  *
+ * ## Due periods are settled from here
+ *
+ * Each row of *Due soon* carries Mark paid and Skip, which call the same server functions and open
+ * the same dialog as the series detail screen. `?markPaid=<period start>&series=<id>` reopens that
+ * dialog on a period - how the entry form brings somebody back once they have recorded the payment
+ * the picker had nothing to offer for. It opens only on a period *Due soon* still lists, and the
+ * address is cleaned when the dialog closes so a reload does not reopen it.
+ *
  * ## The reference lists are loaded here, not in the dialog
  *
  * The form needs accounts, categories and payees, and the form is mounted only while it is open -
@@ -59,6 +69,8 @@ import { pageHead } from '#/routes/-lib/page-title'
 
 const searchSchema = z.object({
   status: z.enum(['active', 'all']).default('active'),
+  markPaid: z.iso.date().optional().catch(undefined),
+  series: z.string().trim().min(1).max(64).optional().catch(undefined),
 })
 
 type StatusFilter = z.infer<typeof searchSchema>['status']
@@ -105,17 +117,48 @@ type Pending =
   | { kind: 'form'; series: RecurringSeries | null }
   | { kind: 'pause'; series: RecurringSeries }
   | { kind: 'complete'; series: RecurringSeries }
+  | { kind: 'markPaid'; period: UpcomingPeriod; series: RecurringSeries }
+
+/**
+ * The dialog state for marking one listed period paid.
+ *
+ * A period is listed only for an active series and `rows` holds every active series, so the lookup
+ * finds one; the `none` branch is what keeps the type honest rather than a case that is expected.
+ */
+function markPaidPending(
+  rows: ReadonlyArray<SeriesListRow>,
+  period: UpcomingPeriod,
+): Pending {
+  const series = rows.find((row) => row.series.id === period.seriesId)?.series
+  return series === undefined
+    ? { kind: 'none' }
+    : { kind: 'markPaid', period, series }
+}
 
 function RecurringListRoute() {
   const t = useTranslate()
   const { overview, accounts, categories, payees } = Route.useLoaderData()
-  const { status } = Route.useSearch()
+  const { status, markPaid, series: markPaidSeries } = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()
   const refreshCaches = useDataRefresh()
 
-  const [pending, setPending] = useState<Pending>({ kind: 'none' })
-  const close = () => setPending({ kind: 'none' })
+  const [pending, setPending] = useState<Pending>(() => {
+    const reopened = overview.upcoming.find(
+      (candidate) =>
+        candidate.periodStart === markPaid &&
+        candidate.seriesId === markPaidSeries,
+    )
+    return reopened === undefined
+      ? { kind: 'none' }
+      : markPaidPending(overview.rows, reopened)
+  })
+  const close = () => {
+    setPending({ kind: 'none' })
+    if (markPaid !== undefined || markPaidSeries !== undefined) {
+      void navigate({ search: { status }, replace: true })
+    }
+  }
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
   const baseCurrencyCode =
@@ -255,7 +298,23 @@ function RecurringListRoute() {
             )}
           </div>
 
-          <UpcomingPanel upcoming={overview.upcoming} />
+          <UpcomingPanel
+            upcoming={overview.upcoming}
+            onMarkPaid={(period) =>
+              setPending(markPaidPending(overview.rows, period))
+            }
+            onSkip={(period) => {
+              void skipPeriod({
+                data: {
+                  seriesId: period.seriesId,
+                  periodStart: period.periodStart,
+                },
+              }).then(() => {
+                toast.success(t('recurring.toast.periodSkipped'))
+                refresh()
+              })
+            }}
+          />
         </div>
       )}
 
@@ -280,6 +339,24 @@ function RecurringListRoute() {
                   : 'recurring.toast.saved',
               ),
             )
+            close()
+            refresh()
+          }}
+        />
+      ) : null}
+
+      {pending.kind === 'markPaid' ? (
+        <MarkPaidDialog
+          key={`${pending.period.seriesId}:${pending.period.periodStart}`}
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) close()
+          }}
+          series={pending.series}
+          period={pending.period}
+          origin="list"
+          onSaved={() => {
+            toast.success(t('recurring.toast.periodPaid'))
             close()
             refresh()
           }}
@@ -326,120 +403,5 @@ function RecurringListRoute() {
         />
       ) : null}
     </div>
-  )
-}
-
-/**
- * What is due soon, and what is already late.
- *
- * A real `<table>`: this is tabular data somebody reads down a column, and it has no sorting, no
- * selection and no cell navigation, so the semantics that matter are the plain ones. The status is
- * a word in its own cell rather than a tint on the row - `docs/ACCESSIBILITY.md` §1 - and the
- * series name is a link, so the row is a route to the thing rather than a dead end.
- */
-function UpcomingPanel({
-  upcoming,
-}: {
-  readonly upcoming: ReadonlyArray<UpcomingPeriod>
-}) {
-  const t = useTranslate()
-  const locale = useLocale()
-  // "Upcoming" repeated down every row says nothing the section name has not already said; the
-  // status column is printed only when a row is late, which is the case the word distinguishes.
-  const showStatus = upcoming.some(
-    (period) => period.derivedStatus !== 'upcoming',
-  )
-
-  return (
-    <Card className="flex flex-col gap-3">
-      <h2 className="text-subtitle font-semibold text-ink">
-        {t('recurring.upcoming.title')}
-      </h2>
-
-      {upcoming.length === 0 ? (
-        <p className="text-body text-ink-2">{t('recurring.upcoming.empty')}</p>
-      ) : (
-        <div
-          role="region"
-          aria-label={t('recurring.upcoming.title')}
-          tabIndex={0}
-          className="overflow-x-auto rounded-md outline-focus focus-safe focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
-        >
-          <table className="w-full border-collapse text-label">
-            <caption className="pb-3 text-start text-caption text-ink-2">
-              {t('recurring.upcoming.caption')}
-            </caption>
-            <thead>
-              <tr className="border-b border-border-subtle">
-                <th
-                  scope="col"
-                  className="px-3 py-2 text-start font-medium text-ink-2"
-                >
-                  {t('recurring.periods.col.due')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-3 py-2 text-start font-medium text-ink-2"
-                >
-                  {t('recurring.form.name')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-3 py-2 text-end font-medium text-ink-2"
-                >
-                  {t('recurring.periods.col.expected')}
-                </th>
-                {showStatus ? (
-                  <th
-                    scope="col"
-                    className="px-3 py-2 text-start font-medium text-ink-2"
-                  >
-                    {t('recurring.periods.col.status')}
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {upcoming.map((period) => (
-                <tr
-                  key={`${period.seriesId}:${period.periodStart}`}
-                  className="border-b border-border-subtle last:border-b-0"
-                >
-                  <th
-                    scope="row"
-                    className="whitespace-nowrap px-3 py-2 text-start font-medium text-ink"
-                  >
-                    {formatCalendarDate(locale, period.dueOn, 'medium')}
-                  </th>
-                  <td className="px-3 py-2">
-                    <Link
-                      to="/recurring/$seriesId"
-                      params={{ seriesId: period.seriesId }}
-                      className="rounded-sm text-ink underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
-                    >
-                      {period.seriesName}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-end tabular text-ink">
-                    {formatMoney(
-                      locale,
-                      makeMoney(
-                        period.expectedAmountMinor,
-                        period.expectedCurrencyCode,
-                      ),
-                    )}
-                  </td>
-                  {showStatus ? (
-                    <td className="px-3 py-2">
-                      <PeriodStatusBadge status={period.derivedStatus} />
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
   )
 }
