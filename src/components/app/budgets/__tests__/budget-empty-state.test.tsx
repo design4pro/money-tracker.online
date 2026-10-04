@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 
 import en from '#/lib/i18n/messages/en'
 import pl from '#/lib/i18n/messages/pl'
@@ -36,6 +37,31 @@ describe('BudgetEmptyState', () => {
       primary.compareDocumentPosition(section) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+  })
+
+  it('hands the chosen kind to onCreate, and none from the primary action', async () => {
+    const onCreate = vi.fn()
+    const user = userEvent.setup()
+    renderBudget(<BudgetEmptyState onCreate={onCreate} />)
+
+    await user.click(
+      screen.getByRole('button', {
+        name: new RegExp(en['budgets.kind.category']),
+      }),
+    )
+    expect(onCreate).toHaveBeenLastCalledWith('category')
+
+    await user.click(
+      screen.getByRole('button', {
+        name: new RegExp(en['budgets.kind.manual']),
+      }),
+    )
+    expect(onCreate).toHaveBeenLastCalledWith('manual')
+
+    await user.click(
+      screen.getByRole('button', { name: en['budgets.empty.action'] }),
+    )
+    expect(onCreate).toHaveBeenLastCalledWith()
   })
 
   it('labels the section in Polish as well', () => {

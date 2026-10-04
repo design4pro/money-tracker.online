@@ -728,8 +728,9 @@ a sentence that says what to do, not a blank.
 - **Actions:** one `primary` at the default size, and at most one `secondary` beside it. There is
   no `size` prop and no second size.
 - **Needs more?** A surface that wants to offer more than two actions - a choice of kind, say -
-  does it in a sibling section under its own sub-heading, never inside the card. `/accounts` is the
-  example: three kind shortcuts in a labelled `<section>` below the empty state.
+  does it in a sibling section under its own sub-heading, never inside the card. `/accounts` (three
+  kind shortcuts) and `/budgets` (two) are the examples: a labelled `<section>` below the empty
+  state.
 - **It is not** a `brand` card (an invitation or an upsell on a page that has content) and not
   `ErrorPanel` (something went wrong). An empty list with a filter on is the same state with the
   filter's own copy.
