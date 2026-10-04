@@ -4,7 +4,7 @@
 | ------------------ | ------------------------------------ |
 | **Status**         | ready                                |
 | **Issue**          | none                                 |
-| **Spec PR**        | none                                 |
+| **Spec PR**        | #510                                 |
 | **Implementation** | none                                 |
 | **Plan**           | 00-S4 (docs/plans/00-foundations.md) |
 
