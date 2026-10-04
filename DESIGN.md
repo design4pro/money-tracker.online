@@ -712,6 +712,30 @@ A slip laid on the paper, for content that needs its own ground. Not the scaffol
   description, with a trailing action slot. There is no eyebrow.
 - A card is not interactive; a clickable card is a `Button` or `Link` wrapping a card.
 
+### Empty state
+
+The designed "nothing here yet" state, and the one owner of it: `EmptyState` is the dashed card
+with a message in it. Every list has one, so a person's first screen in an empty workspace is
+a sentence that says what to do, not a blank.
+
+- **Container:** the dashed card (Cards, above) at `lg` padding, 24px at the sides and 40px
+  vertical, centred, with a 12px gap.
+- **Medallion:** a 44px round `surface-sunken` disc with a 20px glyph in `ink-2`. The icon is
+  `aria-hidden` and never carries a word the copy does not say.
+- **Heading:** `subtitle` (700, 20px) at a caller-chosen level - it is a card title, not a page
+  title, so on a screen whose `<h1>` is `title` the two must not share a step.
+- **Description:** `body` in `ink-2`, capped at the measure.
+- **Actions:** one `primary` at the default size, and at most one `secondary` beside it. There is
+  no `size` prop and no second size.
+- **Needs more?** A surface that wants to offer more than two actions - a choice of kind, say -
+  does it in a sibling section under its own sub-heading, never inside the card. `/accounts` is the
+  example: three kind shortcuts in a labelled `<section>` below the empty state.
+- **It is not** a `brand` card (an invitation or an upsell on a page that has content) and not
+  `ErrorPanel` (something went wrong). An empty list with a filter on is the same state with the
+  filter's own copy.
+- `src/components/ui/__tests__/empty-state-ownership.test.ts` fails when `variant="dashed"`
+  appears outside `src/components/ui`.
+
 ### Badges
 
 A word with a run of pen behind it. Every badge, in every tone, is the pen mark (`mark-pen` in

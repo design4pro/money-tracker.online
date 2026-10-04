@@ -1,6 +1,6 @@
 import { FolderTree, Hand, Plus, Wallet } from 'lucide-react'
 
-import { Button, Card } from '#/components/ui'
+import { Button, EmptyState } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
 /**
@@ -15,6 +15,10 @@ import { useTranslate } from '#/lib/i18n'
  *
  * The tiles create nothing. They pre-fill a form, because a tile that silently wrote a row would
  * be the first thing this product did on somebody's behalf.
+ *
+ * They sit in a labelled section *beside* the empty state, not inside it: the shared `EmptyState`
+ * has one size and no slot for extras, and the accounts screen already keeps its kind shortcuts
+ * the same way (#362).
  */
 
 export interface BudgetEmptyStateProps {
@@ -28,71 +32,75 @@ export function BudgetEmptyState({
   headingLevel = 2,
 }: BudgetEmptyStateProps) {
   const t = useTranslate()
-  const Heading = headingLevel === 2 ? 'h2' : 'h3'
+  const SubHeading = headingLevel === 2 ? 'h3' : 'h4'
 
   return (
-    <Card
-      variant="dashed"
-      padding="lg"
-      className="flex flex-col items-center gap-6 py-12 text-center"
-    >
-      <span
-        aria-hidden="true"
-        className="grid size-14 place-items-center rounded-full bg-surface-sunken text-ink-2"
-      >
-        <Wallet className="size-6" />
-      </span>
+    <div className="flex flex-col gap-6">
+      <EmptyState
+        icon={<Wallet />}
+        title={t('budgets.empty.title')}
+        description={t('budgets.empty.body')}
+        headingLevel={headingLevel}
+        action={
+          <Button
+            variant="primary"
+            icon={<Plus className="size-4" />}
+            onPress={() => onCreate()}
+          >
+            {t('budgets.empty.action')}
+          </Button>
+        }
+      />
 
-      <div className="prose-measure">
-        <Heading className="text-title font-semibold text-ink">
-          {t('budgets.empty.title')}
-        </Heading>
-        <p className="text-body text-ink-2">{t('budgets.empty.body')}</p>
-      </div>
-
-      <ul className="grid w-full max-w-2xl gap-3 sm:grid-cols-2">
-        {(
-          [
-            { kind: 'category', Icon: FolderTree },
-            { kind: 'manual', Icon: Hand },
-          ] as const
-        ).map(({ kind, Icon }) => (
-          <li key={kind}>
-            <Button
-              variant="secondary"
-              size="lg"
-              block
-              className="h-auto flex-col items-start gap-1.5 py-4 text-start"
-              onPress={() => onCreate(kind)}
-            >
-              <Icon aria-hidden="true" className="size-5 text-ink-2" />
-              <span className="text-label font-semibold text-ink">
-                {t(
-                  kind === 'category'
-                    ? 'budgets.kind.category'
-                    : 'budgets.kind.manual',
-                )}
-              </span>
-              <span className="text-caption font-normal text-ink-2 whitespace-normal">
-                {t(
-                  kind === 'category'
-                    ? 'budgets.kind.category.help'
-                    : 'budgets.kind.manual.help',
-                )}
-              </span>
-            </Button>
-          </li>
-        ))}
-      </ul>
-
-      <Button
-        variant="brand"
-        size="lg"
-        icon={<Plus className="size-4" />}
-        onPress={() => onCreate()}
-      >
-        {t('budgets.empty.action')}
-      </Button>
-    </Card>
+      <section aria-labelledby="budgets-empty-pick">
+        <SubHeading
+          id="budgets-empty-pick"
+          className="text-subtitle font-semibold text-ink"
+        >
+          {t('budgets.empty.pick.title')}
+        </SubHeading>
+        <p className="mt-1 text-caption text-ink-2">
+          {t('budgets.empty.pick.body')}
+        </p>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              { kind: 'category', Icon: FolderTree },
+              { kind: 'manual', Icon: Hand },
+            ] as const
+          ).map(({ kind, Icon }) => (
+            <li key={kind}>
+              {/*
+                `size="lg"` stays: these are `h-auto flex-col` tiles whose height comes from their
+                content, so the prop only supplies the padding and type step (#362).
+              */}
+              <Button
+                variant="secondary"
+                size="lg"
+                block
+                className="h-auto flex-col items-start gap-1.5 py-4 text-start"
+                onPress={() => onCreate(kind)}
+              >
+                <Icon aria-hidden="true" className="size-5 text-ink-2" />
+                <span className="text-label font-semibold text-ink">
+                  {t(
+                    kind === 'category'
+                      ? 'budgets.kind.category'
+                      : 'budgets.kind.manual',
+                  )}
+                </span>
+                <span className="text-caption font-normal text-ink-2 whitespace-normal">
+                  {t(
+                    kind === 'category'
+                      ? 'budgets.kind.category.help'
+                      : 'budgets.kind.manual.help',
+                  )}
+                </span>
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
   )
 }

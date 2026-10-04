@@ -1062,6 +1062,9 @@ const messages = {
   'budgets.empty.body':
     'A budget is a limit on a set of categories for a period. Follow a set of categories and it fills itself, or put expenses in by hand for a one-off.',
   'budgets.empty.action': 'Create your first budget',
+  'budgets.empty.pick.title': 'Or start from one of these',
+  'budgets.empty.pick.body':
+    'Each one opens the form with the kind already chosen. Nothing is created until you save.',
   'budgets.empty.archived.title': 'Nothing archived',
   'budgets.empty.archived.body':
     'Archived budgets keep every period they closed. None have been archived yet.',
