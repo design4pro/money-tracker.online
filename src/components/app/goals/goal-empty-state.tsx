@@ -1,6 +1,6 @@
 import { Plus, Target } from 'lucide-react'
 
-import { Button, Card } from '#/components/ui'
+import { Button, EmptyState } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
 /**
@@ -26,36 +26,22 @@ export function GoalEmptyState({
   headingLevel = 2,
 }: GoalEmptyStateProps) {
   const t = useTranslate()
-  const Heading = headingLevel === 2 ? 'h2' : 'h3'
 
   return (
-    <Card
-      variant="dashed"
-      padding="lg"
-      className="flex flex-col items-center gap-6 py-12 text-center"
-    >
-      <span
-        aria-hidden="true"
-        className="grid size-14 place-items-center rounded-full bg-surface-sunken text-ink-2"
-      >
-        <Target className="size-6" />
-      </span>
-
-      <div className="prose-measure">
-        <Heading className="text-title font-semibold text-ink">
-          {t('goals.empty.title')}
-        </Heading>
-        <p className="text-body text-ink-2">{t('goals.empty.body')}</p>
-      </div>
-
-      <Button
-        variant="brand"
-        size="lg"
-        icon={<Plus aria-hidden="true" className="size-4" />}
-        onPress={onCreate}
-      >
-        {t('goals.empty.action')}
-      </Button>
-    </Card>
+    <EmptyState
+      icon={<Target />}
+      title={t('goals.empty.title')}
+      description={t('goals.empty.body')}
+      headingLevel={headingLevel}
+      action={
+        <Button
+          variant="primary"
+          icon={<Plus aria-hidden="true" className="size-4" />}
+          onPress={onCreate}
+        >
+          {t('goals.empty.action')}
+        </Button>
+      }
+    />
   )
 }

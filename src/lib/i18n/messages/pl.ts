@@ -1095,6 +1095,9 @@ const messages = {
   'budgets.empty.body':
     'Budżet to limit na wybrane kategorie w wybranym okresie. Podepnij pod niego kategorie, a wypełni się sam, albo dodawaj wydatki ręcznie, gdy chodzi o jeden konkretny zakup.',
   'budgets.empty.action': 'Utwórz pierwszy budżet',
+  'budgets.empty.pick.title': 'Albo zacznij od jednego z tych',
+  'budgets.empty.pick.body':
+    'Każdy otwiera formularz z wybranym już rodzajem budżetu. Nic nie powstaje, dopóki nie zapiszesz.',
   'budgets.empty.archived.title': 'Nic nie jest zarchiwizowane',
   'budgets.empty.archived.body':
     'Zarchiwizowane budżety zachowują wszystkie zamknięte okresy. Na razie nie ma tu żadnego.',
