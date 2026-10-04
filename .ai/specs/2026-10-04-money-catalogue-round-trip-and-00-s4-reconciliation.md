@@ -59,7 +59,8 @@ amount-rendering screen depends on. Verified against the repository at the time 
    `roundHalfToEven`, `subMinor`, `mulRate`, `formatAmount`, `parseAmount`; the code has `divideHalfEven`,
    `subtractMinor`, `convert`, `formatMoney`, `parseMoney`, `makeMoney` and `toAmountInputValue`. It says
    `money.test.ts` holds the invariants in its Money invariant section while its Owned paths section
-   already says the suite is four files. It lists `ENTITLING_STATUSES` and "the module switches of
+   already says the suite is four files, and its Verification section says "The two test files above"
+   where the Owned paths list names five. It lists `ENTITLING_STATUSES` and "the module switches of
    `docs/SPEC.md` §5.4" as exports of `plans.ts`: `ENTITLING_STATUSES` is a private constant of
    `src/server/billing/resolve-limits.ts` (line 49), where `docs/SPEC.md` §5.4 puts the entitlement
    decision, and §5.4 contains no "module switches".
@@ -152,7 +153,7 @@ what shows formatting working in a browser. No axe run, no frames.
 
 **`risk-low`.** Phase 1 adds a test and, as measured, changes no production code. Phase 2 edits a
 planning document and one comment. The security and tenancy reviewer was still asked, because the
-spec is about money, and its verdict is row 9 of Resolved assumptions.
+spec is about money, and its verdict is row 10 of Resolved assumptions.
 
 | Risk                                                         | Severity | Mitigation                                                                                                                  |
 | ------------------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------- |
