@@ -146,6 +146,11 @@ Every object in R2 is served **only** through `/api/files/$id`, which resolves t
 caller's tenant scope and then streams from R2, supporting `Range`. **No bucket has public access and
 none ever gets it.** A public bucket URL is a tenancy bypass with no audit trail and no revocation.
 
+The row's stored key is checked as well as the row: a read or a delete of an attachment whose key is
+not under the caller's own `attachments/<workspace>/` prefix is a not-found, the same as an id that
+does not exist, and is logged with the attachment id only (`getAttachmentForRead`, `deleteAttachment`
+in `src/server/repos/attachments.ts`).
+
 Uploads are content-type checked, size-capped by the workspace's storage quota, and stored under a
 tenant-prefixed key. For R2 writes the order is **object first, quota assert second, compensating
 delete on throw** — the reverse leaves a quota consumed by an object that does not exist.
