@@ -24,6 +24,12 @@ import type { PeriodView } from '#/server/repos/recurring'
  * A surface that lists periods of **several series** (the Upcoming panel) also passes the series
  * name, because two bills due on the same day would otherwise be two identical names.
  *
+ * ## A narrow cell stacks them
+ *
+ * `compact` is for a cell with no room to spare (the Upcoming panel's rail, which must not scroll
+ * sideways): the buttons stack and a long label wraps onto a second line instead of widening the
+ * column. The series grid, which has the room, keeps them on one line.
+ *
  * The component draws the buttons and not their cell: the `<td>` belongs to the table that owns
  * its columns, and the callbacks to the route that performs the writes.
  */
@@ -32,6 +38,8 @@ export interface PeriodActionsProps {
   readonly period: Pick<PeriodView, 'dueOn' | 'derivedStatus'>
   /** Named in each button's accessible name when the surface mixes series. */
   readonly seriesName?: string
+  /** Stack the buttons and let their labels wrap, for a cell that cannot grow. */
+  readonly compact?: boolean
   /** Opens the link-a-transaction dialog. Supplied by the route, because it performs a write. */
   readonly onMarkPaid: () => void
   readonly onSkip: () => void
@@ -42,6 +50,7 @@ export interface PeriodActionsProps {
 export function PeriodActions({
   period,
   seriesName,
+  compact = false,
   onMarkPaid,
   onSkip,
   onRevert,
@@ -52,12 +61,23 @@ export function PeriodActions({
   const isSettled =
     period.derivedStatus === 'paid' || period.derivedStatus === 'skipped'
 
+  const buttonClass = compact
+    ? 'h-auto min-h-8 whitespace-normal py-1 text-center'
+    : undefined
+
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div
+      className={
+        compact
+          ? 'flex flex-col items-stretch gap-1'
+          : 'flex items-center justify-end gap-1'
+      }
+    >
       {isSettled ? (
         onRevert === undefined ? null : (
           <Button
             size="sm"
+            className={buttonClass}
             variant="ghost"
             aria-label={t('recurring.period.revert.for', { date: due })}
             onPress={onRevert}
@@ -69,6 +89,7 @@ export function PeriodActions({
         <>
           <Button
             size="sm"
+            className={buttonClass}
             variant="subtle"
             aria-label={
               seriesName === undefined
@@ -84,6 +105,7 @@ export function PeriodActions({
           </Button>
           <Button
             size="sm"
+            className={buttonClass}
             variant="ghost"
             aria-label={
               seriesName === undefined

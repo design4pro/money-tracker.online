@@ -812,6 +812,9 @@ the series detail grid and _Due soon_ on `/recurring`.
 - **Which buttons:** a function of the period, never of the surface. An unsettled period gets _Mark
   paid_ and _Skip_; a paid or skipped one gets _Undo_ alone. A surface fed only unsettled periods
   passes no `onRevert`, and a settled period handed to it draws nothing.
+- **A cell with no room to spare:** `compact` stacks the buttons and lets a long label wrap onto a second
+  line rather than widening the column. _Due soon_ uses it so the 30rem rail never scrolls sideways
+  (`e2e/desktop-density.spec.ts`); the series grid keeps the buttons on one line.
 - **The states:** the ordinary button states. There is no hover-only affordance - every action is a
   `<button>` reachable by Tab in reading order.
 - **What carries the meaning when the colour does not:** the label is a word, and the accessible

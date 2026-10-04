@@ -436,33 +436,34 @@ for (const locale of LOCALES) {
     }))
     expect(natural.scrollWidth).toBeLessThanOrEqual(natural.clientWidth)
 
-    // And the case that matters most, which the seeded workspace does not contain: the status
-    // column the panel prints as soon as one period is late. Injected rather than seeded, for the
-    // reason the empty-rail test above gives — writing recurring rows into a workspace the rest
+    // And the case that matters most, which the seeded workspace does not contain: the widest
+    // status the panel prints, a late period's. The status column is always there now (the panel
+    // no longer hides it while every row is merely upcoming), so the late badge replaces what each
+    // row's status cell holds rather than adding a column. Injected rather than seeded, for the
+    // reason the empty-rail test above gives - writing recurring rows into a workspace the rest
     // of this suite reads concurrently is a lot of fixture for a claim about a grid track.
     const late = await scroller.evaluate((element, status) => {
       const table = element.querySelector('table')
       if (table === null) return null
-      const header = document.createElement('th')
-      header.scope = 'col'
-      header.className = 'px-3 py-2 text-start font-medium text-ink-2'
-      header.textContent = status.header
-      table.querySelector('thead tr')?.appendChild(header)
+      const columns = [...table.querySelectorAll('thead th')]
+      const at = columns.findIndex(
+        (header) => header.textContent === status.header,
+      )
+      if (at < 0) return null
       for (const row of table.querySelectorAll('tbody tr')) {
-        const cell = document.createElement('td')
-        cell.className = 'px-3 py-2'
         const badge = document.createElement('span')
         badge.className = status.badgeClass
         badge.textContent = status.badge
-        cell.appendChild(badge)
-        row.appendChild(cell)
+        row.children[at]?.replaceChildren(badge)
       }
       return {
         scrollWidth: element.scrollWidth,
         clientWidth: element.clientWidth,
       }
     }, STATUS_COLUMN[locale])
-    if (late === null) throw new Error('the rail is not rendering a table')
+    if (late === null) {
+      throw new Error('the rail is not rendering a table with a status column')
+    }
     expect(late.scrollWidth).toBeLessThanOrEqual(late.clientWidth)
   })
 }

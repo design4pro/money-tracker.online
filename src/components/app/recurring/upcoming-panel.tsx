@@ -70,31 +70,31 @@ export function UpcomingPanel({
               <tr className="border-b border-border-subtle">
                 <th
                   scope="col"
-                  className="px-3 py-2 text-start font-medium text-ink-2"
+                  className="px-1.5 py-2 text-start font-medium text-ink-2"
                 >
                   {t('recurring.periods.col.due')}
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-2 text-start font-medium text-ink-2"
+                  className="px-1.5 py-2 text-start font-medium text-ink-2"
                 >
                   {t('recurring.form.name')}
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-2 text-end font-medium text-ink-2"
+                  className="px-1.5 py-2 text-end font-medium text-ink-2"
                 >
                   {t('recurring.periods.col.expected')}
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-2 text-start font-medium text-ink-2"
+                  className="px-1.5 py-2 text-start font-medium text-ink-2"
                 >
                   {t('recurring.periods.col.status')}
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-2 text-end font-medium text-ink-2"
+                  className="px-1.5 py-2 text-end font-medium text-ink-2"
                 >
                   {t('recurring.periods.col.actions')}
                 </th>
@@ -108,11 +108,11 @@ export function UpcomingPanel({
                 >
                   <th
                     scope="row"
-                    className="whitespace-nowrap px-3 py-2 text-start font-medium text-ink"
+                    className="px-1.5 py-2 text-start font-medium text-ink"
                   >
                     {formatCalendarDate(locale, period.dueOn, 'medium')}
                   </th>
-                  <td className="px-3 py-2">
+                  <td className="px-1.5 py-2">
                     <Link
                       to="/recurring/$seriesId"
                       params={{ seriesId: period.seriesId }}
@@ -121,7 +121,7 @@ export function UpcomingPanel({
                       {period.seriesName}
                     </Link>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-end tabular text-ink">
+                  <td className="whitespace-nowrap px-1.5 py-2 text-end tabular text-ink">
                     {formatMoney(
                       locale,
                       makeMoney(
@@ -130,13 +130,14 @@ export function UpcomingPanel({
                       ),
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-1.5 py-2">
                     <PeriodStatusBadge status={period.derivedStatus} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-1.5 py-2">
                     <PeriodActions
                       period={period}
                       seriesName={period.seriesName}
+                      compact
                       onMarkPaid={() => onMarkPaid(period)}
                       onSkip={() => onSkip(period)}
                     />
