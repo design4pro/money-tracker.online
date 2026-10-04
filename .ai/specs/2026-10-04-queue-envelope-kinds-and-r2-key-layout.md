@@ -2,10 +2,10 @@
 
 | Field              | Value                                 |
 | ------------------ | ------------------------------------- |
-| **Status**         | ready                                 |
+| **Status**         | in-progress                           |
 | **Issue**          | none                                  |
 | **Spec PR**        | #515                                  |
-| **Implementation** | none                                  |
+| **Implementation** | #525                                  |
 | **Plan**           | 00-S12 (docs/plans/00-foundations.md) |
 
 ## 📝 TLDR
