@@ -582,8 +582,8 @@ for (const locale of LOCALES) {
 
 /**
  * The widths at which issue #161 is read: the one the density spec fixes, and the narrowest
- * desktop one, where the three-column grid has already collapsed to two and the Net worth panel
- * is at its narrowest.
+ * desktop one that still has the three-column grid (`xl` starts at 1280), where the Net worth
+ * panel is at its narrowest.
  */
 const NET_WORTH_VIEWPORTS = [
   { width: 1440, height: 900 },
@@ -634,9 +634,18 @@ for (const locale of LOCALES) {
         expect(box.y - (previous.y + previous.height)).toBeCloseTo(0, 0)
       }
 
-      // The caption sits under the lines it qualifies, not on the floor of a stretched card.
+      // The caption sits under the lines it qualifies, not on the floor of a stretched card: it
+      // starts below the last line and no further from it than one row's own vertical padding (the
+      // panel's rhythm), plus the 1px rule drawn under that line and 1px of rounding.
       const lastLine = lineBoxes[2]
-      expect(captionBox.y).toBeGreaterThanOrEqual(lastLine.y + lastLine.height)
+      const captionOffset = captionBox.y - (lastLine.y + lastLine.height)
+      const rowPadding = await lines
+        .last()
+        .evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).paddingTop),
+        )
+      expect(captionOffset).toBeGreaterThanOrEqual(0)
+      expect(captionOffset).toBeLessThanOrEqual(rowPadding + 2)
 
       // The card ends within its own padding (and its 1px border) of the caption: nothing is
       // left below the content, which is what `WidgetGrid`'s `items-start` is for.
