@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CURRENCIES,
   asRateE10,
   formatMoney,
   formatMoneyPlain,
@@ -296,6 +297,70 @@ describe('the parse/format round trip', () => {
         ).toBe(amount.amountMinor)
       }
     })
+  }
+
+  /**
+   * The invariant is stated for the catalogue, not for the five currencies the
+   * cases above happen to name, so a currency added or re-scaled later is
+   * covered with no edit here. The amounts reach each digit scale's boundaries:
+   * below one major unit, exactly one at three digits, a thousands group, and
+   * both signs. All sit far below `DISPLAY_EXACT_TO`.
+   */
+  const CATALOGUE_AMOUNTS: ReadonlyArray<number> = [
+    0, 1, 5, 99, 1_234, 123_456, 12_345_678, -1, -123_456,
+  ]
+
+  /** Prints every whitespace character as its code point; the text is never normalised before parsing. */
+  function escaped(text: string): string {
+    return text.replace(
+      /\s/g,
+      (space) =>
+        `\\u${(space.codePointAt(0) ?? 0).toString(16).padStart(4, '0')}`,
+    )
+  }
+
+  const CATALOGUE_PATHS: ReadonlyArray<{
+    name: string
+    render: (locale: Locale, amount: Money) => string
+  }> = [
+    { name: 'an edit', render: toAmountInputValue },
+    { name: 'a copy of the displayed figure', render: formatMoney },
+  ]
+
+  for (const locale of ['en', 'pl'] as ReadonlyArray<Locale>) {
+    for (const path of CATALOGUE_PATHS) {
+      it(`survives ${path.name} for every currency in the catalogue in ${locale}`, () => {
+        const mismatches: Array<string> = []
+        const currencies = new Set<string>()
+        const scales = new Set<number>()
+        let roundTrips = 0
+
+        for (const entry of CURRENCIES) {
+          currencies.add(entry.code)
+          scales.add(entry.digits)
+          for (const amountMinor of CATALOGUE_AMOUNTS) {
+            const rendered = path.render(
+              locale,
+              makeMoney(amountMinor, entry.code),
+            )
+            const parsed = parseMoney(locale, rendered, entry.code)
+            roundTrips += 1
+            if (parsed !== amountMinor) {
+              mismatches.push(
+                `${entry.code} ${locale} ${amountMinor} rendered as "${escaped(rendered)}" parsed back as ${parsed}`,
+              )
+            }
+          }
+        }
+
+        expect(mismatches).toEqual([])
+        // An empty or truncated loop would satisfy the assertion above.
+        expect(CURRENCIES.length).toBeGreaterThan(0)
+        expect(currencies.size).toBe(CURRENCIES.length)
+        expect(scales).toEqual(new Set(CURRENCIES.map((entry) => entry.digits)))
+        expect(roundTrips).toBe(CURRENCIES.length * CATALOGUE_AMOUNTS.length)
+      })
+    }
   }
 
   /**
