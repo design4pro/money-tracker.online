@@ -41,7 +41,7 @@ export class InvalidKeyError extends Error {
   }
 }
 
-/** A calendar day, `YYYY-MM-DD`; the round trip through `Date` below refuses `2026-02-31`. */
+/** A calendar day, `YYYY-MM-DD`; the round trip through `Date` below refuses `2026-02-31` and `2026-13-01`. */
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
 function segment(name: string, value: string): string {
@@ -58,9 +58,12 @@ function segment(name: string, value: string): string {
 }
 
 function calendarDay(value: string): string {
+  // `toISOString` throws a RangeError on an invalid Date, so test the time value first.
+  const parsed = new Date(`${value}T00:00:00Z`)
   const real =
     DAY.test(value) &&
-    new Date(`${value}T00:00:00Z`).toISOString().startsWith(value)
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().startsWith(value)
   if (!real) throw new InvalidKeyError('date is not a YYYY-MM-DD calendar day')
   return value
 }

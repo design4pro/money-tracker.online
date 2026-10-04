@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  InvalidKeyError,
   assertKeyInOrg,
   backupKey,
   dlqKey,
@@ -53,7 +54,7 @@ describe('R2 key layout', () => {
     it.each(['2026-02-31', '2026-13-01', '2026-1-4', '20261004', 'today', ''])(
       'refuses the backup date %j',
       (date) => {
-        expect(() => backupKey('org-a', date)).toThrow()
+        expect(() => backupKey('org-a', date)).toThrow(InvalidKeyError)
       },
     )
   })
