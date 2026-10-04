@@ -581,6 +581,74 @@ for (const locale of LOCALES) {
 }
 
 /**
+ * The widths at which issue #161 is read: the one the density spec fixes, and the narrowest
+ * desktop one, where the three-column grid has already collapsed to two and the Net worth panel
+ * is at its narrowest.
+ */
+const NET_WORTH_VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+] as const
+
+for (const locale of LOCALES) {
+  test(`the dashboard Net worth panel has no vertical gap inside it — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/dashboard')
+
+    // Issue #161 reported ~140px of dead space mid-card, measured on 2026-09-03 against a panel
+    // that has since been rewritten as three ruled lines and a caption. The case holds the
+    // rewrite's claim rather than a pixel count of "dead space": every box is read from the
+    // browser and compared with its neighbour, so it fails on a gap of any size. The seeded
+    // `demo` workspace has accounts, which keeps the panel out of its empty state - that state is
+    // a different, designed one and is not measured here.
+    const card = page
+      .getByRole('list', { name: /.+/ })
+      .first()
+      .locator('> li')
+      .first()
+      .locator('section')
+    const lines = card.locator('dl > div')
+    const caption = card.locator('p')
+    await expect(lines).toHaveCount(3)
+    await expect(caption).toHaveCount(1)
+
+    for (const viewport of NET_WORTH_VIEWPORTS) {
+      await page.setViewportSize(viewport)
+
+      const lineBoxes = await Promise.all(
+        [0, 1, 2].map((index) => boxOf(lines.nth(index))),
+      )
+      const captionBox = await boxOf(caption)
+      const cardBox = await boxOf(card)
+      const padding = await card.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).paddingBottom),
+      )
+
+      // Rule to rule: a line's box includes the rule drawn over it, so the next line starts where
+      // this one ends. A gap would be a margin or a grid gap somebody added between the lines.
+      for (const [index, box] of lineBoxes.slice(1).entries()) {
+        const previous = lineBoxes[index]
+        expect(box.y - (previous.y + previous.height)).toBeCloseTo(0, 0)
+      }
+
+      // The caption sits under the lines it qualifies, not on the floor of a stretched card.
+      const lastLine = lineBoxes[2]
+      expect(captionBox.y).toBeGreaterThanOrEqual(lastLine.y + lastLine.height)
+
+      // The card ends within its own padding (and its 1px border) of the caption: nothing is
+      // left below the content, which is what `WidgetGrid`'s `items-start` is for.
+      const floor =
+        cardBox.y + cardBox.height - (captionBox.y + captionBox.height)
+      expect(floor).toBeLessThanOrEqual(padding + 2)
+      expect(floor).toBeGreaterThanOrEqual(0)
+    }
+  })
+}
+
+/**
  * How close to an end of the band a node has to be to count as carrying it.
  *
  * 32px is the gap the shell already uses between two adjacent controls, so a node inside it is
