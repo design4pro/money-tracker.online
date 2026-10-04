@@ -11,6 +11,12 @@ its `H1` names the issue and the pull requests behind it. The rules are in [AGEN
 | ------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- | ------- | -------------- |
 | [Settle and surface recurring periods](2026-09-20-recurring-periods-settle-and-surface.md) | 2026-09-20 | [#363](https://github.com/design4pro/money-tracker.online/issues/363) | —       | —              |
 
+## Ready — merged, waiting for a build (1)
+
+| Spec                                                                                                                                                      | Date       | Issue | Spec PR | Implementation |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----- | ------- | -------------- |
+| [Pin the money round trip for the whole currency catalogue and close plan stage 00-S4](2026-10-04-money-catalogue-round-trip-and-00-s4-reconciliation.md) | 2026-10-04 | —     | —       | —              |
+
 ## In progress — a build is open (1)
 
 | Spec                                                                                                                         | Date       | Issue                                                                 | Spec PR                                                             | Implementation                                                      |
