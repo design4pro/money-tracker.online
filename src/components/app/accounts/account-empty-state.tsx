@@ -1,6 +1,6 @@
 import { Banknote, CreditCard, Landmark, Plus, Wallet } from 'lucide-react'
 
-import { Button, Card } from '#/components/ui'
+import { Button, EmptyState } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { accountCategoryFacts } from './categories'
 
@@ -45,37 +45,25 @@ export function AccountEmptyState({
   headingLevel = 2,
 }: AccountEmptyStateProps) {
   const t = useTranslate()
-  const Heading = headingLevel === 2 ? 'h2' : 'h3'
   const SubHeading = headingLevel === 2 ? 'h3' : 'h4'
 
   return (
     <div className="flex flex-col gap-6">
-      <Card
-        variant="dashed"
-        padding="lg"
-        className="flex flex-col items-center gap-4 py-12 text-center"
-      >
-        <span
-          aria-hidden="true"
-          className="grid size-14 place-items-center rounded-full bg-surface-sunken text-ink-2"
-        >
-          <Banknote className="size-6" />
-        </span>
-        <div className="prose-measure">
-          <Heading className="text-title font-semibold text-ink">
-            {t('accounts.empty.title')}
-          </Heading>
-          <p className="text-body text-ink-2">{t('accounts.empty.body')}</p>
-        </div>
-        <Button
-          variant="brand"
-          size="lg"
-          icon={<Plus className="size-4" />}
-          onPress={() => onCreate()}
-        >
-          {t('accounts.empty.action')}
-        </Button>
-      </Card>
+      <EmptyState
+        icon={<Banknote />}
+        title={t('accounts.empty.title')}
+        description={t('accounts.empty.body')}
+        headingLevel={headingLevel}
+        action={
+          <Button
+            variant="primary"
+            icon={<Plus className="size-4" />}
+            onPress={() => onCreate()}
+          >
+            {t('accounts.empty.action')}
+          </Button>
+        }
+      />
 
       <section aria-labelledby="accounts-empty-pick">
         <SubHeading
@@ -90,6 +78,10 @@ export function AccountEmptyState({
         <ul className="mt-4 grid gap-3 sm:grid-cols-3">
           {SHORTCUTS.map(({ category, Icon }) => (
             <li key={category}>
+              {/*
+                `size="lg"` stays: these are `h-auto flex-col` tiles whose height comes from their
+                content, so the prop only supplies the padding and type step (#362).
+              */}
               <Button
                 variant="secondary"
                 size="lg"
