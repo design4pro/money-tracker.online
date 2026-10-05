@@ -1,8 +1,8 @@
-import { Button } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 
+import { PeriodActions } from './period-actions'
 import { PeriodStatusBadge } from './period-status'
 
 import type { PeriodView } from '#/server/repos/recurring'
@@ -156,9 +156,6 @@ export function PeriodGrid({
           {periods.map((period) => {
             const due = formatCalendarDate(locale, period.dueOn, 'medium')
             const variance = varianceOf(period)
-            const isSettled =
-              period.derivedStatus === 'paid' ||
-              period.derivedStatus === 'skipped'
 
             return (
               <tr
@@ -204,43 +201,12 @@ export function PeriodGrid({
                 </td>
                 {isReadOnly ? null : (
                   <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-1">
-                      {isSettled ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={t('recurring.period.revert.for', {
-                            date: due,
-                          })}
-                          onPress={() => onRevert(period)}
-                        >
-                          {t('recurring.period.revert')}
-                        </Button>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="subtle"
-                            aria-label={t('recurring.period.markPaid.for', {
-                              date: due,
-                            })}
-                            onPress={() => onMarkPaid(period)}
-                          >
-                            {t('recurring.period.markPaid')}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label={t('recurring.period.skip.for', {
-                              date: due,
-                            })}
-                            onPress={() => onSkip(period)}
-                          >
-                            {t('recurring.period.skip')}
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                    <PeriodActions
+                      period={period}
+                      onMarkPaid={() => onMarkPaid(period)}
+                      onSkip={() => onSkip(period)}
+                      onRevert={() => onRevert(period)}
+                    />
                   </td>
                 )}
               </tr>

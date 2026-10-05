@@ -802,6 +802,46 @@ rules and rows by `border-subtle` horizontal ones, cell padding 12 / 10px. Hover
 wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 (`inset 0 0 0 1px`): a box, not a bar. Amounts are end-aligned and tabular.
 
+### Period actions
+
+The buttons on one row of a recurring period, drawn by one component wherever a period is listed:
+the series detail grid and _Due soon_ on `/recurring`.
+
+- **The shape:** the `sm` button, end-aligned in its cell with a 4px gap. _Mark paid_ is `subtle`
+  (the one action a row is for); _Skip_ and _Undo_ are `ghost`.
+- **Which buttons:** a function of the period, never of the surface. An unsettled period gets _Mark
+  paid_ and _Skip_; a paid or skipped one gets _Undo_ alone. A surface fed only unsettled periods
+  passes no `onRevert`, and a settled period handed to it draws nothing.
+- **A cell with no room to spare:** `compact` stacks the buttons and lets a long label wrap onto a second
+  line rather than widening the column. _Due soon_ uses it so the 30rem rail never scrolls sideways
+  (`e2e/desktop-density.spec.ts`); the series grid keeps the buttons on one line.
+- **The states:** the ordinary button states. There is no hover-only affordance - every action is a
+  `<button>` reachable by Tab in reading order.
+- **What carries the meaning when the colour does not:** the label is a word, and the accessible
+  name carries the row's due date (_"Mark the period due 1 March as paid"_), because a column of
+  identical labels is three identical announcements. A surface that mixes series (_Due soon_)
+  also passes the series name (_"... due 1 March for Rent as paid"_), since two bills can fall due on
+  the same day.
+- **The one thing it is not:** a row menu. The actions are visible buttons on purpose; burying
+  _Mark paid_ behind a menu adds a click to the only thing the table is for.
+
+### Mode switch
+
+The control that moves between two addresses of one screen: _Recorded_ and _Planned_ on the
+transactions screen. It is the `SegmentedFilter`, so it takes that component's shape: a radio group
+on a `border-subtle` rule, 44px segments, the current one marked by a one-pixel `brand` rule along
+its top edge and `brand` text at the heavier weight.
+
+- **The tones:** one. There is no emphasis between the two modes; the current one is marked by
+  position and weight, not by a fill.
+- **The states:** hover washes the text to `ink`; focus is the product ring; there is no disabled
+  state, because both modes are always reachable.
+- **What carries the meaning when the colour does not:** `aria-checked`, the weight and the rule.
+  The group is one tab stop and the arrow keys move and select.
+- **The one thing it is not:** a navigation entry or a tab bar. A mode is not an area, so it adds
+  nothing to the navigation table; and there is no panel under it to switch, only a list whose
+  address changes with the filters carried across.
+
 ### Meter
 
 An 8px track at `sm` radius in `border-subtle` (so the fill's stop is readable against it), the

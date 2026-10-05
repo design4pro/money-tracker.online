@@ -108,3 +108,101 @@ export async function deleteAccountNamed(name: string): Promise<void> {
     console.warn(`account ${name} was not cleaned up`, error)
   }
 }
+
+/**
+ * A recurring series with periods in the past, for the specs that settle one.
+ *
+ * ## Why it is written to D1 and why it is in yen
+ *
+ * Creating a series through the dialog would put a date picker and four selects between every
+ * test and the thing it is about, and the periods' dates have to be exact: the picker looks a
+ * fortnight either side of the due date, so two tests that share a window see each other's
+ * payments. The series is therefore written straight to the fixture workspace, with the periods the
+ * test names, and **in the yen account** that {@link installYenFixture} provides. That account is
+ * the one every fixture workspace already has, so this adds nothing to the free plan's account
+ * quota (#228) - and a zero-decimal currency is where a hard-coded scale of two shows itself, so
+ * the amount that travels through the URL to the entry form is the strongest version of that
+ * check.
+ *
+ * The series ends on the last date it is given (`end_date`): reading `/recurring` materialises every
+ * period a schedule has up to the horizon, so an open-ended series would grow rows the test never
+ * named and its locators would match them.
+ *
+ * A period's `period_start` is the first of its due month, as the materialiser writes it, so two
+ * dates given to one series must fall in different months.
+ *
+ * Every test takes its own dates, at least a month from every other test's, and removes what it
+ * made: see {@link deleteRecurringFixture}.
+ */
+
+export const RECURRING_FIXTURE_AMOUNT_MINOR = 1500
+
+export interface RecurringFixture {
+  readonly seriesId: string
+  readonly seriesName: string
+}
+
+export async function installRecurringFixture(
+  organizationId: string,
+  token: string,
+  periodStarts: ReadonlyArray<string>,
+): Promise<RecurringFixture> {
+  const org = sqlText(organizationId)
+  const seriesId = `e2e-rec-${token}`
+  const seriesName = `E2E rent ${token}`
+  const now = Date.now()
+
+  await d1Exec([
+    // A payment left by an earlier, failed run would make the empty picker not empty.
+    ...periodStarts.map(
+      (day) =>
+        `delete from transactions where account_id = ${sqlText(YEN_ACCOUNT_ID)} ` +
+        `and booked_on = ${sqlText(day)}`,
+    ),
+    `insert into recurring_series ` +
+      `(id, organization_id, name, kind, direction, expected_amount_minor, expected_currency_code, ` +
+      `frequency, start_date, end_date, account_id, auto_record, notify_email, show_in_widget, is_active, ` +
+      `created_at, updated_at) ` +
+      `values (${sqlText(seriesId)}, ${org}, ${sqlText(seriesName)}, 'bill', 'expense', ` +
+      `${RECURRING_FIXTURE_AMOUNT_MINOR}, 'JPY', 'annual', ${sqlText(periodStarts[0] ?? '')}, ${sqlText(periodStarts.at(-1) ?? '')}, ` +
+      `${sqlText(YEN_ACCOUNT_ID)}, 0, 0, 1, 1, ${now}, ${now})`,
+    ...periodStarts.map(
+      (day) =>
+        `insert into recurring_periods ` +
+        `(organization_id, series_id, period_start, due_on, status, expected_amount_minor, ` +
+        `expected_currency_code, created_at, updated_at) ` +
+        `values (${org}, ${sqlText(seriesId)}, ${sqlText(`${day.slice(0, 8)}01`)}, ${sqlText(day)}, 'upcoming', ` +
+        `${RECURRING_FIXTURE_AMOUNT_MINOR}, 'JPY', ${now}, ${now})`,
+    ),
+  ])
+
+  return { seriesId, seriesName }
+}
+
+/**
+ * Removes the series, its periods and links (they cascade), and the payments the test recorded.
+ *
+ * The payments are found by account and date rather than by id, because the one a test saves
+ * through the entry form is created by the product and the test may have failed before reading its
+ * id. A failure is reported rather than raised, so cleanup never fails a test whose body passed.
+ */
+export async function deleteRecurringFixture(
+  fixture: RecurringFixture,
+  periodStarts: ReadonlyArray<string>,
+): Promise<void> {
+  try {
+    await d1Exec([
+      `delete from recurring_series where id = ${sqlText(fixture.seriesId)}`,
+      ...periodStarts.map(
+        (day) =>
+          `delete from transactions where account_id = ${sqlText(YEN_ACCOUNT_ID)} ` +
+          `and booked_on = ${sqlText(day)}`,
+      ),
+    ])
+  } catch (error) {
+    console.warn(
+      `recurring fixture ${fixture.seriesId} was not cleaned up`,
+      error,
+    )
+  }
+}

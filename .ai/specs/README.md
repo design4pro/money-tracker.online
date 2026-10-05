@@ -5,23 +5,18 @@
 One document per designed change. The directory a spec sits in is its state, and the table under
 its `H1` names the issue and the pull requests behind it. The rules are in [AGENTS.md](AGENTS.md).
 
-## Draft — being written (1)
-
-| Spec                                                                                       | Date       | Issue                                                                 | Spec PR | Implementation |
-| ------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- | ------- | -------------- |
-| [Settle and surface recurring periods](2026-09-20-recurring-periods-settle-and-surface.md) | 2026-09-20 | [#363](https://github.com/design4pro/money-tracker.online/issues/363) | —       | —              |
-
 ## Ready — merged, waiting for a build (1)
 
 | Spec                                                                                                                                                      | Date       | Issue | Spec PR                                                             | Implementation |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----- | ------------------------------------------------------------------- | -------------- |
 | [Pin the money round trip for the whole currency catalogue and close plan stage 00-S4](2026-10-04-money-catalogue-round-trip-and-00-s4-reconciliation.md) | 2026-10-04 | —     | [#510](https://github.com/design4pro/money-tracker.online/pull/510) | —              |
 
-## In progress — a build is open (2)
+## In progress — a build is open (3)
 
 | Spec                                                                                                                                     | Date       | Issue                                                                 | Spec PR                                                             | Implementation                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | [Queue envelope kinds, the handler seam and the R2 key layout (plan stage 00-S12)](2026-10-04-queue-envelope-kinds-and-r2-key-layout.md) | 2026-10-04 | —                                                                     | [#515](https://github.com/design4pro/money-tracker.online/pull/515) | [#525](https://github.com/design4pro/money-tracker.online/pull/525) |
+| [Settle and surface recurring periods](2026-09-20-recurring-periods-settle-and-surface.md)                                               | 2026-09-20 | [#363](https://github.com/design4pro/money-tracker.online/issues/363) | [#364](https://github.com/design4pro/money-tracker.online/pull/364) | [#537](https://github.com/design4pro/money-tracker.online/pull/537) |
 | [Transactional email on Resend: React Email templates, the digest and unsubscribe](2026-09-19-transactional-email-resend.md)             | 2026-09-19 | [#210](https://github.com/design4pro/money-tracker.online/issues/210) | [#344](https://github.com/design4pro/money-tracker.online/pull/344) | [#349](https://github.com/design4pro/money-tracker.online/pull/349) |
 
 ## Implemented (13)

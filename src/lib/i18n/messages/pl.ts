@@ -782,6 +782,9 @@ const messages = {
   'transactions.planned.empty.title': 'Nic nie jest zaplanowane',
   'transactions.planned.empty.body':
     'Zapisz wydatek z przyszłą datą i oznacz go jako zaplanowany, aby zobaczyć go tutaj.',
+  'transactions.mode.label': 'Które wpisy pokazać',
+  'transactions.mode.actual': 'Zapisane',
+  'transactions.mode.planned': 'Zaplanowane',
   /* -- Kolory (osiem zmierzonych barw kategorii) -------------------------- */
   'colour.blue': 'Niebieski',
   'colour.teal': 'Morski',
@@ -1826,8 +1829,12 @@ const messages = {
   'recurring.period.markPaid': 'Oznacz jako opłacone',
   'recurring.period.markPaid.for':
     'Oznacz okres z terminem {date} jako opłacony',
+  'recurring.period.markPaid.forSeries':
+    'Oznacz okres z terminem {date} dla {series} jako opłacony',
   'recurring.period.skip': 'Pomiń',
   'recurring.period.skip.for': 'Pomiń okres z terminem {date}',
+  'recurring.period.skip.forSeries':
+    'Pomiń okres z terminem {date} dla {series}',
   'recurring.period.revert': 'Cofnij',
   'recurring.period.revert.for': 'Cofnij okres z terminem {date}',
 
@@ -1839,6 +1846,9 @@ const messages = {
   'recurring.markPaid.placeholder': 'Szukaj wśród wydatków',
   'recurring.markPaid.empty':
     'Żaden wydatek z tego okna nie pasuje. Zapisz najpierw płatność i wróć tutaj.',
+  'recurring.markPaid.record': 'Zapisz płatność',
+  'recurring.markPaid.recordHint':
+    'Po zapisaniu wrócisz tutaj, aby ją połączyć.',
   'recurring.markPaid.confirm': 'Połącz',
   'recurring.markPaid.never':
     'Oznaczenie jako opłaconego nigdy nie tworzy nowego wpisu.',
