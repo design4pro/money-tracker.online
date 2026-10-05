@@ -96,9 +96,9 @@ replaces its entry; `worker.ts` and the dispatcher are not edited. For each mess
    with no more information than the first attempt had.
 2. **Claim.** Every kind but `billing.event` takes a claim in KV, `task:claim:v1:<kind>:<orgId>:<identity>`
    (120s; §3.1), where the identity is the batch, the job or the backup day and `backup.run`, which has
-   no workspace, carries the literal `platform` in the workspace position. **A held claim is a delayed retry, never an ack**: the message comes back after 45s,
-   because acking a duplicate loses the job when the first worker crashed without releasing. The claim
-   is released in a `finally`, by token: the value is a random per-delivery token and the key is deleted
+   no workspace, carries the literal `platform` in the workspace position. **A held claim is a delayed
+   retry, never an ack**: the message comes back after 45s, because acking a duplicate loses the job
+   when the first worker crashed without releasing. The claim is released in a `finally`, by token: the value is a random per-delivery token and the key is deleted
    only while it still holds this delivery's token, so a slow worker that outlived the 120s expiry cannot
    delete a claim a second worker has since taken. A crash never runs the `finally`; the expiry is the
    safety net. A claim read or write that throws is a throw before the handler, so the handler never runs
@@ -312,7 +312,8 @@ pagination cursor, and never a value that is also stored in a row** (an amount, 
 status); `envelope.test.ts` holds this as an allow-list over the union. `backup.run` is the one kind
 without `organizationId`: it is platform-level and its handler enumerates workspaces itself.
 
-- `QUEUE_BATCH_BYTE_CAP = 256_000` — a producer that would exceed it splits rather than truncates.
+- **No batch byte cap is enforced.** `QUEUE_BATCH_BYTE_CAP` (256 000) is a planned constant that no code
+  defines; the design is that a producer which would exceed it splits rather than truncates.
 - Production: `max_batch_size 10`, `max_batch_timeout 5`, `max_retries 5`, `max_concurrency 4`,
   `retry_delay 10`. Staging: retries 3, concurrency 2.
 - **Dead-letter queues exist before the first deploy.** A consumer configured with a DLQ that does
