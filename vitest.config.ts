@@ -81,7 +81,8 @@ const SLOW_STARTUP_TEST_TIMEOUT_MS = 15_000
  * Object's storage and its single-threaded turn semantics, and D1 accepting the SQL Drizzle
  * generated. This project runs those inside workerd, on the bindings `wrangler.jsonc` declares,
  * with the migrations in `drizzle/` applied to a real (in-memory) D1. Everything else stays where
- * it is - including the queue consumer, which has no handler to assert against yet.
+ * it is - except the queue dispatcher's KV claim, which also runs here against the real `KV`
+ * binding (`src/server/queue/__tests__/dispatch.workerd.test.ts`).
  *
  * `main` is a test-only entry rather than `src/server/worker.ts`: the pool needs a module that
  * exports the Durable Object class so the `LEDGER` binding resolves, and the real entry pulls the
