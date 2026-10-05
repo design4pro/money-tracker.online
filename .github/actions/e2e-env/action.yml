@@ -140,6 +140,42 @@ runs:
         E2E_BUILD: '1'
       run: pnpm build
 
+    # The step below backgrounds `vite preview` and nothing ever stops it. It was safe while a job
+    # container destroyed the process with the job; on the reused self-hosted runners an orphan can
+    # outlive a cancelled run (both callers set `cancel-in-progress`), and the next browser job on
+    # that runner then dies at `--strictPort` with a bare "port in use" that points at its own
+    # change. This step turns that into a diagnosis (#288).
+    #
+    # It only looks. A composite action has no `post:` hook, so a teardown here would run before
+    # the suite and kill the server the suite needs, and reaping a process on a shared host is not
+    # this action's call. Pure bash over /proc, so it needs no tool the image may lack: `--host`
+    # binds v4 and v6, so both /proc/net/tcp and /proc/net/tcp6 are read, and a socket is the
+    # holder's only when its state is LISTEN (0A). An unprivileged runner sees only its own
+    # processes, hence the explicit "not visible" branch rather than a silent pass.
+    - name: Check the preview port is free
+      shell: bash
+      env:
+        PORT: ${{ inputs.port }}
+      run: |
+        set -euo pipefail
+        hex=$(printf '%04X' "$PORT")
+        inodes=$(awk -v hex="$hex" '$4 == "0A" && $2 ~ (":" hex "$") { print $10 }' /proc/net/tcp /proc/net/tcp6 2>/dev/null | sort -u || true)
+        [ -n "$inodes" ] || exit 0
+
+        holder='a process that is not visible to the runner user'
+        for inode in $inodes; do
+          fd=$(find /proc/[0-9]*/fd -maxdepth 1 -lname "socket:\\[$inode\\]" -print -quit 2>/dev/null || true)
+          if [ -n "$fd" ]; then
+            pid=${fd#/proc/}
+            pid=${pid%%/*}
+            cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | cut -c1-200 || true)
+            holder="PID $pid ($cmd)"
+            break
+          fi
+        done
+        echo "::error title=Preview port::Port $PORT is already held by $holder - probably a preview server left over from an earlier run on this runner. Nothing was killed; stop it before re-running."
+        exit 1
+
     # Started here rather than by Playwright's `webServer` because the seed has
     # to run against it before the first spec: the seed writes through the
     # Worker, so there is no seeding a database without a server in front of it.
