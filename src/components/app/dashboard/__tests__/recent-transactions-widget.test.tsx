@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { plain } from '#/components/charts/__tests__/plain'
+import en from '#/lib/i18n/messages/en'
 import { asCurrencyCode, asMinor } from '#/lib/money'
 
 import { RecentTransactionsWidget } from '../recent-transactions-widget'
@@ -96,7 +97,7 @@ describe('RecentTransactionsWidget', () => {
     expect(screen.getByText('Mar 14, 2026')).toBeTruthy()
   })
 
-  it('gives a period with nothing in it a designed state and a way to fix it', async () => {
+  it('gives a workspace with no booked transaction a designed state and a way to the list', async () => {
     await renderLinked(
       <RecentTransactionsWidget baseCurrencyCode={PLN} transactions={[]} />,
     )
@@ -104,7 +105,9 @@ describe('RecentTransactionsWidget', () => {
     expect(screen.getByText('Nothing recorded yet')).toBeTruthy()
     expect(
       screen
-        .getByRole('link', { name: 'Record an expense' })
+        .getByRole('link', {
+          name: en['dashboard.recentTransactions.empty.action'],
+        })
         .getAttribute('href'),
     ).toBe('/transactions')
   })

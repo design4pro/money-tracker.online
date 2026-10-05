@@ -476,8 +476,7 @@ const messages = {
   },
   'transactions.empty.title': 'Nic jeszcze nie zapisano',
   'transactions.empty.body':
-    'Zapisz pierwszy wydatek albo wczytaj wyciąg, który już masz.',
-  'transactions.empty.action': 'Zapisz wydatek',
+    'Zapisz pierwszą transakcję albo wczytaj wyciąg, który już masz.',
   'transactions.noResults.title': 'Nic nie pasuje do tych filtrów',
   'transactions.noResults.body':
     'Spróbuj szerszego zakresu dat albo mniejszej liczby filtrów.',
@@ -944,6 +943,7 @@ const messages = {
   'dashboard.widget.cashFlow': 'Przepływy pieniężne',
   'dashboard.widget.spendingByCategory': 'Wydatki według kategorii',
   'dashboard.widget.recentTransactions': 'Ostatnie transakcje',
+  'dashboard.recentTransactions.empty.action': 'Przejdź do transakcji',
   'dashboard.widget.upcomingBills': 'Nadchodzące płatności',
   'dashboard.widget.budgetProgress': 'Budżety',
   'dashboard.widget.savingsGoals': 'Cele oszczędnościowe',

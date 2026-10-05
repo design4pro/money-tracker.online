@@ -63,7 +63,7 @@ export function RecentTransactionsWidget({
         description={t('transactions.empty.body')}
         action={
           <Link href="/transactions" size="widget">
-            {t('transactions.empty.action')}
+            {t('dashboard.recentTransactions.empty.action')}
           </Link>
         }
       />
