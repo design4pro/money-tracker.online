@@ -1,9 +1,20 @@
-import { readFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
-import { loadKnownRuleIds } from '../../.claude/skills/impeccable/scripts/lib/staleness-deep.mjs'
+import {
+  checkDetectorIgnores,
+  loadKnownRuleIds,
+} from '../../.claude/skills/impeccable/scripts/lib/staleness-deep.mjs'
 
 /**
  * `.impeccable/config.json` carries this repository's detector suppressions, and its two lists are
@@ -26,9 +37,10 @@ import { loadKnownRuleIds } from '../../.claude/skills/impeccable/scripts/lib/st
  * moves, rather than quietly checking nothing - `loadKnownRuleIds` returns `null` when it cannot
  * find the detector, and a `null` registry is how the upstream check fails open today.
  *
- * The upstream half - teaching `checkDetectorIgnores` to validate the second list the way it
- * already validates the first - stays outstanding on #165. The vendored copy under `.claude/` is
- * not a path an agent run may edit, and this repository is the thing at risk either way.
+ * The vendored doctor pass now validates the second list too (#165): `checkDetectorIgnores` reports
+ * `detector-ignore-values-unknown`, and the second `describe` below holds it to that. This file
+ * stays as the repository gate, because the doctor pass only runs when someone invokes the skill.
+ * The vendored copy diverges from upstream impeccable until the change is sent there.
  *
  * @see .impeccable/config.json
  * @see .claude/skills/impeccable/scripts/lib/staleness-deep.mjs
@@ -89,5 +101,132 @@ describe('.impeccable/config.json detector ignores', () => {
   // The list the upstream check skips, and the reason this file exists.
   it('ignores no value under a rule id the detector does not have', () => {
     expect(unknownIgnoreValueRules).toEqual([])
+  })
+})
+
+describe('checkDetectorIgnores, the vendored doctor pass', () => {
+  const roots = []
+
+  // A project root holding only the given `.impeccable` config files, as the doctor pass reads it.
+  const projectWith = (configs) => {
+    const root = mkdtempSync(join(tmpdir(), 'impeccable-ignores-'))
+    roots.push(root)
+    mkdirSync(join(root, '.impeccable'))
+    for (const [name, config] of Object.entries(configs)) {
+      writeFileSync(join(root, '.impeccable', name), JSON.stringify(config))
+    }
+    return root
+  }
+
+  const valuesFindings = (projectRoot, registry = known) =>
+    checkDetectorIgnores({ projectRoot, knownRuleIds: registry }).filter(
+      (finding) => finding.id === 'detector-ignore-values-unknown',
+    )
+
+  const entry = (rule) => ({ rule, value: '#fff' })
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true })
+  })
+
+  it('reports an unknown rule in detector.ignoreValues and says it never suppressed anything', () => {
+    const root = projectWith({
+      'config.json': {
+        detector: {
+          ignoreValues: [
+            entry('design-system-spacing'),
+            entry('design-system-color'),
+          ],
+        },
+      },
+    })
+
+    const findings = valuesFindings(root)
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0].summary).toContain('`design-system-spacing`')
+    expect(findings[0].summary).not.toContain('`design-system-color`')
+    expect(findings[0].summary).toContain('never suppressed anything')
+  })
+
+  it('tells the two lists apart by finding id', () => {
+    const root = projectWith({
+      'config.json': {
+        detector: {
+          ignoreRules: ['no-such-rule'],
+          ignoreValues: [entry('design-system-spacing')],
+        },
+      },
+    })
+
+    expect(
+      checkDetectorIgnores({ projectRoot: root, knownRuleIds: known }).map(
+        (finding) => finding.id,
+      ),
+    ).toEqual([
+      'detector-ignore-rules-unknown',
+      'detector-ignore-values-unknown',
+    ])
+  })
+
+  it('compares the rule after trim and lower-casing, as the matcher does', () => {
+    const root = projectWith({
+      'config.json': {
+        detector: {
+          ignoreValues: [
+            entry('  Design-System-Color '),
+            entry(' Design-System-SPACING '),
+          ],
+        },
+      },
+    })
+
+    const [finding] = valuesFindings(root)
+
+    expect(finding.summary).toContain('`design-system-spacing`')
+    expect(finding.summary).not.toContain('`design-system-color`')
+  })
+
+  it('does not report an entry with the rule `*`', () => {
+    const root = projectWith({
+      'config.json': { detector: { ignoreValues: [entry('*')] } },
+    })
+
+    expect(valuesFindings(root)).toEqual([])
+  })
+
+  it('reports nothing when the rule registry could not be loaded', () => {
+    const root = projectWith({
+      'config.json': {
+        detector: { ignoreValues: [entry('design-system-spacing')] },
+      },
+    })
+
+    expect(valuesFindings(root, null)).toEqual([])
+  })
+
+  it('checks config.local.json as well as config.json', () => {
+    const root = projectWith({
+      'config.json': {
+        detector: { ignoreValues: [entry('design-system-color')] },
+      },
+      'config.local.json': {
+        detector: { ignoreValues: [entry('design-system-spacing')] },
+      },
+    })
+
+    const findings = valuesFindings(root)
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0].summary).toContain('.impeccable/config.local.json')
+  })
+
+  it('reports nothing for this repository config', () => {
+    expect(
+      checkDetectorIgnores({
+        projectRoot: fromRoot(''),
+        knownRuleIds: known,
+      }).filter((finding) => finding.id.startsWith('detector-ignore-')),
+    ).toEqual([])
   })
 })
