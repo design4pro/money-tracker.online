@@ -219,10 +219,15 @@ function SeriesDetailRoute() {
           onSkip={(period) => {
             void skipPeriod({
               data: { seriesId: series.id, periodStart: period.periodStart },
-            }).then(() => {
-              toast.success(t('recurring.toast.periodSkipped'))
-              refresh()
             })
+              .then(() => {
+                toast.success(t('recurring.toast.periodSkipped'))
+              })
+              .catch(() => {
+                toast.error(t('recurring.toast.failed'))
+              })
+              // Success or refusal, the row on screen may be stale: show what is stored.
+              .finally(refresh)
           }}
           onRevert={(period) => {
             void revertPeriod({

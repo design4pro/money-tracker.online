@@ -128,6 +128,20 @@ export class RecurringPeriodSettledError extends ConflictError {
   }
 }
 
+/** Thrown when a period that has been paid is asked to be skipped. */
+export class RecurringPeriodPaidError extends ConflictError {
+  readonly seriesId: string
+  readonly periodStart: string
+
+  constructor(seriesId: string, periodStart: string) {
+    super(
+      `The period starting ${periodStart} of series ${seriesId} is already paid; revert it before skipping it.`,
+    )
+    this.seriesId = seriesId
+    this.periodStart = periodStart
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Schemas                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -1148,16 +1162,26 @@ export async function markPaid(
   })
 }
 
-/** Records that a period was deliberately not paid — a paused subscription, a skipped month. */
+/**
+ * Records that a period was deliberately not paid — a paused subscription, a skipped month.
+ *
+ * A `paid` period is refused with {@link RecurringPeriodPaidError}: undoing a settled period is
+ * `revertPeriod`'s job, and a list that went stale in another tab must not do it by accident.
+ */
 export async function markSkipped(
   scope: TenantScope,
   input: PeriodKeyInput,
 ): Promise<void> {
   const parsed = periodKeySchema.parse(input)
   await getSeries(scope, parsed.seriesId)
+  // The status condition sits in the UPDATE's predicate rather than in a read before it: another
+  // request can mark the period paid between a read and a write, and only the write is atomic.
   const rows = await periodAccess.updateWhere(
     scope,
-    periodKey(parsed.seriesId, parsed.periodStart),
+    and(
+      periodKey(parsed.seriesId, parsed.periodStart),
+      ne(recurringPeriods.status, 'paid'),
+    ) as SQL,
     {
       status: 'skipped',
       // Cleared, because `recurring_periods_paid_requires_transaction_check` only guards `paid` —
@@ -1166,10 +1190,17 @@ export async function markSkipped(
       updatedAt: new Date(),
     },
   )
-  if (rows.length === 0) {
+  if (rows.length > 0) return
+
+  // Nothing matched: either the period is missing or it is paid. Only a read can tell them apart.
+  const existing = await periodAccess.findOne(
+    scope,
+    periodKey(parsed.seriesId, parsed.periodStart),
+  )
+  if (existing === null) {
     throw new NotFoundError('recurring period', parsed.periodStart)
   }
-  await retireLinksFor(scope, parsed.seriesId, parsed.periodStart)
+  throw new RecurringPeriodPaidError(parsed.seriesId, parsed.periodStart)
 }
 
 /**
@@ -1244,27 +1275,6 @@ async function upsertLink(
     matchSource: input.matchSource,
     updatedAt: input.now,
   })
-}
-
-/** Retires whatever link the period was carrying, leaving the `unlinked` row behind. */
-async function retireLinksFor(
-  scope: TenantScope,
-  seriesId: string,
-  periodStart: string,
-): Promise<void> {
-  const period = await periodAccess.findOne(
-    scope,
-    periodKey(seriesId, periodStart),
-  )
-  if (period === null || period.settledTransactionId === null) return
-  await linkAccess.updateWhere(
-    scope,
-    and(
-      eq(recurringLinks.seriesId, seriesId),
-      eq(recurringLinks.transactionId, period.settledTransactionId),
-    ) as SQL,
-    { status: 'unlinked', updatedAt: new Date() },
-  )
 }
 
 /** Detaches a transaction a matcher adopted, without touching the transaction itself. */
