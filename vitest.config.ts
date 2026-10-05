@@ -56,6 +56,12 @@ const SLOW_STARTUP_TEST_TIMEOUT_MS = 15_000
  *   real bindings from `wrangler.jsonc` (ADR 0015). Its files are named `*.workerd.test.ts` and
  *   `server` excludes them, so the suffix is what says which world a file expects.
  *
+ * A test under a route's private `-ui/` directory is a component test, so `ui` collects it and
+ * `server` leaves it alone. `server` also reaches the `.test.ts` files under `src/routes/`, which
+ * would match a `.ts` test in `-ui/` too and run it in node with no DOM; its `exclude` is what makes
+ * a file there run once, always in jsdom. Nothing else under `src/routes/` changes world: the `-lib/` and
+ * `-server/` logic tests stay in `server`.
+ *
  * `server` collects `.tsx` as well as `.ts` because the transactional email templates under
  * `src/server/email` are React components: they render to a string on the server and never reach
  * a DOM, so they belong in the Node project rather than in jsdom. Vite's esbuild transform picks
@@ -154,6 +160,7 @@ export default defineConfig({
           include: [
             'src/components/**/*.test.{ts,tsx}',
             'src/lib/**/*.test.{ts,tsx}',
+            'src/routes/**/-ui/**/*.test.{ts,tsx}',
           ],
           restoreMocks: true,
         },
@@ -193,8 +200,9 @@ export default defineConfig({
             'src/routes/**/*.test.ts',
             'src/styles/**/*.test.ts',
           ],
-          // The workerd project owns these; run in Node they would fail on `cloudflare:test`.
-          exclude: ['src/server/**/*.workerd.test.ts'],
+          // The workerd project owns the first; run in Node they would fail on `cloudflare:test`.
+          // The `ui` project owns the second: route-local component tests need a DOM.
+          exclude: ['src/server/**/*.workerd.test.ts', 'src/routes/**/-ui/**'],
           testTimeout: SLOW_STARTUP_TEST_TIMEOUT_MS,
           restoreMocks: true,
         },
