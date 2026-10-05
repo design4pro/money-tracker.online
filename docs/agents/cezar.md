@@ -384,6 +384,26 @@ for a run a human starts, and an automation run uses the backend CLI's own defau
 automation sets `task.model` in `docs/agents/cezar-automations.json`.
 `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails any agent step that pins one again.
 
+Which CLI and which model that is resolves in two chains, read from the cezar source
+(`workflows/run.ts`, `config.ts` and `automations/task-template.ts` in `design4pro/cezar` at
+`d55ede1e`, 2026-10-05):
+
+- **Runner.** The run's `task.runner` if set; otherwise the host's `agentDefaults.runner` in
+  `~/.cezar/config.json`; otherwise cezar's built-in `claude`. The repository supplies none of the
+  three, because `defaultRunner` is absent from `.ai/cezar/config.json` (see the runner note under
+  "Install and configure"). A runner is a fact about the host, so this repository cannot name it:
+  ask the host with `jq .agentDefaults ~/.cezar/config.json`. On the host this was written from
+  (2026-10-05) it prints `{"runner": "claude"}`, which is a host value and not a repository fact.
+- **Model.** The run's `task.model` if set; otherwise nothing is passed and the resolved runner's CLI
+  uses its own default. `defaultModels` in `.ai/cezar/config.json` (currently
+  `{"claude": "claude-sonnet-5-5"}`) is only what the cockpit composer preselects for a human-started
+  run; it does not apply to an automation run.
+
+Two things override these. A run a human starts picks the runner and the model in the cockpit
+composer. An automation sets `task.runner` and `task.model` in `docs/agents/cezar-automations.json`;
+none of the automations sets either today, so every automation run takes the host's runner and that
+CLI's default model.
+
 The task text an event automation sends is the issue or PR number alone (`{{github.number}}`); a
 second token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled
 `Fix GitHub issue #<n>: <title>` is safe only because the `om-auto-fix-issue` override treats a
