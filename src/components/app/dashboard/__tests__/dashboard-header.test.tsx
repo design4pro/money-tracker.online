@@ -5,6 +5,7 @@ import { drawn, reading } from '#/components/app/money/__tests__/channels'
 import { asCurrencyCode, asMinor } from '#/lib/money'
 
 import { DashboardHeader } from '../dashboard-header'
+import { PeriodSelector } from '../period-selector'
 import { renderLinked } from './harness'
 
 const PLN = asCurrencyCode('PLN')
@@ -100,5 +101,29 @@ describe('the page action', () => {
     const link = screen.getByRole('link', { name: 'New transaction' })
     expect(link.getAttribute('href')).toBe('/transactions/new')
     expect(link.getAttribute('class')).toContain('bg-accent')
+  })
+})
+
+describe('the action row', () => {
+  it('sets the period selector and the primary action on the same height step', async () => {
+    await renderLinked(
+      <DashboardHeader
+        baseCurrencyCode={PLN}
+        range={RANGE}
+        incomeMinor={asMinor(0)}
+        expenseMinor={asMinor(0)}
+        netMinor={asMinor(0)}
+        action={<PeriodSelector period="thisMonth" onChange={() => {}} />}
+      />,
+    )
+    const trigger = screen.getByRole('button', { name: /Period/ })
+    const link = screen.getByRole('link', { name: 'New transaction' })
+
+    // jsdom does not lay Tailwind out, so the contract is the classes the size scale produces:
+    // `DESIGN.md` fixes a field and a primary button at the same 40px and the same type step.
+    for (const control of [trigger, link]) {
+      expect(control.classList.contains('h-10')).toBe(true)
+      expect(control.classList.contains('text-label')).toBe(true)
+    }
   })
 })
