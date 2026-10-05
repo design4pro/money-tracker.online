@@ -35,8 +35,8 @@ node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>con
 ## Branches and commits
 
 - Cut from `develop`. Never commit to `develop` or `main` directly.
-- Branch names: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`, `claude/<slug>`; the om skills cut
-  `fix/issue-<n>-<slug>` and `spec/<slug>`.
+- Branch names follow the rule in `AGENTS.md` (`## Always`): an open `<type>/` prefix, with
+  `issue-<n>` in the slug only when an issue exists.
 - **Conventional Commits, in English**, always: `feat(transactions): add split editor`. The scope
   is the plan area or the module, not a file name.
 - One pull request targets `develop`. Promotion to production is a separate pull request
