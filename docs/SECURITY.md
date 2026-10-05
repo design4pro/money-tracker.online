@@ -149,7 +149,20 @@ none ever gets it.** A public bucket URL is a tenancy bypass with no audit trail
 The row's stored key is checked as well as the row: a read or a delete of an attachment whose key is
 not under the caller's own `attachments/<workspace>/` prefix is a not-found, the same as an id that
 does not exist, and is logged with the attachment id only (`getAttachmentForRead`, `deleteAttachment`
-in `src/server/repos/attachments.ts`).
+in `src/server/repos/attachments.ts`). A key with a `.` or `..` segment after the prefix is refused
+the same way.
+
+A refused row has **no in-app repair**: it cannot be deleted through the application, and it keeps
+counting toward the workspace's storage quota until it is repaired. Repair is an operator action on
+D1 and R2. The log line is `attachment key is outside the workspace prefix` and carries the
+attachment id only. The orphaned-object sweep does not repair it: that sweep is not built yet, and
+it would work from objects, not from rows.
+
+1. Establish from the object and the audit trail which workspace owns the object the key points at.
+2. **Never delete the R2 object**: it may be another workspace's live receipt.
+3. If the object belongs to another workspace, delete only the poisoned D1 row.
+4. If the object is the owner's, repoint the row to a key under its own
+   `attachments/<workspace>/` prefix.
 
 Uploads are content-type checked, size-capped by the workspace's storage quota, and stored under a
 tenant-prefixed key. For R2 writes the order is **object first, quota assert second, compensating
@@ -244,6 +257,7 @@ A new sub-processor is a change to both, plus customer notice.
   documented as a product limitation, not sold as a security feature.
 - **Backups are not restore-tested on a schedule.** The nightly logical backup exists; a periodic
   restore drill does not yet.
+- **A refused attachment row has no in-app repair.** See §6.2 for the operator procedure.
 
 Each of these is a real gap. They are listed here so that nobody has to discover them during an
 incident, and so that no marketing copy implies otherwise.
