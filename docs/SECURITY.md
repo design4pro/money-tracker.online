@@ -152,17 +152,25 @@ does not exist, and is logged with the attachment id only (`getAttachmentForRead
 in `src/server/repos/attachments.ts`). A key with a `.` or `..` segment after the prefix is refused
 the same way.
 
-A refused row has **no in-app repair**: it cannot be deleted through the application, and it keeps
-counting toward the workspace's storage quota until it is repaired. Repair is an operator action on
-D1 and R2. The log line is `attachment key is outside the workspace prefix` and carries the
-attachment id only. The orphaned-object sweep does not repair it: that sweep is not built yet, and
-it would work from objects, not from rows.
+A refused row has **no in-app repair**: the attachment delete refuses it, and it keeps counting
+toward the workspace's storage quota until it is repaired. The one application path that removes it
+is deleting its parent transaction, which cascades the row (never the object) and takes the whole
+transaction with it. Repair is an operator action on D1 and R2. The log line is
+`attachment key is outside the workspace prefix` and carries the attachment id only. The
+orphaned-object sweep does not repair it: that sweep is not built yet, and when it is, it is
+planned to work from objects, not from rows.
 
-1. Establish from the object and the audit trail which workspace owns the object the key points at.
+1. Establish which workspace owns the object the key points at. Neither audit log records R2 keys,
+   so the evidence is the workspace segment of the key and the `attachments` rows that reference it.
+   Check as well that the object exists at all.
 2. **Never delete the R2 object**: it may be another workspace's live receipt.
-3. If the object belongs to another workspace, delete only the poisoned D1 row.
-4. If the object is the owner's, repoint the row to a key under its own
-   `attachments/<workspace>/` prefix.
+3. If the object belongs to another workspace, or does not exist, delete only the poisoned D1 row.
+4. If the object is the owner's, R2 has no rename: copy it to a key under the owner's own
+   `attachments/<workspace>/` prefix, check the size and content type against the row, and only
+   then repoint `r2_key`. Repointing the row alone leaves it naming an object that is not there
+   (the file route answers 502) and the real object unreferenced. The old object stays, per step 2.
+5. The D1 write is a cross-workspace action with no audit entry of its own: record it in the
+   platform audit log or the incident record.
 
 Uploads are content-type checked, size-capped by the workspace's storage quota, and stored under a
 tenant-prefixed key. For R2 writes the order is **object first, quota assert second, compensating
