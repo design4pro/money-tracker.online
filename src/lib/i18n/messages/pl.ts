@@ -800,13 +800,12 @@ const messages = {
   },
   'transactions.planned.expected.hint':
     'To jeszcze nie są pieniądze. Oczekiwane płatności nigdy nie wchodzą do sum.',
-  'transactions.planned.expected.in': 'Oczekiwane wpływy',
-  'transactions.planned.expected.out': 'Oczekiwane wydatki',
   'transactions.planned.expected.suppressed':
     'Oczekiwane płatności są ukryte, dopóki ten filtr jest aktywny.',
   'transactions.planned.expected.failed':
     'Nie udało się wczytać oczekiwanych płatności.',
-  'transactions.planned.expected.totals': 'Sumy oczekiwanych płatności',
+  'transactions.planned.expected.none':
+    'Brak oczekiwanych płatności do pokazania.',
   'transactions.mode.label': 'Które wpisy pokazać',
   'transactions.mode.actual': 'Zapisane',
   'transactions.mode.planned': 'Zaplanowane',

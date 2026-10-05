@@ -5,7 +5,7 @@
 | **Status**         | in-progress |
 | **Issue**          | #363        |
 | **Spec PR**        | #364        |
-| **Implementation** | #537        |
+| **Implementation** | #537, #564  |
 
 ## 📝 TLDR
 
@@ -625,20 +625,20 @@ Recorded so the design above and the product do not quietly disagree. The body i
    virtualiser re-measures where its rows start when the group changes height. An independent
    accessibility specialist chose this over the same-table option (confidence high); the AA claim is
    unchanged.
-2. **The expected figures are computed in the view, from the rows shown.** Step 7 describes an
-   `expectedByCurrency` field on `loadPlannedScreen`. The server returns the group (`ExpectationGroup`:
-   `shown | suppressed | failed`) and `expectedTotals` (`src/components/app/transactions/expectation-totals.ts`)
-   sums the rows' own integer minor units per currency, income and expense apart. The property the
-   field existed for holds by construction: the figure and the list are the same rows, and the group
-   is read once, identically on every page call.
-3. **The figures sit under the group, not inside `ListSummary`.** `ListSummary` is not rendered when
-   the ledger half is empty, which is exactly when an expectation is most worth reading, so the
-   figures belong to the group. `ListSummary` is untouched and still totals `transactions` only.
+2. **The per-currency expected figures are not in this phase.** Step 7 describes an
+   `expectedByCurrency` field and step 9 renders the figures beside `ListSummary`. Issue #535 split
+   them out to #563 (blocked by #535), so `loadPlannedScreen` returns the group
+   (`ExpectationGroup`: `shown | suppressed | failed`) and no totals, the keys
+   `transactions.planned.expected.in` and `.out` are not landed here, and the group's hint is the
+   only statement about totals. Step 9's guard is kept: a planned screen holding expectations
+   returns byte-identical `totals` to the same screen without them.
+3. **When the last row of the group is settled the group stays on screen** with
+   `transactions.planned.expected.none`, so the heading that focus recovery falls back to still
+   exists (WCAG 2.4.3). A group that never held a row is not drawn.
 4. **Plural machinery selects its branch from `count`.** `transactions.planned.expected.group` is
    therefore parameterised `{count}` (days) and not `{days}`.
 5. **`transactions.planned.fromRecurring` was not added.** The series name is the row header, so
-   nothing would read it. `transactions.planned.expected.totals` (the label of the figures' group)
-   was added instead.
+   nothing would read it.
 6. **A third return origin, `planned`.** Mark paid from the planned screen sends the entry form's
    Save back to `/transactions/planned?markPaid=…&series=…`, which reopens the picker once the group
    has loaded. The brief's "list" origin returns to `/recurring`, which is the wrong screen here.

@@ -363,10 +363,20 @@ export function TransactionsScreen({
     }
   }, [expectations, group])
 
+  // Once the group has held content it stays mounted when the last row is settled, so the heading
+  // its focus recovery falls back to still exists to take focus (WCAG 2.4.3).
+  const groupSeen = useRef(false)
+  const groupHasContent = group !== undefined && hasExpectationContent(group)
+  useEffect(() => {
+    if (groupHasContent) {
+      groupSeen.current = true
+    }
+  }, [groupHasContent])
+
   const expectationGroup =
     expectations === undefined ||
     group === undefined ||
-    !hasExpectationContent(group) ? null : (
+    !(groupHasContent || groupSeen.current) ? null : (
       <ExpectationGroupView
         group={group}
         openRowId={expectations.openRowId}

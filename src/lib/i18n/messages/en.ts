@@ -769,13 +769,11 @@ const messages = {
   },
   'transactions.planned.expected.hint':
     'Not yet money. Expected payments are never added to the totals.',
-  'transactions.planned.expected.in': 'Expected in',
-  'transactions.planned.expected.out': 'Expected out',
   'transactions.planned.expected.suppressed':
     'Expected payments are hidden while this filter is active.',
   'transactions.planned.expected.failed':
     'Expected payments could not be loaded.',
-  'transactions.planned.expected.totals': 'Expected totals',
+  'transactions.planned.expected.none': 'No expected payments to show.',
   'transactions.mode.label': 'Which entries to show',
   'transactions.mode.actual': 'Recorded',
   'transactions.mode.planned': 'Planned',

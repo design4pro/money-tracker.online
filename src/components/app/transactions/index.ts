@@ -33,9 +33,6 @@ export type { DetailSummaryProps } from './detail-summary'
 export { ExpectationGroupView } from './expectation-group'
 export type { ExpectationGroupProps } from './expectation-group'
 
-export { expectedTotals } from './expectation-totals'
-export type { ExpectedTotal } from './expectation-totals'
-
 export { FilterBar } from './filter-bar'
 export type { FilterBarProps } from './filter-bar'
 

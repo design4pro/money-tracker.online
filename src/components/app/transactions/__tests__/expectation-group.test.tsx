@@ -136,27 +136,21 @@ describe('ExpectationGroupView', () => {
     expect(screen.queryByRole('button', { name: /^Undo/ })).toBeNull()
   })
 
-  it('sums what is expected per currency, income and expense apart, under its own label', async () => {
-    await renderGroup(
-      shown([
-        RENT,
-        expectation({
-          id: 'ser-3:2026-10-15',
-          seriesId: 'ser-3',
-          seriesName: 'Salary',
-          direction: 'income',
-          expectedAmountMinor: asMinor(500_000),
-        }),
-        GYM,
-      ]),
-    )
+  it('says that nothing is left instead of drawing an empty table', async () => {
+    await renderGroup(shown([]))
+
+    expect(
+      await screen.findByText('No expected payments to show.'),
+    ).toBeTruthy()
+    expect(screen.queryByRole('table')).toBeNull()
+  })
+
+  it('draws no per-currency figure: that is a separate slice', async () => {
+    await renderGroup(shown([RENT, GYM]))
     await screen.findByRole('table')
 
-    const totals = screen.getByRole('group', { name: 'Expected totals' })
-    expect(within(totals).getAllByText('Expected in')).toHaveLength(2)
-    expect(within(totals).getAllByText('Expected out')).toHaveLength(2)
-    // One line per currency: EUR first, then PLN, never a converted combination.
-    expect(totals.textContent).toMatch(/€.*zł|EUR.*PLN/s)
+    expect(screen.queryByRole('group', { name: 'Expected totals' })).toBeNull()
+    expect(screen.queryByText('Expected in')).toBeNull()
   })
 
   it('says that the group is hidden while a filter it cannot honour is active', async () => {
@@ -238,7 +232,7 @@ describe('ExpectationGroupView', () => {
       const [rows, setRows] = useState([RENT])
       return (
         <ExpectationGroupView
-          group={shown(rows, { isCapped: true })}
+          group={shown(rows)}
           onMarkPaid={vi.fn()}
           onSkip={(row) =>
             setRows((current) => current.filter((r) => r.id !== row.id))

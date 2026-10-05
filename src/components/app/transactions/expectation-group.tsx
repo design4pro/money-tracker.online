@@ -9,11 +9,8 @@ import {
 } from '#/components/app/recurring'
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
-import { formatMoney, money } from '#/lib/money'
 
 import { AmountText } from './amount-text'
-import { expectedTotals } from './expectation-totals'
-import { hasExpectationContent } from './types'
 
 import type {
   ExpectationGroup as ExpectationGroupModel,
@@ -27,8 +24,8 @@ import type {
  *
  * An expected payment is a plan: it has no reference amount and no rate until it settles
  * (`ExpectationRow`), and nothing here is added to the ledger's totals. The group says so in words
- * ({@link ExpectationGroupProps}'s hint line), writes each amount in the series' own currency and
- * sets its own per-currency figures under the table, labelled as expectations.
+ * ({@link ExpectationGroupProps}'s hint line) and writes each amount in the series' own currency.
+ * Per-currency expected figures are a separate slice (#563).
  *
  * ## Its own table, not rows of the ledger grid
  *
@@ -94,12 +91,6 @@ export function ExpectationGroupView({
   if (group.state === 'failed') {
     return <Notice>{t('transactions.planned.expected.failed')}</Notice>
   }
-  if (!hasExpectationContent(group)) {
-    return null
-  }
-
-  const totals = expectedTotals(group.rows)
-
   return (
     <section
       ref={rootRef}
@@ -178,7 +169,7 @@ export function ExpectationGroupView({
                   <Link
                     to="/recurring/$seriesId"
                     params={{ seriesId: row.seriesId }}
-                    className="inline-flex target-min-h items-center rounded-sm underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+                    className="inline-flex target-min-h items-center rounded-sm break-words underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
                   >
                     {row.seriesName}
                   </Link>
@@ -236,41 +227,9 @@ export function ExpectationGroupView({
         </table>
       )}
 
-      {totals.length === 0 ? null : (
-        <div
-          role="group"
-          aria-label={t('transactions.planned.expected.totals')}
-          className="flex flex-col gap-1 border-t border-border-subtle pt-2 text-caption text-ink-2"
-        >
-          {totals.map((line) => (
-            <dl
-              key={line.currencyCode}
-              className="flex flex-wrap gap-x-4 gap-y-0.5"
-            >
-              <div className="flex items-baseline gap-1.5">
-                <dt>{t('transactions.planned.expected.in')}</dt>
-                <dd className="tabular text-ink">
-                  {formatMoney(locale, money(line.inMinor, line.currencyCode), {
-                    display: 'narrowSymbol',
-                  })}
-                </dd>
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <dt>{t('transactions.planned.expected.out')}</dt>
-                <dd className="tabular text-ink">
-                  {formatMoney(
-                    locale,
-                    money(line.outMinor, line.currencyCode),
-                    {
-                      display: 'narrowSymbol',
-                    },
-                  )}
-                </dd>
-              </div>
-            </dl>
-          ))}
-        </div>
-      )}
+      {group.rows.length === 0 && !group.isCapped ? (
+        <Notice>{t('transactions.planned.expected.none')}</Notice>
+      ) : null}
 
       {group.isCapped ? (
         <p className="text-caption text-ink-2">
