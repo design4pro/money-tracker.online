@@ -462,8 +462,7 @@ const messages = {
   },
   'transactions.empty.title': 'Nothing recorded yet',
   'transactions.empty.body':
-    'Record your first expense, or load a statement you already have.',
-  'transactions.empty.action': 'Record an expense',
+    'Record your first transaction, or load a statement you already have.',
   'transactions.noResults.title': 'Nothing matches these filters',
   'transactions.noResults.body': 'Try a wider date range or fewer filters.',
 
@@ -916,6 +915,7 @@ const messages = {
   'dashboard.widget.cashFlow': 'Cash flow',
   'dashboard.widget.spendingByCategory': 'Spending by category',
   'dashboard.widget.recentTransactions': 'Latest transactions',
+  'dashboard.recentTransactions.empty.action': 'Go to transactions',
   'dashboard.widget.upcomingBills': 'Coming up',
   'dashboard.widget.budgetProgress': 'Budgets',
   'dashboard.widget.savingsGoals': 'Savings goals',
