@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CalendarClock } from 'lucide-react'
 
-import { KeyboardShortcuts } from '#/components/app/transactions'
+import {
+  KeyboardShortcuts,
+  TransactionsModeSwitch,
+} from '#/components/app/transactions'
 import { EmptyState } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
@@ -25,6 +28,10 @@ import type { TransactionSearch } from './-lib/filters'
  *
  * It also makes the mode linkable and bookmarkable, which "the ledger with a checkbox ticked" is
  * not.
+ *
+ * The {@link TransactionsModeSwitch} is how a person gets here and back, carrying the active
+ * filters with them. It is a control on the screen and not a navigation entry: a mode is not an
+ * area, and the navigation table was deliberately narrowed.
  *
  * The filter bar, the keyboard map and the totals are the same composition the main ledger uses, so
  * the two screens cannot drift apart in the ways a reader would notice.
@@ -62,6 +69,15 @@ function PlannedTransactionsRoute() {
           {t('transactions.planned.subtitle')}
         </p>
       </header>
+
+      <TransactionsModeSwitch
+        mode="planned"
+        onChange={(next) => {
+          if (next === 'recorded') {
+            void navigate({ to: '/transactions', search })
+          }
+        }}
+      />
 
       <TransactionsScreen
         policies={PLANNED_POLICIES}

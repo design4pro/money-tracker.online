@@ -265,6 +265,35 @@ Three amendment rules are specific to this document's shape:
 - **What a ticket contains** beyond the Definition of Ready: `docs/agents/issue-tracker.md` (tenant
   isolation test, money invariant, visual change expected).
 
+### Stacked pull requests
+
+"PRs target `develop`" has one exception: a PR based on the branch of another open PR. It does not
+target `develop` until its base merges, which is expected, not a finding.
+
+- **When to stack.** Only when the ticket or its spec says the work ships as more than one PR,
+  usually because the halves are reviewable separately and would bury each other. Never as a way
+  to split a PR that grew large. The unattended pipeline stacks only on that explicit instruction.
+- **How to open it.** Base the second PR on the first PR's branch. The first carries `Refs #<n>`
+  and the last `Closes #<n>`, so the issue closes exactly once. Merge them in order, base first.
+- **Retargeting is not automatic here.** GitHub retargets a stacked PR when the base PR's head
+  branch is deleted, and this repository has `delete_branch_on_merge=false`, so nothing does. After
+  the base PR merges, retarget by hand with the REST operation (`gh pr edit` is unusable on this
+  host, `.ai/trackers/github.md`):
+  `gh api -X PATCH repos/{owner}/{repo}/pulls/{prNumber} -f base=develop`. Retarget **before**
+  anyone deletes the base branch: GitHub closes a PR whose base branch disappears under it (its
+  documented behaviour; not exercised in this repository).
+- **CI does not run on the way.** `.github/workflows/ci.yml` triggers on `pull_request` against
+  `main` or `develop` only, so a PR whose base is another feature branch gets no CI run, and
+  merging into that branch passes through no required check: it is not a quality gate. A retarget
+  alone starts none either, because it fires `edited`, which the workflow does not listen to
+  (#175 merged 88 seconds after #172 with none of the required checks ever reported on it). After the retarget the
+  author merges `develop` into the branch and pushes, which fires `synchronize` against `develop`
+  and starts CI. The PR does not merge until the required checks are green on that run. A local
+  validation-gate pass is review evidence, never a substitute for them. No force-push, no
+  `--no-verify`.
+- **Whether CI should start on a retarget** is a workflow change and a merge-policy decision, made
+  in #546, not here.
+
 ### The Reconciler
 
 The Reconciler is a level-triggered loop on the cezar host (a cron every ten minutes; `docs/agents/cezar.md`

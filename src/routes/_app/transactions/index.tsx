@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import {
   KeyboardShortcuts,
   TransactionsEmpty,
+  TransactionsModeSwitch,
 } from '#/components/app/transactions'
 import { useTranslate } from '#/lib/i18n'
 
@@ -27,6 +28,13 @@ import type { TransactionSearch } from './-lib/filters'
  *
  * Spelling it out at the call site is the point — a constant named `DEFAULT_POLICIES` would put
  * this decision somewhere a reviewer does not look.
+ *
+ * ## The way to the planned screen is a switch, not a nav entry
+ *
+ * `/transactions/planned` is a second address rather than a filter (its own docblock says why), and
+ * until the {@link TransactionsModeSwitch} it was reachable only by typing it. The switch carries the
+ * active filters across, so narrowing here and then looking at what is coming keeps the narrowing.
+ * The navigation table stays narrowed: a mode is not an area.
  *
  * ## `validateSearch` is the filter state
  *
@@ -66,6 +74,15 @@ function TransactionsIndexRoute() {
         </h1>
         <KeyboardShortcuts />
       </header>
+
+      <TransactionsModeSwitch
+        mode="recorded"
+        onChange={(next) => {
+          if (next === 'planned') {
+            void navigate({ to: '/transactions/planned', search })
+          }
+        }}
+      />
 
       <TransactionsScreen
         policies={LEDGER_POLICIES}

@@ -25,7 +25,7 @@
  * Read as text, like the other workflow-shape tests here: the repository pins no YAML parser.
  *
  * @see .github/actions/setup/action.yml
- * @see .github/actions/e2e-env/action.yml
+ * @see .github/actions/e2e-env/action.yml (the preview-port guard, #288)
  * @see .github/workflows/deploy-staging.yml
  * @see .github/workflows/deploy-production.yml
  * @see https://github.com/design4pro/money-tracker.online/pull/318
@@ -33,6 +33,7 @@
  * @see https://github.com/design4pro/money-tracker.online/issues/409
  */
 
+import { spawn } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -124,5 +125,103 @@ describe('.github/workflows', () => {
         )
       }
     }
+  })
+})
+
+describe('.github/actions/e2e-env/action.yml preview-port guard (#288)', () => {
+  const GUARD = 'Check the preview port is free'
+  const START = 'Start the preview server'
+  const action = read('.github/actions/e2e-env/action.yml')
+
+  /** The `run: |` body of the step called `name`, dedented. YAML is read as text, as above. */
+  const stepScript = (name) => {
+    const lines = action.split('\n')
+    const at = lines.findIndex((l) => l.trim() === `- name: ${name}`)
+    if (at < 0) return null
+    const run = lines.findIndex((l, i) => i > at && l.trim() === 'run: |')
+    const bodyIndent = lines[run + 1].match(/^ */)[0].length
+    const body = []
+    for (const line of lines.slice(run + 1)) {
+      if (line.trim() !== '' && line.search(/\S/) < bodyIndent) break
+      body.push(line.slice(bodyIndent))
+    }
+    return body.join('\n')
+  }
+
+  /** Runs the guard with `bash` the way the runner does: PORT arrives through the environment. */
+  const runGuard = (port) =>
+    new Promise((resolve) => {
+      const child = spawn('bash', ['-c', stepScript(GUARD)], {
+        env: { ...process.env, PORT: String(port) },
+      })
+      let out = ''
+      child.stdout.on('data', (d) => (out += d))
+      child.stderr.on('data', (d) => (out += d))
+      child.on('close', (status) => resolve({ status, out }))
+    })
+
+  /** A real listener in its own process, so its PID differs from the test worker's. */
+  const listen = async (host) => {
+    const child = spawn(
+      process.execPath,
+      [
+        '-e',
+        `require('node:net').createServer().listen(0, ${JSON.stringify(host)}, function () { console.log(this.address().port) })`,
+      ],
+      { stdio: ['ignore', 'pipe', 'inherit'] },
+    )
+    const port = await new Promise((resolve) =>
+      child.stdout.once('data', (d) => resolve(Number(d.toString()))),
+    )
+    return { child, port }
+  }
+
+  it('sits before the step that starts the preview server and takes its port from the input', () => {
+    expect(
+      action.indexOf(`- name: ${GUARD}`),
+      'no pre-flight step: a leftover `vite preview` surfaces as a bare port-in-use error (#288)',
+    ).toBeGreaterThan(-1)
+    expect(action.indexOf(`- name: ${GUARD}`)).toBeLessThan(
+      action.indexOf(`- name: ${START}`),
+    )
+    expect(stepScript(GUARD)).toMatch(/set -euo pipefail/)
+    expect(action).toMatch(
+      new RegExp(
+        `- name: ${GUARD}[\\s\\S]*?PORT: \\$\\{\\{ inputs\\.port \\}\\}`,
+      ),
+    )
+  })
+
+  it('fails with a diagnosis for a listener on IPv4 or IPv6, naming the holder', async () => {
+    for (const host of ['0.0.0.0', '::1']) {
+      const { child, port } = await listen(host)
+      try {
+        const { status, out } = await runGuard(port)
+        expect(status, host).toBe(1)
+        expect(out, host).toContain('::error title=Preview port::')
+        expect(out, host).toContain(`PID ${child.pid}`)
+        expect(out, host).toContain(`Port ${port} is already held`)
+      } finally {
+        child.kill()
+      }
+    }
+  })
+
+  it('passes silently on a free port', async () => {
+    const { child, port } = await listen('127.0.0.1')
+    child.kill()
+    await new Promise((resolve) => child.once('close', resolve))
+
+    expect(await runGuard(port)).toEqual({ status: 0, out: '' })
+  })
+
+  it('says so when the holder is not visible, and still fails', () => {
+    expect(stepScript(GUARD)).toMatch(/not visible to the runner user/)
+  })
+
+  it('reaps nothing: no kill, no sudo, no `if: always()` step, and --strictPort stays', () => {
+    expect(stepScript(GUARD)).not.toMatch(/\b(?:kill|pkill|killall|sudo)\b/)
+    expect(action).not.toMatch(/\bif: always\(\)/)
+    expect(stepScript(START)).toMatch(/--strictPort/)
   })
 })

@@ -756,6 +756,9 @@ const messages = {
   'transactions.planned.empty.title': 'Nothing planned',
   'transactions.planned.empty.body':
     'Record an expense with a future date and mark it planned to see it here.',
+  'transactions.mode.label': 'Which entries to show',
+  'transactions.mode.actual': 'Recorded',
+  'transactions.mode.planned': 'Planned',
   /* -- Colours (the eight measured category hues) ------------------------- */
   'colour.blue': 'Blue',
   'colour.teal': 'Teal',
@@ -1803,8 +1806,11 @@ const messages = {
 
   'recurring.period.markPaid': 'Mark paid',
   'recurring.period.markPaid.for': 'Mark the period due {date} as paid',
+  'recurring.period.markPaid.forSeries':
+    'Mark the period due {date} for {series} as paid',
   'recurring.period.skip': 'Skip',
   'recurring.period.skip.for': 'Skip the period due {date}',
+  'recurring.period.skip.forSeries': 'Skip the period due {date} for {series}',
   'recurring.period.revert': 'Undo',
   'recurring.period.revert.for': 'Undo the period due {date}',
 
@@ -1816,6 +1822,8 @@ const messages = {
   'recurring.markPaid.placeholder': 'Search your spending',
   'recurring.markPaid.empty':
     'Nothing in this window matches. Record the payment first, then come back.',
+  'recurring.markPaid.record': 'Record the payment',
+  'recurring.markPaid.recordHint': 'We will bring you back here to link it.',
   'recurring.markPaid.confirm': 'Link it',
   'recurring.markPaid.never': 'Marking a period paid never creates an entry.',
   /* -- Automation ----------------------------------------------------------- */

@@ -41,7 +41,7 @@ type SpecStatus = (typeof STATUSES_BY_DIRECTORY)[SpecDirectory][number]
 /** The value `Superseded by` takes when nothing replaced an archived spec. */
 const ABANDONED = 'abandoned'
 
-type Spec = {
+export type Spec = {
   /** Repository-relative path, e.g. `.ai/specs/implemented/2026-09-09-….md`. */
   path: string
   title: string
@@ -143,26 +143,26 @@ const issueLink = (reference: number): string =>
 const pullLink = (reference: number): string =>
   `[#${reference}](${REPOSITORY}/pull/${reference})`
 
+/** What built the spec: the pull requests that merged a phase of it, or a dash when none did. */
+const implementationCell = (spec: Spec): string =>
+  spec.implementation.length === 0
+    ? '—'
+    : spec.implementation.map(pullLink).join(', ')
+
 /**
- * The last column: what built the spec, or - for an archived one - what replaced it.
+ * What replaced an archived spec.
  *
- * `issueLink` rather than `pullLink` for the archived case because a superseding reference can be
- * either, and the document does not say which. GitHub redirects `/issues/n` to `/pull/n` for the
- * same number, so one form reaches both.
+ * `issueLink` rather than `pullLink` because a superseding reference can be either, and the
+ * document does not say which. GitHub redirects `/issues/n` to `/pull/n` for the same number, so
+ * one form reaches both.
  *
  * An archived spec with no reference is read as {@link ABANDONED}, so the cell says that rather
  * than the dash it says elsewhere.
  */
-const lastCell = (spec: Spec): string => {
-  if (spec.status === 'archived') {
-    return spec.supersededBy.length === 0
-      ? ABANDONED
-      : spec.supersededBy.map(issueLink).join(', ')
-  }
-  return spec.implementation.length === 0
-    ? '—'
-    : spec.implementation.map(pullLink).join(', ')
-}
+const supersededByCell = (spec: Spec): string =>
+  spec.supersededBy.length === 0
+    ? ABANDONED
+    : spec.supersededBy.map(issueLink).join(', ')
 
 const row = (spec: Spec): string => {
   const href = spec.path.slice(SPEC_ROOT.length + 1)
@@ -171,7 +171,8 @@ const row = (spec: Spec): string => {
     spec.date,
     spec.issue === null ? '—' : issueLink(spec.issue),
     spec.specPr === null ? '—' : pullLink(spec.specPr),
-    lastCell(spec),
+    implementationCell(spec),
+    ...(spec.status === 'archived' ? [supersededByCell(spec)] : []),
   ]
   return `| ${cells.join(' | ')} |`
 }
@@ -191,15 +192,22 @@ export const renderIndex = (specs: ReadonlyArray<Spec>): string => {
     const section = specs.filter((spec) => spec.status === status)
     if (section.length === 0) continue
 
-    // An archived spec rarely has an implementation to show, so the column would be mostly dashes;
-    // what the reader wants in its place is what replaced it.
-    const last = status === 'archived' ? 'Superseded by' : 'Implementation'
+    // `Superseded by` is the archived status's own column, beside `Implementation` rather than in
+    // place of it: a spec can ship phases and be superseded later, and the index hides no reference.
+    const columns = [
+      'Spec',
+      'Date',
+      'Issue',
+      'Spec PR',
+      'Implementation',
+      ...(status === 'archived' ? ['Superseded by'] : []),
+    ]
 
     lines.push(
       `## ${heading} (${section.length})`,
       '',
-      `| Spec | Date | Issue | Spec PR | ${last} |`,
-      '| --- | --- | --- | --- | --- |',
+      `| ${columns.join(' | ')} |`,
+      `| ${columns.map(() => '---').join(' | ')} |`,
       ...section.map(row),
       '',
     )

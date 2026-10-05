@@ -55,7 +55,7 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
 
 ## Branch model
 
-- Feature branches (`feat/*`, `fix/*`, `spec/*`, `claude/*`) open a pull request to
+- Feature branches (named by the rule in `AGENTS.md`, `## Always`) open a pull request to
   **`develop`**.
 - Merging `develop` deploys **staging** once CI has passed on that commit:
   https://staging.money-tracker.online (`deploy · staging`, the last job of `ci.yml`, calling

@@ -70,13 +70,23 @@ export interface TaskBatchOptions {
  * cannot see that the handler it picked accepts exactly this `task`. The invariant that makes the
  * cast true: `TaskHandlers` maps each kind `K` to a handler of `Extract<TaskMessage, { kind: K }>`,
  * and `task.kind` is the key used to look it up, so the pair always agrees.
+ *
+ * A missing entry rejects instead of throwing synchronously, so both failures reach the caller's
+ * `catch` through the same `await`.
  */
 function runHandler<K extends TaskKind>(
   handlers: TaskHandlers,
   task: Extract<TaskMessage, { kind: K }>,
   ctx: TaskContext,
 ): Promise<void | PermanentRefusal> {
-  const handler = handlers[task.kind] as TaskHandler<K>
+  const handler = handlers[task.kind] as TaskHandler<K> | undefined
+  // The type says an entry exists for every kind; a registry built before a kind was added, or by a
+  // cast, is the one way it might not. Throwing keeps it a retry, never an acknowledgement.
+  if (!handler) {
+    return Promise.reject(
+      new Error(`no handler is registered for ${task.kind}`),
+    )
+  }
   return handler(task, ctx)
 }
 
@@ -129,9 +139,12 @@ export async function handleTaskBatch(
       // Reaching here means the handler could not complete for a reason another attempt might
       // resolve, a database that did not answer. Every *logical* failure is the handler's to
       // record and acknowledge (or to refuse permanently), so a retry here is never a second
-      // attempt at the same rejected payload.
+      // attempt at the same rejected payload. A kind with no installed handler lands here too, on
+      // purpose: it is retried until the retry limit moves it to the dead-letter queue, and never
+      // acknowledged.
       logger.error('queue message failed', error, {
         kind: task.kind,
+        attempt: message.attempts,
         messageId: message.id,
       })
       message.retry()

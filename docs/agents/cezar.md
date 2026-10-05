@@ -456,6 +456,30 @@ same work. To retire them on the host, disable both in the cockpit (Automations)
 `.ai/scripts/cez-automations.sh --dry-run --prune` and `--prune`; the Reconciler's sync re-applies
 the file without `--prune`, which disables the issue pair but only lists the two schedules.
 
+**Renaming an automation:** `name` is the identity key of `.ai/scripts/cez-automations.sh`. It looks
+a definition up in the cockpit by `name` alone: a match is updated in place, a miss is created
+enabled. A changed `name` therefore reads as a new automation, not as a rename, and the cockpit
+keeps the old one as an enabled stray. `--prune` refuses to delete an enabled stray, and the
+Reconciler's sync (which re-applies the file without `--prune`) only lists it, so both triggers fire
+until someone disables the old definition by hand: two agent runs per issue or pull request opened.
+The order that is safe is the reverse of the one that is tempting. On every cockpit that holds the
+old name (a second host, one restored from a backup, a sibling repository's cockpit before its own
+sync), first rename the definition in place through the API, or disable it in the cockpit and prune
+it. Only then run the script, and `--dry-run` first: it prints one line per definition, and no
+`would create <name>` line for a renamed entry is the evidence the rename took. Never run the script
+first. `task.workflow` cannot replace `name` as the
+key, because it is not unique (`issue-groom` is run by more than one automation); a different key is
+a kit-side design change, not a consumer note.
+
+The instance: kit 42 (#312, commit `5775c98`) renamed six automations from their workflow ids to
+display names - `issue-groom`, `issue-regroom`, `issue-autofix`, `issue-spec`, `pr-autopilot` and
+`pr-review-threads`. Those are history, not the current names (see the list above), and some of
+them are still workflow ids. The retired kit's pull request description (design4pro/agent-kit#42)
+says both running cockpits were renamed in place through the API before the sync, and that the
+dry-run then read `would update 11, would create 0` (a total the script itself does not print). That
+step is recorded only there: it is not verifiable from this repository, so read it as the kit's
+account, not as a fact established here.
+
 No label starts a run (ADR 0029). Every event trigger is gated on who can produce it: the open
 events by author, and the unlabel event both by author and because only a collaborator can remove
 a label. This matters because the agent step holds Bash with no allowlist and the issue body is its

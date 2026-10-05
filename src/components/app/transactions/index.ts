@@ -76,6 +76,12 @@ export { KeyboardShortcuts } from './keyboard-shortcuts'
 export { ListSummary } from './list-summary'
 export type { ListSummaryProps } from './list-summary'
 
+export { TransactionsModeSwitch } from './mode-switch'
+export type {
+  TransactionsMode,
+  TransactionsModeSwitchProps,
+} from './mode-switch'
+
 export {
   TransactionForm,
   emptyFormValues,

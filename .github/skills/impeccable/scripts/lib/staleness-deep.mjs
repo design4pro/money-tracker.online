@@ -164,6 +164,13 @@ export function checkDesignCoverage({ design, designPath, parseDesignMd }) {
 
 // ─── detector ignore lists ─────────────────────────────────────────────────
 
+// Same normalization the matcher applies before comparing; `*` is a wildcard, never an unknown id.
+function unknownRuleIds(rules, knownRuleIds) {
+  return rules
+    .map((rule) => String(rule || '').trim().toLowerCase())
+    .filter((rule) => rule && rule !== '*' && !knownRuleIds.has(rule));
+}
+
 /**
  * Ignore entries that no longer match anything: rule ids the engine dropped or
  * renamed, and file paths that are gone. Both read as working suppressions
@@ -181,9 +188,7 @@ export function checkDetectorIgnores({ projectRoot, knownRuleIds = null }) {
     const rel = toRelative(filePath, projectRoot);
 
     if (knownRuleIds && Array.isArray(detector.ignoreRules)) {
-      const unknown = detector.ignoreRules
-        .map((rule) => String(rule || '').trim().toLowerCase())
-        .filter((rule) => rule && rule !== '*' && !knownRuleIds.has(rule));
+      const unknown = unknownRuleIds(detector.ignoreRules, knownRuleIds);
       if (unknown.length) {
         findings.push(finding({
           id: 'detector-ignore-rules-unknown',
@@ -194,6 +199,27 @@ export function checkDetectorIgnores({ projectRoot, knownRuleIds = null }) {
             + `${unknown.map((rule) => `\`${rule}\``).join(', ')}. Either the rule was renamed or removed, or the `
             + 'id was mistyped and has never suppressed anything.',
           fix: 'Report the exact ids. Removing them is safe; keeping a dead ignore hides that the rule is gone.',
+        }));
+      }
+    }
+
+    // The matcher compares an entry's `rule` exactly, so an unknown id here suppresses nothing.
+    if (knownRuleIds && Array.isArray(detector.ignoreValues)) {
+      const unknown = unknownRuleIds(
+        detector.ignoreValues.map((entry) => entry?.rule),
+        knownRuleIds,
+      );
+      if (unknown.length) {
+        findings.push(finding({
+          id: 'detector-ignore-values-unknown',
+          artifact: 'config.json',
+          filePath: rel,
+          severity: 'mention',
+          summary: `${rel} has ignoreValues entries under rule id(s) the detector does not have: `
+            + `${unknown.map((rule) => `\`${rule}\``).join(', ')}. Either the rule was renamed or removed, or the `
+            + 'id was mistyped and the entry has never suppressed anything.',
+          fix: 'Report the exact ids. Removing the entries is safe; a dead value ignore reads as a working '
+            + 'waiver and hides that the rule is gone.',
         }));
       }
     }
