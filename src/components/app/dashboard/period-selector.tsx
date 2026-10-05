@@ -15,8 +15,11 @@ import type { DashboardPeriod } from './period'
  * It is a `Select` rather than a row of chips: five options is already past the point where a
  * segmented control stops fitting a 360px viewport, and React Aria's Select brings the
  * `combobox`/`listbox` announcement pair, type-ahead and Escape-to-cancel with it. The trigger
- * carries `target-min` from `fieldSurface`, so the 44px target is not something this file has to
- * remember.
+ * carries `target-min` itself (`Select` applies it), so the 44px target is not something this file
+ * has to remember.
+ *
+ * It takes the default field size, so it stands at the same 40px as the primary action it shares
+ * the dashboard header's row with (`DESIGN.md` -> Fields).
  *
  * The selected key is the period itself, so the URL, the loader and the control cannot drift:
  * there is no second mapping to keep in step.
@@ -32,7 +35,6 @@ export function PeriodSelector({ period, onChange }: PeriodSelectorProps) {
   return (
     <Select
       aria-label={t('dashboard.period.label')}
-      size="sm"
       className="min-w-44"
       selectedKey={period}
       onSelectionChange={(key) => {

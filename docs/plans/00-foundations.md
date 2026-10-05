@@ -384,6 +384,8 @@ None.
 
 ## Stage 00-S4 — `money.ts` and `plans.ts`
 
+Delivered: 2026-10-05 - `src/lib/money.ts` with `src/lib/money/`, `src/lib/plans.ts` and the six suites under `src/lib/__tests__/` (`money-core`, `money-convert`, `money-allocate`, `money-format`, `plans`, `currencies`) pass, 6 files and 166 tests (`pnpm vitest run src/lib/__tests__`); the catalogue-wide parse/format round trip over all 56 currencies (5 at `digits: 0`, 46 at 2, 5 at 3) in `en` and `pl` merged in #514; the entitlement decision stays in `src/server/billing/resolve-limits.ts`.
+
 ### Stage id
 
 `00-S4` · Wave 0 · effort **M**. The money primitives and the plan catalogue, both browser-safe and
@@ -411,7 +413,7 @@ every plan that renders an amount.
 
 The money suite is four files, not one, split along the module boundaries it covers — the core
 integer arithmetic, conversion, allocation and formatting. One file per concern keeps a failure
-readable; a single `money.test.ts` was a plan-time guess at a shape the code did not take.
+readable; a single-file suite was a plan-time guess at a shape the code did not take.
 
 ### Data and migration
 
@@ -424,15 +426,19 @@ None — both modules are isomorphic. This is the point: a rounding function tha
 server produces a client that rounds differently, which is exactly the failure `docs/MONEY.md` §8
 records.
 
-Exports of `money.ts`: `toMinor(major, digits)`, `toMajor(minor, digits)`,
-`roundHalfToEven(value)`, `addMinor`, `subMinor`, `mulRate(minor, rateE10, digits)`,
-`formatAmount({ minor, code, digits, locale })`, `parseAmount({ input, code, digits, locale })`, and
-the branded constructors `asMinor` / `asRateE10`. Formatting and parsing go through
+Exports of `money.ts`, a barrel over the primitives in `src/lib/money/` (`types`, `rounding`,
+`arithmetic`, `allocate`, `convert`, `format`, `currencies`): `divideHalfEven`, `addMinor`,
+`subtractMinor`, `convert(...)` (carries its rate), `makeMoney`, `formatMoney`, `parseMoney`,
+`toAmountInputValue`, and the branded constructors `asMinor` / `asRateE10`. Importers go through
+`#/lib/money`, never a file inside `src/lib/money/`. Formatting and parsing go through
 `@internationalized/number` so the locale's group and decimal separators are the platform's, not a
 regex's.
 
-Exports of `plans.ts`: `PLAN_IDS`, `BILLING_INTERVALS`, `ENTITLING_STATUSES`, the metric catalogue
-and the module switches of `docs/SPEC.md` §5.4. Polar product ids arrive as **static**
+Exports of `plans.ts`: `PLAN_IDS`, `BILLING_INTERVALS`, `QUOTA_METRICS` and `QUOTA_METRIC_OWNERS`
+(the metric catalogue), with the plan definitions behind them. The set of subscription statuses that
+entitle is not exported from here: it is private to the billing limit resolver,
+`src/server/billing/resolve-limits.ts`, where `docs/SPEC.md` §5.4 puts the entitlement decision.
+Polar product ids arrive as **static**
 `import.meta.env.VITE_POLAR_PRODUCT_*` references so Vite inlines them; a computed lookup is silently
 `undefined` at build.
 
@@ -443,9 +449,11 @@ None.
 ### Quota
 
 This stage **defines** the metrics but enforces none: `assertWithinLimit` is `22-S1`'s. What it owes
-is that the catalogue and the resolver cannot drift — `plans.test.ts` asserts every metric key in the
-catalogue is one `resolveLimits()` knows, and the reverse. In wave 0 the resolver does not exist yet,
-so the test is written against the exported metric-key tuple and `22-S1` extends it to the resolver.
+is that the catalogue and the resolver cannot drift — `src/server/billing/__tests__/resolve-limits.test.ts`
+asserts every metric key in the catalogue is one `resolveLimits()` returns, and the reverse, and that
+the schema's `PLAN_IDS` mirrors the catalogue's. In wave 0 the resolver did not exist yet, so the
+assertion was first written against the exported metric-key tuple and `22-S1` extended it to the
+resolver; `plans.test.ts` keeps the catalogue's own shape.
 
 ### Tenant isolation test
 
@@ -454,20 +462,26 @@ over values the caller already holds.
 
 ### Money invariant
 
-**This stage is the money invariant.** `money.test.ts` holds, at minimum:
+**This stage is the money invariant.** The four `src/lib/__tests__/money-*.test.ts` suites hold, at
+minimum:
 
 - _rounding is half-to-even_: `2.5 → 2`, `3.5 → 4`, and the negative mirrors.
-- _`digits` is honoured, never assumed_: JPY (`digits: 0`) round-trips `¥1234` as `1234` minor, KWD
-  (`digits: 3`) round-trips `1.234` as `1234` minor, EUR as `123456` for `1234.56`.
-- _no float leaks_: `mulRate` composes integer arithmetic and its result for a known rate matches a
-  hand-computed integer, not a tolerance.
-- _parse and format are inverse_ for every currency in the catalogue, in both `en` and `pl`.
+- _`digits` is honoured, never assumed_: `parseMoney`, `toAmountInputValue` and `formatMoney` read the
+  scale from the currency, so JPY (`digits: 0`) parses `5000` as `5000` minor, KWD (`digits: 3`)
+  parses `1.234` as `1234` minor, and `1234.56` in EUR or PLN is `123456` minor.
+- _no float leaks_: `convert` composes integer arithmetic only, and its result for a known rate
+  matches a hand-computed integer, not a tolerance (`money-convert.test.ts`).
+- _parse and format are inverse_ for every currency in the catalogue, in both `en` and `pl`:
+  the catalogue-wide round-trip tests in `describe('the parse/format round trip')` of
+  `money-format.test.ts` iterate `CURRENCIES`, so a currency added or re-scaled later is covered
+  with no edit.
 - _a `pl` group separator round-trips_: `1 234,56 zł` parses to `123456` minor.
 
 ### Verification
 
 - Command gate in order.
-- The two test files above.
+- The five suites in Owned paths (`money-core`, `money-convert`, `money-allocate`, `money-format` and
+  `plans`), including the catalogue-wide round-trip tests in `money-format.test.ts`.
 - No browser evidence and no axe run: no surface. The first surface that renders a formatted amount
   is `06-S2`, and it is that stage's evidence that shows the formatting working.
 
