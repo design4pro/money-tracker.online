@@ -7,6 +7,7 @@ import { asCurrencyCode, asMinor } from '#/lib/money'
 
 import { renderLinkedRecurring } from '../../recurring/__tests__/harness'
 import { ExpectationGroupView } from '../expectation-group'
+import { hasExpectationContent } from '../types'
 
 import type { ExpectationGroup, ExpectationRow } from '../types'
 
@@ -172,11 +173,12 @@ describe('ExpectationGroupView', () => {
     ).toBeTruthy()
   })
 
-  it('draws nothing for an empty group that was not capped', async () => {
-    await renderGroup(shown([]))
-
-    expect(screen.queryByRole('heading')).toBeNull()
-    expect(screen.queryByRole('table')).toBeNull()
+  it('counts an empty group that was not capped as having nothing to draw, which the screen uses to leave it out', () => {
+    expect(hasExpectationContent(shown([]))).toBe(false)
+    expect(hasExpectationContent(shown([], { isCapped: true }))).toBe(true)
+    expect(hasExpectationContent(shown([RENT]))).toBe(true)
+    expect(hasExpectationContent({ state: 'suppressed' })).toBe(true)
+    expect(hasExpectationContent({ state: 'failed' })).toBe(true)
   })
 
   it('keeps the capped line, linking to the recurring screen, even when no row is left to show', async () => {
