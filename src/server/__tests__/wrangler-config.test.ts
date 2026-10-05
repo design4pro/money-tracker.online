@@ -4,6 +4,10 @@ import { unstable_readConfig } from 'wrangler'
 import { describe, expect, it } from 'vitest'
 
 import { IMPORT_MAX_ROWS } from '#/server/import/types'
+import {
+  CLAIM_RETRY_DELAY_SECONDS,
+  CLAIM_TTL_SECONDS,
+} from '#/server/queue/claim'
 
 /**
  * The deployment config is a promise the code does not read: nothing parses `vars.IMPORT_MAX_ROWS`,
@@ -47,6 +51,17 @@ describe.each(configs)('wrangler.jsonc ($name)', ({ config }) => {
   it('produces to the queue it consumes', () => {
     expect(producer?.queue).toBeTruthy()
     expect(producer?.queue).toBe(consumer?.queue)
+  })
+
+  // A held claim is retried after CLAIM_RETRY_DELAY_SECONDS and each retry spends an attempt, so
+  // the attempts must outlast the claim's expiry or a claim could outlive the budget and lose a job.
+  // The consumer's own `retry_delay` applies only to a plain `retry()`, not to this one.
+  it('retries a held claim for longer than the claim lives', () => {
+    const maxRetries = consumer?.max_retries
+    expect(Number.isInteger(maxRetries)).toBe(true)
+    expect((maxRetries as number) * CLAIM_RETRY_DELAY_SECONDS).toBeGreaterThan(
+      CLAIM_TTL_SECONDS,
+    )
   })
 })
 

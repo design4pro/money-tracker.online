@@ -16,8 +16,11 @@ import { createMemorySink } from '#/server/observability/logger'
 
 import { handleTaskBatch } from '../dispatch'
 import { notInstalled } from '../handlers/not-installed'
+import { CLAIM_RETRY_DELAY_SECONDS, claimKey } from '../claim'
+import { fakeKv } from './fake-kv'
 
 import type { TaskContext, TaskHandlers } from '../dispatch'
+import type { FakeKv } from './fake-kv'
 
 interface FakeMessage {
   readonly id: string
@@ -48,11 +51,15 @@ function batchOf(...messages: Array<FakeMessage>) {
   }
 }
 
-const env = {
-  DB: {},
-  LOG_LEVEL: 'debug',
-  ENVIRONMENT: 'test',
-} as unknown as Env
+/** A fresh environment per case, so a claim one case leaves behind cannot hold the next. */
+function envWith(kv: FakeKv = fakeKv()) {
+  return {
+    DB: {},
+    KV: kv,
+    LOG_LEVEL: 'debug',
+    ENVIRONMENT: 'test',
+  } as unknown as Env
+}
 
 /** The five kinds whose handler lands with its own plan, as the registry installs them. */
 const notInstalledKinds = {
@@ -74,7 +81,7 @@ function run(
     ...notInstalledKinds,
     'billing.event': handler,
   }
-  const done = handleTaskBatch(batch, env, handlers, { ...options, sink })
+  const done = handleTaskBatch(batch, envWith(), handlers, { ...options, sink })
   return { sink, batch, done }
 }
 
@@ -282,7 +289,7 @@ describe('a known kind with no working handler', () => {
     const incomplete = {
       'billing.event': () => Promise.resolve(),
     } as unknown as TaskHandlers
-    await handleTaskBatch(batchOf(m), env, incomplete, { sink })
+    await handleTaskBatch(batchOf(m), envWith(), incomplete, { sink })
 
     expect(m.retry).toHaveBeenCalledTimes(1)
     expect(m.ack).not.toHaveBeenCalled()
@@ -294,6 +301,157 @@ describe('a known kind with no working handler', () => {
         messageId: 'm1',
       }),
     ])
+  })
+})
+
+/**
+ * The claim around the five new kinds: a concurrency guard, so a held claim is a delayed retry and
+ * never an acknowledgement, and a store that cannot answer is a retry that never runs the handler
+ * unguarded. The wrapper's own cases are in `claim.test.ts`.
+ */
+describe('the claim around a kind', () => {
+  const importExecute = {
+    kind: 'import.execute',
+    organizationId: 'org-a',
+    userId: 'user-1',
+    batchId: 'batch-1',
+  } as const
+  const key = claimKey(importExecute)
+
+  function runWith(
+    kv: FakeKv,
+    m: FakeMessage,
+    handler: TaskHandlers['import.execute'],
+  ) {
+    const sink = createMemorySink()
+    const handlers: TaskHandlers = {
+      ...notInstalledKinds,
+      'billing.event': () => Promise.resolve(),
+      'import.execute': handler,
+    }
+    const done = handleTaskBatch(batchOf(m), envWith(kv), handlers, { sink })
+    return { sink, done }
+  }
+
+  it('runs the handler under the claim, acknowledges, and leaves no claim behind', async () => {
+    const kv = fakeKv()
+    const m = message('m1', importExecute)
+    const inside: Array<boolean> = []
+    const { done } = runWith(kv, m, () => {
+      inside.push(kv.entries.has(key))
+      return Promise.resolve()
+    })
+    await done
+
+    expect(inside).toEqual([true])
+    expect(kv.entries.has(key)).toBe(false)
+    expect(m.ack).toHaveBeenCalledTimes(1)
+    expect(m.retry).not.toHaveBeenCalled()
+  })
+
+  it('retries a held claim with the 45 second delay, never runs the handler and never acknowledges', async () => {
+    const kv = fakeKv({ [key]: 'another-delivery' })
+    const m = message('m1', importExecute)
+    const handler = vi.fn(() => Promise.resolve())
+    const { done } = runWith(kv, m, handler)
+    await done
+
+    expect(handler).not.toHaveBeenCalled()
+    expect(m.retry).toHaveBeenCalledTimes(1)
+    expect(m.retry).toHaveBeenCalledWith({
+      delaySeconds: CLAIM_RETRY_DELAY_SECONDS,
+    })
+    expect(m.ack).not.toHaveBeenCalled()
+    expect(kv.entries.get(key)).toBe('another-delivery')
+  })
+
+  it('retries and releases the claim when the handler throws', async () => {
+    const kv = fakeKv()
+    const m = message('m1', importExecute, 2)
+    const { done, sink } = runWith(kv, m, () =>
+      Promise.reject(new Error('d1 down')),
+    )
+    await done
+
+    expect(kv.entries.has(key)).toBe(false)
+    expect(m.retry).toHaveBeenCalledTimes(1)
+    expect(m.ack).not.toHaveBeenCalled()
+    expect(sink.records.filter((r) => r.level === 'error')).toEqual([
+      expect.objectContaining({
+        msg: 'queue message failed',
+        kind: 'import.execute',
+        attempt: 2,
+        messageId: 'm1',
+      }),
+    ])
+  })
+
+  it.each(['get', 'put'] as const)(
+    'retries with an error log and runs no handler when the claim store fails on %s',
+    async (call) => {
+      const kv = fakeKv()
+      kv.fail[call] = new Error('kv unavailable')
+      const m = message('m1', importExecute)
+      const handler = vi.fn(() => Promise.resolve())
+      const { done, sink } = runWith(kv, m, handler)
+      await done
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(m.retry).toHaveBeenCalledTimes(1)
+      expect(m.ack).not.toHaveBeenCalled()
+      expect(sink.records.filter((r) => r.level === 'error')).toEqual([
+        expect.objectContaining({
+          msg: 'queue message failed',
+          kind: 'import.execute',
+          messageId: 'm1',
+        }),
+      ])
+    },
+  )
+
+  it('does not fail the message when the release throws', async () => {
+    const kv = fakeKv()
+    const m = message('m1', importExecute)
+    const { done, sink } = runWith(kv, m, () => {
+      kv.fail.delete = new Error('kv delete unavailable')
+      return Promise.resolve()
+    })
+    await done
+
+    expect(m.ack).toHaveBeenCalledTimes(1)
+    expect(m.retry).not.toHaveBeenCalled()
+    expect(sink.records.filter((r) => r.level === 'warn')).toEqual([
+      expect.objectContaining({ msg: 'task claim release failed', key }),
+    ])
+  })
+
+  it('takes no claim for a billing event', async () => {
+    // A store that fails every call would turn a claim into a retry, so an ack proves none was asked for.
+    const kv = fakeKv()
+    kv.fail.get = new Error('kv unavailable')
+    kv.fail.put = new Error('kv unavailable')
+    const sink = createMemorySink()
+    const handlers: TaskHandlers = {
+      ...notInstalledKinds,
+      'billing.event': () => Promise.resolve(),
+    }
+    const billing = billingMessage('m1')
+    await handleTaskBatch(batchOf(billing), envWith(kv), handlers, { sink })
+
+    expect(billing.ack).toHaveBeenCalledTimes(1)
+    expect(billing.retry).not.toHaveBeenCalled()
+    expect(kv.puts).toEqual([])
+  })
+
+  it('gives two workspaces with the same batch id separate claims', async () => {
+    const kv = fakeKv({ [key]: 'workspace-a-delivery' })
+    const other = message('m2', { ...importExecute, organizationId: 'org-b' })
+    const handler = vi.fn(() => Promise.resolve())
+    const { done } = runWith(kv, other, handler)
+    await done
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(other.ack).toHaveBeenCalledTimes(1)
   })
 })
 

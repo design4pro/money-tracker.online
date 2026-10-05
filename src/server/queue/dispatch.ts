@@ -7,8 +7,11 @@
  * the `workerd` project drive the dispatcher against real bindings without importing the
  * application.
  *
- * Dependency direction: this module imports the envelope, the database factory and the logger, and
- * nothing from `handlers/`, `repos/` or `cloudflare:workers`. The registry and the Worker entry
+ * Every kind but `billing.event` runs under the KV claim of `./claim`, a concurrency guard whose
+ * held case is a delayed retry. The billing event takes none: its row status is its idempotency.
+ *
+ * Dependency direction: this module imports the envelope, the claim, the database factory and the
+ * logger, and nothing from `handlers/`, `repos/` or `cloudflare:workers`. The registry and the Worker entry
  * import it, never the reverse.
  *
  * Messages are acknowledged or retried **one at a time**, never with `ackAll` or `retryAll`: a
@@ -18,6 +21,7 @@
 
 import { dbFromEnv } from '../db/from-env'
 import { loggerFromEnv } from '../observability/logger'
+import { CLAIM_RETRY_DELAY_SECONDS, claimKey, withTaskClaim } from './claim'
 import { parseTaskMessage } from './messages'
 
 import type { LogSink, Logger } from '../observability/logger'
@@ -123,11 +127,23 @@ export async function handleTaskBatch(
     }
 
     try {
-      const outcome = await runHandler(handlers, task, {
-        db: dbFromEnv(env),
-        logger,
-        now,
-      })
+      const ctx = { db: dbFromEnv(env), logger, now }
+      const run = () => runHandler(handlers, task, ctx)
+      const claimed =
+        task.kind === 'billing.event'
+          ? { held: true as const, result: await run() }
+          : await withTaskClaim(env.KV, claimKey(task), run, logger)
+      if (!claimed.held) {
+        // Another delivery is running this job. Acknowledging would lose it if that worker
+        // crashed, so it comes back after a delay; the claim's expiry is what ends a crashed hold.
+        logger.info('queue message claim is held', {
+          kind: task.kind,
+          messageId: message.id,
+        })
+        message.retry({ delaySeconds: CLAIM_RETRY_DELAY_SECONDS })
+        continue
+      }
+      const outcome = claimed.result
       if (isPermanentRefusal(outcome)) {
         logger.error('queue message refused permanently', undefined, {
           kind: task.kind,
