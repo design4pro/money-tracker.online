@@ -158,9 +158,10 @@ file is allowed; printing a value is not.
 
 ## Process and skills
 
-- The pipeline is the `om-*` skill collection, vendored in `.claude/skills/om-*` at the SHA recorded
-  in `skills-lock.json` (`pnpm install-skills` refreshes it; the lock moves in the same commit) and
-  configured by `.ai/agentic.config.json`. Tracker operations are
+- The pipeline is the `om-*` skill collection, vendored in `.claude/skills/om-*`: the committed tree
+  is what pins it, and `skills-lock.json` records a per-skill `computedHash` of each entry point,
+  not a SHA (`pnpm install-skills` refreshes both; they move in the same commit). It is configured
+  by `.ai/agentic.config.json`. Tracker operations are
   defined in `.ai/trackers/github.md`, browser operations in `.ai/browsers/playwright.md`.
 - Repo-specific rules for a skill live in `.ai/skills/om-<name>/SKILL.md` and extend the installed
   skill; they never relax its safety rules.
