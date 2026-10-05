@@ -244,6 +244,9 @@ function SeriesDetailRoute() {
         <PeriodGrid
           periods={periods}
           isReadOnly={!series.isActive}
+          openPeriodStart={
+            pending.kind === 'markPaid' ? pending.period.periodStart : null
+          }
           onMarkPaid={(period) => setPending({ kind: 'markPaid', period })}
           onSkip={(period) => {
             void skipPeriod({

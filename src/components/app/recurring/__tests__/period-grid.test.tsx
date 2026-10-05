@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { asMinor } from '#/lib/money'
@@ -95,7 +96,7 @@ describe('PeriodGrid', () => {
     )
 
     const button = screen.getByRole('button', {
-      name: 'Mark the period due Apr 1, 2026 as paid',
+      name: 'Mark paid, period due Apr 1, 2026',
     })
     await userEvent.click(button)
 
@@ -106,10 +107,10 @@ describe('PeriodGrid', () => {
   it('offers undo instead of mark-paid once a period has settled', () => {
     grid([period({ derivedStatus: 'skipped' })])
     expect(
-      screen.getByRole('button', { name: /^Undo the period due/ }),
+      screen.getByRole('button', { name: /^Undo, period due/ }),
     ).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: /^Mark the period/ }),
+      screen.queryByRole('button', { name: /^Mark paid, period due/ }),
     ).toBeNull()
   })
 
@@ -122,5 +123,88 @@ describe('PeriodGrid', () => {
   it('says there is no history rather than drawing an empty table', () => {
     grid([])
     expect(screen.queryByRole('table')).toBeNull()
+  })
+})
+
+/**
+ * The row stays when it is acted on, so focus follows the button that replaces the one pressed
+ * (WCAG 2.4.3): Undo after Skip, Mark paid after Undo.
+ */
+function Settling() {
+  const [periods, setPeriods] = useState([
+    period({ periodStart: '2026-03-01', dueOn: '2026-03-01' }),
+    period({ periodStart: '2026-04-01', dueOn: '2026-04-01' }),
+  ])
+  const set = (start: string, derivedStatus: 'skipped' | 'upcoming') =>
+    setPeriods((current) =>
+      current.map((row) =>
+        row.periodStart === start ? { ...row, derivedStatus } : row,
+      ),
+    )
+  return (
+    <PeriodGrid
+      periods={periods}
+      onMarkPaid={noop}
+      onSkip={(row) => set(row.periodStart, 'skipped')}
+      onRevert={(row) => set(row.periodStart, 'upcoming')}
+    />
+  )
+}
+
+describe('PeriodGrid focus', () => {
+  it('lands on Undo in the row that was skipped, then on Mark paid after Undo', async () => {
+    const user = userEvent.setup()
+    renderRecurring(<Settling />)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Skip, period due Apr 1, 2026' }),
+    )
+    const undo = screen.getByRole('button', {
+      name: 'Undo, period due Apr 1, 2026',
+    })
+    await waitFor(() => expect(document.activeElement).toBe(undo))
+
+    await user.click(undo)
+    const markPaid = screen.getByRole('button', {
+      name: 'Mark paid, period due Apr 1, 2026',
+    })
+    await waitFor(() => expect(document.activeElement).toBe(markPaid))
+  })
+
+  it('focuses the Mark paid of the reopened period when the picker closes without a save', async () => {
+    function Reopened() {
+      const [open, setOpen] = useState<string | null>('2026-04-01')
+      return (
+        <>
+          <PeriodGrid
+            periods={[
+              period({ periodStart: '2026-03-01', dueOn: '2026-03-01' }),
+              period({ periodStart: '2026-04-01', dueOn: '2026-04-01' }),
+            ]}
+            openPeriodStart={open}
+            onMarkPaid={noop}
+            onSkip={noop}
+            onRevert={noop}
+          />
+          {open === null ? null : (
+            <button type="button" autoFocus onClick={() => setOpen(null)}>
+              Close the picker
+            </button>
+          )}
+        </>
+      )
+    }
+    const user = userEvent.setup()
+    renderRecurring(<Reopened />)
+
+    await user.click(screen.getByRole('button', { name: 'Close the picker' }))
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', {
+          name: 'Mark paid, period due Apr 1, 2026',
+        }),
+      ),
+    )
   })
 })

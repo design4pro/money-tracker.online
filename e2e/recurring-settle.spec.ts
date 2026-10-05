@@ -60,20 +60,20 @@ test.describe('write flows', () => {
           .getByRole('row')
           .filter({ hasText: name })
           .filter({
-            has: page.getByRole('button', { name: /^Mark the period/ }),
+            has: page.getByRole('button', { name: /^Mark paid, period due/ }),
           })
       await expect(row(fixture.seriesName)).toHaveCount(2)
 
       // Skip the first period from its own row.
       await row(fixture.seriesName)
         .first()
-        .getByRole('button', { name: /^Skip the period/ })
+        .getByRole('button', { name: /^Skip, period due/ })
         .click()
       await expect(row(fixture.seriesName)).toHaveCount(1)
 
       // Mark paid opens the dialog on the other one, and the picker has nothing to offer.
       await row(fixture.seriesName)
-        .getByRole('button', { name: /^Mark the period/ })
+        .getByRole('button', { name: /^Mark paid, period due/ })
         .click()
       const dialog = page.getByRole('dialog')
       await expect(
@@ -102,7 +102,7 @@ test.describe('write flows', () => {
     try {
       await gotoApp(page, '/recurring')
       const row = page.getByRole('row').filter({ hasText: fixture.seriesName })
-      await row.getByRole('button', { name: /^Mark the period/ }).click()
+      await row.getByRole('button', { name: /^Mark paid, period due/ }).click()
 
       const dialog = page.getByRole('dialog')
       await dialog.getByRole('button', { name: 'Record the payment' }).click()
@@ -152,7 +152,7 @@ test.describe('write flows', () => {
     const fixture = await installFor(uniqueToken('detail'), periods)
     try {
       await gotoApp(page, `/recurring/${fixture.seriesId}`)
-      await page.getByRole('button', { name: /^Mark the period/ }).click()
+      await page.getByRole('button', { name: /^Mark paid, period due/ }).click()
       await page
         .getByRole('dialog')
         .getByRole('button', { name: 'Record the payment' })
@@ -232,17 +232,17 @@ test.describe('read-only, on the demo workspace', () => {
     ).toBeVisible()
 
     const dataRows = table.getByRole('row').filter({
-      has: page.getByRole('button', { name: /^Mark the period/ }),
+      has: page.getByRole('button', { name: /^Mark paid, period due/ }),
     })
     const count = await dataRows.count()
     expect(count).toBeGreaterThan(0)
     for (let index = 0; index < count; index += 1) {
       const row = dataRows.nth(index)
       await expect(
-        row.getByRole('button', { name: /^Skip the period/ }),
+        row.getByRole('button', { name: /^Skip, period due/ }),
       ).toBeVisible()
       await expect(
-        row.getByRole('button', { name: /Undo the period/ }),
+        row.getByRole('button', { name: /^Undo, period due/ }),
       ).toHaveCount(0)
     }
     await expectNoSeriousViolations(page, '/recurring (due soon with actions)')

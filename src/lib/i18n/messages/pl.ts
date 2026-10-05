@@ -1827,16 +1827,14 @@ const messages = {
   'recurring.periods.notSettled': 'Nieuregulowany',
 
   'recurring.period.markPaid': 'Oznacz jako opłacone',
-  'recurring.period.markPaid.for':
-    'Oznacz okres z terminem {date} jako opłacony',
+  'recurring.period.markPaid.for': 'Oznacz jako opłacone, termin {date}',
   'recurring.period.markPaid.forSeries':
-    'Oznacz okres z terminem {date} dla {series} jako opłacony',
+    'Oznacz jako opłacone, termin {date}, {series}',
   'recurring.period.skip': 'Pomiń',
-  'recurring.period.skip.for': 'Pomiń okres z terminem {date}',
-  'recurring.period.skip.forSeries':
-    'Pomiń okres z terminem {date} dla {series}',
+  'recurring.period.skip.for': 'Pomiń, termin {date}',
+  'recurring.period.skip.forSeries': 'Pomiń, termin {date}, {series}',
   'recurring.period.revert': 'Cofnij',
-  'recurring.period.revert.for': 'Cofnij okres z terminem {date}',
+  'recurring.period.revert.for': 'Cofnij, termin {date}',
 
   /* -- Oznaczanie jako opłacone ---------------------------------------------- */
   'recurring.markPaid.title': 'Oznacz ten okres jako opłacony',
@@ -1850,6 +1848,12 @@ const messages = {
   'recurring.markPaid.recordHint':
     'Po zapisaniu wrócisz tutaj, aby ją połączyć.',
   'recurring.markPaid.confirm': 'Połącz',
+  'recurring.markPaid.status.found': {
+    one: '{count} transakcja do wyboru',
+    few: '{count} transakcje do wyboru',
+    many: '{count} transakcji do wyboru',
+    other: '{count} transakcji do wyboru',
+  },
   'recurring.markPaid.never':
     'Oznaczenie jako opłaconego nigdy nie tworzy nowego wpisu.',
   /* -- Automatyzacja --------------------------------------------------------- */

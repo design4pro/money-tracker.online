@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 
 import { Card } from '#/components/ui'
@@ -6,6 +7,10 @@ import { formatMoney, makeMoney } from '#/lib/money'
 
 import { PeriodActions } from './period-actions'
 import { PeriodStatusBadge } from './period-status'
+import {
+  ROW_KEY_ATTRIBUTE,
+  useRowFocusRecovery,
+} from './use-row-focus-recovery'
 
 import type { UpcomingPeriod } from '#/server/repos/recurring'
 
@@ -31,25 +36,54 @@ import type { UpcomingPeriod } from '#/server/repos/recurring'
  *
  * The callbacks are the route's, because they perform writes; the panel hands each the whole
  * period so the route can find the series it belongs to.
+ *
+ * ## Where focus goes when a row leaves
+ *
+ * Skipping a period or saving the mark-paid dialog removes the row that held focus, and focus
+ * would fall to the top of the page. The panel puts it on the Mark paid button of the row that
+ * took the removed row's place, on the new last row's, or on its own heading when the list is
+ * empty - see {@link useRowFocusRecovery}. The route says which period its dialog is open on with
+ * `openPeriod`, which is also how the `?markPaid=` reopen path, which has no trigger to restore
+ * to, gets its focus back when the picker closes.
  */
 
 export interface UpcomingPanelProps {
   readonly upcoming: ReadonlyArray<UpcomingPeriod>
+  /** The period the route's mark-paid dialog is open on, if any. */
+  readonly openPeriod?: Pick<UpcomingPeriod, 'seriesId' | 'periodStart'> | null
   readonly onMarkPaid: (period: UpcomingPeriod) => void
   readonly onSkip: (period: UpcomingPeriod) => void
 }
 
+const rowKey = (period: Pick<UpcomingPeriod, 'seriesId' | 'periodStart'>) =>
+  `${period.seriesId}:${period.periodStart}`
+
 export function UpcomingPanel({
   upcoming,
+  openPeriod = null,
   onMarkPaid,
   onSkip,
 }: UpcomingPanelProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const { remember } = useRowFocusRecovery({
+    rows: upcoming,
+    rowKey,
+    openKey: openPeriod === null ? null : rowKey(openPeriod),
+    rootRef,
+    fallbackRef: headingRef,
+  })
 
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-subtitle font-semibold text-ink">
+      <h2
+        ref={headingRef}
+        // Focusable by script only: it is where focus lands when the last row is settled.
+        tabIndex={-1}
+        className="rounded-sm text-subtitle font-semibold text-ink outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+      >
         {t('recurring.upcoming.title')}
       </h2>
 
@@ -57,6 +91,7 @@ export function UpcomingPanel({
         <p className="text-body text-ink-2">{t('recurring.upcoming.empty')}</p>
       ) : (
         <div
+          ref={rootRef}
           role="region"
           aria-label={t('recurring.upcoming.title')}
           tabIndex={0}
@@ -103,7 +138,8 @@ export function UpcomingPanel({
             <tbody>
               {upcoming.map((period) => (
                 <tr
-                  key={`${period.seriesId}:${period.periodStart}`}
+                  key={rowKey(period)}
+                  {...{ [ROW_KEY_ATTRIBUTE]: rowKey(period) }}
                   className="border-b border-border-subtle last:border-b-0"
                 >
                   <th
@@ -116,7 +152,7 @@ export function UpcomingPanel({
                     <Link
                       to="/recurring/$seriesId"
                       params={{ seriesId: period.seriesId }}
-                      className="rounded-sm text-ink underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+                      className="inline-flex target-min-h target-min-w items-center rounded-sm text-ink underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
                     >
                       {period.seriesName}
                     </Link>
@@ -139,7 +175,10 @@ export function UpcomingPanel({
                       seriesName={period.seriesName}
                       compact
                       onMarkPaid={() => onMarkPaid(period)}
-                      onSkip={() => onSkip(period)}
+                      onSkip={() => {
+                        remember(rowKey(period))
+                        onSkip(period)
+                      }}
                     />
                   </td>
                 </tr>

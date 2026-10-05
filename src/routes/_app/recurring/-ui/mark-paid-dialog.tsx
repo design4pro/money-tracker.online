@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { parseDate } from '@internationalized/date'
 
-import { MarkPaidEmpty } from '#/components/app/recurring'
+import { MarkPaidEmpty, MarkPaidStatus } from '#/components/app/recurring'
 import { ErrorPanel } from '#/components/app/shell'
 import {
   Button,
@@ -55,6 +55,13 @@ import type { RecurringSeries, Transaction } from '#/server/db/types'
  * Picking exactly one thing from a short list, with the choice visible without opening anything,
  * is what a radio group is. Each option's label carries the date, the amount and the payee, so the
  * announcement a screen reader makes is enough to choose on without moving focus anywhere else.
+ *
+ * ## One live region says what changed
+ *
+ * The list arrives after the dialog opens and moves nothing, so a screen reader would hear
+ * silence. {@link MarkPaidStatus} is mounted on the first render and announces loading, then the
+ * count or the empty state; the visible loading line is hidden from assistive technology so
+ * loading is not said twice.
  */
 
 export interface MarkPaidDialogProps {
@@ -162,6 +169,11 @@ export function MarkPaidDialog({
             />
 
             <DialogBody className="flex flex-col gap-4">
+              <MarkPaidStatus
+                candidateCount={rows === null ? null : rows.length}
+                hasFailed={failure !== null}
+              />
+
               {failure === null ? null : (
                 <ErrorPanel
                   title={t('recurring.toast.failed')}
@@ -171,7 +183,11 @@ export function MarkPaidDialog({
               )}
 
               {rows === null ? (
-                <p className="flex items-center gap-2 text-body text-ink-2">
+                // Hidden from assistive technology: the status region above announces loading.
+                <p
+                  aria-hidden="true"
+                  className="flex items-center gap-2 text-body text-ink-2"
+                >
                   <Spinner aria-hidden="true" />
                   {t('recurring.candidates.loading')}
                 </p>

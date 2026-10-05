@@ -818,10 +818,32 @@ the series detail grid and _Due soon_ on `/recurring`.
 - **The states:** the ordinary button states. There is no hover-only affordance - every action is a
   `<button>` reachable by Tab in reading order.
 - **What carries the meaning when the colour does not:** the label is a word, and the accessible
-  name carries the row's due date (_"Mark the period due 1 March as paid"_), because a column of
-  identical labels is three identical announcements. A surface that mixes series (_Due soon_)
-  also passes the series name (_"... due 1 March for Rent as paid"_), since two bills can fall due on
-  the same day.
+  name starts with it and then carries the row's due date (_"Mark paid, period due 1 March"_,
+  _"Skip, period due 1 March"_, _"Undo, period due 1 March"_), so voice control's "click Mark paid"
+  finds the button (WCAG 2.5.3) and a column of identical labels is still not three identical
+  announcements. A surface that mixes series (_Due soon_) also passes the series name
+  (_"Skip, period due 1 March, Rent"_), since two bills can fall due on the same day. The Polish
+  names follow the same order (_"Pomiń, termin 1 mar 2026, Czynsz"_).
+- **Where focus goes when the row changes (2.4.3):** the pressed button is replaced or its row is
+  gone, and focus would fall to `<body>`. It moves only after the dialog has closed and only while
+  focus is lost, so a cancelled dialog's own restore-to-trigger is left alone.
+  - _Due soon_, after Skip or after a save from the dialog, once the refreshed list has rendered:
+    the _Mark paid_ of the row now at the removed row's position, the new last row's when the last
+    one went, or the _Due soon_ heading (`tabIndex={-1}`) when the list is empty.
+  - The series grid, after Skip, a save or Undo: the replacement button in the same row (_Undo_
+    after Skip or a save, _Mark paid_ after Undo).
+  - The `?markPaid=` reopen path has no trigger, so closing the picker without a save focuses that
+    period's _Mark paid_ if the row is still listed, otherwise the heading; with a save the rules
+    above apply.
+- **The mark-paid dialog says what it is doing (4.1.3):** one visually hidden `role="status"`
+  region, mounted on the dialog's first render, announces loading, then the candidate count
+  (plural machinery) or the empty copy, and nothing on a failure because the error panel is an
+  alert. The visible loading line is hidden from assistive technology.
+- **The series link in _Due soon_** carries the claimed target size on both axes (`target-min-h`,
+  `target-min-w`, vertically centred `inline-flex`); the `sm` button keeps its size.
+- **Reflow:** both tables are two-dimensional and rely on the data-table exception of 1.4.10, so
+  at 360px the actions column scrolls with the table. A stacked layout below `sm` is deliberately
+  not done here (#543).
 - **The one thing it is not:** a row menu. The actions are visible buttons on purpose; burying
   _Mark paid_ behind a menu adds a click to the only thing the table is for.
 
