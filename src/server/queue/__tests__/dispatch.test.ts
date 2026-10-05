@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemorySink } from '#/server/observability/logger'
 
 import { handleTaskBatch } from '../dispatch'
+import { notInstalled } from '../handlers/not-installed'
 
 import type { TaskContext, TaskHandlers } from '../dispatch'
 
@@ -26,8 +27,8 @@ interface FakeMessage {
   retry: ReturnType<typeof vi.fn>
 }
 
-function message(id: string, body: unknown): FakeMessage {
-  return { id, body, attempts: 1, ack: vi.fn(), retry: vi.fn() }
+function message(id: string, body: unknown, attempts = 1): FakeMessage {
+  return { id, body, attempts, ack: vi.fn(), retry: vi.fn() }
 }
 
 function billingMessage(id: string, eventId = `evt_${id}`): FakeMessage {
@@ -53,6 +54,15 @@ const env = {
   ENVIRONMENT: 'test',
 } as unknown as Env
 
+/** The five kinds whose handler lands with its own plan, as the registry installs them. */
+const notInstalledKinds = {
+  'import.parse': notInstalled('import.parse'),
+  'import.execute': notInstalled('import.execute'),
+  'import.revert': notInstalled('import.revert'),
+  'export.build': notInstalled('export.build'),
+  'backup.run': notInstalled('backup.run'),
+} satisfies Omit<TaskHandlers, 'billing.event'>
+
 function run(
   messages: Array<FakeMessage>,
   handler: TaskHandlers['billing.event'],
@@ -60,7 +70,10 @@ function run(
 ) {
   const sink = createMemorySink()
   const batch = batchOf(...messages)
-  const handlers: TaskHandlers = { 'billing.event': handler }
+  const handlers: TaskHandlers = {
+    ...notInstalledKinds,
+    'billing.event': handler,
+  }
   const done = handleTaskBatch(batch, env, handlers, { ...options, sink })
   return { sink, batch, done }
 }
@@ -204,6 +217,83 @@ describe('handleTaskBatch', () => {
       route: 'money-tracker-tasks',
       environment: 'test',
     })
+  })
+})
+
+/**
+ * A kind the envelope knows and no plan has installed a handler for yet. Acknowledging it would lose
+ * the job, so it is retried, and the retry limit sends it to the dead-letter queue.
+ */
+describe('a known kind with no working handler', () => {
+  const importParse = {
+    kind: 'import.parse',
+    organizationId: 'org-a',
+    userId: 'user-1',
+    batchId: 'batch-1',
+  }
+
+  it('retries a message for a not-installed handler, with an error log naming kind, attempt and message id', async () => {
+    const m = message('m1', importParse, 3)
+    const { done, sink, batch } = run([m], () => Promise.resolve())
+    await done
+
+    expect(m.retry).toHaveBeenCalledTimes(1)
+    expect(m.ack).not.toHaveBeenCalled()
+    expect(batch.ackAll).not.toHaveBeenCalled()
+    expect(sink.records.filter((r) => r.level === 'error')).toEqual([
+      expect.objectContaining({
+        msg: 'queue message failed',
+        kind: 'import.parse',
+        attempt: 3,
+        messageId: 'm1',
+        errorName: 'HandlerNotInstalledError',
+      }),
+    ])
+  })
+
+  it('retries every one of the five not-installed kinds, never an ack', async () => {
+    const bodies = [
+      importParse,
+      { ...importParse, kind: 'import.execute' },
+      { ...importParse, kind: 'import.revert' },
+      {
+        kind: 'export.build',
+        organizationId: 'org-a',
+        userId: 'user-1',
+        jobId: 'job-1',
+      },
+      { kind: 'backup.run', date: '2026-10-04' },
+    ]
+    const messages = bodies.map((body, i) => message(`m${i}`, body))
+    const { done } = run(messages, () => Promise.resolve())
+    await done
+
+    for (const m of messages) {
+      expect(m.retry).toHaveBeenCalledTimes(1)
+      expect(m.ack).not.toHaveBeenCalled()
+    }
+  })
+
+  it('retries, with an error log, when the registry has no entry for the kind at all', async () => {
+    const m = message('m1', importParse, 2)
+    const sink = createMemorySink()
+    // A registry built before a kind existed, or by a cast: the type says this cannot happen, so
+    // the runtime must not turn it into an acknowledgement.
+    const incomplete = {
+      'billing.event': () => Promise.resolve(),
+    } as unknown as TaskHandlers
+    await handleTaskBatch(batchOf(m), env, incomplete, { sink })
+
+    expect(m.retry).toHaveBeenCalledTimes(1)
+    expect(m.ack).not.toHaveBeenCalled()
+    expect(sink.records.filter((r) => r.level === 'error')).toEqual([
+      expect.objectContaining({
+        msg: 'queue message failed',
+        kind: 'import.parse',
+        attempt: 2,
+        messageId: 'm1',
+      }),
+    ])
   })
 })
 
