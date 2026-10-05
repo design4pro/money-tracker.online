@@ -84,17 +84,47 @@ Four properties of that shape are load-bearing:
 
 ### 2.3 A queue message
 
-`queue()` receives a batch (max 10, 5s timeout, 4 consumers in production). Every handler:
+`queue()` receives a batch (max 10, 5s timeout, 4 consumers in production) and passes it to the
+dispatcher, `handleTaskBatch` in `src/server/queue/dispatch.ts`, which settles each message on its own:
+never `ackAll`, never `retryAll`, so one throw does not redeliver the nine messages that succeeded.
+The handler for a kind is one entry of the registry in `src/server/queue/handlers/index.ts`, typed so
+that a kind without an entry does not compile. A plan that owns a job kind writes one handler file and
+replaces its entry; `worker.ts` and the dispatcher are not edited. For each message:
 
-1. Claims the message by its envelope id in KV (`task:claim:v1:<id>`, 120s), releasing the claim on
-   throw. A duplicate delivery finds the claim and acks without re-doing the work.
-2. Opens `runWithLedgerBatch`.
-3. Does its job.
-4. Acks, or throws to retry. Five retries in production, three in staging, then the dead-letter
-   queue; the DLQ body is written to R2 under `dlq/` so it is inspectable after the message is gone.
+1. **Parse.** The body is parsed against the envelope union (§6). A body no handler in this deploy
+   recognises is acked with a warning, because retrying it five times only fills the dead-letter queue
+   with no more information than the first attempt had.
+2. **Claim.** Every kind but `billing.event` takes a claim in KV, `task:claim:v1:<kind>:<orgId>:<identity>`
+   (120s; §3.1), where the identity is the batch, the job or the backup day and `backup.run`, which has
+   no workspace, carries the literal `platform` in the workspace position. **A held claim is a delayed retry, never an ack**: the message comes back after 45s,
+   because acking a duplicate loses the job when the first worker crashed without releasing. The claim
+   is released in a `finally`, by token: the value is a random per-delivery token and the key is deleted
+   only while it still holds this delivery's token, so a slow worker that outlived the 120s expiry cannot
+   delete a claim a second worker has since taken. A crash never runs the `finally`; the expiry is the
+   safety net. A claim read or write that throws is a throw before the handler, so the handler never runs
+   unguarded. `billing.event` takes none: its `billing_events` row status is its idempotency.
+3. **Run.** The handler opens `runWithLedgerBatch`, does its job, and returns, or returns a permanent
+   refusal (§6), or throws.
+4. **Settle.** Returning acks. A permanent refusal acks and logs at `error` with ids only. A throw
+   retries, with an `error` log naming the kind, the attempt and the message id; that includes a known
+   kind whose handler is not installed yet, which is retried and never acked. Five retries in
+   production, three in staging, then the dead-letter queue. What happens to the body there is §6.
 
-Job kinds: `email`, `import.parse`, `import.execute`, `import.revert`, `export`, `backup`,
-`ledger.rebuild`, `fx.refresh`, `recurring.materialise`, `notify.fanout`.
+**The claim is a concurrency guard, not the correctness mechanism.** Workers KV has no compare-and-swap,
+so two deliveries can both read "free" and both write. What makes a doubled run safe is each handler's
+own D1 state: the batch's `imported_count` as the resume cursor, the export job's row status. Every
+retry of a held claim spends an attempt, so `max_retries` times the 45s delay must exceed the 120s expiry
+in both environments; `src/server/__tests__/wrangler-config.test.ts` asserts it.
+
+**A continuation is enqueued with a delay.** A handler that enqueues the next chunk of its own job does
+so while still holding the claim, so a continuation sent with no delay is delivered into a held claim.
+Enqueue it with `delaySeconds` of at least `CLAIM_RETRY_DELAY_SECONDS` (`src/server/queue/claim.ts`), or
+treat a claim-held retry as normal.
+
+Kinds in the envelope today: `billing.event`, handled, and `import.parse`, `import.execute`,
+`import.revert`, `export.build` and `backup.run`, which parse but have no handler installed yet (plans 19
+and 20). Planned and not in the envelope: `email`, `ledger.rebuild`, `fx.refresh`, `recurring.materialise`,
+`notify.fanout`.
 
 ### 2.4 A scheduled invocation
 
@@ -106,7 +136,7 @@ in `wrangler.jsonc` that quietly runs nothing is indistinguishable from a health
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `*/15 * * * *` | **Reminder and due sweep.** Scans for recurring series due, budgets that crossed a threshold, and tag reminders that fire. Dedupe marker written to KV **after** dispatch. |
 | `7 * * * *`    | **Recurring auto-record.** Materialises `recurring_periods` whose `auto_record` is set and whose due instant has passed.                                                   |
-| `0 3 * * *`    | **Nightly.** FX refresh for every pair any workspace holds; full balance-history revaluation sweep; D1 logical backup to R2; expired export artefact prune.                |
+| `0 3 * * *`    | **Nightly.** FX refresh for every pair any workspace holds; full balance-history revaluation sweep; per-workspace JSON backups to R2; expired export artefact prune.       |
 | `17 4 * * 1`   | **Weekly.** Platform audit-log prune (400-day retention), provider usage roll-up, orphaned R2 object sweep.                                                                |
 
 Staging runs only `0 3 * * *`, so a staging deploy cannot fan out reminders to real inboxes.
@@ -126,9 +156,9 @@ by the same scan, not a hand-maintained index.
 | Binding               | Type                           | Holds                                                                                                               | Written by                             |
 | --------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | `DB`                  | D1 `money-tracker-db`          | All domain tables and all Better Auth tables. `migrations_dir: drizzle`                                             | server functions, queue handlers, cron |
-| `KV`                  | KV                             | Plan-state cache (60s), queue idempotency claims, FX day-cache, import-preset fingerprints, reminder dedupe markers | mutations, webhook, queue, cron        |
+| `KV`                  | KV                             | Plan-state cache (60s), queue concurrency claims, FX day-cache, import-preset fingerprints, reminder dedupe markers | mutations, webhook, queue, cron        |
 | `SESSIONS`            | KV                             | Better Auth secondary storage: sessions, OAuth state, rate-limit counters (60s TTL floor)                           | sign-in, refresh, sign-out             |
-| `FILES`               | R2 `money-tracker-files`       | Uploaded import files, generated exports, receipt attachments, dead-letter bodies, nightly D1 backups               | upload server fn, queue handlers, cron |
+| `FILES`               | R2 `money-tracker-files`       | Uploaded import files, generated exports, receipt attachments, per-workspace JSON backups (§3.2)                    | upload server fn, queue handlers, cron |
 | `LEDGER`              | Durable Object `AccountLedger` | **A lock and a dirty bit. No ledger data.** Addressed `idFromName(accountId)`                                       | the ledger queue handler               |
 | `TASKS`               | Queue                          | Every asynchronous job                                                                                              | server functions, cron                 |
 | `AI`                  | Workers AI (staging first)     | Import column-mapping assistance and statement extraction, always review-before-write                               | import queue handlers                  |
@@ -143,7 +173,7 @@ That is the whole reason for the second namespace and it is worth the extra bind
 | -------------------------------------- | ------------------------ | ------------------------------------------------------- |
 | `billing:plan:v1:<org>`                | 60s                      | Resolved **plan state only**. Usage is always read live |
 | `billing:polar-event:v1:<id>`          | 120s claim → 72h handled | Webhook dedupe                                          |
-| `task:claim:v1:<id>`                   | 120s                     | Queue idempotency claim, released on throw              |
+| `task:claim:v1:<kind>:<org>:<id>`      | 120s                     | Queue concurrency claim, released by token in `finally` |
 | `fx:day:v1:<base>:<quote>:<date>`      | 36h                      | Resolved rate for a pair on a day                       |
 | `import:preset:v1:<org>:<fingerprint>` | 90d                      | Header-row fingerprint → saved mapping                  |
 | `remind:v1:<kind>:<entity>:<date>`     | 8d                       | Reminder dedupe, written **after** dispatch             |
@@ -154,12 +184,18 @@ because a KV value with a stale shape read by new code is a class of bug that is
 ### 3.2 R2 key layout
 
 ```
-imports/<orgId>/<batchId>/source.<ext>         the uploaded file, as uploaded
-exports/<orgId>/<jobId>/export.<json|csv>      generated, with an `expires_at` in D1
-attachments/<orgId>/<txId>/<attachmentId>      receipts
-backups/<env>/<YYYY-MM-DD>/d1.jsonl.gz         nightly logical backup
-dlq/<queue>/<YYYY-MM-DD>/<messageId>.json      dead-letter body
+imports/<orgId>/<batchId>/<filename>               the uploaded file
+attachments/<orgId>/<transactionId>/<attachmentId> receipts
+exports/<orgId>/<jobId>.<zip|json>                 generated, with an `expires_at` in D1
+backups/<orgId>/<yyyy-mm-dd>.json                  one workspace's backup for one day
+dlq/<queue>/<messageId>.json                       dead-letter envelope: planned, nothing writes it
 ```
+
+The workspace is always the second segment of a tenant family, so a sweep of one workspace is one prefix
+list per family, and a reader can refuse an address that belongs to another workspace. `dlq/` is
+platform-level and carries none. There is one bucket per environment, so no key carries the environment.
+`src/server/files/keys.ts` builds the last three and holds the prefix helper `orgPrefix` and the guard
+`assertKeyInOrg`; `importFileKey` and `attachmentKey` stay in their repositories.
 
 **No object is ever served from a public bucket URL.** Everything goes through `/api/files/$id`,
 which resolves the row in the caller's tenant scope first and streams from R2 second, supporting
@@ -256,25 +292,53 @@ to `account_balances` from outside `src/server/ledger` is a defect.
 
 ## 6. Queue envelope and retry policy
 
-```ts
-type TaskEnvelope<K extends TaskKind> = {
-  v: 1
-  id: string // idempotency key; the KV claim is keyed on it
-  kind: K
-  orgId: string | null // null only for platform-level jobs
-  payload: TaskPayload[K]
-  enqueuedAt: number
-  attempt?: number
-}
-```
+The envelope is a **flat object per kind**, one member of the union in `src/server/queue/messages.ts`.
+Each is a `z.strictObject` with a `kind` literal and the fields that kind needs, and there is **no
+version field and no `payload` wrapper**: a new `kind` is the versioning mechanism, and the old kind
+keeps its handler for one release (`BACKWARD_COMPATIBILITY.md`, "Queue messages").
+
+| Kind             | Fields                                |
+| ---------------- | ------------------------------------- |
+| `billing.event`  | `eventId`                             |
+| `import.parse`   | `organizationId`, `userId`, `batchId` |
+| `import.execute` | `organizationId`, `userId`, `batchId` |
+| `import.revert`  | `organizationId`, `userId`, `batchId` |
+| `export.build`   | `organizationId`, `userId`, `jobId`   |
+| `backup.run`     | `date` (`YYYY-MM-DD`), `cursor?`      |
+
+Every id matches `^[A-Za-z0-9_-]{1,64}$`, so an id cannot carry a slash, a space or a control character
+into a KV key or an R2 key. `date` is a real calendar day. **An envelope carries ids, one date and one
+pagination cursor, and never a value that is also stored in a row** (an amount, a rate, a role, a
+status); `envelope.test.ts` holds this as an allow-list over the union. `backup.run` is the one kind
+without `organizationId`: it is platform-level and its handler enumerates workspaces itself.
 
 - `QUEUE_BATCH_BYTE_CAP = 256_000` — a producer that would exceed it splits rather than truncates.
 - Production: `max_batch_size 10`, `max_batch_timeout 5`, `max_retries 5`, `max_concurrency 4`,
   `retry_delay 10`. Staging: retries 3, concurrency 2.
 - **Dead-letter queues exist before the first deploy.** A consumer configured with a DLQ that does
   not exist fails to deploy, and discovering that during an incident is the worst possible time.
-- A handler that throws a `PermanentTaskError` acks and writes the body to `dlq/` rather than
-  retrying five times against a failure that cannot succeed.
+- **A permanent refusal, not a permanent-error class.** A `PermanentTaskError` is not implemented and
+  is not the design. A handler that must never succeed (a workspace or batch that does not match the
+  envelope) returns `{ permanent: string }`; the dispatcher acks it and logs at `error` with ids only.
+  The string is the handler's own label and is not logged, because a free-form reason is how a row value
+  ends up in a log line.
+- **The identity fields are a claim, never an authorisation.** `organizationId` and `userId` find a
+  scope; a handler for a tenant kind then does all four, in this order, and each handler's
+  tenant-isolation case proves each one: (1) `memberScopeFor` re-reads the role from `member` and returns
+  `null` for a person who has left, which is a permanent refusal; (2) the batch or job is loaded through
+  that scope, and a `NotFoundError` is a permanent refusal; (3) the loaded row's creator is the
+  envelope's `userId`, because without it any current member could be named as the actor of a job they
+  did not start; (4) `assertRole` for the action the kind performs, because an envelope carries no role
+  and a role may have changed since the message was sent.
+- **A producer must reach production after its consumer.** An older consumer does not know a new kind
+  and acks the body as unhandled (step 1 of §2.3), so a job sent before its handler is deployed is lost.
+  A known kind whose handler is not installed is the opposite case and is safe: it is retried into the
+  dead-letter queue and never acked.
+- **The dead-letter writer is planned, not written.** Nothing consumes either dead-letter queue and
+  nothing copies a dead-lettered body to R2, so today the body survives for the queue's own retention
+  window (a platform setting) and `docs/DEPLOY.md` §13 says what an operator does. The writer ships with
+  an R2 lifecycle expiry rule and stores the envelope only, which is ids and never more, so a body that
+  could carry more is not kept forever. Its key is `dlq/<queue>/<messageId>.json` (§3.2).
 
 ---
 
@@ -334,7 +398,7 @@ traffic during the migrate-then-deploy window.
 | ------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
 | FX provider down                                  | Nightly refresh writes nothing for that day         | Fallback provider; 7-day look-back at read time; `source` per row               |
 | Both FX providers down for >7 days                | A conversion for a new transaction cannot resolve   | The write is refused with a typed error and the person is offered a manual rate |
-| Queue consumer failing                            | Messages retry, then dead-letter                    | DLQ bodies land in R2; a weekly sweep reports DLQ depth                         |
+| Queue consumer failing                            | Messages retry, then dead-letter                    | The DLQ keeps the body for its retention; a writer to R2 is planned (§6)        |
 | A rebuild interleaves                             | Cannot happen                                       | The `LEDGER` DO serialises by account                                           |
 | A write path forgets `runWithLedgerBatch`         | That account's chart is stale until 03:00           | The nightly sweep heals it; the lint rule catches the missing wrapper           |
 | Polar webhook replayed                            | Handled once                                        | Claim-then-handle dedupe in KV, claim released on throw                         |
