@@ -3,6 +3,8 @@
 # editing .ai/cezar/automations.json by hand). Idempotent: an automation with the same name is
 # updated in place, a new one follows its enabled setting (default true). Automations the cockpit
 # holds that the file no longer names are listed; --prune deletes them, so the file is the whole truth.
+# `name` is the identity key: a changed name is a create plus an enabled stray, so rename the live
+# definition in the cockpit first (docs/agents/cezar.md -> Automations).
 #
 # The file is the truth for every field it names - `enabled` included, when a definition states
 # it. What the file does not state, the cockpit keeps: an update used to send `enabled: true`
