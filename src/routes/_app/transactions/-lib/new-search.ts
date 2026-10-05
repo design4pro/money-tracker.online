@@ -23,7 +23,7 @@
  *
  * ## The way back is a closed shape
  *
- * `return*` names one of two screens of this app, a series and a period start. It is never a URL:
+ * `return*` names one of three screens of this app, a series and a period start. It is never a URL:
  * {@link returnTargetOf} yields a value the caller turns into a typed router target, so
  * `https://evil.example`, `//evil.example` and `/accounts` all fail the enum and the save falls back
  * to where it always went.
@@ -79,7 +79,7 @@ export const newTransactionSearchSchema = z.object({
   account: idParam,
   category: idParam,
   payee: idParam,
-  returnTo: z.enum(['series', 'list']).optional().catch(undefined),
+  returnTo: z.enum(['series', 'list', 'planned']).optional().catch(undefined),
   returnSeries: idParam,
   returnPeriod: dateParam,
 })
@@ -88,7 +88,7 @@ export type NewTransactionSearch = z.infer<typeof newTransactionSearchSchema>
 
 /** The screen a saved entry sends the person back to, and the period it was recorded for. */
 export interface ReturnTarget {
-  readonly to: 'series' | 'list'
+  readonly to: 'series' | 'list' | 'planned'
   readonly seriesId: string
   readonly periodStart: string
 }

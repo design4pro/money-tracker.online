@@ -46,6 +46,9 @@ import {
   currencies,
   payees,
 } from '#/server/db/schema'
+import { materializeSeries } from '#/server/recurring/materialize'
+import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
+import { createLogger, createMemorySink } from '#/server/observability/logger'
 import {
   createMemoryMarkerStore,
   sweepBudgetThresholds,
@@ -105,6 +108,8 @@ import {
   listImportBatches,
 } from '../imports'
 
+import { ledgerReaderFor } from './planned-harness'
+import { createSeries, getUpcoming } from '../recurring'
 import { createTenantRepository, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -1568,5 +1573,172 @@ describe('an unsubscribe link acts in the workspace it names and nowhere else', 
       },
     )
     expect((await listPrefsFor(world.otherScope, 'user-b')).size).toBe(0)
+  })
+})
+
+/**
+ * The upcoming read, which the planned screen widens by three ids of the series it joins.
+ *
+ * `getUpcoming` already scopes both halves of its join. What this case adds is the claim about the
+ * **new** columns: `account_id`, `category_id` and `payee_id` are foreign keys, and three ids
+ * leaving a repository are three more ways to hand one workspace another's row id if the join ever
+ * loses its `tenantFilter`. So A and B each own a series built from their own account, category and
+ * payee - under identical names - and A's read must return A's ids and not one of B's.
+ */
+describe('the upcoming read cannot leak another workspace’s series ids', () => {
+  let world: BudgetWorld
+
+  async function seedPayee(id: string, organizationId: string) {
+    await world.db.insert(payees).values({
+      id,
+      organizationId,
+      name: 'Landlord',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+  }
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    await seedCategory(world.db, { id: 'cat-a', name: 'Rent' })
+    await seedCategory(world.db, {
+      id: 'cat-b',
+      name: 'Rent',
+      organizationId: 'org-b',
+    })
+    await seedPayee('payee-a', 'org-a')
+    await seedPayee('payee-b', 'org-b')
+
+    for (const [scope, suffix] of [
+      [world.scope, 'a'],
+      [world.otherScope, 'b'],
+    ] as const) {
+      const series = await createSeries(scope, {
+        name: 'Rent',
+        expectedAmountMinor: 250_000,
+        expectedCurrencyCode: 'PLN',
+        startDate: '2026-04-10',
+        accountId: `acc-${suffix}`,
+        categoryId: `cat-${suffix}`,
+        payeeId: `payee-${suffix}`,
+      })
+      await materializeSeries(scope, {
+        seriesId: series.id,
+        today: '2026-04-01',
+        ahead: 1,
+      })
+    }
+  })
+
+  it('returns the caller’s own account, category and payee ids and none of the other workspace’s', async () => {
+    const upcoming = await getUpcoming(world.scope, { today: '2026-04-01' })
+
+    expect(upcoming.length).toBeGreaterThan(0)
+    for (const period of upcoming) {
+      expect(period.accountId).toBe('acc-a')
+      expect(period.categoryId).toBe('cat-a')
+      expect(period.payeeId).toBe('payee-a')
+    }
+    const seen = JSON.stringify(upcoming)
+    expect(seen).not.toContain('acc-b')
+    expect(seen).not.toContain('cat-b')
+    expect(seen).not.toContain('payee-b')
+  })
+
+  it('returns null for a series whose links were never set, never a neighbour’s id', async () => {
+    const bare = await createSeries(world.scope, {
+      name: 'Bare',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      startDate: '2026-04-12',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: bare.id,
+      today: '2026-04-01',
+      ahead: 1,
+    })
+
+    const upcoming = await getUpcoming(world.scope, { today: '2026-04-01' })
+    const mine = upcoming.filter((period) => period.seriesId === bare.id)
+
+    expect(mine.length).toBeGreaterThan(0)
+    for (const period of mine) {
+      expect(period.accountId).toBeNull()
+      expect(period.categoryId).toBeNull()
+      expect(period.payeeId).toBeNull()
+    }
+  })
+
+  it('keeps B’s expectations and planned rows off A’s planned screen', async () => {
+    await seedTransaction(world.db, {
+      id: 'plan-b',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      categoryId: 'cat-b',
+      bookedOn: '2026-04-20',
+      isPlanned: true,
+    })
+    await seedTransaction(world.db, {
+      id: 'plan-a',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+
+    const page = await plannedScreenFor(
+      world.scope,
+      {
+        policies: {
+          planned: 'only',
+          adjustments: 'exclude',
+          transfers: 'include',
+          completeness: 'any',
+        },
+        filters: {},
+        sort: { field: 'bookedOn', direction: 'desc' },
+        cursor: null,
+      },
+      '2026-04-01',
+      {
+        readLedger: ledgerReaderFor(world.scope),
+        logger: createLogger({ sink: createMemorySink() }),
+      },
+    )
+
+    if (page.expectations.state !== 'shown') {
+      throw new Error('the group was not shown')
+    }
+    expect(page.expectations.rows.length).toBeGreaterThan(0)
+    expect(page.rows.map((row) => row.id)).toEqual(['plan-a'])
+    const seen = JSON.stringify(page)
+    for (const foreign of ['acc-b', 'cat-b', 'payee-b', 'plan-b']) {
+      expect(seen).not.toContain(foreign)
+    }
+  })
+
+  it('narrows by a category only within the caller’s own tree', async () => {
+    const page = await plannedScreenFor(
+      world.scope,
+      {
+        policies: {
+          planned: 'only',
+          adjustments: 'exclude',
+          transfers: 'include',
+          completeness: 'any',
+        },
+        // B's category id, named from A's screen: it resolves to nothing in A's workspace.
+        filters: { categoryIds: ['cat-b'] },
+        sort: { field: 'bookedOn', direction: 'desc' },
+        cursor: null,
+      },
+      '2026-04-01',
+      {
+        readLedger: ledgerReaderFor(world.scope),
+        logger: createLogger({ sink: createMemorySink() }),
+      },
+    )
+
+    expect(page.expectations).toMatchObject({ state: 'shown', rows: [] })
   })
 })

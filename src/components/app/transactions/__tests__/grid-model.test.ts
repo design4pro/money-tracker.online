@@ -56,6 +56,7 @@ function row(
   income = false,
 ): LedgerRow {
   return {
+    kind: 'transaction',
     id,
     direction: income ? 'income' : 'expense',
     amountMinor: asMinor(minor),

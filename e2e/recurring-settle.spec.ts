@@ -178,6 +178,75 @@ test.describe('write flows', () => {
     }
   })
 
+  test('the planned screen lists an unsettled period as an expectation and skips it', async ({
+    page,
+  }) => {
+    const periods = ['2026-01-01']
+    const fixture = await installFor(uniqueToken('plannedskip'), periods)
+    try {
+      await gotoApp(page, '/transactions/planned')
+
+      const group = page.getByRole('region', {
+        name: /^Expected in the next \d+ days$/,
+      })
+      await expect(group).toBeVisible()
+      await expect(
+        group.getByText(
+          'Not yet money. Expected payments are never added to the totals.',
+        ),
+      ).toBeVisible()
+      const row = group.getByRole('row').filter({ hasText: fixture.seriesName })
+      // Long past, so it is overdue; the status is a word, and the row cannot be selected.
+      await expect(row.getByText('Overdue')).toBeVisible()
+      await expect(row.getByRole('checkbox')).toHaveCount(0)
+      await expectNoSeriousViolations(page, '/transactions/planned, expected')
+
+      await row.getByRole('button', { name: /^Skip, period due/ }).click()
+      await expect(row).toHaveCount(0)
+      // Focus is not left on <body>: it moved to a row of the group or to its heading.
+      await expect(page.locator('body')).not.toBeFocused()
+    } finally {
+      await deleteRecurringFixture(fixture, periods)
+    }
+  })
+
+  test('the planned screen: mark paid, entry form, save, picker reopened here, then link', async ({
+    page,
+  }) => {
+    const periods = ['2026-02-01']
+    const fixture = await installFor(uniqueToken('plannedpay'), periods)
+    try {
+      await gotoApp(page, '/transactions/planned')
+      const row = page
+        .getByRole('region', { name: /^Expected in the next \d+ days$/ })
+        .getByRole('row')
+        .filter({ hasText: fixture.seriesName })
+      await row.getByRole('button', { name: /^Mark paid, period due/ }).click()
+
+      const dialog = page.getByRole('dialog')
+      await dialog.getByRole('button', { name: 'Record the payment' }).click()
+
+      await expect(page).toHaveURL(/\/transactions\/new\?/)
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+      // Back on the planned screen, with the picker reopened on the same period.
+      await expect(page).toHaveURL(/\/transactions\/planned\?/)
+      const reopened = page.getByRole('dialog')
+      await expect(
+        reopened.getByRole('heading', { name: 'Mark this period paid' }),
+      ).toBeVisible()
+      await reopened.locator('label').first().click()
+      await reopened.getByRole('button', { name: 'Link it' }).click()
+
+      await expect(reopened).toBeHidden()
+      await expect(row).toHaveCount(0)
+      // The address was cleaned: a reload does not reopen the dialog.
+      expect(here(page)).not.toContain('markPaid')
+    } finally {
+      await deleteRecurringFixture(fixture, periods)
+    }
+  })
+
   test('a return target that names no unsettled period reopens nothing', async ({
     page,
   }) => {

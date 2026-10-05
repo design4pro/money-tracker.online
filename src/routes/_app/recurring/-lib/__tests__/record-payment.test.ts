@@ -40,6 +40,12 @@ describe('recordPaymentSearch', () => {
     expect(recordPaymentSearch(RENT, MARCH, 'list').returnTo).toBe('list')
   })
 
+  it('names the planned screen as the way back when the person started there', () => {
+    const search = recordPaymentSearch(RENT, MARCH, 'planned')
+    expect(search.returnTo).toBe('planned')
+    expect(newTransactionSearchSchema.parse(search)).toEqual(search)
+  })
+
   it("keeps the amount as integer minor units at the currency's own scale", () => {
     const yen = recordPaymentSearch(
       RENT,

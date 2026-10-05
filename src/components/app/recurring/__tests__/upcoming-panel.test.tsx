@@ -23,6 +23,9 @@ function upcoming(over: Partial<UpcomingPeriod> = {}): UpcomingPeriod {
     seriesName: 'Rent',
     seriesKind: 'bill',
     direction: 'expense',
+    accountId: null,
+    categoryId: null,
+    payeeId: null,
     ...over,
   }
 }

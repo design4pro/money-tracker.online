@@ -106,6 +106,13 @@ export interface TransactionListProps {
   readonly hasBalance?: boolean
   /** Whether the rows span more than one account, so naming the account on each says something. */
   readonly showAccount?: boolean
+  /**
+   * Content that sits above the grid and shares its container: the planned screen's expected
+   * group. It is outside the grid, so its controls take no part in the grid's keyboard model. It
+   * changes height without the rows changing (a row is settled, a notice appears), so the list
+   * watches it and re-measures where the virtualised rows start.
+   */
+  readonly leading?: ReactNode
 }
 
 /**
@@ -256,6 +263,7 @@ export function TransactionList({
   caption,
   hasBalance = false,
   showAccount = true,
+  leading,
 }: TransactionListProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -266,6 +274,8 @@ export function TransactionList({
   const bandSide = bandSideFor(sort, hasBalance)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const leadingRef = useRef<HTMLDivElement>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
   const cellRefs = useRef(new Map<string, HTMLElement>())
   const selectedRef = useRef(selectedIds)
   selectedRef.current = selectedIds
@@ -278,9 +288,34 @@ export function TransactionList({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
 
-  useLayoutEffect(() => {
-    setScrollMargin(containerRef.current?.offsetTop ?? 0)
-  }, [rows.length])
+  // Where the first virtualised row starts: the container's own offset plus whatever `leading`
+  // pushes the table down by (the table's offset inside the positioned container).
+  const measureScrollMargin = useCallback(() => {
+    setScrollMargin(
+      (containerRef.current?.offsetTop ?? 0) +
+        (tableRef.current?.offsetTop ?? 0),
+    )
+  }, [])
+
+  useLayoutEffect(measureScrollMargin, [measureScrollMargin, rows.length])
+
+  // The leading content changes height on its own: a settled row leaves it, a notice appears, a
+  // narrow screen reflows it. None of that changes `rows.length`, so it is observed directly.
+  const hasLeading =
+    leading !== undefined && leading !== null && leading !== false
+  useEffect(() => {
+    const element = leadingRef.current
+    if (
+      !hasLeading ||
+      element === null ||
+      typeof ResizeObserver === 'undefined'
+    ) {
+      return
+    }
+    const observer = new ResizeObserver(measureScrollMargin)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [hasLeading, measureScrollMargin])
 
   const grouping = useMemo(
     () => groupByDay({ rows, sort, hasMore }),
@@ -633,7 +668,13 @@ export function TransactionList({
 
   return (
     <div ref={containerRef} className="relative">
+      {hasLeading ? (
+        <div ref={leadingRef} className="pb-4">
+          {leading}
+        </div>
+      ) : null}
       <table
+        ref={tableRef}
         role="grid"
         aria-label={t('transactions.list.label')}
         aria-rowcount={totalRows + 1}

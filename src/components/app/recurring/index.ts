@@ -30,6 +30,11 @@ export type { PeriodGridProps } from './period-grid'
 export { PeriodStatusBadge } from './period-status'
 export type { PeriodStatusBadgeProps } from './period-status'
 
+export {
+  ROW_KEY_ATTRIBUTE,
+  useRowFocusRecovery,
+} from './use-row-focus-recovery'
+
 export { RecurringEmptyState } from './recurring-empty-state'
 export type { RecurringEmptyStateProps } from './recurring-empty-state'
 

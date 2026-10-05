@@ -175,6 +175,15 @@ describe('returnTargetOf', () => {
         }),
       ),
     ).toEqual({ to: 'list', seriesId: 'ser-1', periodStart: '2026-03-01' })
+    expect(
+      returnTargetOf(
+        parse({
+          returnTo: 'planned',
+          returnSeries: 'ser-1',
+          returnPeriod: '2026-03-01',
+        }),
+      ),
+    ).toEqual({ to: 'planned', seriesId: 'ser-1', periodStart: '2026-03-01' })
   })
 
   it('is undefined unless every part is present', () => {

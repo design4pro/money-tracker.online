@@ -338,11 +338,21 @@ export interface PeriodView {
   readonly settledOn: string | null
 }
 
-/** One row of "what is due", with enough of its series to be rendered without a second query. */
+/**
+ * One row of "what is due", with enough of its series to be rendered without a second query.
+ *
+ * The three ids are the series' own links and **nullable**, because the columns are
+ * `onDelete: 'set null'`: a series whose account was deleted has none. The planned transactions
+ * screen is the caller with no series list in view, so it narrows by them and starts an entry
+ * from them without a second read; `/recurring` already holds better ones and ignores these.
+ */
 export interface UpcomingPeriod extends PeriodView {
   readonly seriesName: string
   readonly seriesKind: RecurringKind
   readonly direction: TransactionDirection
+  readonly accountId: string | null
+  readonly categoryId: string | null
+  readonly payeeId: string | null
 }
 
 /**
@@ -717,6 +727,9 @@ export async function getUpcoming(
       name: recurringSeries.name,
       kind: recurringSeries.kind,
       direction: recurringSeries.direction,
+      accountId: recurringSeries.accountId,
+      categoryId: recurringSeries.categoryId,
+      payeeId: recurringSeries.payeeId,
     })
     .from(recurringPeriods)
     .innerJoin(
@@ -740,7 +753,9 @@ export async function getUpcoming(
         lte(recurringPeriods.dueOn, horizon),
       ),
     )
-    .orderBy(asc(recurringPeriods.dueOn))
+    // The series id breaks a tie on the due date, so which periods fall past `limit` is the same
+    // on every call: the planned screen reads `limit + 1` to know whether it was capped.
+    .orderBy(asc(recurringPeriods.dueOn), asc(recurringPeriods.seriesId))
     .limit(parsed.limit)
 
   const views = await toPeriodViews(
@@ -756,6 +771,9 @@ export async function getUpcoming(
       seriesName: row.name,
       seriesKind: row.kind as RecurringKind,
       direction: row.direction as TransactionDirection,
+      accountId: row.accountId,
+      categoryId: row.categoryId,
+      payeeId: row.payeeId,
     }
   })
 }

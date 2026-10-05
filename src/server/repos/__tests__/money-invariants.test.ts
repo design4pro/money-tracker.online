@@ -55,6 +55,9 @@ import { goalReachedDedupeKey } from '#/server/notify/dedupe'
 import { notify } from '#/server/notify/dispatch'
 import { pageForReader } from '#/server/repos/notifications'
 
+import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
+import { createLogger, createMemorySink } from '#/server/observability/logger'
+
 import { budgetSpend, getBudget } from '../budgets'
 import { periodVarianceMinor } from '../recurring'
 import {
@@ -78,6 +81,7 @@ import {
   seedPeriod,
   seedTransaction,
 } from './budget-harness'
+import { ledgerReaderFor, seedSeries } from './planned-harness'
 import {
   countTransactions,
   pageTransactions,
@@ -93,6 +97,7 @@ import {
 import type { RateE10 } from '#/lib/money'
 import type { MatchSubject } from '#/server/recurring/match'
 import type { BudgetWorld, TestDb } from './budget-harness'
+import type { PlannedScreenInput } from '#/routes/_app/transactions/-server/planned-data'
 import type * as BaseModule from '../base'
 import type { MatchingRules, PeriodView } from '../recurring'
 import type { TenantScope } from '../scope'
@@ -1466,5 +1471,159 @@ describe('14 — a notification stores figures, never a rendered amount', () => 
     const stored = JSON.parse(rows[0].payloadJson) as Record<string, unknown>
     expect(stored.targetMinor).toBe(4_000)
     expect(stored.currencyCode).toBe('JPY')
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 15 — expectations on the planned screen                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The planned transactions screen shows what recurring series expect beside what the ledger holds,
+ * and an expected amount is **never** an addend of the ledger's totals.
+ *
+ * `docs/plans/13-recurring.md` (`13-S1`) is the rule: an expected amount has no `ref_amount_minor`
+ * because it has no rate and no booking date until it settles, and a plan converted at today's rate
+ * and shown alone is how a person's expectations quietly change with the exchange rate. The design
+ * prevents the mistake three ways - the row type has no reference field, the totals read is never
+ * handed an expectation, and these cases run the real composition and compare what it returns.
+ */
+describe('15 — an expectation is shown beside the totals and never in them', () => {
+  const TODAY = '2026-04-15'
+  const POLICIES: PlannedScreenInput['policies'] = {
+    planned: 'only',
+    adjustments: 'exclude',
+    transfers: 'include',
+    completeness: 'any',
+  }
+  let planned: BudgetWorld
+
+  function screen() {
+    return plannedScreenFor(
+      planned.scope,
+      {
+        policies: POLICIES,
+        filters: {},
+        sort: { field: 'bookedOn', direction: 'desc' },
+        cursor: null,
+      },
+      TODAY,
+      {
+        readLedger: ledgerReaderFor(planned.scope),
+        logger: createLogger({ sink: createMemorySink() }),
+      },
+    )
+  }
+
+  beforeEach(async () => {
+    planned = await createBudgetWorld()
+    await seedTransaction(planned.db, {
+      id: 'plan-out',
+      refAmountMinor: 120_00,
+      bookedOn: '2026-04-20',
+      isPlanned: true,
+    })
+    await seedTransaction(planned.db, {
+      id: 'plan-in',
+      refAmountMinor: 900_00,
+      bookedOn: '2026-04-21',
+      direction: 'income',
+      isPlanned: true,
+    })
+  })
+
+  it('returns the same totals, and the same count, with and without expectations', async () => {
+    const without = await screen()
+    expect(without.expectations).toMatchObject({ state: 'shown', rows: [] })
+
+    await seedSeries(planned.scope, TODAY, {
+      name: 'Rent',
+      expectedAmountMinor: 2_500_00,
+    })
+    await seedSeries(planned.scope, TODAY, {
+      name: 'Salary',
+      direction: 'income',
+      expectedAmountMinor: 9_000_00,
+      startDate: '2026-04-25',
+    })
+    const withExpectations = await screen()
+
+    if (withExpectations.expectations.state !== 'shown') {
+      throw new Error('the group was not shown')
+    }
+    expect(withExpectations.expectations.rows.length).toBeGreaterThan(0)
+    expect(withExpectations.totals).toEqual(without.totals)
+    expect(withExpectations.total).toBe(without.total)
+    // Byte for byte, so a field that is merely deep-equal under a different key order or type
+    // does not pass.
+    expect(JSON.stringify(withExpectations.totals)).toBe(
+      JSON.stringify(without.totals),
+    )
+    expect(withExpectations.totals).toMatchObject({
+      incomeMinor: 900_00,
+      expenseMinor: 120_00,
+    })
+  })
+
+  it('keeps each currency at its own scale, unconverted, and runs no rate lookup', async () => {
+    await seedSeries(planned.scope, TODAY, {
+      name: 'Tokyo',
+      expectedAmountMinor: 4_000,
+      expectedCurrencyCode: 'JPY',
+    })
+    await seedSeries(planned.scope, TODAY, {
+      name: 'Kuwait',
+      expectedAmountMinor: 12_345,
+      expectedCurrencyCode: 'KWD',
+      startDate: '2026-04-11',
+    })
+    budgetExecuted.length = 0
+
+    const { expectations } = await screen()
+
+    if (expectations.state !== 'shown') {
+      throw new Error('the group was not shown')
+    }
+    const figures = expectations.rows.map((row) => [
+      row.currencyCode,
+      row.expectedAmountMinor,
+    ])
+    // 4 000 yen is `4000` and 12,345 dinar is `12345`: neither is rescaled to two decimals.
+    expect(figures).toEqual(
+      expect.arrayContaining([
+        ['JPY', 4_000],
+        ['KWD', 12_345],
+      ]),
+    )
+    for (const row of expectations.rows) {
+      expect(Number.isInteger(row.expectedAmountMinor)).toBe(true)
+    }
+    for (const query of budgetExecuted) {
+      expect(query).not.toMatch(/exchange_rates/i)
+    }
+  })
+
+  it('leaves an expected income and an expected expense as two rows, never netted', async () => {
+    await seedSeries(planned.scope, TODAY, {
+      name: 'Rent',
+      expectedAmountMinor: 2_500_00,
+    })
+    await seedSeries(planned.scope, TODAY, {
+      name: 'Salary',
+      direction: 'income',
+      expectedAmountMinor: 9_000_00,
+    })
+
+    const { expectations } = await screen()
+
+    if (expectations.state !== 'shown') {
+      throw new Error('the group was not shown')
+    }
+    const directions = new Set(expectations.rows.map((row) => row.direction))
+    expect(directions).toEqual(new Set(['income', 'expense']))
+    for (const row of expectations.rows) {
+      expect(row.expectedAmountMinor).toBeGreaterThan(0)
+      expect(Object.keys(row)).not.toContain('netMinor')
+    }
   })
 })

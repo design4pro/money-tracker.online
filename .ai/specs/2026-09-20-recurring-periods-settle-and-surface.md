@@ -611,3 +611,36 @@ therefore lands that label's EN and PL entry in the same commit; there is no sep
 Every step leaves the application working and typechecking: steps 1-4 are additive to a screen that
 already renders, step 5 widens a projection nobody reads yet, steps 6-7 add a row kind and a read the
 list ignores until step 8 draws it, and every step that renders a key lands that key.
+
+## Amendment — what Phase 2 shipped differently (#535)
+
+Recorded so the design above and the product do not quietly disagree. The body is left as written.
+
+1. **The expected group is its own table, not rows of the ledger grid.** The Accessibility section
+   says "a real table row in the same table". The ledger is a virtualised `role="grid"` with one tab
+   stop, and the group's rows each carry two real buttons that must be reachable by Tab, so putting
+   them in the grid would break its keyboard model or need a second one. The group is a captioned
+   `<table>` (header row, the series name as the row header, the status as a word) under its own
+   heading, rendered inside `TransactionList`'s container through its `leading` slot so the
+   virtualiser re-measures where its rows start when the group changes height. An independent
+   accessibility specialist chose this over the same-table option (confidence high); the AA claim is
+   unchanged.
+2. **The expected figures are computed in the view, from the rows shown.** Step 7 describes an
+   `expectedByCurrency` field on `loadPlannedScreen`. The server returns the group (`ExpectationGroup`:
+   `shown | suppressed | failed`) and `expectedTotals` (`src/components/app/transactions/expectation-totals.ts`)
+   sums the rows' own integer minor units per currency, income and expense apart. The property the
+   field existed for holds by construction: the figure and the list are the same rows, and the group
+   is read once, identically on every page call.
+3. **The figures sit under the group, not inside `ListSummary`.** `ListSummary` is not rendered when
+   the ledger half is empty, which is exactly when an expectation is most worth reading, so the
+   figures belong to the group. `ListSummary` is untouched and still totals `transactions` only.
+4. **Plural machinery selects its branch from `count`.** `transactions.planned.expected.group` is
+   therefore parameterised `{count}` (days) and not `{days}`.
+5. **`transactions.planned.fromRecurring` was not added.** The series name is the row header, so
+   nothing would read it. `transactions.planned.expected.totals` (the label of the figures' group)
+   was added instead.
+6. **A third return origin, `planned`.** Mark paid from the planned screen sends the entry form's
+   Save back to `/transactions/planned?markPaid=…&series=…`, which reopens the picker once the group
+   has loaded. The brief's "list" origin returns to `/recurring`, which is the wrong screen here.
+7. **The empty state's pointer is a link under the description**, always shown on the empty planned
+   screen, because the screen does not know whether the workspace has series.
