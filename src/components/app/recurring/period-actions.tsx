@@ -16,13 +16,16 @@ import type { PeriodView } from '#/server/repos/recurring'
  * fed only unsettled periods (the Upcoming panel) simply passes no `onRevert`; a settled period
  * handed to it draws nothing rather than a button that does nothing.
  *
- * ## Real buttons, named by the row's date
+ * ## Real buttons, named by their label and then the row's date
  *
- * Each is a `<button>`, reachable by Tab in reading order with no hover needed. Three identical
- * *Mark paid* buttons down a column are three identical announcements, so the accessible name
- * carries the due date - *"Mark the period due 1 March as paid"* - which is what tells them apart.
- * A surface that lists periods of **several series** (the Upcoming panel) also passes the series
- * name, because two bills due on the same day would otherwise be two identical names.
+ * Each is a `<button>`, reachable by Tab in reading order with no hover needed. The accessible
+ * name **opens with the visible label** (WCAG 2.5.3, Label in Name), so that voice control's
+ * *"click Mark paid"* finds it, and then says which period it acts on: *"Mark paid, period due
+ * 1 March"*. Three identical *Mark paid* buttons down a column are three identical announcements,
+ * so the date is what tells them apart. A surface that lists periods of **several series** (the
+ * Upcoming panel) also passes the series name, because two bills due on the same day would
+ * otherwise be two identical names. Mark paid, Skip and Undo all take the same shape, so the three
+ * cannot drift.
  *
  * ## A narrow cell stacks them
  *

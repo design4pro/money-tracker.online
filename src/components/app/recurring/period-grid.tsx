@@ -1,9 +1,15 @@
+import { useRef } from 'react'
+
 import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 
 import { PeriodActions } from './period-actions'
 import { PeriodStatusBadge } from './period-status'
+import {
+  ROW_KEY_ATTRIBUTE,
+  useRowFocusRecovery,
+} from './use-row-focus-recovery'
 
 import type { PeriodView } from '#/server/repos/recurring'
 
@@ -36,14 +42,24 @@ import type { PeriodView } from '#/server/repos/recurring'
  * ## The actions are real buttons
  *
  * Every row action is a `<button>` in the table, reachable by Tab in reading order, with an
- * accessible name that carries the row's date - *"Mark the period due 1 March as paid"*. Three
- * identical *Mark paid* buttons down a column are three identical announcements, which is not a
- * usable list; the date is what tells them apart.
+ * accessible name that opens with the visible label and then carries the row's date - *"Mark paid,
+ * period due 1 March"*. Three identical *Mark paid* buttons down a column are three identical
+ * announcements, which is not a usable list; the date is what tells them apart.
+ *
+ * ## Focus follows the button that replaces the one pressed
+ *
+ * A row here stays when it is acted on - Skip turns its buttons into *Undo*, Undo turns them back
+ * - so the pressed button is replaced rather than removed, and the browser would still drop focus
+ * on `<body>`. {@link useRowFocusRecovery} puts it on the new button of the same row. The route
+ * says which period its dialog is open on with `openPeriodStart`, which also covers the
+ * `?markPaid=` reopen path that has no trigger to restore to.
  */
 
 export interface PeriodGridProps {
   readonly periods: ReadonlyArray<PeriodView>
   /** Opens the link-a-transaction dialog. Supplied by the route, because it performs a write. */
+  /** The `periodStart` the route's mark-paid dialog is open on, if any. */
+  readonly openPeriodStart?: string | null
   readonly onMarkPaid: (period: PeriodView) => void
   readonly onSkip: (period: PeriodView) => void
   readonly onRevert: (period: PeriodView) => void
@@ -67,8 +83,11 @@ function varianceOf(period: PeriodView): number | null {
   return period.settledAmountMinor - period.expectedAmountMinor
 }
 
+const rowKey = (period: PeriodView) => period.periodStart
+
 export function PeriodGrid({
   periods,
+  openPeriodStart = null,
   onMarkPaid,
   onSkip,
   onRevert,
@@ -77,6 +96,13 @@ export function PeriodGrid({
 }: PeriodGridProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const { remember } = useRowFocusRecovery({
+    rows: periods,
+    rowKey,
+    openKey: openPeriodStart,
+    rootRef,
+  })
 
   if (periods.length === 0) {
     return (
@@ -97,6 +123,7 @@ export function PeriodGrid({
     // section's own heading text, and `focus-safe` reserves the room that stops its own overflow
     // from cropping that ring.
     <div
+      ref={rootRef}
       role="region"
       aria-label={t('recurring.periods.title')}
       tabIndex={0}
@@ -159,7 +186,8 @@ export function PeriodGrid({
 
             return (
               <tr
-                key={period.periodStart}
+                key={rowKey(period)}
+                {...{ [ROW_KEY_ATTRIBUTE]: rowKey(period) }}
                 className="border-b border-border-subtle last:border-b-0"
               >
                 <th
@@ -204,8 +232,14 @@ export function PeriodGrid({
                     <PeriodActions
                       period={period}
                       onMarkPaid={() => onMarkPaid(period)}
-                      onSkip={() => onSkip(period)}
-                      onRevert={() => onRevert(period)}
+                      onSkip={() => {
+                        remember(rowKey(period))
+                        onSkip(period)
+                      }}
+                      onRevert={() => {
+                        remember(rowKey(period))
+                        onRevert(period)
+                      }}
                     />
                   </td>
                 )}

@@ -1805,14 +1805,14 @@ const messages = {
   'recurring.periods.notSettled': 'Not settled',
 
   'recurring.period.markPaid': 'Mark paid',
-  'recurring.period.markPaid.for': 'Mark the period due {date} as paid',
+  'recurring.period.markPaid.for': 'Mark paid, period due {date}',
   'recurring.period.markPaid.forSeries':
-    'Mark the period due {date} for {series} as paid',
+    'Mark paid, period due {date}, {series}',
   'recurring.period.skip': 'Skip',
-  'recurring.period.skip.for': 'Skip the period due {date}',
-  'recurring.period.skip.forSeries': 'Skip the period due {date} for {series}',
+  'recurring.period.skip.for': 'Skip, period due {date}',
+  'recurring.period.skip.forSeries': 'Skip, period due {date}, {series}',
   'recurring.period.revert': 'Undo',
-  'recurring.period.revert.for': 'Undo the period due {date}',
+  'recurring.period.revert.for': 'Undo, period due {date}',
 
   /* -- Mark paid ------------------------------------------------------------ */
   'recurring.markPaid.title': 'Mark this period paid',
@@ -1825,6 +1825,10 @@ const messages = {
   'recurring.markPaid.record': 'Record the payment',
   'recurring.markPaid.recordHint': 'We will bring you back here to link it.',
   'recurring.markPaid.confirm': 'Link it',
+  'recurring.markPaid.status.found': {
+    one: '{count} transaction to choose from',
+    other: '{count} transactions to choose from',
+  },
   'recurring.markPaid.never': 'Marking a period paid never creates an entry.',
   /* -- Automation ----------------------------------------------------------- */
   'recurring.automation.label': 'Automation',

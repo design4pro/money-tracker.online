@@ -26,11 +26,11 @@ describe('PeriodActions', () => {
 
     expect(
       screen.getByRole('button', {
-        name: 'Mark the period due Mar 1, 2026 as paid',
+        name: 'Mark paid, period due Mar 1, 2026',
       }),
     ).toBeTruthy()
     expect(
-      screen.getByRole('button', { name: 'Skip the period due Mar 1, 2026' }),
+      screen.getByRole('button', { name: 'Skip, period due Mar 1, 2026' }),
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Undo/ })).toBeNull()
   })
@@ -47,13 +47,94 @@ describe('PeriodActions', () => {
 
     expect(
       screen.getByRole('button', {
-        name: 'Mark the period due Mar 1, 2026 for Rent as paid',
+        name: 'Mark paid, period due Mar 1, 2026, Rent',
       }),
     ).toBeTruthy()
     expect(
       screen.getByRole('button', {
-        name: 'Skip the period due Mar 1, 2026 for Rent',
+        name: 'Skip, period due Mar 1, 2026, Rent',
       }),
+    ).toBeTruthy()
+  })
+
+  it('starts every name with the visible label, so voice control can say what it sees', () => {
+    // WCAG 2.5.3: the accessible name has to contain the visible text, and open with it.
+    renderRecurring(
+      <>
+        <PeriodActions
+          period={period()}
+          onMarkPaid={vi.fn()}
+          onSkip={vi.fn()}
+        />
+        <PeriodActions
+          period={period({ derivedStatus: 'paid' })}
+          onMarkPaid={vi.fn()}
+          onSkip={vi.fn()}
+          onRevert={vi.fn()}
+        />
+      </>,
+    )
+
+    for (const button of screen.getAllByRole('button')) {
+      const label = button.textContent ?? ''
+      expect(label).not.toBe('')
+      expect(button.getAttribute('aria-label')?.startsWith(`${label}, `)).toBe(
+        true,
+      )
+    }
+  })
+
+  it.each([
+    [
+      undefined,
+      ['Oznacz jako opłacone, termin 1 mar 2026', 'Pomiń, termin 1 mar 2026'],
+    ],
+    [
+      'Czynsz',
+      [
+        'Oznacz jako opłacone, termin 1 mar 2026, Czynsz',
+        'Pomiń, termin 1 mar 2026, Czynsz',
+      ],
+    ],
+  ])(
+    'names the Polish buttons label-first (series %s)',
+    (seriesName, names) => {
+      renderRecurring(
+        <PeriodActions
+          period={period()}
+          seriesName={seriesName}
+          onMarkPaid={vi.fn()}
+          onSkip={vi.fn()}
+        />,
+        'pl',
+      )
+
+      const buttons = screen.getAllByRole('button')
+      expect(
+        buttons.map((button) => button.getAttribute('aria-label')),
+      ).toEqual(names)
+      for (const button of buttons) {
+        expect(
+          button
+            .getAttribute('aria-label')
+            ?.startsWith(`${button.textContent ?? ''}, `),
+        ).toBe(true)
+      }
+    },
+  )
+
+  it('names the Polish Undo button label-first too', () => {
+    renderRecurring(
+      <PeriodActions
+        period={period({ derivedStatus: 'skipped' })}
+        onMarkPaid={vi.fn()}
+        onSkip={vi.fn()}
+        onRevert={vi.fn()}
+      />,
+      'pl',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Cofnij, termin 1 mar 2026' }),
     ).toBeTruthy()
   })
 
@@ -71,7 +152,7 @@ describe('PeriodActions', () => {
 
       expect(screen.getAllByRole('button')).toHaveLength(1)
       expect(
-        screen.getByRole('button', { name: /Undo the period due Mar 1, 2026/ }),
+        screen.getByRole('button', { name: /^Undo, period due Mar 1, 2026/ }),
       ).toBeTruthy()
     },
   )
@@ -110,11 +191,13 @@ describe('PeriodActions', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: /Mark the period/ }))
+    await user.click(
+      screen.getByRole('button', { name: /^Mark paid, period due/ }),
+    )
     expect(onMarkPaid).toHaveBeenCalledTimes(1)
     expect(onSkip).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: /Skip the period/ }))
+    await user.click(screen.getByRole('button', { name: /^Skip, period due/ }))
     expect(onSkip).toHaveBeenCalledTimes(1)
   })
 
