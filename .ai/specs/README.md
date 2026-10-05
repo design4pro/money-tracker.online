@@ -44,6 +44,6 @@ its `H1` names the issue and the pull requests behind it. The rules are in [AGEN
 
 ## Archived — superseded or abandoned (1)
 
-| Spec                                                                                              | Date       | Issue                                                                 | Spec PR                                                             | Superseded by |
-| ------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------- |
-| [A test companion for agent-kit-check.mjs](archived/2026-09-18-agent-kit-check-test-companion.md) | 2026-09-18 | [#127](https://github.com/design4pro/money-tracker.online/issues/127) | [#334](https://github.com/design4pro/money-tracker.online/pull/334) | abandoned     |
+| Spec                                                                                              | Date       | Issue                                                                 | Spec PR                                                             | Implementation | Superseded by |
+| ------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- | ------------- |
+| [A test companion for agent-kit-check.mjs](archived/2026-09-18-agent-kit-check-test-companion.md) | 2026-09-18 | [#127](https://github.com/design4pro/money-tracker.online/issues/127) | [#334](https://github.com/design4pro/money-tracker.online/pull/334) | —              | abandoned     |

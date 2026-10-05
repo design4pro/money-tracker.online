@@ -53,7 +53,9 @@ An **archived** spec carries a `Superseded by` row, last, and only an archived s
 ```
 
 It is required exactly when the status is `archived` and refused otherwise, so one value still
-decides the shape of the table. The reference can be an issue or a pull request, and more than one,
+decides the shape of the table. The generated index shows `Implementation` for an archived spec
+too, in a column beside `Superseded by`, so a spec that shipped phases before it was superseded keeps
+its built pull requests listed. The reference can be an issue or a pull request, and more than one,
 comma-separated, the way `Implementation` is. A spec that was **abandoned** rather than superseded
 says so in the same row, and that is the only value it takes that is not a reference:
 
