@@ -420,7 +420,7 @@ not a second stamp. If a screen needs a second violet thing, one of them is not 
 **The Pencil Rule.** A planned entry is written in `ink-2` with the word beside it; a booked entry
 is written in `ink`. State is line form before hue, and nothing is ever struck through.
 
-**The Colour-Is-Third Rule.** Money direction is never encoded by colour alone, and colour is not
+**The Colour-Is-Never-Alone Rule.** Money direction is never encoded by colour alone, and colour is not
 even the first channel: every amount carries an explicit sign, inflow is set at the bold weight and
 outflow at regular, a transfer carries a repeat glyph, and the product stays correct with all
 colour removed. The measured dichromat separation of the green and red inks is the reason.
