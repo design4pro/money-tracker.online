@@ -21,7 +21,7 @@ the rules of `SDLC.md`.
   and partial automation is the point, `systemPrompt`, which is prepended to every run's prompt
   and is where the language contract lives, and `skillsRepos`, which is deliberately empty:
   listing a repository there hands `.claude/skills/` to the cockpit, which then replaces the
-  vendored `om-*` tree. The collection's SHA lives in `skills-lock.json` alone)). Cezar's own
+  vendored `om-*` tree. No SHA is recorded in the config or in `skills-lock.json`: the committed tree pins the collection)). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked. `defaultRunner` is deliberately absent from it: the
   backend is a fact about the host, so each host names its own in `~/.cezar/config.json`
@@ -56,8 +56,9 @@ add -b` writes the new branch's upstream into the shared config, git's config lo
     was handed, so the automation re-reads one window forever (planned.travel#351). The fork
     widens the budget of a poll that did not move its cursor and records the cursor it gave up at
     as `widenExhaustedAt`.
-- Skills: `.claude/skills/om-*` are vendored files, byte-identical to the pinned upstream SHA, and
-  `skills-lock.json` records it. A worktree therefore has the collection the moment it is cut, and
+- Skills: `.claude/skills/om-*` are vendored files, and the committed tree is what pins them: no SHA is
+  recorded anywhere, and `skills-lock.json` holds a per-skill `computedHash` of each entry point as
+  provenance. A worktree therefore has the collection the moment it is cut, and
   the workflow's setup step installs dependencies only. `pnpm install-skills` re-installs and
   updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and `skills-lock.json`
   moves in the same commit. Repo specifics live in

@@ -468,3 +468,26 @@ the membership of a script that no longer exists. None of them is edited in plac
 
 `pr-fix` (`/om-auto-fix-pr`) remains as a manual workflow: a person starts it on a pull request
 whose threads are still open, as `docs/agents/cezar.md` describes.
+
+## Amendment, 2026-10-05: no SHA is recorded in the lockfile or in the config
+
+Three passages above say the collection's SHA is recorded somewhere: decision 2's "**Skill versions
+are pinned, not floating**" paragraph ("`.ai/cezar/config.json` names the SHA", "the pin moves in
+the same commit", "one mechanism and one SHA"), the paragraph after decision 6 ("The collection's
+SHA is therefore recorded in `skills-lock.json` alone"), and the 2026-09-20 amendment's "at a SHA
+`.ai/cezar/config.json` names". None of them was ever true. Every `skills-lock.json` entry carries
+`source`, `sourceType`, `skillPath` and `computedHash`, and `skillsRepos` in `.ai/cezar/config.json`
+is empty and names nothing. The SHA is recorded neither in the lockfile nor in the config, and
+nowhere else.
+
+What vendoring does give is unchanged and is the argument that stands: a skill version is
+**reviewable and reproducible** through the committed tree. `.claude/skills/om-*` is a file in the
+checkout, so a worktree has the collection the moment it is cut and an upgrade is a diff a person
+reads with `om-apply-upgrade-notes`. The lockfile's per-skill `computedHash` is provenance for each
+entry point (`SKILL.md`) only; it does not cover the `references/*.md` files, so it is not what
+makes a run reproducible, the committed tree is. `skillsRepos` stays empty, for the reason given
+after decision 6.
+
+The text above is left as written, the record of what it said on its dates, and is not the reading
+to use. The current wording is in `AGENTS.md` (Process and skills) and `docs/agents/cezar.md`
+(the config paragraph and the "Skills" bullet).
