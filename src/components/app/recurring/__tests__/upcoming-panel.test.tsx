@@ -274,6 +274,28 @@ describe('UpcomingPanel focus', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
+  it('does not pull focus back to a row the person left after cancelling', async () => {
+    const user = userEvent.setup()
+    const controls = {} as Controls
+    await renderLinkedRecurring(<Route controls={controls} />)
+
+    const trigger = await screen.findByRole('button', {
+      name: /^Mark paid, .*, Bravo$/,
+    })
+    await user.click(trigger)
+    trigger.focus() // what the dialog's own restore-to-trigger does
+    act(() => controls.closeDialog())
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    // A press on empty page space drops focus on <body>; a later refresh must not undo it.
+    await user.click(document.body)
+    expect(document.activeElement).toBe(document.body)
+    act(() => controls.refresh([...rows]))
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(document.activeElement).toBe(document.body)
+  })
+
   it("focuses the reopened period's Mark paid when the picker closes without a save", async () => {
     const controls = {} as Controls
     await renderLinkedRecurring(

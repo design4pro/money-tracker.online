@@ -94,14 +94,27 @@ export function useRowFocusRecovery<T>({
     }
     if (remembered.current === null) return
 
+    let forgetOnPress: (() => void) | null = null
     const frame = requestAnimationFrame(() => {
       const target = remembered.current
       if (target === null) return
 
       if (!isFocusLost()) {
         // Focus is somewhere sensible. Forget the row once the list has moved on; until then a
-        // refresh may still be on its way.
-        if (target.rows !== rows) remembered.current = null
+        // refresh may still be on its way. A press anywhere in the meantime means the person has
+        // moved on too (a cancelled dialog, a failed Skip), so a later refresh must not pull
+        // focus back to a row they left.
+        if (target.rows !== rows) {
+          remembered.current = null
+          return
+        }
+        forgetOnPress = () => {
+          remembered.current = null
+        }
+        document.addEventListener('pointerdown', forgetOnPress, {
+          capture: true,
+          once: true,
+        })
         return
       }
 
@@ -127,7 +140,14 @@ export function useRowFocusRecovery<T>({
         remembered.current = null
       }
     })
-    return () => cancelAnimationFrame(frame)
+    return () => {
+      cancelAnimationFrame(frame)
+      if (forgetOnPress !== null) {
+        document.removeEventListener('pointerdown', forgetOnPress, {
+          capture: true,
+        })
+      }
+    }
   }, [rows, openKey, remember, rootRef, fallbackRef])
 
   return { remember }

@@ -57,9 +57,9 @@ import type { PeriodView } from '#/server/repos/recurring'
 
 export interface PeriodGridProps {
   readonly periods: ReadonlyArray<PeriodView>
-  /** Opens the link-a-transaction dialog. Supplied by the route, because it performs a write. */
   /** The `periodStart` the route's mark-paid dialog is open on, if any. */
   readonly openPeriodStart?: string | null
+  /** Opens the link-a-transaction dialog. Supplied by the route, because it performs a write. */
   readonly onMarkPaid: (period: PeriodView) => void
   readonly onSkip: (period: PeriodView) => void
   readonly onRevert: (period: PeriodView) => void
