@@ -690,6 +690,20 @@ label kept in the DOM under the spinner so the button holds its width.
 - **Invalid** moves the rule to `negative`; the error renders below, wired by `aria-describedby`,
   with an icon and a message. **Disabled:** `surface-sunken`, `ink-2`, `not-allowed`.
 
+### Select and ComboBox popover
+
+- **The shape.** The listbox panel is at least as wide as its trigger, grows to its longest option
+  (`w-max` over the base `Popover`'s `min-w-(--trigger-width)`), and is capped at the viewport
+  minus the 12px edge padding React Aria keeps on each side (`max-w-[calc(100vw-1.5rem)]`).
+- **Why not the trigger's width.** A trigger is sized for the value it shows, not for the longest
+  option: pinning the panel to it ellipsised the Polish dashboard period options at 360px
+  ("Poprzedni mie...", #559). Both primitives carry the identical rule, so a call site never picks
+  a width.
+- **Truncation** stays in `ListBoxItem`, and only past the cap: an option wider than the viewport
+  still ends in an ellipsis. Keyboard navigation, selection and focus return to the trigger are
+  React Aria's and are untouched.
+- **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.
+
 ### Focus
 
 One treatment product-wide, drawn outside the control: a 2px `focus-gap` band (a `box-shadow`)
