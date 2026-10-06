@@ -76,13 +76,27 @@ export function orgPrefix(
   return `${family}/${segment('organizationId', organizationId)}/`
 }
 
-/** Throws unless `key` is under the workspace's prefix within `family`; for a reader about to `get` a stored key. */
+/**
+ * Throws unless `key` is under the workspace's prefix within `family`; for a reader about to `get`
+ * a stored key.
+ *
+ * A segment after the prefix that is exactly `.` or `..` is refused too, the same two the builders
+ * refuse: R2 keys are literal today, but a key that only looks like it is under the prefix should
+ * not pass if that ever changes. A dot inside a segment (`file..pdf`) is an ordinary name.
+ */
 export function assertKeyInOrg(
   family: WorkspaceKeyFamily,
   organizationId: string,
   key: string,
 ): void {
-  if (!key.startsWith(orgPrefix(family, organizationId))) {
+  const prefix = orgPrefix(family, organizationId)
+  const underPrefix =
+    key.startsWith(prefix) &&
+    !key
+      .slice(prefix.length)
+      .split('/')
+      .some((part) => part === '.' || part === '..')
+  if (!underPrefix) {
     throw new InvalidKeyError(
       `key is not under the ${family} prefix of the workspace`,
     )

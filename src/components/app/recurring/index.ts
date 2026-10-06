@@ -18,6 +18,9 @@ export type { CandidateCardProps } from './candidate-card'
 export { MarkPaidEmpty } from './mark-paid-empty'
 export type { MarkPaidEmptyProps } from './mark-paid-empty'
 
+export { MarkPaidStatus } from './mark-paid-status'
+export type { MarkPaidStatusProps } from './mark-paid-status'
+
 export { PeriodActions } from './period-actions'
 export type { PeriodActionsProps } from './period-actions'
 

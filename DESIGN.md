@@ -420,7 +420,7 @@ not a second stamp. If a screen needs a second violet thing, one of them is not 
 **The Pencil Rule.** A planned entry is written in `ink-2` with the word beside it; a booked entry
 is written in `ink`. State is line form before hue, and nothing is ever struck through.
 
-**The Colour-Is-Third Rule.** Money direction is never encoded by colour alone, and colour is not
+**The Colour-Is-Never-Alone Rule.** Money direction is never encoded by colour alone, and colour is not
 even the first channel: every amount carries an explicit sign, inflow is set at the bold weight and
 outflow at regular, a transfer carries a repeat glyph, and the product stays correct with all
 colour removed. The measured dichromat separation of the green and red inks is the reason.
@@ -812,16 +812,52 @@ the series detail grid and _Due soon_ on `/recurring`.
 - **Which buttons:** a function of the period, never of the surface. An unsettled period gets _Mark
   paid_ and _Skip_; a paid or skipped one gets _Undo_ alone. A surface fed only unsettled periods
   passes no `onRevert`, and a settled period handed to it draws nothing.
-- **A cell with no room to spare:** `compact` stacks the buttons and lets a long label wrap onto a second
-  line rather than widening the column. _Due soon_ uses it so the 30rem rail never scrolls sideways
+- **A cell with no room to spare:** from `sm` up `compact` stacks the buttons and lets a long label wrap
+  onto a second line rather than widening the column (below `sm` see _Reflow_). _Due soon_ uses it so the 30rem rail never scrolls sideways
   (`e2e/desktop-density.spec.ts`); the series grid keeps the buttons on one line.
 - **The states:** the ordinary button states. There is no hover-only affordance - every action is a
   `<button>` reachable by Tab in reading order.
 - **What carries the meaning when the colour does not:** the label is a word, and the accessible
-  name carries the row's due date (_"Mark the period due 1 March as paid"_), because a column of
-  identical labels is three identical announcements. A surface that mixes series (_Due soon_)
-  also passes the series name (_"... due 1 March for Rent as paid"_), since two bills can fall due on
-  the same day.
+  name starts with it and then carries the row's due date (_"Mark paid, period due 1 March"_,
+  _"Skip, period due 1 March"_, _"Undo, period due 1 March"_), so voice control's "click Mark paid"
+  finds the button (WCAG 2.5.3) and a column of identical labels is still not three identical
+  announcements. A surface that mixes series (_Due soon_) also passes the series name
+  (_"Skip, period due 1 March, Rent"_), since two bills can fall due on the same day. The Polish
+  names follow the same order (_"Pomiń, termin 1 mar 2026, Czynsz"_).
+- **Where focus goes when the row changes (2.4.3):** the pressed button is replaced or its row is
+  gone, and focus would fall to `<body>`. It moves only after the dialog has closed and only while
+  focus is lost, so a cancelled dialog's own restore-to-trigger is left alone.
+  - _Due soon_, after Skip or after a save from the dialog, once the refreshed list has rendered:
+    the _Mark paid_ of the row now at the removed row's position, the new last row's when the last
+    one went, or the _Due soon_ heading (`tabIndex={-1}`) when the list is empty.
+  - The series grid, after Skip, a save or Undo: the replacement button in the same row (_Undo_
+    after Skip or a save, _Mark paid_ after Undo).
+  - The `?markPaid=` reopen path has no trigger, so closing the picker without a save focuses that
+    period's _Mark paid_ if the row is still listed, otherwise the heading; with a save the rules
+    above apply.
+- **The mark-paid dialog says what it is doing (4.1.3):** one visually hidden `role="status"`
+  region, mounted on the dialog's first render, announces loading, then the candidate count
+  (plural machinery) or the empty copy, and nothing on a failure because the error panel is an
+  alert. The visible loading line is hidden from assistive technology.
+- **The series link in _Due soon_** carries the claimed target size on both axes (`target-min-h`,
+  `target-min-w`, vertically centred `inline-flex`); the `sm` button keeps its size.
+- **Reflow:** from `sm` up both tables are tables and scroll sideways in their own region. Below
+  `sm` each row stacks into a block, so Mark paid, Skip and Undo are reachable at 360px without
+  scrolling (#543): the due date opens the block, every other cell is a line with its column
+  label on the start side and its value on the end side (a long value, such as a series name,
+  wraps), and the actions are the last line, end aligned and always on one row (`compact` only
+  stacks the buttons from `sm` up). Every layout change is scoped below `sm`, so nothing changes
+  at `sm` and above. The shared classes and the self-labelling
+  cell are `stacked-table.tsx`.
+  - _Semantics survive the `display` change:_ the table, both row groups, rows, column headers,
+    the due-date row header and cells carry their `role` explicitly, with `<caption>` and `scope`
+    kept, because a non-table `display` can drop a native role in some browser and screen reader
+    pairs.
+  - _The header row is `sr-only`, not `display: none`,_ and the label printed in each cell is
+    `aria-hidden` and comes from the column header's own catalogue key, so the column header is
+    announced once. A cell with nothing to say on a row (the difference of an unsettled period)
+    prints no label and stays in the row.
+  - _Not done:_ a row menu, a sticky actions column, another component in place of the tables.
 - **The one thing it is not:** a row menu. The actions are visible buttons on purpose; burying
   _Mark paid_ behind a menu adds a click to the only thing the table is for.
 

@@ -462,8 +462,7 @@ const messages = {
   },
   'transactions.empty.title': 'Nothing recorded yet',
   'transactions.empty.body':
-    'Record your first expense, or load a statement you already have.',
-  'transactions.empty.action': 'Record an expense',
+    'Record your first transaction, or load a statement you already have.',
   'transactions.noResults.title': 'Nothing matches these filters',
   'transactions.noResults.body': 'Try a wider date range or fewer filters.',
 
@@ -568,6 +567,8 @@ const messages = {
   'transactions.form.noCategories': 'No categories yet',
   'transactions.form.conversionNote':
     'Recorded in {currency} and converted to {base} at the rate for the date of the entry.',
+  'transactions.form.droppedAmountNote':
+    "The expected amount is in {currency}; enter the amount in your account's currency.",
   'transactions.form.error.title': 'The entry was not saved',
   'transactions.form.error.amount': 'Enter an amount greater than zero.',
   'transactions.form.error.account': 'Choose the account this belongs to.',
@@ -916,6 +917,7 @@ const messages = {
   'dashboard.widget.cashFlow': 'Cash flow',
   'dashboard.widget.spendingByCategory': 'Spending by category',
   'dashboard.widget.recentTransactions': 'Latest transactions',
+  'dashboard.recentTransactions.empty.action': 'Go to transactions',
   'dashboard.widget.upcomingBills': 'Coming up',
   'dashboard.widget.budgetProgress': 'Budgets',
   'dashboard.widget.savingsGoals': 'Savings goals',
@@ -1805,14 +1807,14 @@ const messages = {
   'recurring.periods.notSettled': 'Not settled',
 
   'recurring.period.markPaid': 'Mark paid',
-  'recurring.period.markPaid.for': 'Mark the period due {date} as paid',
+  'recurring.period.markPaid.for': 'Mark paid, period due {date}',
   'recurring.period.markPaid.forSeries':
-    'Mark the period due {date} for {series} as paid',
+    'Mark paid, period due {date}, {series}',
   'recurring.period.skip': 'Skip',
-  'recurring.period.skip.for': 'Skip the period due {date}',
-  'recurring.period.skip.forSeries': 'Skip the period due {date} for {series}',
+  'recurring.period.skip.for': 'Skip, period due {date}',
+  'recurring.period.skip.forSeries': 'Skip, period due {date}, {series}',
   'recurring.period.revert': 'Undo',
-  'recurring.period.revert.for': 'Undo the period due {date}',
+  'recurring.period.revert.for': 'Undo, period due {date}',
 
   /* -- Mark paid ------------------------------------------------------------ */
   'recurring.markPaid.title': 'Mark this period paid',
@@ -1825,6 +1827,10 @@ const messages = {
   'recurring.markPaid.record': 'Record the payment',
   'recurring.markPaid.recordHint': 'We will bring you back here to link it.',
   'recurring.markPaid.confirm': 'Link it',
+  'recurring.markPaid.status.found': {
+    one: '{count} transaction to choose from',
+    other: '{count} transactions to choose from',
+  },
   'recurring.markPaid.never': 'Marking a period paid never creates an entry.',
   /* -- Automation ----------------------------------------------------------- */
   'recurring.automation.label': 'Automation',

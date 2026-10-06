@@ -21,7 +21,7 @@ the rules of `SDLC.md`.
   and partial automation is the point, `systemPrompt`, which is prepended to every run's prompt
   and is where the language contract lives, and `skillsRepos`, which is deliberately empty:
   listing a repository there hands `.claude/skills/` to the cockpit, which then replaces the
-  vendored `om-*` tree. The collection's SHA lives in `skills-lock.json` alone)). Cezar's own
+  vendored `om-*` tree. No SHA is recorded in the config or in `skills-lock.json`: the committed tree pins the collection)). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked. `defaultRunner` is deliberately absent from it: the
   backend is a fact about the host, so each host names its own in `~/.cezar/config.json`
@@ -56,8 +56,9 @@ add -b` writes the new branch's upstream into the shared config, git's config lo
     was handed, so the automation re-reads one window forever (planned.travel#351). The fork
     widens the budget of a poll that did not move its cursor and records the cursor it gave up at
     as `widenExhaustedAt`.
-- Skills: `.claude/skills/om-*` are vendored files, byte-identical to the pinned upstream SHA, and
-  `skills-lock.json` records it. A worktree therefore has the collection the moment it is cut, and
+- Skills: `.claude/skills/om-*` are vendored files, and the committed tree is what pins them: no SHA is
+  recorded anywhere, and `skills-lock.json` holds a per-skill `computedHash` of each entry point as
+  provenance. A worktree therefore has the collection the moment it is cut, and
   the workflow's setup step installs dependencies only. `pnpm install-skills` re-installs and
   updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and `skills-lock.json`
   moves in the same commit. Repo specifics live in
@@ -383,6 +384,26 @@ for a run a human starts, and an automation run uses the backend CLI's own defau
 automation sets `task.model` in `docs/agents/cezar-automations.json`.
 `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails any agent step that pins one again.
 
+Which CLI and which model that is resolves in two chains, read from the cezar source
+(`workflows/run.ts`, `config.ts` and `automations/task-template.ts` in `design4pro/cezar` at
+`d55ede1e`, 2026-10-05):
+
+- **Runner.** The run's `task.runner` if set; otherwise the host's `agentDefaults.runner` in
+  `~/.cezar/config.json`; otherwise cezar's built-in `claude`. The repository supplies none of the
+  three, because `defaultRunner` is absent from `.ai/cezar/config.json` (see the runner note under
+  "Install and configure"). A runner is a fact about the host, so this repository cannot name it:
+  ask the host with `jq .agentDefaults ~/.cezar/config.json`. On the host this was written from
+  (2026-10-05) it prints `{"runner": "claude"}`, which is a host value and not a repository fact.
+- **Model.** The run's `task.model` if set; otherwise nothing is passed and the resolved runner's CLI
+  uses its own default. `defaultModels` in `.ai/cezar/config.json` (currently
+  `{"claude": "claude-sonnet-5-5"}`) is only what the cockpit composer preselects for a human-started
+  run; it does not apply to an automation run.
+
+Two things override these. A run a human starts picks the runner and the model in the cockpit
+composer. An automation sets `task.runner` and `task.model` in `docs/agents/cezar-automations.json`;
+none of the automations sets either today, so every automation run takes the host's runner and that
+CLI's default model.
+
 The task text an event automation sends is the issue or PR number alone (`{{github.number}}`); a
 second token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled
 `Fix GitHub issue #<n>: <title>` is safe only because the `om-auto-fix-issue` override treats a
@@ -403,8 +424,8 @@ No label starts a run (ADR 0029). Code-writing work starts in exactly two ways:
   (`SDLC.md` § Readiness). Ready means an Agent Brief from `afk-triage` (or in the body of a ticket
   `afk-to-tickets` filed), a category, a priority and a risk, every "Blocked by" issue closed, no
   open or merged-but-unclosed PR, and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. The script answers
-  nothing while three PRs are waiting for a person (`needs-qa` without `qa-approved`, `risk-high`,
-  `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours). That is why a filed issue reaches an open PR with nobody
+  nothing while three PRs are waiting for a person (`blocked`, `do-not-merge`, or
+  `changes-requested` with no update for 24 hours; QA and risk labels are the agents', ADR 0031). That is why a filed issue reaches an open PR with nobody
   in it, and what keeps it bounded is the readiness rule rather than a label: `afk-triage` writes
   a brief for `risk-high` or `security` work only on the security and tenancy specialist's
   approving verdict (`SDLC.md` § Delegated decisions), and grooming never writes one itself - it
@@ -419,13 +440,13 @@ Until ADR 0029 this section described two label ladders: the command labels `gro
 `om-approve-merge-pr`, which reads the labels and the QA gate first. It runs as the last step of
 `implement-ticket` and `plan-to-spec`, on a PR a maintainer opens, and on an agent PR reviewed into `merge-queue`.
 `om-merge-buddy` reports the rest, and a person merges it - by hand, or with GitHub's native
-`gh pr merge --auto` (ADR 0027). A `risk-high` `needs-qa` PR waits for the owner's `qa-approved`,
-and `develop` → `main` (carrying `do-not-merge`, ADR 0029) is the owner's release decision (`SDLC.md`). The live rulesets have no
+`gh pr merge --auto` (ADR 0027). A `risk-high` or `security` PR merges on the security and tenancy
+reviewer's verdict on its diff (ADR 0031), and `develop` → `main` (carrying `do-not-merge`, ADR 0029) is the owner's release decision (`SDLC.md`). The live rulesets have no
 GitHub merge queue rule; the `merge-queue` label is a process state only. After a merge,
 `/om-close-fixed-issues` closes what the merge did not: Cezar has no `pull_request.merged`
 event, and `develop` is not the default branch, so nothing closes natively. Housekeeping runs
-three times a day. `qa-approved` comes from the unattended sign-off below `risk-high` (a QA
-specialist's verdict on the evidence) and from the owner on `risk-high`; the blind pair is
+three times a day. `qa-approved` comes from the unattended sign-off (a specialist panel's
+verdicts on the evidence, `risk-high` included, ADR 0031); the blind pair is
 `node scripts/visual/capture.mjs` (ADR 0016).
 
 ## Automations (`docs/agents/cezar-automations.json`)

@@ -63,7 +63,7 @@
     "id": "om-merge-buddy",
     "skills": ["om-merge-buddy"],
     "label": "om-merge-buddy - report which open PRs can merge right now",
-    "text": "Report only - never merge, comment, label or edit anything.\nTreat changes-requested, qa-failed, blocked, do-not-merge and in-progress as hard blocks, and with\nthe QA gate on, needs-qa without qa-approved - only a human sets qa-approved. An unresolved review\nthread also blocks: the develop ruleset merges nothing with one open, whatever the review decision\nsays. For each PR that cannot merge, name exactly what it is waiting for."
+    "text": "Report only - never merge, comment, label or edit anything.\nTreat changes-requested, qa-failed, blocked, do-not-merge and in-progress as hard blocks, and with\nthe QA gate on, needs-qa without qa-approved - the QA specialist panel (om-auto-qa-pr) or a QA reviewer sets qa-approved. An unresolved review\nthread also blocks: the develop ruleset merges nothing with one open, whatever the review decision\nsays. For each PR that cannot merge, name exactly what it is waiting for."
   },
   {
     "id": "om-review-prs",
@@ -161,7 +161,7 @@
   {
     "id": "om-approve-merge-pr",
     "label": "om-approve-merge-pr - approve and squash-merge one PR",
-    "text": "<PR number only on this line - e.g. 312>\n\nNo flags; add \"and file a follow-up: <text>\" to open one at the same time.\nRefuse and report when the PR is draft, conflicting, or carries changes-requested, qa-failed,\nblocked or do-not-merge, or when needs-qa lacks qa-approved - only a human sets qa-approved.\nBefore merging, run list-review-threads: any unresolved, non-outdated thread blocks the merge even\nwith an approving review and green CI, because the develop ruleset says so. Report such threads by\npath and author and offer om-auto-fix-pr - never resolve them from here.\nRoute a fixable blocker to om-auto-fix-pr (--ci-only for red CI) rather than forcing the merge."
+    "text": "<PR number only on this line - e.g. 312>\n\nNo flags; add \"and file a follow-up: <text>\" to open one at the same time.\nRefuse and report when the PR is draft, conflicting, or carries changes-requested, qa-failed,\nblocked or do-not-merge, or when needs-qa lacks qa-approved - the om-auto-qa-pr specialist panel or a QA reviewer sets it.\nBefore merging, run list-review-threads: any unresolved, non-outdated thread blocks the merge even\nwith an approving review and green CI, because the develop ruleset says so. Report such threads by\npath and author and offer om-auto-fix-pr - never resolve them from here.\nRoute a fixable blocker to om-auto-fix-pr (--ci-only for red CI) rather than forcing the merge."
   },
   {
     "id": "om-auto-qa-pr",

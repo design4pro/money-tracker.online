@@ -300,6 +300,7 @@ function RecurringListRoute() {
 
           <UpcomingPanel
             upcoming={overview.upcoming}
+            openPeriod={pending.kind === 'markPaid' ? pending.period : null}
             onMarkPaid={(period) =>
               setPending(markPaidPending(overview.rows, period))
             }

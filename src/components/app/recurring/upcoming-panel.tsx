@@ -1,11 +1,23 @@
+import { useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 
 import { Card } from '#/components/ui'
+import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 
 import { PeriodActions } from './period-actions'
 import { PeriodStatusBadge } from './period-status'
+import {
+  STACKED_BLOCK,
+  STACKED_HEAD,
+  STACKED_ROW_HEADER,
+  StackedCell,
+} from './stacked-table'
+import {
+  ROW_KEY_ATTRIBUTE,
+  useRowFocusRecovery,
+} from './use-row-focus-recovery'
 
 import type { UpcomingPeriod } from '#/server/repos/recurring'
 
@@ -31,25 +43,54 @@ import type { UpcomingPeriod } from '#/server/repos/recurring'
  *
  * The callbacks are the route's, because they perform writes; the panel hands each the whole
  * period so the route can find the series it belongs to.
+ *
+ * ## Where focus goes when a row leaves
+ *
+ * Skipping a period or saving the mark-paid dialog removes the row that held focus, and focus
+ * would fall to the top of the page. The panel puts it on the Mark paid button of the row that
+ * took the removed row's place, on the new last row's, or on its own heading when the list is
+ * empty - see {@link useRowFocusRecovery}. The route says which period its dialog is open on with
+ * `openPeriod`, which is also how the `?markPaid=` reopen path, which has no trigger to restore
+ * to, gets its focus back when the picker closes.
  */
 
 export interface UpcomingPanelProps {
   readonly upcoming: ReadonlyArray<UpcomingPeriod>
+  /** The period the route's mark-paid dialog is open on, if any. */
+  readonly openPeriod?: Pick<UpcomingPeriod, 'seriesId' | 'periodStart'> | null
   readonly onMarkPaid: (period: UpcomingPeriod) => void
   readonly onSkip: (period: UpcomingPeriod) => void
 }
 
+const rowKey = (period: Pick<UpcomingPeriod, 'seriesId' | 'periodStart'>) =>
+  `${period.seriesId}:${period.periodStart}`
+
 export function UpcomingPanel({
   upcoming,
+  openPeriod = null,
   onMarkPaid,
   onSkip,
 }: UpcomingPanelProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const { remember } = useRowFocusRecovery({
+    rows: upcoming,
+    rowKey,
+    openKey: openPeriod === null ? null : rowKey(openPeriod),
+    rootRef,
+    fallbackRef: headingRef,
+  })
 
   return (
     <Card className="flex flex-col gap-3">
-      <h2 className="text-subtitle font-semibold text-ink">
+      <h2
+        ref={headingRef}
+        // Focusable by script only: it is where focus lands when the last row is settled.
+        tabIndex={-1}
+        className="rounded-sm text-subtitle font-semibold text-ink outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+      >
         {t('recurring.upcoming.title')}
       </h2>
 
@@ -57,71 +98,118 @@ export function UpcomingPanel({
         <p className="text-body text-ink-2">{t('recurring.upcoming.empty')}</p>
       ) : (
         <div
+          ref={rootRef}
           role="region"
           aria-label={t('recurring.upcoming.title')}
           tabIndex={0}
           className="overflow-x-auto rounded-md outline-focus focus-safe focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
         >
-          <table className="w-full border-collapse text-label">
-            <caption className="pb-3 text-start text-caption text-ink-2">
+          <table
+            role="table"
+            className={cn('w-full border-collapse text-label', STACKED_BLOCK)}
+          >
+            <caption
+              className={cn(
+                'pb-3 text-start text-caption text-ink-2',
+                STACKED_BLOCK,
+              )}
+            >
               {t('recurring.upcoming.caption')}
             </caption>
-            <thead>
-              <tr className="border-b border-border-subtle">
+            <thead role="rowgroup" className={STACKED_HEAD}>
+              <tr
+                role="row"
+                className={cn('border-b border-border-subtle', STACKED_BLOCK)}
+              >
                 <th
+                  role="columnheader"
                   scope="col"
-                  className="px-1.5 py-2 text-start font-medium text-ink-2"
+                  className={cn(
+                    'px-1.5 py-2 text-start font-medium text-ink-2',
+                    STACKED_BLOCK,
+                  )}
                 >
                   {t('recurring.periods.col.due')}
                 </th>
                 <th
+                  role="columnheader"
                   scope="col"
-                  className="px-1.5 py-2 text-start font-medium text-ink-2"
+                  className={cn(
+                    'px-1.5 py-2 text-start font-medium text-ink-2',
+                    STACKED_BLOCK,
+                  )}
                 >
                   {t('recurring.form.name')}
                 </th>
                 <th
+                  role="columnheader"
                   scope="col"
-                  className="px-1.5 py-2 text-end font-medium text-ink-2"
+                  className={cn(
+                    'px-1.5 py-2 text-end font-medium text-ink-2',
+                    STACKED_BLOCK,
+                  )}
                 >
                   {t('recurring.periods.col.expected')}
                 </th>
                 <th
+                  role="columnheader"
                   scope="col"
-                  className="px-1.5 py-2 text-start font-medium text-ink-2"
+                  className={cn(
+                    'px-1.5 py-2 text-start font-medium text-ink-2',
+                    STACKED_BLOCK,
+                  )}
                 >
                   {t('recurring.periods.col.status')}
                 </th>
                 <th
+                  role="columnheader"
                   scope="col"
-                  className="px-1.5 py-2 text-end font-medium text-ink-2"
+                  className={cn(
+                    'px-1.5 py-2 text-end font-medium text-ink-2',
+                    STACKED_BLOCK,
+                  )}
                 >
                   {t('recurring.periods.col.actions')}
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup" className={STACKED_BLOCK}>
               {upcoming.map((period) => (
                 <tr
-                  key={`${period.seriesId}:${period.periodStart}`}
-                  className="border-b border-border-subtle last:border-b-0"
+                  key={rowKey(period)}
+                  role="row"
+                  {...{ [ROW_KEY_ATTRIBUTE]: rowKey(period) }}
+                  className={cn(
+                    'border-b border-border-subtle last:border-b-0',
+                    STACKED_BLOCK,
+                  )}
                 >
                   <th
+                    role="rowheader"
                     scope="row"
-                    className="px-1.5 py-2 text-start font-medium text-ink"
+                    className={cn(
+                      'px-1.5 py-2 text-start font-medium text-ink',
+                      STACKED_ROW_HEADER,
+                    )}
                   >
                     {formatCalendarDate(locale, period.dueOn, 'medium')}
                   </th>
-                  <td className="px-1.5 py-2">
+                  <StackedCell
+                    label={t('recurring.form.name')}
+                    className="px-1.5 py-2 max-sm:text-end"
+                  >
                     <Link
                       to="/recurring/$seriesId"
                       params={{ seriesId: period.seriesId }}
-                      className="rounded-sm text-ink underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+                      className="inline-flex target-min-h target-min-w items-center rounded-sm text-ink underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 max-sm:break-words"
                     >
                       {period.seriesName}
                     </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-1.5 py-2 text-end tabular text-ink">
+                  </StackedCell>
+                  <StackedCell
+                    label={t('recurring.periods.col.expected')}
+                    className="whitespace-nowrap px-1.5 py-2 text-end tabular text-ink"
+                  >
                     {formatMoney(
                       locale,
                       makeMoney(
@@ -129,17 +217,23 @@ export function UpcomingPanel({
                         period.expectedCurrencyCode,
                       ),
                     )}
-                  </td>
-                  <td className="px-1.5 py-2">
+                  </StackedCell>
+                  <StackedCell
+                    label={t('recurring.periods.col.status')}
+                    className="px-1.5 py-2"
+                  >
                     <PeriodStatusBadge status={period.derivedStatus} />
-                  </td>
-                  <td className="px-1.5 py-2">
+                  </StackedCell>
+                  <td role="cell" className={cn('px-1.5 py-2', STACKED_BLOCK)}>
                     <PeriodActions
                       period={period}
                       seriesName={period.seriesName}
                       compact
                       onMarkPaid={() => onMarkPaid(period)}
-                      onSkip={() => onSkip(period)}
+                      onSkip={() => {
+                        remember(rowKey(period))
+                        onSkip(period)
+                      }}
                     />
                   </td>
                 </tr>

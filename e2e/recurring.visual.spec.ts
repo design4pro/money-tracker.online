@@ -131,7 +131,7 @@ test('the period history is a real table a keyboard can reach', async ({
 test('every period row action names the date it acts on', async ({ page }) => {
   await gotoApp(page, '/recurring/demo-rec-1')
 
-  const markPaid = page.getByRole('button', { name: /^Mark the period due/ })
+  const markPaid = page.getByRole('button', { name: /^Mark paid, period due/ })
   expect(await markPaid.count()).toBeGreaterThan(0)
   // Two rows, two different names: the accessible name carries the row's date.
   const names = await markPaid.evaluateAll((nodes) =>

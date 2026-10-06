@@ -16,19 +16,24 @@ import type { PeriodView } from '#/server/repos/recurring'
  * fed only unsettled periods (the Upcoming panel) simply passes no `onRevert`; a settled period
  * handed to it draws nothing rather than a button that does nothing.
  *
- * ## Real buttons, named by the row's date
+ * ## Real buttons, named by their label and then the row's date
  *
- * Each is a `<button>`, reachable by Tab in reading order with no hover needed. Three identical
- * *Mark paid* buttons down a column are three identical announcements, so the accessible name
- * carries the due date - *"Mark the period due 1 March as paid"* - which is what tells them apart.
- * A surface that lists periods of **several series** (the Upcoming panel) also passes the series
- * name, because two bills due on the same day would otherwise be two identical names.
+ * Each is a `<button>`, reachable by Tab in reading order with no hover needed. The accessible
+ * name **opens with the visible label** (WCAG 2.5.3, Label in Name), so that voice control's
+ * *"click Mark paid"* finds it, and then says which period it acts on: *"Mark paid, period due
+ * 1 March"*. Three identical *Mark paid* buttons down a column are three identical announcements,
+ * so the date is what tells them apart. A surface that lists periods of **several series** (the
+ * Upcoming panel) also passes the series name, because two bills due on the same day would
+ * otherwise be two identical names. Mark paid, Skip and Undo all take the same shape, so the three
+ * cannot drift.
  *
  * ## A narrow cell stacks them
  *
  * `compact` is for a cell with no room to spare (the Upcoming panel's rail, which must not scroll
- * sideways): the buttons stack and a long label wraps onto a second line instead of widening the
- * column. The series grid, which has the room, keeps them on one line.
+ * sideways): from `sm` up the buttons stack and a long label wraps onto a second line instead of
+ * widening the column. Below `sm` the table is stacked into blocks (see `stacked-table.tsx`), the
+ * cell has the whole width, and the buttons sit on one line like the series grid's, which has the
+ * room at every width.
  *
  * The component draws the buttons and not their cell: the `<td>` belongs to the table that owns
  * its columns, and the callbacks to the route that performs the writes.
@@ -69,7 +74,7 @@ export function PeriodActions({
     <div
       className={
         compact
-          ? 'flex flex-col items-stretch gap-1'
+          ? 'flex items-center justify-end gap-1 sm:flex-col sm:items-stretch'
           : 'flex items-center justify-end gap-1'
       }
     >
