@@ -18,7 +18,8 @@
  * - The amount is applied only when the account the form ends up on is in the currency the amount
  *   was written in. Integer minor units are only comparable inside one currency's scale
  *   (`docs/MONEY.md` §1.1), so an amount that does not match its account is left empty rather than
- *   rescaled.
+ *   rescaled. When that leaves the field empty the form says so ({@link droppedAmountCurrency}),
+ *   because an empty box with no reason looks like a bug.
  * - There is no planned flag in the schema. A URL cannot make an entry planned.
  *
  * ## The way back is a closed shape
@@ -116,6 +117,28 @@ function known(
   return options.find((option) => option.id === id)?.id
 }
 
+/** The currency of the account with this id, when the reference data has it. */
+function currencyOf(
+  reference: TransactionReference,
+  accountId: string,
+): string | undefined {
+  return reference.accounts.find((option) => option.id === accountId)
+    ?.currencyCode
+}
+
+/**
+ * Whether the address's amount is written in the currency of `accountId`. The one condition that
+ * decides if the amount is applied, shared with {@link droppedAmountCurrency} so the note and the
+ * prefill can never disagree about which amounts were dropped.
+ */
+function amountFitsAccount(
+  search: NewTransactionSearch,
+  reference: TransactionReference,
+  accountId: string,
+): boolean {
+  return currencyOf(reference, accountId) === search.currency
+}
+
 /** The form's starting values with whatever the address could safely add to them. */
 export function applyPrefill(
   values: TransactionFormValues,
@@ -124,9 +147,6 @@ export function applyPrefill(
 ): TransactionFormValues {
   const accountId =
     known(reference.accounts, search.account) ?? values.accountId
-  const currencyCode = reference.accounts.find(
-    (option) => option.id === accountId,
-  )?.currencyCode
   const { amount } = search
 
   return {
@@ -135,11 +155,38 @@ export function applyPrefill(
     accountId,
     bookedOn: search.date ?? values.bookedOn,
     amountMinor:
-      amount !== undefined && currencyCode === search.currency
+      amount !== undefined && amountFitsAccount(search, reference, accountId)
         ? asMinor(amount)
         : values.amountMinor,
     categoryId:
       known(reference.categories, search.category) ?? values.categoryId,
     payeeId: known(reference.payees, search.payee) ?? values.payeeId,
   }
+}
+
+/**
+ * The currency the address's amount was written in, while that amount is the reason the field is
+ * empty - and nothing otherwise.
+ *
+ * It answers from what the form holds **now**, not from what {@link applyPrefill} did once, so it
+ * is derived state: it goes quiet as soon as the person types an amount or moves to an account in
+ * the address's currency. It names a currency and never an amount, because an amount in one
+ * currency's scale shown beside another's would read as a figure the person can use
+ * (`docs/MONEY.md` §1.1). An address with an amount and no currency yields nothing: there is no
+ * currency to name, and the recurring screens that write this address always send one.
+ */
+export function droppedAmountCurrency(
+  search: NewTransactionSearch,
+  reference: TransactionReference,
+  current: Pick<TransactionFormValues, 'accountId' | 'amountMinor'>,
+): string | undefined {
+  if (
+    search.amount === undefined ||
+    search.currency === undefined ||
+    current.amountMinor !== null ||
+    amountFitsAccount(search, reference, current.accountId)
+  ) {
+    return undefined
+  }
+  return search.currency
 }

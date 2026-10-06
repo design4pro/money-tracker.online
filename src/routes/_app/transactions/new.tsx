@@ -10,7 +10,8 @@ import {
   emptyFormValues,
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
-import { useTranslate } from '#/lib/i18n'
+import { useLocale, useTranslate } from '#/lib/i18n'
+import { currencyName } from '#/lib/money'
 import { listTemplates } from '#/server/fns/transaction-groups'
 import { createTransaction } from '#/server/fns/transactions'
 
@@ -21,6 +22,7 @@ import { loadTransactionDetail } from './-server/detail'
 import { loadTransactionReference } from './-server/list'
 import {
   applyPrefill,
+  droppedAmountCurrency,
   newTransactionSearchSchema,
   returnTargetOf,
 } from './-lib/new-search'
@@ -193,6 +195,7 @@ interface EditorProps {
 
 function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
   const t = useTranslate()
+  const locale = useLocale()
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
   const refresh = useDataRefresh()
@@ -211,6 +214,13 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
   // A template list that cannot be fetched is not an error this screen reports: the form behind it
   // works, and a failure banner over an optional shortcut would be louder than the shortcut.
   const templates = templatesQuery.data ?? []
+
+  // Only the entry the address started: a repeat save or a template begins a different one, and
+  // saying "the expected amount" there would describe something the person already dealt with.
+  const droppedCurrency =
+    resetToken === 0
+      ? droppedAmountCurrency(search, reference, values)
+      : undefined
 
   /**
    * A draft fills the fields it carries and leaves the rest of the form alone.
@@ -371,6 +381,13 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
         submitLabel={t('action.save')}
         autoFocusAmount
         resetToken={resetToken}
+        amountNote={
+          droppedCurrency === undefined
+            ? undefined
+            : t('transactions.form.droppedAmountNote', {
+                currency: currencyName(droppedCurrency, locale),
+              })
+        }
         afterAmount={
           <TemplatePicker
             templates={templates}
