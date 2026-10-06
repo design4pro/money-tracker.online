@@ -63,7 +63,7 @@
     "id": "om-merge-buddy",
     "skills": ["om-merge-buddy"],
     "label": "om-merge-buddy - report which open PRs can merge right now",
-    "text": "Report only - never merge, comment, label or edit anything.\nTreat changes-requested, qa-failed, blocked, do-not-merge and in-progress as hard blocks, and with\nthe QA gate on, needs-qa without qa-approved - only a human sets qa-approved. An unresolved review\nthread also blocks: the develop ruleset merges nothing with one open, whatever the review decision\nsays. For each PR that cannot merge, name exactly what it is waiting for."
+    "text": "Report only - never merge, comment, label or edit anything.\nTreat changes-requested, qa-failed, blocked, do-not-merge and in-progress as hard blocks, and with\nthe QA gate on, needs-qa without qa-approved - the QA specialist panel (om-auto-qa-pr) or a QA reviewer sets qa-approved. An unresolved review\nthread also blocks: the develop ruleset merges nothing with one open, whatever the review decision\nsays. For each PR that cannot merge, name exactly what it is waiting for."
   },
   {
     "id": "om-review-prs",

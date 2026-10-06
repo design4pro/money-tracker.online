@@ -37,6 +37,35 @@ stop at merge-ready under `--allow-merge` when the ruleset requires none.
 carries `do-not-merge`, ends at merge-ready under `--allow-merge` too: the `develop` -> `main`
 promotion deploys production and is the owner's to merge.
 
+## Nothing into `develop` waits for a person
+
+Owner decision 2026-10-06 (ADR 0031): QA, `risk-high` and `security` are judged by specialist
+sub-agents, and a rejection goes back to the agents. These rules cover the run and every skill it
+chains:
+
+- **QA runs through the unattended sign-off.** Where the chain reaches the QA stage (state matrix
+  rows 7 and 10) of a PR that touches a user-facing surface, run
+  `om-auto-qa-pr {pr} --self-qa-signoff` (the repo override of `om-auto-qa-pr` says how its panel
+  decides). Row 10 never stops to request a person's sign-off: it runs that QA stage. After a
+  successful sign-off, re-read the QA labels and continue with row 9 under `--allow-merge` in the
+  same run.
+- **A `risk-high` or `security` PR merges on a security verdict.** Before row 9 merges one,
+  whether or not it touches a user-facing surface, ask `security-tenancy-reviewer` through
+  `.ai/skills/afk-decide/SKILL.md` to judge the diff at the current head, and merge only on its
+  approving verdict, recorded in the PR body's Resolved assumptions table with the head it judged.
+  A refusal is a failed round of the loop below, its findings the fix list. A verdict on an older
+  head does not count.
+- **Every rejection goes back to the agents, three rounds at most.** A failed check,
+  `changes-requested`, a `qa-failed` the QA panel set (its 🤖 QA comment carries the verdicts) and a
+  refused security verdict all route to `om-auto-fix-pr {pr}` with the findings, and then to
+  review, QA and the security verdict again on the new head - never to a stop that asks for a
+  person. Row 0c's failed-QA stop applies only to a `qa-failed` a person set; `om-auto-fix-pr`
+  removes the panel's `qa-failed` once its fix is pushed. Each round opens with a 🤖 comment
+  `Autopilot round <n>/3: <what failed>`, counted from the PR's comments, so the count survives
+  across runs. When the third round still fails, add `blocked` and post one comment that starts
+  `🤖 HUMAN-ONLY: ` and lists what each round tried and what still fails: that is the only way this
+  loop hands a PR to a person.
+
 ## A spec PR the plan-to-spec run opened merges
 
 The installed skill treats a spec-only design PR as draft-by-intent
