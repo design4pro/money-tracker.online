@@ -56,8 +56,8 @@ request by hand under any title at all.
 - A second review is not a merge requirement (ADR 0027 removed the mandatory second reviewer). An
   approving review is needed only when the base branch's ruleset asks for one; read it before step
   3: `gh api "repos/{owner}/{repo}/rules/branches/<baseRefName>" --jq '[.[] | select(.type ==
-"pull_request") | .parameters] | {approvals: (map(.required_approving_review_count) | max // 0),
-codeOwners: (map(.require_code_owner_review) | any)}'`. With `approvals: 0` and
+  "pull_request") | .parameters] | {approvals: (map(.required_approving_review_count) | max // 0),
+  codeOwners: (map(.require_code_owner_review) | any)}'`. With `approvals: 0` and
   `codeOwners: false` (true for `develop` today), skip the approval when the run's account
   authored the PR, and go straight to step 4 without asking. Never report "needs an approving
   review from someone other than the author" as a blocker then. Only when the ruleset requires

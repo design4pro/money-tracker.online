@@ -161,7 +161,7 @@
   {
     "id": "om-approve-merge-pr",
     "label": "om-approve-merge-pr - approve and squash-merge one PR",
-    "text": "<PR number only on this line - e.g. 312>\n\nNo flags; add \"and file a follow-up: <text>\" to open one at the same time.\nRefuse and report when the PR is draft, conflicting, or carries changes-requested, qa-failed,\nblocked or do-not-merge, or when needs-qa lacks qa-approved - only a human sets qa-approved.\nBefore merging, run list-review-threads: any unresolved, non-outdated thread blocks the merge even\nwith an approving review and green CI, because the develop ruleset says so. Report such threads by\npath and author and offer om-auto-fix-pr - never resolve them from here.\nRoute a fixable blocker to om-auto-fix-pr (--ci-only for red CI) rather than forcing the merge."
+    "text": "<PR number only on this line - e.g. 312>\n\nNo flags; add \"and file a follow-up: <text>\" to open one at the same time.\nRefuse and report when the PR is draft, conflicting, or carries changes-requested, qa-failed,\nblocked or do-not-merge, or when needs-qa lacks qa-approved - the om-auto-qa-pr specialist panel or a QA reviewer sets it.\nBefore merging, run list-review-threads: any unresolved, non-outdated thread blocks the merge even\nwith an approving review and green CI, because the develop ruleset says so. Report such threads by\npath and author and offer om-auto-fix-pr - never resolve them from here.\nRoute a fixable blocker to om-auto-fix-pr (--ci-only for red CI) rather than forcing the merge."
   },
   {
     "id": "om-auto-qa-pr",
