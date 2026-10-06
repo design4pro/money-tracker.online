@@ -4,7 +4,7 @@
 | ------------------ | ------------------------------------------- |
 | **Status**         | ready                                       |
 | **Issue**          | none                                        |
-| **Spec PR**        | none                                        |
+| **Spec PR**        | #592                                        |
 | **Implementation** | none                                        |
 | **Plan**           | 03-S1 (docs/plans/03-money-and-currency.md) |
 
