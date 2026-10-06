@@ -567,6 +567,8 @@ const messages = {
   'transactions.form.noCategories': 'No categories yet',
   'transactions.form.conversionNote':
     'Recorded in {currency} and converted to {base} at the rate for the date of the entry.',
+  'transactions.form.droppedAmountNote':
+    "The expected amount is in {currency}; enter the amount in your account's currency.",
   'transactions.form.error.title': 'The entry was not saved',
   'transactions.form.error.amount': 'Enter an amount greater than zero.',
   'transactions.form.error.account': 'Choose the account this belongs to.',

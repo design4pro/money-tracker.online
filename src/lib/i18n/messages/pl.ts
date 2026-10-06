@@ -584,6 +584,8 @@ const messages = {
   'transactions.form.noCategories': 'Nie ma jeszcze kategorii',
   'transactions.form.conversionNote':
     'Zapisujemy w walucie {currency} i przeliczamy na {base} po kursie z dnia, którego dotyczy wpis.',
+  'transactions.form.droppedAmountNote':
+    'Oczekiwana kwota jest w walucie {currency}; wpisz kwotę w walucie swojego konta.',
   'transactions.form.error.title': 'Nie zapisaliśmy tego wpisu',
   'transactions.form.error.amount': 'Podaj kwotę większą od zera.',
   'transactions.form.error.account': 'Wybierz konto, którego dotyczy wpis.',
