@@ -15,7 +15,8 @@
  * 2. **Object first, quota second, row third, compensating delete on throw.** The order `11-S3`
  *    established for attachments (`./attachments`), for the same reason and with the same
  *    asymmetry: a row pointing at nothing is a batch a person can see and cannot open, while an
- *    object with no row is invisible and is swept by the orphaned-object cron.
+ *    object with no row is invisible and waits for the orphaned-object sweep, which is planned and
+ *    not yet built.
  *
  * 3. **Nothing that was parsed is stored.** There is no staging table and none is wanted: the
  *    preview recomputes from the bytes in R2 plus the confirmed mapping, and the commit runs that
@@ -43,11 +44,13 @@ import {
   IMPORT_STATUSES,
   importBatches,
 } from '#/server/db/schema'
+import { InvalidKeyError, assertKeyInOrg } from '#/server/files/keys'
 import { safeFileName } from '#/server/files/upload'
 import { IMPORT_MAX_BYTES } from '#/server/import/types'
+import { createLogger } from '#/server/observability/logger'
 
 import { assertWithinLimit, createTenantRepository } from './base'
-import { ConflictError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 import { getAccount } from './accounts'
 
 import type { ImportBatchRow, ImportStatus } from '#/server/db/schema'
@@ -60,6 +63,9 @@ import type { CursorPage, TenantScope } from './base'
  * function that cannot be handed a different value.
  */
 const importBatchRepo = createTenantRepository(importBatches, 'import batch')
+
+/** Where {@link readImportBatchFile} reports a refusal. No request context here, so the console sink and nothing else. */
+const logger = createLogger({ context: { component: 'repo' } })
 
 /** The metered resource. Named once so the meter and the count cannot drift apart. */
 const IMPORT_QUOTA_METRIC = 'importsPerMonth'
@@ -137,6 +143,38 @@ export function importFileKey(
   fileName: string,
 ): string {
   return `imports/${organizationId}/${batchId}/${fileName}`
+}
+
+/**
+ * The batch's stored file, or `null` when the batch has no key or the bucket has no such object.
+ *
+ * **This is the only place a batch's file is fetched**, so the preview, the mapping step and any
+ * later commit path share one check. `file_r2_key` is free text as far as the database is
+ * concerned, and the scoped `SELECT` proves the *row* is the caller's, not that the *key* is: a
+ * bug, a bad restore or a hand-edited row could point A's batch at B's object. A key outside this
+ * workspace's `imports` prefix is therefore a {@link NotFoundError} for the batch, raised before the
+ * bucket is touched and indistinguishable from a batch that does not exist; the warning carries the
+ * batch id and never the key or the other workspace.
+ *
+ * What a `null` means to the caller — which sentence to show — stays the caller's decision.
+ */
+export async function readImportBatchFile(
+  scope: TenantScope,
+  bucket: R2Bucket,
+  batch: ImportBatchRow,
+): Promise<R2ObjectBody | null> {
+  if (batch.fileR2Key === null) return null
+
+  try {
+    assertKeyInOrg('imports', scope.ctx.organizationId, batch.fileR2Key)
+  } catch (error) {
+    if (!(error instanceof InvalidKeyError)) throw error
+    logger.warn('import batch key is outside the workspace prefix', {
+      batchId: batch.id,
+    })
+    throw new NotFoundError('import batch', batch.id)
+  }
+  return bucket.get(batch.fileR2Key)
 }
 
 /* -------------------------------------------------------------------------- */
