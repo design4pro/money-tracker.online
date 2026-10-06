@@ -841,9 +841,22 @@ the series detail grid and _Due soon_ on `/recurring`.
   alert. The visible loading line is hidden from assistive technology.
 - **The series link in _Due soon_** carries the claimed target size on both axes (`target-min-h`,
   `target-min-w`, vertically centred `inline-flex`); the `sm` button keeps its size.
-- **Reflow:** both tables are two-dimensional and rely on the data-table exception of 1.4.10, so
-  at 360px the actions column scrolls with the table. A stacked layout below `sm` is deliberately
-  not done here (#543).
+- **Reflow:** from `sm` up both tables are tables and scroll sideways in their own region. Below
+  `sm` each row stacks into a block, so Mark paid, Skip and Undo are reachable at 360px without
+  scrolling (#543): the due date opens the block, every other cell is one line with its column
+  label on the start side and its value on the end side, and the actions are the last line, end
+  aligned and always on one row (`compact` only stacks the buttons from `sm` up). Every class is
+  gated `max-sm:`, so nothing changes at `sm` and above. The shared classes and the self-labelling
+  cell are `stacked-table.tsx`.
+  - _Semantics survive the `display` change:_ the table, both row groups, rows, column headers,
+    the due-date row header and cells carry their `role` explicitly, with `<caption>` and `scope`
+    kept, because a non-table `display` can drop a native role in some browser and screen reader
+    pairs.
+  - _The header row is `sr-only`, not `display: none`,_ and the label printed in each cell is
+    `aria-hidden` and comes from the column header's own catalogue key, so the column header is
+    announced once. A cell with nothing to say on a row (the difference of an unsettled period)
+    prints no label and stays in the row.
+  - _Not done:_ a row menu, a sticky actions column, another component in place of the tables.
 - **The one thing it is not:** a row menu. The actions are visible buttons on purpose; burying
   _Mark paid_ behind a menu adds a click to the only thing the table is for.
 
