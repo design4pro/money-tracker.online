@@ -49,12 +49,14 @@ chains:
   decides). Row 10 never stops to request a person's sign-off: it runs that QA stage. After a
   successful sign-off, re-read the QA labels and continue with row 9 under `--allow-merge` in the
   same run.
-- **A `risk-high` or `security` PR merges on a security verdict.** Before row 9 merges one,
+- **A `risk-high` or `security` PR merges on a security verdict.** Before row 9 merges one (the
+  label, or the risk `SDLC.md` infers from the diff: a label the author left off does not skip it),
   whether or not it touches a user-facing surface, ask `security-tenancy-reviewer` through
   `.ai/skills/afk-decide/SKILL.md` to judge the diff at the current head, and merge only on its
   approving verdict, recorded in the PR body's Resolved assumptions table with the head it judged.
   A refusal is a failed round of the loop below, its findings the fix list. A verdict on an older
-  head does not count.
+  head does not count: merge with `gh pr merge --match-head-commit <the judged head>`, so a push
+  after the verdict makes the merge fail instead of landing unjudged code.
 - **Every rejection goes back to the agents, three rounds at most.** A failed check,
   `changes-requested`, a `qa-failed` the QA panel set (its 🤖 QA comment carries the verdicts) and a
   refused security verdict all route to `om-auto-fix-pr {pr}` with the findings, and then to

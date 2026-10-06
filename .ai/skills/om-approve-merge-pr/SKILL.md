@@ -51,13 +51,14 @@ request by hand under any title at all.
   stale `QA head:`, and `needs-qa` beside `skip-qa` route to
   `om-auto-qa-pr <number> --self-qa-signoff` on the current head (treat the pair as `needs-qa`);
   `changes-requested` and a `qa-failed` the QA panel set route to `om-auto-fix-pr <number>`. Never
-  merge past one of them in this run. A `qa-failed` a person set, an active `qa`, `blocked` and
-  `do-not-merge` still stop and report.
+  merge past one of them in this run. A `risk-high` or `security` PR merges with
+  `--match-head-commit <head the security verdict judged>` (`.ai/skills/om-pr-autopilot/SKILL.md`). A
+  `qa-failed` a person set, an active `qa`, `blocked` and `do-not-merge` still stop and report.
 - A second review is not a merge requirement (ADR 0027 removed the mandatory second reviewer). An
   approving review is needed only when the base branch's ruleset asks for one; read it before step
   3: `gh api "repos/{owner}/{repo}/rules/branches/<baseRefName>" --jq '[.[] | select(.type ==
-  "pull_request") | .parameters] | {approvals: (map(.required_approving_review_count) | max // 0),
-  codeOwners: (map(.require_code_owner_review) | any)}'`. With `approvals: 0` and
+"pull_request") | .parameters] | {approvals: (map(.required_approving_review_count) | max // 0),
+codeOwners: (map(.require_code_owner_review) | any)}'`. With `approvals: 0` and
   `codeOwners: false` (true for `develop` today), skip the approval when the run's account
   authored the PR, and go straight to step 4 without asking. Never report "needs an approving
   review from someone other than the author" as a blocker then. Only when the ruleset requires
