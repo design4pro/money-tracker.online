@@ -252,7 +252,8 @@ test.describe('a 360px screen still shows its own subject', () => {
 })
 
 /**
- * A `Select` listbox shows every option in full, whatever the width of the trigger.
+ * A `Select` listbox shows every option in full, whatever the width of the trigger, up to the
+ * viewport cap below (an option wider than the cap still ends in an ellipsis).
  *
  * The popover used to be pinned to the trigger's width, so the dashboard period selector's Polish
  * options ("Poprzedni miesiąc", "Ostatnie 12 miesięcy") ended in an ellipsis at 360px (#559). The
