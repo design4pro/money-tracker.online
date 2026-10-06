@@ -291,8 +291,16 @@ target `develop` until its base merges, which is expected, not a finding.
   and starts CI. The PR does not merge until the required checks are green on that run. A local
   validation-gate pass is review evidence, never a substitute for them. No force-push, no
   `--no-verify`.
-- **Whether CI should start on a retarget** is a workflow change and a merge-policy decision, made
-  in #546, not here.
+- **CI does not start on a retarget, by design (#546).** Listening to `edited` would make every
+  title or body edit a CI trigger, and two things make that unsafe. A run for `edited` joins the
+  `ci-<ref>` concurrency group, which cancels in-flight pull request runs, so an edit could cancel
+  a real run on the same ref. A job guarded to skip unless the base changed would report as skipped
+  under the required check names, and GitHub counts a skipped required check as passing, so a
+  failing or cancelled result could be masked. The ruleset already keeps a PR whose required checks
+  never reported from merging, so the cost of the gap is the remedy above: one merge commit and one
+  push per stacked PR. A merge without the required checks is an admin bypass, and it is reported as
+  one. Revisit only after a second stacked-PR incident: then a trigger on `edited` with a per-event
+  concurrency key and no cancellation on `edited`.
 
 ### The Reconciler
 
