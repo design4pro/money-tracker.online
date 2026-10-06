@@ -812,8 +812,8 @@ the series detail grid and _Due soon_ on `/recurring`.
 - **Which buttons:** a function of the period, never of the surface. An unsettled period gets _Mark
   paid_ and _Skip_; a paid or skipped one gets _Undo_ alone. A surface fed only unsettled periods
   passes no `onRevert`, and a settled period handed to it draws nothing.
-- **A cell with no room to spare:** `compact` stacks the buttons and lets a long label wrap onto a second
-  line rather than widening the column. _Due soon_ uses it so the 30rem rail never scrolls sideways
+- **A cell with no room to spare:** from `sm` up `compact` stacks the buttons and lets a long label wrap
+  onto a second line rather than widening the column (below `sm` see _Reflow_). _Due soon_ uses it so the 30rem rail never scrolls sideways
   (`e2e/desktop-density.spec.ts`); the series grid keeps the buttons on one line.
 - **The states:** the ordinary button states. There is no hover-only affordance - every action is a
   `<button>` reachable by Tab in reading order.
@@ -843,10 +843,11 @@ the series detail grid and _Due soon_ on `/recurring`.
   `target-min-w`, vertically centred `inline-flex`); the `sm` button keeps its size.
 - **Reflow:** from `sm` up both tables are tables and scroll sideways in their own region. Below
   `sm` each row stacks into a block, so Mark paid, Skip and Undo are reachable at 360px without
-  scrolling (#543): the due date opens the block, every other cell is one line with its column
-  label on the start side and its value on the end side, and the actions are the last line, end
-  aligned and always on one row (`compact` only stacks the buttons from `sm` up). Every class is
-  gated `max-sm:`, so nothing changes at `sm` and above. The shared classes and the self-labelling
+  scrolling (#543): the due date opens the block, every other cell is a line with its column
+  label on the start side and its value on the end side (a long value, such as a series name,
+  wraps), and the actions are the last line, end aligned and always on one row (`compact` only
+  stacks the buttons from `sm` up). Every layout change is scoped below `sm`, so nothing changes
+  at `sm` and above. The shared classes and the self-labelling
   cell are `stacked-table.tsx`.
   - _Semantics survive the `display` change:_ the table, both row groups, rows, column headers,
     the due-date row header and cells carry their `role` explicitly, with `<caption>` and `scope`

@@ -166,6 +166,9 @@ describe('UpcomingPanel', () => {
     for (const utility of ['target-min-h', 'target-min-w', 'inline-flex']) {
       expect(link.className).toContain(utility)
     }
+    // A later `min-w-0` variant would win over `target-min-w` below `sm` and shrink a short name's
+    // link under the claimed width.
+    expect(link.className).not.toMatch(/min-w-0/)
   })
 })
 

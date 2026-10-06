@@ -283,7 +283,7 @@ export function PeriodGrid({
                       ? undefined
                       : t('recurring.periods.col.variance')
                   }
-                  className="px-3 py-2 text-caption"
+                  className="px-3 py-2 text-caption max-sm:text-end"
                 >
                   <VarianceCell period={period} variance={variance} />
                 </StackedCell>

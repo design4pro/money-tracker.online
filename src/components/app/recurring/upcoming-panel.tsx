@@ -196,12 +196,12 @@ export function UpcomingPanel({
                   </th>
                   <StackedCell
                     label={t('recurring.form.name')}
-                    className="px-1.5 py-2"
+                    className="px-1.5 py-2 max-sm:text-end"
                   >
                     <Link
                       to="/recurring/$seriesId"
                       params={{ seriesId: period.seriesId }}
-                      className="inline-flex target-min-h target-min-w items-center rounded-sm text-ink underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 max-sm:min-w-0 max-sm:break-words"
+                      className="inline-flex target-min-h target-min-w items-center rounded-sm text-ink underline-offset-2 outline-focus hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 max-sm:break-words"
                     >
                       {period.seriesName}
                     </Link>

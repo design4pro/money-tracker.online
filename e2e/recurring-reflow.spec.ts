@@ -151,10 +151,10 @@ for (const locale of LOCALES) {
       await expectTableRoles(region, copy)
       await expectNoSeriousViolations(page, '/recurring (stacked due soon)')
 
-      // Reachable by keyboard alone: Tab from the region lands on the first row's action.
-      const first = actionsIn(region).first()
-      await first.focus()
-      await expect(first).toBeFocused()
+      // Reachable by keyboard alone: Tab from the first row's series link lands on its action.
+      await region.getByRole('row').getByRole('link').first().focus()
+      await page.keyboard.press('Tab')
+      await expect(actionsIn(region).first()).toBeFocused()
     })
 
     test('the period grid on /recurring/$seriesId stacks its rows and reaches every action without scrolling', async ({
