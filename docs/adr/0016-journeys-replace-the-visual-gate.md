@@ -182,3 +182,43 @@ skip it by `isMobile`, as they skip the other engines.
 What this costs is WebKit at phone width in the gate: safe-area insets, `100dvh` and momentum
 scrolling are now checked when a change asks for them, not on every merge. The measurements behind
 one unsharded leg are in the comment above the `e2e` matrix in `ci.yml`.
+
+## Amendment 2026-10-06 (the route scans follow the project's viewport)
+
+**A correction of one sentence in amendment 2026-09-18; the decision it records does not change.**
+That amendment says that the route scans in `accessibility.spec.ts` are not among the cases that
+need the phone leg, because "`openSurface` opens its own context at Playwright's default 1280x720
+under every project, `mobile-safari` included". That is not what the suite does. A context made through the
+`browser` fixture, bare `browser.newContext()` included, already receives the running project's
+`use` options: viewport, `isMobile` and touch, locale, time zone, colour scheme and the clock-pin
+header. `openSurface` therefore scans at the width of the project it runs under, and the 1280x720
+in the sentence is the registry default of `Desktop Chrome`, which no browser project scans at.
+Measured in #336 (PR #531) with a throwaway probe on Playwright 1.62.1.
+
+The viewports, as the installed registry resolves the `devices[...]` entries that
+`playwright.config.ts` spreads:
+
+| Project           | Viewport at scan time | Source in `playwright.config.ts`                       |
+| ----------------- | --------------------- | ------------------------------------------------------ |
+| `chromium`        | 1440x900              | `Desktop Chrome`, viewport set explicitly              |
+| `mobile-chromium` | 412x839               | `Pixel 7`, `isMobile` and touch                        |
+| `mobile-safari`   | 393x659               | `iPhone 15`, `isMobile` and touch; leaves CI per 09-18 |
+
+Two of those figures are not the ones the comments in `playwright.config.ts` and the docblocks of
+`accessibility.spec.ts` and `e2e/support/surfaces.ts` give. `412x915` and `393x852` are the
+registry's `screen` size of the device; the `viewport` a page lays out in is a different, shorter
+rectangle. Width, which is what a responsive layout and the bottom bar key on, is the same in both.
+Those comments are not this record's to correct and are left as they are.
+
+So under `mobile-chromium` the route scans already ran at phone width: the leg carries the route
+scans as well as the bottom-bar and panel cases the 2026-09-18 amendment names, and the reason for
+keeping it is stronger than that amendment said.
+
+The evidence is the test `a scan runs at the project's viewport width` in
+`e2e/accessibility.spec.ts`, which opens a surface through `openSurface` and asserts that
+`window.innerWidth` equals the project's `use.viewport.width`. It holds the outcome rather than the
+mechanism, so it goes red the day a scan stops following the project.
+
+The decision stands: the CI legs are `chromium` and `mobile-chromium`, and `mobile-safari` stays out
+of CI and in `playwright.config.ts` for a change that asks for WebKit at phone width. The 2026-09-18
+text above is left as written.
