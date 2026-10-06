@@ -395,9 +395,16 @@ the script refuses to delete an enabled stray.
   specialist's approving verdict (§ Delegated decisions), and the implementing automation still
   requires `risk-low` to start by itself. The PR still passes every review and QA gate above.
 - **Governance documents are `risk-high`.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`,
-  `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record decisions a human owns, and a
-  person reads the decision before merging a change to one. `.github/CODEOWNERS` routes the same
-  paths to a reviewer; both rulesets keep `require_code_owner_review: false`.
+  `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record decisions a human owns. A change
+  to one takes a second reviewer and merges on the security and tenancy specialist's verdict at the
+  head it judged (ADR 0031), not on a person's reading. `.github/CODEOWNERS` routes the same paths
+  to a reviewer, which is informational: both rulesets keep `require_code_owner_review: false`. For
+  such a change a person is the merger only where `afk-decide` § 5 and ADR 0031 name one: the
+  `develop` -> `main` promotion, a `do-not-merge` PR, and a PR `blocked` after the third failed
+  round.
+- A person's `qa-failed` or an active `qa` label stops a PR (ADR 0031 § Consequences) but is
+  deliberately not counted by the WIP cap: only `blocked`, `do-not-merge` and a parked
+  `changes-requested` count.
 - To stop it all, `cez automation pause <id>`, or start the cockpit with `CEZ_AUTOMATIONS=0`.
 
 **The agent layer is this repository's.** `.ai/cezar/workflows/`, `.ai/scripts/`,
