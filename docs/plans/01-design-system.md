@@ -83,11 +83,12 @@ to delete it.
   also records the house rule separating a skeleton from a spinner.
 - **Tokens.** Every token this stage needs already exists from `00-S3`. If a primitive stage reports
   a missing token, it is a `00-foundations.md` requisition and never a hex literal here.
-- **Accessibility.** The gallery is designed to be the surface the AAA claims are demonstrated on:
-  every hit area measured at ≥44×44 CSS px by the visual spec, and the focus ring checked against
-  `docs/ACCESSIBILITY.md` §3's 2.4.11 / 2.4.12 statement at every scroll position. It demonstrates
-  none of that today, because it does not exist — where the evidence for those five claims comes
-  from meanwhile is #215.
+- **Accessibility.** The provenance of the five named AAA criteria is `docs/ACCESSIBILITY.md` §3
+  (the `_Verified by:_` paragraph under each criterion) and §5.2 (what is and is not automated, and
+  that the probes are advisory); the gallery is not their evidence surface. It will be an additive
+  demonstration surface: every hit area measured at ≥44×44 CSS px by the visual spec, and the focus
+  ring checked against §3's 2.4.11 / 2.4.12 statement at every scroll position. It demonstrates none
+  of that today, because it does not exist, and nothing in the claim waits on it.
 
 ### Quota
 
@@ -128,10 +129,10 @@ means for every later stage, so ticking one it did not look at is worse here tha
 
 ### Blockers
 
-None for building the stage. One open question rides on it: `docs/ACCESSIBILITY.md` claims five AAA
-criteria and this stage's gallery is the surface they were designated to be demonstrated on. The
-gallery does not exist, so the provenance of those five claims is unsettled - #215. That is a
-question for a human, not a blocker on the code.
+None for building the stage. The question #215 raised, where the evidence for the five AAA criteria
+that `docs/ACCESSIBILITY.md` claims comes from, is answered and blocks nothing: it comes from §3
+(per-criterion `_Verified by:_`) and §5.2 of that document, not from this stage's gallery, which
+stays a future, additive demonstration surface whose first stage is this one.
 
 ---
 

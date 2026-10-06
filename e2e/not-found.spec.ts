@@ -78,8 +78,9 @@ const DOCUMENT_404 =
   /^console\.error: Failed to load resource: the server responded with a status of 404 \(Not Found\)$/
 
 /**
- * A watched page in a context carrying this project's `use` options — storage state, locale,
- * viewport and the clock pin — which `browser.newContext()` does not inherit on its own.
+ * A watched page in a context built from the `contextOptions` fixture. `browser.newContext()`
+ * already applies the project's other `use` options (viewport, locale, the clock pin); passing the
+ * fixture adds a `use.contextOptions` override on top, the way `openSurface` does.
  */
 async function watchedPage(
   browser: Browser,

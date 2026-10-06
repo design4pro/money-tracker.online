@@ -21,7 +21,7 @@ the rules of `SDLC.md`.
   and partial automation is the point, `systemPrompt`, which is prepended to every run's prompt
   and is where the language contract lives, and `skillsRepos`, which is deliberately empty:
   listing a repository there hands `.claude/skills/` to the cockpit, which then replaces the
-  vendored `om-*` tree. The collection's SHA lives in `skills-lock.json` alone)). Cezar's own
+  vendored `om-*` tree. No SHA is recorded in the config or in `skills-lock.json`: the committed tree pins the collection)). Cezar's own
   `.ai/cezar/.gitignore` keeps run state, worktrees and its automations store out of git;
   `config.json` and `workflows/` are tracked. `defaultRunner` is deliberately absent from it: the
   backend is a fact about the host, so each host names its own in `~/.cezar/config.json`
@@ -56,8 +56,9 @@ add -b` writes the new branch's upstream into the shared config, git's config lo
     was handed, so the automation re-reads one window forever (planned.travel#351). The fork
     widens the budget of a poll that did not move its cursor and records the cursor it gave up at
     as `widenExhaustedAt`.
-- Skills: `.claude/skills/om-*` are vendored files, byte-identical to the pinned upstream SHA, and
-  `skills-lock.json` records it. A worktree therefore has the collection the moment it is cut, and
+- Skills: `.claude/skills/om-*` are vendored files, and the committed tree is what pins them: no SHA is
+  recorded anywhere, and `skills-lock.json` holds a per-skill `computedHash` of each entry point as
+  provenance. A worktree therefore has the collection the moment it is cut, and
   the workflow's setup step installs dependencies only. `pnpm install-skills` re-installs and
   updates them; the diff is a PR, read with `/om-apply-upgrade-notes`, and `skills-lock.json`
   moves in the same commit. Repo specifics live in
@@ -383,6 +384,26 @@ for a run a human starts, and an automation run uses the backend CLI's own defau
 automation sets `task.model` in `docs/agents/cezar-automations.json`.
 `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails any agent step that pins one again.
 
+Which CLI and which model that is resolves in two chains, read from the cezar source
+(`workflows/run.ts`, `config.ts` and `automations/task-template.ts` in `design4pro/cezar` at
+`d55ede1e`, 2026-10-05):
+
+- **Runner.** The run's `task.runner` if set; otherwise the host's `agentDefaults.runner` in
+  `~/.cezar/config.json`; otherwise cezar's built-in `claude`. The repository supplies none of the
+  three, because `defaultRunner` is absent from `.ai/cezar/config.json` (see the runner note under
+  "Install and configure"). A runner is a fact about the host, so this repository cannot name it:
+  ask the host with `jq .agentDefaults ~/.cezar/config.json`. On the host this was written from
+  (2026-10-05) it prints `{"runner": "claude"}`, which is a host value and not a repository fact.
+- **Model.** The run's `task.model` if set; otherwise nothing is passed and the resolved runner's CLI
+  uses its own default. `defaultModels` in `.ai/cezar/config.json` (currently
+  `{"claude": "claude-sonnet-5-5"}`) is only what the cockpit composer preselects for a human-started
+  run; it does not apply to an automation run.
+
+Two things override these. A run a human starts picks the runner and the model in the cockpit
+composer. An automation sets `task.runner` and `task.model` in `docs/agents/cezar-automations.json`;
+none of the automations sets either today, so every automation run takes the host's runner and that
+CLI's default model.
+
 The task text an event automation sends is the issue or PR number alone (`{{github.number}}`); a
 second token would read as a brief to `om-auto-fix-issue`, which is why the cockpit's pre-filled
 `Fix GitHub issue #<n>: <title>` is safe only because the `om-auto-fix-issue` override treats a
@@ -456,6 +477,30 @@ same work. To retire them on the host, disable both in the cockpit (Automations)
 `.ai/scripts/cez-automations.sh --dry-run --prune` and `--prune`; the Reconciler's sync re-applies
 the file without `--prune`, which disables the issue pair but only lists the two schedules.
 
+**Renaming an automation:** `name` is the identity key of `.ai/scripts/cez-automations.sh`. It looks
+a definition up in the cockpit by `name` alone: a match is updated in place, a miss is created
+enabled. A changed `name` therefore reads as a new automation, not as a rename, and the cockpit
+keeps the old one as an enabled stray. `--prune` refuses to delete an enabled stray, and the
+Reconciler's sync (which re-applies the file without `--prune`) only lists it, so both triggers fire
+until someone disables the old definition by hand: two agent runs per issue or pull request opened.
+The order that is safe is the reverse of the one that is tempting. On every cockpit that holds the
+old name (a second host, one restored from a backup, a sibling repository's cockpit before its own
+sync), first rename the definition in place through the API, or disable it in the cockpit and prune
+it. Only then run the script, and `--dry-run` first: it prints one line per definition, and no
+`would create <name>` line for a renamed entry is the evidence the rename took. Never run the script
+first. `task.workflow` cannot replace `name` as the
+key, because it is not unique (`issue-groom` is run by more than one automation); a different key is
+a kit-side design change, not a consumer note.
+
+The instance: kit 42 (#312, commit `5775c98`) renamed six automations from their workflow ids to
+display names - `issue-groom`, `issue-regroom`, `issue-autofix`, `issue-spec`, `pr-autopilot` and
+`pr-review-threads`. Those are history, not the current names (see the list above), and some of
+them are still workflow ids. The retired kit's pull request description (design4pro/agent-kit#42)
+says both running cockpits were renamed in place through the API before the sync, and that the
+dry-run then read `would update 11, would create 0` (a total the script itself does not print). That
+step is recorded only there: it is not verifiable from this repository, so read it as the kit's
+account, not as a fact established here.
+
 No label starts a run (ADR 0029). Every event trigger is gated on who can produce it: the open
 events by author, and the unlabel event both by author and because only a collaborator can remove
 a label. This matters because the agent step holds Bash with no allowlist and the issue body is its
@@ -509,8 +554,9 @@ host, in `design4pro/cezar` (`host/reconciler`, its ADR 0009), with no Cezar eng
 }
 ```
 
-At most one action per kind, in the order implement, unblock, triage, slice, write-spec; a kind with no
-candidate is left out, and a repository with nothing to do prints `"actions": []`. `target` is an issue
+Up to three actions each for implement, unblock and triage, best first, so a candidate the Reconciler cannot
+start hands its turn to the next, and one each for slice and write-spec, in the order implement, unblock,
+triage, slice, write-spec; a kind with no candidate is left out, and a repository with nothing to do prints `"actions": []`. `target` is an issue
 (`#123`), a spec path (`.ai/specs/<file>.md`) or a plan stage id (`02-S3`). `--plan` is a separate output from
 `--json`, `--next` and `--flow`, and combining them is an error. The Reconciler sends `workflow` and `task` as
 they are.

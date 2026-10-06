@@ -36,11 +36,12 @@ import { fileURLToPath } from 'node:url'
 
 import { and, eq, like, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { organization, user } from '#/server/db/auth-schema'
 import {
   accounts,
+  attachments,
   budgetCategories,
   currencies,
   payees,
@@ -90,6 +91,11 @@ import { isMember, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
 import { notify } from '#/server/notify/dispatch'
+import {
+  createAttachment,
+  deleteAttachment,
+  getAttachmentForRead,
+} from '../attachments'
 import {
   advanceImportBatch,
   createImportBatch,
@@ -964,6 +970,35 @@ describe('budgets cannot be reached across a workspace boundary', () => {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * Only the three methods the import and attachment paths call, with a memory of what each was asked
+ * to do. `get` answers `null`: the cases below assert that it was *not called*, so what it would
+ * have returned is beside the point.
+ */
+class RecordingBucket {
+  readonly writes: Array<string> = []
+  readonly reads: Array<string> = []
+  readonly deletes: Array<string> = []
+
+  async put(key: string): Promise<unknown> {
+    this.writes.push(key)
+    return {}
+  }
+
+  async get(key: string): Promise<null> {
+    this.reads.push(key)
+    return null
+  }
+
+  async delete(key: string): Promise<void> {
+    this.deletes.push(key)
+  }
+
+  asR2(): R2Bucket {
+    return this as unknown as R2Bucket
+  }
+}
+
+/**
  * Import batches, held to the archetype above, plus the one thing no other module in this file has
  * to answer for: **an object in a bucket**.
  *
@@ -977,25 +1012,6 @@ describe('budgets cannot be reached across a workspace boundary', () => {
  * `drizzle/*.sql` — because an upload needs an account to name, and `acc-b` belongs to B.
  */
 describe('import batches cannot be reached or aimed across a workspace boundary', () => {
-  /** Only the two methods the import path calls, with a memory of what it was asked to do. */
-  class RecordingBucket {
-    readonly writes: Array<string> = []
-    readonly deletes: Array<string> = []
-
-    async put(key: string): Promise<unknown> {
-      this.writes.push(key)
-      return {}
-    }
-
-    async delete(key: string): Promise<void> {
-      this.deletes.push(key)
-    }
-
-    asR2(): R2Bucket {
-      return this as unknown as R2Bucket
-    }
-  }
-
   const FILE = new TextEncoder().encode('data;kwota\n2026-01-02;-45,00\n')
 
   let importWorld: BudgetWorld
@@ -1109,6 +1125,231 @@ describe('import batches cannot be reached or aimed across a workspace boundary'
       (candidate) => !candidate.startsWith('insert'),
     )) {
       expect(statement).toContain('organization_id')
+    }
+  })
+})
+
+/**
+ * An attachment row is the whole authorisation decision for a download, so a row whose stored key
+ * points into another workspace's prefix has to be refused by the repository itself. The write path
+ * only ever composes a key under the owner's prefix; this is the backstop for a bug, a bad restore
+ * or a hand-edited row (`00-S12`, Phase 2).
+ */
+describe('an attachment row cannot be used to reach another workspace’s object', () => {
+  const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])
+
+  let world: BudgetWorld
+  let bucket: RecordingBucket
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    bucket = new RecordingBucket()
+    await seedTransaction(world.db, { id: 'txn-a', refAmountMinor: 120_00 })
+    await seedTransaction(world.db, {
+      id: 'txn-b',
+      organizationId: ORG_B,
+      accountId: 'acc-b',
+      refAmountMinor: 200_00,
+    })
+  })
+
+  function metadataFor(transactionId: string, originalName: string) {
+    return {
+      transactionId,
+      contentType: 'application/pdf' as const,
+      byteSize: PDF.byteLength,
+      originalName,
+    }
+  }
+
+  /**
+   * B's receipt is created through B's scope so its key is a real one, then B's *row* is deleted
+   * with a raw statement (a test may write SQL; the rule is for application code) so the unique
+   * index on `r2_key` is free, and an A row is inserted carrying that key. B's object is still in
+   * the bucket, which is the state a poisoned row would point at.
+   */
+  async function poisonedRowOfA() {
+    const theirs = await createAttachment(
+      world.otherScope,
+      bucket.asR2(),
+      metadataFor('txn-b', 'b-receipt.pdf'),
+      PDF,
+    )
+    await world.db.delete(attachments).where(eq(attachments.id, theirs.id))
+    await world.db.insert(attachments).values({
+      id: 'att-poisoned',
+      organizationId: ORG_A,
+      transactionId: 'txn-a',
+      r2Key: theirs.r2Key,
+      contentType: 'application/pdf',
+      byteSize: PDF.byteLength,
+      originalName: 'poisoned.pdf',
+      uploadedByUserId: world.scope.ctx.userId,
+      createdAt: NOW,
+    })
+    return { poisonedId: 'att-poisoned', foreignKey: theirs.r2Key }
+  }
+
+  it('the files route refuses an object whose key prefix is not the caller’s workspace', async () => {
+    const { poisonedId, foreignKey } = await poisonedRowOfA()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      // The route's own order: the repository read decides, and `serveAttachment` runs only when
+      // it returned. A refusal therefore means the bucket is never asked for the bytes.
+      const route = async (id: string) => {
+        const row = await getAttachmentForRead(world.scope, { id })
+        return bucket.asR2().get(row.r2Key)
+      }
+
+      const poisoned = route(poisonedId)
+      await expect(poisoned).rejects.toBeInstanceOf(NotFoundError)
+      expect(bucket.reads).toEqual([])
+
+      // Indistinguishable from an id that does not exist: same class, same entity, same message
+      // shape, and nothing in the error names the key or the other workspace.
+      const missing = await getAttachmentForRead(world.scope, {
+        id: 'att-nope',
+      }).catch((error: unknown) => error)
+      const refused = await poisoned.catch((error: unknown) => error)
+      expect(refused).toBeInstanceOf(NotFoundError)
+      expect((refused as NotFoundError).entity).toBe(
+        (missing as NotFoundError).entity,
+      )
+      expect((refused as NotFoundError).message).toBe(
+        `attachment ${poisonedId} was not found.`,
+      )
+
+      // Delete: the same refusal, and neither the object nor the row is touched.
+      await expect(
+        deleteAttachment(world.scope, bucket.asR2(), { id: poisonedId }),
+      ).rejects.toBeInstanceOf(NotFoundError)
+      expect(bucket.deletes).toEqual([])
+      expect(
+        await world.db
+          .select({ id: attachments.id })
+          .from(attachments)
+          .where(eq(attachments.id, poisonedId)),
+      ).toHaveLength(1)
+
+      // The warning carries the attachment id and nothing else that identifies the target.
+      expect(warn).toHaveBeenCalled()
+      for (const [line] of warn.mock.calls) {
+        const text = String(line)
+        expect(text).toContain(poisonedId)
+        expect(text).not.toContain(foreignKey)
+        expect(text).not.toContain(ORG_B)
+      }
+
+      // A check that rejected everything would pass the lines above, so a correctly keyed row of
+      // A's still reads and still deletes.
+      const own = await createAttachment(
+        world.scope,
+        bucket.asR2(),
+        metadataFor('txn-a', 'a-receipt.pdf'),
+        PDF,
+      )
+      expect(own.r2Key.startsWith('attachments/org-a/')).toBe(true)
+      expect((await getAttachmentForRead(world.scope, { id: own.id })).id).toBe(
+        own.id,
+      )
+      await deleteAttachment(world.scope, bucket.asR2(), { id: own.id })
+      expect(bucket.deletes).toEqual([own.r2Key])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  /**
+   * Keys no builder would compose, written straight into A's row. Each is distinct (the unique
+   * index on `r2_key`) and each starts with something that looks like A's prefix:
+   *
+   * - `org-ab` shares `org-a` as characters, so a check that drops the trailing separator
+   *   (`startsWith('attachments/org-a')`) lets it through;
+   * - the traversal key starts with A's exact prefix and walks out of it into B's.
+   */
+  it.each([
+    {
+      name: 'a key under a workspace whose id merely starts with A’s',
+      r2Key: 'attachments/org-ab/txn-b/att-collision',
+    },
+    {
+      name: 'a key that walks out of A’s prefix with a dot segment',
+      r2Key: 'attachments/org-a/../org-b/txn-b/att-traversal',
+    },
+  ])('refuses $name on read and on delete', async ({ r2Key }) => {
+    await world.db.insert(attachments).values({
+      id: 'att-poisoned',
+      organizationId: ORG_A,
+      transactionId: 'txn-a',
+      r2Key,
+      contentType: 'application/pdf',
+      byteSize: PDF.byteLength,
+      originalName: 'poisoned.pdf',
+      uploadedByUserId: world.scope.ctx.userId,
+      createdAt: NOW,
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const missing = await getAttachmentForRead(world.scope, {
+        id: 'att-nope',
+      }).catch((error: unknown) => error)
+
+      // Read: the same class, entity and message shape as an id that does not exist, and the
+      // bucket is never asked for the bytes.
+      const refused = await getAttachmentForRead(world.scope, {
+        id: 'att-poisoned',
+      }).catch((error: unknown) => error)
+      expect(refused).toBeInstanceOf(NotFoundError)
+      expect((refused as NotFoundError).entity).toBe(
+        (missing as NotFoundError).entity,
+      )
+      expect((refused as NotFoundError).message).toBe(
+        'attachment att-poisoned was not found.',
+      )
+      expect(bucket.reads).toEqual([])
+
+      // Delete: the same refusal, and neither the object nor the row is touched.
+      const refusedDelete = await deleteAttachment(world.scope, bucket.asR2(), {
+        id: 'att-poisoned',
+      }).catch((error: unknown) => error)
+      expect(refusedDelete).toBeInstanceOf(NotFoundError)
+      expect((refusedDelete as NotFoundError).message).toBe(
+        'attachment att-poisoned was not found.',
+      )
+      expect(bucket.deletes).toEqual([])
+      expect(
+        await world.db
+          .select({ id: attachments.id })
+          .from(attachments)
+          .where(eq(attachments.id, 'att-poisoned')),
+      ).toHaveLength(1)
+
+      // The warning carries the attachment id and never the key.
+      expect(warn).toHaveBeenCalled()
+      for (const [line, fields] of warn.mock.calls) {
+        const text = `${String(line)} ${JSON.stringify(fields ?? '')}`
+        expect(text).toContain('att-poisoned')
+        expect(text).not.toContain(r2Key)
+        expect(text).not.toContain('org-ab')
+      }
+
+      // A check that rejected everything would pass the lines above, so a correctly keyed row of
+      // A's still reads and still deletes.
+      const own = await createAttachment(
+        world.scope,
+        bucket.asR2(),
+        metadataFor('txn-a', 'a-receipt.pdf'),
+        PDF,
+      )
+      expect((await getAttachmentForRead(world.scope, { id: own.id })).id).toBe(
+        own.id,
+      )
+      await deleteAttachment(world.scope, bucket.asR2(), { id: own.id })
+      expect(bucket.deletes).toEqual([own.r2Key])
+    } finally {
+      warn.mockRestore()
     }
   })
 })

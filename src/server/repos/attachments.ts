@@ -39,13 +39,15 @@ import { z } from 'zod'
 
 import { newId } from '#/server/db/ids'
 import { attachments } from '#/server/db/schema'
+import { InvalidKeyError, assertKeyInOrg, orgPrefix } from '#/server/files/keys'
 import {
   MAX_ORIGINAL_NAME_LENGTH,
   uploadMetadataSchema,
 } from '#/server/files/upload'
+import { createLogger } from '#/server/observability/logger'
 
 import { asc, assertWithinLimit, createTenantRepository } from './base'
-import { ConflictError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 import { getTransaction } from './transactions'
 
 import type { AttachmentRow } from '#/server/db/schema'
@@ -59,6 +61,9 @@ import type { TransactionPolicies } from './transactions'
  * function that cannot be handed a different value.
  */
 const attachmentRepo = createTenantRepository(attachments, 'attachment')
+
+/** Where {@link requireOwnKey} reports a refusal. No request context here, so the console sink and nothing else. */
+const logger = createLogger({ context: { component: 'repo' } })
 
 /**
  * All four policies `include`, for the reason `repos/splits` gives: this is a panel on a row
@@ -110,6 +115,16 @@ export type CreateAttachmentInput = z.input<typeof createAttachmentSchema>
 /* -------------------------------------------------------------------------- */
 
 /**
+ * `attachments/<orgId>/` — the prefix every key of this workspace starts with.
+ *
+ * The write side ({@link attachmentKey}) and the read side ({@link requireOwnKey}) both spell it
+ * through `files/keys`, so the two cannot drift apart.
+ */
+export function attachmentKeyPrefix(organizationId: string): string {
+  return orgPrefix('attachments', organizationId)
+}
+
+/**
  * `attachments/<orgId>/<transactionId>/<attachmentId>` — the layout `00-S12` fixed.
  *
  * Exported so a test can assert the shape against a real row rather than against a copy of this
@@ -120,7 +135,30 @@ export function attachmentKey(
   transactionId: string,
   attachmentId: string,
 ): string {
-  return `attachments/${organizationId}/${transactionId}/${attachmentId}`
+  return `${attachmentKeyPrefix(organizationId)}${transactionId}/${attachmentId}`
+}
+
+/**
+ * Hands the row back only when its stored key is under this workspace's own prefix.
+ *
+ * The scoped `SELECT` already proves the *row* is the caller's. The *key* is a second fact the
+ * write path guarantees and nothing else checks: a bug, a bad restore or a hand-edited row could
+ * point A's row at B's object, and the next read or delete would serve or destroy it. A foreign
+ * key is therefore the same {@link NotFoundError} as an id that does not exist, so the two are
+ * indistinguishable to a caller; the warning carries the attachment id and never the key or the
+ * other workspace.
+ */
+function requireOwnKey(scope: TenantScope, row: AttachmentRow): AttachmentRow {
+  try {
+    assertKeyInOrg('attachments', scope.ctx.organizationId, row.r2Key)
+  } catch (error) {
+    if (!(error instanceof InvalidKeyError)) throw error
+    logger.warn('attachment key is outside the workspace prefix', {
+      attachmentId: row.id,
+    })
+    throw new NotFoundError('attachment', row.id)
+  }
+  return row
 }
 
 /* -------------------------------------------------------------------------- */
@@ -163,13 +201,19 @@ export async function listAttachments(
  * belonging to another workspace does not come back, so the route never learns a key it could
  * fetch. Named `…ForRead` rather than `getAttachment` because the name is the reminder that its
  * caller is about to move bytes on the strength of it.
+ *
+ * A row whose stored key is not under the caller's own prefix is refused the same way: see
+ * {@link requireOwnKey}. The check lives here, in the one place `GET` and `HEAD` both pass through.
  */
 export async function getAttachmentForRead(
   scope: TenantScope,
   input: AttachmentIdInput,
 ): Promise<AttachmentRow> {
   const parsed = attachmentIdSchema.parse(input)
-  return attachmentRepo.requireById(scope, parsed.id)
+  return requireOwnKey(
+    scope,
+    await attachmentRepo.requireById(scope, parsed.id),
+  )
 }
 
 /** What the workspace is currently storing, in bytes. The figure the quota is asserted against. */
@@ -258,7 +302,8 @@ export async function createAttachment(
  * orphaned-object cron. Given that one of the two has to be possible, the harmless one is chosen.
  *
  * The row is loaded through the scoped read first, so B's id is a `NotFoundError` before
- * `bucket.delete` is reached with a key this workspace does not own.
+ * `bucket.delete` is reached with a key this workspace does not own. The key itself is checked
+ * before the row is removed: a poisoned row must not be a way to delete another workspace's object.
  */
 export async function deleteAttachment(
   scope: TenantScope,
@@ -266,7 +311,10 @@ export async function deleteAttachment(
   input: AttachmentIdInput,
 ): Promise<AttachmentRow> {
   const parsed = attachmentIdSchema.parse(input)
-  const row = await attachmentRepo.requireById(scope, parsed.id)
+  const row = requireOwnKey(
+    scope,
+    await attachmentRepo.requireById(scope, parsed.id),
+  )
 
   await attachmentRepo.requireRemove(scope, row.id)
   await bucket.delete(row.r2Key)

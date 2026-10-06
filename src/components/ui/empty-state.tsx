@@ -1,5 +1,7 @@
 import { cn } from '#/lib/cn'
 
+import { Card } from './card'
+
 import type { ElementType, ReactNode } from 'react'
 
 export interface EmptyStateProps {
@@ -35,6 +37,11 @@ export interface EmptyStateProps {
  * The heading is a real heading, so a screen-reader user scanning by headings
  * finds the explanation instead of landing in a silent region. The icon is
  * `aria-hidden` and the message never depends on it.
+ *
+ * It is the dashed {@link Card} and nothing else, at one size: a `subtitle` heading, a 44px
+ * medallion and the default-size action. There is deliberately no `size` prop - three areas once
+ * hand-rolled their own at 32px / 56px (#362) and `empty-state-ownership.test.ts` now fails on a
+ * fourth. A surface that needs more offers it in a sibling section beside this one.
  */
 export function EmptyState({
   icon,
@@ -48,9 +55,11 @@ export function EmptyState({
   const Heading = `h${headingLevel}` as ElementType
 
   return (
-    <div
+    <Card
+      variant="dashed"
+      padding="lg"
       className={cn(
-        'flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong/60 px-6 py-10 text-center',
+        'flex flex-col items-center gap-3 py-10 text-center',
         className,
       )}
     >
@@ -76,6 +85,6 @@ export function EmptyState({
           {secondaryAction}
         </div>
       ) : null}
-    </div>
+    </Card>
   )
 }

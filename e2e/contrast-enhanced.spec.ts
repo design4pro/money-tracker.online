@@ -172,6 +172,7 @@ test.describe('enhanced contrast', () => {
       // accessible name is checked.
       test(`${surface.name} holds the 7:1 text floor · ${theme}`, async ({
         browser,
+        contextOptions,
       }) => {
         // One case here is eleven axe passes — one at rest and one per hovered row — where an
         // ordinary spec is one page load and a handful of assertions. `/transactions` measured 6.8 s
@@ -184,6 +185,7 @@ test.describe('enhanced contrast', () => {
 
         const { context, page } = await openSurface(
           browser,
+          contextOptions,
           surface,
           theme,
           'en',

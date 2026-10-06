@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
+import { z } from 'zod'
 
 import { PeriodGrid, SeriesDetailSkeleton } from '#/components/app/recurring'
 import { ErrorPanel } from '#/components/app/shell'
@@ -51,13 +52,25 @@ import { pageHead } from '#/routes/-lib/page-title'
  * table's own caption area. A screen that could mint money from a button labelled *mark paid* is a
  * screen where a mis-click adds a payment nobody made.
  *
+ * ## The picker can be reopened from the address
+ *
+ * `?markPaid=<period start>` opens the mark-paid dialog on that period. It is how the entry form
+ * brings a person back after they recorded the payment the picker had nothing to offer for. It opens
+ * only on a period this series still holds unsettled; any other value is ignored, and the address is
+ * cleaned when the dialog closes so a reload does not reopen it.
+ *
  * ## Delete is offered here and nowhere else
  *
  * `deleteSeries` refuses once a period has settled, and this is the only screen that knows how
  * many have. Offering the action on the list would mean offering one that may simply refuse.
  */
 
+const searchSchema = z.object({
+  markPaid: z.iso.date().optional().catch(undefined),
+})
+
 export const Route = createFileRoute('/_app/recurring/$seriesId')({
+  validateSearch: searchSchema,
   loader: async ({ params }) => {
     const [detail, accounts, categories, payees] = await Promise.all([
       loadSeriesDetail({ data: { seriesId: params.seriesId } }),
@@ -107,12 +120,28 @@ function SeriesDetailRoute() {
   const t = useTranslate()
   const locale = useLocale()
   const { detail, accounts, categories, payees } = Route.useLoaderData()
+  const { markPaid } = Route.useSearch()
   const router = useRouter()
   const navigate = Route.useNavigate()
   const refreshCaches = useDataRefresh()
 
-  const [pending, setPending] = useState<Pending>({ kind: 'none' })
-  const close = () => setPending({ kind: 'none' })
+  const [pending, setPending] = useState<Pending>(() => {
+    const reopened = detail.periods.find(
+      (candidate) =>
+        candidate.periodStart === markPaid &&
+        candidate.derivedStatus !== 'paid' &&
+        candidate.derivedStatus !== 'skipped',
+    )
+    return reopened === undefined || !detail.series.isActive
+      ? { kind: 'none' }
+      : { kind: 'markPaid', period: reopened }
+  })
+  const close = () => {
+    setPending({ kind: 'none' })
+    if (markPaid !== undefined) {
+      void navigate({ search: {}, replace: true })
+    }
+  }
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
   const { series, periods, links } = detail
@@ -215,14 +244,22 @@ function SeriesDetailRoute() {
         <PeriodGrid
           periods={periods}
           isReadOnly={!series.isActive}
+          openPeriodStart={
+            pending.kind === 'markPaid' ? pending.period.periodStart : null
+          }
           onMarkPaid={(period) => setPending({ kind: 'markPaid', period })}
           onSkip={(period) => {
             void skipPeriod({
               data: { seriesId: series.id, periodStart: period.periodStart },
-            }).then(() => {
-              toast.success(t('recurring.toast.periodSkipped'))
-              refresh()
             })
+              .then(() => {
+                toast.success(t('recurring.toast.periodSkipped'))
+              })
+              .catch(() => {
+                toast.error(t('recurring.toast.failed'))
+              })
+              // Success or refusal, the row on screen may be stale: show what is stored.
+              .finally(refresh)
           }}
           onRevert={(period) => {
             void revertPeriod({
@@ -336,8 +373,9 @@ function SeriesDetailRoute() {
           onOpenChange={(open) => {
             if (!open) close()
           }}
-          seriesId={series.id}
+          series={series}
           period={pending.period}
+          origin="series"
           onSaved={() => {
             toast.success(t('recurring.toast.periodPaid'))
             close()

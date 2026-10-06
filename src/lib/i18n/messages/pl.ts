@@ -476,8 +476,7 @@ const messages = {
   },
   'transactions.empty.title': 'Nic jeszcze nie zapisano',
   'transactions.empty.body':
-    'Zapisz pierwszy wydatek albo wczytaj wyciąg, który już masz.',
-  'transactions.empty.action': 'Zapisz wydatek',
+    'Zapisz pierwszą transakcję albo wczytaj wyciąg, który już masz.',
   'transactions.noResults.title': 'Nic nie pasuje do tych filtrów',
   'transactions.noResults.body':
     'Spróbuj szerszego zakresu dat albo mniejszej liczby filtrów.',
@@ -585,6 +584,8 @@ const messages = {
   'transactions.form.noCategories': 'Nie ma jeszcze kategorii',
   'transactions.form.conversionNote':
     'Zapisujemy w walucie {currency} i przeliczamy na {base} po kursie z dnia, którego dotyczy wpis.',
+  'transactions.form.droppedAmountNote':
+    'Oczekiwana kwota jest w walucie {currency}; wpisz kwotę w walucie swojego konta.',
   'transactions.form.error.title': 'Nie zapisaliśmy tego wpisu',
   'transactions.form.error.amount': 'Podaj kwotę większą od zera.',
   'transactions.form.error.account': 'Wybierz konto, którego dotyczy wpis.',
@@ -782,6 +783,9 @@ const messages = {
   'transactions.planned.empty.title': 'Nic nie jest zaplanowane',
   'transactions.planned.empty.body':
     'Zapisz wydatek z przyszłą datą i oznacz go jako zaplanowany, aby zobaczyć go tutaj.',
+  'transactions.mode.label': 'Które wpisy pokazać',
+  'transactions.mode.actual': 'Zapisane',
+  'transactions.mode.planned': 'Zaplanowane',
   /* -- Kolory (osiem zmierzonych barw kategorii) -------------------------- */
   'colour.blue': 'Niebieski',
   'colour.teal': 'Morski',
@@ -941,6 +945,7 @@ const messages = {
   'dashboard.widget.cashFlow': 'Przepływy pieniężne',
   'dashboard.widget.spendingByCategory': 'Wydatki według kategorii',
   'dashboard.widget.recentTransactions': 'Ostatnie transakcje',
+  'dashboard.recentTransactions.empty.action': 'Przejdź do transakcji',
   'dashboard.widget.upcomingBills': 'Nadchodzące płatności',
   'dashboard.widget.budgetProgress': 'Budżety',
   'dashboard.widget.savingsGoals': 'Cele oszczędnościowe',
@@ -1092,6 +1097,9 @@ const messages = {
   'budgets.empty.body':
     'Budżet to limit na wybrane kategorie w wybranym okresie. Podepnij pod niego kategorie, a wypełni się sam, albo dodawaj wydatki ręcznie, gdy chodzi o jeden konkretny zakup.',
   'budgets.empty.action': 'Utwórz pierwszy budżet',
+  'budgets.empty.pick.title': 'Albo zacznij od jednego z tych',
+  'budgets.empty.pick.body':
+    'Każdy otwiera formularz z wybranym już rodzajem budżetu. Nic nie powstaje, dopóki nie zapiszesz.',
   'budgets.empty.archived.title': 'Nic nie jest zarchiwizowane',
   'budgets.empty.archived.body':
     'Zarchiwizowane budżety zachowują wszystkie zamknięte okresy. Na razie nie ma tu żadnego.',
@@ -1821,12 +1829,14 @@ const messages = {
   'recurring.periods.notSettled': 'Nieuregulowany',
 
   'recurring.period.markPaid': 'Oznacz jako opłacone',
-  'recurring.period.markPaid.for':
-    'Oznacz okres z terminem {date} jako opłacony',
+  'recurring.period.markPaid.for': 'Oznacz jako opłacone, termin {date}',
+  'recurring.period.markPaid.forSeries':
+    'Oznacz jako opłacone, termin {date}, {series}',
   'recurring.period.skip': 'Pomiń',
-  'recurring.period.skip.for': 'Pomiń okres z terminem {date}',
+  'recurring.period.skip.for': 'Pomiń, termin {date}',
+  'recurring.period.skip.forSeries': 'Pomiń, termin {date}, {series}',
   'recurring.period.revert': 'Cofnij',
-  'recurring.period.revert.for': 'Cofnij okres z terminem {date}',
+  'recurring.period.revert.for': 'Cofnij, termin {date}',
 
   /* -- Oznaczanie jako opłacone ---------------------------------------------- */
   'recurring.markPaid.title': 'Oznacz ten okres jako opłacony',
@@ -1836,7 +1846,16 @@ const messages = {
   'recurring.markPaid.placeholder': 'Szukaj wśród wydatków',
   'recurring.markPaid.empty':
     'Żaden wydatek z tego okna nie pasuje. Zapisz najpierw płatność i wróć tutaj.',
+  'recurring.markPaid.record': 'Zapisz płatność',
+  'recurring.markPaid.recordHint':
+    'Po zapisaniu wrócisz tutaj, aby ją połączyć.',
   'recurring.markPaid.confirm': 'Połącz',
+  'recurring.markPaid.status.found': {
+    one: '{count} transakcja do wyboru',
+    few: '{count} transakcje do wyboru',
+    many: '{count} transakcji do wyboru',
+    other: '{count} transakcji do wyboru',
+  },
   'recurring.markPaid.never':
     'Oznaczenie jako opłaconego nigdy nie tworzy nowego wpisu.',
   /* -- Automatyzacja --------------------------------------------------------- */

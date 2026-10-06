@@ -56,6 +56,12 @@ const SLOW_STARTUP_TEST_TIMEOUT_MS = 15_000
  *   real bindings from `wrangler.jsonc` (ADR 0015). Its files are named `*.workerd.test.ts` and
  *   `server` excludes them, so the suffix is what says which world a file expects.
  *
+ * A test under a route's private `-ui/` directory is a component test, so `ui` collects it and
+ * `server` leaves it alone. `server` also reaches the `.test.ts` files under `src/routes/`, which
+ * would match a `.ts` test in `-ui/` too and run it in node with no DOM; its `exclude` is what makes
+ * a file there run once, always in jsdom. Nothing else under `src/routes/` changes world: the `-lib/` and
+ * `-server/` logic tests stay in `server`.
+ *
  * `server` collects `.tsx` as well as `.ts` because the transactional email templates under
  * `src/server/email` are React components: they render to a string on the server and never reach
  * a DOM, so they belong in the Node project rather than in jsdom. Vite's esbuild transform picks
@@ -75,7 +81,8 @@ const SLOW_STARTUP_TEST_TIMEOUT_MS = 15_000
  * Object's storage and its single-threaded turn semantics, and D1 accepting the SQL Drizzle
  * generated. This project runs those inside workerd, on the bindings `wrangler.jsonc` declares,
  * with the migrations in `drizzle/` applied to a real (in-memory) D1. Everything else stays where
- * it is - including the queue consumer, which has no handler to assert against yet.
+ * it is - except the queue dispatcher's KV claim, which also runs here against the real `KV`
+ * binding (`src/server/queue/__tests__/dispatch.workerd.test.ts`).
  *
  * `main` is a test-only entry rather than `src/server/worker.ts`: the pool needs a module that
  * exports the Durable Object class so the `LEDGER` binding resolves, and the real entry pulls the
@@ -154,6 +161,7 @@ export default defineConfig({
           include: [
             'src/components/**/*.test.{ts,tsx}',
             'src/lib/**/*.test.{ts,tsx}',
+            'src/routes/**/-ui/**/*.test.{ts,tsx}',
           ],
           restoreMocks: true,
         },
@@ -193,8 +201,9 @@ export default defineConfig({
             'src/routes/**/*.test.ts',
             'src/styles/**/*.test.ts',
           ],
-          // The workerd project owns these; run in Node they would fail on `cloudflare:test`.
-          exclude: ['src/server/**/*.workerd.test.ts'],
+          // The workerd project owns the first; run in Node they would fail on `cloudflare:test`.
+          // The `ui` project owns the second: route-local component tests need a DOM.
+          exclude: ['src/server/**/*.workerd.test.ts', 'src/routes/**/-ui/**'],
           testTimeout: SLOW_STARTUP_TEST_TIMEOUT_MS,
           restoreMocks: true,
         },

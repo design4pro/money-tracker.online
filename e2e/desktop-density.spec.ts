@@ -436,33 +436,34 @@ for (const locale of LOCALES) {
     }))
     expect(natural.scrollWidth).toBeLessThanOrEqual(natural.clientWidth)
 
-    // And the case that matters most, which the seeded workspace does not contain: the status
-    // column the panel prints as soon as one period is late. Injected rather than seeded, for the
-    // reason the empty-rail test above gives — writing recurring rows into a workspace the rest
+    // And the case that matters most, which the seeded workspace does not contain: the widest
+    // status the panel prints, a late period's. The status column is always there now (the panel
+    // no longer hides it while every row is merely upcoming), so the late badge replaces what each
+    // row's status cell holds rather than adding a column. Injected rather than seeded, for the
+    // reason the empty-rail test above gives - writing recurring rows into a workspace the rest
     // of this suite reads concurrently is a lot of fixture for a claim about a grid track.
     const late = await scroller.evaluate((element, status) => {
       const table = element.querySelector('table')
       if (table === null) return null
-      const header = document.createElement('th')
-      header.scope = 'col'
-      header.className = 'px-3 py-2 text-start font-medium text-ink-2'
-      header.textContent = status.header
-      table.querySelector('thead tr')?.appendChild(header)
+      const columns = [...table.querySelectorAll('thead th')]
+      const at = columns.findIndex(
+        (header) => header.textContent === status.header,
+      )
+      if (at < 0) return null
       for (const row of table.querySelectorAll('tbody tr')) {
-        const cell = document.createElement('td')
-        cell.className = 'px-3 py-2'
         const badge = document.createElement('span')
         badge.className = status.badgeClass
         badge.textContent = status.badge
-        cell.appendChild(badge)
-        row.appendChild(cell)
+        row.children[at]?.replaceChildren(badge)
       }
       return {
         scrollWidth: element.scrollWidth,
         clientWidth: element.clientWidth,
       }
     }, STATUS_COLUMN[locale])
-    if (late === null) throw new Error('the rail is not rendering a table')
+    if (late === null) {
+      throw new Error('the rail is not rendering a table with a status column')
+    }
     expect(late.scrollWidth).toBeLessThanOrEqual(late.clientWidth)
   })
 }
@@ -577,6 +578,83 @@ for (const locale of LOCALES) {
     expect(stackedSecond.y).toBeGreaterThan(
       stackedFirst.y + stackedFirst.height - 1,
     )
+  })
+}
+
+/**
+ * The widths at which issue #161 is read: the one the density spec fixes, and the narrowest
+ * desktop one that still has the three-column grid (`xl` starts at 1280), where the Net worth
+ * panel is at its narrowest.
+ */
+const NET_WORTH_VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+] as const
+
+for (const locale of LOCALES) {
+  test(`the dashboard Net worth panel has no vertical gap inside it — ${locale}`, async ({
+    page,
+    context,
+  }) => {
+    await useLocale(context, locale)
+    await gotoApp(page, '/dashboard')
+
+    // Issue #161 reported ~140px of dead space mid-card, measured on 2026-09-03 against a panel
+    // that has since been rewritten as three ruled lines and a caption. The case holds the
+    // rewrite's claim rather than a pixel count of "dead space": every box is read from the
+    // browser and compared with its neighbour, so it fails on a gap of any size. The seeded
+    // `demo` workspace has accounts, which keeps the panel out of its empty state - that state is
+    // a different, designed one and is not measured here.
+    const card = page
+      .getByRole('list', { name: /.+/ })
+      .first()
+      .locator('> li')
+      .first()
+      .locator('section')
+    const lines = card.locator('dl > div')
+    const caption = card.locator('p')
+    await expect(lines).toHaveCount(3)
+    await expect(caption).toHaveCount(1)
+
+    for (const viewport of NET_WORTH_VIEWPORTS) {
+      await page.setViewportSize(viewport)
+
+      const lineBoxes = await Promise.all(
+        [0, 1, 2].map((index) => boxOf(lines.nth(index))),
+      )
+      const captionBox = await boxOf(caption)
+      const cardBox = await boxOf(card)
+      const padding = await card.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).paddingBottom),
+      )
+
+      // Rule to rule: a line's box includes the rule drawn over it, so the next line starts where
+      // this one ends. A gap would be a margin or a grid gap somebody added between the lines.
+      for (const [index, box] of lineBoxes.slice(1).entries()) {
+        const previous = lineBoxes[index]
+        expect(box.y - (previous.y + previous.height)).toBeCloseTo(0, 0)
+      }
+
+      // The caption sits under the lines it qualifies, not on the floor of a stretched card: it
+      // starts below the last line and no further from it than one row's own vertical padding (the
+      // panel's rhythm), plus the 1px rule drawn under that line and 1px of rounding.
+      const lastLine = lineBoxes[2]
+      const captionOffset = captionBox.y - (lastLine.y + lastLine.height)
+      const rowPadding = await lines
+        .last()
+        .evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).paddingTop),
+        )
+      expect(captionOffset).toBeGreaterThanOrEqual(0)
+      expect(captionOffset).toBeLessThanOrEqual(rowPadding + 2)
+
+      // The card ends within its own padding (and its 1px border) of the caption: nothing is
+      // left below the content, which is what `WidgetGrid`'s `items-start` is for.
+      const floor =
+        cardBox.y + cardBox.height - (captionBox.y + captionBox.height)
+      expect(floor).toBeLessThanOrEqual(padding + 2)
+      expect(floor).toBeGreaterThanOrEqual(0)
+    }
   })
 }
 

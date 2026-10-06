@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { parseDate } from '@internationalized/date'
 
+import { MarkPaidEmpty, MarkPaidStatus } from '#/components/app/recurring'
 import { ErrorPanel } from '#/components/app/shell'
 import {
   Button,
@@ -18,8 +20,11 @@ import { formatMoney, makeMoney } from '#/lib/money'
 import { markPeriodPaid } from '#/server/fns/recurring'
 import { loadTransactions } from '#/server/fns/transactions'
 
+import { recordPaymentSearch } from '../-lib/record-payment'
+
+import type { RecordPaymentOrigin } from '../-lib/record-payment'
 import type { PeriodView } from '#/server/repos/recurring'
-import type { Transaction } from '#/server/db/types'
+import type { RecurringSeries, Transaction } from '#/server/db/types'
 
 /**
  * Linking a period to the transaction that settled it.
@@ -30,6 +35,13 @@ import type { Transaction } from '#/server/db/types'
  * a balance rebuild behind a button whose label says nothing about money moving, and would let a
  * mis-click add a payment nobody made. So the dialog offers rows that already exist, and when none
  * of them fits it says *record the payment first* rather than offering to do it here.
+ *
+ * ## The way forward is a navigation
+ *
+ * When nothing fits, the picker offers to *record the payment*: it opens the entry form started
+ * from the period, with a way back that reopens this dialog on the same period once the person has
+ * saved. That is a link to a form and not a write - the person presses Save there, through the same
+ * path every entry takes, and the new row then falls inside the window below.
  *
  * ## The candidate window is the due date plus or minus a fortnight
  *
@@ -43,13 +55,26 @@ import type { Transaction } from '#/server/db/types'
  * Picking exactly one thing from a short list, with the choice visible without opening anything,
  * is what a radio group is. Each option's label carries the date, the amount and the payee, so the
  * announcement a screen reader makes is enough to choose on without moving focus anywhere else.
+ *
+ * ## One live region says what changed
+ *
+ * The list arrives after the dialog opens and moves nothing, so a screen reader would hear
+ * silence. {@link MarkPaidStatus} is mounted on the first render and announces loading, then the
+ * count or the empty state; the visible loading line is hidden from assistive technology so
+ * loading is not said twice.
  */
 
 export interface MarkPaidDialogProps {
   readonly isOpen: boolean
   readonly onOpenChange: (isOpen: boolean) => void
-  readonly seriesId: string
+  /** The series the period belongs to: its id, and what the entry form is started from. */
+  readonly series: Pick<
+    RecurringSeries,
+    'id' | 'direction' | 'accountId' | 'categoryId' | 'payeeId'
+  >
   readonly period: PeriodView
+  /** Where the person was, so that saving the payment brings them back to it. */
+  readonly origin: RecordPaymentOrigin
   readonly onSaved: () => void
 }
 
@@ -59,12 +84,14 @@ const WINDOW_DAYS = 14
 export function MarkPaidDialog({
   isOpen,
   onOpenChange,
-  seriesId,
+  series,
   period,
+  origin,
   onSaved,
 }: MarkPaidDialogProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const navigate = useNavigate()
 
   const [rows, setRows] = useState<ReadonlyArray<Transaction> | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
@@ -114,7 +141,7 @@ export function MarkPaidDialog({
     try {
       await markPeriodPaid({
         data: {
-          seriesId,
+          seriesId: series.id,
           periodStart: period.periodStart,
           transactionId: selected,
           matchSource: 'manual',
@@ -142,6 +169,11 @@ export function MarkPaidDialog({
             />
 
             <DialogBody className="flex flex-col gap-4">
+              <MarkPaidStatus
+                candidateCount={rows === null ? null : rows.length}
+                hasFailed={failure !== null}
+              />
+
               {failure === null ? null : (
                 <ErrorPanel
                   title={t('recurring.toast.failed')}
@@ -151,14 +183,25 @@ export function MarkPaidDialog({
               )}
 
               {rows === null ? (
-                <p className="flex items-center gap-2 text-body text-ink-2">
+                // Hidden from assistive technology: the status region above announces loading.
+                <p
+                  aria-hidden="true"
+                  className="flex items-center gap-2 text-body text-ink-2"
+                >
                   <Spinner aria-hidden="true" />
                   {t('recurring.candidates.loading')}
                 </p>
               ) : rows.length === 0 ? (
-                <p className="text-body text-ink-2">
-                  {t('recurring.markPaid.empty')}
-                </p>
+                failure === null ? (
+                  <MarkPaidEmpty
+                    onRecord={() =>
+                      void navigate({
+                        to: '/transactions/new',
+                        search: recordPaymentSearch(series, period, origin),
+                      })
+                    }
+                  />
+                ) : null
               ) : (
                 <RadioGroup
                   label={t('recurring.markPaid.field')}

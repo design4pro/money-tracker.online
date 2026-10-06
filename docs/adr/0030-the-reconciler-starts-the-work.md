@@ -114,3 +114,5 @@ exists, and a trigger per event cannot see a difference.
   Reconciler drops a candidate a live run already holds, so the worst case is a run that stops.
 
 > **Amended 2026-10-03.** The four automations that start the same work as the Reconciler - **Implement the next ready issue**, **Spec to tickets**, **Groom and triage new issues** and **Re-triage when a hold is cleared** - are retired, because the Reconciler starts that work and each would start an issue a second time; the issue pair stays in `docs/agents/cezar-automations.json` with `"enabled": false` for the `authors` gate decision 6 depends on.
+
+> **Amended 2026-10-04.** Decision 1's "at most one action per kind" is now "up to three candidates each for implement, unblock and triage, best first, and one each for slice and write-spec". On 2026-10-04 one `implement` candidate (#516) that every tick skipped, because a run on it had finished inside the cooldown, kept the READY issue behind it from starting for six hours; the Reconciler passes the turn to the next candidate of a kind when the first cannot start (design4pro/cezar#55).

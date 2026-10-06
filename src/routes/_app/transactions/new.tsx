@@ -3,7 +3,6 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { getLocalTimeZone, today } from '@internationalized/date'
 import { WalletMinimal } from 'lucide-react'
-import { z } from 'zod'
 
 import {
   TransactionForm,
@@ -11,7 +10,8 @@ import {
   emptyFormValues,
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
-import { useTranslate } from '#/lib/i18n'
+import { useLocale, useTranslate } from '#/lib/i18n'
+import { currencyName } from '#/lib/money'
 import { listTemplates } from '#/server/fns/transaction-groups'
 import { createTransaction } from '#/server/fns/transactions'
 
@@ -20,12 +20,19 @@ import { TemplatePicker } from './-ui/template-picker'
 import { TransactionFormSkeleton } from './-ui/form-skeleton'
 import { loadTransactionDetail } from './-server/detail'
 import { loadTransactionReference } from './-server/list'
+import {
+  applyPrefill,
+  droppedAmountCurrency,
+  newTransactionSearchSchema,
+  returnTargetOf,
+} from './-lib/new-search'
 
 import type {
   TransactionFormValues,
   TransactionReference,
 } from '#/components/app/transactions'
 import type { Minor } from '#/lib/money'
+import type { ReturnTarget } from './-lib/new-search'
 import type { Transaction } from '#/server/db/types'
 import type { TransactionDraft } from '#/server/repos/transaction-templates'
 import type { TransactionPolicies } from '#/server/repos/transactions'
@@ -48,6 +55,15 @@ import { pageHead } from '#/routes/-lib/page-title'
  * entry that starts somewhere other than blank, so it is the same screen rather than a second one —
  * and because the source is in the URL, the row action is a plain navigation and the result is
  * reloadable.
+ *
+ * ## A mark-paid with nothing to link starts here
+ *
+ * The recurring screens send a person to this form, started from the period they were settling,
+ * when no payment exists yet - amount, date, account, category and payee as search params, and a
+ * way back (`./-lib/new-search.ts`, which owns what the address may carry and why each part is
+ * checked). Saving then returns to that period with the mark-paid picker reopened, where the new
+ * entry is selectable. The form creates nothing until the person presses Save, through the same
+ * path as every entry, so a link into it can suggest a payment and never make one.
  *
  * ## A template is a starting point, not a second screen
  *
@@ -73,13 +89,8 @@ const WRITE_POLICIES: TransactionPolicies = {
   completeness: 'any',
 }
 
-const newSearchSchema = z.object({
-  /** The transaction this entry is a copy of, when the reader arrived by "Duplicate". */
-  from: z.string().trim().min(1).max(64).optional().catch(undefined),
-})
-
 export const Route = createFileRoute('/_app/transactions/new')({
-  validateSearch: newSearchSchema,
+  validateSearch: newTransactionSearchSchema,
   head: ({ matches }) =>
     pageHead(matches, (t) => t('transactions.form.newTitle')),
   component: NewTransactionRoute,
@@ -184,11 +195,13 @@ interface EditorProps {
 
 function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
   const t = useTranslate()
+  const locale = useLocale()
   const navigate = Route.useNavigate()
+  const search = Route.useSearch()
   const refresh = useDataRefresh()
 
   const [values, setValues] = useState<TransactionFormValues>(() =>
-    initialValues(reference, source),
+    applyPrefill(initialValues(reference, source), search, reference),
   )
   const [resetToken, setResetToken] = useState(0)
   const [serverError, setServerError] = useState<string | undefined>(undefined)
@@ -201,6 +214,13 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
   // A template list that cannot be fetched is not an error this screen reports: the form behind it
   // works, and a failure banner over an optional shortcut would be louder than the shortcut.
   const templates = templatesQuery.data ?? []
+
+  // Only the entry the address started: a repeat save or a template begins a different one, and
+  // saying "the expected amount" there would describe something the person already dealt with.
+  const droppedCurrency =
+    resetToken === 0
+      ? droppedAmountCurrency(search, reference, values)
+      : undefined
 
   /**
    * A draft fills the fields it carries and leaves the rest of the form alone.
@@ -232,6 +252,42 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
     () => void navigate({ to: '/transactions', search: {} }),
     [navigate],
   )
+
+  /**
+   * Back to the period this entry was recorded for, on the screen the person started from.
+   *
+   * Typed router targets only, built from the closed shape `returnTargetOf` yields: there is no
+   * href to assemble and no URL to follow, so the address cannot send anybody anywhere but the
+   * recurring screens.
+   */
+  const goBack = useCallback(
+    (target: ReturnTarget) =>
+      target.to === 'series'
+        ? void navigate({
+            to: '/recurring/$seriesId',
+            params: { seriesId: target.seriesId },
+            search: { markPaid: target.periodStart },
+          })
+        : void navigate({
+            to: '/recurring',
+            search: {
+              status: 'active',
+              markPaid: target.periodStart,
+              series: target.seriesId,
+            },
+          }),
+    [navigate],
+  )
+
+  /** Where Save and Cancel both end: the period this entry was for, else the list. */
+  const leave = useCallback(() => {
+    const back = returnTargetOf(search)
+    if (back === undefined) {
+      goToList()
+    } else {
+      goBack(back)
+    }
+  }, [search, goBack, goToList])
 
   const creation = useMutation({
     mutationFn: (input: {
@@ -271,7 +327,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
       // second after a successful save is the worst thing this screen can say.
       await refresh()
       if (!input.addAnother) {
-        goToList()
+        leave()
         return
       }
       // Everything that describes *this* entry is cleared; everything that describes the sitting —
@@ -318,13 +374,20 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
           }
           creation.mutate({ entry: values, amountMinor, addAnother })
         }}
-        onCancel={goToList}
+        onCancel={leave}
         isSubmitting={creation.isPending}
         serverError={serverError}
         allowRepeat
         submitLabel={t('action.save')}
         autoFocusAmount
         resetToken={resetToken}
+        amountNote={
+          droppedCurrency === undefined
+            ? undefined
+            : t('transactions.form.droppedAmountNote', {
+                currency: currencyName(droppedCurrency, locale),
+              })
+        }
         afterAmount={
           <TemplatePicker
             templates={templates}

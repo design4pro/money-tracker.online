@@ -17,7 +17,7 @@ Before intake, the work is shaped: `om-discover` establishes the product context
 - **Designer** — owns the flow and its states before the code exists, and the design contract the UI review reads back. May be a human, `om-ux-shape` for the shaping, `om-ux-review-pr` for the pass over a PR's screens.
 - **QA reviewer** — exercises user-facing changes before they merge, with `om-prepare-test-env` to boot the app once and `om-auto-qa-pr` to walk it in a real browser. Manual means a person judges the result and owns `qa-approved`; it does not mean the work is unassisted. Always referenced by role, never by name or handle: assignments change.
 - **Product owner** — owns the why and the value: the product brief, the scope split (now, later, not doing), the success criteria, and the ticket-level tier of the Definition of Ready. Confirms the brief before it is written and the backlog tree before it is filed; owns every product decision in the brief that names no other owner. Referenced by role, never by name. <!-- discovery -->
-- **Maintainer** — owns branch protection, the label taxonomy, the config, and this document; arbitrates when gates conflict.
+- **Maintainer** — owns branch protection, the label taxonomy, the config, this document, and the installed skills with their repo-local overrides under `.ai/skills/`; arbitrates when gates conflict. Acts as the release manager unless the team names one.
 
 ## Ticket lifecycle
 
@@ -265,21 +265,59 @@ Three amendment rules are specific to this document's shape:
 - **What a ticket contains** beyond the Definition of Ready: `docs/agents/issue-tracker.md` (tenant
   isolation test, money invariant, visual change expected).
 
+### Stacked pull requests
+
+"PRs target `develop`" has one exception: a PR based on the branch of another open PR. It does not
+target `develop` until its base merges, which is expected, not a finding.
+
+- **When to stack.** Only when the ticket or its spec says the work ships as more than one PR,
+  usually because the halves are reviewable separately and would bury each other. Never as a way
+  to split a PR that grew large. The unattended pipeline stacks only on that explicit instruction.
+- **How to open it.** Base the second PR on the first PR's branch. The first carries `Refs #<n>`
+  and the last `Closes #<n>`, so the issue closes exactly once. Merge them in order, base first.
+- **Retargeting is not automatic here.** GitHub retargets a stacked PR when the base PR's head
+  branch is deleted, and this repository has `delete_branch_on_merge=false`, so nothing does. After
+  the base PR merges, retarget by hand with the REST operation (`gh pr edit` is unusable on this
+  host, `.ai/trackers/github.md`):
+  `gh api -X PATCH repos/{owner}/{repo}/pulls/{prNumber} -f base=develop`. Retarget **before**
+  anyone deletes the base branch: GitHub closes a PR whose base branch disappears under it (its
+  documented behaviour; not exercised in this repository).
+- **CI does not run on the way.** `.github/workflows/ci.yml` triggers on `pull_request` against
+  `main` or `develop` only, so a PR whose base is another feature branch gets no CI run, and
+  merging into that branch passes through no required check: it is not a quality gate. A retarget
+  alone starts none either, because it fires `edited`, which the workflow does not listen to
+  (#175 merged 88 seconds after #172 with none of the required checks ever reported on it). After the retarget the
+  author merges `develop` into the branch and pushes, which fires `synchronize` against `develop`
+  and starts CI. The PR does not merge until the required checks are green on that run. A local
+  validation-gate pass is review evidence, never a substitute for them. No force-push, no
+  `--no-verify`.
+- **CI does not start on a retarget, by design (#546).** Listening to `edited` would make every
+  title or body edit a CI trigger, and two things make that unsafe. A run for `edited` joins the
+  `ci-<ref>` concurrency group, which cancels in-flight pull request runs, so an edit could cancel
+  a real run on the same ref. A job guarded to skip unless the base changed would report as skipped
+  under the required check names, and GitHub counts a skipped required check as passing, so a
+  failing or cancelled result could be masked. The ruleset already keeps a PR whose required checks
+  never reported from merging, so the cost of the gap is the remedy above: one merge commit and one
+  push per stacked PR. A merge without the required checks is an admin bypass, and it is reported as
+  one. Revisit only after a second stacked-PR incident: then a trigger on `edited` with a per-event
+  concurrency key and no cancellation on `edited`.
+
 ### The Reconciler
 
 The Reconciler is a level-triggered loop on the cezar host (a cron every ten minutes; `docs/agents/cezar.md`
 § The Reconciler, ADR 0030). It starts work only when there is work and a free `maxParallel` slot, and it repairs a
 run that failed by continuing it. What there is to do is not decided in the cron: it asks
-`node .ai/scripts/backlog-status.mjs --plan`, which prints at most one action per kind, in this order, each with the
-workflow and task text to send:
+`node .ai/scripts/backlog-status.mjs --plan`, which prints its candidates per kind, in this order, best first, each with
+the workflow and task text to send. `implement`, `unblock` and `triage` rank up to three, so a candidate the Reconciler
+cannot start hands its turn to the next; `slice` and `write-spec` name one:
 
-| Kind         | Candidate                                                                                                                           | Workflow           |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `implement`  | the issue `--next` picks (nothing at the WIP limit)                                                                                 | `implement-ticket` |
-| `unblock`    | the first issue whose `blocked` hold, or unanswered not-ready or `STOP:` comment, an agent left and that does not say `HUMAN-ONLY:` | `unblock`          |
-| `triage`     | the first issue that needs an Agent Brief or a category, priority or risk label                                                     | `triage`           |
-| `slice`      | the oldest `ready` spec directly in `.ai/specs/` that no issue (open or closed) opens with `Spec: <path>`                           | `spec-to-tickets`  |
-| `write-spec` | the first stage of `docs/plans/` nothing covers, while no PR adds a spec or marks stages delivered and no spec waits to be sliced   | `plan-to-spec`     |
+| Kind         | Candidate                                                                                                                         | Workflow           |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `implement`  | the READY issues in `--next` order, the first being the one `--next` picks (nothing at the WIP limit)                             | `implement-ticket` |
+| `unblock`    | the issues whose `blocked` hold, or unanswered not-ready or `STOP:` comment, an agent left and that do not say `HUMAN-ONLY:`      | `unblock`          |
+| `triage`     | the issues that need an Agent Brief or a category, priority or risk label                                                         | `triage`           |
+| `slice`      | the oldest `ready` spec directly in `.ai/specs/` that no issue (open or closed) opens with `Spec: <path>`                         | `spec-to-tickets`  |
+| `write-spec` | the first stage of `docs/plans/` nothing covers, while no PR adds a spec or marks stages delivered and no spec waits to be sliced | `plan-to-spec`     |
 
 Every candidate is dropped while a cockpit run already holds it: an issue by its `issueNumber`, a spec path or a stage
 id by the run's task text. A run holds it while it is `queued`, `running` or `waiting`, and a `failed` run holds it

@@ -25,6 +25,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CHANGES_REQUESTED_PARKED_HOURS,
+  PLAN_CANDIDATES,
   PLAN_WORKFLOWS,
   RETIRED_AGENT_LOGINS,
   WIP_LIMIT,
@@ -960,7 +961,7 @@ describe("buildPlan", () => {
     expect(buildPlan(base)).toEqual({ wip: { waitingForPerson: 0, limit: WIP_LIMIT }, actions: [] });
   });
 
-  it("names the five kinds in order, one action each, with the workflow and task text the Reconciler runs", () => {
+  it("names the five kinds in order, with the workflow and task text the Reconciler runs", () => {
     const plan = buildPlan({
       ...base,
       issues: sortIssues([
@@ -976,6 +977,7 @@ describe("buildPlan", () => {
       { kind: "implement", target: "#7", workflow: "implement-ticket", task: "Implement issue #7." },
       { kind: "unblock", target: "#45", workflow: "unblock", task: "Resolve the hold on issue #45." },
       { kind: "triage", target: "#67", workflow: "triage", task: "Triage issue #67." },
+      { kind: "triage", target: "#68", workflow: "triage", task: "Triage issue #68." },
       {
         kind: "write-spec",
         target: "04-S3",
@@ -990,6 +992,57 @@ describe("buildPlan", () => {
       "spec-to-tickets",
       "plan-to-spec",
     ]);
+  });
+
+  it("ranks up to PLAN_CANDIDATES ready issues in pick order, the first being what pickNext takes", () => {
+    const issues = sortIssues([
+      row(5, "READY", { labels: ["priority-low"] }),
+      row(9, "READY", { labels: ["priority-high"] }),
+      row(3, "READY"),
+      row(4, "READY"),
+    ]);
+    const plan = buildPlan({ ...base, issues });
+    expect(PLAN_CANDIDATES).toBe(3);
+    expect(plan.actions.map((a) => [a.kind, a.target])).toEqual([
+      ["implement", "#9"],
+      ["implement", "#3"],
+      ["implement", "#4"],
+    ]);
+    expect(plan.actions[0].target).toBe(`#${pickNext(issues, 0)}`);
+  });
+
+  it("ranks no ready issue at the WIP limit", () => {
+    const plan = buildPlan({ ...base, wip: WIP_LIMIT, issues: sortIssues([row(7, "READY"), row(8, "READY")]) });
+    expect(plan.actions).toEqual([]);
+  });
+
+  it("ranks up to PLAN_CANDIDATES triage and unblock candidates in report order, leaving out one a run holds", () => {
+    const runs = new Map([[61, { status: "running", workflow: "triage" }]]);
+    const plan = buildPlan({
+      ...base,
+      runs,
+      issues: sortIssues([
+        row(41, "BLOCKED", { canUnblock: true }),
+        row(42, "BLOCKED", { canUnblock: true }),
+        row(61, "NEEDS_TRIAGE"),
+        row(62, "NEEDS_TRIAGE"),
+        row(63, "NEEDS_TRIAGE"),
+        row(64, "NEEDS_TRIAGE"),
+        row(65, "NEEDS_TRIAGE"),
+      ]),
+    });
+    expect(plan.actions.map((a) => [a.kind, a.target])).toEqual([
+      ["unblock", "#41"],
+      ["unblock", "#42"],
+      ["triage", "#62"],
+      ["triage", "#63"],
+      ["triage", "#64"],
+    ]);
+  });
+
+  it("ranks three of four triage candidates", () => {
+    const plan = buildPlan({ ...base, issues: sortIssues([67, 68, 69, 70].map((n) => row(n, "NEEDS_TRIAGE"))) });
+    expect(plan.actions.map((a) => a.target)).toEqual(["#67", "#68", "#69"]);
   });
 
   it("implements nothing at the WIP limit, but still triages and unblocks", () => {

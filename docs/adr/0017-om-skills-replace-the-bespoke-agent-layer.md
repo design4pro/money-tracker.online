@@ -4,6 +4,8 @@ Status: accepted
 Date: 2026-09-06
 Supersedes: 0014
 Amends: 0013
+Amended by: ADR 0029 (the `groom` / `autofix` / `spec` command labels and `review-threads` are gone,
+and so is the automation that ran on the last).
 
 ## Context
 
@@ -181,8 +183,9 @@ nothing comparing the two halves drifts. `.github/workflows/claude-code-review.y
 anyway, because the decision solved the review problem and created a different one nobody had
 looked for yet.
 
-`pr-review-threads` is the automation that turns a PR with unresolved threads into an
-`om-auto-fix-pr` run. Its trigger is the `review-threads` label. Nothing in this repository applied
+`pr-review-threads` was the name of the automation that turned a PR with unresolved threads into an
+`om-auto-fix-pr` run, and `review-threads` was its trigger label; both are retired (ADR 0029,
+`d704377`, see the 2026-10-05 amendment). Nothing in this repository applied
 that label: it was documented as a human's call, and the measurable result is that `pr-fix` has
 **never run**, not once, in the cockpit's entire recorded history. The second-chance path for a
 thread the first run left open did not exist; it only looked like it did.
@@ -448,3 +451,43 @@ pairs each permission with the tracker operations it serves and dates the snapsh
 held. That table describes the retired bot token (amendment 2026-10-01) and says so; its permission
 to operation mapping is the durable half, because GitHub's API fixes it. This ADR does not restate
 the list, so the next scope change edits one place.
+
+## Amendment, 2026-10-05: the review-threads automation and the Action that armed it are gone
+
+`d704377` (2026-09-23, "ci: remove Claude Actions workflows") deleted `claude-code-review.yml`,
+`rearm-review-threads.yml`, `scripts/ci/review-threads-label.mjs` and the "Resolve blocking review
+threads" definition from `docs/agents/cezar-automations.json`, which is the automation the
+2026-09-08 amendment called `pr-review-threads`. ADR 0029 records the consequence: nothing arms
+`review-threads` any more, and the label is gone with the rest of the command labels.
+
+Two statements above are therefore the record of their dates and no longer describe the system: the
+2026-09-08 amendment's "the review Action returns as the arming signal", and the 2026-09-20
+amendment's "the Action is still what arms `review-threads`" and "the committed 'Resolve blocking
+review threads' definition ... already sets it". The 2026-09-21 amendment's allowlist is likewise
+the membership of a script that no longer exists. None of them is edited in place.
+
+`pr-fix` (`/om-auto-fix-pr`) remains as a manual workflow: a person starts it on a pull request
+whose threads are still open, as `docs/agents/cezar.md` describes.
+
+## Amendment, 2026-10-05: no SHA is recorded in the lockfile or in the config
+
+Three passages above say the collection's SHA is recorded somewhere: decision 2's "**Skill versions
+are pinned, not floating**" paragraph ("`.ai/cezar/config.json` names the SHA", "the pin moves in
+the same commit", "one mechanism and one SHA"), the paragraph after decision 6 ("The collection's
+SHA is therefore recorded in `skills-lock.json` alone"), and the 2026-09-20 amendment's "at a SHA
+`.ai/cezar/config.json` names". None of them was ever true. Every `skills-lock.json` entry carries
+`source`, `sourceType`, `skillPath` and `computedHash`, and `skillsRepos` in `.ai/cezar/config.json`
+is empty and names nothing. The SHA is recorded neither in the lockfile nor in the config, and
+nowhere else.
+
+What vendoring does give is unchanged and is the argument that stands: a skill version is
+**reviewable and reproducible** through the committed tree. `.claude/skills/om-*` is a file in the
+checkout, so a worktree has the collection the moment it is cut and an upgrade is a diff a person
+reads with `om-apply-upgrade-notes`. The lockfile's per-skill `computedHash` is provenance for each
+entry point (`SKILL.md`) only; it does not cover the `references/*.md` files, so it is not what
+makes a run reproducible, the committed tree is. `skillsRepos` stays empty, for the reason given
+after decision 6.
+
+The text above is left as written, the record of what it said on its dates, and is not the reading
+to use. The current wording is in `AGENTS.md` (Process and skills) and `docs/agents/cezar.md`
+(the config paragraph and the "Skills" bullet).

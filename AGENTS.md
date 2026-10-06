@@ -29,8 +29,12 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   (`pnpm db:generate`) and `.ai/specs/README.md` (`pnpm generate-spec-index`). Migrations are
   additive.
 - Anything slow is enqueued on `TASKS`; balances are rebuilt through the `LEDGER` Durable Object.
-- Conventional Commits in English, scope = module or plan area. Branches `fix/issue-<n>-<slug>`,
-  `feat/issue-<n>-<slug>`, `spec/<slug>`. PRs target `develop` and carry `Closes #<n>`.
+- Conventional Commits in English, scope = module or plan area. Branches are `<type>/issue-<n>-<slug>`
+  when an issue exists and `<type>/<slug>` when none does; `<type>` is an open set (`fix`, `feat`,
+  `chore`, `docs`, `ci`, `perf`, `test`, `claude`), `spec/<slug>` is a spec, `cez/<id8>` is Cezar's
+  task branch, and Dependabot's and other bot branches are outside the rule. PRs target `develop`
+  and carry `Closes #<n>` when there is an issue (a stacked PR is the one exception to the target:
+  `SDLC.md` -> Stacked pull requests).
 - Every number you write down came from a command whose output you read (`docs/SPEC.md` §7.7).
 - Verify before claiming: skill `verifying-changes` is the ladder; `docs/SPEC.md` §7 is done.
 
@@ -154,9 +158,10 @@ file is allowed; printing a value is not.
 
 ## Process and skills
 
-- The pipeline is the `om-*` skill collection, vendored in `.claude/skills/om-*` at the SHA recorded
-  in `skills-lock.json` (`pnpm install-skills` refreshes it; the lock moves in the same commit) and
-  configured by `.ai/agentic.config.json`. Tracker operations are
+- The pipeline is the `om-*` skill collection, vendored in `.claude/skills/om-*`: the committed tree
+  is what pins it, and `skills-lock.json` records a per-skill `computedHash` of each entry point,
+  not a SHA (`pnpm install-skills` refreshes both; they move in the same commit). It is configured
+  by `.ai/agentic.config.json`. Tracker operations are
   defined in `.ai/trackers/github.md`, browser operations in `.ai/browsers/playwright.md`.
 - Repo-specific rules for a skill live in `.ai/skills/om-<name>/SKILL.md` and extend the installed
   skill; they never relax its safety rules.

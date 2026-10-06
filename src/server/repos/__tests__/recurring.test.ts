@@ -26,9 +26,10 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 import {
+  recurringLinks,
   recurringPeriods,
   recurringSeries,
   transactions,
@@ -39,6 +40,7 @@ import { materializeSeries } from '#/server/recurring/materialize'
 import { NotFoundError } from '../errors'
 import {
   RecurringAutomationConflictError,
+  RecurringPeriodPaidError,
   createSeries,
   deleteSeries,
   getSeries,
@@ -268,6 +270,86 @@ describe('the termination is a union', () => {
         matchingRules: { payee: ['rent'] },
       }),
     ).rejects.toBeInstanceOf(RecurringAutomationConflictError)
+  })
+})
+
+describe('skipping a period', () => {
+  async function materialisedPeriod(): Promise<{
+    seriesId: string
+    periodStart: string
+  }> {
+    const series = await createSeries(world.scope, seriesInput())
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const period = (await listPeriods(world.scope, series.id, TODAY)).at(0)
+    if (period === undefined) throw new Error('no period materialised')
+    return { seriesId: series.id, periodStart: period.periodStart }
+  }
+
+  async function storedPeriod(key: { seriesId: string; periodStart: string }) {
+    const [row] = await world.db
+      .select()
+      .from(recurringPeriods)
+      .where(
+        and(
+          eq(recurringPeriods.seriesId, key.seriesId),
+          eq(recurringPeriods.periodStart, key.periodStart),
+        ),
+      )
+    return row
+  }
+
+  it('refuses a period another tab has already marked paid, and leaves it and its link alone', async () => {
+    const key = await materialisedPeriod()
+    await seedTransaction(world.db, {
+      id: 'txn-a',
+      refAmountMinor: 250_000,
+      bookedOn: '2026-01-31',
+    })
+    await markPaid(world.scope, { ...key, transactionId: 'txn-a' })
+
+    await expect(markSkipped(world.scope, key)).rejects.toBeInstanceOf(
+      RecurringPeriodPaidError,
+    )
+
+    const period = await storedPeriod(key)
+    expect(period.status).toBe('paid')
+    expect(period.settledTransactionId).toBe('txn-a')
+    const links = await world.db
+      .select({ status: recurringLinks.status })
+      .from(recurringLinks)
+      .where(eq(recurringLinks.seriesId, key.seriesId))
+    expect(links).toEqual([{ status: 'active' }])
+  })
+
+  it('skips an upcoming period', async () => {
+    const key = await materialisedPeriod()
+
+    await markSkipped(world.scope, key)
+
+    const period = await storedPeriod(key)
+    expect(period.status).toBe('skipped')
+    expect(period.settledTransactionId).toBeNull()
+  })
+
+  it('succeeds without error on a period that is already skipped', async () => {
+    const key = await materialisedPeriod()
+    await markSkipped(world.scope, key)
+
+    await expect(markSkipped(world.scope, key)).resolves.toBeUndefined()
+
+    expect((await storedPeriod(key)).status).toBe('skipped')
+  })
+
+  it('is a not-found, not a conflict, for a period that does not exist', async () => {
+    const { seriesId } = await materialisedPeriod()
+
+    await expect(
+      markSkipped(world.scope, { seriesId, periodStart: '1999-01-31' }),
+    ).rejects.toBeInstanceOf(NotFoundError)
   })
 })
 
