@@ -128,7 +128,7 @@ export function attachmentKeyPrefix(organizationId: string): string {
  * `attachments/<orgId>/<transactionId>/<attachmentId>` — the layout `00-S12` fixed.
  *
  * Exported so a test can assert the shape against a real row rather than against a copy of this
- * string, and so the orphan sweep has one place to read the prefix from.
+ * string, and so the planned orphan sweep will have one place to read the prefix from.
  */
 export function attachmentKey(
   organizationId: string,
