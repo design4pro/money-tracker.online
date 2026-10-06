@@ -18,6 +18,12 @@ const scopedBuilders = [
     family: 'backups',
     build: (org: string) => backupKey(org, '2026-10-04'),
   },
+  {
+    // `attachmentKey` lives in `repos/attachments.ts`, which this module must not import, so the
+    // shipped layout `attachments/<workspace>/<transaction>/<attachment>` is spelled out here.
+    family: 'attachments',
+    build: (org: string) => `attachments/${org}/txn-1/att-1`,
+  },
 ] as const
 
 /** Every value a path segment must refuse, whatever argument it arrives in. */
@@ -127,6 +133,33 @@ describe('R2 key layout', () => {
         expect(() => assertKeyInOrg(family, 'org-a', build('org-ab'))).toThrow()
       },
     )
+
+    // The checker sees a stored key, which no builder vetted, so a segment that would walk out of
+    // the workspace prefix is refused even though the key starts with it.
+    it.each([
+      'attachments/org-a/../org-b/txn-1/att-1',
+      'attachments/org-a/./txn-1/att-1',
+      'attachments/org-a/txn-1/..',
+      'attachments/org-a/txn-1/.',
+      'attachments/org-a/..',
+    ])(
+      'refuses the key %j, which has a dot segment after the prefix',
+      (key) => {
+        expect(() => assertKeyInOrg('attachments', 'org-a', key)).toThrow(
+          InvalidKeyError,
+        )
+      },
+    )
+
+    it.each([
+      'attachments/org-a/txn-1/file..pdf',
+      'attachments/org-a/txn-1/..x',
+      'attachments/org-a/txn-1/x..',
+      'attachments/org-a/txn-1/.hidden',
+      'attachments/org-a/txn-1/att-1',
+    ])('accepts the key %j, whose dots are inside a segment', (key) => {
+      expect(() => assertKeyInOrg('attachments', 'org-a', key)).not.toThrow()
+    })
 
     it('refuses a key of another family', () => {
       expect(() =>
