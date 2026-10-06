@@ -221,19 +221,17 @@ export function trustedAuthors(automations) {
 const hasLabel = (pr, name) => pr.labels.some((label) => label.name === name);
 
 /**
- * A PR sits with a person when no run can move it: QA the unattended sign-off may not give
- * (`needs-qa` still without `qa-approved`), a diff the owner signs off (`risk-high`, `security`), or
- * a hold (`blocked`, or a person's `do-not-merge`), or a `changes-requested` nobody has touched for
- * `CHANGES_REQUESTED_PARKED_HOURS`. Everything else - `review`, a fresh `changes-requested`,
- * `merge-queue`, a plain draft - is on its way to `om-pr-autopilot --allow-merge`, which merges it
- * into `develop` without anyone.
+ * A PR sits with a person when no run can move it: a hold (`blocked`, which `om-pr-autopilot` sets
+ * after three fix-and-QA rounds its agents could not close, or a person's `do-not-merge`), or a
+ * `changes-requested` nobody has touched for `CHANGES_REQUESTED_PARKED_HOURS`. QA and risk labels
+ * are not a person's (owner decision 2026-10-06, ADR 0031): the agents judge them and
+ * `om-pr-autopilot --allow-merge` merges the PR into `develop` without anyone.
  *
  * Pure: `now` is passed in (epoch milliseconds), and a PR with no `updatedAt`, or a call with no
  * `now`, is never parked, because the rule needs both.
  */
 export const waitsForPerson = (pr, now) =>
-  (hasLabel(pr, "needs-qa") && !hasLabel(pr, "qa-approved")) ||
-  ["risk-high", "security", "blocked", "do-not-merge"].some((label) => hasLabel(pr, label)) ||
+  ["blocked", "do-not-merge"].some((label) => hasLabel(pr, label)) ||
   (hasLabel(pr, "changes-requested") &&
     (now - Date.parse(pr.updatedAt)) / 36e5 >= CHANGES_REQUESTED_PARKED_HOURS);
 

@@ -22,7 +22,7 @@ import type { Page } from '@playwright/test'
  *
  * The write flows run on the desktop project only. Two projects settling the same dates in one
  * workspace at the same time is a race the dates cannot avoid, and what the phone layout adds - the
- * table scrolling in its own region - is read-only and covered by the last two tests, which run
+ * stacked rows of `recurring-reflow.spec.ts` - is read-only and covered by the last two tests, which run
  * everywhere.
  */
 

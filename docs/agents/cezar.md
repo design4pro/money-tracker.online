@@ -424,8 +424,8 @@ No label starts a run (ADR 0029). Code-writing work starts in exactly two ways:
   (`SDLC.md` § Readiness). Ready means an Agent Brief from `afk-triage` (or in the body of a ticket
   `afk-to-tickets` filed), a category, a priority and a risk, every "Blocked by" issue closed, no
   open or merged-but-unclosed PR, and no `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. The script answers
-  nothing while three PRs are waiting for a person (`needs-qa` without `qa-approved`, `risk-high`,
-  `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours). That is why a filed issue reaches an open PR with nobody
+  nothing while three PRs are waiting for a person (`blocked`, `do-not-merge`, or
+  `changes-requested` with no update for 24 hours; QA and risk labels are the agents', ADR 0031). That is why a filed issue reaches an open PR with nobody
   in it, and what keeps it bounded is the readiness rule rather than a label: `afk-triage` writes
   a brief for `risk-high` or `security` work only on the security and tenancy specialist's
   approving verdict (`SDLC.md` § Delegated decisions), and grooming never writes one itself - it
@@ -440,13 +440,13 @@ Until ADR 0029 this section described two label ladders: the command labels `gro
 `om-approve-merge-pr`, which reads the labels and the QA gate first. It runs as the last step of
 `implement-ticket` and `plan-to-spec`, on a PR a maintainer opens, and on an agent PR reviewed into `merge-queue`.
 `om-merge-buddy` reports the rest, and a person merges it - by hand, or with GitHub's native
-`gh pr merge --auto` (ADR 0027). A `risk-high` `needs-qa` PR waits for the owner's `qa-approved`,
-and `develop` → `main` (carrying `do-not-merge`, ADR 0029) is the owner's release decision (`SDLC.md`). The live rulesets have no
+`gh pr merge --auto` (ADR 0027). A `risk-high` or `security` PR merges on the security and tenancy
+reviewer's verdict on its diff (ADR 0031), and `develop` → `main` (carrying `do-not-merge`, ADR 0029) is the owner's release decision (`SDLC.md`). The live rulesets have no
 GitHub merge queue rule; the `merge-queue` label is a process state only. After a merge,
 `/om-close-fixed-issues` closes what the merge did not: Cezar has no `pull_request.merged`
 event, and `develop` is not the default branch, so nothing closes natively. Housekeeping runs
-three times a day. `qa-approved` comes from the unattended sign-off below `risk-high` (a QA
-specialist's verdict on the evidence) and from the owner on `risk-high`; the blind pair is
+three times a day. `qa-approved` comes from the unattended sign-off (a specialist panel's
+verdicts on the evidence, `risk-high` included, ADR 0031); the blind pair is
 `node scripts/visual/capture.mjs` (ADR 0016).
 
 ## Automations (`docs/agents/cezar-automations.json`)

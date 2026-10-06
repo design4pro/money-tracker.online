@@ -60,11 +60,11 @@ category:
 # ── meta: routing flags the skills read ───────────────────────────────────────────────────────
 meta:
   - name: needs-qa
-    description: 'The pull request changes a screen; a human QA-approves it before merge.'
+    description: 'The pull request changes a screen; QA approves it before merge.'
   - name: skip-qa
     description: 'No screen changed; the pull request does not wait for QA.'
   - name: qa-approved
-    description: 'A human checked the screens. Only a human sets it.'
+    description: 'QA checked the screens: a person, or the om-auto-qa-pr specialist panel (ADR 0031).'
   - name: qa-self-verified
     description: 'om-auto-qa-pr walked the screens and posted evidence. Not a substitute for qa-approved.'
   - name: in-progress

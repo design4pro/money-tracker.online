@@ -41,7 +41,7 @@ Sort what you find:
 | An issue or PR that has since closed or merged | Lift. This is a fact, not a judgement: no specialist. |
 | An issue that is still open, named by the hold | Add it under the issue's `### Blocked by` (step 4) and lift: the dependency now holds the issue, and the scheduled run takes it once the dependency closes. |
 | A PR that is still open | When it closes an issue, treat that issue as the line above. When it closes none, nothing an agent can wait on: hand it back (step 5). |
-| Anything in `afk-decide` § 5: a person's credentials, account settings, payment or a legal commitment, the `develop` -> `main` promotion, closing an issue, removing a label a human set, `risk-high` QA sign-off, a reporter's own information, a platform limit, a write `dontAsk` refuses, or a guardian's `ESCALATE: yes` for one of those | Hand it back (step 5). |
+| Anything in `afk-decide` § 5: a person's credentials, account settings, payment or a legal commitment, the `develop` -> `main` promotion, closing an issue, removing a label a human set, a PR the fix-and-QA loop left `blocked` after three rounds, a reporter's own information, a platform limit, a write `dontAsk` refuses, or a guardian's `ESCALATE: yes` for one of those | Hand it back (step 5). |
 
 ## 3. Ask the specialist
 

@@ -5,6 +5,8 @@ Date: 2026-10-02
 Amends: ADR 0029 (the schedule that starts implementation, the WIP limit, who clears a hold, and
 which issues the retired `design4pro-agent` account opened are never picked), ADR 0027 (a spec PR
 `afk-plan-to-spec` wrote merges without a person; no other spec-only PR does).
+Amended by: ADR 0031 (only `blocked`, `do-not-merge` and a parked `changes-requested` count as
+waiting for a person).
 
 ## Context
 
