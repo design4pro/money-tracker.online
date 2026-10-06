@@ -7,7 +7,8 @@ Amends: ADR 0017 (the `groom` / `autofix` / `spec` command labels, the intake la
 `do-not-merge`, not `promotion`). ADR 0014, which first named `ready-for-agent`, is already
 superseded by ADR 0017.
 Amended by: ADR 0030 (the Reconciler starts implementation; the WIP limit counts only PRs that wait
-for a person; an agent may lift a hold an agent set).
+for a person; an agent may lift a hold an agent set), ADR 0031 (the owner's `qa-approved` on
+`risk-high` is no longer a brake: agents judge QA and risk).
 
 ## Context
 

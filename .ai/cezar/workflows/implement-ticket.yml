@@ -2,8 +2,8 @@
 # (docs/agents/cezar.md, ADR 0030) with `Implement issue #<n>.` when
 # `node .ai/scripts/backlog-status.mjs --plan` lists an `implement` action, or by a person from
 # the cockpit with an issue number or none,
-# and it ends with the pull request merged into `develop` (or waiting for the owner's `qa-approved`
-# when it is `risk-high`) - the boundary is `SDLC.md` § The automation contract. There is no label
+# and it ends with the pull request merged into `develop` (or `blocked` after three fix-and-QA
+# rounds the agents could not close, ADR 0031) - the boundary is `SDLC.md` § The automation contract. There is no label
 # that marks an issue ready (ADR 0029): readiness is computed by .ai/scripts/backlog-status.mjs, the
 # same rule the backlog report shows.
 #
@@ -29,7 +29,7 @@ steps:
 
       This workflow has no om-root-cause step: the issue's `## Agent Brief` (a triage comment, or the body of a ticket `afk-to-tickets` filed) is your brief.
 
-      Pick the issue. When the task names an issue number, that is the issue. Otherwise run `node .ai/scripts/backlog-status.mjs --next`: it prints the number of the one issue to implement, or nothing when no issue is ready or three PRs are already waiting for a person (the WIP limit: `needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours; a PR the pipeline merges itself does not count). Append a line `ISSUE: #<number>` to the file `$CEZ_HANDOFF_FILE`; later steps read it.
+      Pick the issue. When the task names an issue number, that is the issue. Otherwise run `node .ai/scripts/backlog-status.mjs --next`: it prints the number of the one issue to implement, or nothing when no issue is ready or three PRs are already waiting for a person (the WIP limit: `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours; a PR the pipeline merges itself does not count). Append a line `ISSUE: #<number>` to the file `$CEZ_HANDOFF_FILE`; later steps read it.
 
       Check readiness before claiming. Stop without changing anything if any of these hold:
       - `--next` printed nothing;
@@ -66,7 +66,8 @@ steps:
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]
   # The chain does not stop at an open PR: om-pr-autopilot reviews, fixes, runs QA, waits for CI and
   # merges into develop (ADR 0027) - the develop ruleset requires no approving review. It never
-  # merges the develop -> main promotion, and a `risk-high` PR waits for the owner's `qa-approved`.
+  # merges the develop -> main promotion. QA, `risk-high` and `security` are judged by specialist
+  # sub-agents; three failed fix rounds leave the PR `blocked` (ADR 0031).
   - id: merge
     name: Drive the PR to the merge into develop
     prompt: |

@@ -15,9 +15,11 @@ One addition to the stabilization loop's exit criteria:
 - Before declaring the review approvable, run **list-review-threads** and require zero threads that
   are unresolved and not outdated. An open thread that the `om-auto-review-pr --autofix` stage fixed
   but did not resolve is closed here with **reply-review-comment** and **resolve-review-thread**
-  (the repo override of `om-auto-review-pr` says how). An open thread the stage declined stays open
-  and ends the loop with `changes-requested`, never `merge-queue`; the final report names the thread
-  and its reason so a human can settle it.
+  (the repo override of `om-auto-review-pr` says how). An open thread the stage declined is settled the
+  way that override says, by a specialist's verdict, before the loop ends; only a thread still open
+  after that ends it with `changes-requested`, never `merge-queue`, and counts as a failed round of
+  `om-pr-autopilot`'s loop. After a fix for a `qa-failed` the QA panel set is pushed, remove that
+  label so QA runs again on the new head (ADR 0031).
 
 The live `develop` and `main` rulesets both set `required_review_thread_resolution: true`, so an
 open thread blocks the merge. The criterion above also keeps the skill from reporting an
