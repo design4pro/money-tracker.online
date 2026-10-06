@@ -476,8 +476,7 @@ const messages = {
   },
   'transactions.empty.title': 'Nic jeszcze nie zapisano',
   'transactions.empty.body':
-    'Zapisz pierwszy wydatek albo wczytaj wyciąg, który już masz.',
-  'transactions.empty.action': 'Zapisz wydatek',
+    'Zapisz pierwszą transakcję albo wczytaj wyciąg, który już masz.',
   'transactions.noResults.title': 'Nic nie pasuje do tych filtrów',
   'transactions.noResults.body':
     'Spróbuj szerszego zakresu dat albo mniejszej liczby filtrów.',
@@ -585,6 +584,8 @@ const messages = {
   'transactions.form.noCategories': 'Nie ma jeszcze kategorii',
   'transactions.form.conversionNote':
     'Zapisujemy w walucie {currency} i przeliczamy na {base} po kursie z dnia, którego dotyczy wpis.',
+  'transactions.form.droppedAmountNote':
+    'Oczekiwana kwota jest w walucie {currency}; wpisz kwotę w walucie swojego konta.',
   'transactions.form.error.title': 'Nie zapisaliśmy tego wpisu',
   'transactions.form.error.amount': 'Podaj kwotę większą od zera.',
   'transactions.form.error.account': 'Wybierz konto, którego dotyczy wpis.',
@@ -968,6 +969,7 @@ const messages = {
   'dashboard.widget.cashFlow': 'Przepływy pieniężne',
   'dashboard.widget.spendingByCategory': 'Wydatki według kategorii',
   'dashboard.widget.recentTransactions': 'Ostatnie transakcje',
+  'dashboard.recentTransactions.empty.action': 'Przejdź do transakcji',
   'dashboard.widget.upcomingBills': 'Nadchodzące płatności',
   'dashboard.widget.budgetProgress': 'Budżety',
   'dashboard.widget.savingsGoals': 'Cele oszczędnościowe',

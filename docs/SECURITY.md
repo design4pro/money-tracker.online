@@ -149,7 +149,28 @@ none ever gets it.** A public bucket URL is a tenancy bypass with no audit trail
 The row's stored key is checked as well as the row: a read or a delete of an attachment whose key is
 not under the caller's own `attachments/<workspace>/` prefix is a not-found, the same as an id that
 does not exist, and is logged with the attachment id only (`getAttachmentForRead`, `deleteAttachment`
-in `src/server/repos/attachments.ts`).
+in `src/server/repos/attachments.ts`). A key with a `.` or `..` segment after the prefix is refused
+the same way.
+
+A refused row has **no in-app repair**: the attachment delete refuses it, and it keeps counting
+toward the workspace's storage quota until it is repaired. The one application path that removes it
+is deleting its parent transaction, which cascades the row (never the object) and takes the whole
+transaction with it. Repair is an operator action on D1 and R2. The log line is
+`attachment key is outside the workspace prefix` and carries the attachment id only. The
+orphaned-object sweep does not repair it: that sweep is not built yet, and when it is, it is
+planned to work from objects, not from rows.
+
+1. Establish which workspace owns the object the key points at. Neither audit log records R2 keys,
+   so the evidence is the workspace segment of the key and the `attachments` rows that reference it.
+   Check as well that the object exists at all.
+2. **Never delete the R2 object**: it may be another workspace's live receipt.
+3. If the object belongs to another workspace, or does not exist, delete only the poisoned D1 row.
+4. If the object is the owner's, R2 has no rename: copy it to a key under the owner's own
+   `attachments/<workspace>/` prefix, check the size and content type against the row, and only
+   then repoint `r2_key`. Repointing the row alone leaves it naming an object that is not there
+   (the file route answers 502) and the real object unreferenced. The old object stays, per step 2.
+5. The D1 write is a cross-workspace action with no audit entry of its own: record it in the
+   platform audit log or the incident record.
 
 Uploads are content-type checked, size-capped by the workspace's storage quota, and stored under a
 tenant-prefixed key. For R2 writes the order is **object first, quota assert second, compensating
@@ -244,6 +265,7 @@ A new sub-processor is a change to both, plus customer notice.
   documented as a product limitation, not sold as a security feature.
 - **Backups are not restore-tested on a schedule.** The nightly logical backup exists; a periodic
   restore drill does not yet.
+- **A refused attachment row has no in-app repair.** See §6.2 for the operator procedure.
 
 Each of these is a real gap. They are listed here so that nobody has to discover them during an
 incident, and so that no marketing copy implies otherwise.

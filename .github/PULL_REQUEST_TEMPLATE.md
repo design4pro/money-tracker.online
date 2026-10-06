@@ -68,11 +68,11 @@ and say which screens you shot. Frames belong outside the repository.
 
 <!--
 One label, per SDLC.md: `needs-qa` when the change touches a screen (src/routes, src/components,
-styles, copy), `skip-qa` when it cannot. `needs-qa` without `qa-approved` never merges, and only a
-human sets `qa-approved`; `om-auto-qa-pr` posts evidence, it does not approve.
+styles, copy), `skip-qa` when it cannot. `needs-qa` without `qa-approved` never merges; `qa-approved`
+comes from `om-auto-qa-pr`'s specialist panel or a QA reviewer (ADR 0031).
 -->
 
-- [ ] `needs-qa` - a screen changed; QA evidence and a human's `qa-approved` before merge
+- [ ] `needs-qa` - a screen changed; QA evidence and `qa-approved` before merge
 - [ ] `skip-qa` - no screen changed
 
 ## Risk

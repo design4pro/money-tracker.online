@@ -40,6 +40,71 @@ describe('PeriodGrid', () => {
     expect(screen.getByRole('columnheader', { name: 'Status' })).toBeTruthy()
   })
 
+  it('keeps every table role explicit, so the stacked layout below sm cannot drop them', () => {
+    // `display: block` on a table element can strip its native role in some browser and screen
+    // reader pairs; the attributes are what hold the structure in both layouts.
+    grid()
+
+    const table = screen.getByRole('table')
+    expect(table.getAttribute('role')).toBe('table')
+    expect(within(table).getAllByRole('rowgroup')).toHaveLength(2)
+    expect(within(table).getAllByRole('row')).toHaveLength(2)
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(6)
+    expect(
+      within(table)
+        .getByRole('rowheader', { name: 'Mar 1, 2026' })
+        .getAttribute('scope'),
+    ).toBe('row')
+    expect(within(table).getAllByRole('cell')).toHaveLength(5)
+  })
+
+  it('labels each stacked cell with its column header text, hidden from assistive technology', () => {
+    grid([
+      period({
+        derivedStatus: 'paid',
+        settledTransactionId: 'tx-1',
+        settledAmountMinor: asMinor(2_600_00),
+        settledCurrencyCode: 'PLN',
+        settledOn: '2026-03-02',
+      }),
+    ])
+
+    const row = screen.getAllByRole('row').at(1) as HTMLElement
+    const labels = Array.from(
+      row.querySelectorAll('[aria-hidden="true"].sm\\:hidden'),
+    ).map((label) => label.textContent)
+    expect(labels).toEqual(['Expected', 'Settled', 'Difference', 'Status'])
+
+    // The label is not part of the cell's name, so a reader hears the column header once.
+    const headers = screen
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent)
+    for (const label of labels) expect(headers).toContain(label)
+    expect(screen.getByRole('cell', { name: /^Paid/ })).toBeTruthy()
+  })
+
+  it('leaves no label over a cell that has nothing to say, and keeps the cell', () => {
+    grid([period()])
+
+    const row = screen.getAllByRole('row').at(1) as HTMLElement
+    const labels = Array.from(
+      row.querySelectorAll('[aria-hidden="true"].sm\\:hidden'),
+    ).map((label) => label.textContent)
+    expect(labels).not.toContain('Difference')
+    expect(within(row).getAllByRole('cell')).toHaveLength(5)
+  })
+
+  it('puts the actions in the last cell of the row', () => {
+    grid()
+
+    const cells = within(
+      screen.getAllByRole('row').at(1) as HTMLElement,
+    ).getAllByRole('cell')
+    expect(
+      within(cells.at(-1) as HTMLElement).getAllByRole('button'),
+    ).toHaveLength(2)
+  })
+
   it('gives its own scroll container a name and a tab stop', () => {
     // A scrollable region a keyboard user cannot focus is a set of columns they cannot reach.
     grid()

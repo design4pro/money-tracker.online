@@ -26,8 +26,8 @@ node scripts/visual/capture.mjs --url http://127.0.0.1:3010/<route> --out <scrat
 ```
 
 Frames belong outside the repository. Evidence from `om-auto-qa-pr` complements the pair; it never
-replaces it. `qa-approved` comes from the unattended sign-off in `om-auto-qa-pr` below `risk-high`,
-and from the owner on a `risk-high` PR - never from a review.
+replaces it. `qa-approved` comes from the unattended sign-off in `om-auto-qa-pr`, a specialist panel,
+`risk-high` included (ADR 0031) - never from a review.
 
 ## Review personas
 
@@ -54,8 +54,11 @@ additions to step 2 and step 11:
 - Step 11, accounting: a finding **fixed** in this run ends with **reply-review-comment** (what
   changed, in which commit) followed by **resolve-review-thread**. A finding **filed as a
   follow-up** ends with a reply naming the follow-up issue, then resolve. A finding **declined**
-  ends with a reply giving the reason and the thread stays open, the verdict stays
-  `changes-requested`, and the report names it: a human, not the pipeline, closes a disagreement.
+  goes to an independent specialist through `.ai/skills/afk-decide/SKILL.md` (picked by what the
+  finding is about), with the finding and the reason to decline: when it sides with the finding,
+  fix it as above; when it sides with the decline, reply with the reason and its verdict, then
+  resolve. The pipeline, not a person, closes a disagreement on a PR into `develop` (owner
+  decision 2026-10-06, ADR 0031).
   Never resolve a thread without replying in it first, and never resolve one this run did not act
   on.
 - Step 11, the fourth outcome: **agreed but out of the run's reach.** Declining is for a

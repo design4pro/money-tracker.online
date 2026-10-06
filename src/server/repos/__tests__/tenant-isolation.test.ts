@@ -1264,6 +1264,99 @@ describe('an attachment row cannot be used to reach another workspace’s object
       warn.mockRestore()
     }
   })
+
+  /**
+   * Keys no builder would compose, written straight into A's row. Each is distinct (the unique
+   * index on `r2_key`) and each starts with something that looks like A's prefix:
+   *
+   * - `org-ab` shares `org-a` as characters, so a check that drops the trailing separator
+   *   (`startsWith('attachments/org-a')`) lets it through;
+   * - the traversal key starts with A's exact prefix and walks out of it into B's.
+   */
+  it.each([
+    {
+      name: 'a key under a workspace whose id merely starts with A’s',
+      r2Key: 'attachments/org-ab/txn-b/att-collision',
+    },
+    {
+      name: 'a key that walks out of A’s prefix with a dot segment',
+      r2Key: 'attachments/org-a/../org-b/txn-b/att-traversal',
+    },
+  ])('refuses $name on read and on delete', async ({ r2Key }) => {
+    await world.db.insert(attachments).values({
+      id: 'att-poisoned',
+      organizationId: ORG_A,
+      transactionId: 'txn-a',
+      r2Key,
+      contentType: 'application/pdf',
+      byteSize: PDF.byteLength,
+      originalName: 'poisoned.pdf',
+      uploadedByUserId: world.scope.ctx.userId,
+      createdAt: NOW,
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const missing = await getAttachmentForRead(world.scope, {
+        id: 'att-nope',
+      }).catch((error: unknown) => error)
+
+      // Read: the same class, entity and message shape as an id that does not exist, and the
+      // bucket is never asked for the bytes.
+      const refused = await getAttachmentForRead(world.scope, {
+        id: 'att-poisoned',
+      }).catch((error: unknown) => error)
+      expect(refused).toBeInstanceOf(NotFoundError)
+      expect((refused as NotFoundError).entity).toBe(
+        (missing as NotFoundError).entity,
+      )
+      expect((refused as NotFoundError).message).toBe(
+        'attachment att-poisoned was not found.',
+      )
+      expect(bucket.reads).toEqual([])
+
+      // Delete: the same refusal, and neither the object nor the row is touched.
+      const refusedDelete = await deleteAttachment(world.scope, bucket.asR2(), {
+        id: 'att-poisoned',
+      }).catch((error: unknown) => error)
+      expect(refusedDelete).toBeInstanceOf(NotFoundError)
+      expect((refusedDelete as NotFoundError).message).toBe(
+        'attachment att-poisoned was not found.',
+      )
+      expect(bucket.deletes).toEqual([])
+      expect(
+        await world.db
+          .select({ id: attachments.id })
+          .from(attachments)
+          .where(eq(attachments.id, 'att-poisoned')),
+      ).toHaveLength(1)
+
+      // The warning carries the attachment id and never the key.
+      expect(warn).toHaveBeenCalled()
+      for (const [line, fields] of warn.mock.calls) {
+        const text = `${String(line)} ${JSON.stringify(fields ?? '')}`
+        expect(text).toContain('att-poisoned')
+        expect(text).not.toContain(r2Key)
+        expect(text).not.toContain('org-ab')
+      }
+
+      // A check that rejected everything would pass the lines above, so a correctly keyed row of
+      // A's still reads and still deletes.
+      const own = await createAttachment(
+        world.scope,
+        bucket.asR2(),
+        metadataFor('txn-a', 'a-receipt.pdf'),
+        PDF,
+      )
+      expect((await getAttachmentForRead(world.scope, { id: own.id })).id).toBe(
+        own.id,
+      )
+      await deleteAttachment(world.scope, bucket.asR2(), { id: own.id })
+      expect(bucket.deletes).toEqual([own.r2Key])
+    } finally {
+      warn.mockRestore()
+    }
+  })
 })
 
 describe('notifications cannot be read, counted or marked across a workspace boundary', () => {

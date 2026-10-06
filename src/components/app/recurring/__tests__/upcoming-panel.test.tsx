@@ -64,6 +64,36 @@ describe('UpcomingPanel', () => {
     ).toBeTruthy()
   })
 
+  it('keeps every table role explicit and labels each stacked cell from its column header', async () => {
+    await renderLinkedRecurring(
+      <UpcomingPanel upcoming={[upcoming()]} onMarkPaid={noop} onSkip={noop} />,
+    )
+
+    const table = await screen.findByRole('table')
+    expect(within(table).getAllByRole('rowgroup')).toHaveLength(2)
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(5)
+    expect(
+      within(table).getByRole('rowheader', { name: 'Mar 1, 2026' }),
+    ).toBeTruthy()
+
+    const row = within(table).getAllByRole('row').at(1) as HTMLElement
+    const cells = within(row).getAllByRole('cell')
+    expect(cells).toHaveLength(4)
+    const labels = Array.from(
+      row.querySelectorAll('[aria-hidden="true"].sm\\:hidden'),
+    ).map((label) => label.textContent)
+    expect(labels).toEqual(['Name', 'Expected', 'Status'])
+    const headers = within(table)
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent)
+    for (const label of labels) expect(headers).toContain(label)
+
+    // The actions are the last block of the row.
+    expect(
+      within(cells.at(-1) as HTMLElement).getAllByRole('button'),
+    ).toHaveLength(2)
+  })
+
   it('never renders Revert, even for a period that has somehow settled', async () => {
     await renderLinkedRecurring(
       <UpcomingPanel
@@ -139,6 +169,9 @@ describe('UpcomingPanel', () => {
     for (const utility of ['target-min-h', 'target-min-w', 'inline-flex']) {
       expect(link.className).toContain(utility)
     }
+    // A later `min-w-0` variant would win over `target-min-w` below `sm` and shrink a short name's
+    // link under the claimed width.
+    expect(link.className).not.toMatch(/min-w-0/)
   })
 })
 

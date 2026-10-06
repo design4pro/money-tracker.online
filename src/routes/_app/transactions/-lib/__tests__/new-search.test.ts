@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { asCurrencyCode } from '#/lib/money'
+import { asCurrencyCode, asMinor } from '#/lib/money'
 
 import {
   applyPrefill,
+  droppedAmountCurrency,
   newTransactionSearchSchema,
   returnTargetOf,
 } from '../new-search'
@@ -320,5 +321,89 @@ describe('applyPrefill', () => {
       REFERENCE,
     )
     expect(values.isPlanned).toBe(false)
+  })
+})
+
+describe('droppedAmountCurrency', () => {
+  const eur = { direction: 'expense', amount: 1000, currency: 'EUR' } as const
+
+  /** What the form holds right after the address was applied: the note is a function of this. */
+  const landed = (input: Record<string, unknown>) => {
+    const search = parse(input)
+    const values = applyPrefill(BLANK, search, REFERENCE)
+    return { search, values }
+  }
+
+  it('names the expected currency when the named account is in another one', () => {
+    const { search, values } = landed({ ...eur, account: 'acc-jpy' })
+    expect(droppedAmountCurrency(search, REFERENCE, values)).toBe('EUR')
+  })
+
+  it('names it when the series names no account and the default is in another currency', () => {
+    const { search, values } = landed(eur)
+    expect(values.accountId).toBe(BLANK.accountId)
+    expect(droppedAmountCurrency(search, REFERENCE, values)).toBe('EUR')
+  })
+
+  it('pins that no amount landed in the form whenever the note applies', () => {
+    const { search, values } = landed({ ...eur, account: 'acc-jpy' })
+    expect(droppedAmountCurrency(search, REFERENCE, values)).toBeDefined()
+    expect(values.amountMinor).toBeNull()
+  })
+
+  it('is silent when the currencies match, because the amount was applied', () => {
+    const { search, values } = landed({
+      ...eur,
+      currency: 'PLN',
+      account: 'acc-pln',
+    })
+    expect(values.amountMinor).toBe(1000)
+    expect(droppedAmountCurrency(search, REFERENCE, values)).toBeUndefined()
+  })
+
+  it('is silent when an account-less series lands on a default in the same currency', () => {
+    const { search, values } = landed({ ...eur, currency: 'PLN' })
+    expect(values.amountMinor).toBe(1000)
+    expect(droppedAmountCurrency(search, REFERENCE, values)).toBeUndefined()
+  })
+
+  it('is silent when the address carries no amount', () => {
+    const { search, values } = landed({ currency: 'EUR', account: 'acc-jpy' })
+    expect(droppedAmountCurrency(search, REFERENCE, values)).toBeUndefined()
+  })
+
+  it('is silent when the address carries no currency, because there is none to name', () => {
+    const { search, values } = landed({ amount: 1000, account: 'acc-jpy' })
+    expect(droppedAmountCurrency(search, REFERENCE, values)).toBeUndefined()
+  })
+
+  it('is silent once the person has typed an amount', () => {
+    const { search, values } = landed({ ...eur, account: 'acc-jpy' })
+    expect(
+      droppedAmountCurrency(search, REFERENCE, {
+        ...values,
+        amountMinor: asMinor(500),
+      }),
+    ).toBeUndefined()
+  })
+
+  it('goes away when the person switches to an account in the address currency', () => {
+    const { search, values } = landed({ ...eur, account: 'acc-jpy' })
+    const eurAccount = {
+      id: 'acc-eur',
+      name: 'Euro',
+      currencyCode: asCurrencyCode('EUR'),
+      isArchived: false,
+    }
+    const reference = {
+      ...REFERENCE,
+      accounts: [...REFERENCE.accounts, eurAccount],
+    }
+    expect(
+      droppedAmountCurrency(search, reference, {
+        ...values,
+        accountId: 'acc-eur',
+      }),
+    ).toBeUndefined()
   })
 })

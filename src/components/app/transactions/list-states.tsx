@@ -64,7 +64,7 @@ export function TransactionsEmpty({ onCreate }: TransactionsEmptyProps) {
       description={t('transactions.empty.body')}
       action={
         <Button variant="primary" icon={<Plus />} onPress={onCreate}>
-          {t('transactions.empty.action')}
+          {t('transactions.create')}
         </Button>
       }
     />

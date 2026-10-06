@@ -169,6 +169,12 @@ export interface TransactionFormProps {
    * a prop of its own, because the form neither fetches templates nor knows what one is.
    */
   readonly afterAmount?: ReactNode
+  /**
+   * A sentence for the amount field's description, beside the conversion note when both apply. A
+   * string rather than a reason: the form does not know where a starting amount came from, and
+   * says whatever the caller words.
+   */
+  readonly amountNote?: string
 }
 
 export function TransactionForm({
@@ -184,6 +190,7 @@ export function TransactionForm({
   autoFocusAmount = false,
   resetToken = 0,
   afterAmount,
+  amountNote,
 }: TransactionFormProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -213,6 +220,16 @@ export function TransactionForm({
   const currencyCode: CurrencyCode =
     account?.currencyCode ?? reference.baseCurrencyCode
   const showsConversion = currencyCode !== reference.baseCurrencyCode
+  // One description slot, one element per sentence: the field reads them together on focus.
+  const amountNotes = [
+    amountNote,
+    showsConversion
+      ? t('transactions.form.conversionNote', {
+          currency: currencyName(currencyCode, locale),
+          base: currencyName(reference.baseCurrencyCode, locale),
+        })
+      : undefined,
+  ].filter((note): note is string => note !== undefined)
 
   const patch = (next: Partial<TransactionFormValues>) =>
     onChange({ ...values, ...next })
@@ -343,12 +360,13 @@ export function TransactionForm({
               isRequired
               autoFocus={autoFocusAmount}
               description={
-                showsConversion
-                  ? t('transactions.form.conversionNote', {
-                      currency: currencyName(currencyCode, locale),
-                      base: currencyName(reference.baseCurrencyCode, locale),
-                    })
-                  : undefined
+                amountNotes.length === 0
+                  ? undefined
+                  : amountNotes.map((note) => (
+                      <span key={note} className="block">
+                        {note}
+                      </span>
+                    ))
               }
             />
           </div>

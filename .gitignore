@@ -19,7 +19,8 @@ coverage/
 .claude/worktrees/
 
 # The open-mercato skill collection is vendored: `.claude/skills/om-*` and skills-lock.json are
-# both committed, and the lockfile's per-skill `computedHash` is what makes a run reproducible.
+# both committed. The committed tree is what makes a run reproducible; the lockfile's per-skill
+# `computedHash` is provenance for each skill's SKILL.md entry point, not for its references/.
 # (.ai/cezar/config.json does not pin a SHA - it never did, whatever this comment used to say.)
 # `pnpm install-skills` refreshes both, and they move in the same commit (docs/agents/cezar.md).
 #

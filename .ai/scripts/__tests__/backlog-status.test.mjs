@@ -516,23 +516,21 @@ describe("sortIssues", () => {
 describe("waitsForPerson", () => {
   const pr = (...names) => ({ labels: names.map((name) => ({ name })) });
 
-  it("waits for a person on QA nobody has signed, a high-risk or security diff, or a hold", () => {
-    expect(waitsForPerson(pr("needs-qa"))).toBe(true);
-    expect(waitsForPerson(pr("risk-high"))).toBe(true);
-    expect(waitsForPerson(pr("security"))).toBe(true);
+  it("waits for a person on a hold only", () => {
     expect(waitsForPerson(pr("blocked"))).toBe(true);
     expect(waitsForPerson(pr("do-not-merge"))).toBe(true);
   });
 
-  it("does not wait once QA is approved, nor for a PR the pipeline merges by itself", () => {
+  // The owner took QA and risk off a person's desk (2026-10-06): om-pr-autopilot has agents judge
+  // them and merges into develop itself, so none of these PRs waits for anyone.
+  it("does not wait on QA, a high-risk or security diff, nor for a PR the pipeline merges by itself", () => {
+    expect(waitsForPerson(pr("needs-qa"))).toBe(false);
     expect(waitsForPerson(pr("needs-qa", "qa-approved"))).toBe(false);
+    expect(waitsForPerson(pr("risk-high", "needs-qa"))).toBe(false);
+    expect(waitsForPerson(pr("security"))).toBe(false);
     expect(waitsForPerson(pr("review"))).toBe(false);
     expect(waitsForPerson(pr("risk-low", "merge-queue"))).toBe(false);
     expect(waitsForPerson(pr())).toBe(false);
-  });
-
-  it("still waits for a person when a high-risk PR also has QA approved", () => {
-    expect(waitsForPerson(pr("risk-high", "needs-qa", "qa-approved"))).toBe(true);
   });
 
   describe("a changes-requested PR", () => {
@@ -582,14 +580,14 @@ describe("countWip", () => {
       pr(["review"], "dependabot[bot]"),
       pr(["do-not-merge"], "rafalwolak", "main"),
     ];
-    expect(countWip(prs, trusted)).toBe(4);
+    expect(countWip(prs, trusted)).toBe(1);
   });
 
   it("skips the promotion and another author's PR, and counts the retired agent's once it is trusted", () => {
     const prs = [
-      pr(["risk-high", "do-not-merge"], "rafalwolak", "main"),
-      pr(["risk-high"], "dependabot[bot]"),
-      pr(["risk-high"], "design4pro-agent"),
+      pr(["blocked", "do-not-merge"], "rafalwolak", "main"),
+      pr(["blocked"], "dependabot[bot]"),
+      pr(["blocked"], "design4pro-agent"),
     ];
     expect(countWip(prs, trusted)).toBe(0);
     expect(countWip(prs, trustedAuthors(AUTOMATIONS))).toBe(1);

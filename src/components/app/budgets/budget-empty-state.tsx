@@ -1,6 +1,8 @@
 import { FolderTree, Hand, Plus, Wallet } from 'lucide-react'
+import { Button as RACButton } from 'react-aria-components/Button'
 
-import { Button, EmptyState } from '#/components/ui'
+import { Button, EmptyState, buttonVariants } from '#/components/ui'
+import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 
 /**
@@ -62,23 +64,31 @@ export function BudgetEmptyState({
         <p className="mt-1 text-caption text-ink-2">
           {t('budgets.empty.pick.body')}
         </p>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+        <ul className="mt-4 grid auto-rows-fr gap-3 sm:grid-cols-2">
           {(
             [
               { kind: 'category', Icon: FolderTree },
               { kind: 'manual', Icon: Hand },
             ] as const
           ).map(({ kind, Icon }) => (
-            <li key={kind}>
+            <li key={kind} className="flex">
               {/*
-                `size="lg"` stays: these are `h-auto flex-col` tiles whose height comes from their
-                content, so the prop only supplies the padding and type step (#362).
+                Not the shared `Button`: it wraps its children in an inline row of its own, so a
+                `flex-col` passed to it never reaches the icon, the title and the help text. The
+                tile takes the button's paint instead and is the interactive element itself, so
+                the three are its direct children and stack. `h-auto` in a flex `li` lets the grid
+                cell stretch it, and `auto-rows-fr` on the list gives the rows one height even
+                where it is a single column and the tiles sit in different rows (#536).
               */}
-              <Button
-                variant="secondary"
-                size="lg"
-                block
-                className="h-auto flex-col items-start gap-1.5 py-4 text-start"
+              <RACButton
+                className={cn(
+                  buttonVariants({
+                    variant: 'secondary',
+                    size: 'lg',
+                    block: true,
+                  }),
+                  'h-auto flex-col items-start justify-start gap-1.5 whitespace-normal py-4 text-start',
+                )}
                 onPress={() => onCreate(kind)}
               >
                 <Icon aria-hidden="true" className="size-5 text-ink-2" />
@@ -89,14 +99,14 @@ export function BudgetEmptyState({
                       : 'budgets.kind.manual',
                   )}
                 </span>
-                <span className="text-caption font-normal text-ink-2 whitespace-normal">
+                <span className="text-caption font-normal text-ink-2">
                   {t(
                     kind === 'category'
                       ? 'budgets.kind.category.help'
                       : 'budgets.kind.manual.help',
                   )}
                 </span>
-              </Button>
+              </RACButton>
             </li>
           ))}
         </ul>

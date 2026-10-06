@@ -7,6 +7,12 @@ import { formatMoney, makeMoney } from '#/lib/money'
 import { PeriodActions } from './period-actions'
 import { PeriodStatusBadge } from './period-status'
 import {
+  STACKED_BLOCK,
+  STACKED_HEAD,
+  STACKED_ROW_HEADER,
+  StackedCell,
+} from './stacked-table'
+import {
   ROW_KEY_ATTRIBUTE,
   useRowFocusRecovery,
 } from './use-row-focus-recovery'
@@ -133,53 +139,88 @@ export function PeriodGrid({
         className,
       )}
     >
-      <table className="w-full border-collapse text-label">
-        <caption className="pb-3 text-start text-caption text-ink-2">
+      <table
+        role="table"
+        className={cn('w-full border-collapse text-label', STACKED_BLOCK)}
+      >
+        <caption
+          className={cn(
+            'pb-3 text-start text-caption text-ink-2',
+            STACKED_BLOCK,
+          )}
+        >
           {t('recurring.periods.caption')}
         </caption>
-        <thead>
-          <tr className="border-b border-border-subtle">
+        <thead role="rowgroup" className={STACKED_HEAD}>
+          <tr
+            role="row"
+            className={cn('border-b border-border-subtle', STACKED_BLOCK)}
+          >
             <th
+              role="columnheader"
               scope="col"
-              className="px-3 py-2 text-start font-medium text-ink-2"
+              className={cn(
+                'px-3 py-2 text-start font-medium text-ink-2',
+                STACKED_BLOCK,
+              )}
             >
               {t('recurring.periods.col.due')}
             </th>
             <th
+              role="columnheader"
               scope="col"
-              className="px-3 py-2 text-end font-medium text-ink-2"
+              className={cn(
+                'px-3 py-2 text-end font-medium text-ink-2',
+                STACKED_BLOCK,
+              )}
             >
               {t('recurring.periods.col.expected')}
             </th>
             <th
+              role="columnheader"
               scope="col"
-              className="px-3 py-2 text-end font-medium text-ink-2"
+              className={cn(
+                'px-3 py-2 text-end font-medium text-ink-2',
+                STACKED_BLOCK,
+              )}
             >
               {t('recurring.periods.col.settled')}
             </th>
             <th
+              role="columnheader"
               scope="col"
-              className="px-3 py-2 text-start font-medium text-ink-2"
+              className={cn(
+                'px-3 py-2 text-start font-medium text-ink-2',
+                STACKED_BLOCK,
+              )}
             >
               {t('recurring.periods.col.variance')}
             </th>
             <th
+              role="columnheader"
               scope="col"
-              className="px-3 py-2 text-start font-medium text-ink-2"
+              className={cn(
+                'px-3 py-2 text-start font-medium text-ink-2',
+                STACKED_BLOCK,
+              )}
             >
               {t('recurring.periods.col.status')}
             </th>
             {isReadOnly ? null : (
               <th
+                role="columnheader"
                 scope="col"
-                className="px-3 py-2 text-end font-medium text-ink-2"
+                className={cn(
+                  'px-3 py-2 text-end font-medium text-ink-2',
+                  STACKED_BLOCK,
+                )}
               >
                 {t('recurring.periods.col.actions')}
               </th>
             )}
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup" className={STACKED_BLOCK}>
           {periods.map((period) => {
             const due = formatCalendarDate(locale, period.dueOn, 'medium')
             const variance = varianceOf(period)
@@ -187,16 +228,27 @@ export function PeriodGrid({
             return (
               <tr
                 key={rowKey(period)}
+                role="row"
                 {...{ [ROW_KEY_ATTRIBUTE]: rowKey(period) }}
-                className="border-b border-border-subtle last:border-b-0"
+                className={cn(
+                  'border-b border-border-subtle last:border-b-0',
+                  STACKED_BLOCK,
+                )}
               >
                 <th
+                  role="rowheader"
                   scope="row"
-                  className="whitespace-nowrap px-3 py-2 text-start font-medium text-ink"
+                  className={cn(
+                    'whitespace-nowrap px-3 py-2 text-start font-medium text-ink',
+                    STACKED_ROW_HEADER,
+                  )}
                 >
                   {due}
                 </th>
-                <td className="whitespace-nowrap px-3 py-2 text-end tabular text-ink">
+                <StackedCell
+                  label={t('recurring.periods.col.expected')}
+                  className="whitespace-nowrap px-3 py-2 text-end tabular text-ink"
+                >
                   {formatMoney(
                     locale,
                     makeMoney(
@@ -204,8 +256,11 @@ export function PeriodGrid({
                       period.expectedCurrencyCode,
                     ),
                   )}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-end tabular text-ink">
+                </StackedCell>
+                <StackedCell
+                  label={t('recurring.periods.col.settled')}
+                  className="whitespace-nowrap px-3 py-2 text-end tabular text-ink"
+                >
                   {period.settledAmountMinor === null ||
                   period.settledCurrencyCode === null ? (
                     <span className="text-ink-2">
@@ -220,15 +275,26 @@ export function PeriodGrid({
                       ),
                     )
                   )}
-                </td>
-                <td className="px-3 py-2 text-caption">
+                </StackedCell>
+                <StackedCell
+                  // Nothing settled, nothing to compare: no label over an empty value.
+                  label={
+                    period.settledAmountMinor === null
+                      ? undefined
+                      : t('recurring.periods.col.variance')
+                  }
+                  className="px-3 py-2 text-caption max-sm:text-end"
+                >
                   <VarianceCell period={period} variance={variance} />
-                </td>
-                <td className="px-3 py-2">
+                </StackedCell>
+                <StackedCell
+                  label={t('recurring.periods.col.status')}
+                  className="px-3 py-2"
+                >
                   <PeriodStatusBadge status={period.derivedStatus} />
-                </td>
+                </StackedCell>
                 {isReadOnly ? null : (
-                  <td className="px-3 py-2">
+                  <td role="cell" className={cn('px-3 py-2', STACKED_BLOCK)}>
                     <PeriodActions
                       period={period}
                       onMarkPaid={() => onMarkPaid(period)}
