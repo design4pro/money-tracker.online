@@ -45,7 +45,7 @@ ADR 0035.
 
 - No person reads a money, ledger, auth, tenancy, billing or migration diff before it reaches
   `develop`. The `develop` -> `main` promotion, which a person merges (`do-not-merge`, ADR 0029), is
-  now the one place a person sees those changes before production.
+  now the one place a person sees those changes before production. (Amended 2026-10-06: the decision extends the specialist-settles-it mechanism (`afk-decide`) to the merge, which is how `AGENTS.md` § Ask First items are settled for the pipeline.)
 - More runs and CI per PR: the panel is up to three sub-agents, and a rejected PR runs the chain up
   to three times.
 - What still stops: `do-not-merge`, `blocked`, an active `qa` label or a `qa-failed` a person set,
