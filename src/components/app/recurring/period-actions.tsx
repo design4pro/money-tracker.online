@@ -30,8 +30,10 @@ import type { PeriodView } from '#/server/repos/recurring'
  * ## A narrow cell stacks them
  *
  * `compact` is for a cell with no room to spare (the Upcoming panel's rail, which must not scroll
- * sideways): the buttons stack and a long label wraps onto a second line instead of widening the
- * column. The series grid, which has the room, keeps them on one line.
+ * sideways): from `sm` up the buttons stack and a long label wraps onto a second line instead of
+ * widening the column. Below `sm` the table is stacked into blocks (see `stacked-table.tsx`), the
+ * cell has the whole width, and the buttons sit on one line like the series grid's, which has the
+ * room at every width.
  *
  * The component draws the buttons and not their cell: the `<td>` belongs to the table that owns
  * its columns, and the callbacks to the route that performs the writes.
@@ -72,7 +74,7 @@ export function PeriodActions({
     <div
       className={
         compact
-          ? 'flex flex-col items-stretch gap-1'
+          ? 'flex items-center justify-end gap-1 sm:flex-col sm:items-stretch'
           : 'flex items-center justify-end gap-1'
       }
     >
