@@ -26,8 +26,9 @@ const NON_CURRENCIES = ['XAU', 'XAG', 'XPT', 'XPD', 'XDR', 'XXX', 'XTS']
 
 const SEED_DRIFT_MESSAGE =
   'The seeded `currencies` table differs from the static catalogue. ' +
-  'A catalogue change is made in `src/lib/money/currencies.ts` and in a new migration that ' +
-  'changes `drizzle/0002_seed_currency_catalogue.sql`’s rows, in the same pull request.'
+  'A catalogue change is made in `src/lib/money/currencies.ts` and in a new additive migration ' +
+  '(`drizzle/0002_seed_currency_catalogue.sql` is history and stays as it is), in the same ' +
+  'pull request.'
 
 const WRITE_GUARD_MESSAGE =
   'This is a tripwire, not an authorisation guard. A write to the `currencies` table needs the ' +
@@ -163,7 +164,7 @@ function stripComments(source: string): string {
 
 const DRIZZLE_WRITE = /\.(?:insert|update|delete)\(\s*currencies\b/
 const RAW_SQL_WRITE =
-  /\b(?:insert\s+into\s+currencies|update\s+currencies|delete\s+from\s+currencies)\b/i
+  /\b(?:(?:insert(?:\s+or\s+\w+)?|replace)\s+into|update|delete\s+from)\s+`?currencies\b/i
 
 function writesCurrencies(source: string): boolean {
   const code = stripComments(source)
@@ -234,6 +235,11 @@ describe('nothing writes the currencies table', () => {
     expect(writesCurrencies('await db.run(sql`DELETE FROM currencies`)')).toBe(
       true,
     )
+    expect(
+      writesCurrencies(
+        'db.run(sql`insert or replace into currencies values (1)`)',
+      ),
+    ).toBe(true)
     expect(writesCurrencies('/** reads only: no update currencies */')).toBe(
       false,
     )
