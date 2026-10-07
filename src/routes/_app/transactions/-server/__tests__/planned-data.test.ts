@@ -3,15 +3,18 @@
  *
  * What is under test is `plannedScreenFor`, not `loadPlannedScreen`: a `createServerFn` value is
  * only callable inside the Start request context, so a test of the wrapper is a test of TanStack.
- * The ledger half is the real repository calls through `ledgerReaderFor`; the expected half is the
- * real `getUpcoming`. The composition between them is the code the rules below are about.
+ * The ledger half is the real `ledgerPageFor` (the body `loadTransactions` runs once its door has
+ * resolved a scope); the expected half is the real `getUpcoming`. The composition between them is
+ * the code the rules below are about.
  *
  * The rules, stated once:
  *
  * 1. **The group is a read, never a write.** No statement the composition runs inserts, updates or
  *    deletes anything, and none of the writers of `recurring_periods` is reachable from it.
- * 2. **The group does not depend on the ledger's order or page.** It is ordered by due date and is
- *    identical under all four sort fields, both directions and every cursor.
+ * 2. **The group does not depend on the ledger's order, and a cursor page does not read it.** It is
+ *    ordered by due date and is identical under all four sort fields and both directions; the
+ *    screen draws it from the first page only, so a request with a cursor reads no group at all
+ *    and its ledger half is exactly what the ledger reader returns.
  * 3. **Filters either narrow the group or hide it**, never silently ignored: five of them hide it,
  *    and each is asserted here.
  * 4. **A failing expected read does not take the ledger down with it**, and is logged, not
@@ -32,25 +35,37 @@ import {
   seedCategory,
   seedTransaction,
 } from '#/server/repos/__tests__/budget-harness'
-import {
-  ledgerReaderFor,
-  seedSeries,
-} from '#/server/repos/__tests__/planned-harness'
+import { seedSeries } from '#/server/repos/__tests__/planned-harness'
+import { ledgerPageFor } from '#/server/transactions/ledger-page'
 
 import { plannedScreenFor } from '../planned-data'
 
 import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
+import type * as CategoriesModule from '#/server/repos/categories'
 import type * as RecurringModule from '#/server/repos/recurring'
 import type { TransactionFilters } from '#/server/repos/transaction-queries'
 import type { PlannedScreenInput } from '../planned-data'
 
-// `getUpcoming` stays the real one except in the one case that needs it to fail.
+// `getUpcoming` and `listCategories` stay the real ones, counted so a case can say a request made
+// no call; `getUpcoming` also fails in the one case that needs it to.
 const failing = vi.hoisted(() => ({ next: false }))
+const reads = vi.hoisted(() => ({ upcoming: 0, categories: 0 }))
+vi.mock('#/server/repos/categories', async (importOriginal) => {
+  const actual = await importOriginal<typeof CategoriesModule>()
+  return {
+    ...actual,
+    listCategories: (...args: Parameters<typeof actual.listCategories>) => {
+      reads.categories += 1
+      return actual.listCategories(...args)
+    },
+  }
+})
 vi.mock('#/server/repos/recurring', async (importOriginal) => {
   const actual = await importOriginal<typeof RecurringModule>()
   return {
     ...actual,
     getUpcoming: (...args: Parameters<typeof actual.getUpcoming>) => {
+      reads.upcoming += 1
       if (failing.next) {
         failing.next = false
         return Promise.reject(new Error('d1 is unavailable'))
@@ -85,23 +100,25 @@ const logger = createLogger({ sink, level: 'debug' })
 
 function compose(over: Partial<PlannedScreenInput> = {}, today = TODAY) {
   return plannedScreenFor(world.scope, input(over), today, {
-    readLedger: ledgerReaderFor(world.scope),
+    readLedger: ledgerPageFor,
     logger,
   })
 }
 
 async function shown(over: Partial<PlannedScreenInput> = {}) {
-  const page = await compose(over)
-  if (page.expectations.state !== 'shown') {
-    throw new Error(`expected a shown group, got ${page.expectations.state}`)
+  const { expectations } = await compose(over)
+  if (expectations?.state !== 'shown') {
+    throw new Error(`expected a shown group, got ${expectations?.state}`)
   }
-  return page.expectations
+  return expectations
 }
 
 beforeEach(async () => {
   world = await createBudgetWorld()
   sink.records.length = 0
   failing.next = false
+  reads.upcoming = 0
+  reads.categories = 0
 })
 
 describe('what the group holds', () => {
@@ -200,30 +217,104 @@ describe('what the group does not depend on', () => {
       }
     }
   })
+})
 
-  it('is the same on page two as on page one', async () => {
+describe('a cursor page', () => {
+  /** Three planned rows and a series, so a one-row page has two cursors to walk. */
+  async function seedThreePages() {
+    await seedCategory(world.db, { id: 'cat-parent', name: 'Home' })
     await seedSeries(world.scope, TODAY, { name: 'Rent' })
-    await seedTransaction(world.db, {
-      id: 'plan-1',
-      refAmountMinor: 100_00,
-      bookedOn: '2026-04-20',
-      isPlanned: true,
-    })
-    await seedTransaction(world.db, {
-      id: 'plan-2',
-      refAmountMinor: 200_00,
-      bookedOn: '2026-04-21',
-      isPlanned: true,
+    for (const [id, bookedOn] of [
+      ['plan-1', '2026-04-20'],
+      ['plan-2', '2026-04-21'],
+      ['plan-3', '2026-04-22'],
+    ] as const) {
+      await seedTransaction(world.db, {
+        id,
+        refAmountMinor: 100_00,
+        bookedOn,
+        categoryId: 'cat-parent',
+        isPlanned: true,
+      })
+    }
+  }
+
+  it('makes no upcoming read and no category-list read, on the statements it ran as well as the spies', async () => {
+    await seedThreePages()
+    // A category filter is the case that adds the category read to the group's own.
+    const filters = { categoryIds: ['cat-parent'] }
+    const first = await compose({ limit: 1, filters })
+    expect(first.nextCursor).not.toBeNull()
+    // The control: the first page does make both reads, so zero below is the skip and not a filter.
+    expect(reads).toEqual({ upcoming: 1, categories: 1 })
+    reads.upcoming = 0
+    reads.categories = 0
+    executed.length = 0
+
+    const second = await compose({
+      limit: 1,
+      cursor: first.nextCursor,
+      filters,
     })
 
+    expect(second.rows).toHaveLength(1)
+    expect(reads).toEqual({ upcoming: 0, categories: 0 })
+    expect(executed.some((query) => /recurring_periods/i.test(query))).toBe(
+      false,
+    )
+  })
+
+  it('carries no group, and the day it read', async () => {
+    await seedThreePages()
     const first = await compose({ limit: 1 })
-    expect(first.nextCursor).not.toBeNull()
+
     const second = await compose({ limit: 1, cursor: first.nextCursor })
 
-    expect(second.rows.map((row) => row.id)).not.toEqual(
-      first.rows.map((row) => row.id),
-    )
-    expect(second.expectations).toEqual(first.expectations)
+    expect(second.today).toBe(TODAY)
+    expect(second.expectations).toBeUndefined()
+    expect(Object.keys(second)).not.toContain('expectations')
+    // The first page still carries it: the screen draws the group from there.
+    expect(first.expectations).toMatchObject({ state: 'shown' })
+  })
+
+  it('has the ledger half the ledger reader returns, under every sort and every cursor', async () => {
+    await seedThreePages()
+
+    for (const field of LEDGER_SORT_FIELDS) {
+      for (const direction of ['asc', 'desc'] as const) {
+        const sort = { field, direction }
+        let cursor: string | null = null
+        let pages = 0
+        do {
+          const direct = await ledgerPageFor(
+            world.scope,
+            input({ sort, limit: 1, cursor }),
+          )
+          const composed = await compose({ sort, limit: 1, cursor })
+
+          if (cursor === null) {
+            expect(composed.expectations).toMatchObject({ state: 'shown' })
+          } else {
+            expect(composed.expectations).toBeUndefined()
+          }
+          const { today, expectations: _expectations, ...ledger } = composed
+          expect(today).toBe(TODAY)
+          expect(ledger).toEqual(direct)
+          cursor = direct.nextCursor
+          pages += 1
+        } while (cursor !== null)
+        // Three planned rows, one per page: the walk really went through cursors.
+        expect(pages).toBe(3)
+      }
+    }
+  })
+
+  it('keys the skip on the validated cursor, so a null cursor always reads the group', async () => {
+    await seedThreePages()
+
+    await compose({ limit: 1 })
+
+    expect(reads.upcoming).toBe(1)
   })
 })
 
@@ -235,8 +326,7 @@ describe('the ledger half is passed through untouched', () => {
       bookedOn: '2026-04-20',
       isPlanned: true,
     })
-    const reader = ledgerReaderFor(world.scope)
-    const direct = await reader(input())
+    const direct = await ledgerPageFor(world.scope, input())
 
     const composed = await compose()
 

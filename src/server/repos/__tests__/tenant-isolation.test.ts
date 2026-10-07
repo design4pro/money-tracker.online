@@ -50,6 +50,7 @@ import {
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
+import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
   createMemoryMarkerStore,
   sweepBudgetThresholds,
@@ -111,7 +112,6 @@ import {
   readImportBatchFile,
 } from '../imports'
 
-import { ledgerReaderFor } from './planned-harness'
 import { createSeries, getUpcoming } from '../recurring'
 import { createTenantRepository, tenantFilter } from '../base'
 import {
@@ -1927,7 +1927,7 @@ describe('the upcoming read cannot leak another workspace’s series ids', () =>
       },
       '2026-04-01',
       {
-        readLedger: ledgerReaderFor(world.scope),
+        readLedger: ledgerPageFor,
         logger: createLogger({ sink: createMemorySink() }),
       },
     )
@@ -1960,11 +1960,102 @@ describe('the upcoming read cannot leak another workspace’s series ids', () =>
       },
       '2026-04-01',
       {
-        readLedger: ledgerReaderFor(world.scope),
+        readLedger: ledgerPageFor,
         logger: createLogger({ sink: createMemorySink() }),
       },
     )
 
     expect(page.expectations).toMatchObject({ state: 'shown', rows: [] })
+  })
+
+  describe('the ledger read the planned screen shares with the ledger', () => {
+    const POLICIES = {
+      planned: 'only',
+      adjustments: 'exclude',
+      transfers: 'include',
+      completeness: 'any',
+    } as const
+    const SORT = { field: 'bookedOn', direction: 'desc' } as const
+
+    /** A holds two planned rows, B three, so a leak moves the ids, the count and the totals. */
+    async function seedPlannedRows() {
+      for (const [id, amount] of [
+        ['plan-a-1', 100_00],
+        ['plan-a-2', 200_00],
+      ] as const) {
+        await seedTransaction(world.db, {
+          id,
+          refAmountMinor: amount,
+          bookedOn: '2026-04-20',
+          isPlanned: true,
+        })
+      }
+      for (const id of ['plan-b-1', 'plan-b-2', 'plan-b-3']) {
+        await seedTransaction(world.db, {
+          id,
+          refAmountMinor: 777_00,
+          organizationId: 'org-b',
+          accountId: 'acc-b',
+          categoryId: 'cat-b',
+          bookedOn: '2026-04-21',
+          isPlanned: true,
+        })
+      }
+    }
+
+    it('returns none of B’s row ids, totals or counts under A’s scope', async () => {
+      await seedPlannedRows()
+
+      const page = await ledgerPageFor(world.scope, {
+        policies: POLICIES,
+        filters: {},
+        sort: SORT,
+        cursor: null,
+      })
+
+      expect(page.rows.map((row) => row.id).sort()).toEqual([
+        'plan-a-1',
+        'plan-a-2',
+      ])
+      expect(page.total).toBe(2)
+      expect(page.totals.expenseMinor).toBe(300_00)
+      expect(JSON.stringify(page)).not.toContain('plan-b')
+    })
+
+    it('answers a cursor page from A’s ledger alone, with no group and no foreign id', async () => {
+      await seedPlannedRows()
+      const deps = {
+        readLedger: ledgerPageFor,
+        logger: createLogger({ sink: createMemorySink() }),
+      }
+      const first = await plannedScreenFor(
+        world.scope,
+        { policies: POLICIES, filters: {}, sort: SORT, cursor: null, limit: 1 },
+        '2026-04-01',
+        deps,
+      )
+      expect(first.nextCursor).not.toBeNull()
+
+      const second = await plannedScreenFor(
+        world.scope,
+        {
+          policies: POLICIES,
+          filters: {},
+          sort: SORT,
+          cursor: first.nextCursor,
+          limit: 1,
+        },
+        '2026-04-01',
+        deps,
+      )
+
+      expect(second.rows).toHaveLength(1)
+      expect(second.total).toBe(2)
+      expect(second.expectations).toBeUndefined()
+      const seen = JSON.stringify(second)
+      for (const foreign of ['plan-b', 'acc-b', 'cat-b', 'payee-b']) {
+        expect(seen).not.toContain(foreign)
+      }
+    })
   })
 })
