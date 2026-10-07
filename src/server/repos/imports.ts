@@ -146,6 +146,20 @@ export function importFileKey(
 }
 
 /**
+ * Whether `key` is under this workspace's `imports` prefix: {@link assertKeyInOrg} in a form that
+ * answers instead of throwing, so the reader and the DTO below apply one rule and not two copies.
+ */
+function isKeyInWorkspace(scope: TenantScope, key: string): boolean {
+  try {
+    assertKeyInOrg('imports', scope.ctx.organizationId, key)
+    return true
+  } catch (error) {
+    if (!(error instanceof InvalidKeyError)) throw error
+    return false
+  }
+}
+
+/**
  * The batch's stored file, or `null` when the batch has no key or the bucket has no such object.
  *
  * **This is the only place a batch's file is fetched**, so the preview, the mapping step and any
@@ -165,16 +179,46 @@ export async function readImportBatchFile(
 ): Promise<R2ObjectBody | null> {
   if (batch.fileR2Key === null) return null
 
-  try {
-    assertKeyInOrg('imports', scope.ctx.organizationId, batch.fileR2Key)
-  } catch (error) {
-    if (!(error instanceof InvalidKeyError)) throw error
+  if (!isKeyInWorkspace(scope, batch.fileR2Key)) {
     logger.warn('import batch key is outside the workspace prefix', {
       batchId: batch.id,
     })
     throw new NotFoundError('import batch', batch.id)
   }
   return bucket.get(batch.fileR2Key)
+}
+
+/**
+ * A batch as the browser may see it: the row without its storage key, and the file name the key
+ * would have given.
+ *
+ * `fileName` is the last path segment of the key **only** when the key passes the same prefix check
+ * as {@link readImportBatchFile}, and the batch id otherwise - a key outside this workspace, a
+ * missing key, or one with no final segment. A name is therefore never derived from a key that
+ * belongs to somebody else, and the other workspace's id never reaches a response.
+ */
+export type ImportBatchDto = Omit<ImportBatchRow, 'fileR2Key'> & {
+  readonly fileName: string
+}
+
+/**
+ * The only producer of {@link ImportBatchDto}.
+ *
+ * A pure mapping over a row the scoped repository already returned, so it runs no query and has no
+ * case in `tenant-isolation.test.ts`. A foreign-key batch is mapped, not dropped: filtering it out
+ * of a keyset page would break the page size and make the history disagree with
+ * {@link importsThisMonth}, which counts it.
+ */
+export function toImportBatchDto(
+  scope: TenantScope,
+  batch: ImportBatchRow,
+): ImportBatchDto {
+  const { fileR2Key: key, ...rest } = batch
+  const name =
+    key !== null && isKeyInWorkspace(scope, key)
+      ? key.slice(key.lastIndexOf('/') + 1)
+      : ''
+  return { ...rest, fileName: name === '' ? batch.id : name }
 }
 
 /* -------------------------------------------------------------------------- */
