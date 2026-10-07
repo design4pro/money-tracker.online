@@ -258,15 +258,15 @@ export function ExpectationGroupView({
           <ul
             role="list"
             aria-labelledby={figuresId}
-            className="flex flex-col gap-1 list-none"
+            className="flex flex-col gap-5 list-none"
           >
             {[...groupByCurrency(figures)].map(([currencyCode, lines]) => (
               <li
                 key={currencyCode}
-                className="flex flex-wrap items-baseline gap-x-4 gap-y-1"
+                className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5"
               >
                 <span className="text-caption text-ink-2">{currencyCode}</span>
-                <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
                   {lines.map((line) => (
                     <div
                       key={line.direction}
