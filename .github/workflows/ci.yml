@@ -507,8 +507,11 @@ jobs:
       # updated in place, naming the commit these results belong to. Never gates anything - a fork's
       # read-only token or a missing report must not turn a green suite red.
       - name: Post the test report on the pull request
-        if: ${{ always() && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         continue-on-error: true
+        # `continue-on-error` does not bound time: a hung `gh` call would run to the job's own
+        # timeout and turn this required check red.
+        timeout-minutes: 2
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

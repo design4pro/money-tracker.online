@@ -36,6 +36,8 @@ in a seven-day artifact, so nothing on the pull request itself said which commit
   tested on top of the other. The push to `develop` runs the full suite on the merged commit and
   `deploy · staging` needs it green (ADR 0020), so the breakage stops at staging and the fix is a
   normal pull request.
+- A draft's checks read `skipped`, and a skipped check is not a verdict: tooling that reads a draft's
+  checks as green has read nothing. Marking the pull request ready is what starts the gates.
 - The accessibility result is not in the comment: `a11y.yml` is a separate workflow that runs in
   parallel and has no verdict to read when the comment is written. Its check stays on the pull
   request.

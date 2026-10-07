@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url'
 
 export const MARKER = '<!-- ci-test-report -->'
 
+const BOT_LOGIN = 'github-actions[bot]'
+
 const ICON = { success: '✅', failure: '❌', cancelled: '⚪', skipped: '⏭️' }
 
 /** `needs.<job>.result` as one cell: an icon and the word, unknown values shown as they are. */
@@ -33,12 +35,26 @@ export function describeResult(result) {
 export function readStats(report) {
   const stats = report?.stats
   if (!stats) return null
+  // Counts only: the report is built from blobs the pull request's own jobs uploaded, so a value
+  // that is not a finite number is dropped rather than echoed into a comment.
+  const count = (value) => (Number.isFinite(value) ? value : 0)
   return {
-    passed: stats.expected ?? 0,
-    failed: stats.unexpected ?? 0,
-    flaky: stats.flaky ?? 0,
-    skipped: stats.skipped ?? 0,
+    passed: count(stats.expected),
+    failed: count(stats.unexpected),
+    flaky: count(stats.flaky),
+    skipped: count(stats.skipped),
   }
+}
+
+/**
+ * The comment this script wrote earlier, found by `MARKER`. Only the Actions bot's own comment
+ * counts: a marker pasted by anyone else must not be edited, or the report would end up under
+ * another author's name.
+ */
+export function findReportComment(comments) {
+  return comments.find(
+    (comment) => comment.user === BOT_LOGIN && comment.body?.startsWith(MARKER),
+  )
 }
 
 /** The comment body. Same sections in every repository that carries this script. */
@@ -81,15 +97,18 @@ function main(reportPath) {
     stats: readStats(report),
   })
 
-  const comments = JSON.parse(
-    gh([
-      'api',
-      '--paginate',
-      '--slurp',
-      `repos/${GH_REPO}/issues/${PR_NUMBER}/comments`,
-    ]),
-  ).flat()
-  const existing = comments.find((comment) => comment.body?.startsWith(MARKER))
+  // One JSON object per line: `--slurp` needs gh 2.48 and the runner's client may be older.
+  const comments = gh([
+    'api',
+    '--paginate',
+    `repos/${GH_REPO}/issues/${PR_NUMBER}/comments`,
+    '--jq',
+    '.[] | {id, user: .user.login, body}',
+  ])
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+  const existing = findReportComment(comments)
   const payload = JSON.stringify({ body })
   if (existing) {
     gh(

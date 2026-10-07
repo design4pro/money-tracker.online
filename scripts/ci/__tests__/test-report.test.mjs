@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MARKER,
   describeResult,
+  findReportComment,
   readStats,
   renderComment,
 } from '../test-report.mjs'
@@ -28,6 +29,12 @@ describe('readStats', () => {
       flaky: 0,
       skipped: 0,
     })
+  })
+
+  it('drops a counter that is not a finite number', () => {
+    expect(
+      readStats({ stats: { expected: '[x](http://evil)', unexpected: NaN } }),
+    ).toEqual({ passed: 0, failed: 0, flaky: 0, skipped: 0 })
   })
 
   it.each([null, undefined, {}])(
@@ -77,5 +84,27 @@ describe('renderComment', () => {
     expect(
       renderComment({ ...base, e2eResult: 'failure', stats: null }),
     ).toContain('| E2E journeys | ❌ failure - no report was produced |')
+  })
+})
+
+describe('findReportComment', () => {
+  const bot = 'github-actions[bot]'
+
+  it('finds the bot comment that starts with the marker', () => {
+    const own = { id: 2, user: bot, body: `${MARKER}\nreport` }
+    expect(findReportComment([{ id: 1, user: bot, body: 'other' }, own])).toBe(
+      own,
+    )
+  })
+
+  it('ignores a marker someone else pasted, even when it comes first', () => {
+    const own = { id: 2, user: bot, body: `${MARKER}\nreport` }
+    expect(
+      findReportComment([{ id: 1, user: 'mallory', body: MARKER }, own]),
+    ).toBe(own)
+  })
+
+  it('returns undefined when there is no report comment yet', () => {
+    expect(findReportComment([{ id: 1, user: bot, body: 'x' }])).toBeUndefined()
   })
 })
