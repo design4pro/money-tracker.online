@@ -11,7 +11,9 @@ import { cn } from '#/lib/cn'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 
 import { AmountText } from './amount-text'
+import { expectedFiguresByCurrency } from './expectation-figures'
 
+import type { ExpectedFigure } from './expectation-figures'
 import type {
   ExpectationGroup as ExpectationGroupModel,
   ExpectationRow,
@@ -25,7 +27,13 @@ import type {
  * An expected payment is a plan: it has no reference amount and no rate until it settles
  * (`ExpectationRow`), and nothing here is added to the ledger's totals. The group says so in words
  * ({@link ExpectationGroupProps}'s hint line) and writes each amount in the series' own currency.
- * Per-currency expected figures are a separate slice (#563).
+ *
+ * What the listed rows add up to is drawn in the group, under a label that calls it an expectation
+ * and names the rows it covers (`expectedFiguresByCurrency`): one line per currency, income and
+ * expense kept apart, nothing converted or netted. It sits with the group rather than beside
+ * `ListSummary` so it also appears when the ledger is empty and the summary is not drawn, and it
+ * covers the listed rows even when the group is capped - the capped line stays the only statement
+ * that there are more.
  *
  * ## Its own table, not rows of the ledger grid
  *
@@ -61,6 +69,18 @@ const HEAD_CELL =
   'px-2 py-2 text-start text-caption font-medium text-ink-2 sm:px-3'
 const CELL = 'px-2 py-2 sm:px-3'
 
+/** The figures are already ordered, so a `Map` keeps both the currency order and the direction order. */
+function groupByCurrency(figures: ReadonlyArray<ExpectedFigure>) {
+  const lines = new Map<string, Array<ExpectedFigure>>()
+  for (const figure of figures) {
+    lines.set(figure.currencyCode, [
+      ...(lines.get(figure.currencyCode) ?? []),
+      figure,
+    ])
+  }
+  return lines
+}
+
 function Notice({ children }: { readonly children: string }) {
   return <p className="text-caption text-ink-2">{children}</p>
 }
@@ -74,6 +94,7 @@ export function ExpectationGroupView({
   const t = useTranslate()
   const locale = useLocale()
   const headingId = useId()
+  const figuresId = useId()
   const rootRef = useRef<HTMLElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const rows = group.state === 'shown' ? group.rows : []
@@ -91,6 +112,7 @@ export function ExpectationGroupView({
   if (group.state === 'failed') {
     return <Notice>{t('transactions.planned.expected.failed')}</Notice>
   }
+  const figures = expectedFiguresByCurrency(group.rows)
   return (
     <section
       ref={rootRef}
@@ -225,6 +247,55 @@ export function ExpectationGroupView({
             ))}
           </tbody>
         </table>
+      )}
+
+      {figures.length === 0 ? null : (
+        <div className="flex flex-col gap-1">
+          <p id={figuresId} className="text-caption text-ink-2">
+            {t('transactions.planned.expected.figures')}
+          </p>
+          {/* `role="list"` is deliberate: Safari drops the list role from a `list-none` `<ul>`. */}
+          <ul
+            role="list"
+            aria-labelledby={figuresId}
+            className="flex flex-col gap-1 list-none"
+          >
+            {[...groupByCurrency(figures)].map(([currencyCode, lines]) => (
+              <li
+                key={currencyCode}
+                className="flex flex-wrap items-baseline gap-x-4 gap-y-1"
+              >
+                <span className="text-caption text-ink-2">{currencyCode}</span>
+                <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  {lines.map((line) => (
+                    <div
+                      key={line.direction}
+                      className="flex items-baseline gap-2"
+                    >
+                      <dt className="text-caption text-ink-2">
+                        {t(
+                          line.direction === 'income'
+                            ? 'transactions.planned.expected.in'
+                            : 'transactions.planned.expected.out',
+                        )}
+                      </dt>
+                      <dd>
+                        <AmountText
+                          hideGlyph
+                          isPlanned
+                          amountMinor={line.amountMinor}
+                          currencyCode={line.currencyCode}
+                          direction={line.direction}
+                          className="text-label"
+                        />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {group.rows.length === 0 && !group.isCapped ? (

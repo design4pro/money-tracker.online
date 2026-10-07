@@ -644,3 +644,14 @@ Recorded so the design above and the product do not quietly disagree. The body i
    has loaded. The brief's "list" origin returns to `/recurring`, which is the wrong screen here.
 7. **The empty state's pointer is a link under the description**, always shown on the empty planned
    screen, because the screen does not know whether the workspace has series.
+8. **The per-currency expected figures shipped in #563, with the group and computed in the
+   component layer.** Step 9 says they sit beside `ListSummary` and step 7 says the planned read
+   returns an `expectedByCurrency` field. They are drawn inside the expected group, under their own
+   label (`transactions.planned.expected.figures`), so they also appear when the ledger is empty and
+   `ListSummary` is not drawn, and `expectedFiguresByCurrency` sums the rows the group lists, so the
+   figure and the table cannot disagree and a capped group's figures cover the listed rows only.
+   Nothing is added to the server payload, the repository layer or `LedgerTotals`, so step 9's test
+   home in `money-invariants.test.ts` no longer applies: the byte-identical `totals` case stays, and
+   the two-currency and never-netted cases live in
+   `src/components/app/transactions/__tests__/expectation-figures.test.ts`. A currency whose sum
+   overflows is left out of the figures rather than reaching render.
