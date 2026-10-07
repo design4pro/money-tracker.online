@@ -250,3 +250,62 @@ test.describe('a 360px screen still shows its own subject', () => {
     })
   }
 })
+
+/**
+ * A `Select` listbox shows every option in full, whatever the width of the trigger, up to the
+ * viewport cap below (an option wider than the cap still ends in an ellipsis).
+ *
+ * The popover used to be pinned to the trigger's width, so the dashboard period selector's Polish
+ * options ("Poprzedni miesiąc", "Ostatnie 12 miesięcy") ended in an ellipsis at 360px (#559). The
+ * panel is now at least as wide as the trigger, grows to its longest option and is capped at the
+ * viewport minus React Aria's 12px container padding on each side (`DESIGN.md` -> Select and
+ * ComboBox popover). jsdom has no layout, so this is measured in a browser.
+ */
+const EDGE_PADDING = 12
+
+for (const scenario of [
+  { locale: 'pl', width: 360, label: 'Okres' },
+  { locale: 'en', width: 360, label: 'Period' },
+  { locale: 'en', width: 1280, label: 'Period' },
+] as const) {
+  test(`the period listbox reads in full in ${scenario.locale} at ${scenario.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: scenario.width, height: 800 })
+    await useLocale(page.context(), scenario.locale)
+    await gotoApp(page, '/dashboard')
+
+    const trigger = page.getByRole('button', { name: scenario.label })
+    await trigger.click()
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+
+    const options = listbox.getByRole('option')
+    const count = await options.count()
+    expect(count, 'the period selector has options').toBeGreaterThan(0)
+    for (let index = 0; index < count; index += 1) {
+      const label = options.nth(index).locator('span.truncate')
+      expect(
+        await isClipped(label),
+        `option "${(await label.textContent()) ?? ''}" was ellipsised`,
+      ).toBe(false)
+    }
+
+    const triggerBox = await trigger.boundingBox()
+    const popoverBox = await page
+      .locator('[data-trigger="Select"]')
+      .boundingBox()
+    expect(triggerBox).not.toBeNull()
+    expect(popoverBox).not.toBeNull()
+    if (triggerBox === null || popoverBox === null) return
+    expect(popoverBox.width).toBeGreaterThanOrEqual(triggerBox.width - 1)
+    expect(popoverBox.width).toBeLessThanOrEqual(
+      scenario.width - 2 * EDGE_PADDING + 1,
+    )
+
+    // Selection and focus return are the part of a Select a width rule must not disturb.
+    await page.keyboard.press('Escape')
+    await expect(listbox).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+}
