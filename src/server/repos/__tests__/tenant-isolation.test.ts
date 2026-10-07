@@ -2075,9 +2075,13 @@ describe('the upcoming read cannot leak another workspace’s series ids', () =>
         sort: SORT,
         cursor: fromB.nextCursor,
         limit: 1,
-      }).catch(() => null)
+      })
 
-      // The keyset only narrows A's own rows: it either refuses or answers from A, never from B.
+      // The keyset only narrows A's own rows: the page is A's, and total still counts A alone.
+      expect(
+        page.rows.map((row) => row.id).every((id) => id.startsWith('plan-a-')),
+      ).toBe(true)
+      expect(page.total).toBe(2)
       expect(JSON.stringify(page)).not.toContain('plan-b')
     })
   })
