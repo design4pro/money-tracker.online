@@ -31,7 +31,15 @@ import path from 'node:path'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { asCurrencyCode, asMinor, asRateE10, subtractMinor } from '#/lib/money'
+import {
+  asCurrencyCode,
+  asMinor,
+  asRateE10,
+  minorUnitDigits,
+  parseMoney,
+  subtractMinor,
+} from '#/lib/money'
+import { listEnabledCurrencies } from '#/server/catalog/currencies'
 import { projectCompletion } from '#/server/goals/project'
 import { medianOf } from '#/server/recurring/detect'
 import { matchesPeriod } from '#/server/recurring/match'
@@ -1624,6 +1632,45 @@ describe('15 — an expectation is shown beside the totals and never in them', (
     for (const row of expectations.rows) {
       expect(row.expectedAmountMinor).toBeGreaterThan(0)
       expect(Object.keys(row)).not.toContain('netMinor')
+    }
+  })
+})
+
+/**
+ * A figure is scaled by the currency's `digits`, and the catalogue is where `digits` comes from.
+ * The money functions read the static table in `src/lib/money/currencies.ts`; the `currencies` row
+ * in D1 is its mirror, which no arithmetic reads. So the invariant is held by this pair of facts
+ * being one: the row a listing returns carries the scale the formatter and the parser use. A mirror
+ * that drifted would show the yen at two decimals in a picker and store it at none.
+ */
+describe('16 — the catalogue’s digits is the scale the arithmetic uses', () => {
+  it('lists JPY at 0, KWD at 3 and EUR at 2, each equal to the scale the money functions use', async () => {
+    // Opened here, not taken from the file's `beforeEach`: its `db` is local to that callback and
+    // this case needs no `scope`.
+    const listed = await listEnabledCurrencies(openTestDb())
+    const digitsOf = (code: string) =>
+      listed.find((row) => row.code === code)?.digits
+
+    expect(digitsOf('JPY')).toBe(0)
+    expect(digitsOf('KWD')).toBe(3)
+    expect(digitsOf('EUR')).toBe(2)
+    for (const code of ['JPY', 'KWD', 'EUR']) {
+      expect(digitsOf(code)).toBe(minorUnitDigits(code))
+    }
+
+    // 1234 yen is 1234 minor units; 1.234 dinars is 1234 fils. Neither is scaled by a literal 2.
+    expect(parseMoney('en', '1234', 'JPY')).toBe(1234)
+    expect(parseMoney('en', '1.234', 'KWD')).toBe(1234)
+  })
+
+  it('excludes non-currencies from the listing', async () => {
+    const codes = (await listEnabledCurrencies(openTestDb())).map(
+      (row) => row.code,
+    )
+
+    // A metal with `digits: 0` would silently behave like the yen.
+    for (const code of ['XAU', 'XAG', 'XPT', 'XPD', 'XDR', 'XXX', 'XTS']) {
+      expect(codes).not.toContain(code)
     }
   })
 })
