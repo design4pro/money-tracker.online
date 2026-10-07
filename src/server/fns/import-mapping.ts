@@ -50,7 +50,11 @@ import {
   offerImportPreset,
   saveImportPreset,
 } from '#/server/repos/import-presets'
-import { advanceImportBatch, getImportBatch } from '#/server/repos/imports'
+import {
+  advanceImportBatch,
+  getImportBatch,
+  readImportBatchFile,
+} from '#/server/repos/imports'
 
 import type {
   ImportBatchRow,
@@ -323,11 +327,9 @@ export const previewImportBatch = createServerFn({ method: 'POST' })
     const account = await getAccount(scope, mapping.accountId)
 
     // `file_r2_key` is nullable in the schema, so a batch whose object was never written is a
-    // stated refusal rather than a `get(null)`.
-    const object =
-      batch.fileR2Key === null
-        ? null
-        : await (await filesBucket()).get(batch.fileR2Key)
+    // stated refusal rather than a `get(null)`; the reader also refuses a key that is not this
+    // workspace's before the bucket is asked.
+    const object = await readImportBatchFile(scope, await filesBucket(), batch)
     if (object === null) {
       throw new ConflictError(
         'The uploaded file for this import is no longer stored.',

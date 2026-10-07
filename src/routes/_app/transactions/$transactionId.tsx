@@ -32,8 +32,8 @@ import type {
   TransactionReference,
 } from '#/components/app/transactions'
 import type { Minor } from '#/lib/money'
-import type { AttachmentRow } from '#/server/db/schema'
 import type { Transaction, TransactionSplit } from '#/server/db/types'
+import type { AttachmentDto } from '#/server/repos/attachments'
 import type { RefundSummary } from '#/server/repos/refunds'
 import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
 import type { TransactionPolicies } from '#/server/repos/transactions'
@@ -223,7 +223,7 @@ interface ScreenProps {
   readonly refunds: RefundSummary
   readonly groups: ReadonlyArray<TransactionGroupSummary>
   readonly allGroups: ReadonlyArray<TransactionGroupSummary>
-  readonly attachments: ReadonlyArray<AttachmentRow>
+  readonly attachments: ReadonlyArray<AttachmentDto>
   readonly reference: TransactionReference
   readonly isEditing: boolean
   readonly onRefresh: () => void

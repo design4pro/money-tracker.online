@@ -137,7 +137,7 @@ in `wrangler.jsonc` that quietly runs nothing is indistinguishable from a health
 | `*/15 * * * *` | **Reminder and due sweep.** Scans for recurring series due, budgets that crossed a threshold, and tag reminders that fire. Dedupe marker written to KV **after** dispatch. |
 | `7 * * * *`    | **Recurring auto-record.** Materialises `recurring_periods` whose `auto_record` is set and whose due instant has passed.                                                   |
 | `0 3 * * *`    | **Nightly.** FX refresh for every pair any workspace holds; full balance-history revaluation sweep; per-workspace JSON backups to R2; expired export artefact prune.       |
-| `17 4 * * 1`   | **Weekly.** Platform audit-log prune (400-day retention), provider usage roll-up, orphaned R2 object sweep.                                                                |
+| `17 4 * * 1`   | **Weekly.** Platform audit-log prune (400-day retention), provider usage roll-up, orphaned R2 object sweep (planned, not yet built).                                       |
 
 Staging runs only `0 3 * * *`, so a staging deploy cannot fan out reminders to real inboxes.
 
