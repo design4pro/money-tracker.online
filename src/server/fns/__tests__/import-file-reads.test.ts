@@ -31,8 +31,17 @@ const SRC = fileURLToPath(new URL('../../../', import.meta.url))
 /** The reader's own file: the one place a batch key may reach `get`, after the prefix check. */
 const READER = 'server/repos/imports.ts'
 
-/** The two callers the issue names. Paths are relative to `src/`. */
+/**
+ * The two callers the issue names, as they stand since #601 moved the read out of the server-fn
+ * wrappers into their `-data` modules. Paths are relative to `src/`.
+ */
 const CALLERS = [
+  'server/fns/import-mapping-data.ts',
+  'routes/_app/import/-server/describe-batch-data.ts',
+] as const
+
+/** The server-fn wrappers in front of the callers: they hold the binding and must not `get` it. */
+const WRAPPERS = [
   'server/fns/import-mapping.ts',
   'routes/_app/import/-server/describe-batch.ts',
 ] as const
@@ -59,7 +68,9 @@ describe('the import file read sites', () => {
   it('finds the files it is guarding', () => {
     const sources = productionSources()
     expect(sources).toContain(READER)
-    for (const caller of CALLERS) expect(sources, caller).toContain(caller)
+    for (const caller of [...CALLERS, ...WRAPPERS]) {
+      expect(sources, caller).toContain(caller)
+    }
     expect(read(READER)).toContain('export async function readImportBatchFile')
   })
 
@@ -85,11 +96,14 @@ describe('the import file read sites', () => {
     },
   )
 
-  it.each(CALLERS)('%s never reads the files bucket directly', (caller) => {
-    // Catches the revert that first aliases the key (`const key = batch.fileR2Key`), which the
-    // argument check below cannot see: the bucket is named, whatever it is asked for.
-    expect(read(caller)).not.toMatch(BUCKET_GET)
-  })
+  it.each([...CALLERS, ...WRAPPERS])(
+    '%s never reads the files bucket directly',
+    (caller) => {
+      // Catches the revert that first aliases the key (`const key = batch.fileR2Key`), which the
+      // argument check below cannot see: the bucket is named, whatever it is asked for.
+      expect(read(caller)).not.toMatch(BUCKET_GET)
+    },
+  )
 
   it('has no bucket get outside the reader that takes the batch file key', () => {
     const offenders = productionSources()
