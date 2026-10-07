@@ -693,15 +693,37 @@ label kept in the DOM under the spinner so the button holds its width.
 ### Select and ComboBox popover
 
 - **The shape.** The listbox panel is at least as wide as its trigger, grows to its longest option
-  (`w-max` over the base `Popover`'s `min-w-(--trigger-width)`), and is capped at the viewport
-  minus the 12px edge padding React Aria keeps on each side (`max-w-[calc(100vw-1.5rem)]`).
+  (`w-max` over the base `Popover`'s `min-w-(--trigger-width)`), and is capped twice:
+  at the viewport minus the 12px edge padding React Aria keeps on each side, and at an absolute
+  `32rem` (`max-w-[min(calc(100vw-1.5rem),32rem)]`, the identical literal in `Select` and
+  `ComboBox`). `32rem` is about 65 characters, close to the 64ch measure in
+  `docs/ACCESSIBILITY.md`, and being in `rem` it scales with text size, so the 1.4.4 / 1.4.10
+  behaviour does not change. It is measured, not guessed: the longest fixed option (the Polish
+  dashboard period options) is 160px wide at its widest and nothing fixed reaches the bound or
+  wraps, so `32rem` is raised only if `e2e/narrow-viewport.spec.ts` says one does.
 - **Why not the trigger's width.** A trigger is sized for the value it shows, not for the longest
   option: pinning the panel to it ellipsised the Polish dashboard period options at 360px
   ("Poprzedni mie...", #559). Both primitives carry the identical rule, so a call site never picks
   a width.
-- **Truncation** stays in `ListBoxItem`, and only past the cap: an option wider than the viewport
-  still ends in an ellipsis. Keyboard navigation, selection and focus return to the trigger are
-  React Aria's and are untouched.
+- **A `ComboBox` panel follows its filtered list.** Its floor is the trigger's width and its start
+  edge stays anchored to the trigger, so while a person types only the far edge moves and no option
+  text shifts; the "no matches" state sits at the trigger's width. Holding the width stable would
+  need a measuring effect the popover deliberately avoids, and pinning it to the trigger would bring
+  #559 back. A browser case therefore asserts a range (never narrower than the trigger, never wider
+  than `min(viewport - 24px, 32rem)`) after every keystroke and never that the width is constant.
+- **A label past the bound wraps** (`break-words` on the label span in `ListBoxItem`) instead of
+  ending in an ellipsis: it is the only choice every input method can read, since a `title` is not
+  reachable from the keyboard (a `ComboBox` option never takes DOM focus) or by touch. Rows that
+  fit keep one line; the row grows with its label (`shrink-0`, because the listbox is a column flex
+  container with a max height), and the check mark and trailing meta keep their size
+  (`shrink-0`) and centre against the wrapped text. A row only gets taller past the bound, and the
+  target-size minimum is a minimum height, so 2.5.8 holds.
+- **Known limits.** `100vw` includes a classic scrollbar on desktop, and `1.5rem` equals the 12px
+  edge padding only at the default root font size. The `32rem` bound makes both moot on wide
+  screens; at 360px and a larger root font size the cap can sit a few pixels off the edge padding.
+  They are left documented rather than fixed with a measuring effect.
+- Keyboard navigation, selection and focus return to the trigger are React Aria's and are
+  untouched.
 - **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.
 
 ### Focus

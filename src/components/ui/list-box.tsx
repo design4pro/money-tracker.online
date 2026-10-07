@@ -76,7 +76,10 @@ export function ListBoxItem<T extends object>({
     <RACListBoxItem
       {...props}
       textValue={textValue}
-      className={composeTw(className, collectionItemBase, 'pe-2 ps-2')}
+      // `shrink-0`: the listbox is a column flex container with a max height, and a row that may
+      // shrink is squeezed to its minimum height once the rows overflow, which paints a wrapped
+      // label over the row below.
+      className={composeTw(className, collectionItemBase, 'shrink-0 pe-2 ps-2')}
     >
       {(renderProps) => (
         <>
@@ -96,7 +99,8 @@ export function ListBoxItem<T extends object>({
               {icon}
             </span>
           ) : null}
-          <span className="min-w-0 flex-1 truncate">
+          {/* Wraps rather than ellipsises: a label past the popover's cap must stay readable. */}
+          <span className="min-w-0 flex-1 break-words">
             {typeof children === 'function' ? children(renderProps) : children}
           </span>
           {meta ? (
