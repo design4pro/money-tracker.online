@@ -757,6 +757,24 @@ const messages = {
   'transactions.planned.empty.title': 'Nothing planned',
   'transactions.planned.empty.body':
     'Record an expense with a future date and mark it planned to see it here.',
+  'transactions.planned.empty.recurring':
+    'Nothing planned. Your recurring payments are on the recurring screen.',
+  'transactions.planned.expected': 'Expected',
+  'transactions.planned.expected.group': {
+    one: 'Expected in the next day',
+    other: 'Expected in the next {count} days',
+  },
+  'transactions.planned.expected.capped': {
+    one: 'Showing the soonest one. See all on the recurring screen.',
+    other: 'Showing the {count} soonest. See all on the recurring screen.',
+  },
+  'transactions.planned.expected.hint':
+    'Not yet money. Expected payments are never added to the totals.',
+  'transactions.planned.expected.suppressed':
+    'Expected payments are hidden while this filter is active.',
+  'transactions.planned.expected.failed':
+    'Expected payments could not be loaded.',
+  'transactions.planned.expected.none': 'No expected payments to show.',
   'transactions.mode.label': 'Which entries to show',
   'transactions.mode.actual': 'Recorded',
   'transactions.mode.planned': 'Planned',

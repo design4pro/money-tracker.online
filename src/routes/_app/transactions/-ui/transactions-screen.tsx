@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 
 import {
   BulkActions,
   ConfirmDeleteDialog,
+  ExpectationGroupView,
   FilterBar,
   ListSummary,
   TransactionList,
@@ -14,6 +15,7 @@ import {
   countActiveFilters,
   describeFilters,
   emptyReference,
+  hasExpectationContent,
 } from '#/components/app/transactions'
 import { toast } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
@@ -24,9 +26,11 @@ import { useDataRefresh } from '../../-lib/refresh'
 import { toFilters, toQueryFilters, toSearch, toSort } from '../-lib/filters'
 import { toLedgerRow } from '../-lib/rows'
 import { loadTransactionReference } from '../-server/list'
+import { loadPlannedScreen } from '../-server/planned'
 
 import type { ReactNode } from 'react'
 import type {
+  ExpectationRow,
   LedgerFilters,
   LedgerSort,
   LedgerSortField,
@@ -102,6 +106,24 @@ const SORT_LABEL: Record<LedgerSortField, MessageKey> = {
   account: 'transactions.field.account',
 }
 
+/**
+ * What the planned screen adds: the recurring periods that have not settled, read beside the
+ * ledger page and drawn as a group above it. Absent on every other screen, which then reads the
+ * ledger alone. The callbacks are the route's, because settling a period is a write and the mark-paid
+ * dialog is the route's to open.
+ */
+export interface ScreenExpectations {
+  readonly onMarkPaid: (row: ExpectationRow) => void
+  readonly onSkip: (row: ExpectationRow) => void
+  /** The row the route's mark-paid dialog is open on, if any. */
+  readonly openRowId: string | null
+  /**
+   * A row to open the mark-paid dialog on once the group has loaded, set when the entry form sends
+   * the person back (`?markPaid=`). Acted on once; a row that has since settled is not found.
+   */
+  readonly reopenId: string | null
+}
+
 export interface TransactionsScreenProps {
   /** Which planned, adjustment, transfer and completeness rows this view is about. Never defaulted. */
   readonly policies: TransactionPolicies
@@ -129,6 +151,7 @@ export interface TransactionsScreenProps {
   readonly hasBalance?: boolean
   readonly showFilterBar?: boolean
   readonly showSummary?: boolean
+  readonly expectations?: ScreenExpectations
 }
 
 export function TransactionsScreen({
@@ -140,6 +163,7 @@ export function TransactionsScreen({
   hasBalance = false,
   showFilterBar = true,
   showSummary = true,
+  expectations,
 }: TransactionsScreenProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -171,19 +195,43 @@ export function TransactionsScreen({
     [filters, fixedFilters, reference.baseCurrencyCode],
   )
 
+  const withExpectations = expectations !== undefined
+
   const pageQuery = useInfiniteQuery({
-    queryKey: ['transactions', 'page', policies, queryFilters, sort],
-    queryFn: ({ pageParam }) =>
-      loadTransactions({
-        data: {
-          policies,
-          filters: queryFilters,
-          sort,
-          cursor: pageParam,
-          limit: PAGE_SIZE,
-          includeBalanceAfter: hasBalance,
-        },
-      }),
+    queryKey: [
+      'transactions',
+      'page',
+      policies,
+      queryFilters,
+      sort,
+      withExpectations,
+    ],
+    queryFn: async ({ pageParam }) => {
+      if (withExpectations) {
+        return loadPlannedScreen({
+          data: {
+            policies,
+            filters: queryFilters,
+            sort,
+            cursor: pageParam,
+            limit: PAGE_SIZE,
+          },
+        })
+      }
+      return {
+        ...(await loadTransactions({
+          data: {
+            policies,
+            filters: queryFilters,
+            sort,
+            cursor: pageParam,
+            limit: PAGE_SIZE,
+            includeBalanceAfter: hasBalance,
+          },
+        })),
+        expectations: undefined,
+      }
+    },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
   })
@@ -205,6 +253,8 @@ export function TransactionsScreen({
   const head = pageQuery.data?.pages.at(0)
   const total = head?.total ?? 0
   const totals = head?.totals
+  // Every page call answers the group identically, so the first page speaks for all of them.
+  const group = head?.expectations
 
   /* ---- Writing back to the URL ------------------------------------------ */
 
@@ -297,6 +347,44 @@ export function TransactionsScreen({
     />
   )
 
+  const reopened = useRef(false)
+  useEffect(() => {
+    if (
+      reopened.current ||
+      expectations?.reopenId == null ||
+      group?.state !== 'shown'
+    ) {
+      return
+    }
+    reopened.current = true
+    const row = group.rows.find((entry) => entry.id === expectations.reopenId)
+    if (row !== undefined) {
+      expectations.onMarkPaid(row)
+    }
+  }, [expectations, group])
+
+  // Once the group has held content it stays mounted when the last row is settled, so the heading
+  // its focus recovery falls back to still exists to take focus (WCAG 2.4.3).
+  const groupSeen = useRef(false)
+  const groupHasContent = group !== undefined && hasExpectationContent(group)
+  useEffect(() => {
+    if (groupHasContent) {
+      groupSeen.current = true
+    }
+  }, [groupHasContent])
+
+  const expectationGroup =
+    expectations === undefined ||
+    group === undefined ||
+    !(groupHasContent || groupSeen.current) ? null : (
+      <ExpectationGroupView
+        group={group}
+        openRowId={expectations.openRowId}
+        onMarkPaid={expectations.onMarkPaid}
+        onSkip={expectations.onSkip}
+      />
+    )
+
   const body = () => {
     if (pageQuery.isPending) {
       return <TransactionListSkeleton />
@@ -305,10 +393,15 @@ export function TransactionsScreen({
       return <TransactionListError onRetry={() => void pageQuery.refetch()} />
     }
     if (rows.length === 0) {
-      return countActiveFilters(filters) === 0 ? (
-        emptyState
-      ) : (
-        <TransactionsNoMatch onClearFilters={() => applyView({}, sort)} />
+      return (
+        <>
+          {expectationGroup}
+          {countActiveFilters(filters) === 0 ? (
+            emptyState
+          ) : (
+            <TransactionsNoMatch onClearFilters={() => applyView({}, sort)} />
+          )}
+        </>
       )
     }
     return (
@@ -349,6 +442,7 @@ export function TransactionsScreen({
           caption={caption}
           hasBalance={hasBalance}
           showAccount={showAccount}
+          leading={expectationGroup}
         />
       </>
     )

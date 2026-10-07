@@ -783,6 +783,30 @@ const messages = {
   'transactions.planned.empty.title': 'Nic nie jest zaplanowane',
   'transactions.planned.empty.body':
     'Zapisz wydatek z przyszłą datą i oznacz go jako zaplanowany, aby zobaczyć go tutaj.',
+  'transactions.planned.empty.recurring':
+    'Nic nie jest zaplanowane. Twoje płatności cykliczne są na ekranie cyklicznych.',
+  'transactions.planned.expected': 'Oczekiwane',
+  'transactions.planned.expected.group': {
+    one: 'Oczekiwane w najbliższym dniu',
+    few: 'Oczekiwane w najbliższych {count} dniach',
+    many: 'Oczekiwane w najbliższych {count} dniach',
+    other: 'Oczekiwane w najbliższych {count} dnia',
+  },
+  'transactions.planned.expected.capped': {
+    one: 'Pokazano najbliższą. Zobacz wszystkie na ekranie cyklicznych.',
+    few: 'Pokazano {count} najbliższe. Zobacz wszystkie na ekranie cyklicznych.',
+    many: 'Pokazano {count} najbliższych. Zobacz wszystkie na ekranie cyklicznych.',
+    other:
+      'Pokazano {count} najbliższej. Zobacz wszystkie na ekranie cyklicznych.',
+  },
+  'transactions.planned.expected.hint':
+    'To jeszcze nie są pieniądze. Oczekiwane płatności nigdy nie wchodzą do sum.',
+  'transactions.planned.expected.suppressed':
+    'Oczekiwane płatności są ukryte, dopóki ten filtr jest aktywny.',
+  'transactions.planned.expected.failed':
+    'Nie udało się wczytać oczekiwanych płatności.',
+  'transactions.planned.expected.none':
+    'Brak oczekiwanych płatności do pokazania.',
   'transactions.mode.label': 'Które wpisy pokazać',
   'transactions.mode.actual': 'Zapisane',
   'transactions.mode.planned': 'Zaplanowane',

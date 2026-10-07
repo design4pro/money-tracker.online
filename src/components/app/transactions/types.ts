@@ -123,6 +123,7 @@ export const NO_FILTERS: LedgerFilters = {}
 
 /** One line of the ledger, as the list draws it. */
 export interface LedgerRow {
+  readonly kind: 'transaction'
   readonly id: string
   readonly direction: LedgerDirection
   /** Strictly positive. The sign is {@link direction}, at every layer. */
@@ -151,6 +152,77 @@ export interface LedgerRow {
    * repository from stored amounts, never recomputed here.
    */
   readonly balanceAfterMinor?: Minor
+}
+
+/**
+ * A recurring period that has not settled yet, as the planned screen draws it: an expectation
+ * rather than money.
+ *
+ * **There is deliberately no `refAmountMinor`, no `refCurrencyCode` and no `rateE10`.** An expected
+ * amount has no rate and no booking date until it settles (`docs/plans/13-recurring.md`, `13-S1`),
+ * and converting a plan at today's rate and showing only that is how a person's expectations
+ * quietly change with the exchange rate. Their absence is the type telling every reader that this
+ * row cannot be summed with a {@link LedgerRow}, which makes the totals rule a compile error rather
+ * than a review comment. It is a view type: nothing persists it, and `toExpectationRow` is the one
+ * place it is built.
+ */
+export interface ExpectationRow {
+  readonly kind: 'expectation'
+  /** `${seriesId}:${periodStart}` - the period's natural key, not a row id. */
+  readonly id: string
+  readonly seriesId: string
+  readonly periodStart: string
+  readonly seriesName: string
+  readonly direction: LedgerDirection
+  /** Strictly positive, integer minor units at {@link currencyCode}'s own scale. */
+  readonly expectedAmountMinor: Minor
+  /** The series' currency. Never converted. */
+  readonly currencyCode: CurrencyCode
+  /** `YYYY-MM-DD`. The due date, a calendar date. */
+  readonly dueOn: string
+  /**
+   * What today says about the period. Two values, not four, and that is a fact about the read
+   * rather than a simplification: it returns unsettled periods only, so a paid or skipped one is
+   * not in the result to be drawn.
+   */
+  readonly status: 'upcoming' | 'overdue'
+  /** All three come from the series and all three are nullable (`onDelete: 'set null'`). */
+  readonly accountId: string | null
+  readonly categoryId: string | null
+  readonly payeeId: string | null
+}
+
+/** What a list can hold: a stored transaction, or an expectation drawn beside it. */
+export type LedgerEntry = LedgerRow | ExpectationRow
+
+/**
+ * The expected group of the planned screen, as the read answered it.
+ *
+ * Three states, because three different things can be true and a bare empty list says none of
+ * them: the group was read (possibly empty), the active filters have no counterpart on an
+ * expectation so the group is withheld, or the read failed while the ledger beside it succeeded.
+ */
+export type ExpectationGroup =
+  | {
+      readonly state: 'shown'
+      /** Ordered by due date, soonest first, whatever the ledger below is sorted by. */
+      readonly rows: ReadonlyArray<ExpectationRow>
+      /** How far ahead the group looks, in days. Overdue rows are included however old. */
+      readonly withinDays: number
+      /** The most rows the group holds. */
+      readonly limit: number
+      /** There were more unsettled periods in range than {@link limit}; the soonest are shown. */
+      readonly isCapped: boolean
+    }
+  | { readonly state: 'suppressed' }
+  | { readonly state: 'failed' }
+
+/**
+ * Whether the group has anything to draw: a notice (suppressed, failed), a row, or the capped line
+ * that stops an empty group reading as "nothing matches anywhere".
+ */
+export function hasExpectationContent(group: ExpectationGroup): boolean {
+  return group.state !== 'shown' || group.rows.length > 0 || group.isCapped
 }
 
 /** Income, expense and net over the whole filtered set, in the base currency. */
