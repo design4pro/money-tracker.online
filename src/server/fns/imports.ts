@@ -31,22 +31,16 @@
 import { createServerFn } from '@tanstack/react-start'
 
 import { requireOrg } from '#/server/auth/guards'
-import { rethrowAsNotFound } from '#/server/fns/not-found'
-import { resolveParser } from '#/server/import/registry'
-import { IMPORT_MAX_ROWS } from '#/server/import/types'
-import { readImportUpload } from '#/server/import/upload'
 import {
-  advanceImportBatch,
-  createImportBatch,
-  getImportBatch,
   importBatchIdSchema,
-  listImportBatches as listImportBatchRows,
   listImportBatchesSchema,
 } from '#/server/repos/imports'
 
-import type { ImportBatchRow } from '#/server/db/schema'
+import { getImportFor, listImportsFor, uploadImportFor } from './imports-data'
+
 import type { FileSniff, ImportWarning } from '#/server/import/types'
 import type { CursorPage } from '#/server/repos/base'
+import type { ImportBatchDto } from '#/server/repos/imports'
 
 /** The import bucket for the request in flight. The same `FILES` binding receipts live in. */
 async function filesBucket(): Promise<R2Bucket> {
@@ -54,12 +48,9 @@ async function filesBucket(): Promise<R2Bucket> {
   return env.FILES
 }
 
-/** How many parsed rows come back with the upload, for the mapping screen to draw. */
-const SAMPLE_ROWS = 10
-
-/** What an upload answers with: the row that was created, and what the file turned out to be. */
+/** What an upload answers with: the batch that was created, and what the file turned out to be. */
 export interface ImportUploadResult {
-  readonly batch: ImportBatchRow
+  readonly batch: ImportBatchDto
   /** The account the person chose. Confirmed as theirs, and carried into the mapping step. */
   readonly accountId: string
   readonly sniff: FileSniff
@@ -72,72 +63,26 @@ export interface ImportUploadResult {
   readonly warnings: ReadonlyArray<ImportWarning>
 }
 
-/**
- * Takes one file, stores it, and answers with what it is.
- *
- * One file per call, deliberately: a batch is one file by definition — it has one `file_r2_key`,
- * one mapping and one undo — and a handler that took several would have to answer "two of your
- * three are importable" with a single status code.
- */
+/** Stores one file and answers with what it is. The whole of it is {@link uploadImportFor}. */
 export const uploadImport = createServerFn({ method: 'POST' })
   .inputValidator((data: FormData) => data)
   .handler(async ({ data }): Promise<ImportUploadResult> => {
     const scope = await requireOrg()
-    const upload = await readImportUpload(data)
-    // Before anything is stored: a format with no module in this build must not leave a batch row
-    // behind, and `registry.ts` refuses it rather than reading the file as CSV.
-    const parser = await resolveParser(upload.source)
-
-    const batch = await createImportBatch(
-      scope,
-      await filesBucket(),
-      {
-        source: upload.source,
-        accountId: upload.accountId,
-        fileName: upload.fileName,
-        byteSize: upload.byteSize,
-      },
-      upload.body,
-    )
-
-    const sniff = parser.sniff(upload.body)
-    const parsed = parser.parse(upload.body, sniff, {
-      maxRows: IMPORT_MAX_ROWS,
-    })
-
-    // `queued → parsing → mapping`: the two moves the sniff actually made, rather than one jump
-    // that would leave the history unable to say a parse had happened.
-    await advanceImportBatch(scope, { id: batch.id, status: 'parsing' })
-    const mapping = await advanceImportBatch(scope, {
-      id: batch.id,
-      status: 'mapping',
-      rowCount: parsed.rows.length,
-    })
-
-    return {
-      batch: mapping,
-      accountId: upload.accountId,
-      sniff,
-      headers: parsed.headers,
-      sampleRows: parsed.rows.slice(0, SAMPLE_ROWS),
-      rowCount: parsed.rows.length,
-      truncated: parsed.truncated,
-      warnings: parsed.warnings,
-    }
+    return uploadImportFor(scope, await filesBucket(), data)
   })
 
 /** The import history, newest first. */
 export const listImports = createServerFn({ method: 'GET' })
   .inputValidator(listImportBatchesSchema)
-  .handler(async ({ data }): Promise<CursorPage<ImportBatchRow>> => {
+  .handler(async ({ data }): Promise<CursorPage<ImportBatchDto>> => {
     const scope = await requireOrg()
-    return listImportBatchRows(scope, data)
+    return listImportsFor(scope, data)
   })
 
-/** One batch, or a not-found. An id from another workspace does not exist here. */
+/** One batch, or a not-found. */
 export const getImport = createServerFn({ method: 'GET' })
   .inputValidator(importBatchIdSchema)
-  .handler(async ({ data }): Promise<ImportBatchRow> => {
+  .handler(async ({ data }): Promise<ImportBatchDto> => {
     const scope = await requireOrg()
-    return getImportBatch(scope, data).catch(rethrowAsNotFound)
+    return getImportFor(scope, data)
   })

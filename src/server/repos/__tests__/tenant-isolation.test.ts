@@ -109,6 +109,7 @@ import {
   importsThisMonth,
   listImportBatches,
   readImportBatchFile,
+  toImportBatchDto,
 } from '../imports'
 
 import { ledgerReaderFor } from './planned-harness'
@@ -1200,6 +1201,65 @@ describe('import batches cannot be reached or aimed across a workspace boundary'
       } finally {
         warn.mockRestore()
       }
+    },
+  )
+
+  /**
+   * `toImportBatchDto` is a pure mapper with no query of its own, so what is pinned here is the
+   * input it is given: a listed page that holds a poisoned row. The batch stays in the history -
+   * filtering it would change the page size and disagree with the quota count - and nothing about
+   * the other workspace is derived from its key.
+   */
+  it.each([
+    { name: 'another workspace', fileR2Key: 'imports/org-b/batch-b/leak.csv' },
+    {
+      name: 'a workspace whose id merely starts with A’s',
+      fileR2Key: 'imports/org-ab/batch-b/leak.csv',
+    },
+    {
+      name: 'a dot segment out of A’s prefix',
+      fileR2Key: 'imports/org-a/../org-b/batch-b/leak.csv',
+    },
+    { name: 'another family', fileR2Key: 'attachments/org-a/txn-a/leak.csv' },
+    { name: 'no final segment', fileR2Key: 'imports/org-a/batch-b/' },
+  ])(
+    'lists a batch keyed under $name by its id, with no key in the payload',
+    async ({ fileR2Key }) => {
+      const own = await createImportBatch(
+        importWorld.scope,
+        bucket.asR2(),
+        payload(),
+        FILE,
+      )
+      await importWorld.db.insert(importBatches).values({
+        id: 'batch-poisoned',
+        organizationId: ORG_A,
+        source: 'csv',
+        status: 'queued',
+        fileR2Key,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+
+      const page = await listImportBatches(importWorld.scope)
+      const dtos = page.items.map((row) =>
+        toImportBatchDto(importWorld.scope, row),
+      )
+
+      // Same rows, same order, as the page the repository returned.
+      expect(dtos.map((dto) => dto.id)).toEqual(page.items.map((row) => row.id))
+      expect(dtos).toHaveLength(2)
+      expect(dtos.find((dto) => dto.id === 'batch-poisoned')?.fileName).toBe(
+        'batch-poisoned',
+      )
+      expect(dtos.find((dto) => dto.id === own.id)?.fileName).toBe('wyciag.csv')
+
+      const serialised = JSON.stringify(dtos)
+      expect(serialised).not.toContain('fileR2Key')
+      expect(serialised).not.toContain(fileR2Key)
+      expect(serialised).not.toContain('org-b')
+      expect(serialised).not.toContain('org-ab')
+      expect(serialised).not.toContain('leak.csv')
     },
   )
 

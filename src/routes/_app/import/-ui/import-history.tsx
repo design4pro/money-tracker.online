@@ -17,7 +17,8 @@ import { importLinkClass } from '../-lib/link-style'
 
 import type { MessageKey } from '#/lib/i18n'
 import type { BadgeProps } from '#/components/ui'
-import type { ImportBatchRow, ImportStatus } from '#/server/db/schema'
+import type { ImportStatus } from '#/server/db/schema'
+import type { ImportBatchDto } from '#/server/repos/imports'
 
 /**
  * Every file this workspace has brought in — a peer of the two upload groups, not a page inside a
@@ -44,15 +45,8 @@ const STATUS_TONE: Readonly<Record<ImportStatus, BadgeProps['tone']>> = {
   reverted: 'neutral',
 }
 
-/** `imports/<org>/<batch>/statement.csv` → `statement.csv`. */
-function fileNameOf(batch: ImportBatchRow): string {
-  const key = batch.fileR2Key
-  if (key === null) return batch.id
-  return key.slice(key.lastIndexOf('/') + 1)
-}
-
 export interface ImportHistoryProps {
-  readonly batches: ReadonlyArray<ImportBatchRow>
+  readonly batches: ReadonlyArray<ImportBatchDto>
 }
 
 export function ImportHistory({ batches }: ImportHistoryProps) {
@@ -85,7 +79,7 @@ export function ImportHistory({ batches }: ImportHistoryProps) {
         </TableHeader>
         <TableBody>
           {batches.map((batch) => {
-            const name = fileNameOf(batch)
+            const name = batch.fileName
             return (
               <Row key={batch.id} id={batch.id}>
                 <Cell>
