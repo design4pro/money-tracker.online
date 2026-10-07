@@ -35,7 +35,9 @@ export type RateE10 = number & { readonly __rateE10: unique symbol }
 ### 1.2 The scale is `currencies.digits`, never 2
 
 Every currency row in the catalogue carries `digits`, the number of minor-unit digits ISO 4217
-gives it. It is **not** always 2:
+gives it. It is **not** always 2. "Currency" here means the catalogue: the scale the money functions
+use is the static table `src/lib/money/currencies.ts`, and `currencies.digits` in D1 is its mirror,
+pinned equal to it by the parity test in `src/server/catalog/__tests__/currencies.test.ts`.
 
 | Currency | `digits` | 1 major unit is | Minor units in `1.00`-looking input |
 | -------- | -------- | --------------- | ----------------------------------- |
@@ -46,6 +48,13 @@ gives it. It is **not** always 2:
 | `HUF`    | 2        | 100 fillér      | 100                                 |
 | `KWD`    | **3**    | 1000 fils       | **1000**                            |
 | `BHD`    | **3**    | 1000 fils       | **1000**                            |
+
+**Not everything with a code is a currency.** The precious metals (`XAU`, `XAG`, `XPT`, `XPD`), the
+fund codes, `XDR` (special drawing rights), `XXX` (no currency) and `XTS` (testing) are not
+currencies with minor units and are excluded from the catalogue: a metal stored with `digits: 0`
+would silently behave like `JPY`. The exclusion is pinned by the lib test "carries no metal, fund or
+placeholder code" (`src/lib/__tests__/currencies.test.ts`) and by the seeded-table test in
+`src/server/catalog/__tests__/currencies.test.ts`.
 
 A hard-coded `100` or `/ 100` in the money path is a defect **even when every currency in the test
 fixture has two digits**, because that is exactly the condition under which the bug does not show
