@@ -279,6 +279,8 @@ None.
 - `src/routes/console/audit/index.tsx` — new
 - `src/server/platform/repos/health.ts` — new
 - `src/server/platform/repos/__tests__/health.test.ts` — new
+- `src/server/catalog/currencies.ts` — gains the guarded and audited write path (exists from `03-S1`)
+- `src/server/catalog/__tests__/currencies.test.ts` — gains its cases (exists from `03-S1`)
 
 ### Data and migration
 
@@ -307,6 +309,27 @@ the failure this panel exists to surface.
   currencies (add, deactivate, adjust `digits`) and FX provider status with a manual refresh trigger.
   Deactivating a currency **in use by a workspace is refused** with the count, since it would strand
   those accounts.
+  **The catalogue write path is this stage's** (`CON-09`): `03-S1` shipped the reads only
+  (`listEnabledCurrencies`) because the guard and the audit table arrive with `24-S1`. Acceptance:
+  - The guard is the **platform** dictionary, resolved server-side from whichever source `24-S1`
+    settles on (`user.role` through `permits`, or `platform_roles`), never a workspace role. Which
+    platform role may write the catalogue is `24-S1`'s decision, and this stage's `operator` role
+    and `operator`-gated lines are reconciled by it.
+  - `ForbiddenError` for a caller without it; one audit row, written through `withAudit` only (it
+    records a denied or crashed attempt, which a same-batch write would lose); Zod parsed twice.
+  - A currency is added, and its `digits` changed, **only through `src/lib/money/currencies.ts`**: a
+    D1-only row would format at the fallback scale of 2. The "adjust `digits`" action above is in
+    tension with that and with the immutability of `ref_amount_minor`, and this stage's own spec
+    decides it.
+  - Deactivating a currency in use is refused with the count. The count is an **aggregate** (a
+    number only, no workspace id or name), runs through `24-S1`'s platform scope under `withAudit`,
+    and is not an unscoped query inside `src/server/catalog`.
+  - `requireCatalogueCurrency` rejects a disabled code (the existence check of `03-S3`).
+  - One test for the denied caller and one for the single audit row on success. The no-write
+    tripwires of `03-S1` (in `src/server/catalog/__tests__/currencies.test.ts`) are replaced, in
+    that pull request, by those cases.
+  - The docblock of the `currencies` table in `src/server/db/schema.ts` ("writes go through
+    `src/server/catalog` under `requirePermission`") is checked against what shipped.
 - **Audit viewer.** Filter by actor, action, target and date; keyset paginated; **read-only, with no
   delete path at all** — an audit log an operator can prune is not an audit log.
 
