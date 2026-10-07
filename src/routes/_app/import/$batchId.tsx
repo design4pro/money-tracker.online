@@ -150,11 +150,6 @@ function ImportBatchRoute() {
   const goTo = (target: ImportStep) =>
     void navigate({ search: { step: target } })
 
-  const fileName =
-    batch.fileR2Key === null
-      ? batch.id
-      : batch.fileR2Key.slice(batch.fileR2Key.lastIndexOf('/') + 1)
-
   const back = previousStep(step)
   const forward = nextStep(step)
 
@@ -164,7 +159,7 @@ function ImportBatchRoute() {
         <h1 className="text-title font-semibold text-ink">
           {t('import.title')}
         </h1>
-        <p className="text-caption text-ink-2">{fileName}</p>
+        <p className="text-caption text-ink-2">{batch.fileName}</p>
       </header>
 
       <nav aria-label={t('import.stepper.label')}>
@@ -235,7 +230,7 @@ function ImportBatchRoute() {
                 <p className="text-body text-ink">
                   {t('import.file.rows', {
                     rows: formatNumber(locale, file.rowCount),
-                    name: fileName,
+                    name: batch.fileName,
                   })}
                 </p>
                 {file.truncated ? (
