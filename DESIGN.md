@@ -696,11 +696,11 @@ label kept in the DOM under the spinner so the button holds its width.
   (`w-max` over the base `Popover`'s `min-w-(--trigger-width)`), and is capped twice:
   at the viewport minus the 12px edge padding React Aria keeps on each side, and at an absolute
   `32rem` (`max-w-[min(calc(100vw-1.5rem),32rem)]`, the identical literal in `Select` and
-  `ComboBox`). `32rem` is about 65 characters, close to the 64ch measure in
-  `docs/ACCESSIBILITY.md`, and being in `rem` it scales with text size, so the 1.4.4 / 1.4.10
-  behaviour does not change. It is measured, not guessed: the longest fixed option (the Polish
-  dashboard period options) is 160px wide at its widest and nothing fixed reaches the bound or
-  wraps, so `32rem` is raised only if `e2e/narrow-viewport.spec.ts` says one does.
+  `ComboBox`). Being in `rem` it scales with text size, so the 1.4.4 / 1.4.10 behaviour does not
+  change. A trigger wider than the bound keeps its own width: the floor wins over the cap, so the
+  bound only limits how far the panel grows past the trigger. The bound is measured, not guessed:
+  `e2e/narrow-viewport.spec.ts` fails when a fixed option (the Polish dashboard period options are
+  the longest) wraps or clips, and `32rem` is raised only if it does.
 - **Why not the trigger's width.** A trigger is sized for the value it shows, not for the longest
   option: pinning the panel to it ellipsised the Polish dashboard period options at 360px
   ("Poprzedni mie...", #559). Both primitives carry the identical rule, so a call site never picks
@@ -720,8 +720,10 @@ label kept in the DOM under the spinner so the button holds its width.
   target-size minimum is a minimum height, so 2.5.8 holds.
 - **Known limits.** `100vw` includes a classic scrollbar on desktop, and `1.5rem` equals the 12px
   edge padding only at the default root font size. The `32rem` bound makes both moot on wide
-  screens; at 360px and a larger root font size the cap can sit a few pixels off the edge padding.
-  They are left documented rather than fixed with a measuring effect.
+  screens. At 360px the cap is `100vw - 1.5rem`, so a root font size below 16px (say 12px, 18px
+  instead of 24px) lets the panel overrun the 12px edge padding by up to 6px, and a larger one
+  makes it narrower than it could be, which only wraps sooner. They are left documented rather than
+  fixed with a measuring effect.
 - Keyboard navigation, selection and focus return to the trigger are React Aria's and are
   untouched.
 - **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.

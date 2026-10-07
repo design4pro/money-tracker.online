@@ -305,9 +305,11 @@ async function expectPanelWithinBounds(
     )
     .toBe(true)
   const panel = await measurePanel(page, kind)
-  const cap = Math.min(
-    panel.viewport - 2 * EDGE_PADDING,
-    POPOVER_CAP_REM * panel.rem,
+  // The trigger's width is the floor and wins over the cap: a trigger wider than 32rem keeps its
+  // own width.
+  const cap = Math.max(
+    panel.triggerWidth,
+    Math.min(panel.viewport - 2 * EDGE_PADDING, POPOVER_CAP_REM * panel.rem),
   )
   expect(
     panel.width,
@@ -466,7 +468,7 @@ for (const width of [360, 1280]) {
     const token = uniqueToken('Wrap')
     await gotoApp(page, '/payees')
     for (const suffix of ['a', 'b', 'c', 'd']) {
-      const name = `${token} ${suffix} ${'Przedsiebiorstwo Wielobranzowe '.repeat(4)}${'x'.repeat(48)}`
+      const name = `${token} ${suffix} ${'Przedsiebiorstwo Wielobranzowe '.repeat(4)}${'x'.repeat(40)}`
       await page.getByRole('button', { name: 'Add a payee' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
