@@ -38,6 +38,9 @@ name: CI
 on:
   pull_request:
     branches: [main, develop]
+    # `ready_for_review`: a draft runs no gate, so marking one ready is what starts it. A draft
+    # cannot be merged, and a skipped required check counts as passed only on a pull request that can.
+    types: [opened, synchronize, reopened, ready_for_review]
   # Keep merge_group support if a GitHub merge queue rule is enabled later. The live rulesets have
   # no such rule, so pull requests run the browser journeys before merging (ADR 0020 amendment).
   merge_group:
@@ -123,7 +126,7 @@ jobs:
   # every leg regardless, because `verified-tree.mjs` never reads a `pull_request` run.
   changes:
     name: change scope
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 5
     outputs:
@@ -153,7 +156,7 @@ jobs:
     # first clause only ever stands down when a real earlier run said this tree passed. `!cancelled()`
     # rather than the implicit `success()`, which would read the skipped `verdict` as a reason to skip
     # this too (design4pro/planned.travel#531).
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && !github.event.pull_request.draft && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 20
 
@@ -269,7 +272,7 @@ jobs:
     needs: verdict
     name: unit tests · coverage
     # Same two clauses as `verify` above, for the same two reasons.
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && !github.event.pull_request.draft && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 20
 
@@ -343,7 +346,7 @@ jobs:
   e2e:
     needs: [verdict, changes]
     name: e2e · ${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }}
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && needs.changes.outputs.browser != 'false' }}
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && !github.event.pull_request.draft && needs.changes.outputs.browser != 'false' }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     # The outer bound. `playwright.config.ts` sets `globalTimeout` to 30 minutes
     # so the run's own clock is the one that fires first and names the test it
@@ -449,16 +452,20 @@ jobs:
   # this is seconds.
   e2e-report:
     name: e2e · merged report
-    needs: [changes, e2e]
+    needs: [changes, test, e2e]
     # Every PR needs a real verdict. If its legs were skipped, run and fail instead of publishing
     # a skipped job as a green required check. A push with a reused verdict may still skip, and so
     # may a pull request `changes` found nothing browser-facing in: that skip is a decision with its
     # reason in the `change scope` job, not a leg that never got to run (#455). `!cancelled()`, not
     # `always()`: a cancelled run (superseded push, closed pull request) has no verdict to publish
     # and must not take a `ci` slot to publish one.
-    if: ${{ !cancelled() && needs.changes.outputs.browser != 'false' && (github.event_name == 'pull_request' || needs.e2e.result != 'skipped') }}
+    if: ${{ !cancelled() && needs.changes.outputs.browser != 'false' && !github.event.pull_request.draft && (github.event_name == 'pull_request' || needs.e2e.result != 'skipped') }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 10
+    permissions:
+      contents: read
+      # The one scope this job adds, for the sticky test-report comment below and nothing else.
+      pull-requests: write
 
     steps:
       - name: Check out
@@ -483,7 +490,8 @@ jobs:
             echo '::notice title=e2e report::no shard reports to merge - the browser gate produced none.'
             exit 0
           fi
-          pnpm exec playwright merge-reports --reporter html,github ./all-blob-reports
+          PLAYWRIGHT_JSON_OUTPUT_NAME=merged-results.json \
+            pnpm exec playwright merge-reports --reporter html,github,json ./all-blob-reports
 
       - name: Upload the Playwright report
         if: always()
@@ -494,6 +502,22 @@ jobs:
           path: playwright-report
           retention-days: 7
           if-no-files-found: ignore
+
+      # The evidence a reviewer reads instead of the checks tab: one comment per pull request,
+      # updated in place, naming the commit these results belong to. Never gates anything - a fork's
+      # read-only token or a missing report must not turn a green suite red.
+      - name: Post the test report on the pull request
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          UNIT_RESULT: ${{ needs.test.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: node scripts/ci/test-report.mjs merged-results.json
 
       # A required check (the `develop` and `main` rulesets), so it has to be red whenever a leg
       # is. The result comes from `needs.e2e.result`, the aggregate over the matrix, which is not
