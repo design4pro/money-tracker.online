@@ -33,8 +33,8 @@ const READER = 'server/repos/imports.ts'
 
 /** The two callers the issue names. Paths are relative to `src/`. */
 const CALLERS = [
-  'server/fns/import-mapping.ts',
-  'routes/_app/import/-server/describe-batch.ts',
+  'server/fns/import-mapping-data.ts',
+  'routes/_app/import/-server/describe-batch-data.ts',
 ] as const
 
 const read = (relative: string) =>
