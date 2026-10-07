@@ -7,8 +7,9 @@
  * the key can reach a response, a log line or a component again, so it fails here and not in review.
  *
  * Two names are pinned. The property (`fileR2Key`) catches code that reads or spreads the key. The
- * raw row type (`ImportBatchRow`) catches a handler that returns a row with an inferred return type:
- * it carries the key without ever naming it, so neither the property scan nor the compiler objects.
+ * raw row type (`ImportBatchRow`) catches a handler that imports or names the row, typically to
+ * return it with an inferred return type: the row carries the key without the property ever being
+ * named, so neither the property scan nor the compiler objects.
  *
  * It scans text rather than types on purpose. A type check cannot see a handler that spreads a raw
  * row into an object literal, and a name in a comment is cheap to move.
@@ -129,7 +130,7 @@ describe('the raw import batch row scan', () => {
     export const getBatch = createServerFn().handler(async () => getImportBatch(scope, id))
   `
 
-  it('reports a handler that returns a raw row with an inferred return type', () => {
+  it('reports a handler that names the raw row type', () => {
     const files = [{ path: 'server/fns/fixture.ts', source: handler }]
     expect(namingOutside(files, ROW_PIN)).toEqual(['server/fns/fixture.ts'])
   })
