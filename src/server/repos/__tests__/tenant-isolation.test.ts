@@ -2057,5 +2057,28 @@ describe('the upcoming read cannot leak another workspace’s series ids', () =>
         expect(seen).not.toContain(foreign)
       }
     })
+
+    it('reads a cursor minted under B’s scope as A’s own page, never as B’s rows', async () => {
+      await seedPlannedRows()
+      const fromB = await ledgerPageFor(world.otherScope, {
+        policies: POLICIES,
+        filters: {},
+        sort: SORT,
+        cursor: null,
+        limit: 1,
+      })
+      expect(fromB.nextCursor).not.toBeNull()
+
+      const page = await ledgerPageFor(world.scope, {
+        policies: POLICIES,
+        filters: {},
+        sort: SORT,
+        cursor: fromB.nextCursor,
+        limit: 1,
+      }).catch(() => null)
+
+      // The keyset only narrows A's own rows: it either refuses or answers from A, never from B.
+      expect(JSON.stringify(page)).not.toContain('plan-b')
+    })
   })
 })

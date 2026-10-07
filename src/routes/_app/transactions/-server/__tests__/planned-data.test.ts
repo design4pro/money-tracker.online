@@ -487,6 +487,15 @@ describe('what the composition never does', () => {
     const sources = ['planned-data.ts', 'planned.ts']
       .map((file) => readFileSync(path.join(here, file), 'utf8'))
       .join('\n')
+    const ledgerSource = readFileSync(
+      fileURLToPath(
+        new URL(
+          '../../../../../server/transactions/ledger-page.ts',
+          import.meta.url,
+        ),
+      ),
+      'utf8',
+    )
 
     expect(sources).not.toMatch(/drizzle-orm/)
     expect(sources).not.toMatch(/#\/server\/db\/schema/)
@@ -501,5 +510,6 @@ describe('what the composition never does', () => {
     }
     // Exactly one scope is established per call, in the server function and nowhere else.
     expect(sources.match(/requireOrg\(/g)).toHaveLength(1)
+    expect(ledgerSource).not.toMatch(/server\/auth\/guards/)
   })
 })
