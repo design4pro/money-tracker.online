@@ -22,6 +22,8 @@ rate, and never recomputed.
 
 ## Stage 03-S1 — The currency catalogue
 
+Delivered: 2026-10-07 - `src/server/catalog/currencies.ts` (`listEnabledCurrencies`, reads only) with `src/server/catalog/__tests__/currencies.test.ts` and section 15 of `src/server/repos/__tests__/money-invariants.test.ts`, merged in #596; the seed is `drizzle/0002_seed_currency_catalogue.sql` and the static table `src/lib/money/currencies.ts`, both 56 currencies (5 at `digits: 0`, 46 at 2, 5 at 3), all enabled; `pnpm vitest run src/server/catalog/__tests__/currencies.test.ts src/lib/__tests__/currencies.test.ts` passes 29 tests in 2 files (9 and 20), section 15 passes 2 tests; the guarded and audited write is `24-S3`'s.
+
 ### Stage id
 
 `03-S1` · Wave 1 · effort **M**.
@@ -29,47 +31,58 @@ rate, and never recomputed.
 ### Reference rows
 
 `MNY-01 missing → done` — the ISO-4217 catalogue with `digits`, seeded and curated.
-`MNY-02 missing → done` — the catalogue repository under `src/server/catalog`, guarded by
-`requirePermission` plus a platform audit write.
+`MNY-02 missing → done` — the catalogue repository's **reads** under `src/server/catalog`
+(`listEnabledCurrencies`). Its guarded and audited **writes** are `CON-09` of `24-S3`, where the
+platform audit table is built.
 
 ### Owned paths
 
 - `src/server/catalog/currencies.ts` — new
-- `src/server/catalog/data/currencies.ts` — new
-- `src/server/catalog/index.ts` — new
 - `src/server/catalog/__tests__/currencies.test.ts` — new
-- `scripts/catalog/build-currencies.mjs` — new
+- `src/server/repos/__tests__/money-invariants.test.ts` — a section for the catalogue's `digits`
 
 ### Data and migration
 
 `currencies` exists from `00-S1` (`code text(3) PK`, `name`, `digits integer NOT NULL`,
-`numeric_code`, `is_disabled`). No schema change; this stage populates and reads it.
+`numeric_code`, `is_disabled`). No schema change and no migration; this stage reads it and pins it.
 
-- The seed is **generated**, not hand-typed: `scripts/catalog/build-currencies.mjs` emits
-  `src/server/catalog/data/currencies.ts` from the ISO-4217 list, and the generated file carries a
-  header saying so. `digits` comes from the standard's minor-unit column, which is the only reason
-  JPY (`0`) and KWD (`3`) are right without anybody remembering them.
-- **Excluded by the generator, with the exclusion list in the script and in `docs/MONEY.md` §1:**
-  the precious metals `XAU XAG XPT XPD`, the fund codes, `XDR`, `XXX` (no currency) and `XTS`
-  (testing). A metal is not a currency with minor units and modelling it as one produces a net-worth
-  figure that is wrong by orders of magnitude.
-- The migration is `00-S1`'s `0000_init`; this stage adds a **data** migration only if the catalogue
-  is loaded at deploy rather than at first use. It is loaded at first use, from the generated module,
-  so **no migration is produced and none is needed** — stated so nobody looks for one.
+- The seed is the existing seed migration, `drizzle/0002_seed_currency_catalogue.sql`, which loads
+  all 56 currencies. The source of the catalogue is the static table
+  `src/lib/money/currencies.ts`, which the browser needs too (the transaction form parses input at
+  the currency's scale); `src/server/catalog/data/currencies.ts` is its derived projection
+  (`CURRENCY_SEED_ROWS`). `digits` is each currency's ISO-4217 minor-unit count, which is the only
+  reason JPY (`0`) and KWD (`3`) are right without anybody remembering them.
+- **Excluded, with the exclusion list in `src/lib/__tests__/currencies.test.ts` and in
+  `docs/MONEY.md` §1:** the precious metals `XAU XAG XPT XPD`, the fund codes, `XDR`, `XXX` (no
+  currency) and `XTS` (testing). A metal is not a currency with minor units and modelling it as one
+  produces a net-worth figure that is wrong by orders of magnitude.
+- **No generator.** The stage once prescribed `scripts/catalog/build-currencies.mjs` and a
+  byte-identity test over its output; both are dropped because the repository holds no ISO-4217
+  data file, adding a dependency for one is Ask First (`docs/SPEC.md` §3), and a hand-typed source
+  would be the second copy that the static table and the seed projection exist to prevent. The
+  drift that can actually happen is between the static table and the hand-authored migration, and
+  the parity test pins that.
+- The migration is `0002`, untouched here (`drizzle/` is immutable history); this stage adds none.
 
 ### Server (repo, server function, Zod)
 
 - **Repository.** `src/server/catalog/currencies.ts`, the **named exception** to the tenant-scoped
-  rule (`docs/SPEC.md` §6.1): `currencies` has no `organization_id`. Reads are open to any
-  authenticated caller; **every write** goes through `requirePermission('catalog:write')` and writes
-  a `platform_audit_log` row in the same `db.batch` as the change. A write that audits in a second
-  batch is a write that can succeed unlogged.
-- **Server function.** `listCurrencies` (GET) returns the enabled catalogue for the currency pickers.
-  `setCurrencyDisabled` (POST) is console-only and is `24-S3`'s surface; the function lives here
-  because the repository does.
-- **Zod.** `z.strictObject({ code: z.string().length(3).regex(/^[A-Z]{3}$/) })` and friends, with the
-  `error` parameter set so a malformed code produces a message rather than a Zod dump.
-- **Authorisation.** Decided in the server function, by `requirePermission`, not in `beforeLoad`.
+  rule (`docs/SPEC.md` §6.1): `currencies` has no `organization_id`, so the module takes a bare
+  `Database` and never a `TenantScope`. It exports one function, `listEnabledCurrencies(db)`, which
+  reads the rows with `is_disabled = 0` as stored, in the static table's declaration order. Reads
+  only: **the guarded and audited write path is `24-S3`'s** (`CON-09`), because it needs the
+  platform audit table of `24-S1`, and `setCurrencyDisabled` moves there with it. Nothing can set
+  `is_disabled` before that stage.
+- **Server function.** None here. `listCurrencies` (GET), which returns the enabled catalogue for
+  the currency pickers, moves to `03-S3`, the first stage with a caller (`src/server/fns/currencies.ts`
+  is its owned path); a function with no caller fails the deletion test.
+- **Zod.** None: `listEnabledCurrencies` takes no caller-supplied value. The server function that
+  `03-S3` adds carries the strict input schema.
+- **Authorisation.** None in the repository: it is a read of a global reference table, called only
+  from server code that has already resolved a user (`requireUser()` in `03-S3`). The write guard
+  is the **platform** permission, described as it is today: no `requirePermission` function
+  exists, only the pure `permits(actor, { catalog: ['write'] })` in `src/server/auth/permissions.ts`
+  over Better Auth's `admin | curator | user` roles, and the audited guard arrives with `24-S1`.
 - **Ledger batching.** Not applicable: no account balance changes.
 
 ### UI (route, components)
@@ -88,26 +101,36 @@ counts **workspace** currencies (`organization_currencies`), which is `03-S3`.
 
 ### Tenant isolation test
 
-`currencies` is global, so there is no tenant predicate to test. What is tested instead, in
-`src/server/catalog/__tests__/currencies.test.ts`, is the **exception's own guard**: a caller without
-`catalog:write` gets a `ForbiddenError` from `setCurrencyDisabled`, and a successful write produces
-exactly one `platform_audit_log` row. A catalogue write with no audit row is the failure this case
-exists for.
+`currencies` is global, so there is no tenant predicate to test, and `listEnabledCurrencies` lives
+in `src/server/catalog`, not `src/server/repos`: there is deliberately **no
+`tenant-isolation.test.ts` case**, a justified deviation from the rule that every new repository
+function ships with one. The cases that guard the carve-out in its place are the **no-write
+tripwires** in `src/server/catalog/__tests__/currencies.test.ts`: the module exports exactly
+`listEnabledCurrencies` and its source holds no write call, and no non-test file under `src` writes
+the `currencies` table. They are tripwires, not an authorisation guard; the guard, a `ForbiddenError`
+for a caller without the platform permission and exactly one audit row per successful write, is
+`24-S3`'s, and those cases replace the tripwires in that stage's pull request.
 
 ### Money invariant
 
-**`digits` is the scale, always, and comes from this table.** `money-invariants.test.ts` →
-_`digits` is read, never assumed_: for JPY the catalogue returns `0` and `toMinor('1234')` is `1234`;
-for KWD it returns `3` and `toMinor('1.234')` is `1234`; for EUR it returns `2`. A second case,
-_the catalogue excludes non-currencies_, asserts `XAU`, `XXX` and `XTS` are absent, because a metal
-with `digits: 0` silently behaves like JPY.
+**`digits` is the scale, always.** It is the static table's scale (`src/lib/money/currencies.ts`,
+read by `minorUnitDigits`), mirrored by the stored `currencies.digits` row and pinned equal to it by
+the parity test; it is never read from the table at runtime. `money-invariants.test.ts` → section 15,
+_the catalogue's digits is the scale the arithmetic uses_: through `listEnabledCurrencies`, JPY has
+`digits` `0`, KWD `3` and EUR `2`, each equal to `minorUnitDigits(code)`, with `parseMoney('en',
+'1234', 'JPY')` equal to `1234` and `parseMoney('en', '1.234', 'KWD')` equal to `1234`. A second
+case, _the catalogue excludes non-currencies_, asserts `XAU`, `XAG`, `XPT`, `XPD`, `XDR`, `XXX` and
+`XTS` are absent from the listing, because a metal with `digits: 0` silently behaves like JPY. There
+is no new write path, so no further money-invariant case; the guarded-and-audited write case moves
+to `24-S3`.
 
 ### Verification
 
 - Command gate: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
-- `currencies.test.ts`: the permission guard, the audit row, the `digits` cases, the exclusion list,
-  and that the generated data module is byte-identical to a fresh run of the generator (so an edit to
-  the generated file fails CI instead of drifting).
+- `currencies.test.ts`: the seeded table equals the static catalogue in code, English name, `digits`
+  and numeric code, with every row enabled (the parity test, which names `0002` and the static
+  table in its failure message); the exclusion list; the listing's contents and order, with a
+  disabled row and a code the static table lacks; and the no-write tripwires.
 - No browser evidence and no axe run: this stage ships no surface. The currency picker is `03-S3`.
 
 ### Definition of done
@@ -119,7 +142,7 @@ with `digits: 0` silently behaves like JPY.
 **`OPEN-6`** — whether zero-decimal currencies are in v1 scope. The catalogue models `digits`
 correctly either way; what the decision changes is whether JPY-style currencies ship **enabled**.
 Until it is answered they ship enabled, because disabling later is a flag and enabling later is a
-data migration.
+data migration. The catalogue ships all 56 currencies enabled, the five with `digits: 0` included.
 
 ---
 
@@ -158,8 +181,15 @@ lives — a repository convention over a `real` column would be one careless ins
 - **Repository.** `src/server/catalog/rates.ts`: `getRate({ base, quote, date })`,
   `getRatesForDates({ base, quote, dates })` (batched, because the balance-history rebuild asks for a
   whole grid at once), `upsertRates(rows)`. Global table, so the `src/server/catalog` exception
-  applies and writes carry the `requirePermission` + audit rule of `03-S1`. The **cron** writes
-  through a system principal that satisfies the same guard rather than bypassing it.
+  applies and writes carry the guard and audit rule of `24-S1`, whose platform guard and audit table
+  this stage cites. The **cron** writes through a system principal that satisfies the same guard
+  rather than bypassing it.
+  `upsertRates` is a write to a global table in the same carve-out as `currencies` and **may not
+  merge unguarded and unaudited**: `03-S2`'s own spec must record how its write is attributed and
+  audited before it ships, or this stage carries a `blocked` hold with a `🤖 HUMAN-ONLY:` comment.
+  In practice `03-S2` is held until `24-S1`, unless its spec designs an interim attribution that a
+  specialist approves (an audit table ahead of `24-S1` is a migration, which is Ask First). No
+  no-write tripwire is extended to `rates.ts`: it would fail `03-S2`'s own legitimate `upsertRates`.
 - **Server function.** None user-facing. The refresh is a **cron branch**, not a request path.
 - **Zod.** `z.strictObject({ base, quote, date: z.iso.date() })`; a rate response from a provider is
   parsed before it is trusted, because a provider returning `null` for a pair must produce a skipped
@@ -195,7 +225,8 @@ pairs that are actually held.
 `exchange_rates` is global; the isolation property that matters is the **inverse** —
 `organization_exchange_rates` (`03-S3`) must never fall back to another workspace's flat rate. That
 case lives in `03-S3`. Here, `rates.test.ts` asserts the console write path is permission-guarded and
-audited, as in `03-S1`.
+audited, as in `24-S1`'s guard and audit table; `03-S2`'s pull request adds that guarded-and-audited
+write case.
 
 ### Money invariant
 
@@ -293,6 +324,20 @@ Two properties are enforced by the schema and re-asserted by the repository:
   after the write settles — including when the write throws, because the rows are already committed.
 - **`removeWorkspaceCurrency` refuses** when an account or a transaction still holds the currency.
   A currency with rows behind it is not removable, and the error names the first blocking account.
+- **Acceptance items handed off from `03-S1`**, which ships the catalogue's reads only
+  (`listEnabledCurrencies` in `src/server/catalog/currencies.ts`):
+  - `listCurrencies` is a GET server function in `src/server/fns/currencies.ts` with `requireUser()`
+    and a strict empty Zod input, and it calls `listEnabledCurrencies`.
+  - The catalogue-existence check refuses a disabled code **through the catalogue module**.
+    `requireCatalogueCurrency` is private to `src/server/repos/workspace-currencies.ts` today and
+    does not read `is_disabled`, so that means exporting it or moving it. Nothing can disable a
+    currency before `24-S3`, so this lands no later than that stage.
+  - The stage decides what a workspace that already holds a currency sees once it is disabled.
+  - The locale-sorted picker applies the enabled set over `currenciesForPicker(locale)`, which keeps
+    the first eleven in declaration order and re-sorts the tail by localised name.
+  - Two facts are owed to this stage's own reconciliation and are **not** fixed by `03-S1`: the
+    workspace-currencies module already exists although the stage lists it as new, and the stage
+    has no `Delivered:` line.
 
 ### UI (route, components)
 
