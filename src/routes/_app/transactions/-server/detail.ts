@@ -10,8 +10,8 @@ import { listSplits } from '#/server/repos/splits'
 import { listGroups } from '#/server/repos/transaction-groups'
 import { getTransaction } from '#/server/repos/transactions'
 
-import type { AttachmentRow } from '#/server/db/schema'
 import type { Transaction, TransactionSplit } from '#/server/db/types'
+import type { AttachmentDto } from '#/server/repos/attachments'
 import type { RefundSummary } from '#/server/repos/refunds'
 import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
 import type { TransactionPolicies } from '#/server/repos/transactions'
@@ -75,7 +75,7 @@ export interface TransactionDetail {
   /** Every group in the workspace — what the panel can add this transaction *to*. */
   readonly allGroups: ReadonlyArray<TransactionGroupSummary>
   /** Empty for a transaction with no receipts. Never `null`. */
-  readonly attachments: ReadonlyArray<AttachmentRow>
+  readonly attachments: ReadonlyArray<AttachmentDto>
 }
 
 export const loadTransactionDetail = createServerFn({ method: 'GET' })

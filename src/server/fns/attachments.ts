@@ -33,10 +33,11 @@ import {
   createAttachment,
   deleteAttachment as deleteAttachmentRow,
   listAttachments as listAttachmentRows,
+  toAttachmentDto,
   transactionIdSchema,
 } from '#/server/repos/attachments'
 
-import type { AttachmentRow } from '#/server/db/schema'
+import type { AttachmentDto } from '#/server/repos/attachments'
 
 /** The receipt bucket for the request in flight. */
 async function filesBucket(): Promise<R2Bucket> {
@@ -47,13 +48,13 @@ async function filesBucket(): Promise<R2Bucket> {
 /** A transaction's receipts in upload order, empty when it has none. */
 export const listAttachments = createServerFn({ method: 'GET' })
   .inputValidator(transactionIdSchema)
-  .handler(async ({ data }): Promise<ReadonlyArray<AttachmentRow>> => {
+  .handler(async ({ data }): Promise<ReadonlyArray<AttachmentDto>> => {
     const scope = await requireOrg()
     return listAttachmentRows(scope, data)
   })
 
 /**
- * Takes one file and returns the row it became.
+ * Takes one file and returns the row it became, without its R2 key.
  *
  * One file per call, deliberately: the surface reports progress and failure **per file**, and a
  * handler that took several would have to answer "three of your five were stored" with a single
@@ -61,21 +62,25 @@ export const listAttachments = createServerFn({ method: 'GET' })
  */
 export const uploadAttachment = createServerFn({ method: 'POST' })
   .inputValidator((data: FormData) => data)
-  .handler(async ({ data }): Promise<AttachmentRow> => {
+  .handler(async ({ data }): Promise<AttachmentDto> => {
     const scope = await requireOrg()
     const upload = await readAttachmentUpload(data)
-    return createAttachment(
-      scope,
-      await filesBucket(),
-      { ...upload.metadata, originalName: upload.originalName },
-      upload.body,
+    return toAttachmentDto(
+      await createAttachment(
+        scope,
+        await filesBucket(),
+        { ...upload.metadata, originalName: upload.originalName },
+        upload.body,
+      ),
     )
   })
 
-/** Removes one receipt: the row, then the object. Returns the row that went. */
+/** Removes one receipt: the row, then the object. Returns the row that went, without its R2 key. */
 export const deleteAttachment = createServerFn({ method: 'POST' })
   .inputValidator(attachmentIdSchema)
-  .handler(async ({ data }): Promise<AttachmentRow> => {
+  .handler(async ({ data }): Promise<AttachmentDto> => {
     const scope = await requireOrg()
-    return deleteAttachmentRow(scope, await filesBucket(), data)
+    return toAttachmentDto(
+      await deleteAttachmentRow(scope, await filesBucket(), data),
+    )
   })
