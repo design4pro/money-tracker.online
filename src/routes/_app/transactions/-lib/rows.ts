@@ -27,12 +27,14 @@ import {
 import { asCurrencyCode } from '#/lib/money'
 
 import type {
+  ExpectationRow,
   LedgerDirection,
   LedgerPaymentMethod,
   LedgerRow,
   LedgerTransferKind,
 } from '#/components/app/transactions'
 import type { Transaction } from '#/server/db/types'
+import type { UpcomingPeriod } from '#/server/repos/recurring'
 
 function memberOf<T extends string>(
   vocabulary: ReadonlyArray<T>,
@@ -51,6 +53,7 @@ export function toLedgerRow(row: Transaction): LedgerRow {
       : memberOf(LEDGER_PAYMENT_METHODS, row.paymentMethod, 'other')
 
   return {
+    kind: 'transaction',
     id: row.id,
     direction: memberOf<LedgerDirection>(
       LEDGER_DIRECTIONS,
@@ -76,5 +79,36 @@ export function toLedgerRow(row: Transaction): LedgerRow {
       row.transferKind,
       'none',
     ),
+  }
+}
+
+/**
+ * An unsettled recurring period as the planned screen draws it, and the only place one is built.
+ *
+ * The row carries the series' own amount and currency and nothing else about money: no reference
+ * amount, no rate, no conversion (see {@link ExpectationRow}). `status` is what **today** says
+ * (`derivedStatus`), not the value the row stored. The read this is fed by returns unsettled
+ * periods only, so `paid` and `skipped` cannot arrive; anything that is not `overdue` draws as
+ * `upcoming` rather than reaching a branch with no rendering for it.
+ */
+export function toExpectationRow(period: UpcomingPeriod): ExpectationRow {
+  return {
+    kind: 'expectation',
+    id: `${period.seriesId}:${period.periodStart}`,
+    seriesId: period.seriesId,
+    periodStart: period.periodStart,
+    seriesName: period.seriesName,
+    direction: memberOf<LedgerDirection>(
+      LEDGER_DIRECTIONS,
+      period.direction,
+      'expense',
+    ),
+    expectedAmountMinor: period.expectedAmountMinor,
+    currencyCode: asCurrencyCode(period.expectedCurrencyCode),
+    dueOn: period.dueOn,
+    status: period.derivedStatus === 'overdue' ? 'overdue' : 'upcoming',
+    accountId: period.accountId,
+    categoryId: period.categoryId,
+    payeeId: period.payeeId,
   }
 }

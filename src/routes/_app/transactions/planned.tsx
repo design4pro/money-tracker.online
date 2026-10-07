@@ -1,16 +1,22 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { CalendarClock } from 'lucide-react'
+import { z } from 'zod'
 
 import {
   KeyboardShortcuts,
   TransactionsModeSwitch,
 } from '#/components/app/transactions'
-import { EmptyState } from '#/components/ui'
+import { EmptyState, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
+import { skipPeriod } from '#/server/fns/recurring'
 
+import { useDataRefresh } from '../-lib/refresh'
+import { MarkPaidDialog } from '../recurring/-ui/mark-paid-dialog'
 import { transactionSearchSchema } from './-lib/filters'
 import { TransactionsScreen } from './-ui/transactions-screen'
 
+import type { ExpectationRow } from '#/components/app/transactions'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 import { pageHead } from '#/routes/-lib/page-title'
 import type { TransactionSearch } from './-lib/filters'
@@ -35,7 +41,22 @@ import type { TransactionSearch } from './-lib/filters'
  *
  * The filter bar, the keyboard map and the totals are the same composition the main ledger uses, so
  * the two screens cannot drift apart in the ways a reader would notice.
+ *
+ * ## Recurring payments are listed here, and settled from here
+ *
+ * The screen also reads the recurring periods that have not settled and draws them as a group above
+ * the planned entries (`TransactionsScreen`'s `expectations`). They are expectations, not planned
+ * transactions: no row exists until one settles, and they are never added to the totals. This
+ * route owns what settling them takes, because both ways are writes: **Skip** calls the same
+ * server function `/recurring` does, and **Mark paid** opens the same dialog, with the entry form's
+ * way back (`returnTo=planned`) reopening it through `?markPaid=<period start>&series=<id>`. The
+ * address is cleaned when the dialog closes, so a reload does not reopen it.
  */
+
+const plannedSearchSchema = transactionSearchSchema.extend({
+  markPaid: z.iso.date().optional().catch(undefined),
+  series: z.string().trim().min(1).max(64).optional().catch(undefined),
+})
 
 const PLANNED_POLICIES: TransactionPolicies = {
   planned: 'only',
@@ -45,7 +66,7 @@ const PLANNED_POLICIES: TransactionPolicies = {
 }
 
 export const Route = createFileRoute('/_app/transactions/planned')({
-  validateSearch: transactionSearchSchema,
+  validateSearch: plannedSearchSchema,
   head: ({ matches }) =>
     pageHead(matches, (t) => t('transactions.planned.title')),
   component: PlannedTransactionsRoute,
@@ -53,8 +74,27 @@ export const Route = createFileRoute('/_app/transactions/planned')({
 
 function PlannedTransactionsRoute() {
   const t = useTranslate()
-  const search = Route.useSearch()
+  const { markPaid, series, ...search } = Route.useSearch()
   const navigate = Route.useNavigate()
+  const refresh = useDataRefresh()
+
+  const [pending, setPending] = useState<ExpectationRow | null>(null)
+  const close = () => {
+    setPending(null)
+    if (markPaid !== undefined || series !== undefined) {
+      void navigate({ search, replace: true })
+    }
+  }
+
+  const skip = (row: ExpectationRow) => {
+    void skipPeriod({
+      data: { seriesId: row.seriesId, periodStart: row.periodStart },
+    })
+      .then(() => toast.success(t('recurring.toast.periodSkipped')))
+      .catch(() => toast.error(t('recurring.toast.failed')))
+      // A failure may mean it settled in another tab: either way the list is read again.
+      .finally(() => void refresh())
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -91,9 +131,56 @@ function PlannedTransactionsRoute() {
             headingLevel={2}
             title={t('transactions.planned.empty.title')}
             description={t('transactions.planned.empty.body')}
+            action={
+              <Link
+                to="/recurring"
+                search={{ status: 'active' }}
+                className="inline-flex target-min-h items-center rounded-sm text-body text-ink underline underline-offset-2 outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+              >
+                {t('transactions.planned.empty.recurring')}
+              </Link>
+            }
           />
         }
+        expectations={{
+          onMarkPaid: setPending,
+          onSkip: skip,
+          openRowId: pending?.id ?? null,
+          reopenId:
+            markPaid !== undefined && series !== undefined
+              ? `${series}:${markPaid}`
+              : null,
+        }}
       />
+
+      {pending === null ? null : (
+        <MarkPaidDialog
+          key={pending.id}
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) close()
+          }}
+          series={{
+            id: pending.seriesId,
+            direction: pending.direction,
+            accountId: pending.accountId,
+            categoryId: pending.categoryId,
+            payeeId: pending.payeeId,
+          }}
+          period={{
+            periodStart: pending.periodStart,
+            dueOn: pending.dueOn,
+            expectedAmountMinor: pending.expectedAmountMinor,
+            expectedCurrencyCode: pending.currencyCode,
+          }}
+          origin="planned"
+          onSaved={() => {
+            toast.success(t('recurring.toast.periodPaid'))
+            close()
+            void refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

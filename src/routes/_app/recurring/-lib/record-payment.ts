@@ -24,7 +24,7 @@ import type { PeriodView } from '#/server/repos/recurring'
  * the currencies differ.
  */
 
-export type RecordPaymentOrigin = 'series' | 'list'
+export type RecordPaymentOrigin = 'series' | 'list' | 'planned'
 
 export function recordPaymentSearch(
   series: Pick<

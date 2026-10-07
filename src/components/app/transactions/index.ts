@@ -30,6 +30,9 @@ export type { ConfirmDeleteDialogProps } from './confirm-delete-dialog'
 export { DetailSummary } from './detail-summary'
 export type { DetailSummaryProps } from './detail-summary'
 
+export { ExpectationGroupView } from './expectation-group'
+export type { ExpectationGroupProps } from './expectation-group'
+
 export { FilterBar } from './filter-bar'
 export type { FilterBarProps } from './filter-bar'
 
@@ -110,12 +113,16 @@ export {
   LEDGER_TRANSFER_KINDS,
   NO_FILTERS,
   emptyReference,
+  hasExpectationContent,
   nameIndex,
 } from './types'
 export type {
   AccountOption,
   CategoryOption,
+  ExpectationGroup,
+  ExpectationRow,
   LedgerDirection,
+  LedgerEntry,
   LedgerFilters,
   LedgerPaymentMethod,
   LedgerRow,

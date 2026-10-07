@@ -72,7 +72,11 @@ export interface MarkPaidDialogProps {
     RecurringSeries,
     'id' | 'direction' | 'accountId' | 'categoryId' | 'payeeId'
   >
-  readonly period: PeriodView
+  /** What the dialog reads of the period: its window and what the entry form is started with. */
+  readonly period: Pick<
+    PeriodView,
+    'periodStart' | 'dueOn' | 'expectedAmountMinor' | 'expectedCurrencyCode'
+  >
   /** Where the person was, so that saving the payment brings them back to it. */
   readonly origin: RecordPaymentOrigin
   readonly onSaved: () => void
