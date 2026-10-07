@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { requireOrg } from '#/server/auth/guards'
 import { resolveParser } from '#/server/import/registry'
 import { IMPORT_MAX_ROWS } from '#/server/import/types'
-import { getImportBatch } from '#/server/repos/imports'
+import { getImportBatch, readImportBatchFile } from '#/server/repos/imports'
 
 import type { ImportBatchRow } from '#/server/db/schema'
 import type { FileSniff, ImportWarning } from '#/server/import/types'
@@ -94,7 +94,7 @@ export const describeImportBatch = createServerFn({ method: 'GET' })
     }
 
     const { env } = await import('cloudflare:workers')
-    const object = await env.FILES.get(batch.fileR2Key)
+    const object = await readImportBatchFile(scope, env.FILES, batch)
     if (object === null) {
       throw new Error('The stored file for this import is gone.')
     }

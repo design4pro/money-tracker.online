@@ -44,6 +44,7 @@ import {
   attachments,
   budgetCategories,
   currencies,
+  importBatches,
   payees,
 } from '#/server/db/schema'
 import { materializeSeries } from '#/server/recurring/materialize'
@@ -98,6 +99,7 @@ import {
   createAttachment,
   deleteAttachment,
   getAttachmentForRead,
+  listAttachments,
 } from '../attachments'
 import {
   advanceImportBatch,
@@ -106,6 +108,7 @@ import {
   importFileKey,
   importsThisMonth,
   listImportBatches,
+  readImportBatchFile,
 } from '../imports'
 
 import { ledgerReaderFor } from './planned-harness'
@@ -1132,6 +1135,95 @@ describe('import batches cannot be reached or aimed across a workspace boundary'
       expect(statement).toContain('organization_id')
     }
   })
+
+  /**
+   * `file_r2_key` is a free-text column, so a row of A's can name an object in B's prefix after a
+   * bug or a bad restore. The shared reader is the only place a batch's file is fetched, so it is
+   * the place that has to refuse before the bucket is asked for anything.
+   */
+  it.each([
+    {
+      name: 'a key under another workspace',
+      fileR2Key: 'imports/org-b/batch-b/statement.csv',
+    },
+    {
+      name: 'a key under a workspace whose id merely starts with A’s',
+      fileR2Key: 'imports/org-ab/batch-b/statement.csv',
+    },
+    {
+      name: 'a key that walks out of A’s prefix with a dot segment',
+      fileR2Key: 'imports/org-a/../org-b/batch-b/statement.csv',
+    },
+    {
+      name: 'a key from another family',
+      fileR2Key: 'attachments/org-a/txn-a/att-1',
+    },
+  ])(
+    'refuses $name with a not-found and never asks the bucket for it',
+    async ({ fileR2Key }) => {
+      await importWorld.db.insert(importBatches).values({
+        id: 'batch-poisoned',
+        organizationId: ORG_A,
+        source: 'csv',
+        status: 'queued',
+        fileR2Key,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      const batch = await getImportBatch(importWorld.scope, {
+        id: 'batch-poisoned',
+      })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+      try {
+        const refused = await readImportBatchFile(
+          importWorld.scope,
+          bucket.asR2(),
+          batch,
+        ).catch((error: unknown) => error)
+
+        expect(refused).toBeInstanceOf(NotFoundError)
+        expect((refused as NotFoundError).message).toBe(
+          'import batch batch-poisoned was not found.',
+        )
+        expect(bucket.reads).toEqual([])
+
+        // The warning carries the batch id and never the key or the other workspace.
+        expect(warn).toHaveBeenCalled()
+        for (const [line, fields] of warn.mock.calls) {
+          const text = `${String(line)} ${JSON.stringify(fields ?? '')}`
+          expect(text).toContain('batch-poisoned')
+          expect(text).not.toContain(fileR2Key)
+          expect(text).not.toContain('org-b')
+          expect(text).not.toContain('org-ab')
+        }
+      } finally {
+        warn.mockRestore()
+      }
+    },
+  )
+
+  it('reads A’s own file through the reader, and answers null for a batch with no key', async () => {
+    const own = await createImportBatch(
+      importWorld.scope,
+      bucket.asR2(),
+      payload(),
+      FILE,
+    )
+
+    // A check that refused everything would pass the cases above: the right key reaches the bucket.
+    await readImportBatchFile(importWorld.scope, bucket.asR2(), own)
+    expect(bucket.reads).toEqual([own.fileR2Key])
+
+    bucket.reads.length = 0
+    await expect(
+      readImportBatchFile(importWorld.scope, bucket.asR2(), {
+        ...own,
+        fileR2Key: null,
+      }),
+    ).resolves.toBeNull()
+    expect(bucket.reads).toEqual([])
+  })
 })
 
 /**
@@ -1353,6 +1445,47 @@ describe('an attachment row cannot be used to reach another workspace’s object
       )
       await deleteAttachment(world.scope, bucket.asR2(), { id: own.id })
       expect(bucket.deletes).toEqual([own.r2Key])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('lists without a poisoned row, and no item it returns carries r2Key', async () => {
+    await world.db.insert(attachments).values({
+      id: 'att-poisoned',
+      organizationId: ORG_A,
+      transactionId: 'txn-a',
+      r2Key: 'attachments/org-b/txn-b/att-foreign',
+      contentType: 'application/pdf',
+      byteSize: PDF.byteLength,
+      originalName: 'poisoned.pdf',
+      uploadedByUserId: world.scope.ctx.userId,
+      createdAt: NOW,
+    })
+    const own = await createAttachment(
+      world.scope,
+      bucket.asR2(),
+      metadataFor('txn-a', 'a-receipt.pdf'),
+      PDF,
+    )
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const listed = await listAttachments(world.scope, {
+        transactionId: 'txn-a',
+      })
+
+      // The poisoned row is dropped, the honest one stays, and the call does not throw.
+      expect(listed.map((item) => item.id)).toEqual([own.id])
+      for (const item of listed) expect(item).not.toHaveProperty('r2Key')
+
+      // The warning is the one the read and delete paths log: the attachment id, never the key.
+      expect(warn).toHaveBeenCalledTimes(1)
+      const [line, fields] = warn.mock.calls[0]
+      const text = `${String(line)} ${JSON.stringify(fields ?? '')}`
+      expect(text).toContain('att-poisoned')
+      expect(text).not.toContain('att-foreign')
+      expect(text).not.toContain(ORG_B)
     } finally {
       warn.mockRestore()
     }
