@@ -146,12 +146,106 @@ describe('ExpectationGroupView', () => {
     expect(screen.queryByRole('table')).toBeNull()
   })
 
-  it('draws no per-currency figure: that is a separate slice', async () => {
+  it('draws one expected line per currency, named as expectations and never converted', async () => {
     await renderGroup(shown([RENT, GYM]))
-    await screen.findByRole('table')
 
-    expect(screen.queryByRole('group', { name: 'Expected totals' })).toBeNull()
-    expect(screen.queryByText('Expected in')).toBeNull()
+    const figures = await screen.findByRole('list', {
+      name: 'Expected from the payments listed above. Not money.',
+    })
+    const lines = within(figures).getAllByRole('listitem')
+    expect(lines).toHaveLength(2)
+    expect(lines[0].textContent).toMatch(/^EUR/)
+    expect(lines[0].textContent).toMatch(/Expected out.*89[.,]00/)
+    expect(lines[0].textContent).not.toMatch(/PLN|zł|1[ ,.\s]*200/)
+    expect(lines[1].textContent).toMatch(/^PLN/)
+    expect(lines[1].textContent).toMatch(
+      /Expected out.*1[\s\u00a0,.]*200[.,]00/,
+    )
+  })
+
+  it('keeps an expected income and an expected expense of one currency as two figures', async () => {
+    const salary = expectation({
+      id: 'ser-3:2026-10-05',
+      seriesId: 'ser-3',
+      seriesName: 'Salary',
+      direction: 'income',
+      expectedAmountMinor: asMinor(500_000),
+    })
+    await renderGroup(shown([RENT, salary]))
+
+    const figures = await screen.findByRole('list', {
+      name: 'Expected from the payments listed above. Not money.',
+    })
+    const lines = within(figures).getAllByRole('listitem')
+    expect(lines).toHaveLength(1)
+    const line = within(lines[0])
+    expect(line.getByText('Expected in')).toBeTruthy()
+    expect(line.getByText('Expected out')).toBeTruthy()
+    expect(line.getByText(/^Income of .*5,000\.00 Polish zlotys$/)).toBeTruthy()
+    expect(
+      line.getByText(/^Expense of .*1,200\.00 Polish zlotys$/),
+    ).toBeTruthy()
+  })
+
+  it('draws the figures of the listed rows only when the group is capped, beside the capped line', async () => {
+    await renderGroup(shown([RENT], { isCapped: true }))
+
+    expect(
+      await screen.findByRole('list', {
+        name: 'Expected from the payments listed above. Not money.',
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('link', {
+        name: 'Showing the 50 soonest. See all on the recurring screen.',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('draws no figures for a group without rows', async () => {
+    await renderGroup(shown([], { isCapped: true }))
+
+    await screen.findByRole('link', { name: /Showing the 50 soonest/ })
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('draws no figures for a suppressed group', async () => {
+    await renderGroup({ state: 'suppressed' })
+
+    await screen.findByText(/hidden while this filter is active/)
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('draws no figures for a failed group', async () => {
+    await renderGroup({ state: 'failed' })
+
+    await screen.findByText('Expected payments could not be loaded.')
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('draws the group without figures instead of throwing when a currency overflows', async () => {
+    await renderGroup(
+      shown([
+        expectation({ expectedAmountMinor: asMinor(Number.MAX_SAFE_INTEGER) }),
+        expectation({
+          id: 'ser-9:2026-10-11',
+          seriesId: 'ser-9',
+          expectedAmountMinor: asMinor(1),
+        }),
+      ]),
+    )
+
+    expect(await screen.findByRole('table')).toBeTruthy()
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('reads the figures in Polish', async () => {
+    await renderGroup(shown([RENT]), {}, 'pl')
+
+    const figures = await screen.findByRole('list', {
+      name: 'Oczekiwane z wymienionych powyżej płatności. To nie są pieniądze.',
+    })
+    expect(within(figures).getByText('Oczekiwane wydatki')).toBeTruthy()
   })
 
   it('says that the group is hidden while a filter it cannot honour is active', async () => {

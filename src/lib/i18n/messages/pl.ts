@@ -807,6 +807,10 @@ const messages = {
     'Nie udało się wczytać oczekiwanych płatności.',
   'transactions.planned.expected.none':
     'Brak oczekiwanych płatności do pokazania.',
+  'transactions.planned.expected.figures':
+    'Oczekiwane z wymienionych powyżej płatności. To nie są pieniądze.',
+  'transactions.planned.expected.in': 'Oczekiwane wpływy',
+  'transactions.planned.expected.out': 'Oczekiwane wydatki',
   'transactions.mode.label': 'Które wpisy pokazać',
   'transactions.mode.actual': 'Zapisane',
   'transactions.mode.planned': 'Zaplanowane',

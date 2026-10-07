@@ -775,6 +775,10 @@ const messages = {
   'transactions.planned.expected.failed':
     'Expected payments could not be loaded.',
   'transactions.planned.expected.none': 'No expected payments to show.',
+  'transactions.planned.expected.figures':
+    'Expected from the payments listed above. Not money.',
+  'transactions.planned.expected.in': 'Expected in',
+  'transactions.planned.expected.out': 'Expected out',
   'transactions.mode.label': 'Which entries to show',
   'transactions.mode.actual': 'Recorded',
   'transactions.mode.planned': 'Planned',
