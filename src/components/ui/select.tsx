@@ -112,11 +112,12 @@ export function Select<T extends object>({
 
       {/*
         `Popover` already floors the width at the trigger's (`min-w-(--trigger-width)`). `w-max` lets
-        the panel grow to its longest option rather than ellipsising it, and the cap is the viewport
-        minus React Aria's 12px container padding on each side (`DESIGN.md` -> Select and ComboBox
-        popover). `Select` and `ComboBox` carry the identical rule.
+        the panel grow to its longest option rather than ellipsising it, capped at the viewport minus
+        React Aria's 12px container padding on each side and at an absolute 32rem; an option past the
+        cap wraps (`DESIGN.md` -> Select and ComboBox popover). `Select` and `ComboBox` carry the
+        identical rule.
       */}
-      <Popover className="w-max max-w-[calc(100vw-1.5rem)]">
+      <Popover className="w-max max-w-[min(calc(100vw-1.5rem),32rem)]">
         <ListBox items={items}>{children}</ListBox>
       </Popover>
     </RACSelect>
