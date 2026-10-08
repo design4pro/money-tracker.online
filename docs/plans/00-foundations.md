@@ -1147,26 +1147,35 @@ None.
 
 ## Stage 00-S12 — Bindings: the import and export queue surfaces
 
+Delivered: 2026-10-05 - the key module `src/server/files/keys.ts` (#525), the dispatcher `src/server/queue/dispatch.ts` and the handler registry `src/server/queue/handlers/index.ts` (#526), `IMPORT_MAX_ROWS` at 20 000 and `src/server/__tests__/wrangler-config.test.ts` (#527), the attachment prefix check in `src/server/repos/attachments.ts` (#528), the five envelope kinds in `src/server/queue/messages.ts` (#553) and the KV claim `src/server/queue/claim.ts` with the retry-budget assertion (#560); `pnpm vitest run src/server/files src/server/queue src/server/__tests__/wrangler-config.test.ts --project='!workerd'` passes, 7 files and 210 tests; `pnpm test:workerd` passes, 3 files and 13 tests, 2 of them in `dispatch.workerd.test.ts`, which drives the dispatcher against the real `KV` binding; _the files route refuses an object whose key prefix is not the caller’s workspace_ passes in `tenant-isolation.test.ts` (`pnpm vitest run src/server/repos/__tests__/tenant-isolation.test.ts -t "attachment row cannot be used"`, 1 test run and passed). No handler for the new kinds and no dead-letter-to-storage writer is part of this delivery; `FND-26` names both.
+
 ### Stage id
 
 `00-S12` · Wave 4 · effort **S**.
 
 ### Reference rows
 
-`FND-26 missing → missing` — the dispatch exists in `src/server/worker.ts` and the envelope union
-in `src/server/queue/messages.ts`, but that union carries exactly **one** kind, `billing.event`.
-The import, export and backup kinds this row is about have no envelope and no handler, and the R2
-key layout is unfixed. Deferred to `19-S1` and `20-S1`, which own them; the row stays open.
+`FND-26 missing → partial` — the dispatcher and the handler registry, the six envelope kinds, the KV claim guard, the R2 key module and the attachment prefix check are in the code. What remains: the handlers (`19-S1`, `19-S3`, `20-S1` to `20-S3`), which install themselves over the `notInstalled` registry entries, and the dead-letter-to-storage writer, a consumer of each dead-letter queue that copies the envelope to `dlq/<queue>/<messageId>.json` and ships with an R2 lifecycle expiry rule. The row stays open until both exist.
 
 Requisitioned by `19-S1` and `20-S1`.
 
 ### Owned paths
 
-- `src/server/worker.ts` — edit
+- `src/server/worker.ts` — edit; `queue()` is one call to the dispatcher
 - `wrangler.jsonc` — edit
-
-The dispatch this stage widens is inlined in `src/server/worker.ts`, owned above; there is no
-`consumer.ts` to edit. See `00-S2`.
+- `vitest.config.ts` — edit; a comment naming the `workerd` dispatcher test
+- `src/server/queue/messages.ts` — edit
+- `src/server/queue/dispatch.ts` — new
+- `src/server/queue/claim.ts` — new
+- `src/server/queue/handlers/index.ts` — new
+- `src/server/queue/handlers/not-installed.ts` — new
+- `src/server/files/keys.ts` — new
+- `src/server/repos/attachments.ts` — edit; the prefix check on read and on delete
+- `src/server/__tests__/wrangler-config.test.ts` — new
+- `src/server/queue/__tests__/{dispatch,envelope,claim}.test.ts`, `dispatch.workerd.test.ts` and `fake-kv.ts` — new
+- `src/server/queue/handlers/__tests__/registry.test.ts` — new
+- `src/server/files/__tests__/keys.test.ts` — new
+- `src/server/repos/__tests__/tenant-isolation.test.ts` — edit
 
 ### Data and migration
 
@@ -1174,16 +1183,10 @@ None.
 
 ### Server (repo, server function, Zod)
 
-- The consumer gains the `import.parse`, `import.execute`, `import.revert`, `export.build` and
-  `backup.d1` envelope kinds, each with its Zod discriminant parse and its idempotency marker in KV.
-- `wrangler.jsonc` gains nothing new in bindings — `FILES` and `TASKS` already exist from `00-S2`.
-  What changes is `IMPORT_MAX_ROWS` / `EXPORT_MAX_ROWS` moving from proposal to enforced values, and
-  the DLQ names being asserted present by the config test.
-- The R2 key layout is fixed here and documented in `docs/ARCHITECTURE.md` §3:
-  `imports/<orgId>/<batchId>/<filename>`, `exports/<orgId>/<jobId>.<ext>`,
-  `attachments/<orgId>/<transactionId>/<attachmentId>`, `backups/<env>/<yyyy-mm-dd>/d1.sql.gz`,
-  `dlq/<queue>/<messageId>.json`. The `orgId` **must** be the second segment so a tenant sweep is a
-  prefix list.
+- The envelope union gains the `import.parse`, `import.execute`, `import.revert`, `export.build` and `backup.run` kinds, each a flat `z.strictObject` with no version field and no `payload` wrapper (`docs/ARCHITECTURE.md` §6). `backup.run` is `{ date, cursor? }` and platform-level: a Worker has no D1 dump API, so a backup is one JSON object per workspace, and `cursor` is where a run that did not finish resumes. The registry is typed over every kind, and the five have a `notInstalled` handler that throws, so a message of a known kind is retried into the dead-letter queue and never acknowledged.
+- `src/server/queue/dispatch.ts` is the batch loop and `src/server/queue/handlers/index.ts` is the registry, so a plan that owns a kind adds a handler file and replaces one entry and never edits `worker.ts`. Every kind but `billing.event` takes a KV claim, `task:claim:v1:<kind>:<orgId>:<identity>`: a concurrency guard, not the correctness mechanism, because KV has no compare-and-swap and correctness is each handler's own D1 state. A held claim is a delayed retry, never an ack (`docs/ARCHITECTURE.md` §2.3).
+- `wrangler.jsonc` gains nothing new in bindings — `FILES` and `TASKS` already exist from `00-S2`. `IMPORT_MAX_ROWS` is 20 000 in both environments, the code constant's value, and `wrangler-config.test.ts` asserts it, both dead-letter queues, and that `max_retries` times the claim retry delay exceeds the claim's expiry. `EXPORT_MAX_ROWS` stays 250 000, read by no code and promised by no plan until `20-S2` adopts or replaces it.
+- The R2 key layout is fixed here and documented in `docs/ARCHITECTURE.md` §3.2: `imports/<orgId>/<batchId>/<filename>`, `attachments/<orgId>/<transactionId>/<attachmentId>`, `exports/<orgId>/<jobId>.<zip|json>`, `backups/<orgId>/<yyyy-mm-dd>.json` and `dlq/<queue>/<messageId>.json`. The `orgId` is the second segment of every tenant family so a tenant sweep is a prefix list; `dlq/` is platform-level and carries none. The first two are written by their repositories, the last three are built by `src/server/files/keys.ts`.
 
 ### UI (route, components)
 
@@ -1191,29 +1194,20 @@ None.
 
 ### Quota
 
-`storageBytes` is metered against the `imports/`, `exports/` and `attachments/` prefixes. The
-enforcement order for every R2 write in this product is **object first, assert second, compensating
-delete on throw**, and it is stated here because the queue handlers of plans 19 and 20 are the
-heaviest writers.
+`storageBytes` is the sum of `attachments.byte_size` and nothing else (`src/server/repos/usage.ts`, `src/lib/plans.ts`): imports are limited by the monthly `imports` metric and exports are time-boxed by plan 20's expiry, so neither is metered against the storage meter. The enforcement order for every R2 write in this product is **object first, assert second, compensating delete on throw**. It is a convention, stated here because the queue handlers of plans 19 and 20 are the heaviest writers, and it is already true of `uploadAttachment` and `createImportBatch`.
 
 ### Tenant isolation test
 
-The R2 key layout is the isolation mechanism for object storage, and it gets its own case in
-`src/server/repos/__tests__/tenant-isolation.test.ts` → _`/api/files/$id` refuses an object whose key
-prefix is not the caller's organization_, asserted against a real key from workspace B.
+The R2 key layout is the isolation mechanism for object storage, and it gets its own case in `src/server/repos/__tests__/tenant-isolation.test.ts` → _the files route refuses an object whose key prefix is not the caller’s workspace_, asserted against a real key from workspace B. The case exercises the repository read (`getAttachmentForRead`) and `deleteAttachment`, not the route: both refuse the row with a `NotFoundError` before the bucket is touched, and the route serves only what the read returned.
 
 ### Money invariant
 
-This stage moves no amount. It fixes the envelope for the jobs that do: every money-bearing envelope
-carries `organizationId` and the **batch id**, never a list of amounts, so an amount is never
-serialised into a queue message where it could be re-parsed. Held by
-`src/server/queue/__tests__/envelope.test.ts` → _no envelope kind carries an amount field_.
+This stage moves no amount. An envelope carries ids, one date and one pagination cursor, and never a value that is also stored in a row (an amount, a rate, a role, a status), so an amount is never serialised into a queue message where it could be re-parsed. Held by `src/server/queue/__tests__/envelope.test.ts` → _no envelope field can carry a value that is stored in a row_, an allow-list of field names and string types over `taskMessageSchema.options`.
 
 ### Verification
 
-- Command gate; `envelope.test.ts`; the updated `wrangler-config.test.ts` asserting both DLQs.
-- A local queue round-trip via `wrangler dev` for one envelope kind, with the idempotency marker
-  observed in KV.
+- Command gate; `envelope.test.ts`, `dispatch.test.ts`, `claim.test.ts`, `keys.test.ts` and `wrangler-config.test.ts`.
+- `pnpm test:workerd`: `dispatch.workerd.test.ts` drives `handleTaskBatch` with the real `KV` binding, reads the claim marker from inside the handler, and asserts it is gone once the batch settles. This replaces a `wrangler dev` round trip, which needs a handler for a new kind to run and none exists yet.
 - No browser evidence, no axe run: no surface.
 
 ### Definition of done

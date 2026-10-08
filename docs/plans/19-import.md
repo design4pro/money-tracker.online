@@ -490,7 +490,9 @@ the batch row survives so the history says so.
   already carrying this `import_batch_id` is the resume cursor: a chunk skips what the batch has
   already created. `import_batches.imported_count` is written in the same D1 batch as the chunk's
   inserts, so the number a person is shown and the number the job resumes from are one number. A
-  retried message re-reads it and re-does nothing, so at-least-once delivery cannot double-post. The
+  retried message re-reads it and re-does nothing, so at-least-once delivery cannot double-post. A
+  duplicate delivery that arrives while another worker holds the job's KV claim (`00-S12`) is a delayed
+  retry, never an ack; that claim is a concurrency guard, and `imported_count` is the mechanism. The
   DLQ path marks the batch `failed` with `imported_count` preserved, and a resume continues from
   there rather than restarting.
 - **Ledger.** The whole commit runs inside `runWithLedgerBatch` (`09-S2`) so the balance rebuild is

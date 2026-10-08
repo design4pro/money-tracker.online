@@ -201,7 +201,8 @@ implements the class those bindings already name.
   outer batch rather than starting a second.
 - **`src/server/queue/handlers/ledger.ts`** consumes the `ledger.rebuild` envelope, calls the DO, and
   acks. Its idempotency marker in KV is keyed on `(accountId, dirtyGeneration)` so a retried message
-  does not force a redundant rebuild.
+  does not force a redundant rebuild. It registers in the handler registry,
+  `src/server/queue/handlers/index.ts` (`00-S12`); `worker.ts` is not edited.
 - **Zod.** The envelope's discriminant and payload are parsed before dispatch.
 - **Authorisation.** The queue handler constructs a scope from the envelope's `organizationId` and
   goes through the same repository as a request would.
