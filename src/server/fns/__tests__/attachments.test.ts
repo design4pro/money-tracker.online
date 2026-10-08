@@ -14,6 +14,10 @@
  * a handler reaches for that a Node test cannot supply are `requireOrg`, which returns the world's
  * scope, and the `FILES` binding, which is the fake bucket. Everything between - the multipart
  * read, the sniffing, `createAttachment`, `deleteAttachment` - is the real code.
+ *
+ * **The mocks are a sanctioned exception.** This is the first test in the `server` project to
+ * `vi.mock('cloudflare:workers')` and `createServerFn`; the rule they bend, and why the exception
+ * stays test-only, is stated in the `server` project comment in `vitest.config.ts`.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
