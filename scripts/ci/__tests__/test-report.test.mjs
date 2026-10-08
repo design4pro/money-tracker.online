@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  BOT_LOGIN,
   MARKER,
+  commentsLookupArgs,
   describeResult,
   findReportComment,
+  parseComments,
   readStats,
   renderComment,
 } from '../test-report.mjs'
@@ -106,5 +109,56 @@ describe('findReportComment', () => {
 
   it('returns undefined when there is no report comment yet', () => {
     expect(findReportComment([{ id: 1, user: bot, body: 'x' }])).toBeUndefined()
+  })
+})
+
+describe('parseComments', () => {
+  it('parses one JSON object per line, across the pages gh --paginate prints', () => {
+    const page1 = [
+      JSON.stringify({ id: 1, user: BOT_LOGIN, body: 'first\nsecond' }),
+      JSON.stringify({ id: 2, user: BOT_LOGIN, body: 'say "hi"' }),
+    ].join('\n')
+    const page2 = JSON.stringify({
+      id: 3,
+      user: BOT_LOGIN,
+      body: `${MARKER}\n\nreport`,
+    })
+
+    expect(parseComments(`${page1}\n${page2}\n`)).toEqual([
+      { id: 1, user: BOT_LOGIN, body: 'first\nsecond' },
+      { id: 2, user: BOT_LOGIN, body: 'say "hi"' },
+      { id: 3, user: BOT_LOGIN, body: `${MARKER}\n\nreport` },
+    ])
+  })
+
+  it('ignores blank lines and returns an empty list for empty output', () => {
+    const line = JSON.stringify({ id: 1, user: BOT_LOGIN, body: 'x' })
+    expect(parseComments(`\n${line}\n\n`)).toEqual([
+      { id: 1, user: BOT_LOGIN, body: 'x' },
+    ])
+    expect(parseComments('')).toEqual([])
+  })
+})
+
+describe('commentsLookupArgs', () => {
+  const args = commentsLookupArgs('o/r', 42)
+  const jq = args[args.indexOf('--jq') + 1]
+
+  it('pages through the pull request comments of the repository', () => {
+    expect(args.slice(0, 3)).toEqual([
+      'api',
+      '--paginate',
+      'repos/o/r/issues/42/comments',
+    ])
+  })
+
+  it('selects only the Actions bot comments at the source, so other bodies never reach the buffer', () => {
+    expect(jq).toBe(
+      `.[] | select(.user.login == "${BOT_LOGIN}") | {id, user: .user.login, body}`,
+    )
+  })
+
+  it('keeps line-by-line --jq output instead of --slurp, which needs gh 2.48', () => {
+    expect(args).not.toContain('--slurp')
   })
 })

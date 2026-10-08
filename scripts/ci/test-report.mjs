@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 
 export const MARKER = '<!-- ci-test-report -->'
 
-const BOT_LOGIN = 'github-actions[bot]'
+export const BOT_LOGIN = 'github-actions[bot]'
 
 const ICON = { success: '✅', failure: '❌', cancelled: '⚪', skipped: '⏭️' }
 
@@ -76,6 +76,30 @@ export function renderComment({ sha, runUrl, unitResult, e2eResult, stats }) {
   ].join('\n')
 }
 
+/**
+ * `gh api` arguments that list the report-bearing comments of a pull request. The bot filter is in
+ * `--jq`, so GitHub's other authors never reach the process buffer (`execFileSync` stops at 1 MiB
+ * and a long thread would throw ENOBUFS). One JSON object per line: `--slurp` needs gh 2.48 and the
+ * runner's client may be older.
+ */
+export function commentsLookupArgs(repo, prNumber) {
+  return [
+    'api',
+    '--paginate',
+    `repos/${repo}/issues/${prNumber}/comments`,
+    '--jq',
+    `.[] | select(.user.login == ${JSON.stringify(BOT_LOGIN)}) | {id, user: .user.login, body}`,
+  ]
+}
+
+/** The comments in `gh --paginate --jq` output: one JSON object per line, blank lines skipped. */
+export function parseComments(text) {
+  return text
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+}
+
 function gh(args, input) {
   return execFileSync('gh', args, { encoding: 'utf8', input })
 }
@@ -97,17 +121,7 @@ function main(reportPath) {
     stats: readStats(report),
   })
 
-  // One JSON object per line: `--slurp` needs gh 2.48 and the runner's client may be older.
-  const comments = gh([
-    'api',
-    '--paginate',
-    `repos/${GH_REPO}/issues/${PR_NUMBER}/comments`,
-    '--jq',
-    '.[] | {id, user: .user.login, body}',
-  ])
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
+  const comments = parseComments(gh(commentsLookupArgs(GH_REPO, PR_NUMBER)))
   const existing = findReportComment(comments)
   const payload = JSON.stringify({ body })
   if (existing) {
