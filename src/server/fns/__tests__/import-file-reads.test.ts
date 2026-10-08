@@ -18,6 +18,11 @@
  * later change that stops sending `fileR2Key` to the client (#591) can remove every mention of it
  * outside the repositories and the schema without touching this file, and a stronger "the key
  * appears nowhere" assertion belongs to that change.
+ *
+ * **Out of scope, deferred to #591:** a revert that aliases the key and reads it on a bucket that
+ * is not named `FILES` or `*Bucket` (`const key = batch.fileR2Key; r2.get(key)`). Neither the
+ * argument scan nor the bucket-name scan sees it, and a heuristic alias scan would only be
+ * superseded by #591's assertion.
  */
 
 import { readFileSync, readdirSync } from 'node:fs'
@@ -58,8 +63,25 @@ function productionSources(): ReadonlyArray<string> {
     .filter((file) => !/\.test\.tsx?$/.test(file))
 }
 
+/**
+ * What may sit between `.get(` and the key: anything but a parenthesis, a call's balanced
+ * parentheses (two levels deep, so `f(g())` is one), or a lone `(` for a key inside a call.
+ * `[^)]*` alone stopped at the first `)`, so `.get(await f(), batch.fileR2Key)` slipped past.
+ */
+const BEFORE_KEY = String.raw`(?:[^()]|\((?:[^()]|\([^()]*\))*\)|\()*`
+
 /** A `.get(` call whose argument mentions the batch's file key, under either of its spellings. */
-const KEY_GET = /\.get\(\s*[^)]*\b(?:fileR2Key|file_r2_key)\b/
+const KEY_GET = new RegExp(
+  String.raw`\.get\(${BEFORE_KEY}\b(?:fileR2Key|file_r2_key)\b`,
+)
+
+/** Source with `//` and `/* *\/` comments removed, so a mention in prose is not a call. */
+const stripComments = (source: string) =>
+  source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+
+/** Whether `source` calls the reader in code; a comment that names it does not count. */
+const callsReader = (source: string) =>
+  /\breadImportBatchFile\(/.test(stripComments(source))
 
 /** A `.get(` on something that is the files bucket by name, whatever it is passed. */
 const BUCKET_GET = /\b(?:FILES|[a-z]*[bB]ucket)\b\)?(?:\(\))?\)?\s*\.get\(/
@@ -79,6 +101,12 @@ describe('the import file read sites', () => {
     expect('await FILES.get(batch.fileR2Key)').toMatch(KEY_GET)
     expect('await env.FILES.get(batch.fileR2Key)').toMatch(KEY_GET)
     expect('bucket.get(row.file_r2_key)').toMatch(KEY_GET)
+    // A first argument that is itself a call: the form `[^)]*` used to stop short of.
+    expect('await r2.get(await f(), batch.fileR2Key)').toMatch(KEY_GET)
+    expect('bucket.get(f(), row.file_r2_key)').toMatch(KEY_GET)
+    expect('bucket.get(g(h()), batch.fileR2Key)').toMatch(KEY_GET)
+    expect('bucket.get(\n  await f(),\n  batch.fileR2Key,\n)').toMatch(KEY_GET)
+    expect('bucket.get(prefix(batch.fileR2Key))').toMatch(KEY_GET)
     expect('await (await filesBucket()).get(key)').toMatch(BUCKET_GET)
     expect('const object = await env.FILES.get(key)').toMatch(BUCKET_GET)
     // ...and these are the guarded form and an unrelated map, which must stay allowed.
@@ -86,13 +114,39 @@ describe('the import file read sites', () => {
       'readImportBatchFile(scope, await filesBucket(), batch)',
     ).not.toMatch(BUCKET_GET)
     expect('PARSED_FILES.get(batchId)').not.toMatch(KEY_GET)
+    expect('PARSED_FILES.get(await f(), batchId)').not.toMatch(KEY_GET)
+    expect('PARSED_FILES.get(batchId)\nconst k = batch.fileR2Key').not.toMatch(
+      KEY_GET,
+    )
     expect('PARSED_FILES.get(batchId)').not.toMatch(BUCKET_GET)
+  })
+
+  it('counts only code as a call to the reader, never a comment', () => {
+    // The per-caller check below is only worth having if a revert can fail it: the reverted
+    // caller still says `readImportBatchFile(` in its comments.
+    expect(callsReader('await readImportBatchFile(scope, bucket, batch)')).toBe(
+      true,
+    )
+    expect(callsReader('// goes through readImportBatchFile(scope, ...)')).toBe(
+      false,
+    )
+    expect(callsReader('/* readImportBatchFile( was here */')).toBe(false)
+    expect(
+      callsReader(
+        '/**\n * readImportBatchFile(scope, ...)\n */\nFILES.get(key)',
+      ),
+    ).toBe(false)
+    expect(
+      callsReader(
+        '// reverted:\nawait readImportBatchFile(scope, bucket, batch)',
+      ),
+    ).toBe(true)
   })
 
   it.each(CALLERS)(
     '%s reads the batch file through readImportBatchFile',
     (caller) => {
-      expect(read(caller)).toMatch(/\breadImportBatchFile\(/)
+      expect(callsReader(read(caller))).toBe(true)
     },
   )
 
