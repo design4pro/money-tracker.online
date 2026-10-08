@@ -3,13 +3,13 @@ import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
 import { serverToday } from '#/server/clock'
-import { loadTransactions } from '#/server/fns/transactions'
 import { loggerFromEnv } from '#/server/observability/logger'
 import {
   transactionFiltersSchema,
   transactionSortSchema,
 } from '#/server/repos/transaction-queries'
 import { transactionPoliciesSchema } from '#/server/repos/transactions'
+import { ledgerPageFor } from '#/server/transactions/ledger-page'
 
 import { plannedScreenFor } from './planned-data'
 
@@ -30,10 +30,11 @@ import type { PlannedScreenPage } from './planned-data'
  * the ledger gains is a filter this accepts. There is no organisation id, no scope and no `today`
  * in it, and the schema is strict, so a client that sends one is refused rather than believed.
  *
- * ## It wraps a server function that authorises on its own
+ * ## The door proves membership once, for both halves
  *
- * The ledger half is `loadTransactions`, which calls `requireOrg` itself. This function never
- * passes it a scope and never derives one from the input: each call proves its own membership.
+ * The ledger half is `ledgerPageFor`, the body `loadTransactions` runs after its own `requireOrg`.
+ * It takes a scope and resolves none, so this door calls `requireOrg` once and hands that one scope
+ * to the ledger read and to the expected read. The scope is never derived from the input.
  */
 
 const plannedScreenSchema = z.strictObject({
@@ -50,7 +51,7 @@ export const loadPlannedScreen = createServerFn({ method: 'GET' })
     const scope = await requireOrg()
     const { env } = await import('cloudflare:workers')
     return plannedScreenFor(scope, data, serverToday(), {
-      readLedger: (input) => loadTransactions({ data: input }),
+      readLedger: ledgerPageFor,
       logger: loggerFromEnv(env, {
         context: { component: 'transactions', route: 'planned' },
       }),
