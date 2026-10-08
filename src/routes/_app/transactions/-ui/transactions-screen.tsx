@@ -253,7 +253,7 @@ export function TransactionsScreen({
   const head = pageQuery.data?.pages.at(0)
   const total = head?.total ?? 0
   const totals = head?.totals
-  // Every page call answers the group identically, so the first page speaks for all of them.
+  // Only the first page carries the group (a cursor page does not read it), so it speaks for all.
   const group = head?.expectations
 
   /* ---- Writing back to the URL ------------------------------------------ */
