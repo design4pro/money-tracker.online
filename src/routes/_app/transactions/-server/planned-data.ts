@@ -12,14 +12,13 @@ import type {
   ExpectationGroup,
   ExpectationRow,
 } from '#/components/app/transactions'
-import type { TransactionListPage } from '#/server/fns/transactions'
 import type { Logger } from '#/server/observability/logger'
 import type { TenantScope } from '#/server/repos/base'
 import type {
-  TransactionFilters,
-  TransactionSort,
-} from '#/server/repos/transaction-queries'
-import type { TransactionPolicies } from '#/server/repos/transactions'
+  LedgerPageInput,
+  TransactionListPage,
+} from '#/server/transactions/ledger-page'
+import type { TransactionFilters } from '#/server/repos/transaction-queries'
 
 /**
  * The planned screen's read: the planned transactions page, and the recurring periods that have
@@ -40,20 +39,22 @@ import type { TransactionPolicies } from '#/server/repos/transactions'
  * money row behind it. This composes two scoped reads and persists nothing, so reverting the
  * commit undoes it (`.ai/specs/2026-09-20-recurring-periods-settle-and-surface.md`).
  *
- * ## The group is read once and is not paged
+ * ## The group is read once, on the first page, and is not paged
  *
  * The upcoming read has no lower date bound and the ledger's sort can be by a name, so there is no
- * horizon a page could derive. The group is therefore the same on every call whatever the cursor
- * or the sort: due within {@link WITHIN_DAYS} days or already overdue, the {@link LIMIT} nearest,
- * ordered by due date. The screen draws it from the first page only.
+ * horizon a page could derive. The group is therefore the same whatever the sort: due within
+ * {@link WITHIN_DAYS} days or already overdue, the {@link LIMIT} nearest, ordered by due date. The
+ * screen draws it from the first page only, so a request with a cursor reads no group (and no
+ * category tree for one) and carries none: its ledger half is exactly what the ledger reader
+ * returns. The skip keys on the validated `cursor !== null`, never on a flag the client sends.
  *
  * ## It owns no SQL and no scope
  *
  * It receives the scope and the day from the server function that established them (the day is
- * read from the server clock there, never accepted from a caller) and passes the scope first to
- * every repository call. The ledger half arrives as a function, because the thing it stands for is
- * a server function that authorises on its own and only runs inside a request - which is also what
- * makes this one callable from a unit test.
+ * read from the server clock there, never accepted from a caller) and passes that one scope first
+ * to the ledger read and to every repository call. The ledger half arrives as a function taking
+ * the scope (`ledgerPageFor`), which resolves none of its own, so the door proves membership once.
+ * Taking it as a dependency is also what keeps the server-only module out of this one's imports.
  */
 
 /** How far ahead the group looks, in days. The same window `/recurring` uses for what is due. */
@@ -62,23 +63,23 @@ const WITHIN_DAYS = 30
 /** The most periods the group holds. */
 const LIMIT = 50
 
-export interface PlannedScreenInput {
-  readonly policies: TransactionPolicies
-  readonly filters: TransactionFilters
-  readonly sort: TransactionSort
-  readonly cursor: string | null
-  readonly limit?: number
-  readonly includeBalanceAfter?: boolean
-}
+export type PlannedScreenInput = LedgerPageInput
 
 /** One page of the transactions ledger, under the policies and filters the input states. */
 export type LedgerReader = (
+  scope: TenantScope,
   input: PlannedScreenInput,
 ) => Promise<TransactionListPage>
 
 export interface PlannedScreenPage extends TransactionListPage {
   /** The day the read was taken on, so "overdue" is judged against the same date everywhere. */
   readonly today: string
+  /** Present on the first page and absent on a cursor page, which does not read it. */
+  readonly expectations?: ExpectationGroup
+}
+
+/** The page a request without a cursor gets: the one that carries the group. */
+export interface PlannedScreenFirstPage extends PlannedScreenPage {
   readonly expectations: ExpectationGroup
 }
 
@@ -147,17 +148,34 @@ async function readExpectations(
 /**
  * The planned screen's page for a scope that has already been established.
  *
- * A failing ledger read rejects, so the screen's ordinary error path applies. A failing expected
- * read does not: it becomes the `failed` state of the group beside a ledger that loaded.
+ * The first page (`cursor` null) carries the group; a page with a cursor carries the ledger half
+ * alone and makes no expected read. A failing ledger read rejects, so the screen's ordinary error
+ * path applies. A failing expected read does not: it becomes the `failed` state of the group
+ * beside a ledger that loaded.
  */
+export function plannedScreenFor(
+  scope: TenantScope,
+  input: PlannedScreenInput & { readonly cursor: null },
+  today: string,
+  deps: PlannedScreenDeps,
+): Promise<PlannedScreenFirstPage>
+export function plannedScreenFor(
+  scope: TenantScope,
+  input: PlannedScreenInput,
+  today: string,
+  deps: PlannedScreenDeps,
+): Promise<PlannedScreenPage>
 export async function plannedScreenFor(
   scope: TenantScope,
   input: PlannedScreenInput,
   today: string,
   { readLedger, logger }: PlannedScreenDeps,
 ): Promise<PlannedScreenPage> {
+  if (input.cursor !== null) {
+    return { ...(await readLedger(scope, input)), today }
+  }
   const [page, expectations] = await Promise.all([
-    readLedger(input),
+    readLedger(scope, input),
     readExpectations(scope, input.filters, today, logger),
   ])
   return { ...page, today, expectations }

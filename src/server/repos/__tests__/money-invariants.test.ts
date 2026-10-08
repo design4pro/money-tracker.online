@@ -89,7 +89,8 @@ import {
   seedPeriod,
   seedTransaction,
 } from './budget-harness'
-import { ledgerReaderFor, seedSeries } from './planned-harness'
+import { seedSeries } from './planned-harness'
+import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
   countTransactions,
   pageTransactions,
@@ -1517,7 +1518,7 @@ describe('15 — an expectation is shown beside the totals and never in them', (
       },
       TODAY,
       {
-        readLedger: ledgerReaderFor(planned.scope),
+        readLedger: ledgerPageFor,
         logger: createLogger({ sink: createMemorySink() }),
       },
     )
