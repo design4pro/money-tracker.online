@@ -23,9 +23,6 @@ import { z } from 'zod'
 import { requireOrg } from '#/server/auth/guards'
 import { runWithLedgerBatch } from '#/server/ledger'
 import {
-  countTransactions,
-  pageTransactions,
-  sumTransactions,
   transactionFiltersSchema,
   transactionSortSchema,
 } from '#/server/repos/transaction-queries'
@@ -39,12 +36,10 @@ import {
   updateTransactionSchema,
 } from '#/server/repos/transactions'
 import { conversionContextFor } from '#/server/repos/workspace-currencies'
+import { ledgerPageFor } from '#/server/transactions/ledger-page'
 
 import type { Transaction } from '#/server/db/types'
-import type {
-  TransactionPage,
-  TransactionTotals,
-} from '#/server/repos/transaction-queries'
+import type { TransactionListPage } from '#/server/transactions/ledger-page'
 
 const transactionIdSchema = z.strictObject({
   transactionId: z.string().trim().min(1).max(64),
@@ -77,53 +72,18 @@ const loadTransactionsSchema = z.strictObject({
   includeBalanceAfter: z.boolean().optional(),
 })
 
-export interface TransactionListPage extends TransactionPage {
-  /** How many rows match, over the whole filtered set rather than this page. */
-  readonly total: number
-  /** Income, expense and net over the whole filtered set, in the base currency. */
-  readonly totals: TransactionTotals
-}
-
 /**
  * One page of the ledger, with the totals under it.
  *
- * The totals are computed over the **whole filtered set**, not the page: a footer that only sums
- * what is on screen changes every time somebody scrolls, and is worse than no footer at all.
- *
- * `historyFloor` is `null` here, which the repository reads as "no ceiling in force" and reports as
- * no clamp. The ceiling itself is a plan entitlement (`analyticsHistoryMonths`) resolved by the
- * billing layer; it is passed through this one argument, so turning it on is a change at this call
- * site and nowhere else.
+ * The door proves membership and hands the scope to {@link ledgerPageFor}, where the read and its
+ * notes on the totals and the history ceiling live. The planned screen reuses that read behind its
+ * own single `requireOrg()`, which is why the body is not here.
  */
 export const loadTransactions = createServerFn({ method: 'GET' })
   .inputValidator(loadTransactionsSchema)
-  .handler(async ({ data }): Promise<TransactionListPage> => {
-    const scope = await requireOrg()
-    const conversion = await conversionContextFor(scope)
-    const query = {
-      scope,
-      policies: data.policies,
-      filters: data.filters,
-      historyFloor: null,
-    }
-
-    const [page, total, totals] = await Promise.all([
-      pageTransactions({
-        ...query,
-        sort: data.sort,
-        cursor: data.cursor,
-        limit: data.limit,
-        includeBalanceAfter: data.includeBalanceAfter,
-      }),
-      countTransactions(query),
-      sumTransactions({
-        ...query,
-        baseCurrencyCode: conversion.baseCurrencyCode,
-      }),
-    ])
-
-    return { ...page, total, totals }
-  })
+  .handler(async ({ data }): Promise<TransactionListPage> =>
+    ledgerPageFor(await requireOrg(), data),
+  )
 
 /* -------------------------------------------------------------------------- */
 /* Writes                                                                      */
