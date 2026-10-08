@@ -102,8 +102,8 @@
   ],
 
   "r2_buckets": [
-    // Uploaded import files, generated exports, receipt attachments, dead-letter bodies and
-    // the nightly D1 logical backups.
+    // Uploaded import files, generated exports, receipt attachments and the per-workspace JSON
+    // backups under `backups/<orgId>/`. The key layout is docs/ARCHITECTURE.md §3.2.
     { "binding": "FILES", "bucket_name": "money-tracker-files" },
   ],
 
@@ -158,8 +158,8 @@
       // and whose due instant has passed.
       "7 * * * *",
       // Nightly: FX refresh for every currency pair any workspace holds; the balance-history
-      // revaluation sweep that self-heals any write path which skipped a rebuild; the D1
-      // logical backup to R2; the expired-export prune.
+      // revaluation sweep that self-heals any write path which skipped a rebuild; the
+      // per-workspace JSON backups to R2 under `backups/<orgId>/`; the expired-export prune.
       "0 3 * * *",
       // Weekly: audit-log prune (400-day retention), provider usage roll-up, orphaned R2
       // object sweep.

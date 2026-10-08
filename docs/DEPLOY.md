@@ -520,14 +520,18 @@ depth and the Polar dashboard after any rollback that touched billing or notific
 
 ```bash
 pnpm exec wrangler queues list
-pnpm exec wrangler r2 object list money-tracker-files --prefix dlq/
-pnpm exec wrangler r2 object get money-tracker-files dlq/<queue>/<date>/<id>.json --file /tmp/dlq.json
 ```
 
-Every dead-lettered message's body is written to R2 under `dlq/`, because the message itself is gone
-by the time anyone looks. Re-driving is a deliberate act: read the body, fix the cause, and enqueue a
-fresh message with a **new** envelope id — never replay the old one, whose idempotency claim may
-still exist.
+Nothing consumes either dead-letter queue and nothing writes a dead-lettered body to R2, so there is
+no `dlq/` object to list or fetch. What an operator has today is the dead-letter queue's own retention:
+the body stays in `money-tracker-tasks-dlq` (`money-tracker-tasks-staging-dlq` in staging) for the
+queue's retention window, a platform setting, and is gone after it. The writer that copies the envelope
+to `dlq/<queue>/<messageId>.json` is planned, not written (`docs/ARCHITECTURE.md` §6); it ships with an
+R2 lifecycle expiry rule and stores the envelope only.
+
+Re-driving is a deliberate act: fix the cause, then enqueue a fresh message. The old message's claim in
+KV may still be held (it expires after 120 seconds), and a held claim makes the fresh message a delayed
+retry rather than a lost one.
 
 ---
 
