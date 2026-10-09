@@ -21,6 +21,8 @@ the platform console (plan `24`), and billing entitlements (plan `22`).
 
 ## Stage 04-S1 — Better Auth, KV sessions, and workspace provisioning
 
+Delivered: 2026-10-09 - the auth code under `src/server/auth/` (`config.ts`, `index.ts`, `organization.ts`, `guards.ts`, `permissions.ts`, `db.ts`, `email.ts`, `env.ts`, `secondary-storage.ts`, `tenant.ts`) and the route `src/routes/api/auth/$.ts`, with the tests `config.test.ts`, `guards.test.ts`, `organization.test.ts`, `permissions.test.ts`, `secondary-storage.test.ts`, `email.test.ts`, `organization-route.test.ts` and `auth.workerd.test.ts` (#620 the deterministic personal-workspace id and the retry, #621 the configuration, hooks and KV adapter pinned, #623 a real email sign-up driven through Better Auth in workerd, #624 the create-organization route closed, #625 further pins); `pnpm vitest run src/server/auth --project=server` passes 116 tests in 7 files and `pnpm test:workerd` passes 14 tests in 4 files, `auth.workerd.test.ts` among them, so an end-to-end sign-up was driven; ADR 0011 carries the matching `## Amendment`.
+
 ### Stage id
 
 `04-S1` · Wave 1 · effort **XL**.
@@ -38,9 +40,20 @@ the platform console (plan `24`), and billing entitlements (plan `22`).
 - `src/server/auth/organization.ts` — new
 - `src/server/auth/guards.ts` — new
 - `src/server/auth/permissions.ts` — new
+- `src/server/auth/db.ts`, `email.ts`, `env.ts`, `secondary-storage.ts`, `tenant.ts` — new
 - `src/routes/api/auth/$.ts` — new
 - `src/server/auth/__tests__/guards.test.ts` — new
 - `src/server/auth/__tests__/organization.test.ts` — new
+- `src/server/auth/__tests__/permissions.test.ts` — new
+- `src/server/auth/__tests__/config.test.ts`, `secondary-storage.test.ts` — new
+- `src/server/auth/__tests__/auth.workerd.test.ts` — new, with the fake auth bindings in the workerd
+  project's `miniflare.bindings` in `vitest.config.ts`
+- `src/server/auth/__tests__/harness.ts` — new, shared by the tests above
+
+`organization.ts` writes `organization_currencies` outside `src/server/repos` by design: the
+workspace it would need a `TenantScope` for is created by the same batch (see the docblock of
+`organization.ts`). This is a third departure from the two exceptions `docs/SPEC.md` §5.2 documents,
+and §5.2 does not record it yet.
 
 ### Data and migration
 
@@ -54,23 +67,32 @@ of thing a well-meaning refactor "fixes".
 
 - **Configuration**, and each of these is load-bearing rather than stylistic:
   - `secondaryStorage` is the `SESSIONS` KV binding. Sessions, OAuth state and rate-limit counters
-    live there, with a 60 s TTL floor on the counters.
+    live there, with a 60 s TTL floor (the KV minimum) on every write that carries a TTL.
   - **No `cookieCache`.** A signed session snapshot is a window — five minutes by default — in which
     a banned or removed account keeps authority. The cost is a KV read per request; the alternative
     is an authorisation decision made from stale data.
   - `verification.storeInDatabase: true`.
-  - `disabledPaths` at **top level**, not inside `admin({})` — inside, it is silently ignored.
-  - Plugin order: `admin()` **first**.
-  - `rateLimit` with per-path custom rules: `/sign-in/email` 10/60 s, `/sign-up/email` 5/300 s,
-    `/request-password-reset` 5/300 s, `/two-factor/verify-totp` 10/60 s.
-  - `advanced.cookiePrefix: 'mtr'`, `generateId: () => nanoid(24)`.
+  - `disabledPaths` at **top level**, not inside `admin({})` — inside, it is silently ignored. It
+    closes the fifteen `admin` paths and `/organization/create` on the HTTP surface.
+  - Plugins, in order: `admin()` **first**, then `twoFactor` and `organization`. The passkey plugin
+    is not installed yet (`04-S4`).
+  - `rateLimit` with per-path custom rules, seven in all — the four of ADR 0011 first:
+    `/sign-in/email` 10/60 s, `/sign-up/email` 5/300 s, `/request-password-reset` 5/300 s,
+    `/two-factor/verify-totp` 10/60 s; then `/reset-password` 10/300 s, `/send-verification-email`
+    5/300 s and `/two-factor/verify-backup-code` 5/300 s.
+  - `advanced.cookiePrefix: 'mtr'`, `advanced.database.generateId: () => nanoid(24)`.
 - **`resolveOrProvisionOrganization`** runs in `user.create.after` **and** `session.create.before`.
-  It inserts the organization and its owner `member` row in **one `db.batch`**, with a slug retry
-  ladder on collision. Both hooks, because a user created before this shipped would otherwise have no
-  workspace and every guard would fail for them.
+  It inserts the organization, its owner `member` row and the workspace's `organization_currencies`
+  rows in **one `db.batch`**. A failed batch is retried, at most four attempts, and the cause is read
+  from database state, never from the error: the other call won, the id is held, or the slug is held.
+  Both hooks, because a user created before this shipped would otherwise have no workspace and every
+  guard would fail for them. **One auto-provisioned personal workspace per user is held by the
+  deterministic personal-workspace id** (a primary key derived from the user id), **not by the slug
+  index**: two concurrent calls insert the same key and exactly one batch wins.
 - **`requireOrg()` re-reads the role from `member`**, never from a session claim. A claim is a
   snapshot; a membership is a fact, and a member demoted a minute ago must not still be an admin.
-- `permissions.ts` exports `permits(actor, action)` as a **pure predicate**. The console's render
+- `permissions.ts` exports `permits(actor, request)` as a **pure predicate**; `actor` carries `role`,
+  `banned` and `impersonatedBy`, and `request` is a platform permission statement. The console's render
   flags derive from the same helper as its guards, so a button cannot appear for an action the guard
   will refuse.
 - **Ledger batching.** Not applicable: no balance changes.
@@ -101,23 +123,28 @@ client-supplied tenant id makes every downstream isolation test meaningless.
 
 ### Money invariant
 
-This stage writes no amount. It does write `organization_settings.base_currency_code` at
-provisioning time, defaulted from the negotiated locale's country, and **that value is the anchor for
-every `ref_amount` the workspace will ever store**. The case
-`organization.test.ts` → _a provisioned workspace always has a base currency_ asserts it is never
-null and is a code present in the catalogue — a workspace with a null base currency cannot compute a
-single report.
+This stage writes no amount. It does write the workspace's `organization_currencies` rows at
+provisioning time, with `is_base` set on a fixed `PLN` beside `EUR`, `USD` and `GBP`, and **that
+base is the anchor for every `ref_amount` the workspace will ever store**. Deriving the base from the
+locale was considered and deferred; a personal workspace's base is chosen only through the `26-S*`
+onboarding for workspaces it creates. The case `organization.test.ts` → _a provisioned workspace
+always has exactly one base currency_ asserts the one `is_base` row, that it is a code present in the
+catalogue and that the four codes are the ones written — a workspace with no base currency cannot
+compute a single report.
 
 ### Verification
 
 - Command gate.
 - `guards.test.ts`: `requireUser` rejects an absent session; `requireOrg` re-reads the role; a forged
-  `organizationId` is ignored; the two role dictionaries are separate types and mixing them is a type
-  error (`@ts-expect-error` fixture).
-- `organization.test.ts`: provisioning is one batch; a slug collision retries; both hooks provision;
-  a base currency is always set.
-- A manual sign-up against `wrangler dev` showing the session key in local KV and the workspace row
-  in local D1.
+  `organizationId` is ignored.
+- `permissions.test.ts`: the two role dictionaries are separate types and mixing them is a type
+  error, asserted with `expectTypeOf` and checked by `pnpm typecheck`.
+- `config.test.ts`: both hooks provision, and running both leaves one workspace.
+- `organization.test.ts`: provisioning is one batch; a collision retries; one
+  personal workspace per user under a race; exactly one base currency is always set.
+- `auth.workerd.test.ts`: a real email sign-up through `betterAuth(authOptions())` in workerd,
+  showing the session key in `SESSIONS` and the workspace row in `DB`. It replaces the manual
+  `wrangler dev` sign-up.
 - No browser evidence and no axe run: the screens are `04-S4`.
 
 ### Definition of done
@@ -127,6 +154,11 @@ single report.
 ### Blockers
 
 None.
+
+Owed elsewhere and not fixed here: `FND-02` in `00-foundations.md` and the Data section of
+`02-i18n.md` name `04-S1` as the owner of `organization_settings.locale` and
+`user_preferences.locale`, and `04-S1` creates neither (`23-S2` and `00-S14` requisition them); and
+the money-invariant text of `04-S3` reads `settings.base_currency_code`, which does not exist.
 
 ---
 

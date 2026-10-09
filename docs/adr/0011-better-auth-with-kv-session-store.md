@@ -70,3 +70,49 @@ and `disabledPaths` subtleties above are exactly the sort of thing a minor relea
 In exchange, the account record and the organization model live in our own database, tenancy and
 identity share one source of truth, there is no per-MAU bill, and there is no five-minute window in
 which a revoked role still works.
+
+## Amendment
+
+Date: 2026-10-09. Written against the code of stage `04-S1` as merged in #620, #621, #623, #624 and
+#625. The text above stands as the decision of 2026-09-01; where it disagrees with what follows, this
+section is the record of what the code does.
+
+- **Sessions live in KV only.** The paragraph in Consequences that says a miss "falls through to D1"
+  is superseded. `config.ts` sets `secondaryStorage` and not `session.storeSessionInDatabase`, and
+  with that combination Better Auth's `findSession` answers `null` on a KV miss without reading D1.
+  A session that has expired or been evicted from `SESSIONS` means signing in again. D1 holds the
+  verification rows (`verification.storeInDatabase: true`) and the rest of the auth tables, not the
+  session.
+- **No `cookieCache`, and what that buys.** The workspace role is a fact read from the `member` row
+  on every call: `requireOrg` re-reads it, so a demotion applies to the next call. A ban and the
+  platform role are different: the guards read them from the session record held in `SESSIONS`, so
+  they take effect when Better Auth rewrites or deletes that record, bounded by the propagation of an
+  eventually-consistent store. Nothing here promises "immediate" revocation of a session.
+- **Rate limits are seven rules**, with the four above first. The others are `/reset-password`
+  10/300s, `/send-verification-email` 5/300s and `/two-factor/verify-backup-code` 5/300s, and the
+  global default is 100/60s. The counters live in `SESSIONS` and are approximate: a courtesy guard
+  that can undercount, not a hard limit.
+- **Plugins are `admin`, `twoFactor` and `organization`, in that order.** The passkey plugin the
+  Decision names is not installed yet; it arrives with `04-S4`, and nothing here claims the
+  3.3.9 Accessible Authentication (Enhanced) criterion before it does.
+- **Closed routes.** `disabledPaths` closes the fifteen `/admin/*` paths and `/organization/create`
+  on the HTTP surface only. In-process `auth.api.*` calls never pass through the router and stay
+  intended to stay usable behind `permits` once a caller exists; none does yet, and plan stage `26-S1`
+  has not settled between `auth.api.createOrganization` and a direct batch. The pull request that
+  closed the create-organization route is #624.
+- **The personal workspace's base currency is a fixed `PLN`**, with `EUR`, `USD` and `GBP` beside
+  it, written as `organization_currencies` rows in the same `db.batch` as the organization and the
+  owner `member` row. It is not derived from the locale.
+- **One auto-provisioned personal workspace per user is held by a deterministic id, not by the slug
+  index.** The workspace id is a pure function of the user id (an unkeyed SHA-256, shortened to the
+  24-character shape of every auth id), so two concurrent provisions insert the same primary key and
+  one batch fails; the failed call reads the winner back and returns it. The slug ladder narrows the
+  window and does not close it, so the batch is retried (at most four attempts) with the cause read
+  from database state. The guarantee is conditional: when the derived id is already held by a
+  workspace the user is not in, provisioning draws a random id rather than lock the user out, and
+  the race protection is gone for that call. The id is not a secret and not an authorisation input;
+  `requireOrg` checks a workspace id against `member`.
+
+Pull requests: #620 (deterministic id and the retry), #621 (configuration, hooks and the KV adapter
+pinned by tests), #623 (a real sign-up driven through Better Auth in workerd), #624 (the
+create-organization route closed) and #625 (further pins).
