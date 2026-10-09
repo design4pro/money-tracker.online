@@ -17,7 +17,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { member, organization } from '#/server/db/auth-schema'
 
 import { authOptions } from '../config'
-import { DISABLED_ADMIN_PATHS } from '../permissions'
+import {
+  DISABLED_ADMIN_PATHS,
+  DISABLED_ORGANIZATION_PATHS,
+} from '../permissions'
 import { openAuthTestDb, seedUser } from './harness'
 
 import type { BetterAuthOptions } from 'better-auth'
@@ -74,9 +77,18 @@ describe('session and verification storage', () => {
 })
 
 describe('the disabled console paths', () => {
-  it('are top level and equal the constant: the admin plugin does not read them from its own options', () => {
-    expect(options.disabledPaths).toBe(DISABLED_ADMIN_PATHS)
+  it('are top level and equal both constants: the admin plugin does not read them from its own options', () => {
+    expect(options.disabledPaths).toEqual([
+      ...DISABLED_ADMIN_PATHS,
+      ...DISABLED_ORGANIZATION_PATHS,
+    ])
     expect(pluginOptions('admin')).not.toHaveProperty('disabledPaths')
+  })
+
+  it('keep organization creation enabled: plan stage 26-S1 creates workspaces in-process', () => {
+    expect(pluginOptions('organization')).toMatchObject({
+      allowUserToCreateOrganization: true,
+    })
   })
 })
 

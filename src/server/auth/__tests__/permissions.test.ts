@@ -16,6 +16,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   BANNED_USER_MESSAGE,
   DISABLED_ADMIN_PATHS,
+  DISABLED_ORGANIZATION_PATHS,
   IMPERSONATION_SESSION_SECONDS,
   adminOptions,
   isPlatformRole,
@@ -170,6 +171,24 @@ describe('the disabled console paths', () => {
 
   it('lists each path once', () => {
     expect(new Set(DISABLED_ADMIN_PATHS).size).toBe(DISABLED_ADMIN_PATHS.length)
+  })
+})
+
+describe('the disabled organization paths', () => {
+  it('close the creation route with the router’s own spelling, and each path once', () => {
+    expect(DISABLED_ORGANIZATION_PATHS).toContain('/organization/create')
+    for (const path of DISABLED_ORGANIZATION_PATHS) {
+      expect(path.startsWith('/organization/')).toBe(true)
+    }
+    expect(new Set(DISABLED_ORGANIZATION_PATHS).size).toBe(
+      DISABLED_ORGANIZATION_PATHS.length,
+    )
+  })
+
+  it('do not overlap the admin list', () => {
+    for (const path of DISABLED_ORGANIZATION_PATHS) {
+      expect(DISABLED_ADMIN_PATHS).not.toContain(path)
+    }
   })
 })
 

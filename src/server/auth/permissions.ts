@@ -275,3 +275,16 @@ export const DISABLED_ADMIN_PATHS: string[] = [
   '/admin/unban-user',
   '/admin/update-user',
 ]
+
+/**
+ * The `organization` plugin's creation path, closed on the HTTP surface.
+ *
+ * Nothing in the product posts to it, and left open it lets a signed-in user mint unlimited
+ * owner-role organizations with no base currency; one created before provisioning is what
+ * `firstOrganizationIdFor` returns, so that user never gets a personal workspace. Spelled without
+ * `/api/auth`, for the reason {@link DISABLED_ADMIN_PATHS} gives.
+ *
+ * Only this one path: `allowUserToCreateOrganization` stays on, because plan stage 26-S1 creates
+ * workspaces in-process with `auth.api.createOrganization`, which never passes through the router.
+ */
+export const DISABLED_ORGANIZATION_PATHS: string[] = ['/organization/create']
