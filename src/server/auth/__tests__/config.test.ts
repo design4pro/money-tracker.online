@@ -20,6 +20,7 @@ import { authOptions } from '../config'
 import {
   DISABLED_ADMIN_PATHS,
   DISABLED_ORGANIZATION_PATHS,
+  adminOptions,
 } from '../permissions'
 import { openAuthTestDb, seedUser } from './harness'
 
@@ -28,9 +29,33 @@ import type { AppDatabase } from '../db'
 
 const current = vi.hoisted(() => ({ db: undefined as unknown }))
 
+/**
+ * The two KV bindings, told apart. `SESSIONS` records its writes; `KV` is the general cache and
+ * throws on any access, so a path that reaches it fails loudly rather than silently (ADR 0011).
+ */
+const stores = vi.hoisted(() => ({
+  sessionPuts: [] as Array<{ key: string; value: string }>,
+  sessions: {
+    async put(key: string, value: string) {
+      stores.sessionPuts.push({ key, value })
+    },
+  },
+  cache: new Proxy(
+    {},
+    {
+      get(_target, property) {
+        throw new Error(
+          `the general KV cache was touched (${String(property)}): sessions must live in SESSIONS`,
+        )
+      },
+    },
+  ),
+}))
+
 vi.mock('cloudflare:workers', () => ({
   env: {
-    SESSIONS: {},
+    SESSIONS: stores.sessions,
+    KV: stores.cache,
     BETTER_AUTH_SECRET: 'test-only-secret-that-is-not-a-real-deployment-value',
     APP_URL: 'https://app.example.test',
     EMAIL_API_KEY: '',
@@ -45,6 +70,7 @@ let options: BetterAuthOptions
 beforeEach(() => {
   db = openAuthTestDb()
   current.db = db
+  stores.sessionPuts.length = 0
   options = authOptions()
 })
 
@@ -74,6 +100,14 @@ describe('session and verification storage', () => {
   it('has secondary storage: sessions and rate-limit counters live in KV', () => {
     expect(options.secondaryStorage).toBeDefined()
   })
+
+  it('writes secondary storage to SESSIONS, never the general KV cache: a cache purge must not sign everyone out (ADR 0011)', async () => {
+    await options.secondaryStorage!.set('session-token', 'payload', 120)
+
+    expect(stores.sessionPuts).toEqual([
+      { key: 'session-token', value: 'payload' },
+    ])
+  })
 })
 
 describe('the disabled console paths', () => {
@@ -88,6 +122,17 @@ describe('the disabled console paths', () => {
   it('keep organization creation enabled: plan stage 26-S1 creates workspaces in-process', () => {
     expect(pluginOptions('organization')).toMatchObject({
       allowUserToCreateOrganization: true,
+    })
+  })
+})
+
+describe('the admin plugin', () => {
+  it('receives adminOptions: the role grid, adminRoles and defaultRole, not the plugin defaults', () => {
+    expect(pluginOptions('admin')).toMatchObject({
+      ac: adminOptions.ac,
+      roles: adminOptions.roles,
+      adminRoles: adminOptions.adminRoles,
+      defaultRole: adminOptions.defaultRole,
     })
   })
 })

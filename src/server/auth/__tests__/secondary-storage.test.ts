@@ -60,6 +60,29 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('get', () => {
+  it('returns the stored text on a hit', async () => {
+    kv.store.set('k', 'v')
+
+    expect(await createKvSecondaryStorage(kv.asKv()).get('k')).toBe('v')
+  })
+
+  it('returns null on a miss', async () => {
+    expect(await createKvSecondaryStorage(kv.asKv()).get('k')).toBe(null)
+  })
+})
+
+describe('delete', () => {
+  it('removes the key from KV', async () => {
+    kv.store.set('k', 'v')
+
+    await createKvSecondaryStorage(kv.asKv()).delete('k')
+
+    expect(kv.deletes).toEqual(['k'])
+    expect(kv.store.has('k')).toBe(false)
+  })
+})
+
 describe('set', () => {
   it('clamps a TTL below the Workers KV floor up to 60 seconds', async () => {
     await createKvSecondaryStorage(kv.asKv()).set('k', 'v', 10)
@@ -106,6 +129,19 @@ describe('increment', () => {
     expect(await storage.increment!('rl', 300)).toBe(3)
 
     vi.setSystemTime(START.getTime() + 300_001)
+    expect(await storage.increment!('rl', 300)).toBe(1)
+  })
+
+  it('pins the window edge: one millisecond early still counts, exactly at resetAt restarts at 1', async () => {
+    const storage = createKvSecondaryStorage(kv.asKv())
+    const resetAt = START.getTime() + 300_000
+
+    expect(await storage.increment!('rl', 300)).toBe(1)
+    vi.setSystemTime(resetAt - 1)
+    expect(await storage.increment!('rl', 300)).toBe(2)
+
+    // The adapter keeps a counter only while `resetAt > now`, so equality is already a new window.
+    vi.setSystemTime(resetAt)
     expect(await storage.increment!('rl', 300)).toBe(1)
   })
 
