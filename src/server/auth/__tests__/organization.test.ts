@@ -328,9 +328,14 @@ describe('provisionPersonalWorkspace under a race', () => {
         }
         return async (...args: Parameters<AppDatabase['batch']>) => {
           calls += 1
-          const [first] = args[0]
-          // The organization insert's params are [id, name, slug, ...].
-          const slug = first.toSQL().params[2] as string
+          // The organization insert is first, and its params are [id, name, slug, ...].
+          const first = args[0][0]
+          if (!('toSQL' in first) || typeof first.toSQL !== 'function') {
+            throw new Error('expected a query builder')
+          }
+          const slug = String(
+            (first.toSQL() as { params: Array<unknown> }).params[2],
+          )
           if (calls < 4) {
             // Someone else takes the slug this attempt drew, so the batch collides on it.
             await seedOrganization(db, {
