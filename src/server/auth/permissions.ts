@@ -11,7 +11,7 @@
  * They share the word `admin` and mean unrelated things by it. A helper taking "a role" without
  * saying which one is a defect, not a naming quibble — so the two are separate TypeScript types with
  * no overlap in their union members beyond that shared literal, and `__tests__/permissions.test.ts`
- * holds a `@ts-expect-error` fixture proving one cannot be passed where the other is wanted.
+ * holds a type-level assertion proving one cannot be passed where the other is wanted.
  *
  * **This module is binding-free by construction**, and that is load-bearing rather than tidy: the
  * console screens, the guards and the tests all read the same grid, and they cannot share a runtime.
