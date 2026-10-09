@@ -210,7 +210,8 @@ Rationale: `docs/adr/0002-tenant-scoped-repository-boundary.md`.
 ### 5.3 Platform roles and workspace roles are two dictionaries
 
 Workspace roles are `owner | admin | member`, read from the membership row and never trusted from a
-session claim. Platform roles are `admin | curator | user`, read from the user row. The two are
+session claim. Platform roles are `admin | curator | user`, carried on the session record held in KV, so a change
+applies when Better Auth rewrites or deletes that record (ADR 0011, Amendment). The two are
 never mixed, never compared, and never resolved by one helper.
 
 ### 5.4 Billing surface
