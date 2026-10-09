@@ -13,7 +13,8 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   hard-coded 2. `ref_amount_minor` is historical and never recomputed (`docs/MONEY.md`).
 - All SQL lives in `src/server/repos` and goes through the tenant-scoped base repository;
   `src/server/catalog`, `billing_events` and the `organization_currencies` insert in the
-  workspace-creation batch are the three documented exceptions (`docs/SPEC.md` §5.2).
+  workspace-creation batch (`src/server/auth/organization.ts`) are the three documented exceptions
+  (`docs/SPEC.md` §5.2).
 - Validate every server-function input with Zod, and parse it a second time in the repository.
   Validation is shape, never permission.
 - A new repository function ships with a case in `src/server/repos/__tests__/tenant-isolation.test.ts`;

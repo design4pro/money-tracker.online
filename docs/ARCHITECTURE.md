@@ -235,7 +235,8 @@ export function createTenantRepository<T extends KeyedTenantTable>(
 
 `src/server/catalog` is a carve-out (global tables with no `organization_id`), guarded by
 `requirePermission` plus a `platform_audit_log` write. `billing_events` and the insert-only
-`organization_currencies` write in the workspace-creation batch are the other two
+`organization_currencies` write in the workspace-creation batch (`src/server/auth/organization.ts`)
+are the other two
 (`docs/SPEC.md` §5.2).
 
 ### 4.2 Transaction read and write policies

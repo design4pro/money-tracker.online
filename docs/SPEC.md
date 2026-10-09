@@ -188,14 +188,18 @@ workspace can reach goes through `tenantFilter` like every other read in the dir
 
 The **third** is one write: the `organization_currencies` insert inside the workspace-creation
 `db.batch` in `src/server/auth/organization.ts` (stage `04-S1`). It is insert-only and sits in the
-same batch as the `organization` and the owner `member` inserts, and its `organizationId` is the id
-that batch generates, never one taken from a request. The reason is that no `TenantScope` exists
-before the workspace does, and the write cannot be split off: a workspace without a base currency
-leaves `conversionContextFor`, and so every `ref_amount_minor`, undefined, so atomicity needs one
-batch. The module never reads or updates tenant rows without a scope. The exception covers no read,
-update or delete and no other table, and it is not inherited: the writes plan stage `26-S1` makes at
-workspace creation (`workspace_settings`, preset categories and budgets) need their own recorded
-decision in that ticket.
+same batch as the `organization` and the owner `member` inserts, and its `organizationId` is derived
+server-side from the authenticated user id and shared by the three inserts, never taken from a
+request. The currency codes are server constants. The reason is that no `TenantScope` exists before
+the workspace does, and the write cannot be split off: a workspace without a base currency leaves
+`conversionContextFor`, and so every `ref_amount_minor`, undefined, so atomicity needs one batch.
+The module's other statements touch only the Better Auth tables (`organization`, `member`, `user`),
+which are not product tables in the sense of this section and are guarded by ADR 0011; it reads and
+writes no product table other than this one insert. The exception covers no read, update or delete
+and no other product table, and it is not inherited: the writes plan stage `26-S1` makes at
+workspace creation (`organization_currencies` with a base currency the person chooses,
+`workspace_settings`, preset categories and budgets) need their own recorded decision in that
+ticket.
 
 `assertScopedWrite` throws when a write composes to an empty predicate list. Transaction reads and
 writes additionally require **explicit policies** — planned, balance-adjustment, transfer and

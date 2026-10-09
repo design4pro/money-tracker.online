@@ -56,7 +56,7 @@ product decision (`docs/adr/0008-no-bank-connectors.md`), not a control we could
   list totals and response timing.
 - `src/server/catalog` is a carve-out (global tables), guarded by `requirePermission` plus a
   `platform_audit_log` write. `billing_events` and the insert-only `organization_currencies` write
-  in the workspace-creation batch are the other two (`docs/SPEC.md` §5.2).
+  in the workspace-creation batch (`src/server/auth/organization.ts`) are the other two (`docs/SPEC.md` §5.2).
 - **Every repository function has a tenant-isolation case** in
   `src/server/repos/__tests__/tenant-isolation.test.ts`: workspace A asks, in A's scope, to read,
   list, update and delete B's rows by id and to parent new rows onto B's rows. Every one must be

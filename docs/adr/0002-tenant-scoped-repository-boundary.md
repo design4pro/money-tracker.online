@@ -56,9 +56,9 @@ shown to a stranger cannot be un-shown.
 
 ## Amendment
 
-Date: 2026-10-09. Written against the code of stages `04-S1` and `22-S1`. The text above stands as
-the decision of 2026-09-01; where it disagrees with what follows, this section is the record of
-what the code does. It adds nothing to the Decision: it records two exceptions the Decision does not
+Date: 2026-10-09. Written against the code of stages `04-S1` and `22-S1`. The decision of 2026-09-01
+above is unchanged apart from one pointer to this section; where it disagrees with what follows,
+this section is the record of what the code does. It adds nothing to the Decision: it records two exceptions the Decision does not
 name, and `docs/SPEC.md` §5.2 is the canonical statement of all three.
 
 - **Reconciled with SPEC §5.2.** The Decision names `src/server/catalog` only. SPEC §5.2 also lists
@@ -68,13 +68,17 @@ name, and `docs/SPEC.md` §5.2 is the canonical statement of all three.
 - **A third exception: the workspace-creation write.** The `organization_currencies` insert inside
   the `db.batch` in `src/server/auth/organization.ts` is written outside `src/server/repos`. It is
   insert-only, it sits in the same batch as the `organization` and owner `member` inserts, and its
-  `organizationId` is the id that batch generates, never one taken from a request. No `TenantScope`
+  `organizationId` is derived server-side from the authenticated user id and shared by the three
+  inserts, never taken from a request. The currency codes are server constants. No `TenantScope`
   exists before the workspace does, and the write cannot be split off, because a workspace without
   a base currency leaves `conversionContextFor`, and so every `ref_amount_minor`, undefined. The
-  module never reads or updates tenant rows without a scope.
-- **What the third exception does not cover.** No read, update or delete, and no other table. It is
-  not inherited: the writes plan stage `26-S1` makes at workspace creation (`workspace_settings`,
-  preset categories and budgets) need their own recorded decision in that ticket.
+  module's other statements touch only the Better Auth tables (`organization`, `member`, `user`),
+  which are not product tables in the sense of SPEC §5.2 and are guarded by ADR 0011; it reads and
+  writes no product table other than this one insert.
+- **What the third exception does not cover.** No read, update or delete, and no other product
+  table. It is not inherited: the writes plan stage `26-S1` makes at workspace creation
+  (`organization_currencies` with a base currency the person chooses, `workspace_settings`, preset
+  categories and budgets) need their own recorded decision in that ticket.
 - **Considered and rejected for now:** moving the write behind the repository layer. It needs a
   bootstrap-scope concept in the tenancy layer, which is heavier and harder to reverse than
   recording what the code does; the rule text contradicting the code was the worse state.

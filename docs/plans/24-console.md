@@ -12,9 +12,9 @@ The area exists under a single constraint, and everything below follows from it:
 > named `platformScope` rather than by bypassing `tenantFilter`, every call is behind
 > `requirePermission`, and every read and write lands in `platform_audit_log`.**
 
-`04-S2` established `src/server/catalog` as the sole exception to the tenant-scoped repository
+`04-S2` established `src/server/catalog` as the first exception to the tenant-scoped repository
 boundary; `20-S3` (backup) and `22-S1` (billing events) added themselves to the same explicitly named
-allow-list with tests. This plan is the third and last addition, and it adds the **audit** obligation
+allow-list with tests. This plan is the last addition to that allow-list, and it adds the **audit** obligation
 that the other two do not carry, because the others are machines and this one is people.
 
 **What the console deliberately cannot do:** read a workspace's transaction amounts, descriptions,

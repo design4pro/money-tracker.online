@@ -36,8 +36,8 @@ every agent branch used to be held to by `scripts/agent/floor-guard.mjs`.
       never recomputed; `rate_e10` travels with every cross-currency amount (`docs/MONEY.md`).
 - [ ] Tenancy: SQL only in `src/server/repos` through the scoped base repository; the tenant
       predicate cannot be removed; `src/server/catalog`, `billing_events` and the
-      `organization_currencies` insert in the workspace-creation batch are the three documented
-      exceptions (SPEC §5.2).
+      `organization_currencies` insert in the workspace-creation batch (`src/server/auth/organization.ts`)
+      are the three documented exceptions (SPEC §5.2).
 - [ ] Every server-function input is Zod-validated and parsed again in the repository; permission
       is enforced server-side, the UI only reflects it.
 - [ ] Slow work (import, export, email, backup, ledger rebuild, notification fan-out) is enqueued
