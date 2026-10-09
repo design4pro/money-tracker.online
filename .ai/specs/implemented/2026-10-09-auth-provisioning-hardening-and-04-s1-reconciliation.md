@@ -2,10 +2,10 @@
 
 | Field              | Value                                     |
 | ------------------ | ----------------------------------------- |
-| **Status**         | ready                                     |
+| **Status**         | implemented                               |
 | **Issue**          | none                                      |
 | **Spec PR**        | #612                                      |
-| **Implementation** | none                                      |
+| **Implementation** | #621, #620, #624, #623, #625, #626        |
 | **Plan**           | 04-S1 (docs/plans/04-auth-and-tenancy.md) |
 
 ## 📝 TLDR

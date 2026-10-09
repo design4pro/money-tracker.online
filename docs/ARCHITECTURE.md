@@ -369,7 +369,10 @@ without `organizationId`: it is platform-level and its handler enumerates worksp
   cache needs no invalidation path at all.
 - **No cookie session cache.** Better Auth's `cookieCache` would put a signed session snapshot in a
   cookie, which is a five-minute window in which a banned or role-changed account keeps its old
-  authority. The KV read on every request is the price of that not being true.
+  authority. Without it, the workspace role is read from the `member` row on every call, so a
+  demotion applies to the next call; a ban and the platform role are read from the session record in
+  KV and take effect when Better Auth rewrites or deletes it, bounded by KV propagation
+  (ADR 0011, Amendment).
 - **Query cache on the client** is TanStack Query with route-loader integration; a mutation
   invalidates by key prefix, and money-bearing surfaces refetch rather than optimistically patching,
   because an optimistic amount that is later corrected is worse than a spinner.
