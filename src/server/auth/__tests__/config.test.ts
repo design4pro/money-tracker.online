@@ -127,13 +127,9 @@ describe('the disabled console paths', () => {
 })
 
 describe('the admin plugin', () => {
-  it('receives adminOptions: the role grid, adminRoles and defaultRole, not the plugin defaults', () => {
-    expect(pluginOptions('admin')).toMatchObject({
-      ac: adminOptions.ac,
-      roles: adminOptions.roles,
-      adminRoles: adminOptions.adminRoles,
-      defaultRole: adminOptions.defaultRole,
-    })
+  it('receives exactly adminOptions: the role grid, adminRoles and defaultRole, with nothing added or dropped', () => {
+    // Whole-object equality: an extra key such as `adminUserIds` would bypass the permission check.
+    expect(pluginOptions('admin')).toEqual(adminOptions)
   })
 })
 
