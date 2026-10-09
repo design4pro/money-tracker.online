@@ -254,9 +254,9 @@ export const adminOptions = {
  * is the instrument and a `hooks.before` guard is not — the latter wraps `auth.api` too, and would
  * leave no way to perform the action at all.
  *
- * The declared type is mutable because `BetterAuthOptions['disabledPaths']` is `string[]`, and the
- * array is passed by reference so a drift test and the running Worker cannot read two different
- * lists. Nothing mutates it.
+ * The declared type is mutable because `BetterAuthOptions['disabledPaths']` is `string[]`. The
+ * config spreads this array into `disabledPaths` and a drift test compares against it, so the
+ * running Worker and the test cannot read two different lists. Nothing mutates it.
  */
 export const DISABLED_ADMIN_PATHS: string[] = [
   '/admin/ban-user',

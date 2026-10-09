@@ -133,16 +133,23 @@ describe('POST /api/auth/organization/create', () => {
     expect(await db.select().from(member)).toEqual(membersBefore)
   })
 
-  it('is closed with a trailing slash too', async () => {
-    const cookie = await signUp('katherine@example.test')
+  // Without the fix the router already answers a trailing slash with a body-less 404, so the body
+  // text is what tells the `disabledPaths` answer ("Not Found") from the router's. The dot-segment
+  // spelling reaches the endpoint when the path is open.
+  it.each(['/organization/create/', '/organization/./create'])(
+    'is closed as %s too',
+    async (path) => {
+      const cookie = await signUp('katherine@example.test')
 
-    const response = await auth.handler(
-      post('/organization/create/', { name: 'Extra', slug: 'extra' }, cookie),
-    )
+      const response = await auth.handler(
+        post(path, { name: 'Extra', slug: 'extra' }, cookie),
+      )
 
-    expect(response.status).toBe(404)
-    expect(await db.select().from(organization)).toHaveLength(1)
-  })
+      expect(response.status).toBe(404)
+      expect(await response.text()).toBe('Not Found')
+      expect(await db.select().from(organization)).toHaveLength(1)
+    },
+  )
 
   it('stays usable in-process: auth.api bypasses the router, which is what 26-S1 relies on', async () => {
     const cookie = await signUp('margaret@example.test')
