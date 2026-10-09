@@ -188,9 +188,9 @@ workspace can reach goes through `tenantFilter` like every other read in the dir
 
 The **third** is one write: the `organization_currencies` insert inside the workspace-creation
 `db.batch` in `src/server/auth/organization.ts` (stage `04-S1`). It is insert-only and sits in the
-same batch as the `organization` and the owner `member` inserts, and its `organizationId` is derived
-server-side from the authenticated user id and shared by the three inserts, never taken from a
-request. The currency codes are server constants. The reason is that no `TenantScope` exists before
+same batch as the `organization` and the owner `member` inserts, and its `organizationId` is generated
+server-side (a hash of the authenticated user id, or a random id when that one is taken) and shared
+by the three inserts, never taken from a request. The currency codes are server constants. The reason is that no `TenantScope` exists before
 the workspace does, and the write cannot be split off: a workspace without a base currency leaves
 `conversionContextFor`, and so every `ref_amount_minor`, undefined, so atomicity needs one batch.
 The module's other statements touch only the Better Auth tables (`organization`, `member`, `user`),

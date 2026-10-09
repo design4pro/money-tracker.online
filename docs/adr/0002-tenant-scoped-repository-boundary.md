@@ -57,9 +57,10 @@ shown to a stranger cannot be un-shown.
 ## Amendment
 
 Date: 2026-10-09. Written against the code of stages `04-S1` and `22-S1`. The decision of 2026-09-01
-above is unchanged apart from one pointer to this section; where it disagrees with what follows,
-this section is the record of what the code does. It adds nothing to the Decision: it records two exceptions the Decision does not
-name, and `docs/SPEC.md` §5.2 is the canonical statement of all three.
+above is unchanged apart from two small edits ("the single stated exception" became "the stated
+exception", and a pointer to this section); where it disagrees with what follows, this section is
+the record of what the code does. It adds no new rule to the Decision: it records two exceptions the
+Decision does not name, and `docs/SPEC.md` §5.2 is the canonical statement of all three.
 
 - **Reconciled with SPEC §5.2.** The Decision names `src/server/catalog` only. SPEC §5.2 also lists
   `billing_events` (`docs/plans/22-billing.md`, stage `22-S1`): a webhook delivery arrives before
@@ -68,8 +69,8 @@ name, and `docs/SPEC.md` §5.2 is the canonical statement of all three.
 - **A third exception: the workspace-creation write.** The `organization_currencies` insert inside
   the `db.batch` in `src/server/auth/organization.ts` is written outside `src/server/repos`. It is
   insert-only, it sits in the same batch as the `organization` and owner `member` inserts, and its
-  `organizationId` is derived server-side from the authenticated user id and shared by the three
-  inserts, never taken from a request. The currency codes are server constants. No `TenantScope`
+  `organizationId` is generated server-side (a hash of the authenticated user id, or a random id
+  when that one is taken) and shared by the three inserts, never taken from a request. The currency codes are server constants. No `TenantScope`
   exists before the workspace does, and the write cannot be split off, because a workspace without
   a base currency leaves `conversionContextFor`, and so every `ref_amount_minor`, undefined. The
   module's other statements touch only the Better Auth tables (`organization`, `member`, `user`),

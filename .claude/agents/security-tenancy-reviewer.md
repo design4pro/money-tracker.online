@@ -33,9 +33,9 @@ nit.
    write; `billing_events` (`docs/SPEC.md` §5.2, `docs/plans/22-billing.md` stage `22-S1`); and the
    `organization_currencies` insert in the workspace-creation `db.batch` of
    `src/server/auth/organization.ts`, which must stay insert-only, in the same batch as the
-   `organization` and `member` inserts, with an `organizationId` derived server-side from the
-   authenticated user id and never taken from a request, and currency codes that are server
-   constants. Any read, update or delete there, any other product table, or the writes of plan
+   `organization` and `member` inserts, with an `organizationId` generated server-side (a hash of the
+   authenticated user id, or a random id when that one is taken) and never taken from a request,
+   and currency codes that are server constants. Any read, update or delete there, any other product table, or the writes of plan
    stage `26-S1` riding on it (its `organization_currencies` row carries a base currency the person
    chooses) is the finding, and so is a fourth exception.
 2. **SQL outside `src/server/repos` is a blocker** (`AGENTS.md` § Never), as is a direct write to
