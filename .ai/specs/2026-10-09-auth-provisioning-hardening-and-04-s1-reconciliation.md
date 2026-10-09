@@ -75,23 +75,32 @@ Test counts, by file: `guards.test.ts` 14, `organization.test.ts` 16, `permissio
    exactly one base currency that is a catalogue code, or that a failed batch leaves no half-written
    workspace. `organization.test.ts` never reads `organization_currencies`; the only test of
    `DEFAULT_BASE_CURRENCY_CODE` is of the constant itself.
-3. **The slug "retry ladder" is check-then-insert.** `reserveSlug` reads each candidate and returns the
-   first free one; the batch then inserts it. Two provisions that read the same base slug before
-   either inserts (two people of the same name signing up at once, **or the same user's two hooks**,
-   which `organization.ts` says do not await each other) make the loser's batch fail on
-   `organization_slug_unique`. The batch is atomic, so nothing partial lands, but the exception leaves
-   the hook and the sign-up request errors while the `user` row already exists; the next sign-in heals
-   it. The existing slug tests are sequential and never reach this.
+3. **The slug "retry ladder" is check-then-insert, and nothing makes a workspace per user unique.**
+   `reserveSlug` reads each candidate and returns the first free one; the batch then inserts it. Two
+   provisions that read the same base slug before either inserts (two people of the same name signing
+   up at once) make the loser's batch fail on `organization_slug_unique`; the batch is atomic, so
+   nothing partial lands, but the exception leaves the hook and the sign-up request errors while the
+   `user` row already exists. Worse, the same user's two hooks (which `organization.ts` says do not
+   await each other) can interleave so that hook A's batch commits _after_ hook B passed
+   `firstOrganizationIdFor` with no rows and _before_ B calls `reserveSlug`: B then sees the base slug
+   taken, draws a random suffix and its batch **succeeds**, so the user ends with two workspaces and no
+   error. The only unique indexes are `organization_slug_unique` and
+   `member_organization_id_user_id_unique` (`src/server/db/auth-schema.ts` lines 238 and 255);
+   nothing is unique on `member.user_id`. The existing slug tests are sequential and reach neither.
 4. **The load-bearing configuration is asserted nowhere.** No test calls `authOptions()`. A refactor
    that adds `session.cookieCache`, moves `disabledPaths` into `admin({})`, reorders `plugins`, drops
    `storeInDatabase` or removes one provisioning hook keeps every current test green. The plan's
    `organization.test.ts` case "both hooks provision" is therefore unproven, and
    `secondary-storage.ts` (the 60 s floor, `increment`'s window, `getAndDelete`) has no test.
-5. **The two-dictionaries proof does not exist, and the plan asks for a forbidden construct.**
+5. **The two-dictionaries proof is not where the code says it is, and the plan asks for a forbidden construct.**
    `permissions.ts` line 14 says `permissions.test.ts` "holds a `@ts-expect-error` fixture proving one
    cannot be passed where the other is wanted"; it does not, and `AGENTS.md` forbids
    `@ts-expect-error` in any case. `tsc --noEmit` covers test files (`tsconfig.json` includes
-   `**/*.ts`), so a type-level assertion with `expectTypeOf` is checked by `pnpm typecheck`.
+   `**/*.ts`), so a type-level assertion with `expectTypeOf` is checked by `pnpm typecheck`. (The
+   claim is overstated rather than empty: `tenant-isolation.test.ts` line 690 already assigns `'curator'`
+   to the workspace role type under a `@ts-expect-error`, which is a pre-existing deviation from the
+   `AGENTS.md` rule and is not touched here. The new assertion states the property of the two
+   dictionaries as a whole, and does not depend on that line.)
 6. **The manual check is not repeatable.** "A manual sign-up against `wrangler dev` showing the session
    key in local KV and the workspace row in local D1" cannot be run unattended, and the Node harness
    cannot show that D1 accepts the SQL Drizzle generated (the purpose of the `workerd` project,
@@ -109,9 +118,10 @@ A stage with an unpinned decision is not delivered, so it is not marked delivere
 
 Four phases, one small pull request each. Stage `04-S1` is this whole spec.
 
-- **Phase 1.** `provisionPersonalWorkspace` retries its batch on a slug collision (detected from
-  database state, not from error text), reuses a concurrent winner for the same user, and the base
-  currency invariant gets its test.
+- **Phase 1.** `provisionPersonalWorkspace` gives a user's personal workspace a **deterministic id**
+  (so the primary key arbitrates a same-user race), retries its batch on a slug collision (detected
+  from database state, not from error text), reuses a concurrent winner for the same user, and the
+  base currency invariant gets its test.
 - **Phase 2.** `config.test.ts`, `secondary-storage.test.ts`, the role-dictionary type assertion, and
   the false claim in `permissions.ts` corrected.
 - **Phase 3.** `auth.workerd.test.ts`, one end-to-end sign-up in workerd, with a stated fallback.
@@ -140,17 +150,29 @@ tables (`23-S2`, `00-S14`); a passkey plugin (`04-S4` / `AUTH-09`, ADR 0011); se
   `config.test.ts` mocks `cloudflare:workers` and `./db` (the narrow exception the `server` project
   allows, precedent `src/server/fns/__tests__/attachments.test.ts`); `secondary-storage.test.ts`
   passes an in-memory KV fake as an argument; the workerd test uses the real bindings.
-- **Phase 1 algorithm.** Up to 4 attempts. Attempt 1 uses `reserveSlug`'s result. On a thrown batch
-  error, in this order: (1) `firstOrganizationIdFor(db, user.id)`; if it returns a workspace, return it
-  (the other hook won); (2) select the attempted slug from `organization`; if present, take the next
-  rung (a fresh `base-<nanoid(6)>`, the last rung `base-<nanoid(12)>`) and regenerate the
-  `organization` and `member` ids; (3) if the slug is absent, or the attempts are spent, **rethrow the
-  original error**. The error text is never parsed: SQLite and D1 report
-  `UNIQUE constraint failed: organization.slug`, which names columns and not the index, D1 wraps the
-  error again, and the harness rethrows the raw `node:sqlite` error, so a string match could pass in
-  the test and miss on D1 (`src/server/repos/notifications.ts` lines 16-30 say the same).
-- **The unique slug index stays the only thing that stops one user getting two workspaces.** That is
-  why step (1), the re-read, comes before any retry.
+- **One workspace per user is enforced by the primary key.** The personal workspace's
+  `organization.id` is a pure function of the user id: `personalWorkspaceId(userId)`, 24 URL-safe
+  characters (the shape of every id in the auth tables), for example the first 24 characters of the
+  base64url SHA-256 of a fixed prefix plus the user id, via `crypto.subtle` (available in Workers and
+  Node). Two concurrent provisions for one user therefore insert the same primary key and exactly one
+  batch commits, whichever slug each drew. No migration: the id is an ordinary text value, and
+  accounts that already have a workspace keep theirs (they are found by `firstOrganizationIdFor`
+  before any insert).
+- **Phase 1 algorithm.** Up to 4 attempts around `db.batch` only. Attempt 1 uses the deterministic id
+  and `reserveSlug`'s result. On a thrown batch error, in this order: (1)
+  `firstOrganizationIdFor(db, user.id)`; if it returns a workspace, return it (the other hook won);
+  (2) select the attempted `organization.id`; if present, that id is held by a workspace this user has
+  no membership in (step 1 found none), so the next attempt uses a random `nanoid(24)` id, which keeps
+  sign-in from ever being blocked in that state at the price of the race protection (Edge Cases);
+  (3) select the attempted slug; if present, take the next rung (a fresh `base-<nanoid(6)>`, the last
+  rung `base-<nanoid(12)>`) and regenerate the `member` id; (4) if neither is present, or the attempts
+  are spent, **rethrow the original error**. The error text is never parsed: SQLite and D1 report
+  `UNIQUE constraint failed: organization.slug` (or `organization.id`), which names columns and not
+  the index, D1 wraps the error again, and the harness rethrows the raw `node:sqlite` error, so a
+  string match could pass in the test and miss on D1 (`src/server/repos/notifications.ts` lines
+  16-30 say the same). A batch that succeeds ends the loop.
+- **The re-read comes before any retry** because after a primary-key failure the winner's workspace
+  is the right answer for this user, and only the re-read can tell.
 
 ## 📝 Data Model
 
@@ -191,8 +213,14 @@ auth screens and their accessibility obligations, including the 3.3.9 claim of
 
 - **Two sign-ups with the same name at the same instant.** The loser's batch fails; the slug it tried
   is now present; it retries on the next rung and lands one workspace with a different slug.
-- **One user, both hooks at once.** The loser's batch fails (the winner's slug is the same base); the
-  re-read finds the winner's workspace and returns its id; exactly one workspace and one membership.
+- **One user, both hooks at once, either interleaving.** Both batches carry the same primary key, so
+  one commits and the other fails; the re-read finds the winner's workspace and returns its id. This
+  holds when the loser had already drawn the base slug, and when it drew a suffixed slug because the
+  winner had committed first. Exactly one workspace and one membership.
+- **The deterministic id is held by a workspace the user has no membership in** (possible only if
+  their owner membership was removed from their own personal workspace). The re-read finds nothing,
+  the id is present, and the next attempt uses a random id so the user is never locked out. This
+  state is outside the race protection; a test pins that sign-in still lands a workspace.
 - **A batch fails for any other reason** (a foreign-key failure for a vanished user, say). The attempted
   slug is absent, the original error is rethrown, and the loop cannot spin. The rolled-back batch
   leaves no `organization`, `member` or `organization_currencies` row.
@@ -211,7 +239,7 @@ auth screens and their accessibility obligations, including the 3.3.9 claim of
 
 | Risk                                                                                         | Mitigation                                                                                                                                                                                          |
 | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The retry loop duplicates a workspace for one user.                                          | The re-read of `firstOrganizationIdFor` comes before any retry; a same-user race test asserts one workspace and one membership (Phase 1 step 1).                                                    |
+| The retry loop, or a race between the two hooks, gives one user two workspaces.              | The workspace id is deterministic per user, so the primary key arbitrates; the re-read of `firstOrganizationIdFor` precedes any retry; three same-user race tests (Phase 1 step 1).                 |
 | A string match on the collision error passes in the harness and misses on D1.                | Collision is detected from database state (the attempted slug is present), never from the message.                                                                                                  |
 | The fixed PLN base surprises a non-Polish household, and v1 cannot change a base afterwards. | Recorded as a product decision (row 1, ADR 0011 amendment); `26-S*` onboarding is where a base is chosen for workspaces it creates; the auto-provisioned personal workspace stays PLN until then.   |
 | The workerd test makes the suite slow or flaky.                                              | Timeboxed with a stated fallback; one file; it runs in `pnpm test:workerd`, which CI already runs.                                                                                                  |
@@ -242,28 +270,46 @@ None. This change adds no user-facing string, so no key lands in the EN or PL ca
 | 1     | Slug retry on collision, the base-currency invariant test                            | `src/server/auth/organization.ts`, `src/server/auth/__tests__/organization.test.ts`                                                                                                             |
 | 2     | Configuration and hooks pinned, KV adapter tested, role dictionaries proved separate | `src/server/auth/__tests__/config.test.ts`, `src/server/auth/__tests__/secondary-storage.test.ts`, `src/server/auth/__tests__/permissions.test.ts`, `src/server/auth/permissions.ts` (docblock) |
 | 3     | End-to-end sign-up in workerd (timeboxed)                                            | `src/server/auth/__tests__/auth.workerd.test.ts`, `vitest.config.ts` (workerd `miniflare.bindings`)                                                                                             |
-| 4     | Plan block, ADR 0011 amendment, hand-offs, `Delivered:` line                         | `docs/plans/04-auth-and-tenancy.md`, `docs/adr/0011-better-auth-kv-sessions-no-cookie-cache.md`                                                                                                 |
+| 4     | Plan block, ADR 0011 amendment, hand-offs, `Delivered:` line                         | `docs/plans/04-auth-and-tenancy.md`, `docs/adr/0011-better-auth-with-kv-session-store.md`                                                                                                       |
 
-Four tickets. The slicer may merge Phases 1 and 2 into one pull request; step 15 says what to do about
-the `Delivered:` line then.
+Four tickets. Phases 1, 2 and 3 are independent of each other. **Phase 4 is blocked by Phases 1 to 3**:
+its `Delivered:` evidence needs their pull request numbers and test counts, so the slicer must not run
+it in parallel. The slicer may merge Phases 1 and 2 into one pull request; that leaves Phase 3 and
+Phase 4 as separate follow-up tickets, and step 15 says what to do about the `Delivered:` line when
+the phases were merged.
 
 ## 📋 Implementation Plan
 
 ### Phase 1
 
 1. **Write the tests first** (`tdd` skill), in `src/server/auth/__tests__/organization.test.ts` with
-   `openAuthTestDb()` and `seedUser`:
-   - _a concurrent slug collision lands one workspace_: wrap the harness database in a `Proxy` whose
-     `batch` first inserts an `organization` with the slug `reserveSlug` just returned (via
-     `seedOrganization`), then delegates. Assert `provisionPersonalWorkspace` resolves, exactly one
-     workspace belongs to the user, its slug differs from the clashing one, and it has its owner
-     `member` row and its currency rows.
-   - _a same-user race reuses the winner's workspace_: the proxy's `batch` first provisions the same
-     user through the unwrapped database, then delegates. Assert the returned id equals the winner's,
-     there is one workspace and one membership.
-   - _a failure that is not a slug collision rethrows and cannot loop_: provision for a user id with no
-     `user` row (the `member` foreign key fails); assert the call rejects, the batch ran once, and no
-     `organization`, `member` or `organization_currencies` row exists.
+   `openAuthTestDb()` and `seedUser`. The injecting tests wrap the harness database in a `Proxy` that
+   overrides `batch` only, counts its calls, and **fires its side effect on the first call only** (a
+   flag), because a retried batch goes through the same `Proxy`:
+   - _a concurrent slug collision lands one workspace_: the first `batch` call first inserts, via
+     `seedOrganization`, an `organization` with the slug `personalWorkspaceSlug(user)` (the base slug
+     `reserveSlug` returns on a free database; the `Proxy` never sees the slug itself), then delegates.
+     Assert `provisionPersonalWorkspace` resolves, exactly one workspace belongs to the user, its slug
+     differs from the clashing one, and it has its owner `member` row and its currency rows.
+   - _a same-user race reuses the winner's workspace, the loser having drawn the base slug_: the first
+     `batch` call first provisions the same user through the unwrapped database, then delegates.
+     Assert the returned id equals the winner's, there is one workspace and one membership.
+   - _a same-user race reuses the winner's workspace, the loser having drawn a suffixed slug_: the
+     winner commits **before** the loser's `reserveSlug` runs (the `Proxy` also overrides the `select`
+     path, or the test provisions the user between a first `firstOrganizationIdFor` and the call, so
+     that the loser sees the base slug taken). Assert the loser's batch fails on the primary key, the
+     returned id is the winner's, there is one workspace and one `member` row for the user, and
+     `batch` was called as many times as attempts were needed (at most the winner's, plus the
+     loser's one).
+   - _a successful batch ends the loop_: with no injection, `batch` was called exactly once.
+   - _a deterministic id held by a foreign workspace does not lock the user out_: pre-insert an
+     `organization` with `personalWorkspaceId(user.id)` and no membership for the user; assert the
+     call resolves with a different id, one membership for the user.
+   - _`personalWorkspaceId` is a pure function_: same user id, same id; different user ids, different
+     ids; 24 characters from the URL-safe alphabet.
+   - _a failure that is not a collision rethrows and cannot loop_: provision for a user id with no
+     `user` row (the `member` foreign key fails); assert the call rejects, the test's own counter
+     shows `batch` ran once, and no `organization`, `member` or `organization_currencies` row exists.
 2. **Add the money-invariant case** in the same file, named for what it holds: "_a provisioned
    workspace always has exactly one base currency_". After `provisionPersonalWorkspace`: exactly one
    `organization_currencies` row with `is_base = 1` for the workspace; its code is a row of the
@@ -271,12 +317,14 @@ the `Delivered:` line then.
    `is_base = 0`; the row set equals `DEFAULT_WORKSPACE_CURRENCY_CODES` and the base equals
    `DEFAULT_BASE_CURRENCY_CODE` (read from the constants); and the failed-batch case of step 1 leaves
    none of them behind.
-3. **Implement** the loop in `provisionPersonalWorkspace` as the Architecture section describes: at
-   most 4 attempts around `db.batch` only; on failure the re-read, then the slug-present check, then
-   the next rung; ids regenerated per attempt; the original error rethrown when neither applies.
-   Update the `reserveSlug` docblock so it no longer claims the ladder alone prevents a failed insert,
-   and the `provisionPersonalWorkspace` docblock to describe the retry. Do not parse the error message
-   and do not name the index.
+3. **Implement** `personalWorkspaceId(userId)` (exported, pure, async because of `crypto.subtle`) and
+   the loop in `provisionPersonalWorkspace` as the Architecture section describes: the deterministic
+   id on the first attempt, at most 4 attempts around `db.batch` only; on failure the re-read, then
+   the id-present check, then the slug-present check, then the next rung; the `member` id regenerated
+   per attempt; the original error rethrown when no check applies. Update the `reserveSlug` docblock
+   so it no longer claims the ladder alone prevents a failed insert, and the
+   `provisionPersonalWorkspace` docblock to say the primary key is what keeps it to one workspace per
+   user. Do not parse the error message and do not name an index.
 4. **Run the gate**:
    `node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>console.log(c))"` and
    every command in the order printed, on the final commit. No `.skip`, `.only`, `.todo`, no
@@ -308,8 +356,11 @@ Tenant-isolation test: none, no repository function (above). Money invariant: st
      with their windows;
    - `advanced.cookiePrefix` is `mtr`; `advanced.database.generateId()` returns 24 characters;
      `secondaryStorage` is defined;
-   - _both provisioning hooks provision_: seed a user with `seedUser`; call
-     `databaseHooks.user.create.after({ id })` and assert one workspace and one owner membership; on a
+   - _both provisioning hooks provision_: both hooks are optional in Better Auth's option type and take
+     a full user or session record plus an optional context, and `advanced.database.generateId` is a
+     union, so the test narrows each (a typed fixture, a guard that throws when the hook is absent) and
+     passes `pnpm typecheck` without `@ts-expect-error` or `as any`. Seed a user with `seedUser`; call
+     `databaseHooks.user.create.after(user)` and assert one workspace and one owner membership; on a
      second user call `databaseHooks.session.create.before({ userId, ... })` and assert it returns data
      whose `activeOrganizationId` is that user's workspace and that one workspace exists; calling both
      for one user leaves one workspace; `session.create.before` for a vanished user returns nothing.
@@ -326,7 +377,9 @@ Tenant-isolation test: none. Money invariant: none, no amount.
 ### Phase 3
 
 9. **Add `BETTER_AUTH_SECRET` and `EMAIL_API_KEY` to the workerd project's `miniflare.bindings`** in
-   `vitest.config.ts`: an obviously fake secret literal (at least the length Better Auth accepts), and
+   `vitest.config.ts`: a secret literal that is plainly a non-secret test value (at least the length
+   Better Auth accepts, carrying the words `test-only`, and different from any real deployment value, so
+   neither a secret scanner nor a reviewer mistakes it for a leak), and
    `EMAIL_API_KEY: ''` so a developer's local `.dev.vars` cannot turn the test into a real send.
    Read no `.dev.vars*`, edit no `wrangler.jsonc`.
 10. **`src/server/auth/__tests__/auth.workerd.test.ts`** (`*.workerd.test.ts`, the `workerd` project,
@@ -352,7 +405,8 @@ Tenant-isolation test: none. Money invariant: none, no amount.
       tests of this spec, `__tests__/harness.ts`, and the existing `permissions.test.ts`; note that
       `organization.ts` writes `organization_currencies` outside `src/server/repos` by design.
     - Server: plugins are `admin`, `twoFactor`, `organization` with `admin` first; the rate-limit table
-      has seven rules, the four of ADR 0011 first; the retry ladder is a retry on the batch (Phase 1);
+      has seven rules, the four of ADR 0011 first; the retry ladder is a retry on the batch (Phase 1), and **one workspace per user is held by the
+      deterministic personal-workspace id (a primary key), not by the slug index**;
       `permits(actor, request)` is the real signature.
     - Money invariant: replace `organization_settings.base_currency_code` and "defaulted from the
       negotiated locale's country" with `organization_currencies.is_base`, the fixed PLN default and
@@ -368,7 +422,8 @@ Tenant-isolation test: none. Money invariant: none, no amount.
       not exist. Change nothing else in those blocks.
 14. **Amend ADR 0011** with an `## Amendment` section (amend, never rewrite): the personal workspace's
     base currency is a fixed PLN with EUR, USD and GBP beside it; the rate-limit rules are the seven in
-    `config.ts`; the plugin list is `admin`, `twoFactor`, `organization`; the passkey plugin is not yet
+    `config.ts`; the plugin list is `admin`, `twoFactor`, `organization`; one workspace per user is held by the
+    deterministic personal-workspace id, not by the slug index; the passkey plugin is not yet
     installed (`04-S4`). Cite the pull requests of Phases 1 to 3.
 15. **Add the `Delivered:` line** directly under `## Stage 04-S1` in the plan:
     `Delivered: <YYYY-MM-DD> - <evidence>`, dated the day Phase 4 is written, naming the paths, the
@@ -378,7 +433,7 @@ Tenant-isolation test: none. Money invariant: none, no amount.
     commit once it is known. Change nothing outside the blocks named in steps 13 and 14 (the stage
     register of `docs/plans/README.md` is not edited).
 16. **Run the gate** as in step 4, plus
-    `pnpm exec prettier --check docs/plans/04-auth-and-tenancy.md docs/adr/0011-better-auth-kv-sessions-no-cookie-cache.md`
+    `pnpm exec prettier --check docs/plans/04-auth-and-tenancy.md docs/adr/0011-better-auth-with-kv-session-store.md`
     (`pnpm check` cannot be scoped to files).
 
 ## 📝 Resolved assumptions (autonomous defaults)
@@ -396,3 +451,7 @@ before merge by saying so on the spec PR.
 | 6   | Does Phase 4 add the `Delivered:` line, and when?                                                                 | **Yes, as its last step, after Phases 1 to 3 have merged.**                                                                                                                                                                                                                           | `docs/plans/TEMPLATE.md` and `docs/plans/README.md` define the line; it stops `backlog-status.mjs --plan` offering the stage. Last keeps the marker true.                                                                                                                                                                                                                                                                                                                                                                     |
 | 7   | Is the stage covered elsewhere?                                                                                   | **No.**                                                                                                                                                                                                                                                                               | `grep -rn "04-S1" .ai/specs` found nothing; every issue and pull request (state all, 400 of each) was filtered for the string `04-S1` and none matched; the open pull requests are two Dependabot branches; the plan has no `Delivered:` line.                                                                                                                                                                                                                                                                                |
 | 8   | Which numbers in this spec are measured?                                                                          | `67` tests in `4` files: `pnpm vitest run src/server/auth --project=server` (`Test Files 4 passed`, `Tests 67 passed`). By file (verbose reporter): `email` 17, `guards` 14, `organization` 16, `permissions` 20. Seven rate-limit rules: counted in `RATE_LIMIT_RULES`, `config.ts`. | `docs/SPEC.md` §7.7: every number came from a command whose output was read. Phase 4's evidence line re-measures them in its own pull request rather than copying these.                                                                                                                                                                                                                                                                                                                                                      |
+| 9   | How is "one workspace per user" held when the slug index does not hold it?                                        | **A deterministic personal-workspace id (a pure function of the user id), so the primary key arbitrates; the re-read precedes any retry; a foreign-held id falls back to a random id so sign-in is never blocked.**                                                                   | Decided by security-tenancy-reviewer sub-agent (confidence high) and found independently by the product owner in round 1: the only unique indexes are on `organization.slug` and `(organization_id, user_id)`, and one interleaving of the two hooks succeeds with a different suffixed slug and no error. Conditions applied: the false sentence in Architecture and Risks replaced; a third same-user race test; Phase 4 states the mechanism; no migration.                                                                |
+| 10  | Product owner: approve this spec?                                                                                 | **Round 1: approve with conditions, applied. Round 2: pending.**                                                                                                                                                                                                                      | Decided by product-owner sub-agent (confidence medium): claims verified against the repository; four tickets is the right size. Round 1 conditions applied: the same-user race with a taken base slug is closed (row 9); the Problem item on the dictionaries acknowledges `tenant-isolation.test.ts` line 690; Phasing says Phase 4 is blocked by Phases 1 to 3 and what a merged Phases 1+2 ticket leaves.                                                                                                                  |
+| 11  | Software architect: approve this spec?                                                                            | **Round 1: approve with conditions, applied. Round 2: pending.**                                                                                                                                                                                                                      | Decided by software architect sub-agent (confidence high): respects ADR 0002, 0011, 0015 and `AGENTS.md`; the harness, the mocks and the plugin ids (`admin`, `two-factor`, `organization`) check out. Round 1 conditions applied: the ADR 0011 path corrected to `docs/adr/0011-better-auth-with-kv-session-store.md`; the `Proxy` fires once, the clashing slug is `personalWorkspaceSlug(user)` and the test counts `batch` calls; the hook typing and `generateId` narrowing without `@ts-expect-error`.                  |
+| 12  | Security and tenancy reviewer: approve this spec?                                                                 | **Round 1: approve with conditions, applied. Round 2: pending.**                                                                                                                                                                                                                      | Decided by security-tenancy-reviewer sub-agent (confidence high): the retry loop cannot create a workspace without an owner; no guard, tenant id or secret is weakened. Round 1 conditions applied: row 9; the third race test with the loser drawing a suffixed slug; Phase 4 names the mechanism; the test secret is marked `test-only`.                                                                                                                                                                                    |
