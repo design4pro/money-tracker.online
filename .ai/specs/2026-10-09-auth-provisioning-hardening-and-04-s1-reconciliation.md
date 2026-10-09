@@ -4,7 +4,7 @@
 | ------------------ | ----------------------------------------- |
 | **Status**         | ready                                     |
 | **Issue**          | none                                      |
-| **Spec PR**        | #TBD                                      |
+| **Spec PR**        | #612                                      |
 | **Implementation** | none                                      |
 | **Plan**           | 04-S1 (docs/plans/04-auth-and-tenancy.md) |
 
