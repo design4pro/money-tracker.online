@@ -2,8 +2,9 @@
  * Better Auth secondary storage backed by the `SESSIONS` KV namespace.
  *
  * Sessions, OAuth state and rate-limit counters live at the edge so the hot read path never touches
- * D1; D1 remains the durable record, so a KV miss degrades to a slower read rather than to a
- * signed-out user (ADR 0011).
+ * D1. Sessions live here only: `session.storeSessionInDatabase` is unset, so a KV miss (an expired
+ * or evicted record) means signing in again, not a fall-through to D1. D1 holds the verification
+ * rows and the other auth tables (ADR 0011, Amendment).
  *
  * `increment` is a read-modify-write and **not** an atomic operation — KV offers no compare-and-swap
  * — so a burst arriving inside one eventual-consistency window can undercount. Better Auth's rate

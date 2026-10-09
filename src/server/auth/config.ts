@@ -145,7 +145,8 @@ export function authOptions(): BetterAuthOptions {
 
     /**
      * Sessions, OAuth state and rate-limit counters read from KV at the edge instead of from D1
-     * on the other side of the network (ADR 0011). D1 stays the durable record.
+     * on the other side of the network (ADR 0011). Sessions live in KV only: a miss means signing in
+     * again. D1 holds the verification rows and the other auth tables.
      */
     secondaryStorage: createKvSecondaryStorage(sessionStore()),
 
@@ -155,9 +156,11 @@ export function authOptions(): BetterAuthOptions {
       /**
        * **No `cookieCache`.** It puts a signed copy of the session in the cookie and serves reads
        * from it for its lifetime, which means a ban, a sign-out-everywhere or a role change is not
-       * visible until it expires. `requireOrg` re-reads the membership on every call precisely so
-       * that revocation is immediate; caching the session in the cookie would undo that for the
-       * user record while leaving the membership fresh, which is the worst of both.
+       * visible until it expires. `requireOrg` re-reads the membership on every call, so a workspace
+       * role change applies on the next call. A ban and the platform role are read from the session
+       * record held in KV, so they take effect when that record is rewritten or deleted, bounded by
+       * KV propagation. Caching the session in the cookie would put them behind the cookie's
+       * lifetime instead while leaving the membership fresh, which is the worst of both.
        */
     },
 

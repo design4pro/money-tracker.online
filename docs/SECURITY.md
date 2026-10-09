@@ -66,16 +66,24 @@ product decision (`docs/adr/0008-no-bank-connectors.md`), not a control we could
 
 ## 4. Authentication
 
-Better Auth, with sessions in the `SESSIONS` KV namespace.
+Better Auth, with sessions in the `SESSIONS` KV namespace. Sessions live there only: a session that
+has expired or been evicted means signing in again, and D1 holds the verification rows and the other
+auth tables, not the session (ADR 0011, Amendment).
 
 - **No cookie session cache.** Better Auth's `cookieCache` puts a signed session snapshot in a
   cookie; that is a five-minute window in which a banned account, or one whose role was just
-  reduced, keeps its old authority. The KV read on every request is the price of that being false.
+  reduced, keeps its old authority. Without it, the workspace role is read from the `member` row on
+  every call, so a demotion applies to the next call. A ban and the platform role are read from the
+  session record held in KV, so they take effect when Better Auth rewrites or deletes that record,
+  bounded by KV propagation.
 - **Verification records are stored in the database**, not held in a cookie.
-- **Rate limits are per path**, not global: `/sign-in/email` 10 per 60s, `/sign-up/email` 5 per 300s,
-  `/request-password-reset` 5 per 300s, `/two-factor/verify-totp` 10 per 60s. Counters live in KV
-  with a 60s TTL floor.
-- **Passkeys** (WebAuthn) are first-class, with our own plugin. **TOTP two-factor** is available and
+- **Rate limits are per path**, seven rules on top of a global default of 100 per 60s:
+  `/sign-in/email` 10 per 60s, `/sign-up/email` 5 per 300s, `/request-password-reset` 5 per 300s,
+  `/reset-password` 10 per 300s, `/send-verification-email` 5 per 300s, `/two-factor/verify-totp`
+  10 per 60s and `/two-factor/verify-backup-code` 5 per 300s. Counters live in KV with a 60s TTL
+  floor and are approximate: a courtesy guard that can undercount, not a hard limit.
+- **Passkeys** (WebAuthn): the passkey plugin is not installed yet and arrives with `04-S4`; the
+  plugins today are `admin`, `twoFactor` and `organization`. **TOTP two-factor** is available and
   its recovery codes are shown once.
 - **There is no CAPTCHA anywhere**, which is both an accessibility commitment
   (`docs/ACCESSIBILITY.md` §3.5) and a deliberate choice to rate-limit server-side instead.
