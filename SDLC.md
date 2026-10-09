@@ -4,7 +4,7 @@
 
 This file documents how work flows from ticket to merged PR in this repository. The agent skills configured in `.ai/agentic.config.json` enforce the process; humans read it here. Issues and PRs live in GitHub, with every tracker operation the skills run defined in `.ai/trackers/github.md` (edit that file to extend or override tracker behavior).
 
-Everything above the `BEGIN per-repo` marker near the end of this file is shared, word for word, with the sibling repositories that run this pipeline; `## This repository`, below that marker, is the only section that differs. So this document never names the base branch, the merge mechanics, or the automations by hand: **the base branch is `.ai/agentic.config.json` → `baseBranch`, and it is named once, in `## This repository`.** Everything below that says "the base branch" means that value.
+Everything above the `BEGIN per-repo` marker near the end of this file is written to be shareable with the sibling repositories that run this pipeline; `## This repository`, below that marker, is the section that is specific to this repository. Nothing checks either half against a sibling: ADR 0027 (decision 6 and Consequences) deleted the text-parity test, so the halves may drift, and review is what catches it. So this document never names the base branch, the merge mechanics, or the automations by hand: **the base branch is `.ai/agentic.config.json` → `baseBranch`, and it is named once, in `## This repository`.** Everything below that says "the base branch" means that value.
 
 Work enters through two paths: a free-form task brief handed to an agent, or a filed ticket. Both converge on the same review loop, the same validation gate, and the same merge rules.
 
@@ -15,7 +15,7 @@ Before intake, the work is shaped: `om-discover` establishes the product context
 - **Author** — the human or agent who writes the change. Owns the ticket from claim to a merge-ready PR.
 - **Reviewer** — reads the diff and approves or requests changes. May be a human or the `om-auto-review-pr` skill; the `om-code-review` checklist applies either way. The reviewer is also the second person a `risk-high` change needs and signs off the spec when a feature requires one; a team that names a tech lead or an architect puts them here.
 - **Designer** — owns the flow and its states before the code exists, and the design contract the UI review reads back. May be a human, `om-ux-shape` for the shaping, `om-ux-review-pr` for the pass over a PR's screens.
-- **QA reviewer** — exercises user-facing changes before they merge, with `om-prepare-test-env` to boot the app once and `om-auto-qa-pr` to walk it in a real browser. Manual means a person judges the result and owns `qa-approved`; it does not mean the work is unassisted. Always referenced by role, never by name or handle: assignments change.
+- **QA reviewer** — exercises user-facing changes before they merge, with `om-prepare-test-env` to boot the app once and `om-auto-qa-pr` to walk it in a real browser. Manual means a person judges the result and can grant `qa-approved`; it does not mean the work is unassisted. Unattended, a specialist panel is the QA reviewer (ADR 0031). Always referenced by role, never by name or handle: assignments change.
 - **Product owner** — owns the why and the value: the product brief, the scope split (now, later, not doing), the success criteria, and the ticket-level tier of the Definition of Ready. Confirms the brief before it is written and the backlog tree before it is filed; owns every product decision in the brief that names no other owner. Referenced by role, never by name. <!-- discovery -->
 - **Maintainer** — owns branch protection, the label taxonomy, the config, this document, and the installed skills with their repo-local overrides under `.ai/skills/`; arbitrates when gates conflict. Acts as the release manager unless the team names one.
 
@@ -130,7 +130,7 @@ When signals conflict, pick the higher label and say why in the label comment. A
 
 No label says an issue is ready, and no label starts a run. The taxonomy above is the whole vocabulary; readiness is computed.
 
-An issue is **ready** when all of these hold: it is open; a maintainer opened it (the `authors` gate of the issue automations) and it was not filed from production error data (a `sentry-issue` marker); its body or a maintainer's comment carries an `## Agent Brief`; it has a category, a priority and a risk label; every issue under its `Blocked by` is closed; no PR addresses it, open or merged and not yet closed (`develop` is not the default branch, so a merge does not close the issue by itself; an issue a person deliberately reopens after its PR merged stays out of `--next` until that PR ages out of the 30 most recent merged ones, or a person starts the run from the cockpit); no 🤖 not-ready or `STOP:` comment waits for an answer; and it carries none of `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. A later trusted `🤖 RESOLVED:` comment (what `afk-unblock` posts) answers a not-ready or `STOP:` comment, as a human reply does. A comment that says `HUMAN-ONLY:` names what only a person can do, and no run is started on that issue. `.ai/scripts/backlog-status.mjs` is the one implementation of that rule. It prints the report a person reads, with `--next` it picks the issue the next `implement-ticket` run takes: highest priority first, then oldest, and nothing while three PRs are **waiting for a person**, and with `--plan` it lists everything the Reconciler may start right now (§ The Reconciler, ADR 0030). A PR waits for a person when it is open, by a maintainer, not the `develop` -> `main` promotion (base `main`), and it is `needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours (an autopilot that stopped at `changes-requested` is parked on a decision no run is making): those are the PRs only a person can move. A PR the pipeline merges by itself (`review`, a fresh `changes-requested`, `merge-queue`, a plain draft) is not inventory, so it does not hold back the next implementation. Trusted authors are the `authors` gates of the issue automations plus the retired `design4pro-agent`, every issue of which came out of an agent run (ADR 0027, amendment of 2026-10-01).
+An issue is **ready** when all of these hold: it is open; a maintainer opened it (the `authors` gate of the issue automations) and it was not filed from production error data (a `sentry-issue` marker); its body or a maintainer's comment carries an `## Agent Brief`; it has a category, a priority and a risk label; every issue under its `Blocked by` is closed; no PR addresses it, open or merged and not yet closed (`develop` is not the default branch, so a merge does not close the issue by itself; an issue a person deliberately reopens after its PR merged stays out of `--next` until that PR ages out of the 30 most recent merged ones, or a person starts the run from the cockpit); no 🤖 not-ready or `STOP:` comment waits for an answer; and it carries none of `blocked`, `do-not-merge`, `do-not-close` or `in-progress`. A later trusted `🤖 RESOLVED:` comment (what `afk-unblock` posts) answers a not-ready or `STOP:` comment, as a human reply does. A comment that says `HUMAN-ONLY:` names what only a person can do, and no run is started on that issue. `.ai/scripts/backlog-status.mjs` is the one implementation of that rule. It prints the report a person reads, with `--next` it picks the issue the next `implement-ticket` run takes: highest priority first, then oldest, and nothing while three PRs are **waiting for a person**, and with `--plan` it lists everything the Reconciler may start right now (§ The Reconciler, ADR 0030). A PR waits for a person when it is open, by a maintainer, not the `develop` -> `main` promotion (base `main`), and it is `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours (an autopilot that stopped at `changes-requested` is parked on a decision no run is making): those are the PRs only a person can move. A PR the pipeline merges by itself (`review`, a fresh `changes-requested`, `merge-queue`, a plain draft) is not inventory, so it does not hold back the next implementation. Trusted authors are the `authors` gates of the issue automations plus the retired `design4pro-agent`, every issue of which came out of an agent run (ADR 0027, amendment of 2026-10-01).
 
 - **How an issue gets there.** Opening it starts grooming and triage in one run: `om-auto-manage-issues` adds the SDLC labels, the Definition of Ready check and implementation notes, then `afk-triage` writes the Agent Brief, or puts a `blocked` hold on it with a comment that starts `🤖 HUMAN-ONLY:` and names the one thing a person must do. One run, two steps, so the two never race on the same labels. `afk-to-tickets` files tickets whose body is their brief; `afk-plan-to-spec` writes the spec for a stage of `docs/plans/` that nothing covers yet, which `afk-to-tickets` then slices.
 - **How it leaves a hold.** A hold an agent set that does not say `HUMAN-ONLY:` is offered to `afk-unblock`, which asks a specialist (§ Delegated decisions): on a verdict it removes `blocked` and posts `🤖 RESOLVED:`, otherwise it posts `🤖 HUMAN-ONLY:` and leaves the hold. A hold a person set, or a person commented on last, and a `HUMAN-ONLY:` one stay until a person removes `blocked`; that event grooms and triages the issue again.
@@ -146,9 +146,9 @@ The one hard rule of this process: **a PR carrying `needs-qa` must not merge unt
 - `skip-qa` is the explicit opt-out for docs-only, dependency-only, CI-only, test-only, and similarly low-risk non-user-facing changes. Never combine it with `needs-qa`.
 - `qa-failed`, `do-not-merge`, and `blocked` are hard blocks regardless of every other signal. An active `qa` pipeline label means a tester is on the PR right now — never merge under an active tester.
 - The gate is satisfied when a QA reviewer tests the PR and applies `qa-approved`.
-- **Unattended sign-off**: below `risk-high`, the unattended run is the QA reviewer. `om-auto-qa-pr --self-qa-signoff` attaches the evidence, a QA specialist sub-agent judges it (`.ai/skills/afk-decide/SKILL.md`), and on its approving verdict the run applies `qa-approved` + `qa-self-verified` under the self-QA exception below. A `risk-high` PR gets the same evidence and verdict, and the owner applies `qa-approved`.
+- **Unattended sign-off**: the unattended run is the QA reviewer for every PR, `risk-high` and `security` included (owner decision 2026-10-06, ADR 0031). `om-auto-qa-pr --self-qa-signoff` attaches the evidence, a panel of specialist sub-agents judges it (`.ai/skills/afk-decide/SKILL.md`; the security and tenancy reviewer sits on it for a `risk-high` or `security` PR), and on every member's approving verdict the run applies `qa-approved` + `qa-self-verified`; the self-QA exception below is for a person signing off, not for this panel. A rejection goes to `om-auto-fix-pr` and QA again, at most three rounds; then the PR is `blocked` for a person (`.ai/skills/om-pr-autopilot/SKILL.md`).
 - **Self-QA exception**: when no QA reviewer has capacity in time, any engineer may sign off instead, on a `risk-low` or `risk-medium` PR only — but only by (1) checking the PR out and running it locally, (2) exercising the affected flow, and (3) attaching evidence to the PR that names the scenario exercised, the environment, the test data, the observed result, and the negative cases tried. Then apply both `qa-approved` (so the merge skills treat QA as done) and `qa-self-verified` (so the exception is auditable). No evidence, no `qa-approved`.
-- **No self-QA on `risk-high`.** A PR labeled `risk-high`, or one whose diff touches auth, sessions, data scoping, money, schema migrations, or shared contracts (the `risk-high` inference above), needs a QA reviewer, or a maintainer's explicit exception stated on the PR.
+- **No self-QA by a person on `risk-high`.** A PR labeled `risk-high`, or one whose diff touches auth, sessions, data scoping, money, schema migrations, or shared contracts (the `risk-high` inference above), needs a QA reviewer, or a maintainer's explicit exception stated on the PR, when a person signs off. The unattended panel above signs it off too, with the security and tenancy reviewer on it (ADR 0031).
 
 ## The claim protocol
 
@@ -170,12 +170,12 @@ None of this touches the merge rules. Reporting early is safe; merging early is 
 
 ## The automation contract
 
-The `om-auto-*` skills run this process unattended and are chainable: each accepts the artifact the previous one produced (an issue id, a spec path, or a PR number from the `PR: #<number> (link: <url>)` reference line every PR-producing skill emits), and each detects work already started — an open PR referencing the issue or plan — and continues on it rather than opening a duplicate. A completed autonomous run leaves a **ready** (non-draft), fully labeled PR — one pipeline label, category, QA meta, one priority, one risk — with a run-summary comment and, for user-facing changes, screenshots from the working app attached as PR evidence. Draft PRs are reserved for explicitly incomplete states: spec-only design PRs, interrupted hand-offs, or autonomous defaults flagged for human confirmation. Automation applies `qa-approved` only through the unattended sign-off in the QA gate, never on a `risk-high` PR.
+The `om-auto-*` skills run this process unattended and are chainable: each accepts the artifact the previous one produced (an issue id, a spec path, or a PR number from the `PR: #<number> (link: <url>)` reference line every PR-producing skill emits), and each detects work already started — an open PR referencing the issue or plan — and continues on it rather than opening a duplicate. A completed autonomous run leaves a **ready** (non-draft), fully labeled PR — one pipeline label, category, QA meta, one priority, one risk — with a run-summary comment and, for user-facing changes, screenshots from the working app attached as PR evidence. Draft PRs are reserved for explicitly incomplete states: spec-only design PRs, interrupted hand-offs, or autonomous defaults flagged for human confirmation. Automation applies `qa-approved` only through the unattended sign-off in the QA gate, `risk-high` included (ADR 0031).
 
 Two properties bound the whole unattended loop, and both are worth stating plainly because they are what make it safe to leave running:
 
 - **Merge policy is repository-specific.** The pipeline's output is a reviewed PR; `## This repository` states who merges a reviewed PR and how.
-- **The cap is on inventory, not on rate.** `--next` and `--plan` start no implementation while three PRs wait for a person (`needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours), so a burst of intake cannot outrun the review only a person can give. Raising throughput means reviewing those PRs, not tuning the schedule.
+- **The cap is on inventory, not on rate.** `--next` and `--plan` start no implementation while three PRs wait for a person (`blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours; QA and risk labels are the agents', ADR 0031), so a burst of intake cannot outrun the review only a person can give. Raising throughput means reviewing those PRs, not tuning the schedule.
 
 ## Unattended decisions
 
@@ -224,9 +224,9 @@ This document and `.ai/agentic.config.json` describe the same process: change th
 
 Three amendment rules are specific to this document's shape:
 
-- **A change above the `BEGIN per-repo` marker is a change to every repository that shares this document.** Make it in all of them, or make it in `## This repository` instead. `diff` between two repositories' files, truncated at that marker, must be empty. The marker is the boundary — never a section count, which goes stale the first time a section is added, and was wrong here for as long as it was written down. Name the marker in prose the way this bullet does, without its comment syntax: a second literal copy of it above the real one is a false cut point, and truncating there silently drops every line between the two.
-- **A shared section may not point at a repo-relative path that is missing from any repository sharing it.** A bare path reads as "here", so a reader who follows it in a sibling finds nothing — that is how the intake-bridge spec, which exists in only one of these repositories, came to be cited as though it were local in every one of them. Name the repository that holds it, or move the sentence into `## This repository`. This binds a path a reader is sent to follow, not one named as an output the process writes or as a place that must _not_ repeat something.
-- **This file deliberately diverges from the `om-setup-agent-pipeline` SDLC template** by naming the base branch, the merge mechanics, the QA routing and the automations once, in `## This repository`, instead of rendering them throughout. Re-running that skill must not push those values back into the shared sections.
+- **A change above the `BEGIN per-repo` marker is a change to every repository that carries this text.** Make it in all of them, or make it in `## This repository` instead. No test compares the halves any more (ADR 0027), so a sibling that was not updated drifts until a reviewer notices. The marker is the boundary — never a section count, which goes stale the first time a section is added, and was wrong here for as long as it was written down. Name the marker in prose the way this bullet does, without its comment syntax: a second literal copy of it above the real one is a false cut point, and truncating there silently drops every line between the two.
+- **A section above the marker may not point at a repo-relative path that is missing from any repository that carries it.** A bare path reads as "here", so a reader who follows it in a sibling finds nothing — that is how the intake-bridge spec, which exists in only one of these repositories, came to be cited as though it were local in every one of them. Name the repository that holds it, or move the sentence into `## This repository`. This binds a path a reader is sent to follow, not one named as an output the process writes or as a place that must _not_ repeat something.
+- **This file deliberately diverges from the `om-setup-agent-pipeline` SDLC template** by naming the base branch, the merge mechanics, the QA routing and the automations once, in `## This repository`, instead of rendering them throughout. Re-running that skill must not push those values back into the sections above the marker.
 
 <!-- BEGIN per-repo -->
 
@@ -244,9 +244,9 @@ Three amendment rules are specific to this document's shape:
   Reconciler (§ The Reconciler); a PR is driven by its own automations. A person can start any
   workflow from the cockpit. The pipeline
   runs from a filed issue to a merged PR with nobody in it, and `implement-ticket` ends by running
-  `om-pr-autopilot --allow-merge`, which merges the PR into `develop`; QA below `risk-high` is
-  signed off by the run on a specialist's verdict, and a `risk-high` PR waits for the owner's
-  `qa-approved`. Beyond events and schedules, the Reconciler sweeps the backlog: it triages, one at
+  `om-pr-autopilot --allow-merge`, which merges the PR into `develop`; QA is signed off by the
+  run on a specialist panel's verdict, and a `risk-high` or `security` PR merges on the security
+  and tenancy reviewer's verdict on its diff (ADR 0031). Beyond events and schedules, the Reconciler sweeps the backlog: it triages, one at
   a time, an issue opened before an Agent Brief existed.
 - **Risk here.** `risk-high` means anything touching auth, tenant scoping, money, the ledger,
   billing, a migration, a protected decision document or a merge-policy surface. The label is
@@ -259,9 +259,8 @@ Three amendment rules are specific to this document's shape:
   reviewer takes the blind pair with
   `node scripts/visual/capture.mjs` at 360x800 and 1280x900 in both themes (ADR 0016);
   `om-auto-qa-pr` evidence complements it and never replaces it. An unattended run passes
-  `--self-qa-signoff` and signs off below `risk-high` on a QA specialist's approving verdict (the
-  unattended sign-off in the QA gate above, owner decision 2026-10-01); on `risk-high` the skill
-  produces the evidence and the owner grants `qa-approved`.
+  `--self-qa-signoff` and signs off on its specialist panel's approving verdicts (the unattended
+  sign-off in the QA gate above), `risk-high` included (owner decision 2026-10-06, ADR 0031).
 - **What a ticket contains** beyond the Definition of Ready: `docs/agents/issue-tracker.md` (tenant
   isolation test, money invariant, visual change expected).
 
@@ -382,13 +381,13 @@ the script refuses to delete an enabled stray.
   every label rule in this document is a convention that `om-merge-buddy` and
   `om-approve-merge-pr` read and the person merging honours, and nothing in CI enforces it
   (ADR 0027). The process label `merge-queue` is not a GitHub merge queue entry.
-- A `risk-high` PR gets a deeper review and no self-QA: when it is `needs-qa`, a human QA reviewer
-  applies `qa-approved`. Below `risk-high`, a `needs-qa` PR waits for `qa-approved` from the
-  unattended sign-off or a QA reviewer. Promotion from `develop` to `main` merges after the
+- A `risk-high` or `security` PR gets a deeper review: the security and tenancy reviewer sits on
+  its QA panel and judges its diff before it merges (ADR 0031). A `needs-qa` PR waits for
+  `qa-approved` from the unattended sign-off or a QA reviewer. Promotion from `develop` to `main` merges after the
   release decision.
 - `backlog-status.mjs --next` and `--plan` pick no implementation while three PRs are waiting for
-  a person (`needs-qa` without `qa-approved`, `risk-high`, `security`, `blocked`, `do-not-merge`, or
-  `changes-requested` with no update for 24 hours), and
+  a person (`blocked`, `do-not-merge`, or `changes-requested` with no update for 24 hours; QA and
+  risk labels are the agents', ADR 0031), and
   that cap is shared: a cockpit-started `issue-autofix` PR counts against it too, because every run
   publishes under the same `gh` identity. A PR the pipeline merges by itself does not count (ADR 0030),
   and neither does the promotion (base `main`).
@@ -396,9 +395,16 @@ the script refuses to delete an enabled stray.
   specialist's approving verdict (§ Delegated decisions), and the implementing automation still
   requires `risk-low` to start by itself. The PR still passes every review and QA gate above.
 - **Governance documents are `risk-high`.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`,
-  `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record decisions a human owns, and a
-  person reads the decision before merging a change to one. `.github/CODEOWNERS` routes the same
-  paths to a reviewer; both rulesets keep `require_code_owner_review: false`.
+  `docs/ACCESSIBILITY.md`, `docs/MONEY.md` and `docs/adr/` record decisions a human owns. A change
+  to one takes a second reviewer and merges on the security and tenancy specialist's verdict at the
+  head it judged (ADR 0031), not on a person's reading. `.github/CODEOWNERS` routes the same paths
+  to a reviewer, which is informational: both rulesets keep `require_code_owner_review: false`. For
+  such a change a person is the merger only where `afk-decide` § 5 and ADR 0031 name one: the
+  `develop` -> `main` promotion, a `do-not-merge` PR, and a PR `blocked` after the third failed
+  round.
+- A person's `qa-failed` or an active `qa` label stops a PR (ADR 0031 § Consequences) but is
+  deliberately not counted by the WIP cap: only `blocked`, `do-not-merge` and a parked
+  `changes-requested` count.
 - To stop it all, `cez automation pause <id>`, or start the cockpit with `CEZ_AUTOMATIONS=0`.
 
 **The agent layer is this repository's.** `.ai/cezar/workflows/`, `.ai/scripts/`,

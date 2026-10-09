@@ -5,7 +5,7 @@
 | **Status**         | in-progress |
 | **Issue**          | #363        |
 | **Spec PR**        | #364        |
-| **Implementation** | #537        |
+| **Implementation** | #537, #564  |
 
 ## 📝 TLDR
 
@@ -611,3 +611,47 @@ therefore lands that label's EN and PL entry in the same commit; there is no sep
 Every step leaves the application working and typechecking: steps 1-4 are additive to a screen that
 already renders, step 5 widens a projection nobody reads yet, steps 6-7 add a row kind and a read the
 list ignores until step 8 draws it, and every step that renders a key lands that key.
+
+## Amendment — what Phase 2 shipped differently (#535)
+
+Recorded so the design above and the product do not quietly disagree. The body is left as written.
+
+1. **The expected group is its own table, not rows of the ledger grid.** The Accessibility section
+   says "a real table row in the same table". The ledger is a virtualised `role="grid"` with one tab
+   stop, and the group's rows each carry two real buttons that must be reachable by Tab, so putting
+   them in the grid would break its keyboard model or need a second one. The group is a captioned
+   `<table>` (header row, the series name as the row header, the status as a word) under its own
+   heading, rendered inside `TransactionList`'s container through its `leading` slot so the
+   virtualiser re-measures where its rows start when the group changes height. An independent
+   accessibility specialist chose this over the same-table option (confidence high); the AA claim is
+   unchanged.
+2. **The per-currency expected figures are not in this phase.** Step 7 describes an
+   `expectedByCurrency` field and step 9 renders the figures beside `ListSummary`. Issue #535 split
+   them out to #563 (blocked by #535), so `loadPlannedScreen` returns the group
+   (`ExpectationGroup`: `shown | suppressed | failed`) and no totals, the keys
+   `transactions.planned.expected.in` and `.out` are not landed here, and the group's hint is the
+   only statement about totals. Step 9's guard is kept: a planned screen holding expectations
+   returns byte-identical `totals` to the same screen without them.
+3. **When the last row of the group is settled the group stays on screen** with
+   `transactions.planned.expected.none`, so the heading that focus recovery falls back to still
+   exists (WCAG 2.4.3). A group that never held a row is not drawn.
+4. **Plural machinery selects its branch from `count`.** `transactions.planned.expected.group` is
+   therefore parameterised `{count}` (days) and not `{days}`.
+5. **`transactions.planned.fromRecurring` was not added.** The series name is the row header, so
+   nothing would read it.
+6. **A third return origin, `planned`.** Mark paid from the planned screen sends the entry form's
+   Save back to `/transactions/planned?markPaid=…&series=…`, which reopens the picker once the group
+   has loaded. The brief's "list" origin returns to `/recurring`, which is the wrong screen here.
+7. **The empty state's pointer is a link under the description**, always shown on the empty planned
+   screen, because the screen does not know whether the workspace has series.
+8. **The per-currency expected figures shipped in #563, with the group and computed in the
+   component layer.** Step 9 says they sit beside `ListSummary` and step 7 says the planned read
+   returns an `expectedByCurrency` field. They are drawn inside the expected group, under their own
+   label (`transactions.planned.expected.figures`), so they also appear when the ledger is empty and
+   `ListSummary` is not drawn, and `expectedFiguresByCurrency` sums the rows the group lists, so the
+   figure and the table cannot disagree and a capped group's figures cover the listed rows only.
+   Nothing is added to the server payload, the repository layer or `LedgerTotals`, so step 9's test
+   home in `money-invariants.test.ts` no longer applies: the byte-identical `totals` case stays, and
+   the two-currency and never-netted cases live in
+   `src/components/app/transactions/__tests__/expectation-figures.test.ts`. A currency whose sum
+   overflows is left out of the figures rather than reaching render.

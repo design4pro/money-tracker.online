@@ -6,6 +6,8 @@ Amends: ADR 0003 (the promotion no longer waits for `merge-gate`), ADR 0017 (the
 convention the skills read, not a check), ADR 0020 (`merge-gate` is no longer a required context),
 ADR 0021 (the gate scripts it names as governance paths are gone), ADR 0022 (the `gate` runner slot
 is folded into `ci`).
+Amended by: ADR 0031 (`risk-high` QA is the agents' too, and a `risk-high` or `security` PR merges
+on a security reviewer's verdict).
 
 ## Context
 

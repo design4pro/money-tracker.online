@@ -44,8 +44,13 @@ import {
   attachments,
   budgetCategories,
   currencies,
+  importBatches,
   payees,
 } from '#/server/db/schema'
+import { materializeSeries } from '#/server/recurring/materialize'
+import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
+import { createLogger, createMemorySink } from '#/server/observability/logger'
+import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
   createMemoryMarkerStore,
   sweepBudgetThresholds,
@@ -95,6 +100,7 @@ import {
   createAttachment,
   deleteAttachment,
   getAttachmentForRead,
+  listAttachments,
 } from '../attachments'
 import {
   advanceImportBatch,
@@ -103,8 +109,11 @@ import {
   importFileKey,
   importsThisMonth,
   listImportBatches,
+  readImportBatchFile,
+  toImportBatchDto,
 } from '../imports'
 
+import { createSeries, getUpcoming } from '../recurring'
 import { createTenantRepository, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -1127,6 +1136,154 @@ describe('import batches cannot be reached or aimed across a workspace boundary'
       expect(statement).toContain('organization_id')
     }
   })
+
+  /**
+   * `file_r2_key` is a free-text column, so a row of A's can name an object in B's prefix after a
+   * bug or a bad restore. The shared reader is the only place a batch's file is fetched, so it is
+   * the place that has to refuse before the bucket is asked for anything.
+   */
+  it.each([
+    {
+      name: 'a key under another workspace',
+      fileR2Key: 'imports/org-b/batch-b/statement.csv',
+    },
+    {
+      name: 'a key under a workspace whose id merely starts with A’s',
+      fileR2Key: 'imports/org-ab/batch-b/statement.csv',
+    },
+    {
+      name: 'a key that walks out of A’s prefix with a dot segment',
+      fileR2Key: 'imports/org-a/../org-b/batch-b/statement.csv',
+    },
+    {
+      name: 'a key from another family',
+      fileR2Key: 'attachments/org-a/txn-a/att-1',
+    },
+  ])(
+    'refuses $name with a not-found and never asks the bucket for it',
+    async ({ fileR2Key }) => {
+      await importWorld.db.insert(importBatches).values({
+        id: 'batch-poisoned',
+        organizationId: ORG_A,
+        source: 'csv',
+        status: 'queued',
+        fileR2Key,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      const batch = await getImportBatch(importWorld.scope, {
+        id: 'batch-poisoned',
+      })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+      try {
+        const refused = await readImportBatchFile(
+          importWorld.scope,
+          bucket.asR2(),
+          batch,
+        ).catch((error: unknown) => error)
+
+        expect(refused).toBeInstanceOf(NotFoundError)
+        expect((refused as NotFoundError).message).toBe(
+          'import batch batch-poisoned was not found.',
+        )
+        expect(bucket.reads).toEqual([])
+
+        // The warning carries the batch id and never the key or the other workspace.
+        expect(warn).toHaveBeenCalled()
+        for (const [line, fields] of warn.mock.calls) {
+          const text = `${String(line)} ${JSON.stringify(fields ?? '')}`
+          expect(text).toContain('batch-poisoned')
+          expect(text).not.toContain(fileR2Key)
+          expect(text).not.toContain('org-b')
+          expect(text).not.toContain('org-ab')
+        }
+      } finally {
+        warn.mockRestore()
+      }
+    },
+  )
+
+  /**
+   * `toImportBatchDto` is a pure mapper with no query of its own, so what is pinned here is the
+   * input it is given: a listed page that holds a poisoned row. The batch stays in the history -
+   * filtering it would change the page size and disagree with the quota count - and nothing about
+   * the other workspace is derived from its key.
+   */
+  it.each([
+    { name: 'another workspace', fileR2Key: 'imports/org-b/batch-b/leak.csv' },
+    {
+      name: 'a workspace whose id merely starts with A’s',
+      fileR2Key: 'imports/org-ab/batch-b/leak.csv',
+    },
+    {
+      name: 'a dot segment out of A’s prefix',
+      fileR2Key: 'imports/org-a/../org-b/batch-b/leak.csv',
+    },
+    { name: 'another family', fileR2Key: 'attachments/org-a/txn-a/leak.csv' },
+    { name: 'no final segment', fileR2Key: 'imports/org-a/batch-b/' },
+  ])(
+    'lists a batch keyed under $name by its id, with no key in the payload',
+    async ({ fileR2Key }) => {
+      const own = await createImportBatch(
+        importWorld.scope,
+        bucket.asR2(),
+        payload(),
+        FILE,
+      )
+      await importWorld.db.insert(importBatches).values({
+        id: 'batch-poisoned',
+        organizationId: ORG_A,
+        source: 'csv',
+        status: 'queued',
+        fileR2Key,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+
+      const page = await listImportBatches(importWorld.scope)
+      const dtos = page.items.map((row) =>
+        toImportBatchDto(importWorld.scope, row),
+      )
+
+      // Same rows, same order, as the page the repository returned.
+      expect(dtos.map((dto) => dto.id)).toEqual(page.items.map((row) => row.id))
+      expect(dtos).toHaveLength(2)
+      expect(dtos.find((dto) => dto.id === 'batch-poisoned')?.fileName).toBe(
+        'batch-poisoned',
+      )
+      expect(dtos.find((dto) => dto.id === own.id)?.fileName).toBe('wyciag.csv')
+
+      const serialised = JSON.stringify(dtos)
+      expect(serialised).not.toContain('fileR2Key')
+      expect(serialised).not.toContain(fileR2Key)
+      expect(serialised).not.toContain('org-b')
+      expect(serialised).not.toContain('org-ab')
+      expect(serialised).not.toContain('leak.csv')
+    },
+  )
+
+  it('reads A’s own file through the reader, and answers null for a batch with no key', async () => {
+    const own = await createImportBatch(
+      importWorld.scope,
+      bucket.asR2(),
+      payload(),
+      FILE,
+    )
+
+    // A check that refused everything would pass the cases above: the right key reaches the bucket.
+    await readImportBatchFile(importWorld.scope, bucket.asR2(), own)
+    expect(bucket.reads).toEqual([own.fileR2Key])
+
+    bucket.reads.length = 0
+    await expect(
+      readImportBatchFile(importWorld.scope, bucket.asR2(), {
+        ...own,
+        fileR2Key: null,
+      }),
+    ).resolves.toBeNull()
+    expect(bucket.reads).toEqual([])
+  })
 })
 
 /**
@@ -1348,6 +1505,47 @@ describe('an attachment row cannot be used to reach another workspace’s object
       )
       await deleteAttachment(world.scope, bucket.asR2(), { id: own.id })
       expect(bucket.deletes).toEqual([own.r2Key])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('lists without a poisoned row, and no item it returns carries r2Key', async () => {
+    await world.db.insert(attachments).values({
+      id: 'att-poisoned',
+      organizationId: ORG_A,
+      transactionId: 'txn-a',
+      r2Key: 'attachments/org-b/txn-b/att-foreign',
+      contentType: 'application/pdf',
+      byteSize: PDF.byteLength,
+      originalName: 'poisoned.pdf',
+      uploadedByUserId: world.scope.ctx.userId,
+      createdAt: NOW,
+    })
+    const own = await createAttachment(
+      world.scope,
+      bucket.asR2(),
+      metadataFor('txn-a', 'a-receipt.pdf'),
+      PDF,
+    )
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const listed = await listAttachments(world.scope, {
+        transactionId: 'txn-a',
+      })
+
+      // The poisoned row is dropped, the honest one stays, and the call does not throw.
+      expect(listed.map((item) => item.id)).toEqual([own.id])
+      for (const item of listed) expect(item).not.toHaveProperty('r2Key')
+
+      // The warning is the one the read and delete paths log: the attachment id, never the key.
+      expect(warn).toHaveBeenCalledTimes(1)
+      const [line, fields] = warn.mock.calls[0]
+      const text = `${String(line)} ${JSON.stringify(fields ?? '')}`
+      expect(text).toContain('att-poisoned')
+      expect(text).not.toContain('att-foreign')
+      expect(text).not.toContain(ORG_B)
     } finally {
       warn.mockRestore()
     }
@@ -1661,5 +1859,290 @@ describe('an unsubscribe link acts in the workspace it names and nowhere else', 
       },
     )
     expect((await listPrefsFor(world.otherScope, 'user-b')).size).toBe(0)
+  })
+})
+
+/**
+ * The upcoming read, which the planned screen widens by three ids of the series it joins.
+ *
+ * `getUpcoming` already scopes both halves of its join. What this case adds is the claim about the
+ * **new** columns: `account_id`, `category_id` and `payee_id` are foreign keys, and three ids
+ * leaving a repository are three more ways to hand one workspace another's row id if the join ever
+ * loses its `tenantFilter`. So A and B each own a series built from their own account, category and
+ * payee - under identical names - and A's read must return A's ids and not one of B's.
+ */
+describe('the upcoming read cannot leak another workspace’s series ids', () => {
+  let world: BudgetWorld
+
+  async function seedPayee(id: string, organizationId: string) {
+    await world.db.insert(payees).values({
+      id,
+      organizationId,
+      name: 'Landlord',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+  }
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    await seedCategory(world.db, { id: 'cat-a', name: 'Rent' })
+    await seedCategory(world.db, {
+      id: 'cat-b',
+      name: 'Rent',
+      organizationId: 'org-b',
+    })
+    await seedPayee('payee-a', 'org-a')
+    await seedPayee('payee-b', 'org-b')
+
+    for (const [scope, suffix] of [
+      [world.scope, 'a'],
+      [world.otherScope, 'b'],
+    ] as const) {
+      const series = await createSeries(scope, {
+        name: 'Rent',
+        expectedAmountMinor: 250_000,
+        expectedCurrencyCode: 'PLN',
+        startDate: '2026-04-10',
+        accountId: `acc-${suffix}`,
+        categoryId: `cat-${suffix}`,
+        payeeId: `payee-${suffix}`,
+      })
+      await materializeSeries(scope, {
+        seriesId: series.id,
+        today: '2026-04-01',
+        ahead: 1,
+      })
+    }
+  })
+
+  it('returns the caller’s own account, category and payee ids and none of the other workspace’s', async () => {
+    const upcoming = await getUpcoming(world.scope, { today: '2026-04-01' })
+
+    expect(upcoming.length).toBeGreaterThan(0)
+    for (const period of upcoming) {
+      expect(period.accountId).toBe('acc-a')
+      expect(period.categoryId).toBe('cat-a')
+      expect(period.payeeId).toBe('payee-a')
+    }
+    const seen = JSON.stringify(upcoming)
+    expect(seen).not.toContain('acc-b')
+    expect(seen).not.toContain('cat-b')
+    expect(seen).not.toContain('payee-b')
+  })
+
+  it('returns null for a series whose links were never set, never a neighbour’s id', async () => {
+    const bare = await createSeries(world.scope, {
+      name: 'Bare',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      startDate: '2026-04-12',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: bare.id,
+      today: '2026-04-01',
+      ahead: 1,
+    })
+
+    const upcoming = await getUpcoming(world.scope, { today: '2026-04-01' })
+    const mine = upcoming.filter((period) => period.seriesId === bare.id)
+
+    expect(mine.length).toBeGreaterThan(0)
+    for (const period of mine) {
+      expect(period.accountId).toBeNull()
+      expect(period.categoryId).toBeNull()
+      expect(period.payeeId).toBeNull()
+    }
+  })
+
+  it('keeps B’s expectations and planned rows off A’s planned screen', async () => {
+    await seedTransaction(world.db, {
+      id: 'plan-b',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      categoryId: 'cat-b',
+      bookedOn: '2026-04-20',
+      isPlanned: true,
+    })
+    await seedTransaction(world.db, {
+      id: 'plan-a',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+
+    const page = await plannedScreenFor(
+      world.scope,
+      {
+        policies: {
+          planned: 'only',
+          adjustments: 'exclude',
+          transfers: 'include',
+          completeness: 'any',
+        },
+        filters: {},
+        sort: { field: 'bookedOn', direction: 'desc' },
+        cursor: null,
+      },
+      '2026-04-01',
+      {
+        readLedger: ledgerPageFor,
+        logger: createLogger({ sink: createMemorySink() }),
+      },
+    )
+
+    if (page.expectations.state !== 'shown') {
+      throw new Error('the group was not shown')
+    }
+    expect(page.expectations.rows.length).toBeGreaterThan(0)
+    expect(page.rows.map((row) => row.id)).toEqual(['plan-a'])
+    const seen = JSON.stringify(page)
+    for (const foreign of ['acc-b', 'cat-b', 'payee-b', 'plan-b']) {
+      expect(seen).not.toContain(foreign)
+    }
+  })
+
+  it('narrows by a category only within the caller’s own tree', async () => {
+    const page = await plannedScreenFor(
+      world.scope,
+      {
+        policies: {
+          planned: 'only',
+          adjustments: 'exclude',
+          transfers: 'include',
+          completeness: 'any',
+        },
+        // B's category id, named from A's screen: it resolves to nothing in A's workspace.
+        filters: { categoryIds: ['cat-b'] },
+        sort: { field: 'bookedOn', direction: 'desc' },
+        cursor: null,
+      },
+      '2026-04-01',
+      {
+        readLedger: ledgerPageFor,
+        logger: createLogger({ sink: createMemorySink() }),
+      },
+    )
+
+    expect(page.expectations).toMatchObject({ state: 'shown', rows: [] })
+  })
+
+  describe('the ledger read the planned screen shares with the ledger', () => {
+    const POLICIES = {
+      planned: 'only',
+      adjustments: 'exclude',
+      transfers: 'include',
+      completeness: 'any',
+    } as const
+    const SORT = { field: 'bookedOn', direction: 'desc' } as const
+
+    /** A holds two planned rows, B three, so a leak moves the ids, the count and the totals. */
+    async function seedPlannedRows() {
+      for (const [id, amount] of [
+        ['plan-a-1', 100_00],
+        ['plan-a-2', 200_00],
+      ] as const) {
+        await seedTransaction(world.db, {
+          id,
+          refAmountMinor: amount,
+          bookedOn: '2026-04-20',
+          isPlanned: true,
+        })
+      }
+      for (const id of ['plan-b-1', 'plan-b-2', 'plan-b-3']) {
+        await seedTransaction(world.db, {
+          id,
+          refAmountMinor: 777_00,
+          organizationId: 'org-b',
+          accountId: 'acc-b',
+          categoryId: 'cat-b',
+          bookedOn: '2026-04-21',
+          isPlanned: true,
+        })
+      }
+    }
+
+    it('returns none of B’s row ids, totals or counts under A’s scope', async () => {
+      await seedPlannedRows()
+
+      const page = await ledgerPageFor(world.scope, {
+        policies: POLICIES,
+        filters: {},
+        sort: SORT,
+        cursor: null,
+      })
+
+      expect(page.rows.map((row) => row.id).sort()).toEqual([
+        'plan-a-1',
+        'plan-a-2',
+      ])
+      expect(page.total).toBe(2)
+      expect(page.totals.expenseMinor).toBe(300_00)
+      expect(JSON.stringify(page)).not.toContain('plan-b')
+    })
+
+    it('answers a cursor page from A’s ledger alone, with no group and no foreign id', async () => {
+      await seedPlannedRows()
+      const deps = {
+        readLedger: ledgerPageFor,
+        logger: createLogger({ sink: createMemorySink() }),
+      }
+      const first = await plannedScreenFor(
+        world.scope,
+        { policies: POLICIES, filters: {}, sort: SORT, cursor: null, limit: 1 },
+        '2026-04-01',
+        deps,
+      )
+      expect(first.nextCursor).not.toBeNull()
+
+      const second = await plannedScreenFor(
+        world.scope,
+        {
+          policies: POLICIES,
+          filters: {},
+          sort: SORT,
+          cursor: first.nextCursor,
+          limit: 1,
+        },
+        '2026-04-01',
+        deps,
+      )
+
+      expect(second.rows).toHaveLength(1)
+      expect(second.total).toBe(2)
+      expect(second.expectations).toBeUndefined()
+      const seen = JSON.stringify(second)
+      for (const foreign of ['plan-b', 'acc-b', 'cat-b', 'payee-b']) {
+        expect(seen).not.toContain(foreign)
+      }
+    })
+
+    it('reads a cursor minted under B’s scope as A’s own page, never as B’s rows', async () => {
+      await seedPlannedRows()
+      const fromB = await ledgerPageFor(world.otherScope, {
+        policies: POLICIES,
+        filters: {},
+        sort: SORT,
+        cursor: null,
+        limit: 1,
+      })
+      expect(fromB.nextCursor).not.toBeNull()
+
+      const page = await ledgerPageFor(world.scope, {
+        policies: POLICIES,
+        filters: {},
+        sort: SORT,
+        cursor: fromB.nextCursor,
+        limit: 1,
+      })
+
+      // The keyset only narrows A's own rows: the page is A's, and total still counts A alone.
+      expect(
+        page.rows.map((row) => row.id).every((id) => id.startsWith('plan-a-')),
+      ).toBe(true)
+      expect(page.total).toBe(2)
+      expect(JSON.stringify(page)).not.toContain('plan-b')
+    })
   })
 })

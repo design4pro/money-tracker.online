@@ -49,7 +49,11 @@ const SLOW_STARTUP_TEST_TIMEOUT_MS = 15_000
  * - `ui` runs component tests in jsdom with the React plugin.
  * - `server` runs repositories, queue handlers, the money and FX arithmetic, and route handlers
  *   in plain Node. Nothing there may import `cloudflare:workers`; bindings arrive as arguments,
- *   which is what makes them fake-able.
+ *   which is what makes them fake-able. One narrow exception, for tests only: a test may
+ *   `vi.mock('cloudflare:workers')` and `createServerFn` to run a server-function handler, which
+ *   reaches its binding through that import and is not callable outside the Start request context.
+ *   Repositories and the rest of the server logic still take bindings as arguments, and
+ *   `src/server/fns/__tests__/attachments.test.ts` is the first user of the pattern.
  * - `tooling` runs the repository's own scripts in plain Node as well, over `scripts/**`
  *   rather than `src/**`.
  * - `workerd` runs the handful of things a fake cannot reproduce inside the real runtime, on the

@@ -36,7 +36,7 @@ import type { ReactNode } from 'react'
  * Cancel, `danger` on the confirm — is the product's one implementation rather than a second.
  */
 
-/** What the list needs from a row. A subset of `AttachmentRow`, so a loader can pass rows straight. */
+/** What the list needs from a row. A subset of `AttachmentDto`, so a loader can pass rows straight. */
 export interface AttachmentSummary {
   readonly id: string
   readonly originalName: string

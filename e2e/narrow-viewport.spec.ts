@@ -1,9 +1,9 @@
 import { expect, test } from './support/console'
 
-import { gotoApp, useLocale } from './support/app'
+import { gotoApp, uniqueToken, useLocale } from './support/app'
 import { storageStateFor } from './support/session'
 
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 /**
  * What a screen must still say at 360px.
@@ -250,3 +250,266 @@ test.describe('a 360px screen still shows its own subject', () => {
     })
   }
 })
+
+/**
+ * The listbox panel of a `Select` or a `ComboBox`: never narrower than its trigger, never wider
+ * than `min(viewport - 24px, 32rem)`, and an option reads in full.
+ *
+ * The popover used to be pinned to the trigger's width, so the dashboard period selector's Polish
+ * options ("Poprzedni miesiąc", "Ostatnie 12 miesięcy") ended in an ellipsis at 360px (#559). The
+ * panel is now at least as wide as the trigger, grows to its longest option, is capped at the
+ * viewport minus React Aria's 12px container padding on each side and at an absolute 32rem, and an
+ * option past the cap wraps instead of ending in an ellipsis (`DESIGN.md` -> Select and ComboBox
+ * popover, #580). jsdom has no layout, so this is measured in a browser.
+ *
+ * The width is asserted as a range and never as a constant: a `ComboBox` panel follows its filtered
+ * list, so it may shrink while typing and grow on Backspace.
+ */
+const EDGE_PADDING = 12
+const POPOVER_CAP_REM = 32
+
+type PopoverKind = 'Select' | 'ComboBox'
+
+/** The open panel of one kind, with the bounds it must stay inside, in CSS pixels. */
+async function measurePanel(page: Page, kind: PopoverKind) {
+  const popover = page.locator(`[data-trigger="${kind}"]`)
+  await expect(popover).toBeVisible()
+  return popover.evaluate((element) => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
+    return {
+      width: element.getBoundingClientRect().width,
+      // React Aria publishes the trigger's width on the popover element itself.
+      triggerWidth: parseFloat(
+        getComputedStyle(element).getPropertyValue('--trigger-width'),
+      ),
+      viewport: window.innerWidth,
+      rem,
+    }
+  })
+}
+
+async function expectPanelWithinBounds(
+  page: Page,
+  kind: PopoverKind,
+  context: string,
+): Promise<void> {
+  // React Aria mounts the panel before it has measured the trigger: for a frame it is 0px wide and
+  // `--trigger-width` is not yet set. Only a laid-out panel is a measurement.
+  await expect
+    .poll(
+      async () => {
+        const measured = await measurePanel(page, kind)
+        return measured.width > 0 && Number.isFinite(measured.triggerWidth)
+      },
+      { message: `${context}: the panel was never laid out` },
+    )
+    .toBe(true)
+  const panel = await measurePanel(page, kind)
+  // The trigger's width is the floor and wins over the cap: a trigger wider than 32rem keeps its
+  // own width.
+  const cap = Math.max(
+    panel.triggerWidth,
+    Math.min(panel.viewport - 2 * EDGE_PADDING, POPOVER_CAP_REM * panel.rem),
+  )
+  expect(
+    panel.width,
+    `${context}: the panel is narrower than its trigger`,
+  ).toBeGreaterThanOrEqual(panel.triggerWidth - 1)
+  expect(
+    panel.width,
+    `${context}: the panel is wider than min(viewport - 24px, 32rem)`,
+  ).toBeLessThanOrEqual(cap + 1)
+}
+
+/**
+ * Focuses a field after scrolling it clear of the sticky action bar, and waits for the page to
+ * stop moving.
+ *
+ * At 360px the form's footer covers the lower fields, the focus keeps scrolling the page for a few
+ * frames, and React Aria closes a popover whose trigger scrolls — so the field has to be at rest
+ * before it is opened.
+ */
+async function centreInViewport(field: Locator): Promise<void> {
+  const page = field.page()
+  await field.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+  await field.focus()
+  let previous = -1
+  await expect
+    .poll(async () => {
+      const top = await page.evaluate(() => window.scrollY)
+      const settled = top === previous
+      previous = top
+      return settled
+    })
+    .toBe(true)
+}
+
+/** The label span of an option: the one that used to carry `truncate`. */
+function optionLabel(option: Locator): Locator {
+  return option.locator('span.flex-1')
+}
+
+/** Whether an option's label runs over more than one line. */
+async function wraps(label: Locator): Promise<boolean> {
+  return label.evaluate((element) => {
+    const lineHeight = parseFloat(getComputedStyle(element).lineHeight)
+    return element.getBoundingClientRect().height > lineHeight * 1.5
+  })
+}
+
+for (const scenario of [
+  { locale: 'pl', width: 360, label: 'Okres' },
+  { locale: 'pl', width: 1280, label: 'Okres' },
+  { locale: 'en', width: 360, label: 'Period' },
+  { locale: 'en', width: 1280, label: 'Period' },
+] as const) {
+  test(`the period listbox reads in full in ${scenario.locale} at ${scenario.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: scenario.width, height: 800 })
+    await useLocale(page.context(), scenario.locale)
+    await gotoApp(page, '/dashboard')
+
+    const trigger = page.getByRole('button', { name: scenario.label })
+    await trigger.click()
+    const listbox = page.getByRole('listbox')
+    await expect(listbox).toBeVisible()
+
+    const options = listbox.getByRole('option')
+    const count = await options.count()
+    expect(count, 'the period selector has options').toBeGreaterThan(0)
+    for (let index = 0; index < count; index += 1) {
+      const label = optionLabel(options.nth(index))
+      const text = (await label.textContent()) ?? ''
+      expect(await isClipped(label), `option "${text}" was clipped`).toBe(false)
+      // The worst fixed label has to fit one line under the bound; wrapping is for user-named
+      // options. When this goes red, 32rem is the number to revisit.
+      expect(await wraps(label), `option "${text}" wrapped`).toBe(false)
+    }
+
+    await expectPanelWithinBounds(
+      page,
+      'Select',
+      `period listbox, ${scenario.locale} ${scenario.width}px`,
+    )
+
+    // Selection and focus return are the part of a Select a width rule must not disturb.
+    await page.keyboard.press('Escape')
+    await expect(listbox).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+}
+
+for (const width of [360, 1280]) {
+  test(`a ComboBox panel stays inside its bounds while filtering at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await useLocale(page.context(), 'en')
+    await gotoApp(page, '/transactions/new')
+
+    const combobox = page.getByRole('combobox', { name: 'Category' })
+    await centreInViewport(combobox)
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('listbox')).toBeVisible()
+    await expectPanelWithinBounds(page, 'ComboBox', `unfiltered, ${width}px`)
+
+    // Narrowing to nothing and widening again: the panel follows the list, so only the range is
+    // asserted. "No matches" is the state that used to collapse to the trigger's width.
+    for (const key of ['g', 'r', 'o', 'z', 'z', 'z']) {
+      await page.keyboard.type(key)
+      await expectPanelWithinBounds(
+        page,
+        'ComboBox',
+        `after typing "${key}", ${width}px`,
+      )
+    }
+    for (let erased = 0; erased < 6; erased += 1) {
+      await page.keyboard.press('Backspace')
+      await expectPanelWithinBounds(
+        page,
+        'ComboBox',
+        `after Backspace ${erased + 1}, ${width}px`,
+      )
+    }
+  })
+
+  test(`a Select inside a dialog stays inside its bounds at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await useLocale(page.context(), 'en')
+    await gotoApp(page, '/accounts')
+    await page.getByRole('button', { name: 'New account' }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    // The trigger renders its value first and the label after it ("PLN · ... Currency").
+    await dialog.getByRole('button', { name: /\bCurrency$/ }).click()
+    await expect(page.getByRole('listbox')).toBeVisible()
+
+    await expectPanelWithinBounds(
+      page,
+      'Select',
+      `currency in a dialog, ${width}px`,
+    )
+  })
+
+  test(`a very long option wraps inside the bound at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await useLocale(page.context(), 'en')
+
+    // A payee name is user-typed and unbounded, which is what a fixed label never is. The long
+    // unbroken word is the second half of the rule: it has to break rather than push the panel.
+    // Four of them, because a listbox is a column flex container with a max height: one row never
+    // overflows it, and it is the overflow that squeezes a row that is allowed to shrink.
+    const token = uniqueToken('Wrap')
+    await gotoApp(page, '/payees')
+    for (const suffix of ['a', 'b', 'c', 'd']) {
+      const name = `${token} ${suffix} ${'Przedsiebiorstwo Wielobranzowe '.repeat(4)}${'x'.repeat(40)}`
+      await page.getByRole('button', { name: 'Add a payee' }).click()
+      const dialog = page.getByRole('dialog')
+      await expect(dialog).toBeVisible()
+      // Enter submits rather than a click: the success toast of the previous payee sits over the
+      // dialog's footer button.
+      const field = dialog.getByRole('textbox', { name: 'Name' })
+      await field.fill(name)
+      await field.press('Enter')
+      await expect(dialog).toBeHidden()
+    }
+
+    await gotoApp(page, '/transactions/new')
+    const combobox = page.getByRole('combobox', { name: 'Paid to' })
+    await centreInViewport(combobox)
+    await page.keyboard.type(token)
+
+    const options = page.getByRole('option', { name: new RegExp(token) })
+    await expect(options).toHaveCount(4)
+    for (let index = 0; index < 4; index += 1) {
+      const option = options.nth(index)
+      const label = optionLabel(option)
+      expect(
+        await isClipped(label),
+        `option ${index} was clipped instead of wrapping`,
+      ).toBe(false)
+      expect(await wraps(label), `option ${index} stayed on one line`).toBe(
+        true,
+      )
+      // The row grows with its label: a row squeezed to its minimum height lets the next row paint
+      // over the wrapped lines.
+      const [rowBox, labelBox] = await Promise.all([
+        option.boundingBox(),
+        label.boundingBox(),
+      ])
+      expect(rowBox, `option ${index} has a box`).not.toBeNull()
+      expect(labelBox, `option ${index} has a label box`).not.toBeNull()
+      expect(
+        rowBox?.height ?? 0,
+        `option ${index}: the wrapped label spills out of its row`,
+      ).toBeGreaterThanOrEqual(labelBox?.height ?? Infinity)
+    }
+    await expectPanelWithinBounds(page, 'ComboBox', `long option, ${width}px`)
+  })
+}

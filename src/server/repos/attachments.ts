@@ -128,7 +128,7 @@ export function attachmentKeyPrefix(organizationId: string): string {
  * `attachments/<orgId>/<transactionId>/<attachmentId>` — the layout `00-S12` fixed.
  *
  * Exported so a test can assert the shape against a real row rather than against a copy of this
- * string, and so the orphan sweep has one place to read the prefix from.
+ * string, and so the planned orphan sweep will have one place to read the prefix from.
  */
 export function attachmentKey(
   organizationId: string,
@@ -139,26 +139,53 @@ export function attachmentKey(
 }
 
 /**
- * Hands the row back only when its stored key is under this workspace's own prefix.
+ * Whether the row's stored key is under this workspace's own prefix, warning when it is not.
  *
  * The scoped `SELECT` already proves the *row* is the caller's. The *key* is a second fact the
  * write path guarantees and nothing else checks: a bug, a bad restore or a hand-edited row could
- * point A's row at B's object, and the next read or delete would serve or destroy it. A foreign
- * key is therefore the same {@link NotFoundError} as an id that does not exist, so the two are
- * indistinguishable to a caller; the warning carries the attachment id and never the key or the
- * other workspace.
+ * point A's row at B's object, and the next read or delete would serve or destroy it. The warning
+ * carries the attachment id and never the key or the other workspace.
  */
-function requireOwnKey(scope: TenantScope, row: AttachmentRow): AttachmentRow {
+function hasOwnKey(scope: TenantScope, row: AttachmentRow): boolean {
   try {
     assertKeyInOrg('attachments', scope.ctx.organizationId, row.r2Key)
+    return true
   } catch (error) {
     if (!(error instanceof InvalidKeyError)) throw error
     logger.warn('attachment key is outside the workspace prefix', {
       attachmentId: row.id,
     })
-    throw new NotFoundError('attachment', row.id)
+    return false
   }
+}
+
+/**
+ * Hands the row back only when its stored key is under this workspace's own prefix (see
+ * {@link hasOwnKey}).
+ *
+ * A foreign key is the same {@link NotFoundError} as an id that does not exist, so the two are
+ * indistinguishable to a caller.
+ */
+function requireOwnKey(scope: TenantScope, row: AttachmentRow): AttachmentRow {
+  if (!hasOwnKey(scope, row)) throw new NotFoundError('attachment', row.id)
   return row
+}
+
+/**
+ * What leaves the server about an attachment: the row without its R2 key.
+ *
+ * The key is an address into the bucket, and the one thing a browser needs to open a receipt is the
+ * id, which `/api/files/$id` resolves back to a key under a scoped read. Nothing in the UI reads
+ * `r2Key`, so it does not go on the wire — every server function and loader that returns an
+ * attachment returns this, and only {@link getAttachmentForRead}, which the file route calls, hands
+ * out the full row.
+ */
+export type AttachmentDto = Omit<AttachmentRow, 'r2Key'>
+
+/** The row as {@link AttachmentDto}. The one place the key is taken off. */
+export function toAttachmentDto(row: AttachmentRow): AttachmentDto {
+  const { r2Key: _r2Key, ...dto } = row
+  return dto
 }
 
 /* -------------------------------------------------------------------------- */
@@ -176,11 +203,15 @@ function requireOwnKey(scope: TenantScope, row: AttachmentRow): AttachmentRow {
  * uploads that did not land in the same millisecond, which two HTTP requests never do — within one
  * millisecond `newId()`'s random half decides, and the repository promises only that the order is
  * ascending by `id` and the same on every read.
+ *
+ * A row whose stored key is outside the workspace's prefix is left out (and logged, see
+ * {@link hasOwnKey}) rather than failing the list: one bad row must not take the whole detail
+ * screen down, and the row would not be openable or deletable anyway. No item carries the key.
  */
 export async function listAttachments(
   scope: TenantScope,
   input: TransactionIdInput,
-): Promise<ReadonlyArray<AttachmentRow>> {
+): Promise<ReadonlyArray<AttachmentDto>> {
   const parsed = transactionIdSchema.parse(input)
   await getTransaction({
     scope,
@@ -188,10 +219,11 @@ export async function listAttachments(
     id: parsed.transactionId,
   })
 
-  return attachmentRepo.findMany(scope, {
+  const rows = await attachmentRepo.findMany(scope, {
     where: eq(attachments.transactionId, parsed.transactionId),
     orderBy: [asc(attachments.id)],
   })
+  return rows.filter((row) => hasOwnKey(scope, row)).map(toAttachmentDto)
 }
 
 /**
@@ -298,8 +330,9 @@ export async function createAttachment(
  *
  * **That order is deliberate and it is the reverse of the write.** The two failure modes are not
  * symmetric: a row without an object is a receipt somebody can see and cannot open, which is a bug
- * they will report; an object without a row is invisible, costs storage, and is swept by the weekly
- * orphaned-object cron. Given that one of the two has to be possible, the harmless one is chosen.
+ * they will report; an object without a row is invisible and costs storage until the orphaned-object
+ * sweep, which is planned and not yet built, takes it. Given that one of the two has to be possible,
+ * the harmless one is chosen.
  *
  * The row is loaded through the scoped read first, so B's id is a `NotFoundError` before
  * `bucket.delete` is reached with a key this workspace does not own. The key itself is checked

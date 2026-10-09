@@ -41,13 +41,22 @@ stored minor-unit value.
 ## Rules
 
 - Sign-off follows the installed skill's `--self-qa-signoff` rules, and an unattended run always
-  passes that flag. Before applying `qa-approved` + `qa-self-verified`, hand the frames and the
-  report to the `manual-tester` sub-agent (with `accessibility-specialist` when the change touches
-  layout or copy) through `.ai/skills/afk-decide/SKILL.md`, and sign off only on its approving
-  verdict, quoted in the evidence comment. A `risk-high` PR keeps the installed skill's rule: post
-  the evidence and the verdict, withhold the sign-off, and leave `qa-approved` to the owner (a
-  security specialist's verdict, 2026-10-01: money, ledger, auth and migrations break silently,
-  and those PRs are few).
+  passes that flag. The installed `risk-high` limit does not apply here: the unattended run is the
+  QA reviewer for every PR (owner decision 2026-10-06, ADR 0031). Before applying `qa-approved` +
+  `qa-self-verified`, hand the frames and the report through `.ai/skills/afk-decide/SKILL.md` to a
+  panel, one sub-agent each, none of them shown another's verdict:
+  - `manual-tester`, always;
+  - `accessibility-specialist`, when the change touches layout or copy;
+  - `security-tenancy-reviewer`, when the PR is `risk-high` (labelled, or inferred per `SDLC.md`
+    from the diff) or `security`. It judges the diff as well as the evidence: money, ledger, auth
+    and migrations break silently, so a frame cannot clear them.
+
+  Sign off only when every member approves, and quote each verdict in the evidence comment. When
+  one does not, post its findings in a 🤖 comment as the fix list, apply `qa-failed` (the
+  `--apply-failure` path) and return: `om-pr-autopilot` routes the PR to `om-auto-fix-pr` with that
+  list, and QA runs again on the new head (the repo override of `om-pr-autopilot` says how many
+  times).
+
 - Frames go to `.ai/qa/artifacts_<runId>/` (gitignored). A PNG anywhere else in the repository is a
   defect.
 - No secret from `.dev.vars` or `.ai/qa/test-env.env` enters a screenshot or the report.

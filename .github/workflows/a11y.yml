@@ -26,7 +26,7 @@ on:
   pull_request:
     branches: [main, develop]
     # No `labeled`: ADR 0016 retired `needs-e2e`, and no label changes what this workflow does.
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
   # output means "run", and the push to `develop` after the merge scans every route regardless.
   changes:
     name: change scope
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 5
     outputs:
@@ -67,7 +67,7 @@ jobs:
     # A develop→main pull request duplicates the push-triggered run on the same commits; the push
     # run is canonical for the shared branches. `!cancelled()` rather than the implicit `success()`,
     # which would read the skipped `changes` on a push as a reason to skip the scan too.
-    if: ${{ !cancelled() && needs.changes.outputs.browser != 'false' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
+    if: ${{ !cancelled() && !github.event.pull_request.draft && needs.changes.outputs.browser != 'false' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 30
     # The same runners as the e2e gate, and no `container:` on either: `./.github/actions/e2e-env`

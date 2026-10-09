@@ -423,7 +423,12 @@ is written in `ink`. State is line form before hue, and nothing is ever struck t
 **The Colour-Is-Never-Alone Rule.** Money direction is never encoded by colour alone, and colour is not
 even the first channel: every amount carries an explicit sign, inflow is set at the bold weight and
 outflow at regular, a transfer carries a repeat glyph, and the product stays correct with all
-colour removed. The measured dichromat separation of the green and red inks is the reason.
+colour removed. The measured dichromat separation of the green and red inks is the reason. The rule
+is wider than direction. A status is named by a word, never by its hue alone (`### Badges`, the
+accessibility contract). A chart series is told apart by something besides its hue: ADR 0007 requires
+a marker shape, a dash pattern or a direct in-place label for each series, and a text table carrying
+the data drawn (`### Charts`). A category carries its series colour as a dot beside its name, so
+the colour is never the only identifier (`### Badges`, when not to use one).
 
 **The Measured Pair Rule.** Every colour token that can meet text carries its measured contrast
 ratio as a trailing comment beside its declaration in `tokens.css`, and the contrast test recomputes
@@ -690,6 +695,44 @@ label kept in the DOM under the spinner so the button holds its width.
 - **Invalid** moves the rule to `negative`; the error renders below, wired by `aria-describedby`,
   with an icon and a message. **Disabled:** `surface-sunken`, `ink-2`, `not-allowed`.
 
+### Select and ComboBox popover
+
+- **The shape.** The listbox panel is at least as wide as its trigger, grows to its longest option
+  (`w-max` over the base `Popover`'s `min-w-(--trigger-width)`), and is capped twice:
+  at the viewport minus the 12px edge padding React Aria keeps on each side, and at an absolute
+  `32rem` (`max-w-[min(calc(100vw-1.5rem),32rem)]`, the identical literal in `Select` and
+  `ComboBox`). Being in `rem` it scales with text size, so the 1.4.4 / 1.4.10 behaviour does not
+  change. A trigger wider than the bound keeps its own width: the floor wins over the cap, so the
+  bound only limits how far the panel grows past the trigger. The bound is measured, not guessed:
+  `e2e/narrow-viewport.spec.ts` fails when a fixed option (the Polish dashboard period options are
+  the longest) wraps or clips, and `32rem` is raised only if it does.
+- **Why not the trigger's width.** A trigger is sized for the value it shows, not for the longest
+  option: pinning the panel to it ellipsised the Polish dashboard period options at 360px
+  ("Poprzedni mie...", #559). Both primitives carry the identical rule, so a call site never picks
+  a width.
+- **A `ComboBox` panel follows its filtered list.** Its floor is the trigger's width and its start
+  edge stays anchored to the trigger, so while a person types only the far edge moves and no option
+  text shifts; the "no matches" state sits at the trigger's width. Holding the width stable would
+  need a measuring effect the popover deliberately avoids, and pinning it to the trigger would bring
+  #559 back. A browser case therefore asserts a range (never narrower than the trigger, never wider
+  than `min(viewport - 24px, 32rem)`) after every keystroke and never that the width is constant.
+- **A label past the bound wraps** (`break-words` on the label span in `ListBoxItem`) instead of
+  ending in an ellipsis: it is the only choice every input method can read, since a `title` is not
+  reachable from the keyboard (a `ComboBox` option never takes DOM focus) or by touch. Rows that
+  fit keep one line; the row grows with its label (`shrink-0`, because the listbox is a column flex
+  container with a max height), and the check mark and trailing meta keep their size
+  (`shrink-0`) and centre against the wrapped text. A row only gets taller past the bound, and the
+  target-size minimum is a minimum height, so 2.5.8 holds.
+- **Known limits.** `100vw` includes a classic scrollbar on desktop, and `1.5rem` equals the 12px
+  edge padding only at the default root font size. The `32rem` bound makes both moot on wide
+  screens. At 360px the cap is `100vw - 1.5rem`, so a root font size below 16px (say 12px, 18px
+  instead of 24px) lets the panel overrun the 12px edge padding by up to 6px, and a larger one
+  makes it narrower than it could be, which only wraps sooner. They are left documented rather than
+  fixed with a measuring effect.
+- Keyboard navigation, selection and focus return to the trigger are React Aria's and are
+  untouched.
+- **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.
+
 ### Focus
 
 One treatment product-wide, drawn outside the control: a 2px `focus-gap` band (a `box-shadow`)
@@ -902,6 +945,49 @@ and nothing else — no headline is ever a caution tone, the verdict word and th
 `warning` at 7:1, and a caller that wants loud caution TEXT has to re-measure the token at 4.5:1
 first. What the 3:1 floor bought differs by theme and is measured rather than assumed: dark gets
 full chroma at nearly the old weight, light has to lighten to get any (`src/styles/tokens.css`).
+
+### Charts
+
+The forms drawn by the primitives in `src/components/charts` wherever a trend or a breakdown is
+shown: line and area, bar (stacked and grouped), donut and sparkline. They are hand-rolled SVG, not a
+chart library (`docs/adr/0007-hand-rolled-accessible-charts-over-a-chart-library.md`). The ADR
+states what a chart owes and the primitives carry it out, so this section does not restate either;
+it says which form to pick and what carries the meaning when the colour does not. A chart takes its
+data, locale and copy as props, never fetches, and uses the series hues of _The category series
+palette_.
+
+- **The shape.** One `ChartFrame` around every form: an `<svg>` authored at the container's measured
+  pixel width, so an axis label keeps its size at every breakpoint instead of scaling down with the
+  drawing. Gridlines and axis rules are `border-strong`, tick labels are `ink-2` text, and the zero
+  rule is drawn heavier than the gridlines.
+- **The forms, picked by meaning.** The sparkline is a trend at a glance, with no axes and no
+  legend. The line (or area) chart is readings over time. The bar chart compares periods; stacked
+  takes non-negative parts of a whole only, and a net figure that goes both ways belongs in the
+  grouped layout or the line chart. The donut is the parts of one total; slices that are a
+  negligible share fold into one _Other_ slice whose contents stay reachable behind a button.
+- **What a chart owes.** ADR 0007 requires a text table, keyboard-reachable points, a non-colour
+  encoding per series and a reduced-motion path, and the primitives provide them. The text table is
+  the one enforced at the type level: `ChartFrame` takes `dataTable` as a required prop, so a chart
+  without one does not compile. The other three are provided, not type-enforced:
+  keyboard-reachable points (one `Tab` stop per series, arrows along it, `Home` and `End` to the
+  ends, each point named with its full unabbreviated amount); a non-colour encoding per series; and
+  a reduced-motion path, where the only animation is an entrance fade behind `motion-safe:`.
+- **The tones.** There is no tone to pick. A series takes its hue, marker shape, dash pattern and
+  fill pattern from its position in the array, so the same data drawn twice is encoded the same way
+  both times. The sparkline is one series with no legend and relies on the in-place labels on its
+  lowest and highest readings.
+- **The states.** Empty is a designed state: the axes stay on screen and the message sits over them,
+  so the layout does not jump when the first reading arrives. A missing reading is a gap, drawn as a
+  break and written in the table as a word, never as zero. A focused point is described as text
+  under the plot rather than in a floating tooltip, because a tooltip that follows focus can cover
+  the focus indicator.
+- **What carries the meaning when the colour does not.** The series name in words, in the legend, in
+  the table and in each point's accessible name, plus the marker, dash and fill patterns. The hue is
+  an additional channel on a chart, never the only one, and a series colour is never text. See _The
+  Colour-Is-Never-Alone Rule_.
+- **The one thing it is not:** `Meter`, which shows one figure against a limit and says its state in
+  a word and an icon. A chart is a set of readings, and every amount it draws or names is an integer
+  in minor units formatted through `chartAmount` (`docs/MONEY.md`).
 
 ### Navigation
 

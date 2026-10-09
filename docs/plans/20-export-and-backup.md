@@ -69,8 +69,8 @@ baseCurrency, counts, entities[] }`). The schema is the contract: a consumer rea
   named in a comment and accepted. The writer emits local headers, the central directory and the EOCD
   with correct CRC-32s, and `zip.test.ts` asserts a produced archive opens in Node's `zlib`-free
   reader and that a 100 MB stream never exceeds a bounded buffer.
-- **R2 layout** (`00-S12` owns the key module): `workspaces/{workspaceId}/exports/{jobId}/{name}` for
-  exports and `backups/{yyyy-mm-dd}/{workspaceId}.json` for backups. Different prefixes, different
+- **R2 layout** (`00-S12` owns the key module, `src/server/files/keys.ts`): `exports/<orgId>/<jobId>.<zip|json>`
+  for exports and `backups/<orgId>/<yyyy-mm-dd>.json` for backups. Different prefixes, different
   lifecycle rules, no chance of a workspace-facing signed URL reaching a backup.
 
 ### UI (route, components)
@@ -163,13 +163,16 @@ shows that an export happened — an audit trail of who took the data out is wor
 ### Server (repo, server function, Zod)
 
 - `createExportsRepository(scope)` — `list`, `get`, `request`, and `markExpired` (operator path).
-- `requestExport({ format })` enqueues `export.generate`. **One in-flight job per workspace**: a
+- `requestExport({ format })` enqueues `export.build`. **One in-flight job per workspace**: a
   second request while one is `queued` or `running` returns the existing job rather than starting a
   duplicate, enforced with a conditional insert, not a read-then-write.
 - The handler streams `serialize` into `zip` (or into a JSON writer) and multipart-uploads to R2,
   then flips the row to `ready` in one update. A failure sets `failed` with a code and **deletes any
   partial object** — a half-written export offered as a download is a support ticket that costs more
   than the failure.
+- **The export row cap is unenforced and unpromised.** `EXPORT_MAX_ROWS` (250 000 in `wrangler.jsonc`,
+  both environments) is read by no code; `20-S2` adopts it or replaces it, and until then nothing
+  promises it.
 - **Download.** `/api/exports/$jobId/download` re-checks the session, the membership and the job's
   workspace on every request, then streams from R2 with
   `Content-Disposition: attachment; filename*=UTF-8''...`. There is **no public signed URL** — the
@@ -277,14 +280,17 @@ data, and it lives with the other console tables so `tenantFilter` is not misapp
 - **The backup step** runs inside the nightly cron (`0 3 * * *`) after the FX refresh and the
   revaluation sweep, in that order, because a backup taken before revaluation would capture a state
   the morning would immediately change. It iterates workspaces in pages, reuses `20-S1`'s serialiser
-  at `format: 'json'`, and writes `backups/{yyyy-mm-dd}/{workspaceId}.json`.
+  at `format: 'json'`, and writes `backups/<orgId>/<yyyy-mm-dd>.json`.
 - **Bounded work.** The cron has a CPU budget; the step processes workspaces until a **time budget**
   (a named constant, well under the limit) is exhausted, records the cursor in `backup_runs`, and
   enqueues a continuation message. A backup that silently covers only the first 200 workspaces is the
   failure mode this guards against, and `backup.test.ts` asserts the continuation covers the
-  remainder.
+  remainder. The continuation message is the `backup.run` kind of `00-S12` with a `cursor`, enqueued with
+  a delay of at least `CLAIM_RETRY_DELAY_SECONDS`, the delay of `00-S12`'s KV claim.
 - **Retention.** Daily backups for 30 days, then the weekly prune keeps one per week for 12 weeks.
-  Both numbers are constants in one file and are quoted in `docs/RESTORE.md`.
+  Both numbers are constants in one file and are quoted in `docs/RESTORE.md`. Pruning `backups/<orgId>/`
+  and the offboarding sweep of a workspace's prefixes are this plan's, not `00-S12`'s; the layout makes
+  each one a prefix list.
 - **Restore.** `scripts/restore-workspace.ts` reads one backup object and writes it into a **named
   target workspace** through the same Zod schemas, in dependency order, remapping ids. It runs against
   staging by default and requires an explicit `--env production --confirm <workspaceId>` to touch

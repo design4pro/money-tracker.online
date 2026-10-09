@@ -265,7 +265,7 @@ meaning of each label: `.github/labels.yml`.
 | `priority-*` / `risk-*`                                           | One of each; `om-prepare-issue` sets them from the stage's risk section    |
 | `in-progress`                                                     | A run holds the issue (assignee + label + claim comment); nothing restarts |
 | `review` / `changes-requested` / `qa` / `merge-queue` / `blocked` | The pull request's pipeline state, at most one at a time                   |
-| `needs-qa` / `skip-qa` / `qa-approved`                            | The QA gate; only a human sets `qa-approved`                               |
+| `needs-qa` / `skip-qa` / `qa-approved`                            | The QA gate; a specialist panel or a person sets `qa-approved` (ADR 0031)  |
 
 Body marker: `<!-- sentry-issue: SHORT-ID[#n] -->`.
 Commits: Conventional Commits in English, agent runs included. There is no agent-only prefix.
