@@ -31,7 +31,11 @@ import {
   trustedOrigins,
 } from './env'
 import { resolveOrProvisionOrganization } from './organization'
-import { DISABLED_ADMIN_PATHS, adminOptions } from './permissions'
+import {
+  DISABLED_ADMIN_PATHS,
+  DISABLED_ORGANIZATION_PATHS,
+  adminOptions,
+} from './permissions'
 import { createKvSecondaryStorage } from './secondary-storage'
 
 import type { Locale } from '#/lib/i18n'
@@ -214,6 +218,9 @@ export function authOptions(): BetterAuthOptions {
       admin(adminOptions),
       twoFactor({ issuer: APP_NAME }),
       organization({
+        // Stays on although `/organization/create` is closed below: plan stage 26-S1 creates
+        // workspaces in-process through `auth.api.createOrganization`, and with this off that call
+        // is refused for a session-carrying user too.
         allowUserToCreateOrganization: true,
         creatorRole: 'owner',
         sendInvitationEmail: async (data, request) => {
@@ -230,8 +237,11 @@ export function authOptions(): BetterAuthOptions {
       }),
     ],
 
-    /** The console's HTTP surface, closed. See `./permissions` for why this and not a hook. */
-    disabledPaths: DISABLED_ADMIN_PATHS,
+    /**
+     * The console's HTTP surface and the unused create-organization route, closed. See
+     * `./permissions` for why this and not a hook.
+     */
+    disabledPaths: [...DISABLED_ADMIN_PATHS, ...DISABLED_ORGANIZATION_PATHS],
 
     rateLimit: {
       enabled: true,

@@ -81,7 +81,9 @@ Better Auth, with sessions in the `SESSIONS` KV namespace.
   (`docs/ACCESSIBILITY.md` §3.5) and a deliberate choice to rate-limit server-side instead.
 - Cookie prefix `mtr`, `Secure`, `HttpOnly`, `SameSite=Lax`.
 - `disabledPaths` is configured at the **top level** of the auth config, not inside a plugin, because
-  a path disabled inside a plugin is only disabled for that plugin's routes.
+  a path disabled inside a plugin is only disabled for that plugin's routes. It lists the `admin`
+  plugin's paths and `/organization/create`: no screen creates an organization over HTTP, and
+  workspaces are created in-process, which `disabledPaths` does not reach.
 - **After a successful sign-in the client does a full document load**, not a client-side navigation,
   so the shell loader sees the session cookie on its first run rather than rendering a signed-out
   shell and correcting it.
