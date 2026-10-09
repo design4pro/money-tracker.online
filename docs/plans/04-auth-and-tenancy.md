@@ -52,8 +52,8 @@ Delivered: 2026-10-09 - the auth code under `src/server/auth/` (`config.ts`, `in
 
 `organization.ts` writes `organization_currencies` outside `src/server/repos` by design: the
 workspace it would need a `TenantScope` for is created by the same batch (see the docblock of
-`organization.ts`). This is a third departure from the two exceptions `docs/SPEC.md` §5.2 documents,
-and §5.2 does not record it yet.
+`organization.ts`). This is the third exception `docs/SPEC.md` §5.2 documents, with ADR 0002's
+amendment of 2026-10-09; it covers that one insert and nothing else.
 
 ### Data and migration
 

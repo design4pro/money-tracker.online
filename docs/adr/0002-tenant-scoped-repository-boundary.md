@@ -30,9 +30,9 @@ Concretely:
   from not existing, including in counts, aggregates and totals.
 - `organization_id` is the **leading column of every composite index**, so the predicate is always
   index-satisfiable and never the thing a query plan drops.
-- `src/server/catalog` is the single stated exception — global tables with no `organization_id`
+- `src/server/catalog` is the stated exception — global tables with no `organization_id`
   (currencies, exchange rates, brand logos) — guarded instead by `requirePermission` plus a
-  `platform_audit_log` write.
+  `platform_audit_log` write. Two more exceptions have been recorded since; see the Amendment.
 - Quota is enforced at the same boundary, inside the repository, before the write.
 
 Considered and rejected: enforcing tenancy in a service layer above the repositories. It reads
@@ -53,3 +53,28 @@ be understood before anyone can write a query at all, which is a real onboarding
 
 We accept all of that, because the alternative failure is unrecoverable: a customer's transactions
 shown to a stranger cannot be un-shown.
+
+## Amendment
+
+Date: 2026-10-09. Written against the code of stages `04-S1` and `22-S1`. The text above stands as
+the decision of 2026-09-01; where it disagrees with what follows, this section is the record of
+what the code does. It adds nothing to the Decision: it records two exceptions the Decision does not
+name, and `docs/SPEC.md` §5.2 is the canonical statement of all three.
+
+- **Reconciled with SPEC §5.2.** The Decision names `src/server/catalog` only. SPEC §5.2 also lists
+  `billing_events` (`docs/plans/22-billing.md`, stage `22-S1`): a webhook delivery arrives before
+  its workspace is known, so `organization_id` is nullable and the two writes that record and close
+  a delivery take a bare `Database`. The ADR did not carry that exception; it does now.
+- **A third exception: the workspace-creation write.** The `organization_currencies` insert inside
+  the `db.batch` in `src/server/auth/organization.ts` is written outside `src/server/repos`. It is
+  insert-only, it sits in the same batch as the `organization` and owner `member` inserts, and its
+  `organizationId` is the id that batch generates, never one taken from a request. No `TenantScope`
+  exists before the workspace does, and the write cannot be split off, because a workspace without
+  a base currency leaves `conversionContextFor`, and so every `ref_amount_minor`, undefined. The
+  module never reads or updates tenant rows without a scope.
+- **What the third exception does not cover.** No read, update or delete, and no other table. It is
+  not inherited: the writes plan stage `26-S1` makes at workspace creation (`workspace_settings`,
+  preset categories and budgets) need their own recorded decision in that ticket.
+- **Considered and rejected for now:** moving the write behind the repository layer. It needs a
+  bootstrap-scope concept in the tenancy layer, which is heavier and harder to reverse than
+  recording what the code does; the rule text contradicting the code was the worse state.

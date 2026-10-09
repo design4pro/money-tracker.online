@@ -233,8 +233,10 @@ export function createTenantRepository<T extends KeyedTenantTable>(
 - `assertScopedWrite` throws when a write composes to an empty predicate list — "refusing to write to
   every transactions row" is a real message and it has earned its place.
 
-`src/server/catalog` is the only carve-out (global tables with no `organization_id`), guarded by
-`requirePermission` plus a `platform_audit_log` write.
+`src/server/catalog` is a carve-out (global tables with no `organization_id`), guarded by
+`requirePermission` plus a `platform_audit_log` write. `billing_events` and the insert-only
+`organization_currencies` write in the workspace-creation batch are the other two
+(`docs/SPEC.md` §5.2).
 
 ### 4.2 Transaction read and write policies
 

@@ -54,8 +54,9 @@ These are not style preferences. Each one has a failure mode behind it.
 2. **A recomputed historical conversion.** `ref_amount_minor` is written once at the booked date's
    rate and never recalculated. A report that re-derives one is a defect. `docs/MONEY.md` §3.
 3. **SQL outside `src/server/repos`.** All data access goes through the tenant-scoped repository.
-   `src/server/catalog` is the single stated exception, guarded by `requirePermission` plus a
-   platform audit-log write. `docs/adr/0002-tenant-scoped-repository-boundary.md`.
+   `docs/SPEC.md` §5.2 lists the three documented exceptions: `src/server/catalog`, guarded by
+   `requirePermission` plus a platform audit-log write; `billing_events`; and the insert-only
+   `organization_currencies` write in the workspace-creation batch. `docs/adr/0002-tenant-scoped-repository-boundary.md`.
 4. **A repository function with no tenant-isolation test.** A new read or write path in a repo
    module ships with its case in `src/server/repos/__tests__/tenant-isolation.test.ts`.
 5. **A write path that touches an amount with no money-invariant test.** The money boundary is a

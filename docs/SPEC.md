@@ -180,11 +180,22 @@ remove that one. Forgetting the tenant filter is not expressible.
 (currencies, exchange rates, brand logos) — guarded instead by `requirePermission` plus a
 `platform_audit_log` write.
 
-`billing_events` is the **second and last** (`docs/plans/22-billing.md`, stage `22-S1`): a webhook
+`billing_events` is the **second** (`docs/plans/22-billing.md`, stage `22-S1`): a webhook
 delivery arrives before we know which workspace it belongs to, so its `organization_id` is nullable
 and the two writes that record and close a delivery take a bare `Database`. They are reachable only
 from the webhook endpoint and its queue handler, never from a server function; the one read a
 workspace can reach goes through `tenantFilter` like every other read in the directory.
+
+The **third** is one write: the `organization_currencies` insert inside the workspace-creation
+`db.batch` in `src/server/auth/organization.ts` (stage `04-S1`). It is insert-only and sits in the
+same batch as the `organization` and the owner `member` inserts, and its `organizationId` is the id
+that batch generates, never one taken from a request. The reason is that no `TenantScope` exists
+before the workspace does, and the write cannot be split off: a workspace without a base currency
+leaves `conversionContextFor`, and so every `ref_amount_minor`, undefined, so atomicity needs one
+batch. The module never reads or updates tenant rows without a scope. The exception covers no read,
+update or delete and no other table, and it is not inherited: the writes plan stage `26-S1` makes at
+workspace creation (`workspace_settings`, preset categories and budgets) need their own recorded
+decision in that ticket.
 
 `assertScopedWrite` throws when a write composes to an empty predicate list. Transaction reads and
 writes additionally require **explicit policies** — planned, balance-adjustment, transfer and
@@ -248,7 +259,7 @@ src/
   server/
     db/            schema.ts (shared path), auth-schema.ts
     repos/         ALL SQL. Tenant-scoped base repository. __tests__/ lives here
-    catalog/       the single tenancy carve-out
+    catalog/       a tenancy carve-out (§5.2 lists all three)
     fns/           server functions
     ledger/        the balance-history rebuild and the LEDGER DO client
     import/        ofx/, qif/, csv/ parsers
@@ -266,7 +277,7 @@ e2e/                 <module>.visual.spec.ts, one per module
 ### 6.1 Layering (contract, not style)
 
 - All SQL lives in `src/server/repos` and goes through the tenant-scoped base repository. The tenant
-  predicate must not be removable. `src/server/catalog` is the only carve-out.
+  predicate must not be removable. §5.2 lists the three documented exceptions.
 - Routes call server functions; server functions call repositories. **No SQL anywhere else.**
 - **Money never leaves the integer minor-unit representation.** No float arithmetic on an amount, at
   any layer, ever. Formatting is the only place a decimal appears and it goes through

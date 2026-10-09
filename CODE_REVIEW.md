@@ -22,9 +22,11 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 
 - **Data access.** Every query goes through the tenant-scoped base repository in
   `src/server/repos`, takes a `TenantScope` as its first parameter, and the tenant predicate cannot
-  be removed by a caller. `docs/SPEC.md` §5.2 documents exactly two exceptions: `src/server/catalog`,
-  guarded by `requirePermission` plus a platform audit-log write, and `billing_events`, whose two
-  delivery writes take a bare `Database` because a webhook arrives before its workspace is known.
+  be removed by a caller. `docs/SPEC.md` §5.2 documents three exceptions: `src/server/catalog`,
+  guarded by `requirePermission` plus a platform audit-log write; `billing_events`, whose two
+  delivery writes take a bare `Database` because a webhook arrives before its workspace is known;
+  and the insert-only `organization_currencies` write in the workspace-creation batch, which has no
+  `TenantScope` to take because the workspace does not exist yet. Anything wider is a finding.
 - **Money.** No float arithmetic on an amount anywhere, including a tooltip or a chart label. The
   scale is `currencies.digits`, never a hard-coded 2. `ref_amount_minor` is written once at the
   booked date's rate and never recomputed. Balances are rebuilt wholesale through the `LEDGER`
