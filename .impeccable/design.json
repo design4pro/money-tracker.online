@@ -1009,7 +1009,7 @@
       },
       {
         "name": "The Colour-Is-Never-Alone Rule",
-        "body": "Money direction is never encoded by colour alone, and colour is not even the first channel: every amount carries an explicit sign, inflow is set at the bold weight and outflow at regular, a transfer carries a repeat glyph, and the product stays correct with all colour removed. The measured dichromat separation of the green and red inks is the reason.",
+        "body": "Money direction is never encoded by colour alone, and colour is not even the first channel: every amount carries an explicit sign, inflow is set at the bold weight and outflow at regular, a transfer carries a repeat glyph, and the product stays correct with all colour removed. The measured dichromat separation of the green and red inks is the reason. The rule is wider than direction. A status is named by a word, never by its hue alone (`### Badges`, the accessibility contract). A chart series is told apart by something besides its hue: ADR 0007 requires a marker shape, a dash pattern or a direct in-place label for each series, and a text table carrying the data drawn (`### Charts`). A category carries its series colour as a dot beside its name, so the colour is never the only identifier (`### Badges`, when not to use one).",
         "section": "colors"
       },
       {
