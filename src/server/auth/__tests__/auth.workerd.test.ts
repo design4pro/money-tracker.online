@@ -18,6 +18,10 @@ import { env } from 'cloudflare:workers'
 import { betterAuth } from 'better-auth'
 import { describe, expect, it, vi } from 'vitest'
 
+import {
+  DEFAULT_BASE_CURRENCY_CODE,
+  DEFAULT_WORKSPACE_CURRENCY_CODES,
+} from '../../catalog/data/currencies'
 import { appUrl } from '../env'
 import { authOptions } from '../config'
 
@@ -75,11 +79,25 @@ describe('email sign-up through Better Auth in workerd', () => {
     expect(workspaces.results[0]!.role).toBe('owner')
 
     const organizationId = workspaces.results[0]!.organizationId
-    const baseCurrencies = await env.DB.prepare(
-      'SELECT currency_code FROM organization_currencies WHERE organization_id = ? AND is_base = 1',
+    const organizations = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM organization',
+    ).first<{
+      n: number
+    }>()
+    expect(organizations!.n).toBe(1)
+
+    const currencies = await env.DB.prepare(
+      'SELECT currency_code AS code, is_base AS isBase FROM organization_currencies WHERE organization_id = ?',
     )
       .bind(organizationId)
-      .all()
-    expect(baseCurrencies.results).toHaveLength(1)
+      .all<{ code: string; isBase: number }>()
+    expect(currencies.results.map((row) => row.code).sort()).toEqual(
+      [...DEFAULT_WORKSPACE_CURRENCY_CODES].sort(),
+    )
+    expect(
+      currencies.results
+        .filter((row) => row.isBase === 1)
+        .map((row) => row.code),
+    ).toEqual([DEFAULT_BASE_CURRENCY_CODE])
   })
 })
