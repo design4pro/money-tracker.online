@@ -106,8 +106,16 @@ const workerdProject = {
       miniflare: {
         compatibilityDate: '2026-08-15',
         compatibilityFlags: ['nodejs_compat'],
-        // Read in Node, applied inside workerd by `vitest.setup.workerd.ts`.
-        bindings: { TEST_MIGRATIONS: migrations },
+        bindings: {
+          // Read in Node, applied inside workerd by `vitest.setup.workerd.ts`.
+          TEST_MIGRATIONS: migrations,
+          // Fake auth bindings for `src/server/auth/__tests__/auth.workerd.test.ts`. The secret is
+          // not a credential: it is long enough for Better Auth, says so, and matches no deployment.
+          // The empty key makes `emailDelivery()` null, so no email is sent, whatever `.dev.vars`
+          // holds on a developer's machine.
+          BETTER_AUTH_SECRET: 'test-only-better-auth-secret-not-a-credential',
+          EMAIL_API_KEY: '',
+        },
       },
       wrangler: { configPath: './wrangler.jsonc' },
     }),
