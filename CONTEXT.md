@@ -13,7 +13,7 @@ already caused, or would obviously cause, two people to mean two things by one w
   has no meaningful net-worth figure. _Avoid_: "account" for a workspace; "team".
 - **Personal workspace** — the workspace provisioned automatically for a person at sign-up. Its id
   is a pure function of the user id, so the primary key lets only one of two concurrent provisions
-  win. Workspaces created later keep their own random ids. _Avoid_: "default workspace".
+  win, unless another workspace already holds that id. Workspaces created later keep their own random ids. _Avoid_: "default workspace".
 - **Member** — a person with a login who belongs to a workspace, holding one workspace role:
   _owner_, _admin_ or _member_. _Avoid_: "user" when the workspace relationship is what is meant.
 - **Account** — a place money is held or owed: cash, a current account, a card, savings, an

@@ -14,8 +14,9 @@
  *   memberships alone loses the race and strands a brand-new session with a null active workspace.
  *   It also covers the accounts that existed before this shipped.
  *
- * {@link provisionPersonalWorkspace} is idempotent, which is what makes running it from two places
- * safe rather than duplicating workspaces.
+ * {@link provisionPersonalWorkspace} is idempotent for a user that already has a workspace, and the
+ * workspace id is a pure function of the user id, so the primary key keeps two concurrent calls to
+ * one workspace per user rather than duplicating it.
  *
  * Every function takes its database handle as an argument and none of them reaches a binding, so the
  * whole module is exercised against real SQLite in `__tests__/organization.test.ts`.
@@ -144,7 +145,8 @@ const SLUG_RETRIES = 3
  * ladder is bounded and its last rung is long enough to be unique without another read.
  *
  * This is a read followed by a write, so it narrows the window and does not close it: two callers
- * can read the same free slug. {@link provisionPersonalWorkspace} owns the retry that closes it.
+ * can read the same free slug. {@link provisionPersonalWorkspace} owns the retry that closes it,
+ * and its primary key keeps one user to one workspace.
  */
 export async function reserveSlug(
   db: AppDatabase,
@@ -239,10 +241,12 @@ export async function provisionPersonalWorkspace(
       ])
       return organizationId
     } catch (error) {
-      if (attempt >= MAX_PROVISION_ATTEMPTS) throw error
-
+      // The winner re-read comes first, so a user whose last attempt lost the race still gets the
+      // workspace the other call created instead of a failed sign-up.
       const winner = await firstOrganizationIdFor(db, user.id)
       if (winner) return winner
+
+      if (attempt >= MAX_PROVISION_ATTEMPTS) throw error
 
       if (await organizationExists(db, eq(organization.id, organizationId))) {
         organizationId = newAuthId()

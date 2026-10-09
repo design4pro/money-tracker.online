@@ -306,8 +306,63 @@ describe('provisionPersonalWorkspace under a race', () => {
     const memberships = await membershipsOf(ANNA.id)
     expect(memberships).toHaveLength(1)
     expect(memberships[0]?.organizationId).toBe(organizationId)
+    // The foreign workspace gained no member: the failed batch rolled back whole.
+    await expect(
+      membershipRoleFor(db, {
+        userId: ANNA.id,
+        organizationId: await personalWorkspaceId(ANNA.id),
+      }),
+    ).resolves.toBeNull()
     // The attempt on the deterministic id, then the one on a random id.
     expect(spy.batchCalls()).toBe(2)
+  })
+
+  it('returns the winner’s workspace when the race is lost on the last attempt', async () => {
+    const winnerId = await personalWorkspaceId(ANNA.id)
+    let calls = 0
+    const racing = new Proxy(db, {
+      get(inner, property) {
+        const value: unknown = Reflect.get(inner, property, inner)
+        if (property !== 'batch') {
+          return typeof value === 'function' ? value.bind(inner) : value
+        }
+        return async (...args: Parameters<AppDatabase['batch']>) => {
+          calls += 1
+          const [first] = args[0]
+          // The organization insert's params are [id, name, slug, ...].
+          const slug = first.toSQL().params[2] as string
+          if (calls < 4) {
+            // Someone else takes the slug this attempt drew, so the batch collides on it.
+            await seedOrganization(db, {
+              id: `org-clash-${calls}`,
+              name: 'Someone else',
+              slug,
+            })
+          } else {
+            // The other hook's batch commits just before the fourth attempt's.
+            await seedOrganization(db, {
+              id: winnerId,
+              name: 'Anna',
+              slug: 'anna-winner',
+            })
+            await db.insert(member).values({
+              id: 'member-winner',
+              organizationId: winnerId,
+              userId: ANNA.id,
+              role: 'owner',
+              createdAt: new Date(),
+            })
+          }
+          return inner.batch(...args)
+        }
+      },
+    })
+
+    await expect(provisionPersonalWorkspace(racing, ANNA)).resolves.toBe(
+      winnerId,
+    )
+    expect(calls).toBe(4)
+    await expect(membershipsOf(ANNA.id)).resolves.toHaveLength(1)
   })
 
   it('rethrows a failure that is not a collision, once, and leaves nothing behind', async () => {
