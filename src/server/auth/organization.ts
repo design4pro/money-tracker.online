@@ -54,6 +54,8 @@ import {
 } from '#/server/catalog/data/currencies'
 import { organizationCurrencies } from '#/server/db/schema'
 
+import type { SQL } from 'drizzle-orm'
+
 import type { OrganizationRole } from '#/server/db/auth-schema'
 import type { AppDatabase } from './db'
 
@@ -102,6 +104,35 @@ export function personalWorkspaceSlug(input: {
   return base || 'workspace'
 }
 
+/** Prefix of the hashed input, so the id cannot coincide with a hash of the bare user id. */
+const PERSONAL_WORKSPACE_ID_PREFIX = 'mtr:personal-workspace:'
+
+/** How many times {@link provisionPersonalWorkspace} submits its batch before giving up. */
+const MAX_PROVISION_ATTEMPTS = 4
+
+/**
+ * The id of a user's auto-provisioned personal workspace: a pure function of the user id.
+ *
+ * Nothing in the schema is unique per user (`member` is unique on the pair, `organization` on the
+ * slug), so two provisions of one user would otherwise both commit. With the id derived from the
+ * user, they insert the same primary key and exactly one batch wins, whichever slug each drew.
+ *
+ * The hash is plain and unkeyed on purpose. An HMAC keyed with the auth secret would stop being
+ * deterministic the day the secret rotates, and the id protects nothing by being secret:
+ * `requireOrg` treats a workspace id as an assertion checked against `member`, never a selector.
+ * 24 base64url characters, the shape of every other id in the auth tables.
+ */
+export async function personalWorkspaceId(userId: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${PERSONAL_WORKSPACE_ID_PREFIX}${userId}`),
+  )
+  // 18 bytes are exactly 24 base64 characters, so there is no padding to strip.
+  return btoa(String.fromCharCode(...new Uint8Array(digest).slice(0, 18)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
 /** How many random suffixes are tried before the unconditionally-unique fallback. */
 const SLUG_RETRIES = 3
 
@@ -111,6 +142,9 @@ const SLUG_RETRIES = 3
  * `organization.slug` carries a unique index, so a collision is a failed insert rather than a
  * duplicate — and two people called Anna signing up in the same minute is not an edge case. The
  * ladder is bounded and its last rung is long enough to be unique without another read.
+ *
+ * This is a read followed by a write, so it narrows the window and does not close it: two callers
+ * can read the same free slug. {@link provisionPersonalWorkspace} owns the retry that closes it.
  */
 export async function reserveSlug(
   db: AppDatabase,
@@ -144,7 +178,19 @@ export async function reserveSlug(
  * clean up. The batch is atomic and is also a single network hop, which matters on a sign-up path.
  *
  * Idempotent: an account that already belongs to a workspace is left alone, so the second hook — and
- * a retried one — cannot spawn duplicates.
+ * a retried one — cannot spawn duplicates. What keeps two *concurrent* calls to one workspace per
+ * user is the primary key, not the slug ladder: the workspace id is {@link personalWorkspaceId}, so
+ * both calls insert the same key and one batch fails.
+ *
+ * A failed batch is retried (at most {@link MAX_PROVISION_ATTEMPTS} attempts) and the cause is read
+ * from database state, never from the error: SQLite names a column and D1 wraps the error again, so
+ * a string match could pass against the test harness and miss in production. In order:
+ *
+ * 1. the user now has a workspace → the other call won; return it;
+ * 2. the attempted id is held by a workspace → it is one this user is not in (step 1 found none), so
+ *    draw a random id rather than lock the user out, at the price of the race protection;
+ * 3. the attempted slug is held → reserve another;
+ * 4. none of these → not a collision; rethrow, so a failure that cannot be retried never loops.
  */
 export async function provisionPersonalWorkspace(
   db: AppDatabase,
@@ -153,42 +199,72 @@ export async function provisionPersonalWorkspace(
   const existing = await firstOrganizationIdFor(db, user.id)
   if (existing) return existing
 
-  const organizationId = newAuthId()
-  const slug = await reserveSlug(db, personalWorkspaceSlug(user))
-  const now = new Date()
+  const baseSlug = personalWorkspaceSlug(user)
+  let organizationId = await personalWorkspaceId(user.id)
+  let slug = await reserveSlug(db, baseSlug)
 
-  await db.batch([
-    db.insert(organization).values({
-      id: organizationId,
-      name: personalWorkspaceName(user),
-      slug,
-      logo: null,
-      metadata: JSON.stringify({ personal: true }),
-      createdAt: now,
-      updatedAt: now,
-    }),
-    db.insert(member).values({
-      id: newAuthId(),
-      organizationId,
-      userId: user.id,
-      role: 'owner' satisfies OrganizationRole,
-      createdAt: now,
-    }),
-    // The workspace's currencies, base first. `live_rate_update` is true on all of them: a fresh
-    // workspace prices from the catalogue, and a household that settles at its own fixed rate says
-    // so afterwards. See the docblock for why this write is in the batch rather than in a repo.
-    db.insert(organizationCurrencies).values(
-      DEFAULT_WORKSPACE_CURRENCY_CODES.map((currencyCode) => ({
-        organizationId,
-        currencyCode,
-        isBase: currencyCode === DEFAULT_BASE_CURRENCY_CODE,
-        liveRateUpdate: true,
-        addedAt: now,
-      })),
-    ),
-  ])
+  for (let attempt = 1; ; attempt += 1) {
+    const now = new Date()
+    try {
+      await db.batch([
+        db.insert(organization).values({
+          id: organizationId,
+          name: personalWorkspaceName(user),
+          slug,
+          logo: null,
+          metadata: JSON.stringify({ personal: true }),
+          createdAt: now,
+          updatedAt: now,
+        }),
+        db.insert(member).values({
+          id: newAuthId(),
+          organizationId,
+          userId: user.id,
+          role: 'owner' satisfies OrganizationRole,
+          createdAt: now,
+        }),
+        // The workspace's currencies, base first. `live_rate_update` is true on all of them: a fresh
+        // workspace prices from the catalogue, and a household that settles at its own fixed rate
+        // says so afterwards. See the docblock for why this write is in the batch rather than in a
+        // repo.
+        db.insert(organizationCurrencies).values(
+          DEFAULT_WORKSPACE_CURRENCY_CODES.map((currencyCode) => ({
+            organizationId,
+            currencyCode,
+            isBase: currencyCode === DEFAULT_BASE_CURRENCY_CODE,
+            liveRateUpdate: true,
+            addedAt: now,
+          })),
+        ),
+      ])
+      return organizationId
+    } catch (error) {
+      if (attempt >= MAX_PROVISION_ATTEMPTS) throw error
 
-  return organizationId
+      const winner = await firstOrganizationIdFor(db, user.id)
+      if (winner) return winner
+
+      if (await organizationExists(db, eq(organization.id, organizationId))) {
+        organizationId = newAuthId()
+      } else if (await organizationExists(db, eq(organization.slug, slug))) {
+        slug = await reserveSlug(db, baseSlug)
+      } else {
+        throw error
+      }
+    }
+  }
+}
+
+async function organizationExists(
+  db: AppDatabase,
+  condition: SQL,
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: organization.id })
+    .from(organization)
+    .where(condition)
+    .limit(1)
+  return rows.length > 0
 }
 
 /** The workspace a returning account lands in: its oldest membership. */
