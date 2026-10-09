@@ -82,7 +82,8 @@ sees for a week, in exchange for a checklist that is never wrong.
     rows land in one batch, with the workspace-provisioning batch in
     `src/server/auth/organization.ts` as the precedent. Nothing calls `createOrganization`, so
     `allowUserToCreateOrganization` is turned off **in the same change as the choice**: the auth
-    config, its pin in the config test, and the comment on `DISABLED_ORGANIZATION_PATHS` in
+    config and its comment, its pin in the config test, the in-process case in
+    `organization-route.test.ts`, and the comment on `DISABLED_ORGANIZATION_PATHS` in
     `permissions.ts`.
 - **Base currency is chosen here and only here** — `23-S2` made it permanently read-only afterwards,
   for the `ref_amount_minor` reason recorded there. The form therefore states, at the point of choice,
