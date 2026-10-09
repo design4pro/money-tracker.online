@@ -75,8 +75,8 @@ Five claims, all five checkable:
   and one currency; `plus` is one person without ceilings and with as many currencies as they
   keep; `household` is up to six people sharing one workspace with nothing capped. The numbers
   live in `src/lib/plans.ts` and are the ones enforced.
-- **Authentication through Better Auth**, sessions in KV, with passkeys, TOTP two-factor and
-  optional Google / Apple sign-in.
+- **Authentication through Better Auth**, sessions in KV, with TOTP two-factor, optional Google /
+  Apple sign-in and passkeys (planned, `04-S4`).
 - **The reference product** (an open-source budget tracker and a commercial competitor's public
   demo) is a **feature and quality benchmark only**. Never copy its source, comments, strings,
   schema names or assets; never use its name, wordmark or logo anywhere in this repository or on
