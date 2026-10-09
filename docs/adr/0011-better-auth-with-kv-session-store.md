@@ -83,10 +83,11 @@ section is the record of what the code does.
   A session that has expired or been evicted from `SESSIONS` means signing in again. D1 holds the
   verification rows (`verification.storeInDatabase: true`) and the rest of the auth tables, not the
   session.
-- **No `cookieCache`, and what that buys.** A ban or a role change is visible on the next request:
-  `requireOrg` re-reads the role from the `member` row on every call and the guards refuse a banned
-  account. This is not an "immediate" guarantee for the session record itself, which sits in an
-  eventually-consistent store.
+- **No `cookieCache`, and what that buys.** The workspace role is a fact read from the `member` row
+  on every call: `requireOrg` re-reads it, so a demotion applies to the next call. A ban and the
+  platform role are different: the guards read them from the session record held in `SESSIONS`, so
+  they take effect when Better Auth rewrites or deletes that record, bounded by the propagation of an
+  eventually-consistent store. Nothing here promises "immediate" revocation of a session.
 - **Rate limits are seven rules**, with the four above first. The others are `/reset-password`
   10/300s, `/send-verification-email` 5/300s and `/two-factor/verify-backup-code` 5/300s, and the
   global default is 100/60s. The counters live in `SESSIONS` and are approximate: a courtesy guard
@@ -96,7 +97,8 @@ section is the record of what the code does.
   3.3.9 Accessible Authentication (Enhanced) criterion before it does.
 - **Closed routes.** `disabledPaths` closes the fifteen `/admin/*` paths and `/organization/create`
   on the HTTP surface only. In-process `auth.api.*` calls never pass through the router and stay
-  usable, gated by `permits`; plan stage `26-S1` creates workspaces that way. The pull request that
+  intended to stay usable behind `permits` once a caller exists; none does yet, and plan stage `26-S1`
+  has not settled between `auth.api.createOrganization` and a direct batch. The pull request that
   closed the create-organization route is #624.
 - **The personal workspace's base currency is a fixed `PLN`**, with `EUR`, `USD` and `GBP` beside
   it, written as `organization_currencies` rows in the same `db.batch` as the organization and the

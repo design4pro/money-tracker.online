@@ -21,7 +21,7 @@ the platform console (plan `24`), and billing entitlements (plan `22`).
 
 ## Stage 04-S1 — Better Auth, KV sessions, and workspace provisioning
 
-Delivered: 2026-10-09 - the auth code under `src/server/auth/` (`config.ts`, `index.ts`, `organization.ts`, `guards.ts`, `permissions.ts`, `db.ts`, `email.ts`, `env.ts`, `secondary-storage.ts`, `tenant.ts`) and the route `src/routes/api/auth/$.ts`, with the tests `config.test.ts`, `guards.test.ts`, `organization.test.ts`, `permissions.test.ts`, `secondary-storage.test.ts` and `auth.workerd.test.ts` (#620 the deterministic personal-workspace id and the retry, #621 the configuration, hooks and KV adapter pinned, #623 a real email sign-up driven through Better Auth in workerd, #624 the create-organization route closed, #625 further pins); `pnpm vitest run src/server/auth --project=server` passes 116 tests in 7 files and `pnpm test:workerd` passes 14 tests in 4 files, `auth.workerd.test.ts` among them, so an end-to-end sign-up was driven; ADR 0011 carries the matching `## Amendment`.
+Delivered: 2026-10-09 - the auth code under `src/server/auth/` (`config.ts`, `index.ts`, `organization.ts`, `guards.ts`, `permissions.ts`, `db.ts`, `email.ts`, `env.ts`, `secondary-storage.ts`, `tenant.ts`) and the route `src/routes/api/auth/$.ts`, with the tests `config.test.ts`, `guards.test.ts`, `organization.test.ts`, `permissions.test.ts`, `secondary-storage.test.ts`, `email.test.ts`, `organization-route.test.ts` and `auth.workerd.test.ts` (#620 the deterministic personal-workspace id and the retry, #621 the configuration, hooks and KV adapter pinned, #623 a real email sign-up driven through Better Auth in workerd, #624 the create-organization route closed, #625 further pins); `pnpm vitest run src/server/auth --project=server` passes 116 tests in 7 files and `pnpm test:workerd` passes 14 tests in 4 files, `auth.workerd.test.ts` among them, so an end-to-end sign-up was driven; ADR 0011 carries the matching `## Amendment`.
 
 ### Stage id
 
@@ -52,7 +52,8 @@ Delivered: 2026-10-09 - the auth code under `src/server/auth/` (`config.ts`, `in
 
 `organization.ts` writes `organization_currencies` outside `src/server/repos` by design: the
 workspace it would need a `TenantScope` for is created by the same batch (see the docblock of
-`organization.ts`).
+`organization.ts`). This is a third departure from the two exceptions `docs/SPEC.md` §5.2 documents,
+and §5.2 does not record it yet.
 
 ### Data and migration
 
@@ -66,7 +67,7 @@ of thing a well-meaning refactor "fixes".
 
 - **Configuration**, and each of these is load-bearing rather than stylistic:
   - `secondaryStorage` is the `SESSIONS` KV binding. Sessions, OAuth state and rate-limit counters
-    live there, with a 60 s TTL floor (the KV minimum) on every write.
+    live there, with a 60 s TTL floor (the KV minimum) on every write that carries a TTL.
   - **No `cookieCache`.** A signed session snapshot is a window — five minutes by default — in which
     a banned or removed account keeps authority. The cost is a KV read per request; the alternative
     is an authorisation decision made from stale data.
@@ -138,7 +139,8 @@ compute a single report.
   `organizationId` is ignored.
 - `permissions.test.ts`: the two role dictionaries are separate types and mixing them is a type
   error, asserted with `expectTypeOf` and checked by `pnpm typecheck`.
-- `organization.test.ts`: provisioning is one batch; a collision retries; both hooks provision; one
+- `config.test.ts`: both hooks provision, and running both leaves one workspace.
+- `organization.test.ts`: provisioning is one batch; a collision retries; one
   personal workspace per user under a race; exactly one base currency is always set.
 - `auth.workerd.test.ts`: a real email sign-up through `betterAuth(authOptions())` in workerd,
   showing the session key in `SESSIONS` and the workspace row in `DB`. It replaces the manual
