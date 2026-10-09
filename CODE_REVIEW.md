@@ -45,22 +45,21 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 - **Dependencies.** The set is frozen (`docs/SPEC.md` §3). A new package is a blocker, not a
   judgement call.
 - **Tests.** A new repository function has its tenant-isolation case; a money-touching write path
-  has its money-invariant case; a behaviour change has a test that fails without it. No added
-  suppression, skip or focus; no deleted test file.
-- **A test that cannot fail proves nothing.** A pinning or guard test is seen red once: revert what
-  it pins and read the failure. A count with no control, or a measurement that cannot reach the
-  fault, passes on a broken tree (#541, #604, #623, #625); a pin never seen red is the major
-  "without a failing-first test" of the table below.
+  has its money-invariant case; a behaviour change has a test that fails without it, and a pin or
+  guard test has been seen red once (revert what it pins; a count with no control passes on a broken
+  tree: #541, #604, #623, #625), and a pin never seen red is the major below. No added suppression,
+  skip or focus; no deleted test file.
 - **Layout lives in the browser.** A behaviour carried only by classes (a stacked row, a popover
   width, `flex-shrink` under overflow) is asserted by a Playwright case that reads computed layout,
   with enough rows or width to reach the fault. jsdom computes no CSS, so a unit test stays green
-  with the class deleted (#561, #577, #609); same severity.
+  with the class deleted (#577, #609); a miss is major.
 - **Clean room.** Nothing is copied from the reference product (`docs/agents/reference.md`): not a
   string, a name, a number or a layout.
 - **Numbers.** Every count in the PR body and the review came from a command whose output was read
   (`docs/SPEC.md` §7.7). The same holds for a figure written into a spec, a plan, an ADR or a code
   comment: it is re-derived on the head under review, and a headline total agrees with the table it
-  summarises (#170, #191, #222, #250, #252, #253).
+  summarises (#170, #191, #222, #250, #252, #253). A claim about what a tool or the suite does is
+  probed, not copied from a comment (#472, #531, #574).
 - **Governance documents.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`,
   `docs/MONEY.md` and `docs/adr/` record decisions a person owns. A PR touching one is
   `risk-high`. Reviewing it means reading the decision, not only the
