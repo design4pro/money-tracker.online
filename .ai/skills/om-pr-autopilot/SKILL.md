@@ -120,3 +120,9 @@ These hold for every skill this run chains, whether or not its own override was 
   `"$TEST_OWNER_PASSWORD"` in the command (AGENTS.md).
 - **The dev server URL is `baseUrl` in `.ai/qa/test-env.json`** (`om-prepare-test-env` writes it).
   Never derive it from `.dev.vars`, which the agent never reads.
+- **A push restarts the CI queue, so push once.** `ci.yml` cancels the queued run of the previous
+  head on every push to a pull request (`cancel-in-progress`), and the self-hosted runners can hold
+  the required checks for 40 minutes or more when several `cez/*` branches push at once. Gather the
+  review fixes and the autofix into one commit and one push instead of one push per finding. The
+  autopilot runs for #533, #588, #596, #598, #604, #608, #609 and #610 each hit required checks
+  still queued past the wait budget.

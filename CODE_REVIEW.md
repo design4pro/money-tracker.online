@@ -47,6 +47,14 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 - **Tests.** A new repository function has its tenant-isolation case; a money-touching write path
   has its money-invariant case; a behaviour change has a test that fails without it. No added
   suppression, skip or focus; no deleted test file.
+- **A test that cannot fail proves nothing.** A pinning or guard test is seen red once: revert what
+  it pins and read the failure. A count with no control, or a measurement that cannot reach the
+  fault, passes on a broken tree (#541, #604, #623, #625); a pin never seen red is the major
+  "without a failing-first test" of the table below.
+- **Layout lives in the browser.** A behaviour carried only by classes (a stacked row, a popover
+  width, `flex-shrink` under overflow) is asserted by a Playwright case that reads computed layout,
+  with enough rows or width to reach the fault. jsdom computes no CSS, so a unit test stays green
+  with the class deleted (#561, #577, #609); same severity.
 - **Clean room.** Nothing is copied from the reference product (`docs/agents/reference.md`): not a
   string, a name, a number or a layout.
 - **Numbers.** Every count in the PR body and the review came from a command whose output was read

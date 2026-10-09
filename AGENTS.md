@@ -35,7 +35,12 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   task branch, and Dependabot's and other bot branches are outside the rule. PRs target `develop`
   and carry `Closes #<n>` when there is an issue (a stacked PR is the one exception to the target:
   `SDLC.md` -> Stacked pull requests).
-- Every number you write down came from a command whose output you read (`docs/SPEC.md` §7.7).
+- Every number you write down came from a command whose output you read (`docs/SPEC.md` §7.7). So
+  does every claim about what a tool, a library or the suite does: probe it once instead of copying
+  a sentence from a comment, an ADR or a brief (#472, #531, #562, #574, #626).
+- In a worktree every `Write` and `Edit` path starts at the worktree root (`$PWD`). The worktree is
+  nested inside the main checkout, so a path that stops short of its own directory lands in the
+  main checkout and leaves a stray file there (runs ae3e4860 for #588, b778b4dc for #624).
 - Verify before claiming: skill `verifying-changes` is the ladder; `docs/SPEC.md` §7 is done.
 
 ## Ask First
@@ -80,6 +85,14 @@ node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>con
 request that can change what the browser sees (`scripts/ci/change-scope.mjs`) and on every push to
 `develop`, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
 repo) is not a gate either; keep what you touch prettier-clean.
+
+`pnpm test` takes 160-200 s (#472, #525, #588), longer than the Bash tool's 120 s default: pass
+`timeout: 600000` and write the output to a file. A call over the default is moved to the
+background, and a Cezar run's background job dies with the turn.
+
+The three `git diff --exit-code` commands compare the regenerated file with the **index**, so stage
+the change (`git add -A`) before running the gate: a correct but unstaged spec index or route tree
+fails it (#537, #550).
 
 The gate's first two commands regenerate and diff, but they do not both catch a hand edit.
 `pnpm generate-routes` rewrites `src/routeTree.gen.ts` whole, so any edit to it shows in the diff.
