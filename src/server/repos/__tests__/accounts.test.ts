@@ -49,6 +49,8 @@ import {
   deleteAccount,
   deleteAccountGroup,
   getAccount,
+  getAccountBalanceOn,
+  getAccountBalanceOnSchema,
   listAccountGroups,
   listAccounts,
   reorderAccountGroups,
@@ -1142,6 +1144,113 @@ describe('adjustAccountBalance', () => {
       .where(eq(transactions.accountId, 'acc-b'))
     expect(rows).toHaveLength(0)
     expect((await accountRow('acc-b'))?.currentBalanceMinor).toBe(5_000)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* The balance on a day                                                        */
+/* -------------------------------------------------------------------------- */
+
+describe('getAccountBalanceOn', () => {
+  it('equals the base adjustAccountBalance measures, on a past day and on today with a stale cache', async () => {
+    const created = await createAccount(
+      scope,
+      { ...EVERYDAY, initialBalanceMinor: 100_00 },
+      conversion,
+    )
+    await seedTransaction({
+      accountId: created.id,
+      direction: 'income',
+      amountMinor: 40_00,
+      bookedOn: '2026-03-14',
+    })
+    // The cache is the ledger's to rebuild and can lag; the read must not consult it.
+    await db
+      .update(accounts)
+      .set({ currentBalanceMinor: 999_99 })
+      .where(eq(accounts.id, created.id))
+
+    for (const bookedOn of ['2026-03-14', '2026-03-15']) {
+      const read = await getAccountBalanceOn(scope, {
+        accountId: created.id,
+        on: bookedOn,
+      })
+      const written = await adjustAccountBalance(
+        scope,
+        { accountId: created.id, targetMinor: 1_000_00, bookedOn },
+        conversion,
+      )
+      expect(read.balanceMinor).toBe(140_00)
+      expect(written).toMatchObject({
+        status: 'recorded',
+        balanceMinor: 140_00,
+      })
+      // The write above booked a correction; remove it so the next date is read from the same
+      // fixture rather than from the correction.
+      await db
+        .delete(transactions)
+        .where(eq(transactions.isBalanceAdjustment, true))
+    }
+  })
+
+  it('returns the balance on the earlier day when later transactions exist', async () => {
+    const created = await createAccount(
+      scope,
+      { ...EVERYDAY, initialBalanceMinor: 100_00 },
+      conversion,
+    )
+    await seedTransaction({
+      accountId: created.id,
+      direction: 'expense',
+      amountMinor: 30_00,
+      bookedOn: '2026-03-20',
+    })
+
+    expect(
+      await getAccountBalanceOn(scope, {
+        accountId: created.id,
+        on: '2026-03-19',
+      }),
+    ).toEqual({ balanceMinor: 100_00 })
+    expect(
+      await getAccountBalanceOn(scope, {
+        accountId: created.id,
+        on: '2026-03-20',
+      }),
+    ).toEqual({ balanceMinor: 70_00 })
+  })
+
+  it('writes nothing', async () => {
+    const created = await createAccount(scope, EVERYDAY, conversion)
+    executed.length = 0
+
+    await getAccountBalanceOn(scope, {
+      accountId: created.id,
+      on: '2026-03-15',
+    })
+
+    expect(executed.filter((query) => !/^\s*select/i.test(query))).toEqual([])
+  })
+
+  it('is strict about its shape: an extra key and a non-date are refused', async () => {
+    const created = await createAccount(scope, EVERYDAY, conversion)
+
+    expect(
+      getAccountBalanceOnSchema.safeParse({
+        accountId: created.id,
+        on: '2026-03-15',
+        organizationId: 'org-b',
+      }).success,
+    ).toBe(false)
+    expect(
+      getAccountBalanceOnSchema.safeParse({
+        accountId: created.id,
+        on: '15 March',
+      }).success,
+    ).toBe(false)
+    await expect(
+      getAccountBalanceOn(scope, { accountId: created.id, on: '15 March' }),
+    ).rejects.toThrow()
   })
 })
 

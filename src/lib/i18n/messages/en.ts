@@ -393,8 +393,10 @@ const messages = {
   'accounts.adjust.preview.expense': 'An expense of {amount}, dated {date}.',
   'accounts.adjust.preview.none':
     'Nothing. The balance on {date} already reads {amount}.',
-  'accounts.adjust.preview.past':
-    'The difference is measured against the balance at the end of {date}, which is read as you save. You are shown exactly what was written.',
+  'accounts.adjust.preview.loading': 'Reading the balance on {date}…',
+  'accounts.adjust.preview.error': 'The balance on {date} could not be read.',
+  'accounts.adjust.preview.blocked':
+    'The correction can be recorded once the balance on {date} has loaded.',
   'accounts.adjust.action': 'Record the correction',
   'accounts.adjust.result.title': 'Recorded',
   'accounts.adjust.result.income':
