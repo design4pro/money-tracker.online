@@ -8,7 +8,7 @@ import {
   stepMove,
 } from '../move'
 
-import type { CategoryTreeItem } from '../move'
+import type { TreeRow } from '../move'
 
 /**
  * The reordering rules, tested against arrays.
@@ -19,22 +19,8 @@ import type { CategoryTreeItem } from '../move'
  * reorder rule nobody re-tests after the first refactor.
  */
 
-function row(
-  id: string,
-  parentId: string | null = null,
-  extra: Partial<CategoryTreeItem> = {},
-): CategoryTreeItem {
-  return {
-    id,
-    name: id,
-    color: '#0d6abb',
-    icon: null,
-    kind: 'expense',
-    parentId,
-    isSystem: false,
-    isArchived: false,
-    ...extra,
-  }
+function row(id: string, parentId: string | null = null): TreeRow {
+  return { id, parentId }
 }
 
 /**
@@ -49,7 +35,7 @@ function row(
  * travel
  * ```
  */
-const tree: ReadonlyArray<CategoryTreeItem> = [
+const tree: ReadonlyArray<TreeRow> = [
   row('food'),
   row('groceries', 'food'),
   row('dining', 'food'),

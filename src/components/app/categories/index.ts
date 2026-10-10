@@ -23,14 +23,7 @@ export type { CategoryHue } from './palette'
 export { CategoryColourField } from './category-colour-field'
 export type { CategoryColourFieldProps } from './category-colour-field'
 
-export {
-  dropMove,
-  hasChildren,
-  reparentMove,
-  siblingsOf,
-  stepMove,
-} from './move'
-export type { CategoryMove, CategoryTreeItem, MoveStep } from './move'
+export type { CategoryMove, CategoryTreeItem } from './types'
 
 export { CategoryTree } from './category-tree'
 export type { CategoryTreeProps } from './category-tree'
