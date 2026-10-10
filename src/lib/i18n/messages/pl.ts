@@ -409,6 +409,10 @@ const messages = {
     'Nie udało się odczytać stanu konta na dzień {date}.',
   'accounts.adjust.preview.blocked':
     'Korektę zapiszesz, gdy odczytamy stan konta na dzień {date}.',
+  'accounts.adjust.preview.blockedFailed':
+    'Korektę zapiszesz, gdy odczytamy stan konta na dzień {date}. Wybierz „{retry}”, aby spróbować jeszcze raz.',
+  'accounts.adjust.preview.blockedFuture':
+    'Korekty nie zapiszesz z datą, która jeszcze nie nadeszła. Wybierz dzień do dzisiaj włącznie.',
   'accounts.adjust.action': 'Zapisz korektę',
   'accounts.adjust.result.title': 'Zapisano',
   'accounts.adjust.result.income': 'Zapisaliśmy wpływ {amount} z datą {date}.',
