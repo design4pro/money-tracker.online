@@ -42,6 +42,7 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { asCurrencyCode, asMinor } from '#/lib/money'
+import { assertBookable, isBookable } from '#/server/booking-rule'
 import { newId } from '#/server/db/ids'
 import { accounts, transactionSplits, transactions } from '#/server/db/schema'
 import { createTransferSchema, sidesOf } from '#/server/transfers/create'
@@ -179,6 +180,9 @@ export async function createTransfer(
   const { scope, conversion } = args
   const input = createTransferSchema.parse(args.input)
   const sides = sidesOf(input)
+  // A transfer leg is a settled row, so it takes the same rule as a transaction and is refused
+  // before any account is read or any leg written (`#/server/booking-rule`).
+  assertBookable({ bookedOn: input.bookedOn, isPlanned: false })
 
   const source = await prepareSide(scope, sides.source)
   const destination = await prepareSide(scope, sides.destination)
@@ -370,6 +374,14 @@ export async function updateTransfer(
 
   const legs = legsOf(pair)
   const bookedOn = patch.bookedOn ?? legs[0].bookedOn
+  // Per leg, with that leg's own planned flag, and only when the pair moves: a note or an amount
+  // edit of a legacy pair dated after the cutoff must still succeed.
+  for (const leg of legs) {
+    assertBookable(
+      { bookedOn, isPlanned: leg.isPlanned },
+      { stored: { bookedOn: leg.bookedOn, isPlanned: leg.isPlanned } },
+    )
+  }
   const sourceAmountMinor = amountOf(pair.source, patch.sourceAmountMinor)
   const destinationAmountMinor = amountOf(
     pair.destination,
@@ -591,6 +603,14 @@ export async function convertToTransfer(
     if (counterAccount.currencyCode !== transaction.currencyCode) {
       throw new ConflictError(
         `Account ${counterAccount.id} is in ${counterAccount.currencyCode} and the transaction is in ${transaction.currencyCode}. Create the transfer with both amounts instead of converting this row.`,
+      )
+    }
+    // The counter leg is a new settled row on the original's day, and the convert input has no
+    // `bookedOn` to correct. A planned row dated after the cutoff therefore cannot become an
+    // internal transfer until its date changes; the external kinds mint no row and are unaffected.
+    if (!isBookable({ bookedOn: transaction.bookedOn, isPlanned: false })) {
+      throw new ConflictError(
+        `Transaction ${transaction.id} is dated after the latest calendar day on Earth, so the settled counter leg of an internal transfer cannot be booked. Change its date first.`,
       )
     }
   }

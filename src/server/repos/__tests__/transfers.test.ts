@@ -27,7 +27,8 @@ import path from 'node:path'
 
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 import { asCurrencyCode, asRateE10 } from '#/lib/money'
 import { organization, user } from '#/server/db/auth-schema'
@@ -1073,5 +1074,228 @@ describe('money invariants', () => {
     expect(await storedLegs(pair.transferId)).toHaveLength(0)
     expect(new Set(rebuilt)).toEqual(new Set(['acc-a-pln', 'acc-a-pln2']))
     expect(rebuilt).toHaveLength(2)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* The booking date                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A transfer leg is a settled row, so it takes the same booking rule as a transaction
+ * (`#/server/booking-rule`). `NOW` is 10:00 UTC on the 15th, so the cutoff day is the 16th. Only
+ * `Date` is faked: the in-memory database needs its timers.
+ */
+describe('the booking date', () => {
+  const CUTOFF_DAY = '2026-03-16'
+  const BEYOND = '2026-03-17'
+  const FAR_FUTURE = '2999-01-01'
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-03-15T10:00:00.000Z'))
+    return () => vi.useRealTimers()
+  })
+
+  async function rowCount(): Promise<number> {
+    return (await db.select({ id: transactions.id }).from(transactions)).length
+  }
+
+  /** A legacy pair: written when no rule looked, so its settled legs are dated after the cutoff. */
+  async function legacyFuturePair() {
+    const pair = await createTransfer({
+      scope,
+      conversion,
+      input: internalInput({ note: 'before' }),
+    })
+    await db
+      .update(transactions)
+      .set({ bookedOn: FAR_FUTURE })
+      .where(eq(transactions.transferId, pair.transferId))
+    return pair
+  }
+
+  it('creates a transfer up to the cutoff day', async () => {
+    const pair = await createTransfer({
+      scope,
+      conversion,
+      input: internalInput({ bookedOn: CUTOFF_DAY }),
+    })
+
+    expect(pair.source?.bookedOn).toBe(CUTOFF_DAY)
+  })
+
+  it('refuses every kind of transfer after the cutoff, writing no leg', async () => {
+    const inputs: Array<CreateTransferInput> = [
+      internalInput({ bookedOn: BEYOND }),
+      {
+        kind: 'external_out',
+        sourceAccountId: 'acc-a-pln',
+        sourceAmountMinor: 10_000,
+        bookedOn: FAR_FUTURE,
+      },
+      {
+        kind: 'external_in',
+        destinationAccountId: 'acc-a-pln',
+        destinationAmountMinor: 10_000,
+        bookedOn: FAR_FUTURE,
+      },
+    ]
+
+    for (const input of inputs) {
+      await expect(
+        createTransfer({ scope, conversion, input }),
+      ).rejects.toBeInstanceOf(z.ZodError)
+    }
+    expect(await rowCount()).toBe(0)
+  })
+
+  it('refuses a date edit after the cutoff and leaves both legs where they were', async () => {
+    const pair = await createTransfer({
+      scope,
+      conversion,
+      input: internalInput(),
+    })
+
+    await expect(
+      updateTransfer({
+        scope,
+        conversion,
+        transferId: pair.transferId,
+        patch: { bookedOn: BEYOND },
+      }),
+    ).rejects.toBeInstanceOf(z.ZodError)
+
+    const legs = await storedLegs(pair.transferId)
+    expect(legs.every((leg) => leg.bookedOn === MARCH)).toBe(true)
+  })
+
+  describe('a legacy pair dated after the cutoff', () => {
+    it('still takes a note-only and an amount-only edit', async () => {
+      const pair = await legacyFuturePair()
+
+      await updateTransfer({
+        scope,
+        conversion,
+        transferId: pair.transferId,
+        patch: { note: 'after' },
+      })
+      await updateTransfer({
+        scope,
+        conversion: {
+          ...conversion,
+          resolveRate: async () => asRateE10(10_000_000_000),
+        },
+        transferId: pair.transferId,
+        patch: { sourceAmountMinor: 5_000, destinationAmountMinor: 5_000 },
+      })
+
+      const legs = await storedLegs(pair.transferId)
+      expect(legs.map((leg) => leg.note)).toEqual(['after', 'after'])
+      expect(legs.map((leg) => leg.amountMinor)).toEqual([5_000, 5_000])
+    })
+
+    it('still takes a save that re-sends the stored date', async () => {
+      const pair = await legacyFuturePair()
+
+      await expect(
+        updateTransfer({
+          scope,
+          conversion,
+          transferId: pair.transferId,
+          patch: { bookedOn: FAR_FUTURE, note: 'resent' },
+        }),
+      ).resolves.toBeDefined()
+    })
+
+    it('refuses a move to a different future date and takes a move back to a bookable one', async () => {
+      const pair = await legacyFuturePair()
+
+      await expect(
+        updateTransfer({
+          scope,
+          conversion,
+          transferId: pair.transferId,
+          patch: { bookedOn: '2999-01-02' },
+        }),
+      ).rejects.toBeInstanceOf(z.ZodError)
+
+      const moved = await updateTransfer({
+        scope,
+        conversion,
+        transferId: pair.transferId,
+        patch: { bookedOn: CUTOFF_DAY },
+      })
+      expect(moved.source?.bookedOn).toBe(CUTOFF_DAY)
+    })
+  })
+
+  describe('converting a transaction', () => {
+    async function ordinaryRowOn(bookedOn: string, isPlanned: boolean) {
+      const plain = await createTransfer({
+        scope,
+        conversion,
+        input: {
+          kind: 'external_out',
+          sourceAccountId: 'acc-a-pln',
+          sourceAmountMinor: 10_000,
+          bookedOn: MARCH,
+        },
+      })
+      const [ordinary] = await unlinkTransfer(scope, plain.transferId)
+      await db
+        .update(transactions)
+        .set({ bookedOn, isPlanned })
+        .where(eq(transactions.id, ordinary.id))
+      return ordinary
+    }
+
+    it('refuses an internal transfer whose counter leg would be settled after the cutoff, promoting nothing', async () => {
+      const planned = await ordinaryRowOn(FAR_FUTURE, true)
+
+      await expect(
+        convertToTransfer({
+          scope,
+          input: {
+            transactionId: planned.id,
+            kind: 'internal',
+            counterAccountId: 'acc-a-pln2',
+          },
+        }),
+      ).rejects.toThrow(ConflictError)
+
+      const [row] = await db
+        .select({ transferKind: transactions.transferKind })
+        .from(transactions)
+        .where(eq(transactions.id, planned.id))
+      expect(row.transferKind).toBe('none')
+      expect(await transactionsOn('acc-a-pln2')).toHaveLength(0)
+    })
+
+    it('leaves an external conversion of a future-dated planned row alone', async () => {
+      const planned = await ordinaryRowOn(FAR_FUTURE, true)
+
+      const pair = await convertToTransfer({
+        scope,
+        input: { transactionId: planned.id, kind: 'external_out' },
+      })
+
+      expect(pair.source?.bookedOn).toBe(FAR_FUTURE)
+    })
+
+    it('converts an internal transfer on a bookable date', async () => {
+      const settled = await ordinaryRowOn(CUTOFF_DAY, false)
+
+      const pair = await convertToTransfer({
+        scope,
+        input: {
+          transactionId: settled.id,
+          kind: 'internal',
+          counterAccountId: 'acc-a-pln2',
+        },
+      })
+
+      expect(pair.destination?.bookedOn).toBe(CUTOFF_DAY)
+    })
   })
 })

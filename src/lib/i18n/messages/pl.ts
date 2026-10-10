@@ -593,6 +593,8 @@ const messages = {
   'transactions.form.error.amount': 'Podaj kwotę większą od zera.',
   'transactions.form.error.account': 'Wybierz konto, którego dotyczy wpis.',
   'transactions.form.error.date': 'Podaj datę w formacie {example}.',
+  'transactions.form.error.dateFuture':
+    'Ta data jeszcze nie nadeszła. Zaznacz „{planned}”, aby zapisać wpis jako planowany, albo wybierz dzisiejszą lub wcześniejszą datę.',
   'transactions.form.error.note': 'Notatka może mieć najwyżej {max} znaków.',
   'transactions.form.noAccounts.title': 'Najpierw konto',
   'transactions.form.noAccounts.body':

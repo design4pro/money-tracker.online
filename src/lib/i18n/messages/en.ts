@@ -575,6 +575,8 @@ const messages = {
   'transactions.form.error.amount': 'Enter an amount greater than zero.',
   'transactions.form.error.account': 'Choose the account this belongs to.',
   'transactions.form.error.date': 'Enter a date in the form {example}.',
+  'transactions.form.error.dateFuture':
+    'That date is still ahead. Tick "{planned}" to record it as planned, or choose today or an earlier date.',
   'transactions.form.error.note': 'Keep the note to {max} characters or fewer.',
   'transactions.form.noAccounts.title': 'An account comes first',
   'transactions.form.noAccounts.body':

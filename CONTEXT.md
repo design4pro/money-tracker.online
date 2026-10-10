@@ -134,3 +134,8 @@ already caused, or would obviously cause, two people to mean two things by one w
   and defaulted from their own timezone. It is what every report groups by. Distinct from the
   instant the row was created, which exists only to order two transactions on the same day.
   _Avoid_: "date" without saying which of the two; "timestamp" for the booked date.
+- **Booking cutoff** — the latest calendar date it is anywhere on Earth right now (UTC+14). A
+  settled (non-planned) row may not be booked after it; a planned row may. The server enforces it
+  on every writer of a settled row, and the entry form stops a settled date at the reader's own
+  today, which is never later. _Avoid_: "today" for it, which is the UTC day or the reader's own;
+  "max date" for the form's picker limit, which is a different (earlier) bound.

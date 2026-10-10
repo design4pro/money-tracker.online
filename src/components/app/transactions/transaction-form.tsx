@@ -96,6 +96,37 @@ export type TransactionFormErrors = Partial<
 
 const NOTE_MAX = 500
 
+/**
+ * What the form measures a settled entry's date against.
+ *
+ * The server refuses a non-planned row dated after the latest calendar day on Earth
+ * (`#/server/booking-rule`). The form never offers that day: every device-local day is at most
+ * that one, so `today` is a cap the server always accepts, the form's own default stays valid east
+ * of UTC, and `components` need no import from `server/`.
+ */
+export interface BookingWindow {
+  /** `YYYY-MM-DD`: today on the reader's device, the last day a settled entry may carry. */
+  readonly today: string
+  /**
+   * The date a settled row already holds when it was saved before the rule existed. The server
+   * judges an update on the `(date, planned)` pair it changes, so leaving this date as it is
+   * stays valid and anything else follows the cap.
+   */
+  readonly storedSettledOn?: string
+}
+
+/** Whether the entry is settled and dated past what {@link BookingWindow} allows. */
+export function isBeyondBookingWindow(
+  values: Pick<TransactionFormValues, 'bookedOn' | 'isPlanned'>,
+  window: BookingWindow,
+): boolean {
+  return (
+    !values.isPlanned &&
+    values.bookedOn > window.today &&
+    values.bookedOn !== window.storedSettledOn
+  )
+}
+
 /** A blank entry for today, on the account the reader is most likely to mean. */
 export function emptyFormValues(
   accountId: string,
@@ -123,6 +154,7 @@ export function emptyFormValues(
 export function validateForm(
   values: TransactionFormValues,
   t: Translate,
+  window: BookingWindow,
 ): TransactionFormErrors {
   const errors: TransactionFormErrors = {}
 
@@ -135,6 +167,11 @@ export function validateForm(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(values.bookedOn)) {
     errors.bookedOn = t('transactions.form.error.date', {
       example: '2026-03-15',
+    })
+  } else if (isBeyondBookingWindow(values, window)) {
+    // Names the way out: this form has one (the planned checkbox), so the message says so.
+    errors.bookedOn = t('transactions.form.error.dateFuture', {
+      planned: t('transactions.planned'),
     })
   }
   if (values.note.length > NOTE_MAX) {
@@ -175,6 +212,12 @@ export interface TransactionFormProps {
    * says whatever the caller words.
    */
   readonly amountNote?: string
+  /**
+   * The date a settled row being edited already holds, when it was saved before settled rows were
+   * capped at today. Set by the detail route; the entry route has nothing stored. See
+   * {@link BookingWindow.storedSettledOn}.
+   */
+  readonly storedSettledOn?: string
 }
 
 export function TransactionForm({
@@ -191,14 +234,33 @@ export function TransactionForm({
   resetToken = 0,
   afterAmount,
   amountNote,
+  storedSettledOn,
 }: TransactionFormProps) {
   const t = useTranslate()
   const locale = useLocale()
   const [touched, setTouched] = useState(false)
   const amountRef = useRef<HTMLDivElement>(null)
+  const dateRef = useRef<HTMLDivElement>(null)
 
-  const errors = useMemo(() => validateForm(values, t), [t, values])
-  const shown: TransactionFormErrors = touched ? errors : {}
+  const localToday = today(getLocalTimeZone())
+  const todayIso = localToday.toString()
+  const bookingWindow = useMemo<BookingWindow>(
+    () => ({ today: todayIso, storedSettledOn }),
+    [todayIso, storedSettledOn],
+  )
+  const errors = useMemo(
+    () => validateForm(values, t, bookingWindow),
+    [t, values, bookingWindow],
+  )
+  const dateBeyondWindow = isBeyondBookingWindow(values, bookingWindow)
+  // The date error is the one that does not wait for the field to be left or the form submitted:
+  // it answers something the person just did (unticking "planned" under a future date), and a
+  // refusal that appears only on Save would be a refusal with no visible cause.
+  const shown: TransactionFormErrors = touched
+    ? errors
+    : dateBeyondWindow
+      ? { bookedOn: errors.bookedOn }
+      : {}
 
   // After a repeat save the amount is the only thing left to type, so the caret goes back to it.
   // Focusing the wrapper's input rather than remounting the field keeps the account and the date
@@ -237,6 +299,13 @@ export function TransactionForm({
   const submit = (addAnother: boolean) => {
     setTouched(true)
     if (Object.keys(errors).length > 0) {
+      // Amount comes first in the DOM and already keeps the caret, so the date only takes focus
+      // when it is the first thing the refusal is about (WCAG 2.4.3, 4.1.3).
+      if (errors.amountMinor === undefined && errors.bookedOn !== undefined) {
+        dateRef.current
+          ?.querySelector<HTMLElement>('[role="spinbutton"]')
+          ?.focus()
+      }
       return
     }
     onSubmit({ addAnother })
@@ -374,20 +443,38 @@ export function TransactionForm({
           {afterAmount}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <DatePicker
-              label={t('transactions.field.date')}
-              calendarLabel={t('transactions.filter.openCalendar')}
-              isRequired
-              isDisabled={isSubmitting}
-              errorMessage={shown.bookedOn}
-              value={safeParseDate(values.bookedOn)}
-              maxValue={today(getLocalTimeZone()).add({ years: 10 })}
-              onChange={(value: DateValue | null) => {
-                if (value !== null) {
-                  patch({ bookedOn: value.toString() })
+            <div ref={dateRef}>
+              {/*
+                A settled entry stops at today, a planned one may run ten years ahead. The cap
+                is the larger of today and a legacy row's stored date, so that date can be shown
+                rather than clamped. `isInvalid` makes the field render our message instead of
+                React Aria's range default.
+              */}
+              <DatePicker
+                label={t('transactions.field.date')}
+                calendarLabel={t('transactions.filter.openCalendar')}
+                isRequired
+                isDisabled={isSubmitting}
+                isInvalid={dateBeyondWindow ? true : undefined}
+                errorMessage={shown.bookedOn}
+                value={safeParseDate(values.bookedOn)}
+                maxValue={
+                  values.isPlanned
+                    ? localToday.add({ years: 10 })
+                    : (safeParseDate(
+                        storedSettledOn !== undefined &&
+                          storedSettledOn > todayIso
+                          ? storedSettledOn
+                          : todayIso,
+                      ) ?? localToday)
                 }
-              }}
-            />
+                onChange={(value: DateValue | null) => {
+                  if (value !== null) {
+                    patch({ bookedOn: value.toString() })
+                  }
+                }}
+              />
+            </div>
 
             <Select
               label={t('transactions.field.account')}
