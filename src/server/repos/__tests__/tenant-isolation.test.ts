@@ -92,6 +92,7 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
+import { getAccountBalanceOn } from '../accounts'
 import { isMember, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
@@ -371,6 +372,33 @@ describe('reads cannot reach another workspace', () => {
     for (const statement of statementsMatching('select')) {
       expect(statement).toContain('organization_id')
     }
+  })
+})
+
+describe('the balance on a day cannot be read across a workspace boundary', () => {
+  it('reports a foreign account exactly like a nonexistent one', async () => {
+    const foreign = await getAccountBalanceOn(a, {
+      accountId: B_ACCOUNTS[0],
+      on: '2026-03-15',
+    }).catch((thrown: unknown) => thrown)
+    const missing = await getAccountBalanceOn(a, {
+      accountId: 'acc-nobody',
+      on: '2026-03-15',
+    }).catch((thrown: unknown) => thrown)
+
+    // Same class and same message shape: the id is the only thing that differs, so the answer
+    // cannot tell a typo from a row that exists in someone else's workspace.
+    expect(foreign).toBeInstanceOf(NotFoundError)
+    expect(missing).toBeInstanceOf(NotFoundError)
+    expect((foreign as NotFoundError).message).toBe(
+      (missing as NotFoundError).message.replace('acc-nobody', B_ACCOUNTS[0]),
+    )
+  })
+
+  it('answers the owner of the same account', async () => {
+    await expect(
+      getAccountBalanceOn(b, { accountId: B_ACCOUNTS[0], on: '2026-03-15' }),
+    ).resolves.toEqual({ balanceMinor: expect.any(Number) })
   })
 })
 

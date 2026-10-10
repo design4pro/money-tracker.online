@@ -404,8 +404,11 @@ const messages = {
   'accounts.adjust.preview.expense': 'Wydatek {amount} z datą {date}.',
   'accounts.adjust.preview.none':
     'Nic. Na dzień {date} na koncie jest już {amount}.',
-  'accounts.adjust.preview.past':
-    'Różnicę liczymy wobec stanu konta na koniec dnia {date}, który odczytujemy przy zapisie. Pokażemy dokładnie to, co zostało zapisane.',
+  'accounts.adjust.preview.loading': 'Odczytujemy stan konta na dzień {date}…',
+  'accounts.adjust.preview.error':
+    'Nie udało się odczytać stanu konta na dzień {date}.',
+  'accounts.adjust.preview.blocked':
+    'Korektę zapiszesz, gdy odczytamy stan konta na dzień {date}.',
   'accounts.adjust.action': 'Zapisz korektę',
   'accounts.adjust.result.title': 'Zapisano',
   'accounts.adjust.result.income': 'Zapisaliśmy wpływ {amount} z datą {date}.',

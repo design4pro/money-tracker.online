@@ -40,6 +40,8 @@ import {
   deleteAccount as deleteAccountRow,
   deleteAccountGroup as deleteAccountGroupRow,
   getAccount as getAccountRow,
+  getAccountBalanceOn as getAccountBalanceOnRow,
+  getAccountBalanceOnSchema,
   listAccountGroups as listAccountGroupsRow,
   listAccounts as listAccountsRow,
   listAccountsSchema,
@@ -60,6 +62,7 @@ import { conversionContextFor } from '#/server/repos/workspace-currencies'
 import type { AccountGroupRow } from '#/server/db/schema'
 import type { Account } from '#/server/db/types'
 import type {
+  AccountBalanceOn,
   AccountGroupWithMembers,
   AccountListResult,
   BalanceAdjustment,
@@ -181,6 +184,18 @@ export const reorderAccounts = createServerFn({ method: 'POST' })
 /* -------------------------------------------------------------------------- */
 /* The balance correction                                                      */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * The balance at the end of a day, so the correction dialog can name the delta it is about to
+ * write for any date. Any member may call it, like reading an account: the repository's account
+ * lookup is the authoriser, and the schema only checks shape.
+ */
+export const getAccountBalanceOn = createServerFn({ method: 'GET' })
+  .inputValidator(getAccountBalanceOnSchema)
+  .handler(async ({ data }): Promise<AccountBalanceOn> => {
+    const scope = await requireOrg()
+    return getAccountBalanceOnRow(scope, data)
+  })
 
 /**
  * Records a correction as a real transaction, or reports that none was needed.
