@@ -83,10 +83,11 @@ function sentence(
   key:
     | 'accounts.adjust.preview.loading'
     | 'accounts.adjust.preview.error'
-    | 'accounts.adjust.preview.blocked',
+    | 'accounts.adjust.preview.blocked'
+    | 'accounts.adjust.preview.blockedFailed',
   date: string,
 ) {
-  return en[key].replace('{date}', date)
+  return en[key].replace('{date}', date).replace('{retry}', en['action.retry'])
 }
 
 async function typeTarget(value: string) {
@@ -103,6 +104,21 @@ async function dayBack() {
   const day = screen.getByRole('spinbutton', { name: /^day/i })
   day.focus()
   await user.keyboard('{ArrowDown}')
+}
+
+/** Moves the date one day forward, past today when the dialog opens on today. */
+async function dayForward() {
+  const day = screen.getByRole('spinbutton', { name: /^day/i })
+  day.focus()
+  await user.keyboard('{ArrowUp}')
+}
+
+/** The sentence the disabled Record button points at. */
+function blockedReason() {
+  const record = screen.getByRole('button', { name: 'Record the correction' })
+  const reasonId = record.getAttribute('aria-describedby')
+  expect(reasonId).toBeTruthy()
+  return document.getElementById(reasonId!)
 }
 
 beforeEach(() => {
@@ -294,6 +310,50 @@ describe('a failed read', () => {
     ).not.toBeNull()
   })
 
+  it('explains the block with a sentence that names Try again, not one that promises a load', async () => {
+    server.getAccountBalanceOn.mockRejectedValue(new Error('boom'))
+    renderDialog()
+    await screen.findByText(
+      sentence('accounts.adjust.preview.error', 'March 15, 2026'),
+    )
+
+    const reason = blockedReason()
+    expect(reason?.textContent).toBe(
+      sentence('accounts.adjust.preview.blockedFailed', 'March 15, 2026'),
+    )
+    expect(reason?.textContent).toContain('Try again')
+    expect(reason?.textContent).not.toMatch(/\b(above|below)\b/i)
+  })
+
+  it('keeps the loading sentence while loading, and while a retry is in flight', async () => {
+    const retried = deferred<{ balanceMinor: number }>()
+    server.getAccountBalanceOn
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockReturnValueOnce(retried.promise)
+    renderDialog()
+    const loading = sentence(
+      'accounts.adjust.preview.blocked',
+      'March 15, 2026',
+    )
+    // First read still pending: the blocked sentence is the loading one.
+    expect(blockedReason()?.textContent).toBe(loading)
+
+    await screen.findByText(
+      sentence('accounts.adjust.preview.error', 'March 15, 2026'),
+    )
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+    // The retry in flight reverts to the loading sentence, on the same element.
+    expect(blockedReason()?.textContent).toBe(loading)
+
+    retried.reject(new Error('boom again'))
+    await waitFor(() => {
+      expect(blockedReason()?.textContent).toBe(
+        sentence('accounts.adjust.preview.blockedFailed', 'March 15, 2026'),
+      )
+    })
+  })
+
   it('moves focus to the status container when a successful retry removes the button', async () => {
     server.getAccountBalanceOn
       .mockRejectedValueOnce(new Error('boom'))
@@ -343,5 +403,157 @@ describe('the status region', () => {
     await screen.findByText(/Nothing|Money in|Money out|expense/i)
     expect(screen.getByRole('status')).toBe(region)
     expect(within(region).queryByRole('button')).toBeNull()
+  })
+})
+
+describe('a booking date later than today', () => {
+  // UX only: the server still accepts a future date (#657), so nothing here may be worded or
+  // read as the server refusing it.
+  async function pickTomorrow() {
+    server.getAccountBalanceOn.mockResolvedValue({ balanceMinor: 100_00 })
+    renderDialog()
+    await typeTarget('150')
+    await screen.findByText(/Money in of/)
+    await dayForward()
+  }
+
+  it('shows the future-date error on the picker, and only that text', async () => {
+    await pickTomorrow()
+
+    const error = await screen.findByText(en['validation.date.future'])
+    expect(error).toBeTruthy()
+    expect(screen.queryByText(/constraints|Value must be/i)).toBeNull()
+  })
+
+  it('starts no balance read for it', async () => {
+    await pickTomorrow()
+    await screen.findByText(en['validation.date.future'])
+
+    const dates = server.getAccountBalanceOn.mock.calls.map(
+      ([call]) => call.data.on,
+    )
+    expect(dates).toEqual(['2026-03-15'])
+  })
+
+  it('disables Record and says to pick a date up to today', async () => {
+    await pickTomorrow()
+    await screen.findByText(en['validation.date.future'])
+
+    const record = screen.getByRole('button', { name: 'Record the correction' })
+    expect(
+      record.getAttribute('aria-disabled') ?? record.getAttribute('disabled'),
+    ).not.toBeNull()
+    expect(blockedReason()?.textContent).toBe(
+      en['accounts.adjust.preview.blockedFuture'],
+    )
+  })
+
+  it('does not submit on Enter in the amount field', async () => {
+    await pickTomorrow()
+    await screen.findByText(en['validation.date.future'])
+
+    const field = screen.getByRole('textbox', {
+      name: /what the balance should be/i,
+    })
+    await user.type(field, '{Enter}')
+
+    expect(server.adjustAccountBalance).not.toHaveBeenCalled()
+  })
+
+  it('can be corrected: back on today the read runs and Record is enabled again', async () => {
+    await pickTomorrow()
+    await screen.findByText(en['validation.date.future'])
+
+    await dayBack()
+
+    await waitFor(() => {
+      expect(
+        screen
+          .getByRole('button', { name: 'Record the correction' })
+          .hasAttribute('disabled'),
+      ).toBe(false)
+    })
+    expect(screen.queryByText(en['validation.date.future'])).toBeNull()
+  })
+})
+
+describe('the result card', () => {
+  it('states the date that was written, not the one the picker shows by then', async () => {
+    server.getAccountBalanceOn.mockResolvedValue({ balanceMinor: 100_00 })
+    const write = deferred<{
+      status: 'recorded'
+      transactionId: string
+      direction: 'income'
+      amountMinor: number
+      balanceMinor: number
+    }>()
+    server.adjustAccountBalance.mockReturnValue(write.promise)
+    renderDialog()
+    await typeTarget('150')
+    await screen.findByText(/Money in of/)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Record the correction' }),
+    )
+    expect(server.adjustAccountBalance).toHaveBeenCalledWith({
+      data: expect.objectContaining({ bookedOn: '2026-03-15' }),
+    })
+    // The picker stays editable while the save is in flight.
+    await dayBack()
+
+    write.resolve({
+      status: 'recorded',
+      transactionId: 'tx-1',
+      direction: 'income',
+      amountMinor: 50_00,
+      balanceMinor: 100_00,
+    })
+
+    const written = await screen.findByText(/^Money in of .* was recorded/)
+    expect(written.textContent).toContain('March 15, 2026')
+    expect(written.textContent).not.toContain('March 14, 2026')
+  })
+
+  it('takes focus from the Record button it replaces, so the outcome is read out', async () => {
+    server.getAccountBalanceOn.mockResolvedValue({ balanceMinor: 100_00 })
+    server.adjustAccountBalance.mockResolvedValue({
+      status: 'recorded',
+      transactionId: 'tx-1',
+      direction: 'income',
+      amountMinor: 50_00,
+      balanceMinor: 100_00,
+    })
+    renderDialog()
+    await typeTarget('150')
+    await screen.findByText(/Money in of/)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Record the correction' }),
+    )
+
+    const written = await screen.findByText(/^Money in of .* was recorded/)
+    const status = screen.getByRole('status')
+    expect(status.contains(written)).toBe(true)
+    expect(status.getAttribute('tabindex')).toBe('-1')
+    expect(document.activeElement).toBe(status)
+  })
+
+  it('does the same for an unchanged outcome', async () => {
+    server.getAccountBalanceOn.mockResolvedValue({ balanceMinor: 100_00 })
+    const write = deferred<{ status: 'unchanged'; balanceMinor: number }>()
+    server.adjustAccountBalance.mockReturnValue(write.promise)
+    renderDialog()
+    await typeTarget('100')
+    await screen.findByText(/^Nothing\./)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Record the correction' }),
+    )
+    await dayBack()
+    write.resolve({ status: 'unchanged', balanceMinor: 100_00 })
+
+    const written = await screen.findByText(/^Nothing was written/)
+    expect(written.textContent).toContain('March 15, 2026')
+    expect(document.activeElement).toBe(screen.getByRole('status'))
   })
 })

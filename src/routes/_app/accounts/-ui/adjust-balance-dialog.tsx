@@ -55,6 +55,11 @@ import type { BalanceAdjustment } from '#/server/repos/accounts'
  * recording is blocked, with the reason in visible text. A failed read is retryable and blocks
  * recording too: a button that worked without a preview would reintroduce the hidden delta.
  *
+ * A booking date later than today is refused here, in the interface only: the picker says so, no
+ * read starts for it and recording stays blocked. The server still accepts a future date (#657),
+ * so this guard is a courtesy to the person typing, never the thing that keeps one out of the
+ * ledger.
+ *
  * ## Zero writes nothing
  *
  * Correcting a balance to what it already is returns `unchanged` and no row is created, because
@@ -67,6 +72,12 @@ export interface AdjustBalanceDialogProps {
   account: Account
   /** Called once a correction has been written, so the route can refresh its data. */
   onRecorded: (result: BalanceAdjustment) => void
+}
+
+/** The correction the dialog wrote, with the booking date as it was when the save was made. */
+interface Recorded {
+  readonly adjustment: BalanceAdjustment
+  readonly bookedOn: CalendarDate
 }
 
 /** What the read for one date has come to. No entry for the selected date means it is loading. */
@@ -99,18 +110,20 @@ export function AdjustBalanceDialog({
   const [note, setNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
-  const [result, setResult] = useState<BalanceAdjustment | null>(null)
+  const [result, setResult] = useState<Recorded | null>(null)
 
   const [read, setRead] = useState<BalanceRead | null>(null)
   const [attempt, setAttempt] = useState(0)
   const blockedId = useId()
   const statusRef = useRef<HTMLDivElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
   const refocusStatus = useRef(false)
 
   const currency = account.currencyCode
   const bookedOnIso = bookedOn.toString()
   const bookedOnText = formatCalendarDate(locale, bookedOn, 'long')
   const isToday = bookedOnIso === todayValue.toString()
+  const isFuture = bookedOn.compare(todayValue) > 0
 
   // One read per date, and per retry. The cleanup is what discards an answer for a date the
   // person has left; the `read.date` comparison below is what stops the render in between from
@@ -121,6 +134,11 @@ export function AdjustBalanceDialog({
     // A figure as if it were the new read. A retry keeps its date, so the failed read it is
     // retrying stays.
     setRead((previous) => (previous?.date === bookedOnIso ? previous : null))
+    // A date the person cannot record against is not read: its loading sentence would compete
+    // with the error the picker is already showing.
+    if (isFuture) {
+      return
+    }
     getAccountBalanceOn({
       data: { accountId: account.id, on: bookedOnIso },
     }).then(
@@ -138,13 +156,18 @@ export function AdjustBalanceDialog({
     return () => {
       isCurrent = false
     }
-  }, [account.id, bookedOnIso, attempt])
+  }, [account.id, bookedOnIso, isFuture, attempt])
 
   const balance = read?.date === bookedOnIso ? read : null
   const isRetrying = balance?.status === 'failed' && balance.attempt !== attempt
   const loadedBalanceMinor =
     balance?.status === 'loaded' ? balance.balanceMinor : null
-  const canRecord = loadedBalanceMinor !== null
+  const canRecord = !isFuture && loadedBalanceMinor !== null
+  const blockedKey = isFuture
+    ? 'accounts.adjust.preview.blockedFuture'
+    : balance?.status === 'failed' && !isRetrying
+      ? 'accounts.adjust.preview.blockedFailed'
+      : 'accounts.adjust.preview.blocked'
 
   // When a retry succeeds the button that was pressed unmounts, and the focus scope would hand
   // focus to whatever it likes. The status container is where the answer now is, so focus goes
@@ -158,6 +181,16 @@ export function AdjustBalanceDialog({
       refocusStatus.current = false
     }
   }, [balance])
+
+  // Pressing Record unmounts the button that was pressed, and the browser hands focus to the
+  // header's Close button - nowhere near the outcome, which is plain text with no live region
+  // of its own. Focus goes to the result card, so the outcome is read out once and keyboard focus
+  // starts from it (WCAG 2.4.3, 4.1.3).
+  useEffect(() => {
+    if (result !== null) {
+      resultRef.current?.focus()
+    }
+  }, [result])
 
   const deltaMinor =
     targetMinor !== null && loadedBalanceMinor !== null
@@ -182,10 +215,13 @@ export function AdjustBalanceDialog({
 
   async function submit() {
     // Enter in the amount field submits the form even while the button is disabled, so the
-    // handler refuses by itself: no balance for this date yet means no delta to write against.
+    // handler refuses by itself: no balance for this date yet means no delta to write against,
+    // and a future date is not one to record.
     if (targetMinor === null || !canRecord) {
       return
     }
+    // The picker stays editable while the save is in flight; the card states what was written.
+    const writtenOn = bookedOn
     setIsSaving(true)
     setFailure(null)
     try {
@@ -193,11 +229,11 @@ export function AdjustBalanceDialog({
         data: {
           accountId: account.id,
           targetMinor,
-          bookedOn: bookedOnIso,
+          bookedOn: writtenOn.toString(),
           ...(note.trim() === '' ? {} : { note: note.trim() }),
         },
       })
-      setResult(written)
+      setResult({ adjustment: written, bookedOn: writtenOn })
       onRecorded(written)
     } catch (error) {
       setFailure(error instanceof Error ? error.message : String(error))
@@ -279,6 +315,7 @@ export function AdjustBalanceDialog({
                       calendarLabel={t('common.date')}
                       value={bookedOn}
                       maxValue={todayValue}
+                      errorMessage={t('validation.date.future')}
                       onChange={(value) => {
                         if (value !== null) {
                           refocusStatus.current = false
@@ -344,22 +381,26 @@ export function AdjustBalanceDialog({
                       // A disabled button leaves the tab order, so its reason is plain text in
                       // reading order, just before the footer, and the button points at it.
                       <p id={blockedId} className="text-caption text-ink-2">
-                        {t('accounts.adjust.preview.blocked', {
+                        {t(blockedKey, {
                           date: bookedOnText,
+                          retry: t('action.retry'),
                         })}
                       </p>
                     )}
                   </>
                 ) : (
-                  <Card
-                    variant="inset"
-                    padding="sm"
-                    className="flex flex-col gap-2"
-                  >
-                    <p className="text-micro tracking-label uppercase text-ink-2">
-                      {t('accounts.adjust.result.title')}
-                    </p>
-                    {renderResult(result)}
+                  <Card variant="inset" padding="sm">
+                    <div
+                      ref={resultRef}
+                      role="status"
+                      tabIndex={-1}
+                      className="focus-ring flex flex-col gap-2 rounded-md"
+                    >
+                      <p className="text-micro tracking-label uppercase text-ink-2">
+                        {t('accounts.adjust.result.title')}
+                      </p>
+                      {renderResult(result)}
+                    </div>
                   </Card>
                 )}
               </DialogBody>
@@ -396,6 +437,9 @@ export function AdjustBalanceDialog({
   function renderPreview() {
     // A retry in flight reads as loading, so a second failure swaps the sentence back and the
     // status region announces it.
+    if (isFuture) {
+      return null
+    }
     if (balance === null || isRetrying) {
       return (
         <p className="text-body text-ink-2">
@@ -453,12 +497,16 @@ export function AdjustBalanceDialog({
     )
   }
 
-  function renderResult(written: BalanceAdjustment) {
+  function renderResult({
+    adjustment: written,
+    bookedOn: writtenOn,
+  }: Recorded) {
+    const writtenOnText = formatCalendarDate(locale, writtenOn, 'long')
     if (written.status === 'unchanged') {
       return (
         <p className="text-body text-ink">
           {t('accounts.adjust.result.unchanged', {
-            date: bookedOnText,
+            date: writtenOnText,
             amount: formatMoney(
               locale,
               makeMoney(written.balanceMinor, currency),
@@ -483,7 +531,7 @@ export function AdjustBalanceDialog({
               locale,
               makeMoney(written.amountMinor, currency),
             ),
-            date: bookedOnText,
+            date: writtenOnText,
           })}
         </p>
       </>
