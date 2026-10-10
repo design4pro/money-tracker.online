@@ -158,25 +158,38 @@ of the contract:
 3. **Look up everything before any shortcut**: `accountRepo.requireById` for the account and
    `requireAllOwned(scope, accountGroups, [non-null ids], 'account group')` for the groups. A foreign
    id is a `NotFoundError` even on a call that would have been a no-op.
-4. Then exactly one statement, chosen by the arguments:
+4. Then exactly one **write** statement, chosen by the arguments after one read (is the target
+   membership present, and the position the account takes there):
    - `from` and `to` both set and different, the target membership absent: one scoped
-     `UPDATE account_group_members SET group_id = :to, position = :end WHERE group_id = :from AND account_id = :id`,
-     built like `reorderAccountGroups` (`scope.db.update` guarded by `assertScopedWrite` and
-     `tenantFilter`). `:end` is a `max(position) + 1` read composed through `tenantFilter`.
-   - the target membership already exists: one scoped delete of the source row
-     (`membershipRepo.removeWhere`), and the target keeps its place.
-   - `from` null: `membershipRepo.insertOnConflictDoNothing` on `[groupId, accountId]`, a pure add.
+     `UPDATE account_group_members SET group_id = :to, position = :end WHERE group_id = :from AND account_id = :id`
+     through `membershipRepo.updateWhere`, which returns the changed rows, asserts a scoped write and
+     refuses a patch that carries the tenant column (otherwise `scope.db.update` with `.returning()`,
+     `assertScopedWrite` and `tenantFilter`, the way `reorderAccountGroups` is built). Updating
+     `group_id` is valid: it is part of the primary key `(group_id, account_id)`, nothing references
+     it, and the clash case is the next bullet.
+   - the target membership already exists: one scoped, **conditional** delete of the source row
+     (`DELETE … WHERE group_id = :from AND account_id = :id AND EXISTS (the target row)`), so the
+     source is never removed unless the target is there; the target keeps its place.
+   - `from` null: `membershipRepo.insertOnConflictDoNothing` on `[groupId, accountId]`, a pure add,
+     at `:end`.
    - `to` null: one scoped delete of `(from, account)`, a pure remove.
    - `from === to`, or both null: nothing is written (the lookups of step 3 already ran).
-5. **A stale `from`**: when the source membership does not exist (another tab removed it) the
-   statement matches no row, and the function throws `NotFoundError('account group membership')`
-   rather than degrading to an add; the screen invalidates the loader. A membership in a third group
-   is never touched.
+   - `:end` is `max(position) + 1` over `account_group_members` rows **of the target group**
+     (`tenantFilter(scope, accountGroupMembers, eq(groupId, :to))`), not the workspace-wide
+     `nextPosition`, which takes only `accounts` or `accountGroups`.
+5. **A stale source, in every branch**: when the write changes no row (the source membership was
+   removed in another tab, or, in the conditional delete, the target was) the function throws
+   `NotFoundError('account group membership')` rather than degrading to an add; the screen
+   invalidates the loader and shows the "list changed" sentence. A membership in a third group is
+   never touched.
 
-One statement means there is no partial state to converge from: the account is in the source or in
-the target, never in neither and never in both (no repository `batch` primitive exists, `base.ts`;
-`account-balances.ts:411`, `transfers.ts:34`, `import-preview.ts:180`, and one statement does not need
-one). No ledger batch: no balance moves; `moveAccountToGroup` is **not** wrapped in
+Each branch is one write statement, so there is no partial state to converge from: the account stays
+in the source until the one statement that moves it succeeds, and it is never in neither group (no
+repository `batch` primitive exists, `base.ts`; `account-balances.ts:411`, `transfers.ts:34`,
+`import-preview.ts:180`, and one statement does not need one). **One race is accepted and named**:
+if another tab adds the target membership between the read and an `UPDATE`, the `UPDATE` hits the
+primary key, the account stays in the source untouched, and the screen shows the generic catalogue
+sentence. No ledger batch: no balance moves; `moveAccountToGroup` is **not** wrapped in
 `runWithLedgerBatch`, like the other group writes. No quota: a group is organisation, not capacity.
 
 **Tree rows (phase A and B).** One flat `GridList` in reading order, the pattern `category-tree.tsx`
@@ -234,7 +247,10 @@ on **group rows only**, and a row menu built from `MenuTrigger`, ghost icon `But
 `Menu` and `SubmenuTrigger`, never hidden behind hover. A group row's menu: _Rename_, _Add
 sub-group_, _Move up_, _Move down_, _Move to top_, _Move to bottom_, _Move to…_ (re-parent: a submenu
 of top-level groups and "No parent"), _Delete_. An item that would change nothing is **disabled**,
-not absent and not silent; _Move to…_ lists every destination with an accessible name that carries
+not absent and not silent, and each disabled item carries its reason as visible item description
+text ("A sub-group cannot have its own sub-groups", "Already first", "Already last", "Already
+there"); the _Inside_ field of the form dialog is disabled with visible text saying why when the
+group has child groups. _Move to…_ lists every destination with an accessible name that carries
 its parent ("<child>, inside <parent>") because names may repeat across parents, and disables the
 one the row is already under. The two row menus (categories, groups) are a second call site of the
 same construction; the `DESIGN.md` guideline "Reorderable tree" names both and records that the
@@ -256,7 +272,10 @@ component test asserts it.
 with its content swapped (the category precedent). Every **successful** menu move (group reorder,
 re-parent, account move, remove, create, rename, delete) is announced politely through a toast that
 reaches a `role="status"` region; a menu-initiated group reorder says its new place ("<name> moved
-to position <n> of <total>"). Drag moves are announced by React Aria.
+to position <n> of <total>"). For a child group the drag label, the actions label and that
+announcement are parent-qualified ("Drag <child>, inside <parent>", "<child> moved to position <n>
+of <total> inside <parent>"), and `<total>` counts the siblings under that parent, so two children
+with the same name under different parents are told apart. Drag moves are announced by React Aria.
 
 **Focus.** After _Move to…_ on an account, focus goes to the new `member:<to>:<account>` row. After
 _Remove from this group_ or a delete, focus goes to the next row, or the previous one when it was
@@ -279,8 +298,9 @@ is not consulted. The preview card has an always-mounted `role="status"` region.
 the loading sentence ("Reading the balance on <date>…") replaces the previous delta at once, so an
 old delta is never visible beside a disabled button. **Record the correction is disabled** while the
 balance for the selected date is loading or failed, and the status text is its explanation: it has a
-stable id referenced by the button's `aria-describedby`, because a disabled React Aria button leaves
-the tab order. The failed state sits in the same card, names the date and holds a _Try again_ button
+stable id referenced by the button's `aria-describedby`. A disabled React Aria button leaves the tab
+order, so the remedy for a keyboard user is the visible status text beside it, which is read in
+reading order; the status text changes in one atomic swap per date change, never word by word. The failed state sits in the same card, names the date and holds a _Try again_ button
 (`action.retry`); the correction stays disabled in it, because enabling it would reintroduce the
 hidden delta. When a retry succeeds and the button unmounts while focused, focus moves to the card's
 status container (`tabIndex={-1}`). The submit handler itself checks that the balance for the
@@ -302,6 +322,9 @@ path. `docs/ACCESSIBILITY.md` §4's 2.5.7 surface list gains "account groups" an
   menu disables _Move to…_ for the row's own group.
 - A stale `from` (the membership was removed in another tab): `NotFoundError`, the loader is
   invalidated and the sentence says the list changed.
+- Another tab adds the target membership between the read and the `UPDATE`: the primary key
+  refuses the `UPDATE`, the account stays in the source group untouched, and the generic catalogue
+  sentence is shown. An accepted race, not a data loss.
 - An account in two groups (existing data): each row's menu acts on that row's group only; the
   other membership stays; the two rows have different accessible names ("<account>, in <group>").
 - Deleting a group with accounts and child groups: accounts become ungrouped (or stay in other
@@ -358,9 +381,10 @@ reused: `accounts.group.title` ("Groups"), `accounts.group.create` ("New group")
 - `accounts.groups.error.title` / `accounts.groups.error.body`
 - `accounts.groups.tree.label`: "Account groups, in display order"
 - Row names: `accounts.groups.row.group`: "{name}, group, {count} accounts" (plural); `accounts.groups.row.childOf`: "{name}, inside {parent}, {count} accounts" (plural); `accounts.groups.row.account`: "{account}, in {group}"; `accounts.groups.row.accountArchived`: "{account}, archived, in {group}"
-- Controls: `accounts.groups.drag.label`: "Drag {name}"; `accounts.groups.actions.label`: "Actions for {name}"; `accounts.groups.accountActions.label`: "Actions for {account}, in {group}"
+- Controls: `accounts.groups.drag.label`: "Drag {name}"; `accounts.groups.drag.labelChild`: "Drag {name}, inside {parent}"; `accounts.groups.actions.label`: "Actions for {name}"; `accounts.groups.actions.labelChild`: "Actions for {name}, inside {parent}"; `accounts.groups.accountActions.label`: "Actions for {account}, in {group}"
 - Fields and items: `accounts.group.field.name`: "Group name"; `accounts.group.field.parent`: "Inside"; `accounts.group.parent.none`: "No parent"; `accounts.group.rename`: "Rename"; `accounts.group.addChild`: "Add sub-group"; `accounts.group.move.to`: "Move to…"; `accounts.group.move.remove`: "Remove from this group"; the up, down, top and bottom items reuse the category keys where the text is identical, through a shared key
-- Polite results, phrased with a noun so a user-entered name never needs inflection in Polish (for example "Przeniesiono konto {account} do grupy {group}"): `accounts.group.toast.created`, `.renamed`, `.reparented`, `.deleted`, `.accountMoved`, `.accountRemoved`, and `accounts.group.announce.position`: "{name} moved to position {position} of {total}"
+- Polite results, phrased with a noun so a user-entered name never needs inflection in Polish (for example "Przeniesiono konto {account} do grupy {group}"): `accounts.group.toast.created`, `.renamed`, `.reparented`, `.deleted`, `.accountMoved`, `.accountRemoved`, `accounts.group.announce.position`: "{name} moved to position {position} of {total}" and `accounts.group.announce.positionChild`: "{name} moved to position {position} of {total} inside {parent}"
+- Reasons for disabled items and fields: `accounts.group.disabled.noGrandchild`: "A sub-group cannot have its own sub-groups", `accounts.group.disabled.first`: "Already first", `accounts.group.disabled.last`: "Already last", `accounts.group.disabled.same`: "Already there", `accounts.group.field.parent.hasChildren`: "This group has sub-groups, so it cannot sit inside another group."
 - Refusals: `accounts.group.refused.title`: "That change was not made"; bodies `accounts.group.refused.depth` ("A group can sit inside one other group, not two deep."), `.notFound` ("The list changed in another window. It has been reloaded."), `.forbidden` ("Only an owner or an admin can change groups in a shared workspace."), `.generic` ("Something went wrong. Try again.")
 - Delete: `accounts.group.delete.action`: "Delete group"; `accounts.group.delete.title`: "Delete {name}?"; `accounts.group.delete.body`: "{count} accounts leave this group. None is deleted. Sub-groups become top-level groups." (plural; a count-0 variant without the first sentence); `accounts.group.delete.rules`: "Rules that use this group will be paused until you pick another."
 - `accounts.adjust.preview.loading`: "Reading the balance on {date}…"; `accounts.adjust.preview.error`: "The balance on {date} could not be read."; `accounts.adjust.preview.blocked`: "The correction can be recorded once the balance on {date} has loaded."
@@ -390,7 +414,10 @@ slice that a person can see and check. A is the base; B and the rest follow.
   in EN and PL; the "Reorderable tree" section in `DESIGN.md` (shape, tones, states, what carries the
   meaning without colour, drop and focus rules, that the row menu is built per tree, and that it is
   not a data table); the `routes.json`, `surfaces.ts` and `accessibility.spec.ts` additions and the
-  `docs/ACCESSIBILITY.md` §4 surface-list edit.
+  `docs/ACCESSIBILITY.md` §4 surface-list edit (the PR body calls it a factual correction of the
+  surface list, not a wider claim, and updates the document's "Last reviewed" line).
+- Account rows render here **read-only, with no menu**; phase B adds their menu. The groups, their
+  nesting and the accounts under them are visible from A on.
 - `tenant-isolation.test.ts`: A, in A's scope, calls `updateAccountGroup`, `deleteAccountGroup`,
   `setAccountGroupMembers` (with B's account ids **and** with A's accounts onto B's group),
   `reorderAccountGroups`, `createAccountGroup` and `updateAccountGroup` with `parentId` set to B's
@@ -407,8 +434,12 @@ slice that a person can see and check. A is the base; B and the rest follow.
   `serious`, zero `critical`); console silent on create, move and delete (the spec creates its own
   group and removes it; the demo workspace is otherwise read-only). Frames, outside the repository:
   the two-level tree, light and dark, 360 and 1280 px, and the empty state.
-- Done when: every gesture in UI/UX is reachable from the keyboard, the refusals reach the alert
-  region as catalogue text, and `pnpm lint`, `typecheck`, `test`, `build` pass.
+- Component tests also assert the parent-qualified labels and announcements for a child group and
+  the visible reasons of disabled items, and a measured 44 px target for the drag handle and the menu
+  trigger on an indented child row at 360 px.
+- Done when: every **group** gesture in UI/UX (create, rename, re-parent, reorder, delete) is
+  reachable from the keyboard, the refusals reach the alert region as catalogue text, and
+  `pnpm lint`, `typecheck`, `test`, `build` pass.
 
 ### Phase B — Moving an account between groups
 
@@ -417,16 +448,20 @@ slice that a person can see and check. A is the base; B and the rest follow.
   behaviour; copy.
 - Tests in `accounts.test.ts`: add-only, remove-only, move, move into a group the account is already
   in (a delete, no key conflict), a membership in a third group survives, `from === to` writes
-  nothing, a stale `from` is a `NotFoundError` and changes nothing, a statement that fails (a driver
-  wrapper rejects the `UPDATE`) leaves the account in the source, a plain member of a shared workspace
-  is refused, an omitted key is a validation failure. In `tenant-isolation.test.ts`: B's account, B's
+  nothing, the moved account lands last in a non-empty target group, a stale `from` is a
+  `NotFoundError` and changes nothing in both the `UPDATE` and the conditional-delete branch, the
+  primary-key race (the target row appears between the read and the `UPDATE`, for example through a
+  spy on the read helper that inserts it) leaves the account in the source, a plain member of a
+  shared workspace is refused, an omitted key is a validation failure. In `tenant-isolation.test.ts`: B's account, B's
   `fromGroupId`, B's `toGroupId`, A's account into B's group, and a foreign id on a `from === to`
   call (the no-op must still be a `NotFoundError`); each re-reads B's memberships through B's scope
   and finds them unchanged.
 - Component tests: _Move to…_ lists every other group with disambiguated names and disables the row's
   own; focus lands on the new row after a move.
 - Frames: the _Move to…_ menu open on an account row. The axe spec from phase A gains the open menu.
-- Done when: those cases pass and the `no repository forks the tenant predicate` scans stay green.
+- Component tests also assert a measured 44 px target for the account-row menu trigger at 360 px.
+- Done when: both account gestures (_Move to…_ and _Remove from this group_) are reachable from the
+  keyboard, those cases pass and the `no repository forks the tenant predicate` scans stay green.
 
 ### Phase C — The exact preview
 
@@ -471,7 +506,7 @@ slice that a person can see and check. A is the base; B and the rest follow.
 | 4   | Where does the delivered code live?                                           | Stays in `repos/accounts.ts` and `fns/accounts.ts`; the plan's owned paths are amended in phase D; a split is a later refactor.                                                                                                                                                                                                                                                            | Decided by software-architect sub-agent (confidence medium): the move needs the module's private helpers, and a split rewrites about 1000 lines and every importer for a path list.                                                                                                                              |
 | 5   | Share or copy the tree-move logic?                                            | Generic `TreeRow` and `TreeMove` in `components/app/tree/`; categories re-pointed; "Reorderable tree" guideline in `DESIGN.md`; moves only ever see group rows.                                                                                                                                                                                                                            | Decided by software-architect sub-agent (confidence medium): the functions read only `id` and `parentId`; a copy would drift; importing from `categories/` is the wrong direction; the Second Call Site Rule requires the guideline.                                                                             |
 | 6   | Are accounts draggable?                                                       | No: account rows are menu-only; only group rows are draggable and accept drops.                                                                                                                                                                                                                                                                                                            | Applied by the author: one drop target meaning "re-parent" for one row kind and "change membership" for another is the ambiguity `move.ts` refuses; the menu is the guaranteed path. Narrows the stage's "as well as by drag" for account rows. Accessibility specialist: 2.5.7 has nothing to satisfy for them. |
-| 7   | How is the account move written?                                              | One SQL statement (an `UPDATE` of `group_id`, or a delete when the target exists, or an insert-on-conflict-do-nothing for a pure add), after lookups that run even for no-ops.                                                                                                                                                                                                             | Raised by the product-owner and architect sub-agents: the architect's insert-then-delete converges but is two statements; no repository batch exists, so one statement is the way to be atomic. A stale source is a `NotFoundError`.                                                                             |
+| 7   | How is the account move written?                                              | One write statement after one read (an `UPDATE` of `group_id`, or a conditional delete when the target exists, or an insert-on-conflict-do-nothing for a pure add), after lookups that run even for no-ops.                                                                                                                                                                                | Raised by the product-owner and architect sub-agents: the architect's insert-then-delete converges but is two statements; no repository batch exists, so one statement is the way to be atomic. A stale source is a `NotFoundError`.                                                                             |
 | 8   | Real tree semantics?                                                          | The flat reading-order `GridList` of the category tree, "inside <parent>" in the accessible name.                                                                                                                                                                                                                                                                                          | Applied by the author: the pattern is shipped and reviewed; no new component or dependency (`docs/SPEC.md` §3 freeze).                                                                                                                                                                                           |
 | 9   | Extract the row menu shared by the category and group trees?                  | No: built per tree, both named in the `DESIGN.md` guideline.                                                                                                                                                                                                                                                                                                                               | Applied by the author: the item sets differ (colour and kind versus rename and sub-group); the guideline is what stops drift.                                                                                                                                                                                    |
 | 10  | Who may read, correct and write?                                              | Group and move writes: owner or admin once shared (existing `assertMayAdminister`). `getAccountBalanceOn`: any member, like `getAccount`. `adjustAccountBalance`: unchanged, any member.                                                                                                                                                                                                   | Recorded at the security reviewer's request: pre-existing and not widened here; a plain member of a shared workspace can already write any transaction.                                                                                                                                                          |
@@ -483,9 +518,12 @@ slice that a person can see and check. A is the base; B and the rest follow.
 
 ### Panel verdicts
 
-| Specialist                    | Round 1                                       | Round 2 |
-| ----------------------------- | --------------------------------------------- | ------- |
-| Product owner                 | approve with conditions (medium), all applied | pending |
-| Software architect            | approve with conditions (medium), all applied | pending |
-| Security and tenancy reviewer | approve with conditions (medium), all applied | pending |
-| Accessibility and UX          | approve with conditions (medium), all applied | pending |
+| Specialist                    | Round 1                                       | Round 2                                                                                                                                     |
+| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product owner                 | approve with conditions (medium), all applied | approve with conditions (wording), applied                                                                                                  |
+| Software architect            | approve with conditions (medium), all applied | approve with conditions (move statement and primitive named), applied                                                                       |
+| Security and tenancy reviewer | approve with conditions (medium), all applied | approve with conditions (conditional delete, race named), applied; asks for a second reviewer on the implementation PRs (risk-high tenancy) |
+| Accessibility and UX          | approve with conditions (medium), all applied | approve with conditions (parent-qualified labels, disabled reasons, 44 px check), applied                                                   |
+
+The two rounds the skill allows are used; no specialist answered "revise". The `Spec PR` row in the
+metadata table holds `#TBD` until the pull-request step fills it in.
