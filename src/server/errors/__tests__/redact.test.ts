@@ -64,7 +64,9 @@ describe('redact: an amount never survives', () => {
     'account_balance',
     'accountNumber',
     'account_numbers',
-  ])('removes the number under the key %s', (key) => {
+  ])('denies the key %s by its name, not by the value type', (key) => {
+    // An object value is told apart from the default-deny rule, which would recurse into it.
+    expect(only({ [key]: { inner: 987_654 } })).toBe('[redacted:object]')
     expect(only({ [key]: 987_654 })).toBe('[redacted:number]')
     expect(wire({ [key]: 987_654 })).not.toContain('987654')
   })
@@ -257,9 +259,9 @@ describe('redact: a name, an address, a contact or a secret never survives', () 
 })
 
 describe('redact: the allow-list', () => {
-  it('is a read-only set of full keys', () => {
-    expect([...REDACT_ALLOW_KEYS]).toEqual(
-      expect.arrayContaining([
+  it('is exactly the set of full keys the spec names, so widening it is a deliberate edit', () => {
+    expect([...REDACT_ALLOW_KEYS].sort()).toEqual(
+      [
         'errorName',
         'kind',
         'code',
@@ -271,7 +273,7 @@ describe('redact: the allow-list', () => {
         'requestId',
         'route',
         'queue',
-      ]),
+      ].sort(),
     )
   })
 
@@ -392,8 +394,10 @@ describe('redact: shapes', () => {
       level = next
     }
     const started = performance.now()
-    redact(level)
+    const out = JSON.stringify(redact(level))
     expect(performance.now() - started).toBeLessThan(1000)
+    // The node budget, not the clock, is what bounds the work.
+    expect(out).toContain('[truncated]')
   })
 })
 
@@ -672,6 +676,37 @@ describe('redactError', () => {
     const out = redactError(error)
     expect(out.frames).toEqual([])
     expect(JSON.stringify(out)).not.toMatch(/fake|original|Biedronka|zł/)
+  })
+
+  it.each(['Error', 'rror', 'E', 'Err', 'or: x', '', 'at fake (a.ts:1:1)'])(
+    'fails closed when the message is changed to %j after the stack was read',
+    (changed) => {
+      const error = new Error('x\n    at fake (a.ts:1:1)')
+      void error.stack
+      error.message = changed
+      expect(JSON.stringify(redactError(error))).not.toContain('fake')
+    },
+  )
+
+  it('fails closed when the message is deleted after the stack was read', () => {
+    const error = new Error('x\n    at fake (a.ts:1:1)')
+    void error.stack
+    Reflect.deleteProperty(error, 'message')
+    expect(JSON.stringify(redactError(error))).not.toContain('fake')
+  })
+
+  it('reads no frame out of a message getter on the prototype', () => {
+    class Getter extends Error {
+      override get message(): string {
+        return 'x\n    at fake (a.ts:1:1)'
+      }
+    }
+    expect(JSON.stringify(redactError(new Getter()))).not.toContain('fake')
+  })
+
+  it('keeps the frames of an error with an empty message', () => {
+    const out = redactError(new Error())
+    expect(out.frames.length).toBeGreaterThan(0)
   })
 
   it('reads no fake frame when the message is changed before the stack is read', () => {

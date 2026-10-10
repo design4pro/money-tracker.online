@@ -18,10 +18,11 @@
  *   interpolate a name, an email and an amount into their sentence. Its result is **final**: the sinks
  *   do not pass it through {@link redact} again, which would drop every frame.
  *
- * Neither function throws and neither invokes user code. Properties are read through
+ * Neither function throws and neither invokes user code of its own. Properties are read through
  * `Object.getOwnPropertyDescriptor` only, so an accessor is reported as `'[getter]'` and never
- * called; `toString`, `toJSON` and `valueOf` are never reached. The one read that may run a
- * getter is `error.stack`, because the engine implements it as an accessor, and it is wrapped.
+ * called; `toString`, `toJSON` and `valueOf` are never reached. Two things can still run code, and
+ * both are wrapped so that nothing escapes: a Proxy trap (the descriptor, prototype and key reads
+ * reach it) and `error.stack`, which the engine implements as an accessor.
  *
  * Narrowing the deny set later is Ask First: a leak cannot be recalled, an over-redacted field can be
  * loosened by a deliberate change.
@@ -126,12 +127,16 @@ export const REDACT_ALLOW_KEYS: ReadonlySet<string> = new Set([
  * `g`, so use it with `String.prototype.replace`, never with `.test`.
  */
 export const AMOUNT_PATTERN =
-  /[+-]?(?:(?:[A-Z]{3}|\p{Sc})\s?)?(?<!\d)(?:\d{1,3}(?:[   ,.']\d{3})+(?:[.,]\d{1,4})?|\d+[.,]\d{1,4})(?:\s?(?:[A-Z]{3}|\p{Sc}|zł))?/gu
+  /[+-]?(?:(?:[A-Z]{3}|\p{Sc})\s?)?(?<!\d)(?:\d{1,3}(?:[ \u00A0\u202F,.']\d{3})+(?:[.,]\d{1,4})?|\d+[.,]\d{1,4})(?:\s?(?:[A-Z]{3}|\p{Sc}|zł))?/gu
 
 /** What survives under an allow-listed key. Bounded at 128, which is also this module's string cap. */
 const ID_SHAPE = /^[A-Za-z0-9_.:/$-]{1,128}$/
 
-/** A key that is emitted as written; anything else becomes `[key:N]`. */
+/**
+ * A key that is emitted as written; anything else becomes `[key:N]`. Residual: a record keyed by a
+ * single-token user value (`{ Biedronka: 1 }`) emits that key. Callers must not pass a record keyed
+ * by user text; the spec states this limit.
+ */
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/
 
 /** An error name or a repository error code that is safe to emit. */
@@ -347,6 +352,39 @@ export interface RedactedError {
   frames: string[]
 }
 
+/** An empty message renders a bare name, or `Name: ` under some stack formatters, and nothing else. */
+const EMPTY_MESSAGE_HEADER = /^[^:]*(?::\s*)?$/
+
+/**
+ * The part of the stack after its header, or `undefined` when the header cannot be trusted.
+ *
+ * The header is `Name: message` and nothing else: one line before the message, and the message runs
+ * to the end of the header. Anything different is a stale header (the message was changed after
+ * `stack` was read) or came from a `message` getter on the prototype, which the descriptor read does
+ * not see; its old message could still hold a line shaped like a frame, so fail closed.
+ */
+function bodyAfterHeader(text: string, message: string): string | undefined {
+  const newline = text.indexOf('\n')
+  if (message === '') {
+    if (newline < 0 || !EMPTY_MESSAGE_HEADER.test(text.slice(0, newline)))
+      return undefined
+    return text.slice(newline + 1)
+  }
+
+  const headerEnd = newline < 0 ? text.length : newline
+  // The message starts the stack (no name) or follows the first `: ` of the first line.
+  for (let at = 0; at <= headerEnd;) {
+    if (text.startsWith(message, at)) {
+      const rest = text.slice(at + message.length)
+      return rest === '' || rest.startsWith('\n') ? rest : undefined
+    }
+    const colon = text.indexOf(': ', at)
+    if (colon < 0 || colon >= headerEnd) return undefined
+    at = colon + 2
+  }
+  return undefined
+}
+
 /**
  * The stack's frames, and only its frames.
  *
@@ -354,6 +392,12 @@ export interface RedactedError {
  * and a line shaped like a frame. So everything up to the end of the *current* message is cut off
  * first, and only then is each remaining line kept if it is a strict frame. A message that was
  * changed after construction is not in the stack, so the header's extent is unknown: fail closed.
+ *
+ * One case cannot be told apart from a genuine header by looking at the stack: a multi-line message
+ * whose later lines look like frames, shortened to its leading lines *after* `stack` was first read
+ * (the header is rendered on that read). The shortened message is then a clean prefix of the stale
+ * header and the old lines are read as frames. That needs a layer that both reads `stack` and then
+ * rewrites `message`; the stage that logs an error reads it once, from a fresh object.
  */
 function framesOf(error: Error): string[] {
   let stack: unknown
@@ -373,15 +417,8 @@ function framesOf(error: Error): string[] {
   }
 
   const text = stack.slice(0, MAX_STACK_LENGTH)
-  let body: string
-  if (message === '') {
-    body = text.slice(text.indexOf('\n') + 1)
-    if (!text.includes('\n')) return []
-  } else {
-    const at = text.indexOf(message)
-    if (at < 0) return []
-    body = text.slice(at + message.length)
-  }
+  const body = bodyAfterHeader(text, message)
+  if (body === undefined) return []
 
   const frames: string[] = []
   for (const line of body.split('\n')) {
