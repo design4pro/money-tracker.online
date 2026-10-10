@@ -75,6 +75,13 @@ already caused, or would obviously cause, two people to mean two things by one w
   transactions, with alert thresholds and a rollover policy. A **budget period** is one
   materialised instance of it, carrying what was carried in, what was spent, and what closed.
   _Avoid_: "budget" for a period; "envelope" without saying which rollover policy is meant.
+- **Failure** — a refusal or fault the server turns into a **failure kind**: one of a closed set
+  (`unauthenticated`, `forbidden`, `not_found`, `validation`, `conflict`, `quota`, `feature_locked`,
+  `rate_unavailable`, `rate_limited`, `upstream`, `internal`), with `internal` the default for
+  anything unnamed. The browser is told the kind through the **failure envelope**, a versioned
+  public shape built only from closed sets, so two failures of one kind are identical. _Avoid_:
+  "envelope" alone, which also names a budget idea; "error message" for what the reader is shown,
+  which is always a catalogue sentence chosen by kind.
 - **Rollover** — what a budget period does with the difference between its limit and its spend:
   `none`, carry the surplus, or carry both surplus and overspend. _Avoid_: "carryover" and
   "rollover" for the same thing in different sentences.

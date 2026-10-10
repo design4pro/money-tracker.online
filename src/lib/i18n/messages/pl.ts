@@ -1286,6 +1286,26 @@ const messages = {
   'validation.number.invalid': 'Podaj liczbę.',
   'validation.generic': 'Sprawdź to pole.',
 
+  /* -- Błędy nazwane przez serwer ----------------------------------------- */
+  // Jeden klucz na rodzaj błędu i trzy na pole, czytane przez zamknięte tabele w
+  // `src/lib/failure-envelope.ts`; żaden klucz nie jest budowany w czasie działania.
+  'failure.internal': 'Coś poszło nie tak po naszej stronie.',
+  'failure.unauthenticated': 'Zaloguj się, aby kontynuować.',
+  'failure.forbidden': 'Nie masz do tego dostępu.',
+  'failure.not_found': 'Nie możemy tego znaleźć.',
+  'failure.validation': 'Sprawdź zaznaczone pola i spróbuj ponownie.',
+  'failure.conflict':
+    'To koliduje z tym, co jest już zapisane. Odśwież stronę i spróbuj ponownie.',
+  'failure.quota': 'Twój plan osiągnął limit w tym zakresie.',
+  'failure.feature_locked': 'To nie wchodzi w skład Twojego planu.',
+  'failure.rate_unavailable': 'Brak kursu waluty na ten dzień.',
+  'failure.rate_limited': 'Zbyt wiele żądań. Spróbuj za chwilę.',
+  'failure.upstream':
+    'Usługa, z której korzystamy, nie odpowiedziała. Spróbuj ponownie.',
+  'failure.field.invalid': 'Ta wartość jest nieprawidłowa.',
+  'failure.field.tooShort': 'Ta wartość jest za krótka.',
+  'failure.field.tooLong': 'Ta wartość jest za długa.',
+
   /* -- Empty and failure states ------------------------------------------ */
   'empty.search.title': 'Nic nie znaleziono',
   'empty.search.body': 'Nic nie pasuje do {query}. Spróbuj krótszej frazy.',

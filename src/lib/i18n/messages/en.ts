@@ -1247,6 +1247,25 @@ const messages = {
   'validation.number.invalid': 'Enter a number.',
   'validation.generic': 'Check this field.',
 
+  /* -- Failures the server names ------------------------------------------ */
+  // One key per failure kind and three for a field, all read through the closed tables in
+  // `src/lib/failure-envelope.ts`; no key here is built at runtime.
+  'failure.internal': 'Something went wrong on our side.',
+  'failure.unauthenticated': 'Sign in to continue.',
+  'failure.forbidden': 'You do not have access to this.',
+  'failure.not_found': 'This could not be found.',
+  'failure.validation': 'Check the highlighted fields and try again.',
+  'failure.conflict':
+    'This conflicts with what is already saved. Reload and try again.',
+  'failure.quota': 'Your plan has reached its limit for this.',
+  'failure.feature_locked': 'This is not part of your plan.',
+  'failure.rate_unavailable': 'No exchange rate is available for that date.',
+  'failure.rate_limited': 'Too many requests. Try again shortly.',
+  'failure.upstream': 'A service we depend on did not answer. Try again.',
+  'failure.field.invalid': 'This value is not valid.',
+  'failure.field.tooShort': 'This value is too short.',
+  'failure.field.tooLong': 'This value is too long.',
+
   /* -- Empty and failure states ------------------------------------------ */
   'empty.search.title': 'Nothing found',
   'empty.search.body': 'Nothing matches {query}. Try a shorter search.',
