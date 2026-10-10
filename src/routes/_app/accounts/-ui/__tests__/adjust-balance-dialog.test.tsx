@@ -191,6 +191,30 @@ describe('reading the balance for another date', () => {
     })
     expect(screen.getByText(/Money in of .*50[.,]00/)).toBeTruthy()
   })
+
+  it('does not show the first answer for a date again while its new read is in flight (A, B, A)', async () => {
+    server.getAccountBalanceOn.mockResolvedValueOnce({ balanceMinor: 100_00 })
+    renderDialog()
+    await typeTarget('150')
+    await screen.findByText(/Money in of .*50[.,]00/)
+
+    const second = deferred<{ balanceMinor: number }>()
+    const third = deferred<{ balanceMinor: number }>()
+    server.getAccountBalanceOn
+      .mockReturnValueOnce(second.promise)
+      .mockReturnValueOnce(third.promise)
+    await dayBack()
+    const day = screen.getByRole('spinbutton', { name: /^day/i })
+    day.focus()
+    await user.keyboard('{ArrowUp}')
+
+    // Back on March 15 with its second read pending: the old figure must not stand in for it.
+    const status = screen.getByRole('status')
+    expect(status.textContent).toContain(
+      sentence('accounts.adjust.preview.loading', 'March 15, 2026'),
+    )
+    expect(screen.queryByText(/Money in of/)).toBeNull()
+  })
 })
 
 describe('recording is blocked until the balance has loaded', () => {
@@ -285,6 +309,27 @@ describe('a failed read', () => {
     const status = screen.getByRole('status')
     expect(status.getAttribute('tabindex')).toBe('-1')
     expect(document.activeElement).toBe(status)
+  })
+
+  it('reads as loading while a retry is in flight, so a second failure is announced', async () => {
+    const retried = deferred<{ balanceMinor: number }>()
+    server.getAccountBalanceOn
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockReturnValueOnce(retried.promise)
+    renderDialog()
+
+    const error = sentence('accounts.adjust.preview.error', 'March 15, 2026')
+    await screen.findByText(error)
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+    const status = screen.getByRole('status')
+    expect(status.textContent).toContain(
+      sentence('accounts.adjust.preview.loading', 'March 15, 2026'),
+    )
+    expect(status.textContent).not.toContain(error)
+
+    retried.reject(new Error('boom again'))
+    expect(await screen.findByText(error)).toBeTruthy()
   })
 })
 

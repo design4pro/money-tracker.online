@@ -117,6 +117,10 @@ export function AdjustBalanceDialog({
   // showing the previous date's figure beside the new date.
   useEffect(() => {
     let isCurrent = true
+    // Leaving a date drops its answer: going A -> B -> A before B settles must not show the first
+    // A figure as if it were the new read. A retry keeps its date, so the failed read it is
+    // retrying stays.
+    setRead((previous) => (previous?.date === bookedOnIso ? previous : null))
     getAccountBalanceOn({
       data: { accountId: account.id, on: bookedOnIso },
     }).then(
@@ -308,7 +312,7 @@ export function AdjustBalanceDialog({
                         ref={statusRef}
                         role="status"
                         tabIndex={-1}
-                        className="flex flex-col gap-2 outline-none"
+                        className="focus-ring flex flex-col gap-2 rounded-md"
                       >
                         {renderPreview()}
                       </div>
@@ -390,7 +394,9 @@ export function AdjustBalanceDialog({
   )
 
   function renderPreview() {
-    if (balance === null) {
+    // A retry in flight reads as loading, so a second failure swaps the sentence back and the
+    // status region announces it.
+    if (balance === null || isRetrying) {
       return (
         <p className="text-body text-ink-2">
           {t('accounts.adjust.preview.loading', { date: bookedOnText })}
@@ -425,14 +431,18 @@ export function AdjustBalanceDialog({
     const magnitude = absMinor(deltaMinor)
     return (
       <>
-        <DirectionalAmount
-          locale={locale}
-          direction={direction}
-          amountMinor={magnitude}
-          currencyCode={currency}
-          label={t(`transactions.direction.${direction}`)}
-          size="lg"
-        />
+        {/* The sentence below says the same in words; inside the live region the figure would be
+            read out a second and third time. */}
+        <div aria-hidden="true">
+          <DirectionalAmount
+            locale={locale}
+            direction={direction}
+            amountMinor={magnitude}
+            currencyCode={currency}
+            label={t(`transactions.direction.${direction}`)}
+            size="lg"
+          />
+        </div>
         <p className="text-body text-ink">
           {t(`accounts.adjust.preview.${direction}`, {
             amount: formatMoney(locale, makeMoney(magnitude, currency)),
