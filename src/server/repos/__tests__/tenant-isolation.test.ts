@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url'
 
 import { and, eq, like, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import { isNotFound } from '@tanstack/react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { organization, user } from '#/server/db/auth-schema'
@@ -393,6 +394,7 @@ describe('the failure a read produces discloses nothing about the row', () => {
         },
         (error: unknown) => error,
       )
+    expect(isNotFound(thrown)).toBe(true)
     return JSON.stringify(thrown)
   }
 

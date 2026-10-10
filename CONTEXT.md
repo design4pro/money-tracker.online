@@ -81,7 +81,7 @@ already caused, or would obviously cause, two people to mean two things by one w
   anything unnamed. The browser is told the kind through the **failure envelope**, a versioned
   public shape built only from closed sets, so two failures of one kind are identical. _Avoid_:
   "envelope" alone, which also names a budget idea; "error message" for what the reader is shown,
-  which is always a catalogue sentence chosen by kind.
+  which is a catalogue sentence chosen by kind, never the text of the thrown value.
 - **Rollover** — what a budget period does with the difference between its limit and its spend:
   `none`, carry the surplus, or carry both surplus and overspend. _Avoid_: "carryover" and
   "rollover" for the same thing in different sentences.
