@@ -4,7 +4,7 @@
 | ------------------ | --------------------------------- |
 | **Status**         | ready                             |
 | **Issue**          | none                              |
-| **Spec PR**        | #TBD                              |
+| **Spec PR**        | #636                              |
 | **Implementation** | none                              |
 | **Plan**           | 06-S3 (docs/plans/06-accounts.md) |
 
@@ -525,5 +525,4 @@ slice that a person can see and check. A is the base; B and the rest follow.
 | Security and tenancy reviewer | approve with conditions (medium), all applied | approve with conditions (conditional delete, race named), applied; asks for a second reviewer on the implementation PRs (risk-high tenancy) |
 | Accessibility and UX          | approve with conditions (medium), all applied | approve with conditions (parent-qualified labels, disabled reasons, 44 px check), applied                                                   |
 
-The two rounds the skill allows are used; no specialist answered "revise". The `Spec PR` row in the
-metadata table holds `#TBD` until the pull-request step fills it in.
+The two rounds the skill allows are used; no specialist answered "revise".
