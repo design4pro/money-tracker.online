@@ -111,6 +111,8 @@ describe('TransactionForm booking date', () => {
     expect(dateDescription()).toContain('still ahead')
     // The message names the control that fixes it, using that control's own label.
     expect(dateDescription()).toContain('"Planned"')
+    // Focus stays on the checkbox, so the refusal is also announced by a status region.
+    expect(screen.getByRole('status').textContent).toContain('still ahead')
     // Not clamped, not auto-ticked, and Save stays available.
     expect(within(dateGroup()).getByText(FUTURE.slice(0, 4))).toBeTruthy()
     expect((planned as HTMLInputElement).checked).toBe(false)
@@ -129,6 +131,7 @@ describe('TransactionForm booking date', () => {
 
     expect(dateGroup().hasAttribute('data-invalid')).toBe(false)
     expect(dateDescription()).not.toContain('still ahead')
+    expect(screen.getByRole('status').textContent).toBe('')
   })
 
   it('says it in Polish with the Polish checkbox label', () => {

@@ -299,8 +299,8 @@ export function TransactionForm({
   const submit = (addAnother: boolean) => {
     setTouched(true)
     if (Object.keys(errors).length > 0) {
-      // Amount comes first in the DOM and already keeps the caret, so the date only takes focus
-      // when it is the first thing the refusal is about (WCAG 2.4.3, 4.1.3).
+      // The amount comes first in the DOM, so the date only takes focus when it is the first
+      // thing the refusal is about; otherwise the amount error is the one to fix first (WCAG 2.4.3).
       if (errors.amountMinor === undefined && errors.bookedOn !== undefined) {
         dateRef.current
           ?.querySelector<HTMLElement>('[role="spinbutton"]')
@@ -474,6 +474,14 @@ export function TransactionForm({
                   }
                 }}
               />
+              {/*
+                The error mounts in the date field while focus is on the "planned" checkbox, so
+                the field's own description is never read. This region is announced instead
+                (WCAG 4.1.3); it stays mounted so the first message is announced too.
+              */}
+              <p role="status" className="sr-only">
+                {dateBeyondWindow ? shown.bookedOn : ''}
+              </p>
             </div>
 
             <Select
