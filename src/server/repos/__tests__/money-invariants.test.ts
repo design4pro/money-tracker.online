@@ -1758,6 +1758,29 @@ describe('17 — a correction is a transaction, never an overwrite', () => {
     expect(signed).toBe(120_00)
   })
 
+  it('writes no row and leaves the balance alone when the booking date is beyond the latest day on Earth', async () => {
+    const conversion = conversionOf('PLN', [])
+    await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, direction: 'income', amountMinor: 75_00 },
+    })
+    executed.length = 0
+
+    await expect(
+      adjustAccountBalance(
+        scope,
+        { accountId: 'acc-a', targetMinor: 500_00, bookedOn: '2999-01-01' },
+        conversion,
+      ),
+    ).rejects.toThrow()
+
+    // The refusal is the schema's, so not even a read ran, and the one existing row is the only row.
+    expect(executed).toEqual([])
+    expect(await rows()).toHaveLength(1)
+  })
+
   it('writes nothing when the balance is already the target', async () => {
     const conversion = conversionOf('PLN', [])
     await createTransaction({

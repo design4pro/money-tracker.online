@@ -53,7 +53,7 @@ import {
   sumMinor,
 } from '#/lib/money'
 import { isLiabilityCategory } from '#/server/catalog/account-types'
-import { serverToday } from '#/server/clock'
+import { latestCalendarDayOnEarth, serverToday } from '#/server/clock'
 import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
 import { pauseRulesReferencing } from '#/server/rules/integrity'
@@ -257,11 +257,25 @@ export const reorderAccountsSchema = z.strictObject({
   ids: z.array(idSchema).min(1).max(200),
 })
 
+/**
+ * A calendar date no later than the latest one anywhere on Earth right now.
+ *
+ * A correction is a real, non-planned transaction, so a future day would count in balances at once
+ * and freeze a borrowed rate into `ref_amount_minor` for good (`docs/MONEY.md` §2.3, §3). The
+ * browser dialog also refuses the future; this is the check a direct caller cannot skip. The
+ * `custom` issue lands on the field, which the failure envelope maps to `failure.field.invalid`.
+ *
+ * ISO dates compare correctly as strings.
+ */
+const bookableDaySchema = z.iso
+  .date()
+  .refine((day) => day <= latestCalendarDayOnEarth())
+
 export const adjustBalanceSchema = z.strictObject({
   accountId: idSchema,
   /** What the balance **should** be at the end of `bookedOn`, in the account's own currency. */
   targetMinor: minorSchema,
-  bookedOn: z.iso.date(),
+  bookedOn: bookableDaySchema,
   note: noteSchema.optional(),
 })
 export type AdjustBalanceInput = z.input<typeof adjustBalanceSchema>
@@ -269,7 +283,7 @@ export type AdjustBalanceInput = z.input<typeof adjustBalanceSchema>
 /** The question {@link getAccountBalanceOn} answers: one account, at the end of one day. */
 export const getAccountBalanceOnSchema = z.strictObject({
   accountId: idSchema,
-  on: z.iso.date(),
+  on: bookableDaySchema,
 })
 export type GetAccountBalanceOnInput = z.input<typeof getAccountBalanceOnSchema>
 

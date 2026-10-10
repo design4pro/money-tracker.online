@@ -34,6 +34,8 @@ import {
   organizationCurrencies,
   transactions,
 } from '#/server/db/schema'
+import { classifyFailure } from '#/server/errors/classify'
+import { buildEnvelope } from '#/server/errors/envelope'
 
 import { setLimitResolver, touchLedgerAccount } from '../base'
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors'
@@ -43,6 +45,7 @@ import {
   CurrencyNotHeldError,
   GroupDepthError,
   adjustAccountBalance,
+  adjustBalanceSchema,
   archiveAccount,
   createAccount,
   createAccountGroup,
@@ -1144,6 +1147,114 @@ describe('adjustAccountBalance', () => {
       .where(eq(transactions.accountId, 'acc-b'))
     expect(rows).toHaveLength(0)
     expect((await accountRow('acc-b'))?.currentBalanceMinor).toBe(5_000)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* The future-date guard                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `NOW` is 10:00 UTC on the 15th, the first instant UTC+14 is on the 16th, so the latest calendar
+ * day anywhere on Earth is the 16th. Only `Date` is faked: the in-memory database needs its timers.
+ */
+describe('the booking-date window', () => {
+  const CUTOFF_DAY = '2026-03-16'
+  const FAR_FUTURE = '2999-01-01'
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+    return () => vi.useRealTimers()
+  })
+
+  async function transactionCount(accountId: string): Promise<number> {
+    const rows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.accountId, accountId))
+    return rows.length
+  }
+
+  it('accepts today and the cutoff day for a correction, so UTC+14 can book its own today', async () => {
+    const created = await createAccount(scope, EVERYDAY, conversion)
+
+    for (const [bookedOn, targetMinor] of [
+      ['2026-03-15', 10_00],
+      [CUTOFF_DAY, 20_00],
+    ] as const) {
+      const result = await adjustAccountBalance(
+        scope,
+        { accountId: created.id, targetMinor, bookedOn },
+        conversion,
+      )
+      expect(result.status).toBe('recorded')
+    }
+  })
+
+  it('refuses the day after the cutoff and a far-future day for a correction, writing nothing', async () => {
+    const created = await createAccount(scope, EVERYDAY, conversion)
+
+    for (const bookedOn of ['2026-03-17', FAR_FUTURE]) {
+      await expect(
+        adjustAccountBalance(
+          scope,
+          { accountId: created.id, targetMinor: 120_00, bookedOn },
+          conversion,
+        ),
+      ).rejects.toThrow()
+    }
+    expect(await transactionCount(created.id)).toBe(0)
+  })
+
+  it('refuses a date after the cutoff at the field, as a refinement the envelope maps to the invalid key', () => {
+    const adjust = adjustBalanceSchema.safeParse({
+      accountId: 'acc-a',
+      targetMinor: 0,
+      bookedOn: '2026-03-17',
+    })
+    const read = getAccountBalanceOnSchema.safeParse({
+      accountId: 'acc-a',
+      on: '2026-03-17',
+    })
+
+    expect(adjust.error?.issues).toMatchObject([
+      { code: 'custom', path: ['bookedOn'] },
+    ])
+    expect(read.error?.issues).toMatchObject([{ code: 'custom', path: ['on'] }])
+    for (const [error, field] of [
+      [adjust.error, 'bookedOn'],
+      [read.error, 'on'],
+    ] as const) {
+      expect(buildEnvelope(error, classifyFailure(error))).toMatchObject({
+        kind: 'validation',
+        fields: [{ path: field, key: 'failure.field.invalid' }],
+      })
+    }
+  })
+
+  it('reads the clock when it parses, not when the module loads', () => {
+    const input = { accountId: 'acc-a', on: '2026-03-17' }
+    expect(getAccountBalanceOnSchema.safeParse(input).success).toBe(false)
+
+    vi.setSystemTime(new Date('2026-03-16T10:00:00.000Z'))
+
+    expect(getAccountBalanceOnSchema.safeParse(input).success).toBe(true)
+  })
+
+  it('accepts today and the cutoff day for a balance read, and refuses the day after', async () => {
+    const created = await createAccount(scope, EVERYDAY, conversion)
+
+    for (const on of ['2026-03-15', CUTOFF_DAY]) {
+      await expect(
+        getAccountBalanceOn(scope, { accountId: created.id, on }),
+      ).resolves.toEqual({ balanceMinor: 0 })
+    }
+    for (const on of ['2026-03-17', FAR_FUTURE]) {
+      await expect(
+        getAccountBalanceOn(scope, { accountId: created.id, on }),
+      ).rejects.toThrow()
+    }
   })
 })
 
