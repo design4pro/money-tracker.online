@@ -397,6 +397,10 @@ const messages = {
   'accounts.adjust.preview.error': 'The balance on {date} could not be read.',
   'accounts.adjust.preview.blocked':
     'The correction can be recorded once the balance on {date} has loaded.',
+  'accounts.adjust.preview.blockedFailed':
+    'The correction can be recorded once the balance on {date} has been read. Choose “{retry}” to read it again.',
+  'accounts.adjust.preview.blockedFuture':
+    'The correction cannot be recorded for a date that has not happened yet. Pick a date up to today.',
   'accounts.adjust.action': 'Record the correction',
   'accounts.adjust.result.title': 'Recorded',
   'accounts.adjust.result.income':
