@@ -22,9 +22,12 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 
 - **Data access.** Every query goes through the tenant-scoped base repository in
   `src/server/repos`, takes a `TenantScope` as its first parameter, and the tenant predicate cannot
-  be removed by a caller. `docs/SPEC.md` §5.2 documents exactly two exceptions: `src/server/catalog`,
-  guarded by `requirePermission` plus a platform audit-log write, and `billing_events`, whose two
-  delivery writes take a bare `Database` because a webhook arrives before its workspace is known.
+  be removed by a caller. `docs/SPEC.md` §5.2 documents three exceptions: `src/server/catalog`,
+  guarded by `requirePermission` plus a platform audit-log write; `billing_events`, whose two
+  delivery writes take a bare `Database` because a webhook arrives before its workspace is known;
+  and the insert-only `organization_currencies` write in the workspace-creation batch
+  (`src/server/auth/organization.ts`), which has no
+  `TenantScope` to take because the workspace does not exist yet. Anything wider is a finding.
 - **Money.** No float arithmetic on an amount anywhere, including a tooltip or a chart label. The
   scale is `currencies.digits`, never a hard-coded 2. `ref_amount_minor` is written once at the
   booked date's rate and never recomputed. Balances are rebuilt wholesale through the `LEDGER`
@@ -45,14 +48,21 @@ the protected surfaces, and `AGENTS.md` the rules every change is written under.
 - **Dependencies.** The set is frozen (`docs/SPEC.md` §3). A new package is a blocker, not a
   judgement call.
 - **Tests.** A new repository function has its tenant-isolation case; a money-touching write path
-  has its money-invariant case; a behaviour change has a test that fails without it. No added
-  suppression, skip or focus; no deleted test file.
+  has its money-invariant case; a behaviour change has a test that fails without it, and a pin or
+  guard test has been seen red once (revert what it pins; a count with no control passes on a broken
+  tree: #541, #604, #623, #625), and a pin never seen red is the major below. No added suppression,
+  skip or focus; no deleted test file.
+- **Layout lives in the browser.** A behaviour carried only by classes (a stacked row, a popover
+  width, `flex-shrink` under overflow) is asserted by a Playwright case that reads computed layout,
+  with enough rows or width to reach the fault. jsdom computes no CSS, so a unit test stays green
+  with the class deleted (#577, #609); a miss is major.
 - **Clean room.** Nothing is copied from the reference product (`docs/agents/reference.md`): not a
   string, a name, a number or a layout.
 - **Numbers.** Every count in the PR body and the review came from a command whose output was read
   (`docs/SPEC.md` §7.7). The same holds for a figure written into a spec, a plan, an ADR or a code
   comment: it is re-derived on the head under review, and a headline total agrees with the table it
-  summarises (#170, #191, #222, #250, #252, #253).
+  summarises (#170, #191, #222, #250, #252, #253). A claim about what a tool or the suite does is
+  probed, not copied from a comment (#472, #531, #574).
 - **Governance documents.** `DESIGN.md`, `BACKWARD_COMPATIBILITY.md`, `docs/ACCESSIBILITY.md`,
   `docs/MONEY.md` and `docs/adr/` record decisions a person owns. A PR touching one is
   `risk-high`. Reviewing it means reading the decision, not only the

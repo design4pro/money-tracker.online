@@ -11,7 +11,7 @@
  * They share the word `admin` and mean unrelated things by it. A helper taking "a role" without
  * saying which one is a defect, not a naming quibble — so the two are separate TypeScript types with
  * no overlap in their union members beyond that shared literal, and `__tests__/permissions.test.ts`
- * holds a `@ts-expect-error` fixture proving one cannot be passed where the other is wanted.
+ * holds a type-level assertion proving one cannot be passed where the other is wanted.
  *
  * **This module is binding-free by construction**, and that is load-bearing rather than tidy: the
  * console screens, the guards and the tests all read the same grid, and they cannot share a runtime.
@@ -254,9 +254,9 @@ export const adminOptions = {
  * is the instrument and a `hooks.before` guard is not — the latter wraps `auth.api` too, and would
  * leave no way to perform the action at all.
  *
- * The declared type is mutable because `BetterAuthOptions['disabledPaths']` is `string[]`, and the
- * array is passed by reference so a drift test and the running Worker cannot read two different
- * lists. Nothing mutates it.
+ * The declared type is mutable because `BetterAuthOptions['disabledPaths']` is `string[]`. The
+ * config spreads this array into `disabledPaths` and a drift test compares against it, so the
+ * running Worker and the test cannot read two different lists. Nothing mutates it.
  */
 export const DISABLED_ADMIN_PATHS: string[] = [
   '/admin/ban-user',
@@ -275,3 +275,16 @@ export const DISABLED_ADMIN_PATHS: string[] = [
   '/admin/unban-user',
   '/admin/update-user',
 ]
+
+/**
+ * The `organization` plugin's creation path, closed on the HTTP surface.
+ *
+ * Nothing in the product posts to it, and left open it lets a signed-in user mint unlimited
+ * owner-role organizations with no base currency; one created before provisioning is what
+ * `firstOrganizationIdFor` returns, so that user never gets a personal workspace. Spelled without
+ * `/api/auth`, for the reason {@link DISABLED_ADMIN_PATHS} gives.
+ *
+ * Only this one path: `allowUserToCreateOrganization` stays on, because plan stage 26-S1 creates
+ * workspaces in-process with `auth.api.createOrganization`, which never passes through the router.
+ */
+export const DISABLED_ORGANIZATION_PATHS: string[] = ['/organization/create']

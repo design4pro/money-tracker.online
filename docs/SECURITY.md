@@ -54,8 +54,9 @@ product decision (`docs/adr/0008-no-bank-connectors.md`), not a control we could
 - **A foreign id answers `NotFoundError`, never `ForbiddenError`.** A 403 tells an attacker the row
   exists. Not seeing must be indistinguishable from not existing, including in counts, aggregates,
   list totals and response timing.
-- `src/server/catalog` is the only carve-out (global tables), guarded by `requirePermission` plus a
-  `platform_audit_log` write.
+- `src/server/catalog` is a carve-out (global tables), guarded by `requirePermission` plus a
+  `platform_audit_log` write. `billing_events` and the insert-only `organization_currencies` write
+  in the workspace-creation batch (`src/server/auth/organization.ts`) are the other two (`docs/SPEC.md` §5.2).
 - **Every repository function has a tenant-isolation case** in
   `src/server/repos/__tests__/tenant-isolation.test.ts`: workspace A asks, in A's scope, to read,
   list, update and delete B's rows by id and to parent new rows onto B's rows. Every one must be
@@ -66,22 +67,32 @@ product decision (`docs/adr/0008-no-bank-connectors.md`), not a control we could
 
 ## 4. Authentication
 
-Better Auth, with sessions in the `SESSIONS` KV namespace.
+Better Auth, with sessions in the `SESSIONS` KV namespace. Sessions live there only: a session that
+has expired or been evicted means signing in again, and D1 holds the verification rows and the other
+auth tables, not the session (ADR 0011, Amendment).
 
 - **No cookie session cache.** Better Auth's `cookieCache` puts a signed session snapshot in a
   cookie; that is a five-minute window in which a banned account, or one whose role was just
-  reduced, keeps its old authority. The KV read on every request is the price of that being false.
+  reduced, keeps its old authority. Without it, the workspace role is read from the `member` row on
+  every call, so a demotion applies to the next call. A ban and the platform role are read from the
+  session record held in KV, so they take effect when Better Auth rewrites or deletes that record,
+  bounded by KV propagation.
 - **Verification records are stored in the database**, not held in a cookie.
-- **Rate limits are per path**, not global: `/sign-in/email` 10 per 60s, `/sign-up/email` 5 per 300s,
-  `/request-password-reset` 5 per 300s, `/two-factor/verify-totp` 10 per 60s. Counters live in KV
-  with a 60s TTL floor.
-- **Passkeys** (WebAuthn) are first-class, with our own plugin. **TOTP two-factor** is available and
+- **Rate limits are per path**, seven rules on top of a global default of 100 per 60s:
+  `/sign-in/email` 10 per 60s, `/sign-up/email` 5 per 300s, `/request-password-reset` 5 per 300s,
+  `/reset-password` 10 per 300s, `/send-verification-email` 5 per 300s, `/two-factor/verify-totp`
+  10 per 60s and `/two-factor/verify-backup-code` 5 per 300s. Counters live in KV with a 60s TTL
+  floor and are approximate: a courtesy guard that can undercount, not a hard limit.
+- **Passkeys** (WebAuthn): the passkey plugin is not installed yet and arrives with `04-S4`; the
+  plugins today are `admin`, `twoFactor` and `organization`. **TOTP two-factor** is available and
   its recovery codes are shown once.
 - **There is no CAPTCHA anywhere**, which is both an accessibility commitment
   (`docs/ACCESSIBILITY.md` §3.5) and a deliberate choice to rate-limit server-side instead.
 - Cookie prefix `mtr`, `Secure`, `HttpOnly`, `SameSite=Lax`.
 - `disabledPaths` is configured at the **top level** of the auth config, not inside a plugin, because
-  a path disabled inside a plugin is only disabled for that plugin's routes.
+  a path disabled inside a plugin is only disabled for that plugin's routes. It lists the `admin`
+  plugin's paths and `/organization/create`: no screen creates an organization over HTTP, and
+  workspaces are created in-process, which `disabledPaths` does not reach.
 - **After a successful sign-in the client does a full document load**, not a client-side navigation,
   so the shell loader sees the session cookie on its first run rather than rendering a signed-out
   shell and correcting it.

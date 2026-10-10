@@ -31,7 +31,11 @@ import {
   trustedOrigins,
 } from './env'
 import { resolveOrProvisionOrganization } from './organization'
-import { DISABLED_ADMIN_PATHS, adminOptions } from './permissions'
+import {
+  DISABLED_ADMIN_PATHS,
+  DISABLED_ORGANIZATION_PATHS,
+  adminOptions,
+} from './permissions'
 import { createKvSecondaryStorage } from './secondary-storage'
 
 import type { Locale } from '#/lib/i18n'
@@ -141,7 +145,8 @@ export function authOptions(): BetterAuthOptions {
 
     /**
      * Sessions, OAuth state and rate-limit counters read from KV at the edge instead of from D1
-     * on the other side of the network (ADR 0011). D1 stays the durable record.
+     * on the other side of the network (ADR 0011). Sessions live in KV only: a miss means signing in
+     * again. D1 holds the verification rows and the other auth tables.
      */
     secondaryStorage: createKvSecondaryStorage(sessionStore()),
 
@@ -151,9 +156,11 @@ export function authOptions(): BetterAuthOptions {
       /**
        * **No `cookieCache`.** It puts a signed copy of the session in the cookie and serves reads
        * from it for its lifetime, which means a ban, a sign-out-everywhere or a role change is not
-       * visible until it expires. `requireOrg` re-reads the membership on every call precisely so
-       * that revocation is immediate; caching the session in the cookie would undo that for the
-       * user record while leaving the membership fresh, which is the worst of both.
+       * visible until it expires. `requireOrg` re-reads the membership on every call, so a workspace
+       * role change applies on the next call. A ban and the platform role are read from the session
+       * record held in KV, so they take effect when that record is rewritten or deleted, bounded by
+       * KV propagation. Caching the session in the cookie would put them behind the cookie's
+       * lifetime instead while leaving the membership fresh, which is the worst of both.
        */
     },
 
@@ -214,6 +221,9 @@ export function authOptions(): BetterAuthOptions {
       admin(adminOptions),
       twoFactor({ issuer: APP_NAME }),
       organization({
+        // Stays on although `/organization/create` is closed below: plan stage 26-S1 creates
+        // workspaces in-process through `auth.api.createOrganization`, and with this off that call
+        // is refused for a session-carrying user too.
         allowUserToCreateOrganization: true,
         creatorRole: 'owner',
         sendInvitationEmail: async (data, request) => {
@@ -230,8 +240,11 @@ export function authOptions(): BetterAuthOptions {
       }),
     ],
 
-    /** The console's HTTP surface, closed. See `./permissions` for why this and not a hook. */
-    disabledPaths: DISABLED_ADMIN_PATHS,
+    /**
+     * The console's HTTP surface and the unused create-organization route, closed. See
+     * `./permissions` for why this and not a hook.
+     */
+    disabledPaths: [...DISABLED_ADMIN_PATHS, ...DISABLED_ORGANIZATION_PATHS],
 
     rateLimit: {
       enabled: true,

@@ -36,6 +36,7 @@ A hold always carries `blocked`, so an issue with `## Triage Notes` and no `bloc
 - **Duplicate or already built?** **search-issues** by domain concept, not just the title's words. Search the code for the behaviour. Note where you looked.
 - **Previously rejected?** Read `.out-of-scope/*.md` if it exists.
 - **Bug claims:** reproduce read-only. Trace the code path, and run an existing test or a CLI command when that is cheap. Record the outcome: confirmed (name the code path), not reproduced, or not enough detail.
+- **Behaviour or figure the issue relies on:** a statement about how a tool or the suite behaves, or a number such as a viewport size, is probed or re-derived from its source (a ten-line throwaway spec, `node -e` on the registry). A comment or an ADR in the repo that says the same thing is a lead, not evidence: #531 (a false `browser.newContext()` claim copied into three comments and the brief) and #574 (device `screen` sizes read as `viewport`, an ADR claim that lived 18 days).
 
 ## 3. Classify
 

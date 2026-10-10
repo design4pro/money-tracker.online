@@ -65,10 +65,26 @@ sees for a week, in exchange for a checklist that is never wrong.
 ### Server (repo, server function, Zod)
 
 - **`createWorkspace`** takes name, base currency, time zone, locale and an optional preset key. It
-  creates the organization (Better Auth, `04-S1`), the owner `member` row, `workspace_settings`
-  (`23-S2`), the currency row (`03-S3`) and, if a preset was chosen, the preset's categories and
-  budget — **in one D1 batch**, so a half-created workspace cannot exist. If the batch fails, nothing
-  landed and the person retries; a workspace with settings but no owner is unrecoverable from the UI.
+  creates the organization, the owner `member` row, `workspace_settings` (`23-S2`), the currency row
+  (`03-S3`) and, if a preset was chosen, the preset's categories and budget, so that a half-created
+  workspace cannot exist. If the creation fails, nothing landed and the person retries; a workspace
+  with settings but no owner is unrecoverable from the UI.
+- **Open choice, owned by this stage: how the organization is created.** An in-process
+  `auth.api.createOrganization` call (Better Auth, `04-S1`) cannot be part of a `db.batch`, so the
+  stage must pick one of two mechanisms before it writes code, and record the choice, and the SPEC
+  §5.2 decision for its product-table writes, in its ticket. Until then `allowUserToCreateOrganization`
+  stays on; it is dormant, because the HTTP route is closed (ADR 0011).
+  - **In-process `createOrganization`.** The organization is created by Better Auth and the rest
+    follows in a batch, so the all-or-nothing guarantee above needs its own compensation for the
+    window between the two (the stage states how a failed batch removes the organization).
+    `allowUserToCreateOrganization: true` stays on, because this is the caller it is kept for.
+  - **A direct `db.batch`.** The organization, `member`, `workspace_settings`, currency and preset
+    rows land in one batch, with the workspace-provisioning batch in
+    `src/server/auth/organization.ts` as the precedent. Nothing calls `createOrganization`, so
+    `allowUserToCreateOrganization` is turned off **in the same change as the choice**: the auth
+    config and its comment, its pin in the config test, the in-process case in
+    `organization-route.test.ts`, and the comment on `DISABLED_ORGANIZATION_PATHS` in
+    `permissions.ts`.
 - **Base currency is chosen here and only here** — `23-S2` made it permanently read-only afterwards,
   for the `ref_amount_minor` reason recorded there. The form therefore states, at the point of choice,
   that it cannot be changed later. Telling someone afterwards is the definition of a dark pattern.

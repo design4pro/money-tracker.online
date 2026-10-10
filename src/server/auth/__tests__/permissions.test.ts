@@ -11,11 +11,12 @@
  * exercises.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
   BANNED_USER_MESSAGE,
   DISABLED_ADMIN_PATHS,
+  DISABLED_ORGANIZATION_PATHS,
   IMPERSONATION_SESSION_SECONDS,
   adminOptions,
   isPlatformRole,
@@ -24,7 +25,8 @@ import {
   roles,
 } from '../permissions'
 
-import type { PlatformActor } from '../permissions'
+import type { OrganizationRole, roleSatisfies } from '#/server/repos/scope'
+import type { PlatformActor, PlatformRole } from '../permissions'
 
 function actor(overrides: Partial<PlatformActor> = {}): PlatformActor {
   return { role: null, banned: false, impersonatedBy: null, ...overrides }
@@ -169,5 +171,50 @@ describe('the disabled console paths', () => {
 
   it('lists each path once', () => {
     expect(new Set(DISABLED_ADMIN_PATHS).size).toBe(DISABLED_ADMIN_PATHS.length)
+  })
+})
+
+describe('the disabled organization paths', () => {
+  it('close the creation route with the router’s own spelling, and each path once', () => {
+    expect(DISABLED_ORGANIZATION_PATHS).toContain('/organization/create')
+    for (const path of DISABLED_ORGANIZATION_PATHS) {
+      expect(path.startsWith('/organization/')).toBe(true)
+    }
+    expect(new Set(DISABLED_ORGANIZATION_PATHS).size).toBe(
+      DISABLED_ORGANIZATION_PATHS.length,
+    )
+  })
+
+  it('do not overlap the admin list', () => {
+    for (const path of DISABLED_ORGANIZATION_PATHS) {
+      expect(DISABLED_ADMIN_PATHS).not.toContain(path)
+    }
+  })
+})
+
+describe('the two role dictionaries', () => {
+  // `expectTypeOf` is a runtime no-op: these cases are checked by `pnpm typecheck`, which covers
+  // `**/*.ts`. They state the property of the dictionaries as a whole, so a refactor that merged
+  // them into one type, or made one a subtype of the other, breaks the build rather than a review.
+  it('are different types that neither extends the other', () => {
+    expectTypeOf<PlatformRole>().not.toEqualTypeOf<OrganizationRole>()
+    expectTypeOf<PlatformRole>().not.toExtend<OrganizationRole>()
+    expectTypeOf<OrganizationRole>().not.toExtend<PlatformRole>()
+  })
+
+  it('share no name but admin: curator and user are not workspace roles, owner and member are not platform roles', () => {
+    expectTypeOf<'curator'>().not.toExtend<OrganizationRole>()
+    expectTypeOf<'user'>().not.toExtend<OrganizationRole>()
+    expectTypeOf<'owner'>().not.toExtend<PlatformRole>()
+    expectTypeOf<'member'>().not.toExtend<PlatformRole>()
+  })
+
+  it('cannot be mixed up at a workspace call site: roleSatisfies refuses a platform role', () => {
+    expectTypeOf<PlatformRole>().not.toExtend<
+      Parameters<typeof roleSatisfies>[0]
+    >()
+    expectTypeOf<OrganizationRole>().toExtend<
+      Parameters<typeof roleSatisfies>[0]
+    >()
   })
 })

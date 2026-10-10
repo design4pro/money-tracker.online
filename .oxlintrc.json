@@ -126,8 +126,8 @@
       }
     },
     {
-      // Layering law: all SQL lives in server/repos (the currency/locale catalog is the single
-      // stated exception). Client-side layers never see drizzle-orm.
+      // Layering law: all SQL lives in server/repos (`docs/SPEC.md` §5.2 lists the three
+      // documented exceptions). Client-side layers never see drizzle-orm.
       "files": ["src/components/**", "src/lib/**", "src/routes/**"],
       "rules": {
         "no-restricted-imports": [

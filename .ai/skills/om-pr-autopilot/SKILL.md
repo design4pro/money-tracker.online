@@ -120,3 +120,8 @@ These hold for every skill this run chains, whether or not its own override was 
   `"$TEST_OWNER_PASSWORD"` in the command (AGENTS.md).
 - **The dev server URL is `baseUrl` in `.ai/qa/test-env.json`** (`om-prepare-test-env` writes it).
   Never derive it from `.dev.vars`, which the agent never reads.
+- **Required checks stuck at `queued`: read the runner pool before waiting.** When
+  `gh api repos/<owner>/<repo>/actions/runners --jq .total_count` is 0, nothing can pick the jobs up
+  and the wait budget is wasted: apply the `ci.maxWaitMinutes` expiry procedure at once, and do not
+  push again, because `ci.yml` cancels the queued run of the previous head on every push. #596,
+  #598, #604, #608, #609 and #610 waited on an empty or idle self-hosted pool.
