@@ -49,6 +49,7 @@ import {
   budgetCategories,
   currencies,
   transactionSplits,
+  transactions,
 } from '#/server/db/schema'
 import { rolloverChain } from '#/server/budgets/rollover'
 import { transferRefAmounts } from '#/server/transfers/ref-amount-cases'
@@ -66,6 +67,7 @@ import { pageForReader } from '#/server/repos/notifications'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 
+import { adjustAccountBalance } from '../accounts'
 import { budgetSpend, getBudget } from '../budgets'
 import { periodVarianceMinor } from '../recurring'
 import {
@@ -1673,5 +1675,300 @@ describe('16 — the catalogue’s digits is the scale the arithmetic uses', () 
     for (const code of ['XAU', 'XAG', 'XPT', 'XPD', 'XDR', 'XXX', 'XTS']) {
       expect(codes).not.toContain(code)
     }
+  })
+})
+
+/**
+ * A correction is a transaction, not a property of the account. The person states a target; the
+ * system writes the difference as one ordinary row, measured on the booking date, in the
+ * account's own currency, converted once at that date's rate. Nothing here writes the cached
+ * balance: the ledger rebuilds it from the rows.
+ */
+describe('17 — a correction is a transaction, never an overwrite', () => {
+  const APRIL = '2026-04-15'
+
+  async function rows() {
+    return scope.db.select().from(transactions)
+  }
+
+  it('writes exactly one balance-adjustment row and no direct write of the cached balance', async () => {
+    const conversion = conversionOf('PLN', [])
+    executed.length = 0
+
+    const result = await adjustAccountBalance(
+      scope,
+      { accountId: 'acc-a', targetMinor: 120_00, bookedOn: BOOKED_ON },
+      conversion,
+    )
+
+    expect(result).toMatchObject({ status: 'recorded', amountMinor: 120_00 })
+    const written = await rows()
+    expect(written).toHaveLength(1)
+    expect(written[0]?.isBalanceAdjustment).toBe(true)
+    expect(written[0]?.direction).toBe('income')
+    // No statement set the cache column: only the ledger rebuild may, and it is not this path.
+    expect(
+      executed.filter((query) =>
+        /update\s+"accounts"[\s\S]*current_balance_minor/i.test(query),
+      ),
+    ).toEqual([])
+    const [account] = await scope.db.select().from(accounts)
+    expect(account?.currentBalanceMinor).toBe(0)
+  })
+
+  it('measures the delta on the booking date, and later transactions still apply on top', async () => {
+    const conversion = conversionOf('PLN', [])
+    await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, direction: 'income', amountMinor: 100_00 },
+    })
+    await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: {
+        ...INPUT,
+        direction: 'expense',
+        amountMinor: 30_00,
+        bookedOn: APRIL,
+      },
+    })
+
+    const result = await adjustAccountBalance(
+      scope,
+      { accountId: 'acc-a', targetMinor: 150_00, bookedOn: BOOKED_ON },
+      conversion,
+    )
+
+    // 100,00 on the day, so the correction is 50,00 — not 150,00 − 70,00 (today's balance).
+    expect(result).toMatchObject({
+      status: 'recorded',
+      direction: 'income',
+      amountMinor: 50_00,
+      balanceMinor: 100_00,
+    })
+    const signed = (await rows()).reduce(
+      (sum, row) =>
+        sum + (row.direction === 'income' ? row.amountMinor : -row.amountMinor),
+      0,
+    )
+    // 100,00 + 50,00 − 30,00: the April expense is untouched and still counts.
+    expect(signed).toBe(120_00)
+  })
+
+  it('writes no row and leaves the balance alone when the booking date is beyond the latest day on Earth', async () => {
+    const conversion = conversionOf('PLN', [])
+    await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, direction: 'income', amountMinor: 75_00 },
+    })
+    executed.length = 0
+
+    await expect(
+      adjustAccountBalance(
+        scope,
+        { accountId: 'acc-a', targetMinor: 500_00, bookedOn: '2999-01-01' },
+        conversion,
+      ),
+    ).rejects.toThrow()
+
+    // The refusal is the schema's, so not even a read ran, and the one existing row is the only row.
+    expect(executed).toEqual([])
+    expect(await rows()).toHaveLength(1)
+  })
+
+  it('writes nothing when the balance is already the target', async () => {
+    const conversion = conversionOf('PLN', [])
+    await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, direction: 'income', amountMinor: 75_00 },
+    })
+
+    const result = await adjustAccountBalance(
+      scope,
+      { accountId: 'acc-a', targetMinor: 75_00, bookedOn: BOOKED_ON },
+      conversion,
+    )
+
+    expect(result).toEqual({ status: 'unchanged', balanceMinor: 75_00 })
+    expect(await rows()).toHaveLength(1)
+  })
+
+  it('is in the account’s own currency, with the reference amount at the booking date’s rate', async () => {
+    const now = new Date('2026-03-15T10:00:00.000Z')
+    await scope.db.insert(accounts).values({
+      id: 'acc-eur',
+      organizationId: 'org-a',
+      name: 'Euro savings',
+      currencyCode: 'EUR',
+      createdAt: now,
+      updatedAt: now,
+    })
+    const conversion = conversionOf('PLN', [
+      [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
+      [`EUR:PLN:${APRIL}`, 40_000_000_000],
+    ])
+
+    await adjustAccountBalance(
+      scope,
+      { accountId: 'acc-eur', targetMinor: 100_00, bookedOn: APRIL },
+      conversion,
+    )
+
+    const [written] = await rows()
+    expect(written?.currencyCode).toBe('EUR')
+    expect(written?.amountMinor).toBe(100_00)
+    // April's rate, not March's: 100,00 € at 4,0000 is 400,00 zł.
+    expect(written?.rateE10).toBe(40_000_000_000)
+    expect(written?.refAmountMinor).toBe(400_00)
+  })
+})
+
+describe('18 — no settled row is dated after the latest calendar day on Earth', () => {
+  // 10:00 UTC on the 15th is the first instant UTC+14 is on the 16th, so the cutoff day is the
+  // 16th. Only `Date` is faked: the in-memory database needs its timers.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-03-15T10:00:00.000Z'))
+    return () => vi.useRealTimers()
+  })
+
+  it('writes no row, resolves no rate and reads nothing when a create is refused', async () => {
+    const conversion = conversionOf('PLN', [])
+    executed.length = 0
+
+    await expect(
+      createTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        input: { ...INPUT, currencyCode: 'EUR', bookedOn: '2026-03-17' },
+      }),
+    ).rejects.toThrow()
+
+    // The refusal is the rule's, so not even a parent lookup ran.
+    expect(executed).toEqual([])
+    expect(await scope.db.select().from(transactions)).toHaveLength(0)
+  })
+
+  it('leaves the stored row, its figures and its date untouched when an update is refused', async () => {
+    const conversion = conversionOf('PLN', [
+      [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
+    ])
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, currencyCode: 'EUR' },
+    })
+
+    await expect(
+      updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id: created.id,
+        patch: { bookedOn: '2999-01-01' },
+      }),
+    ).rejects.toThrow()
+
+    const [stored] = await scope.db.select().from(transactions)
+    expect(stored).toMatchObject({
+      bookedOn: BOOKED_ON,
+      refAmountMinor: created.refAmountMinor,
+      rateE10: created.rateE10,
+    })
+  })
+
+  describe('a legacy settled row stored with a future date', () => {
+    const LEGACY_DATE = '2999-01-01'
+
+    /** A row saved before the booking rule existed: written straight into the table. */
+    async function seedLegacy(
+      currencyCode: 'PLN' | 'EUR',
+      amountMinor: number,
+    ) {
+      const at = new Date('2026-03-01T00:00:00.000Z')
+      await scope.db.insert(transactions).values({
+        id: 'tx-legacy',
+        organizationId: 'org-a',
+        accountId: 'acc-a',
+        direction: 'expense',
+        amountMinor,
+        currencyCode,
+        // Stored at the rate the look-back found for the stored date, then.
+        refAmountMinor: currencyCode === 'PLN' ? amountMinor : 4_000,
+        refCurrencyCode: 'PLN',
+        rateE10: currencyCode === 'PLN' ? 10_000_000_000 : 40_000_000_000,
+        bookedOn: LEGACY_DATE,
+        bookedAt: new Date(`${LEGACY_DATE}T12:00:00.000Z`),
+        isPlanned: false,
+        createdAt: at,
+        updatedAt: at,
+      })
+    }
+
+    it('keeps the identity conversion exact when the amount of a base-currency row is edited', async () => {
+      await seedLegacy('PLN', 5_000)
+
+      const updated = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion: conversionOf('PLN', []),
+        id: 'tx-legacy',
+        patch: { amountMinor: 7_000 },
+      })
+
+      expect(updated).toMatchObject({
+        bookedOn: LEGACY_DATE,
+        amountMinor: 7_000,
+        refAmountMinor: 7_000,
+        rateE10: 10_000_000_000,
+      })
+    })
+
+    it('re-anchors a foreign row at the stored date’s look-back rate, not at another day’s', async () => {
+      await seedLegacy('EUR', 1_000)
+
+      const updated = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        // The stored date resolves to 4.3218 (the look-back's answer); today's rate is different,
+        // so a re-anchor at the wrong day would show in the figure.
+        conversion: conversionOf('PLN', [
+          [`EUR:PLN:${LEGACY_DATE}`, 43_218_000_000],
+          [`EUR:PLN:${BOOKED_ON}`, 45_000_000_000],
+        ]),
+        id: 'tx-legacy',
+        patch: { amountMinor: 10_000 },
+      })
+
+      // 100.00 EUR at 4.3218 = 432.18 PLN, worked by hand.
+      expect(updated).toMatchObject({
+        bookedOn: LEGACY_DATE,
+        amountMinor: 10_000,
+        refAmountMinor: 43_218,
+        rateE10: 43_218_000_000,
+      })
+    })
+  })
+
+  it('keeps a planned forecast bookable on any date, since it counts in no balance', async () => {
+    const conversion = conversionOf('PLN', [])
+
+    const planned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, isPlanned: true, bookedOn: '2999-01-01' },
+    })
+
+    expect(planned).toMatchObject({ isPlanned: true, bookedOn: '2999-01-01' })
   })
 })

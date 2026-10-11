@@ -36,6 +36,14 @@ describe('recordPaymentSearch', () => {
     })
   })
 
+  it('leaves the due date out when the period is not due yet, so the form opens on today', () => {
+    const early = recordPaymentSearch(RENT, MARCH, 'series', '2026-03-04')
+    expect(early).not.toHaveProperty('date')
+    expect(recordPaymentSearch(RENT, MARCH, 'series', '2026-03-05').date).toBe(
+      '2026-03-05',
+    )
+  })
+
   it('names the list as the way back when the person started there', () => {
     expect(recordPaymentSearch(RENT, MARCH, 'list').returnTo).toBe('list')
   })

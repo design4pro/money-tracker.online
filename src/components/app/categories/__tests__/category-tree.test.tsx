@@ -8,7 +8,7 @@ import en from '#/lib/i18n/messages/en'
 import { CategoryTree } from '../category-tree'
 
 import type { Catalogue } from '#/lib/i18n'
-import type { CategoryTreeItem } from '../move'
+import type { CategoryTreeItem } from '../types'
 
 /**
  * The keyboard half of the reorder contract, asserted through the rendered menu.

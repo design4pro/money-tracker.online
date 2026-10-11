@@ -28,16 +28,23 @@ import {
   Popover,
   SubmenuTrigger,
 } from '#/components/ui'
+import {
+  dropMove,
+  hasChildren,
+  reparentMove,
+  stepMove,
+} from '#/components/app/tree'
 import { useTranslate } from '#/lib/i18n'
 
 import { CategoryIcon } from './icons'
 import { CategorySwatch } from './category-swatch'
-import { dropMove, hasChildren, reparentMove, stepMove } from './move'
 
 import type { ComponentType } from 'react'
 import type { Key } from 'react-aria-components'
 import type { Translate } from '#/lib/i18n'
-import type { CategoryMove, CategoryTreeItem, MoveStep } from './move'
+import type { MoveStep } from '#/components/app/tree'
+
+import type { CategoryMove, CategoryTreeItem } from './types'
 
 /**
  * The two-level category tree, reorderable by drag **and** by keyboard.
@@ -47,7 +54,7 @@ import type { CategoryMove, CategoryTreeItem, MoveStep } from './move'
  * A drag-only reorder is unusable with a keyboard, unreachable with a switch and painful on a
  * phone. So every gesture the pointer can perform is also a menu item: _Move up_, _Move down_,
  * _Move to top_, _Move to bottom_ and _Move to…_, the last of which re-parents. Both paths produce
- * the same {@link CategoryMove} through the same pure functions in `./move`, so they cannot drift
+ * the same {@link CategoryMove} through the same pure functions in `#/components/app/tree`, so they cannot drift
  * apart - and a menu item that would change nothing is **disabled** rather than enabled and
  * silently doing nothing.
  *

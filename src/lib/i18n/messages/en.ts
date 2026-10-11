@@ -393,8 +393,14 @@ const messages = {
   'accounts.adjust.preview.expense': 'An expense of {amount}, dated {date}.',
   'accounts.adjust.preview.none':
     'Nothing. The balance on {date} already reads {amount}.',
-  'accounts.adjust.preview.past':
-    'The difference is measured against the balance at the end of {date}, which is read as you save. You are shown exactly what was written.',
+  'accounts.adjust.preview.loading': 'Reading the balance on {date}…',
+  'accounts.adjust.preview.error': 'The balance on {date} could not be read.',
+  'accounts.adjust.preview.blocked':
+    'The correction can be recorded once the balance on {date} has loaded.',
+  'accounts.adjust.preview.blockedFailed':
+    'The correction can be recorded once the balance on {date} has been read. Choose “{retry}” to read it again.',
+  'accounts.adjust.preview.blockedFuture':
+    'The correction cannot be recorded for a date that has not happened yet. Pick a date up to today.',
   'accounts.adjust.action': 'Record the correction',
   'accounts.adjust.result.title': 'Recorded',
   'accounts.adjust.result.income':
@@ -573,6 +579,8 @@ const messages = {
   'transactions.form.error.amount': 'Enter an amount greater than zero.',
   'transactions.form.error.account': 'Choose the account this belongs to.',
   'transactions.form.error.date': 'Enter a date in the form {example}.',
+  'transactions.form.error.dateFuture':
+    'That date is still ahead. Tick "{planned}" to record it as planned, or choose today or an earlier date.',
   'transactions.form.error.note': 'Keep the note to {max} characters or fewer.',
   'transactions.form.noAccounts.title': 'An account comes first',
   'transactions.form.noAccounts.body':
@@ -1246,6 +1254,26 @@ const messages = {
   'validation.transfer.sameAccount': 'Pick two different accounts.',
   'validation.number.invalid': 'Enter a number.',
   'validation.generic': 'Check this field.',
+
+  /* -- Failures the server names ------------------------------------------ */
+  // One key per failure kind and three for a field, all read through the closed tables in
+  // `src/lib/failure-envelope.ts`; no key here is built at runtime.
+  'failure.internal': 'Something went wrong on our side.',
+  'failure.unauthenticated': 'Sign in to continue.',
+  'failure.forbidden': 'You do not have access to this.',
+  'failure.not_found': 'This could not be found.',
+  'failure.validation':
+    'Some fields need your attention. Check them and try again.',
+  'failure.conflict':
+    'This conflicts with what is already saved. Reload and try again.',
+  'failure.quota': 'Your plan has reached its limit for this.',
+  'failure.feature_locked': 'This is not part of your plan.',
+  'failure.rate_unavailable': 'No exchange rate is available for that date.',
+  'failure.rate_limited': 'The service is busy right now. Try again shortly.',
+  'failure.upstream': 'A service we depend on did not answer. Try again.',
+  'failure.field.invalid': 'This value is not valid.',
+  'failure.field.tooShort': 'This value is too short.',
+  'failure.field.tooLong': 'This value is too long.',
 
   /* -- Empty and failure states ------------------------------------------ */
   'empty.search.title': 'Nothing found',
@@ -2449,6 +2477,8 @@ const messages = {
   'rules.action.value.note': 'Note',
   'rules.action.value.paymentMethod': 'Payment method',
   'rules.action.value.planned': 'Planned',
+  'rules.action.value.planned.waitsForDate':
+    'An entry dated in the future stays planned until this rule next runs on it once its date has arrived (when an entry is added, edited or imported).',
   'rules.action.value.excluded': 'Excluded from statistics',
   'rules.action.value.empty': 'There is nothing to pick here yet.',
 

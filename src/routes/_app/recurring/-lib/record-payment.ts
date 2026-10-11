@@ -1,3 +1,5 @@
+import { getLocalTimeZone, today } from '@internationalized/date'
+
 import type { NewTransactionSearch } from '#/routes/_app/transactions/-lib/new-search'
 import type { RecurringSeries } from '#/server/db/types'
 import type { PeriodView } from '#/server/repos/recurring'
@@ -10,6 +12,12 @@ import type { PeriodView } from '#/server/repos/recurring'
  * The result is a set of search params for `/transactions/new`. Navigating there creates nothing -
  * the person reads the form and presses Save, which is the only way a transaction comes into being
  * and the reason the mark-paid dialog can keep its refusal to create (see `mark-paid-dialog.tsx`).
+ *
+ * ## A payment is dated on or before today
+ *
+ * A period that is not due yet is paid early, and a settled entry may not be dated after today
+ * (`docs/MONEY.md` §6.1), so its due date is left out and the form opens on today. Carrying it
+ * would open the form already refusing.
  *
  * ## What the series does not have, the form is left to ask for
  *
@@ -36,12 +44,13 @@ export function recordPaymentSearch(
     'periodStart' | 'dueOn' | 'expectedAmountMinor' | 'expectedCurrencyCode'
   >,
   origin: RecordPaymentOrigin,
+  todayIso: string = today(getLocalTimeZone()).toString(),
 ): NewTransactionSearch {
   return {
     direction: series.direction === 'income' ? 'income' : 'expense',
     amount: period.expectedAmountMinor,
     currency: period.expectedCurrencyCode,
-    date: period.dueOn,
+    ...(period.dueOn > todayIso ? {} : { date: period.dueOn }),
     ...(series.accountId === null ? {} : { account: series.accountId }),
     ...(series.categoryId === null ? {} : { category: series.categoryId }),
     ...(series.payeeId === null ? {} : { payee: series.payeeId }),

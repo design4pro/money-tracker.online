@@ -53,6 +53,7 @@ import {
   sumMinor,
 } from '#/lib/money'
 import { isLiabilityCategory } from '#/server/catalog/account-types'
+import { latestCalendarDayOnEarth } from '#/server/calendar-day'
 import { serverToday } from '#/server/clock'
 import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
@@ -257,14 +258,35 @@ export const reorderAccountsSchema = z.strictObject({
   ids: z.array(idSchema).min(1).max(200),
 })
 
+/**
+ * A calendar date no later than the latest one anywhere on Earth right now.
+ *
+ * A correction is a real, non-planned transaction, so a future day would count in balances at once
+ * and freeze a borrowed rate into `ref_amount_minor` for good (`docs/MONEY.md` §2.3, §3). The
+ * browser dialog also refuses the future; this is the check a direct caller cannot skip. The
+ * `custom` issue lands on the field, which the failure envelope maps to `failure.field.invalid`.
+ *
+ * ISO dates compare correctly as strings.
+ */
+const bookableDaySchema = z.iso
+  .date()
+  .refine((day) => day <= latestCalendarDayOnEarth())
+
 export const adjustBalanceSchema = z.strictObject({
   accountId: idSchema,
   /** What the balance **should** be at the end of `bookedOn`, in the account's own currency. */
   targetMinor: minorSchema,
-  bookedOn: z.iso.date(),
+  bookedOn: bookableDaySchema,
   note: noteSchema.optional(),
 })
 export type AdjustBalanceInput = z.input<typeof adjustBalanceSchema>
+
+/** The question {@link getAccountBalanceOn} answers: one account, at the end of one day. */
+export const getAccountBalanceOnSchema = z.strictObject({
+  accountId: idSchema,
+  on: bookableDaySchema,
+})
+export type GetAccountBalanceOnInput = z.input<typeof getAccountBalanceOnSchema>
 
 export const createAccountGroupSchema = z.strictObject({
   name: nameSchema,
@@ -332,6 +354,11 @@ export interface AccountListResult {
 export interface AccountGroupWithMembers {
   readonly group: AccountGroupRow
   readonly accountIds: ReadonlyArray<string>
+}
+
+/** The balance {@link getAccountBalanceOn} read: the account's own currency, integer minor units. */
+export interface AccountBalanceOn {
+  readonly balanceMinor: Minor
 }
 
 /** What {@link adjustAccountBalance} did. `'unchanged'` writes nothing at all. */
@@ -828,6 +855,28 @@ export async function adjustAccountBalance(
     amountMinor,
     balanceMinor,
   }
+}
+
+/**
+ * The account's balance at the end of `on`, for a person about to correct it.
+ *
+ * The preview in the correction dialog and {@link adjustAccountBalance} must name the same delta,
+ * so this is not a second way of computing a balance: it looks the account up under the tenant
+ * predicate and then calls the very {@link balanceOn} the write calls. It never reads the cached
+ * balance column, which is today's number and can lag the ledger.
+ *
+ * **Validation is shape, never permission.** The schema says what a date looks like; whether the
+ * caller may see this account is answered by `accountRepo.requireById`, which treats another
+ * workspace's id exactly like a nonexistent one. Any member may read an account, so any member may
+ * read its balance on a day; there is no role gate here, as there is none on `getAccount`.
+ */
+export async function getAccountBalanceOn(
+  scope: TenantScope,
+  input: GetAccountBalanceOnInput,
+): Promise<AccountBalanceOn> {
+  const parsed = getAccountBalanceOnSchema.parse(input)
+  const account = await accountRepo.requireById(scope, parsed.accountId)
+  return { balanceMinor: await balanceOn(scope, account, parsed.on) }
 }
 
 /**
