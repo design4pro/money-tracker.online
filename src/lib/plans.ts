@@ -99,6 +99,26 @@ export const QUOTA_METRIC_OWNERS: Readonly<Record<QuotaMetric, string>> = {
   storageBytes: 'src/server/repos/attachments.ts — uploadAttachment',
 }
 
+/**
+ * The catalogue key that names each metric to a reader. Total over {@link QUOTA_METRICS}, so a
+ * metric added without a label does not compile, and a literal per metric so the i18n sweeps can
+ * see every key (`docs/I18N.md` §2.1). The usage meters and the failure panel both read it.
+ */
+export const QUOTA_METRIC_LABEL_KEYS: Readonly<
+  Record<QuotaMetric, MessageKey>
+> = {
+  members: 'billing.usage.metric.members',
+  accounts: 'billing.usage.metric.accounts',
+  currencies: 'billing.usage.metric.currencies',
+  budgets: 'billing.usage.metric.budgets',
+  goals: 'billing.usage.metric.goals',
+  rules: 'billing.usage.metric.rules',
+  recurringSeries: 'billing.usage.metric.recurringSeries',
+  transactions: 'billing.usage.metric.transactions',
+  importsPerMonth: 'billing.usage.metric.importsPerMonth',
+  storageBytes: 'billing.usage.metric.storageBytes',
+}
+
 /** No ceiling. The value `resolveLimits()` returns for an uncapped metric. */
 export const UNLIMITED = Number.POSITIVE_INFINITY
 

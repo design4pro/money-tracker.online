@@ -21,6 +21,9 @@ export type { WordmarkProps } from './brand-mark'
 export { ErrorPanel } from './error-panel'
 export type { ErrorPanelProps } from './error-panel'
 
+export { FailurePanel } from './failure-panel'
+export type { FailurePanelProps, Recovery } from './failure-panel'
+
 export { FormModal, useIsDirty } from './form-modal'
 export type { FormModalProps } from './form-modal'
 
