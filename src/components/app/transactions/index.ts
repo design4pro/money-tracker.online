@@ -24,6 +24,13 @@ export type {
 export { BulkActions } from './bulk-actions'
 export type { BulkActionsProps } from './bulk-actions'
 
+export {
+  NO_SAVE_FAILURE,
+  saveFailureOf,
+  withoutRefusal,
+} from './booking-refusal'
+export type { SaveFailure } from './booking-refusal'
+
 export { ConfirmDeleteDialog } from './confirm-delete-dialog'
 export type { ConfirmDeleteDialogProps } from './confirm-delete-dialog'
 
@@ -91,6 +98,7 @@ export {
   validateForm,
 } from './transaction-form'
 export type {
+  RefusedBooking,
   TransactionFormErrors,
   TransactionFormProps,
   TransactionFormValues,
