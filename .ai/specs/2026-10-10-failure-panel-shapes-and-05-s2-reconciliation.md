@@ -4,7 +4,7 @@
 | ------------------ | ------------------------------------------------ |
 | **Status**         | ready                                            |
 | **Issue**          | none                                             |
-| **Spec PR**        | none                                             |
+| **Spec PR**        | #635                                             |
 | **Implementation** | none                                             |
 | **Plan**           | 05-S2 (docs/plans/05-error-and-observability.md) |
 
