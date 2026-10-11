@@ -125,7 +125,8 @@ path for no behaviour, row 1 of the assumptions; a later refactor stays availabl
 `assertWithinLimit` in `createTransaction` (a billing-adjacent behaviour change on the
 highest-blast-radius write path, `AGENTS.md` Ask First, and contrary to the stage's stated intent, row
 2); fixing `QUOTA_METRIC_OWNERS` or `19-S3`'s wording (not this stage's files or plan, row 3); a
-`transferId` on the create schema (plan `10` owns transfers); the read functions and the list (`07-S2`);
+`transferId` on the create schema (plan `10` owns transfers); the read functions, `loadTransactions` (in
+the same `fns/transactions.ts`) and the list (`07-S2`);
 the entry form (`07-S3`); any UI.
 
 ## 📝 Architecture
@@ -190,9 +191,9 @@ None. No route, component, state or token. The list and the entry form are `07-S
 - **A patch aimed across the boundary.** A's own row patched to B's account, then to B's payee, then to
   B's category: each is `NotFoundError` and A's row is byte-identical afterwards (the whole row, not
   one column).
-- **A workspace B row compared whole.** After every hostile call B's complete `transactions` rows and
-  B's `account_balances`-adjacent state are re-read; the test snapshots `transactions` for `org-b`
-  with `select()` and compares with `toEqual`, because a write that matched no row but changed one
+- **A workspace B row compared whole.** After the hostile calls B's complete rows are re-read: the test
+  snapshots `transactions`, `accounts`, `categories` and `payees` for `org-b` with `select()` before and
+  after, on the create, update and delete paths alike, and compares with `toEqual`, because a write that matched no row but changed one
   anyway is the failure a return-value assertion misses (the budgets section's own rule).
 - **A handler that loses its wrapper.** The test fails: a create that returns normally with zero
   rebuilds enqueued is the regression it exists to catch.
@@ -234,7 +235,7 @@ None. This change adds no user-facing string, so no key lands in the EN or PL ca
 | ----- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | 1a    | The transactions write-path isolation section; the `applyPolicies` precondition case and the backstop comment | `src/server/repos/__tests__/tenant-isolation.test.ts`, `src/server/repos/__tests__/transactions.test.ts` |
 | 1b    | The four handlers run: ledger wrapper, strict-schema refusals, no workspace id from the client                | `src/server/fns/__tests__/transactions.test.ts`                                                          |
-| 2     | The `07-S1` block amended to the code, the quota hand-off to `19-S3`, and the `Delivered:` line               | `docs/plans/07-transactions-core.md`                                                                     |
+| 2     | The `07-S1` block amended to the code, the quota hand-off to `19-S3`, and the `Delivered:` line               | `docs/plans/07-transactions-core.md`, one pointer sentence in `docs/plans/19-import.md`                  |
 
 Three tickets; 1a and 1b touch disjoint files. The slicer may merge 1a and 1b into one pull request.
 Phase 2 depends on 1a and 1b (it cites them); if the slicer merges all three into one pull request,
@@ -259,14 +260,23 @@ step 8 says what to do.
    - _foreign parents on create_: `createTransaction` with B's `accountId`, then B's `categoryId`, then
      B's `payeeId` (valid own account) is `NotFoundError` each time and writes no row.
    - _foreign parents on update_: A's own row patched with B's `accountId`, B's `categoryId`, B's
-     `payeeId` is `NotFoundError` each time.
-   - _nothing moved_: after the whole group, `select()` of `transactions` where `organization_id =
-'org-b'` equals the snapshot taken before (the whole row, every column), the count of A's rows
-     equals the count before the hostile calls plus the one fixture row of its own, and A's patched
-     row is `toEqual` to its pre-patch self.
-   - _the error discloses nothing_: the `NotFoundError` thrown for B's id has the same `entity` and
-     `code` as for an id that exists nowhere (the file's "the failure a read produces discloses nothing
-     about the row" rule), so the response does not confirm B's row.
+     `payeeId` is `NotFoundError` each time. Each foreign parent is shown to exist through B's scope
+     first, so the refusal is isolation and not an empty fixture.
+   - _nothing moved_: after the whole group (and after each of the update and delete attempts), the
+     whole rows of B's `transactions`, `accounts`, `categories` and `payees` (`select()`, every
+     column) are `toEqual` to the snapshot taken before; A's `transactions` rows are the same set
+     before and after the hostile calls (the ids and a count read from the fixture, not a literal),
+     and A's patched row is `toEqual` to its pre-patch self.
+   - _the error discloses nothing_: the `NotFoundError` for B's transaction id has the same `entity`
+     and `code` as for an id that exists nowhere, and so does the one for a foreign `accountId`,
+     `categoryId` and `payeeId` against an id that exists nowhere (the entity asserted per case:
+     `account`, `category`, `payee`). The comparison is on `entity` and `code` only, never on `message`
+     or `id`, because `NotFoundError` embeds the id it was given (the file's "the failure a read
+     produces discloses nothing about the row" rule).
+   - _positive controls_, so no refusal can come from another cause: a `createTransaction` by A with
+     A's own account, category and payee succeeds, and the row has `organizationId` `org-a` and
+     `createdByUserId` `user-a`; the same patch on A's row with A's own parents succeeds; A reads its
+     own row back through `getTransaction`.
    - _the strict schema is the tenant column's door_: `createTransactionSchema.safeParse` of a payload
      carrying `organizationId: 'org-b'` fails (the repository stamps the tenant from the scope, so the
      key must not exist), and so does one carrying `transferId`; this is the plan's "B's `transfer_id`"
@@ -288,17 +298,26 @@ src/server/repos/__tests__/transactions.test.ts`), then the gate (step 9). The n
 4. **Write `src/server/fns/__tests__/transactions.test.ts`** with the mocking technique of
    `attachments.test.ts` (`vi.mock('@tanstack/react-start')` with the builder that keeps the validator,
    `vi.mock('#/server/auth/guards')` returning the world's scope, `vi.mock('cloudflare:workers')` as
-   that file does) over `createBudgetWorld()`. Install `setLedgerBatchPorts({ namespace: () => fake })`
-   in `beforeEach` with a fake `LedgerNamespace` that records the account id of each rebuild request
-   (`idFromName` / `get().fetch`, as `batch.test.ts` does) and `setLedgerBatchPorts(null)` in
-   `afterEach`. Cases:
-   - _create enqueues exactly one rebuild, for its account_: two `createTransaction` handler calls in
-     one `runWithLedgerBatch` are not what a request does; one call, one rebuild for `acc-a`.
-   - _update across accounts enqueues one per account_: a row moved from `acc-a` to a second account of
-     A's enqueues exactly two rebuilds, once each.
+   that file does; its `env` may be an empty object, because `fns/transactions.ts` imports
+   `#/server/ledger`, whose module body reads `env.LOG_LEVEL` and installs its own ports) over
+   `createBudgetWorld()`. Install `setLedgerBatchPorts({ namespace: () => fake })`
+   in `beforeEach` (it overrides the wiring the module installed at load) with a fake `LedgerNamespace`
+   that records the account id of each rebuild request (`idFromName` / `get().fetch`, as
+   `batch.test.ts` does) and `setLedgerBatchPorts(null)` in `afterEach` (which leaves the default
+   null namespace, not the load-time wiring; no case here relies on the latter). The handler test
+   covers the three writes and `getTransaction` only; `loadTransactions` in the same file is
+   `07-S2`'s and is left out. Cases:
+   - _create enqueues exactly one rebuild, for its account_: one `createTransaction` handler call
+     produces one rebuild request, for `acc-a`.
+   - _update across accounts enqueues one per account_: a row moved from `acc-a` to `acc-a-hidden`
+     (the harness's second PLN account of A's; its `excludeFromStats` flag does not touch
+     `createTransaction`, and if the implementer finds it does, seed a plain one) enqueues exactly two rebuilds, once each.
    - _delete enqueues one rebuild for the row's account_.
-   - _a refused write enqueues nothing_: `createTransaction` with B's `accountId` raises
-     `NotFoundError` and the fake saw zero requests.
+   - _a refused write enqueues nothing_: `createTransaction` with B's `accountId`, and
+     `updateTransaction` and `deleteTransaction` on B's transaction id, each through the handler,
+     raise `NotFoundError` and the fake saw zero requests.
+   - _the guard is the authorisation point_: with the mocked `requireOrg` rejecting, each of the three
+     writes rejects, writes no row and enqueues no rebuild.
    - _the validator refuses before anything runs_: for each of a negative `amountMinor`, a fractional
      one, a `bookedOn` that is not a date, `policies` missing, `policies` with one field missing, and
      the extra keys `organizationId`, `transferId`, `transferKind`, `refundLinked`, `importBatchId`,
@@ -334,26 +353,35 @@ is added, so no further case.
      rule) runs first on create and on update.
    - _Server_: `applyPolicies(policies)` returns predicates; `computeRefAmount(input, conversion)` with
      `ConversionContext` from `conversionContextFor(scope)`; the read function is `getTransaction` /
-     `findTransaction`; the `assertScopedWrite` bullet states the id-predicate reasoning of row 5.
+     `findTransaction`; the `assertScopedWrite` bullet states the id-predicate reasoning of row 5. `loadTransactions` is
+     `07-S2`'s and is not amended or exercised here.
    - _Tenant isolation test_: the section of step 1, with the `transfer_id` case restated as the
      strict-schema refusal and the sentence that transfer parenting is `10-S1`'s.
    - _Money invariant_ and _Verification_: the seven cases keep their wording; the `assertScopedWrite`
      "fires on a collapsed list" line is replaced by the backstop-and-precondition pair of steps 1 and
      2; the verification names the two new test files; the `ref-amount.test.ts` line points at the
      `computeRefAmount` cases in `transactions.test.ts` and section 7 of `money-invariants.test.ts`.
-   - _Quota_: two sentences. `createTransaction` is unmetered, for manual entry and for the recurring
-     auto-recorder; the `transactions` metric of `src/lib/plans.ts` (free plan 5 000) applies to import
-     only and is `19-S3`'s to enforce. Then the hand-off, as plain facts for the `19-S3` spec writer:
-     `QUOTA_METRIC_OWNERS.transactions` names `commitImport`, which does not exist; the import preview
-     only warns; `docs/plans/19-import.md` Quota says "inside the write path" and that the importer
-     writes through `createTransaction`, which checks no quota, so `19-S3` must either check per chunk
-     in the importer or this stage's position must change by a decision of its own.
-   - Change nothing outside the `07-S1` block (not `07-S2`, `07-S3`, not `19-import.md`, not
-     `docs/plans/README.md`).
+   - _Quota_: state what is true today, not a ruling. `createTransaction` (manual entry and the
+     recurring auto-recorder) calls no `assertWithinLimit`, so it is unmetered; whether manual and
+     recurring entry count toward the `transactions` metric of `src/lib/plans.ts` (free plan 5 000) is
+     for `19-S3` and plan `22` to decide, and until they do the ceiling is enforced nowhere (the import
+     preview only warns), so it must not be read as a guarantee. Then the hand-off, as plain facts for
+     the `19-S3` spec writer: `QUOTA_METRIC_OWNERS.transactions` names `commitImport`, which does not
+     exist in `src`; `docs/plans/19-import.md` Quota says "inside the write path" and that the importer
+     writes through `createTransaction`, which checks no quota; and `docs/ARCHITECTURE.md` (the
+     server-function shape, line 66) shows `assertWithinLimit(scope, 'transactions', 1)` in a write
+     handler, a third statement that disagrees with this stage's. `19-S3` must reconcile the four.
+   - Change nothing outside the `07-S1` block (not `07-S2`, `07-S3`, not `docs/plans/README.md`) with
+     one exception: add a single pointer sentence at the top of the `Quota` section of `19-S3` in
+     `docs/plans/19-import.md`, "Before writing this spec read `07-S1`'s Quota section in
+     `docs/plans/07-transactions-core.md`: the `transactions` ceiling has no enforcement point today
+     and four documents disagree about where it is", so the stage that owns the enforcement meets the
+     hand-off. It reconciles nothing and changes no requirement of `19-S3` (row 13).
 8. **Add the `Delivered:` line** directly under `## Stage 07-S1`:
    `Delivered: <YYYY-MM-DD> - <evidence>`, dated the day Phase 2 is written, naming the paths of step 7,
-   the Phase 1 pull requests, and the counts read from commands run in that pull request
-   (`pnpm vitest run` of the four files; the numbers at spec time were 37, 67 and the two new files').
+   the Phase 1 pull requests, and the test counts re-read by running `pnpm vitest run` on the four
+   files in the Phase 2 pull request (the numbers at spec time were 37 and 67 for the two existing
+   files; never copy them).
    If the slicer merged the phases into one pull request, name the paths and tests and add the pull
    request number in a final commit once it is known.
 9. **Run the gate** on the staged tree, in the order printed by
@@ -370,7 +398,7 @@ before merge by saying so on the spec PR.
 | --- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Split `transactions.ts` to the plan's `transaction-policies.ts` and `ref-amount.ts`?               | **No. Keep the module; Phase 2 amends the plan's owned paths and signatures to the code.**                                                                                                                                                                                                                                                                              | Decided by the software architect sub-agent (confidence medium): `computeRefAmount` and `ConversionContext` are used by six other files and the module is imported by 26, so a split is pure churn in the money write path; the 03-S1 and 05-S2 precedents amended the plan to the code. |
 | 2   | Meter `createTransaction` with `assertWithinLimit('transactions')`?                                | **No. Manual entry and recurring auto-record stay unmetered; the `transactions` ceiling is import-only.**                                                                                                                                                                                                                                                               | Decided by the product owner sub-agent (confidence medium): keeps the plan's stated intent, avoids a billing change on the highest-blast-radius write path (Ask First), and is fully reversible because `19-S3` can add a check later.                                                   |
-| 3   | Fix `QUOTA_METRIC_OWNERS.transactions` and plan `19-S3`'s "inside the write path" wording?         | **Not here. Phase 2 records the facts in the `07-S1` Quota section; no other stage's plan or `plans.ts` is edited.**                                                                                                                                                                                                                                                    | Decided by the product owner and the software architect sub-agents: the pointer and the wording belong to `19-S3` (and plan `22`); this spec edits no other stage. The facts are written where the `19-S3` spec writer will meet them.                                                   |
+| 3   | Fix `QUOTA_METRIC_OWNERS.transactions` and plan `19-S3`'s "inside the write path" wording?         | **Not here. Phase 2 records the facts in the `07-S1` Quota section and adds one pointer sentence to `19-S3`'s Quota section; `plans.ts` and every requirement of `19-S3` are untouched.**                                                                                                                                                                               | Decided by the product owner and the software architect sub-agents: the pointer and the wording belong to `19-S3` (and plan `22`); this spec reconciles no other stage. See row 13 for the pointer.                                                                                      |
 | 4   | Pin the plan's "`assertScopedWrite` fires on a collapsed list" for transactions?                   | **No fabricated list and no code change. Test the precondition (`applyPolicies` of all-`include` is empty, the id predicate scopes the statement), add a comment, and record the reasoning in the plan.**                                                                                                                                                               | Decided by the software architect sub-agent (confidence medium): a test of a list the code never builds proves nothing, and changing the money write path to satisfy a test is the wrong direction; the backstop is already pinned at the base ("the write backstop").                   |
 | 5   | Add the isolation section to `tenant-isolation.test.ts` although `transactions.test.ts` has cases? | **Yes: the file `AGENTS.md` names, asserting B's whole rows unchanged and A's patch to B's parents.**                                                                                                                                                                                                                                                                   | Decided by the software architect sub-agent: a standing `AGENTS.md` obligation, and the existing cases assert only the error and one column.                                                                                                                                             |
 | 6   | Treat the stage as delivered (mark it) or give it a spec?                                          | **A spec for what is left.**                                                                                                                                                                                                                                                                                                                                            | Decided by the software architect and product owner sub-agents: item 2 of the problem is a standing rule the stage has not met, and three owned paths are absent; § 2a marks only what the evidence proves.                                                                              |
@@ -380,6 +408,7 @@ before merge by saying so on the spec PR.
 | 10  | Product owner: approve this spec?                                                                  | **Round 1: approve with conditions, applied** (stray `account_balances` phrase dropped; `loadTransactions` named as `07-S2`'s and left out; `acc-a-hidden` named; the quota hand-off made findable from `19-S3`).                                                                                                                                                       | Decided by the product owner sub-agent (confidence medium): the right slice, no production change, deferrals cited.                                                                                                                                                                      |
 | 11  | Software architect: approve this spec?                                                             | **Round 1: approve with conditions, applied** (`env` mock and port override stated; garbled first case reduced; circular count replaced; row 9 table repaired; step 8 wording; `NotFoundError` compared on `entity` and `code` only).                                                                                                                                   | Decided by the software architect sub-agent (confidence high): respects `docs/SPEC.md`, owner modules named, harness supports both phases, three tickets.                                                                                                                                |
 | 12  | Security and tenancy reviewer: approve this spec?                                                  | **Round 1: approve with conditions, applied** (disclosure check extended to the three parents; positive controls; whole-row snapshots of `transactions`, `accounts`, `categories`, `payees`; two handler cases for a rejecting `requireOrg` and for update and delete on B's id; the Quota wording made a statement of fact with `docs/ARCHITECTURE.md` line 66 named). | Decided by the security and tenancy reviewer sub-agent (confidence medium): tests only, no production change, no guarantee weakened; no `ESCALATE`.                                                                                                                                      |
+| 13  | How does the `19-S3` spec writer meet the quota hand-off?                                          | **One pointer sentence at the top of `19-S3`'s Quota section (step 7); no requirement of it changes.**                                                                                                                                                                                                                                                                  | Decided by the product owner sub-agent (round 2, confidence high): a hand-off written only inside `07-S1` is findable by no one who is not reading `07-S1`; a pointer is reversible and reconciles nothing.                                                                              |
 
 The commands behind row 9:
 
