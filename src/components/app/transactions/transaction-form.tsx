@@ -115,6 +115,16 @@ export interface BookingWindow {
   readonly storedSettledOn?: string
 }
 
+/**
+ * The `(date, planned)` pair the server refused as a settled row dated after the latest calendar
+ * day on Earth. The form says the refusal at the date field for as long as the entry still holds
+ * exactly this pair, so changing either one drops it without any state of its own.
+ */
+export type RefusedBooking = Pick<
+  TransactionFormValues,
+  'bookedOn' | 'isPlanned'
+>
+
 /** Whether the entry is settled and dated past what {@link BookingWindow} allows. */
 export function isBeyondBookingWindow(
   values: Pick<TransactionFormValues, 'bookedOn' | 'isPlanned'>,
@@ -145,6 +155,13 @@ export function emptyFormValues(
   }
 }
 
+/** Names the way out: this form has one (the planned checkbox), so the message says so. */
+function dateFutureMessage(t: Translate): string {
+  return t('transactions.form.error.dateFuture', {
+    planned: t('transactions.planned'),
+  })
+}
+
 /**
  * Everything that would make the server refuse, checked here so it is said beside the field.
  *
@@ -169,10 +186,7 @@ export function validateForm(
       example: '2026-03-15',
     })
   } else if (isBeyondBookingWindow(values, window)) {
-    // Names the way out: this form has one (the planned checkbox), so the message says so.
-    errors.bookedOn = t('transactions.form.error.dateFuture', {
-      planned: t('transactions.planned'),
-    })
+    errors.bookedOn = dateFutureMessage(t)
   }
   if (values.note.length > NOTE_MAX) {
     errors.note = t('transactions.form.error.note', { max: NOTE_MAX })
@@ -218,6 +232,12 @@ export interface TransactionFormProps {
    * {@link BookingWindow.storedSettledOn}.
    */
   readonly storedSettledOn?: string
+  /**
+   * The date the server refused as later than the latest calendar day on Earth, when the client
+   * check was bypassed (a skewed clock or time zone). Said beside the date field in place of the
+   * server's English; see {@link RefusedBooking}.
+   */
+  readonly refusedBooking?: RefusedBooking
 }
 
 export function TransactionForm({
@@ -235,6 +255,7 @@ export function TransactionForm({
   afterAmount,
   amountNote,
   storedSettledOn,
+  refusedBooking,
 }: TransactionFormProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -252,14 +273,31 @@ export function TransactionForm({
     () => validateForm(values, t, bookingWindow),
     [t, values, bookingWindow],
   )
+  // A settled row saved before the rule existed with a date after today: the one future day that
+  // stays valid.
+  const legacyDate =
+    storedSettledOn !== undefined && storedSettledOn > todayIso
+      ? storedSettledOn
+      : undefined
   const dateBeyondWindow = isBeyondBookingWindow(values, bookingWindow)
+  const dateRefused =
+    refusedBooking !== undefined &&
+    refusedBooking.bookedOn === values.bookedOn &&
+    refusedBooking.isPlanned === values.isPlanned
   // The date error is the one that does not wait for the field to be left or the form submitted:
-  // it answers something the person just did (unticking "planned" under a future date), and a
-  // refusal that appears only on Save would be a refusal with no visible cause.
+  // it answers something the person just did (unticking "planned" under a future date) or the
+  // server's refusal of their save, and a refusal that appears only on Save would be a refusal with
+  // no visible cause. The server's refusal never blocks another attempt: it is not in `errors`.
+  const dateFlagged = dateBeyondWindow || dateRefused
+  const dateMessage =
+    errors.bookedOn ?? (dateRefused ? dateFutureMessage(t) : undefined)
   const shown: TransactionFormErrors = touched
-    ? errors
-    : dateBeyondWindow
-      ? { bookedOn: errors.bookedOn }
+    ? {
+        ...errors,
+        ...(dateMessage === undefined ? {} : { bookedOn: dateMessage }),
+      }
+    : dateFlagged
+      ? { bookedOn: dateMessage }
       : {}
 
   // After a repeat save the amount is the only thing left to type, so the caret goes back to it.
@@ -447,26 +485,32 @@ export function TransactionForm({
               {/*
                 A settled entry stops at today, a planned one may run ten years ahead. The cap
                 is the larger of today and a legacy row's stored date, so that date can be shown
-                rather than clamped. `isInvalid` makes the field render our message instead of
-                React Aria's range default.
+                rather than clamped, and the days between today and that date are unavailable.
+                `isInvalid` makes the field render our message instead of React Aria's range
+                default.
               */}
               <DatePicker
                 label={t('transactions.field.date')}
                 calendarLabel={t('transactions.filter.openCalendar')}
                 isRequired
                 isDisabled={isSubmitting}
-                isInvalid={dateBeyondWindow ? true : undefined}
+                isInvalid={dateFlagged ? true : undefined}
                 errorMessage={shown.bookedOn}
                 value={safeParseDate(values.bookedOn)}
                 maxValue={
                   values.isPlanned
                     ? localToday.add({ years: 10 })
-                    : (safeParseDate(
-                        storedSettledOn !== undefined &&
-                          storedSettledOn > todayIso
-                          ? storedSettledOn
-                          : todayIso,
-                      ) ?? localToday)
+                    : (safeParseDate(legacyDate ?? todayIso) ?? localToday)
+                }
+                isDateUnavailable={
+                  legacyDate === undefined || values.isPlanned
+                    ? undefined
+                    : (date: DateValue) => {
+                        // Only the stored date is valid past today, so the days between are shown
+                        // as unavailable rather than offered and then rejected.
+                        const iso = date.toString()
+                        return iso > todayIso && iso !== legacyDate
+                      }
                 }
                 onChange={(value: DateValue | null) => {
                   if (value !== null) {
@@ -482,7 +526,7 @@ export function TransactionForm({
                 field's description on focus.
               */}
               <p role="status" className="sr-only">
-                {dateBeyondWindow ? shown.bookedOn : ''}
+                {dateFlagged ? shown.bookedOn : ''}
               </p>
             </div>
 

@@ -8,8 +8,10 @@ import { ErrorPanel } from '#/components/app/shell'
 import {
   ConfirmDeleteDialog,
   DetailSummary,
+  NO_SAVE_FAILURE,
   TransactionForm,
   TransactionListError,
+  saveFailureOf,
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
 import { cn } from '#/lib/cn'
@@ -28,6 +30,7 @@ import { loadTransactionDetail } from './-server/detail'
 import { loadTransactionReference } from './-server/list'
 
 import type {
+  SaveFailure,
   TransactionFormValues,
   TransactionReference,
 } from '#/components/app/transactions'
@@ -248,7 +251,7 @@ function TransactionDetailScreen({
   const [values, setValues] = useState<TransactionFormValues>(() =>
     toFormValues(transaction),
   )
-  const [serverError, setServerError] = useState<string | undefined>(undefined)
+  const [failure, setFailure] = useState<SaveFailure>(NO_SAVE_FAILURE)
   const [isConfirmingDelete, setConfirmingDelete] = useState(false)
 
   const row = toLedgerRow(transaction)
@@ -297,7 +300,7 @@ function TransactionDetailScreen({
       })
     },
     onSuccess: async () => {
-      setServerError(undefined)
+      setFailure(NO_SAVE_FAILURE)
       toast.success(t('transactions.saved'))
       onRefresh()
       // An edit moves the ledger row, the day total, the account balance and the dashboard, none of
@@ -305,10 +308,8 @@ function TransactionDetailScreen({
       await refresh()
       setMode(undefined)
     },
-    onError: (error: unknown) => {
-      setServerError(
-        error instanceof Error ? error.message : t('empty.error.body'),
-      )
+    onError: (error: unknown, input) => {
+      setFailure(saveFailureOf(error, input.entry, t('empty.error.body')))
     },
   })
 
@@ -392,7 +393,8 @@ function TransactionDetailScreen({
             setMode(undefined)
           }}
           isSubmitting={saving.isPending}
-          serverError={serverError}
+          serverError={failure.serverError}
+          refusedBooking={failure.refusedBooking}
           submitLabel={t('action.saveChanges')}
           storedSettledOn={
             transaction.isPlanned ? undefined : transaction.bookedOn

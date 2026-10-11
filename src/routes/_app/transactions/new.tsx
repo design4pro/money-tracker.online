@@ -6,8 +6,10 @@ import { WalletMinimal } from 'lucide-react'
 
 import {
   TransactionForm,
+  NO_SAVE_FAILURE,
   TransactionListError,
   emptyFormValues,
+  saveFailureOf,
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
@@ -28,6 +30,7 @@ import {
 } from './-lib/new-search'
 
 import type {
+  SaveFailure,
   TransactionFormValues,
   TransactionReference,
 } from '#/components/app/transactions'
@@ -204,7 +207,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
     applyPrefill(initialValues(reference, source), search, reference),
   )
   const [resetToken, setResetToken] = useState(0)
-  const [serverError, setServerError] = useState<string | undefined>(undefined)
+  const [failure, setFailure] = useState<SaveFailure>(NO_SAVE_FAILURE)
 
   const templatesQuery = useQuery({
     queryKey: ['transactions', 'templates'],
@@ -329,7 +332,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
       })
     },
     onSuccess: async (_created, input) => {
-      setServerError(undefined)
+      setFailure(NO_SAVE_FAILURE)
       toast.success(t('transactions.saved'))
       // Before the navigation, not after: the ledger this lands on reads a React Query cache that
       // was populated before the row existed, and a list that answers "Nothing recorded yet" a
@@ -350,10 +353,8 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
       })
       setResetToken((token) => token + 1)
     },
-    onError: (error: unknown) => {
-      setServerError(
-        error instanceof Error ? error.message : t('empty.error.body'),
-      )
+    onError: (error: unknown, input) => {
+      setFailure(saveFailureOf(error, input.entry, t('empty.error.body')))
     },
   })
 
@@ -385,7 +386,8 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
         }}
         onCancel={leave}
         isSubmitting={creation.isPending}
-        serverError={serverError}
+        serverError={failure.serverError}
+        refusedBooking={failure.refusedBooking}
         allowRepeat
         submitLabel={t('action.save')}
         autoFocusAmount

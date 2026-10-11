@@ -11,7 +11,7 @@ import { asCurrencyCode, asMinor } from '#/lib/money'
 import { TransactionForm, emptyFormValues } from '../transaction-form'
 
 import type { Catalogue } from '#/lib/i18n'
-import type { TransactionFormValues } from '../transaction-form'
+import type { RefusedBooking, TransactionFormValues } from '../transaction-form'
 import type { TransactionReference } from '../types'
 
 /**
@@ -45,11 +45,15 @@ function Wired({
   locale = 'en',
   initial,
   storedSettledOn,
+  refusedBooking,
+  serverError,
   onSubmit = () => {},
 }: {
   readonly locale?: 'en' | 'pl'
   readonly initial: Partial<TransactionFormValues>
   readonly storedSettledOn?: string
+  readonly refusedBooking?: RefusedBooking
+  readonly serverError?: string
   readonly onSubmit?: () => void
 }) {
   const [values, setValues] = useState<TransactionFormValues>(() => ({
@@ -71,6 +75,8 @@ function Wired({
         isSubmitting={false}
         submitLabel="Save"
         storedSettledOn={storedSettledOn}
+        refusedBooking={refusedBooking}
+        serverError={serverError}
       />
     </I18nProvider>
   )
@@ -87,6 +93,21 @@ function dateDescription(): string {
   return ids
     .map((id) => document.getElementById(id)?.textContent ?? '')
     .join(' ')
+}
+
+/** The calendar day before `iso`, as `YYYY-MM-DD`. */
+function dayBefore(iso: string): string {
+  return new Date(Date.parse(iso) - DAY_MS).toISOString().slice(0, 10)
+}
+
+/** The day cell for `iso`, found through the calendar popover the date field opens. */
+function dayCell(iso: string): HTMLElement {
+  const date = new Date(`${iso}T00:00:00Z`)
+  const label = new Intl.DateTimeFormat('en', {
+    dateStyle: 'full',
+    timeZone: 'UTC',
+  }).format(date)
+  return screen.getByRole('button', { name: new RegExp(`^${label}`) })
 }
 
 describe('TransactionForm booking date', () => {
@@ -196,6 +217,138 @@ describe('TransactionForm booking date', () => {
       )
 
       expect(dateGroup().hasAttribute('data-invalid')).toBe(true)
+    })
+  })
+  describe('a booking-date refusal from the server', () => {
+    // A date the client check accepts, so the only reason to flag it is the server's refusal.
+    const refused: RefusedBooking = { bookedOn: '2026-03-15', isPlanned: false }
+
+    it("is said at the date field in the reader's language, not in the banner", () => {
+      render(
+        <Wired
+          initial={{ bookedOn: refused.bookedOn }}
+          refusedBooking={refused}
+        />,
+      )
+
+      expect(dateGroup().hasAttribute('data-invalid')).toBe(true)
+      expect(dateDescription()).toContain('still ahead')
+      expect(dateDescription()).toContain('"Planned"')
+      expect(screen.getByRole('status').textContent).toContain('still ahead')
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('says it in Polish', () => {
+      render(
+        <Wired
+          locale="pl"
+          initial={{ bookedOn: refused.bookedOn }}
+          refusedBooking={refused}
+        />,
+      )
+
+      expect(dateDescription()).toContain('Ta data jeszcze nie nadeszła.')
+      expect(dateDescription()).toContain('„Planowana”')
+    })
+
+    it('does not block another attempt', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Wired
+          initial={{ bookedOn: refused.bookedOn }}
+          refusedBooking={refused}
+          onSubmit={onSubmit}
+        />,
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect(onSubmit).toHaveBeenCalledOnce()
+    })
+
+    it('clears as soon as the planned flag changes', async () => {
+      const user = userEvent.setup()
+      render(
+        <Wired
+          initial={{ bookedOn: refused.bookedOn }}
+          refusedBooking={refused}
+        />,
+      )
+
+      await user.click(screen.getByRole('checkbox', { name: /Planned/ }))
+
+      expect(dateGroup().hasAttribute('data-invalid')).toBe(false)
+      expect(screen.getByRole('status').textContent).toBe('')
+    })
+
+    it('clears as soon as the date changes', async () => {
+      const user = userEvent.setup()
+      render(
+        <Wired
+          initial={{ bookedOn: refused.bookedOn }}
+          refusedBooking={refused}
+        />,
+      )
+
+      const day = within(dateGroup()).getAllByRole('spinbutton')[1]
+      await user.click(day)
+      await user.keyboard('{ArrowUp}')
+
+      expect(dateGroup().hasAttribute('data-invalid')).toBe(false)
+    })
+
+    it('leaves any other failure in the banner, with the date field untouched', () => {
+      render(
+        <Wired
+          initial={{ bookedOn: refused.bookedOn }}
+          serverError="Network down"
+        />,
+      )
+
+      expect(screen.getByRole('alert').textContent).toContain('Network down')
+      expect(dateGroup().hasAttribute('data-invalid')).toBe(false)
+    })
+  })
+
+  describe('the calendar of a legacy settled row dated after today', () => {
+    it('offers the stored date and nothing between it and today', async () => {
+      const user = userEvent.setup()
+      render(<Wired initial={{ bookedOn: FUTURE }} storedSettledOn={FUTURE} />)
+
+      await user.click(screen.getByRole('button', { name: /Open calendar/ }))
+
+      expect(
+        dayCell(FUTURE).hasAttribute('data-unavailable') ||
+          dayCell(FUTURE).getAttribute('aria-disabled') === 'true',
+      ).toBe(false)
+      const before = dayCell(dayBefore(FUTURE))
+      expect(
+        before.hasAttribute('data-unavailable') ||
+          before.getAttribute('aria-disabled') === 'true',
+      ).toBe(true)
+    })
+
+    it('keeps the stored date displayed', () => {
+      render(<Wired initial={{ bookedOn: FUTURE }} storedSettledOn={FUTURE} />)
+
+      expect(within(dateGroup()).getByText(FUTURE.slice(0, 4))).toBeTruthy()
+    })
+
+    it('offers every day up to the planned cap once the row is marked planned', async () => {
+      const user = userEvent.setup()
+      render(
+        <Wired
+          initial={{ bookedOn: FUTURE, isPlanned: true }}
+          storedSettledOn={FUTURE}
+        />,
+      )
+
+      await user.click(screen.getByRole('button', { name: /Open calendar/ }))
+
+      const before = dayCell(dayBefore(FUTURE))
+      expect(before.hasAttribute('data-unavailable')).toBe(false)
+      expect(before.getAttribute('aria-disabled')).not.toBe('true')
     })
   })
 })
