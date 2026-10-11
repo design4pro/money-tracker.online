@@ -40,6 +40,7 @@ import {
   convert,
   money,
 } from '#/lib/money'
+import { assertBookable } from '#/server/booking-rule'
 import { newId } from '#/server/db/ids'
 import {
   PAYMENT_METHODS,
@@ -572,6 +573,12 @@ export async function createTransaction(
 ): Promise<Transaction> {
   const { scope, policies, conversion } = args
   const input = createTransactionSchema.parse(args.input)
+  // The rule is a validation of the pair, so it runs before any read: a refusal writes nothing and
+  // asks the conversion nothing (`#/server/booking-rule`).
+  assertBookable({
+    bookedOn: input.bookedOn,
+    isPlanned: input.isPlanned ?? false,
+  })
 
   await assertParentsInScope(scope, {
     accountId: input.accountId,
@@ -647,6 +654,16 @@ export async function updateTransaction(
   const { scope, policies, conversion, id } = args
   const patch = updateTransactionSchema.parse(args.patch)
   const current = await getTransaction({ scope, policies, id })
+
+  // Judged on the merged pair, and only when it differs from the stored one: the detail screen
+  // re-sends both keys on every save, so a legacy future-dated row must still take a note.
+  assertBookable(
+    {
+      bookedOn: patch.bookedOn ?? current.bookedOn,
+      isPlanned: patch.isPlanned ?? current.isPlanned,
+    },
+    { stored: { bookedOn: current.bookedOn, isPlanned: current.isPlanned } },
+  )
 
   await assertParentsInScope(scope, {
     accountId: patch.accountId,

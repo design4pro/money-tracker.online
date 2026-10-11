@@ -444,6 +444,15 @@ UTC is already 22:30 on 14 March in winter — but in summer, at 23:30 CEST, UTC
 late-evening or early-morning transaction on the wrong day roughly one entry in twelve, forever,
 with no error message. The person chose 14 March; the row says 14 March.
 
+**A settled row may not be dated after the latest calendar day on Earth** (UTC+14, computed from the
+wall clock and never from the request or a development pin): such a row counts in balances at once
+and freezes a borrowed look-back rate into `ref_amount_minor` for good (§2.3 rung 3, §3.1). The
+server refuses it with a validation error at `bookedOn`, on every writer of a settled row
+(`src/server/booking-rule.ts`). A planned row (§5.2) keeps any date. An update is judged on the
+`(booked_on, is_planned)` pair it changes, so a note or amount edit of a row saved before the rule
+existed still succeeds, but flipping a future-dated planned row to posted, or moving a settled row to
+another future date, does not. A rule's `mark_planned: false` never settles such a row.
+
 ### 6.2 The snapshot grid is UTC-keyed
 
 `account_balances.date` and the day-walk of §5.2 are **UTC**. So is any SQL date truncation.

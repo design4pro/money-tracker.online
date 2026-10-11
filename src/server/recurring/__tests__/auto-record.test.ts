@@ -23,7 +23,7 @@
  * the rebuild port at all. Nothing here writes `account_balances` itself.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 
 import { accounts, recurringPeriods, transactions } from '#/server/db/schema'
@@ -154,6 +154,31 @@ describe('posting', () => {
 
     expect(report.posted).toBe(2)
     expect(rebuilds).toEqual(['acc-a'])
+  })
+})
+
+describe('the booking-date rule', () => {
+  // Midnight UTC is the earliest instant of the UTC day, so the cutoff day is the 15th and a period
+  // due on the 15th is exactly on the boundary. Only `Date` is faked: the database needs its timers.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(`${TODAY}T00:00:00.000Z`))
+    return () => vi.useRealTimers()
+  })
+
+  it('still posts a period due today, because the UTC day is never after the latest day on Earth', async () => {
+    await seriesWithDuePeriod({ startDate: TODAY })
+
+    const report = await runAutoRecord({
+      scope: world.scope,
+      markers: createMemoryMarkerStore(),
+      today: TODAY,
+    })
+
+    expect(report.posted).toBe(1)
+    const rows = await world.db.select().from(transactions)
+    expect(rows.at(0)?.bookedOn).toBe(TODAY)
+    expect(rows.at(0)?.isPlanned).toBe(false)
   })
 })
 

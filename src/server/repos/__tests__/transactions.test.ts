@@ -15,6 +15,7 @@ import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 import { asCurrencyCode, asMinor, asRateE10 } from '#/lib/money'
 import { organization, user } from '#/server/db/auth-schema'
@@ -25,6 +26,8 @@ import {
   payees,
   transactions,
 } from '#/server/db/schema'
+import { classifyFailure } from '#/server/errors/classify'
+import { buildEnvelope } from '#/server/errors/envelope'
 
 import { touchLedgerAccount } from '../base'
 import { ConflictError, NotFoundError, RateUnavailableError } from '../errors'
@@ -688,5 +691,239 @@ describe('computeRefAmount', () => {
 
     expect(half.refAmountMinor).toBe(0)
     expect(oneAndAHalf.refAmountMinor).toBe(2)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* The booking date                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `NOW` is 10:00 UTC on the 15th, the first instant UTC+14 is on the 16th, so the latest calendar
+ * day anywhere on Earth is the 16th. Only `Date` is faked: the in-memory database needs its timers.
+ */
+describe('the booking date', () => {
+  const CUTOFF_DAY = '2026-03-16'
+  const BEYOND = '2026-03-17'
+  const FAR_FUTURE = '2999-01-01'
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-03-15T10:00:00.000Z'))
+    return () => vi.useRealTimers()
+  })
+
+  async function rowCount(): Promise<number> {
+    const rows = await scope.db.select().from(transactions)
+    return rows.length
+  }
+
+  /** A legacy row: written when no rule looked, so it is settled and dated after the cutoff. */
+  async function legacyFutureRow(): Promise<string> {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...BASE_INPUT, isPlanned: true, bookedOn: FAR_FUTURE },
+    })
+    await scope.db
+      .update(transactions)
+      .set({ isPlanned: false })
+      .where(eq(transactions.id, created.id))
+    return created.id
+  }
+
+  it('accepts a non-planned row up to the cutoff day, so UTC+14 can book its own today', async () => {
+    for (const bookedOn of ['2026-03-15', CUTOFF_DAY]) {
+      const created = await createTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        input: { ...BASE_INPUT, bookedOn },
+      })
+      expect(created.bookedOn).toBe(bookedOn)
+    }
+  })
+
+  it('refuses a non-planned row after the cutoff at bookedOn, before any lookup, writing nothing', async () => {
+    for (const bookedOn of [BEYOND, FAR_FUTURE]) {
+      executed.length = 0
+      const failure = await createTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        input: { ...BASE_INPUT, currencyCode: 'EUR', bookedOn },
+      }).catch((error: unknown) => error)
+
+      expect(buildEnvelope(failure, classifyFailure(failure))).toMatchObject({
+        kind: 'validation',
+        fields: [{ path: 'bookedOn', key: 'failure.field.invalid' }],
+      })
+      expect(executed).toEqual([])
+    }
+    expect(await rowCount()).toBe(0)
+  })
+
+  it('accepts a planned row on any future date', async () => {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: conversionOf(new Map([['EUR:PLN:2999-01-01', APRIL_RATE]])),
+      input: { ...BASE_INPUT, isPlanned: true, bookedOn: FAR_FUTURE },
+    })
+
+    expect(created.isPlanned).toBe(true)
+    expect(created.bookedOn).toBe(FAR_FUTURE)
+  })
+
+  it('refuses a balance adjustment created through the generic path after the cutoff', async () => {
+    await expect(
+      createTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        input: { ...BASE_INPUT, isBalanceAdjustment: true, bookedOn: BEYOND },
+      }),
+    ).rejects.toBeInstanceOf(z.ZodError)
+    expect(await rowCount()).toBe(0)
+  })
+
+  it('refuses an update that moves a non-planned row after the cutoff, leaving the row as it was', async () => {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: BASE_INPUT,
+    })
+
+    await expect(
+      updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id: created.id,
+        patch: { bookedOn: BEYOND },
+      }),
+    ).rejects.toBeInstanceOf(z.ZodError)
+
+    const after = await getTransaction({
+      scope,
+      policies: EVERYTHING,
+      id: created.id,
+    })
+    expect(after.bookedOn).toBe(BASE_INPUT.bookedOn)
+  })
+
+  it('refuses a patch that flips a future-dated planned row to posted until the date changes', async () => {
+    const planned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...BASE_INPUT, isPlanned: true, bookedOn: FAR_FUTURE },
+    })
+
+    await expect(
+      updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id: planned.id,
+        patch: { isPlanned: false },
+      }),
+    ).rejects.toBeInstanceOf(z.ZodError)
+
+    const posted = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      id: planned.id,
+      patch: { isPlanned: false, bookedOn: CUTOFF_DAY },
+    })
+    expect(posted).toMatchObject({ isPlanned: false, bookedOn: CUTOFF_DAY })
+  })
+
+  it('accepts a planned row moved to another future date', async () => {
+    const planned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...BASE_INPUT, isPlanned: true, bookedOn: FAR_FUTURE },
+    })
+
+    const moved = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: conversionOf(new Map([['EUR:PLN:2999-06-01', APRIL_RATE]])),
+      id: planned.id,
+      patch: { bookedOn: '2999-06-01' },
+    })
+
+    expect(moved.bookedOn).toBe('2999-06-01')
+  })
+
+  describe('a legacy future-dated non-planned row', () => {
+    it('still takes a note-only and an amount-only edit', async () => {
+      const id = await legacyFutureRow()
+
+      const noted = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id,
+        patch: { note: 'renamed' },
+      })
+      const resized = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id,
+        patch: { amountMinor: 99_00 },
+      })
+
+      expect(noted.note).toBe('renamed')
+      expect(resized.amountMinor).toBe(99_00)
+    })
+
+    it('still takes a save that re-sends the stored date and flag, as the detail screen does', async () => {
+      const id = await legacyFutureRow()
+
+      const saved = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id,
+        patch: { bookedOn: FAR_FUTURE, isPlanned: false, note: 'resent' },
+      })
+
+      expect(saved.note).toBe('resent')
+    })
+
+    it('refuses a move to a different future date', async () => {
+      const id = await legacyFutureRow()
+
+      await expect(
+        updateTransaction({
+          scope,
+          policies: EVERYTHING,
+          conversion,
+          id,
+          patch: { bookedOn: '2999-01-02' },
+        }),
+      ).rejects.toBeInstanceOf(z.ZodError)
+    })
+
+    it('takes a move back to a bookable date', async () => {
+      const id = await legacyFutureRow()
+
+      const moved = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id,
+        patch: { bookedOn: CUTOFF_DAY },
+      })
+
+      expect(moved.bookedOn).toBe(CUTOFF_DAY)
+    })
   })
 })

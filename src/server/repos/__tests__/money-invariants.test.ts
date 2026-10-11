@@ -1829,3 +1829,73 @@ describe('17 — a correction is a transaction, never an overwrite', () => {
     expect(written?.refAmountMinor).toBe(400_00)
   })
 })
+
+describe('18 — no settled row is dated after the latest calendar day on Earth', () => {
+  // 10:00 UTC on the 15th is the first instant UTC+14 is on the 16th, so the cutoff day is the
+  // 16th. Only `Date` is faked: the in-memory database needs its timers.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-03-15T10:00:00.000Z'))
+    return () => vi.useRealTimers()
+  })
+
+  it('writes no row, resolves no rate and reads nothing when a create is refused', async () => {
+    const conversion = conversionOf('PLN', [])
+    executed.length = 0
+
+    await expect(
+      createTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        input: { ...INPUT, currencyCode: 'EUR', bookedOn: '2026-03-17' },
+      }),
+    ).rejects.toThrow()
+
+    // The refusal is the rule's, so not even a parent lookup ran.
+    expect(executed).toEqual([])
+    expect(await scope.db.select().from(transactions)).toHaveLength(0)
+  })
+
+  it('leaves the stored row, its figures and its date untouched when an update is refused', async () => {
+    const conversion = conversionOf('PLN', [
+      [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
+    ])
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, currencyCode: 'EUR' },
+    })
+
+    await expect(
+      updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion,
+        id: created.id,
+        patch: { bookedOn: '2999-01-01' },
+      }),
+    ).rejects.toThrow()
+
+    const [stored] = await scope.db.select().from(transactions)
+    expect(stored).toMatchObject({
+      bookedOn: BOOKED_ON,
+      refAmountMinor: created.refAmountMinor,
+      rateE10: created.rateE10,
+    })
+  })
+
+  it('keeps a planned forecast bookable on any date, since it counts in no balance', async () => {
+    const conversion = conversionOf('PLN', [])
+
+    const planned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, isPlanned: true, bookedOn: '2999-01-01' },
+    })
+
+    expect(planned).toMatchObject({ isPlanned: true, bookedOn: '2999-01-01' })
+  })
+})

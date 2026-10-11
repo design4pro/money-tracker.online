@@ -394,6 +394,9 @@ function TransactionDetailScreen({
           isSubmitting={saving.isPending}
           serverError={serverError}
           submitLabel={t('action.saveChanges')}
+          storedSettledOn={
+            transaction.isPlanned ? undefined : transaction.bookedOn
+          }
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
