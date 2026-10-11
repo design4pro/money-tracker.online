@@ -36,9 +36,13 @@ import { fileURLToPath } from 'node:url'
 
 import { and, eq, like, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import { isNotFound } from '@tanstack/react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { organization, user } from '#/server/db/auth-schema'
+import { buildEnvelope } from '#/server/errors/envelope'
+import { classifyFailure } from '#/server/errors/classify'
+import { rethrowAsNotFound } from '#/server/fns/not-found'
 import {
   accounts,
   attachments,
@@ -92,6 +96,7 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
+import { getAccountBalanceOn } from '../accounts'
 import { isMember, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
@@ -374,9 +379,73 @@ describe('reads cannot reach another workspace', () => {
   })
 })
 
+describe('the balance on a day cannot be read across a workspace boundary', () => {
+  it('reports a foreign account exactly like a nonexistent one', async () => {
+    const foreign = await getAccountBalanceOn(a, {
+      accountId: B_ACCOUNTS[0],
+      on: '2026-03-15',
+    }).catch((thrown: unknown) => thrown)
+    const missing = await getAccountBalanceOn(a, {
+      accountId: 'acc-nobody',
+      on: '2026-03-15',
+    }).catch((thrown: unknown) => thrown)
+
+    // Same class and same message shape: the id is the only thing that differs, so the answer
+    // cannot tell a typo from a row that exists in someone else's workspace.
+    expect(foreign).toBeInstanceOf(NotFoundError)
+    expect(missing).toBeInstanceOf(NotFoundError)
+    expect((foreign as NotFoundError).message).toBe(
+      (missing as NotFoundError).message.replace('acc-nobody', B_ACCOUNTS[0]),
+    )
+  })
+
+  it('answers the owner of the same account', async () => {
+    await expect(
+      getAccountBalanceOn(b, { accountId: B_ACCOUNTS[0], on: '2026-03-15' }),
+    ).resolves.toEqual({ balanceMinor: expect.any(Number) })
+  })
+})
+
 /* -------------------------------------------------------------------------- */
 /* Aggregates                                                                  */
 /* -------------------------------------------------------------------------- */
+
+describe('the failure a read produces discloses nothing about the row', () => {
+  /** What the wire would carry for the sentinel: a thrown value, serialised. */
+  async function sentinelFor(scope: TenantScope, id: string): Promise<string> {
+    const thrown = await accountRepo
+      .requireById(scope, id)
+      .catch(rethrowAsNotFound)
+      .then(
+        () => {
+          throw new Error('the read was meant to find nothing')
+        },
+        (error: unknown) => error,
+      )
+    expect(isNotFound(thrown)).toBe(true)
+    return JSON.stringify(thrown)
+  }
+
+  it('the failure for a missing row and for another workspace’s row is byte-identical', async () => {
+    const missing = await sentinelFor(a, 'acc-does-not-exist')
+    const foreign = await sentinelFor(a, B_ACCOUNTS[0])
+
+    expect(foreign).toBe(missing)
+    expect(missing).not.toContain('acc-')
+
+    // Raw, before the helper: the two errors differ in entity and id, and the classifier plus the
+    // builder turn both into the same constant envelope.
+    const rawMissing = new NotFoundError('account', 'acc-does-not-exist')
+    const rawForeign = new NotFoundError('transaction', B_ACCOUNTS[0])
+    const bytesOf = (error: Error) =>
+      JSON.stringify(buildEnvelope(error, classifyFailure(error)))
+
+    expect(bytesOf(rawForeign)).toBe(bytesOf(rawMissing))
+    for (const leaked of ['account', 'transaction', 'acc-', 'requestId']) {
+      expect(bytesOf(rawMissing)).not.toContain(leaked)
+    }
+  })
+})
 
 describe('aggregates cannot see another workspace', () => {
   it('counts only the caller’s rows', async () => {

@@ -404,8 +404,15 @@ const messages = {
   'accounts.adjust.preview.expense': 'Wydatek {amount} z datą {date}.',
   'accounts.adjust.preview.none':
     'Nic. Na dzień {date} na koncie jest już {amount}.',
-  'accounts.adjust.preview.past':
-    'Różnicę liczymy wobec stanu konta na koniec dnia {date}, który odczytujemy przy zapisie. Pokażemy dokładnie to, co zostało zapisane.',
+  'accounts.adjust.preview.loading': 'Odczytujemy stan konta na dzień {date}…',
+  'accounts.adjust.preview.error':
+    'Nie udało się odczytać stanu konta na dzień {date}.',
+  'accounts.adjust.preview.blocked':
+    'Korektę zapiszesz, gdy odczytamy stan konta na dzień {date}.',
+  'accounts.adjust.preview.blockedFailed':
+    'Korektę zapiszesz, gdy odczytamy stan konta na dzień {date}. Wybierz „{retry}”, aby spróbować jeszcze raz.',
+  'accounts.adjust.preview.blockedFuture':
+    'Korekty nie zapiszesz z datą, która jeszcze nie nadeszła. Wybierz dzień do dzisiaj włącznie.',
   'accounts.adjust.action': 'Zapisz korektę',
   'accounts.adjust.result.title': 'Zapisano',
   'accounts.adjust.result.income': 'Zapisaliśmy wpływ {amount} z datą {date}.',
@@ -590,6 +597,8 @@ const messages = {
   'transactions.form.error.amount': 'Podaj kwotę większą od zera.',
   'transactions.form.error.account': 'Wybierz konto, którego dotyczy wpis.',
   'transactions.form.error.date': 'Podaj datę w formacie {example}.',
+  'transactions.form.error.dateFuture':
+    'Ta data jeszcze nie nadeszła. Zaznacz „{planned}”, aby zapisać wpis jako planowany, albo wybierz dzisiejszą lub wcześniejszą datę.',
   'transactions.form.error.note': 'Notatka może mieć najwyżej {max} znaków.',
   'transactions.form.noAccounts.title': 'Najpierw konto',
   'transactions.form.noAccounts.body':
@@ -1285,6 +1294,27 @@ const messages = {
   'validation.transfer.sameAccount': 'Wybierz dwa różne konta.',
   'validation.number.invalid': 'Podaj liczbę.',
   'validation.generic': 'Sprawdź to pole.',
+
+  /* -- Błędy nazwane przez serwer ----------------------------------------- */
+  // Jeden klucz na rodzaj błędu i trzy na pole, czytane przez zamknięte tabele w
+  // `src/lib/failure-envelope.ts`; żaden klucz nie jest budowany w czasie działania.
+  'failure.internal': 'Coś poszło nie tak po naszej stronie.',
+  'failure.unauthenticated': 'Zaloguj się, aby kontynuować.',
+  'failure.forbidden': 'Nie masz do tego dostępu.',
+  'failure.not_found': 'Nie możemy tego znaleźć.',
+  'failure.validation':
+    'Niektóre pola wymagają poprawy. Sprawdź je i spróbuj ponownie.',
+  'failure.conflict':
+    'To koliduje z tym, co jest już zapisane. Odśwież stronę i spróbuj ponownie.',
+  'failure.quota': 'Twój plan osiągnął limit w tym zakresie.',
+  'failure.feature_locked': 'To nie wchodzi w skład Twojego planu.',
+  'failure.rate_unavailable': 'Brak kursu waluty na ten dzień.',
+  'failure.rate_limited': 'Zbyt wiele prób. Spróbuj za chwilę.',
+  'failure.upstream':
+    'Usługa, z której korzystamy, nie odpowiedziała. Spróbuj ponownie.',
+  'failure.field.invalid': 'Ta wartość jest nieprawidłowa.',
+  'failure.field.tooShort': 'Ta wartość jest za krótka.',
+  'failure.field.tooLong': 'Ta wartość jest za długa.',
 
   /* -- Empty and failure states ------------------------------------------ */
   'empty.search.title': 'Nic nie znaleziono',
@@ -2484,6 +2514,8 @@ const messages = {
   'rules.action.value.note': 'Notatka',
   'rules.action.value.paymentMethod': 'Sposób płatności',
   'rules.action.value.planned': 'Planowana',
+  'rules.action.value.planned.waitsForDate':
+    'Wpis z przyszłą datą pozostaje planowany, dopóki zasada nie zadziała na nim po nadejściu tej daty (przy dodaniu, edycji lub imporcie wpisu).',
   'rules.action.value.excluded': 'Wyłączona ze statystyk',
   'rules.action.value.empty': 'Nie ma tu jeszcze czego wybierać.',
 

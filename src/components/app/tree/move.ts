@@ -1,7 +1,7 @@
 /**
- * Where a category lands, worked out before anything is sent.
+ * Where a row lands, worked out before anything is sent.
  *
- * Every reordering gesture in the tree — the drag, and each of the five menu items — ends in the
+ * Every reordering gesture in a tree — the drag, and each of the five menu items — ends in the
  * same request: *this row now has this parent, and this is the complete order of the run it is in*.
  * Computing that here, as pure functions over the rows the screen is already holding, is what lets
  * the drag path and the keyboard path be the same code rather than two implementations that drift.
@@ -13,21 +13,15 @@
  * places deciding the depth rule is how the two start disagreeing.
  */
 
-/** The one row shape the tree, its menu and its drag handler all read. */
-export interface CategoryTreeItem {
+/** The two fields the arithmetic reads; a screen's row type extends it with whatever it renders. */
+export interface TreeRow {
   readonly id: string
-  readonly name: string
-  /** Resolved through inheritance by the repository. Rendered as a swatch, never as a fill. */
-  readonly color: string
-  readonly icon: string | null
-  readonly kind: 'expense' | 'income' | 'both'
+  /** `null` is the top level. */
   readonly parentId: string | null
-  readonly isSystem: boolean
-  readonly isArchived: boolean
 }
 
 /** What one gesture asks the server for. */
-export interface CategoryMove {
+export interface TreeMove {
   readonly id: string
   /** `null` puts the row at the top level. */
   readonly parentId: string | null
@@ -37,20 +31,15 @@ export interface CategoryMove {
 
 /** The ids of one sibling run, in the order the tree is already showing them. */
 export function siblingsOf(
-  categories: ReadonlyArray<CategoryTreeItem>,
+  rows: ReadonlyArray<TreeRow>,
   parentId: string | null,
 ): ReadonlyArray<string> {
-  return categories
-    .filter((row) => row.parentId === parentId)
-    .map((row) => row.id)
+  return rows.filter((row) => row.parentId === parentId).map((row) => row.id)
 }
 
 /** Whether a row has children — the one condition that stops it being moved inside another row. */
-export function hasChildren(
-  categories: ReadonlyArray<CategoryTreeItem>,
-  id: string,
-): boolean {
-  return categories.some((row) => row.parentId === id)
+export function hasChildren(rows: ReadonlyArray<TreeRow>, id: string): boolean {
+  return rows.some((row) => row.parentId === id)
 }
 
 /** Inserts `id` into `run` at `index`, removing it from wherever it was. */
@@ -76,17 +65,17 @@ function placeAt(
  * `null` when the gesture asks for nothing — a row dropped onto itself.
  */
 export function dropMove(
-  categories: ReadonlyArray<CategoryTreeItem>,
+  rows: ReadonlyArray<TreeRow>,
   id: string,
   targetId: string,
   position: 'before' | 'after',
-): CategoryMove | null {
+): TreeMove | null {
   if (id === targetId) return null
-  const target = categories.find((row) => row.id === targetId)
+  const target = rows.find((row) => row.id === targetId)
   if (target === undefined) return null
 
   const parentId = target.parentId
-  const run = siblingsOf(categories, parentId)
+  const run = siblingsOf(rows, parentId)
   const withoutMoved = run.filter((candidate) => candidate !== id)
   const targetIndex = withoutMoved.indexOf(targetId)
   if (targetIndex === -1) return null
@@ -106,14 +95,14 @@ export type MoveStep = 'up' | 'down' | 'top' | 'bottom'
  * kinder than an enabled one that silently no-ops.
  */
 export function stepMove(
-  categories: ReadonlyArray<CategoryTreeItem>,
+  rows: ReadonlyArray<TreeRow>,
   id: string,
   step: MoveStep,
-): CategoryMove | null {
-  const row = categories.find((candidate) => candidate.id === id)
+): TreeMove | null {
+  const row = rows.find((candidate) => candidate.id === id)
   if (row === undefined) return null
 
-  const run = siblingsOf(categories, row.parentId)
+  const run = siblingsOf(rows, row.parentId)
   const index = run.indexOf(id)
   if (index === -1) return null
 
@@ -148,20 +137,18 @@ function targetIndexFor(
 /**
  * The move "Move to…" produces: a new parent, and the row appended to the end of its run.
  *
- * The end rather than the start, because a person re-filing a category is adding it to a group
+ * The end rather than the start, because a person re-filing a row is adding it to a group
  * rather than promoting it above what is already there — and a row that jumped to the top of
  * somebody's carefully ordered list is a second edit they now have to undo.
  */
 export function reparentMove(
-  categories: ReadonlyArray<CategoryTreeItem>,
+  rows: ReadonlyArray<TreeRow>,
   id: string,
   parentId: string | null,
-): CategoryMove | null {
-  const row = categories.find((candidate) => candidate.id === id)
+): TreeMove | null {
+  const row = rows.find((candidate) => candidate.id === id)
   if (row === undefined || row.parentId === parentId) return null
 
-  const run = siblingsOf(categories, parentId).filter(
-    (candidate) => candidate !== id,
-  )
+  const run = siblingsOf(rows, parentId).filter((candidate) => candidate !== id)
   return { id, parentId, orderedIds: [...run, id] }
 }

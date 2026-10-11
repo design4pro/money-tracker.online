@@ -87,6 +87,8 @@ interface TransactionInput {
   readonly categoryId?: string | null
   readonly organizationId?: string
   readonly accountId?: string
+  readonly bookedOn?: string
+  readonly isPlanned?: boolean
 }
 
 const IDENTITY_RATE_E10 = 10_000_000_000
@@ -103,8 +105,9 @@ async function seedTransaction(input: TransactionInput): Promise<string> {
     refAmountMinor: amountMinor,
     refCurrencyCode: 'PLN',
     rateE10: IDENTITY_RATE_E10,
-    bookedOn: '2026-03-10',
+    bookedOn: input.bookedOn ?? '2026-03-10',
     bookedAt: new Date('2026-03-10T12:00:00.000Z'),
+    isPlanned: input.isPlanned ?? false,
     categoryId: input.categoryId ?? null,
     payeeId: input.payeeId ?? null,
     payeeLocked: input.payeeLocked ?? false,
@@ -597,5 +600,134 @@ describe('match accounting is one statement per run', () => {
         .from(transactionTags)
         .where(eq(transactionTags.transactionId, 'tx-1')),
     ).toEqual([{ tagId: 'tag-1' }])
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* A rule never settles a row dated after the cutoff                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `mark_planned: false` settles a row, and a settled row may not be dated after the latest calendar
+ * day on Earth (`#/server/booking-rule`). A run is not transactional, so the action is dropped
+ * rather than thrown: the rest of the rule still applies. `NOW` makes the cutoff day the 16th.
+ */
+describe('mark_planned: false on a row dated after the cutoff', () => {
+  const SETTLE_AND_NOTE = [
+    { kind: 'mark_planned', isPlanned: false },
+    { kind: 'set_note', note: 'tidied' },
+  ]
+
+  it('drops the settle and keeps the other actions of the same rule', () => {
+    const settling = rule({
+      id: 'rule-1',
+      conditions: EXPENSE,
+      actions: SETTLE_AND_NOTE,
+    })
+
+    const { outcome } = resolveOutcome(
+      [settling],
+      subject({ bookedOn: '2026-03-17' }),
+      'edit',
+      NOW,
+    )
+
+    expect(outcome.isPlanned).toBeUndefined()
+    expect(outcome.note).toBe('tidied')
+  })
+
+  it('settles a row dated up to the cutoff day', () => {
+    const settling = rule({
+      id: 'rule-1',
+      conditions: EXPENSE,
+      actions: SETTLE_AND_NOTE,
+    })
+
+    for (const bookedOn of ['2026-03-10', '2026-03-16']) {
+      expect(
+        resolveOutcome([settling], subject({ bookedOn }), 'edit', NOW).outcome,
+      ).toMatchObject({ isPlanned: false })
+    }
+  })
+
+  it('still lets a rule keep a future row planned', () => {
+    const planning = rule({
+      id: 'rule-1',
+      conditions: EXPENSE,
+      actions: [{ kind: 'mark_planned', isPlanned: true }],
+    })
+
+    expect(
+      resolveOutcome(
+        [planning],
+        subject({ bookedOn: '2999-01-01' }),
+        'edit',
+        NOW,
+      ).outcome,
+    ).toMatchObject({ isPlanned: true })
+  })
+
+  it('ends a future row planned when one rule plans it and a later one un-plans it', () => {
+    const planning = rule({
+      id: 'rule-1',
+      conditions: EXPENSE,
+      actions: [{ kind: 'mark_planned', isPlanned: true }],
+    })
+    const settling = rule({
+      id: 'rule-2',
+      conditions: EXPENSE,
+      actions: [{ kind: 'mark_planned', isPlanned: false }],
+    })
+
+    const resolved = resolveOutcome(
+      [planning, settling],
+      subject({ bookedOn: '2999-01-01' }),
+      'edit',
+      NOW,
+    )
+
+    expect(resolved.outcome.isPlanned).toBe(true)
+    // Both still matched: the un-plan is withheld, the rule is not unmatched.
+    expect(resolved.matchedRuleIds).toEqual(['rule-1', 'rule-2'])
+  })
+
+  it('leaves a future planned row planned and flips a past one, when run for real', async () => {
+    await seedRule({
+      id: 'rule-1',
+      position: 0,
+      conditions: EXPENSE,
+      actions: SETTLE_AND_NOTE,
+    })
+    await seedTransaction({
+      id: 'tx-future',
+      isPlanned: true,
+      bookedOn: '2999-01-01',
+    })
+    await seedTransaction({
+      id: 'tx-past',
+      isPlanned: true,
+      bookedOn: '2026-03-10',
+    })
+
+    await applyRules(scope, {
+      transactionIds: ['tx-future', 'tx-past'],
+      trigger: 'edit',
+    })
+
+    const rows = await db
+      .select({
+        id: transactions.id,
+        isPlanned: transactions.isPlanned,
+        note: transactions.note,
+      })
+      .from(transactions)
+    expect(rows.find((row) => row.id === 'tx-future')).toMatchObject({
+      isPlanned: true,
+      note: 'tidied',
+    })
+    expect(rows.find((row) => row.id === 'tx-past')).toMatchObject({
+      isPlanned: false,
+      note: 'tidied',
+    })
   })
 })

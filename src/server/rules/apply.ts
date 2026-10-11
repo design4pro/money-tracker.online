@@ -47,6 +47,8 @@ import {
   recordMatches,
 } from '#/server/repos/rules'
 
+import { isBookable } from '#/server/booking-rule'
+
 import { evaluateRule } from './evaluate'
 
 import type { Rule, RuleOutcome, RuleSubject } from '#/server/repos/rules'
@@ -63,11 +65,17 @@ export interface ResolvedOutcome {
 /**
  * Folds the rule set over one transaction.
  *
- * Pure: no scope, no database, no clock. Rules arrive **in the order they run** — the caller owns
+ * Pure: no scope, no database, and a clock only through `now`. Rules arrive **in the order they run** — the caller owns
  * loading and ordering, this owns deciding — and every later action overwrites the earlier one for
  * the field it names. The `run_on` gate is applied here rather than left to the loader, so a caller
  * that hands over the whole rule set (`14-S2`'s preview does) gets the answer the save path would
  * produce.
+ *
+ * **A run never settles a row the booking rule would refuse.** For a subject dated after the latest
+ * calendar day on Earth, `mark_planned: false` is dropped and the rule's other actions still apply:
+ * a run is not transactional, so throwing mid-run would leave the earlier subjects written and the
+ * later ones not (`#/server/booking-rule`). The preview calls this too, so it shows what the save
+ * will do.
  *
  * A tag is kept as **the last operation naming it**, not as two sets: a rule that adds `#coffee`
  * followed by one that removes it means the tag is removed, and a run that both inserted and
@@ -77,6 +85,7 @@ export function resolveOutcome(
   orderedRules: ReadonlyArray<Rule>,
   subject: RuleSubject,
   trigger: RuleTrigger,
+  now: Date = new Date(),
 ): ResolvedOutcome {
   const matchedRuleIds: Array<string> = []
   const tagOperations = new Map<string, 'add' | 'remove'>()
@@ -88,7 +97,7 @@ export function resolveOutcome(
 
     matchedRuleIds.push(rule.id)
     for (const action of rule.actions) {
-      scalars = { ...scalars, ...scalarFor(action, subject) }
+      scalars = { ...scalars, ...scalarFor(action, subject, now) }
       const tagOperation = tagOperationFor(action)
       if (tagOperation !== null) {
         tagOperations.set(tagOperation.tagId, tagOperation.operation)
@@ -116,6 +125,7 @@ export function resolveOutcome(
 function scalarFor(
   action: RuleAction,
   subject: RuleSubject,
+  now: Date,
 ): Omit<RuleOutcome, 'addTagIds' | 'removeTagIds'> {
   switch (action.kind) {
     case 'set_category':
@@ -128,7 +138,11 @@ function scalarFor(
     case 'set_payment_method':
       return { paymentMethod: action.paymentMethod }
     case 'mark_planned':
-      return { isPlanned: action.isPlanned }
+      // Settling is the one action the booking rule can refuse; planning a row is always allowed.
+      return action.isPlanned ||
+        isBookable({ bookedOn: subject.bookedOn, isPlanned: false }, now)
+        ? { isPlanned: action.isPlanned }
+        : {}
     case 'set_excluded':
       return { excludeFromStats: action.excludeFromStats }
     case 'add_tag':

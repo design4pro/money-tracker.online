@@ -50,6 +50,7 @@ import {
   transactions,
 } from '#/server/db/schema'
 import { newId } from '#/server/db/ids'
+import { isBookable } from '#/server/booking-rule'
 import {
   MAX_RULES_PER_WORKSPACE,
   RULE_TRIGGERS,
@@ -759,6 +760,20 @@ export async function recordMatches(
 }
 
 /**
+ * Whether the outcome's planned flag may reach the row: settling is the one write the booking rule
+ * can refuse (`#/server/booking-rule`). The resolver drops such an action already; this is the
+ * second line, for an outcome built without it. The refusal is a skip and not a throw because a
+ * run is not transactional - a throw would leave a chunk partly written. `subject` is a snapshot
+ * loaded before the write, which is fine: the run follows the same trigger's write.
+ */
+function mayWritePlanned(subject: RuleSubject, outcome: RuleOutcome): boolean {
+  return (
+    outcome.isPlanned === true ||
+    isBookable({ bookedOn: subject.bookedOn, isPlanned: false })
+  )
+}
+
+/**
  * Writes what a run decided for one transaction.
  *
  * Two statements at most, and **not one of them can carry an amount**: the patch is assembled field
@@ -785,7 +800,7 @@ export async function applyOutcome(
     ...(outcome.paymentMethod === undefined
       ? {}
       : { paymentMethod: outcome.paymentMethod }),
-    ...(outcome.isPlanned === undefined
+    ...(outcome.isPlanned === undefined || !mayWritePlanned(subject, outcome)
       ? {}
       : { isPlanned: outcome.isPlanned }),
     ...(outcome.excludeFromStats === undefined

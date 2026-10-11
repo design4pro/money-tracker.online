@@ -75,6 +75,13 @@ already caused, or would obviously cause, two people to mean two things by one w
   transactions, with alert thresholds and a rollover policy. A **budget period** is one
   materialised instance of it, carrying what was carried in, what was spent, and what closed.
   _Avoid_: "budget" for a period; "envelope" without saying which rollover policy is meant.
+- **Failure** — a refusal or fault the server turns into a **failure kind**: one of a closed set
+  (`unauthenticated`, `forbidden`, `not_found`, `validation`, `conflict`, `quota`, `feature_locked`,
+  `rate_unavailable`, `rate_limited`, `upstream`, `internal`), with `internal` the default for
+  anything unnamed. The browser is told the kind through the **failure envelope**, a versioned
+  public shape built only from closed sets, so two failures of one kind are identical. _Avoid_:
+  "envelope" alone, which also names a budget idea; "error message" for what the reader is shown,
+  which is a catalogue sentence chosen by kind, never the text of the thrown value.
 - **Rollover** — what a budget period does with the difference between its limit and its spend:
   `none`, carry the surplus, or carry both surplus and overspend. _Avoid_: "carryover" and
   "rollover" for the same thing in different sentences.
@@ -127,3 +134,8 @@ already caused, or would obviously cause, two people to mean two things by one w
   and defaulted from their own timezone. It is what every report groups by. Distinct from the
   instant the row was created, which exists only to order two transactions on the same day.
   _Avoid_: "date" without saying which of the two; "timestamp" for the booked date.
+- **Booking cutoff** — the latest calendar date it is anywhere on Earth right now (UTC+14). A
+  settled (non-planned) row may not be booked after it; a planned row may. The server enforces it
+  on every writer of a settled row, and the entry form stops a settled date at the reader's own
+  today, which is never later. _Avoid_: "today" for it, which is the UTC day or the reader's own;
+  "max date" for the form's picker limit, which is a different (earlier) bound.
