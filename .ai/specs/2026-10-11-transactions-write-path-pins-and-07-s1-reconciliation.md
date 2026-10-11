@@ -4,7 +4,7 @@
 | ------------------ | ------------------------------------------ |
 | **Status**         | ready                                      |
 | **Issue**          | none                                       |
-| **Spec PR**        | #TBD                                       |
+| **Spec PR**        | #685                                       |
 | **Implementation** | none                                       |
 | **Plan**           | 07-S1 (docs/plans/07-transactions-core.md) |
 
