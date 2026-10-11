@@ -2514,7 +2514,7 @@ const messages = {
   'rules.action.value.paymentMethod': 'Sposób płatności',
   'rules.action.value.planned': 'Planowana',
   'rules.action.value.planned.waitsForDate':
-    'Wpis z przyszłą datą zostanie oznaczony jako nieplanowany dopiero, gdy ta data nadejdzie.',
+    'Wpis z przyszłą datą pozostaje planowany, dopóki zasada nie zadziała na nim po nadejściu tej daty (przy dodaniu, edycji lub imporcie wpisu).',
   'rules.action.value.excluded': 'Wyłączona ze statystyk',
   'rules.action.value.empty': 'Nie ma tu jeszcze czego wybierać.',
 
