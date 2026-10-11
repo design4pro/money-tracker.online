@@ -5,10 +5,11 @@
 One document per designed change. The directory a spec sits in is its state, and the table under
 its `H1` names the issue and the pull requests behind it. The rules are in [AGENTS.md](AGENTS.md).
 
-## Ready — merged, waiting for a build (4)
+## Ready — merged, waiting for a build (5)
 
 | Spec                                                                                                                                                                    | Date       | Issue | Spec PR                                                             | Implementation |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----- | ------------------------------------------------------------------- | -------------- |
+| [The failure panel's shapes, the page-level boundaries and plan stage 05-S2 reconciled](2026-10-10-failure-panel-shapes-and-05-s2-reconciliation.md)                    | 2026-10-10 | —     | [#635](https://github.com/design4pro/money-tracker.online/pull/635) | —              |
 | [Failure classification, the public envelope and the redaction middleware (plan stage 05-S1)](2026-10-10-failure-classification-and-public-envelope.md)                 | 2026-10-10 | —     | [#634](https://github.com/design4pro/money-tracker.online/pull/634) | —              |
 | [The account groups screen, the account move and the balance-adjustment preview (plan stage 06-S3)](2026-10-10-account-groups-screen-and-balance-adjustment-preview.md) | 2026-10-10 | —     | [#636](https://github.com/design4pro/money-tracker.online/pull/636) | —              |
 | [The currency catalogue's read side, its seed parity test, and plan stage 03-S1 reconciled](2026-10-06-currency-catalogue-reads-and-03-s1-reconciliation.md)            | 2026-10-06 | —     | [#592](https://github.com/design4pro/money-tracker.online/pull/592) | —              |
