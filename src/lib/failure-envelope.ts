@@ -75,6 +75,15 @@ export type FailureFieldKey = (typeof FAILURE_FIELD_KEYS)[number]
 /** The most field entries an envelope carries. */
 export const MAX_FAILURE_FIELDS = 20
 
+/** The most dot-separated segments of a field path; a deeper path is reported at form level (`''`). */
+export const MAX_FAILURE_PATH_SEGMENTS = 8
+/** The longest a single field-path segment may be. */
+export const MAX_FAILURE_PATH_SEGMENT_LENGTH = 64
+/** The longest a legal field path can be: the longest segments, joined by the dots between them. */
+export const MAX_FAILURE_PATH_LENGTH =
+  MAX_FAILURE_PATH_SEGMENTS * MAX_FAILURE_PATH_SEGMENT_LENGTH +
+  (MAX_FAILURE_PATH_SEGMENTS - 1)
+
 export type FailureEnvelope = {
   v: 1
   kind: FailureKind
@@ -98,7 +107,12 @@ export const failureEnvelopeSchema = z.object({
     params: z.object({ metric: z.enum(QUOTA_METRICS).optional() }).optional(),
   }),
   fields: z
-    .array(z.object({ path: z.string(), key: z.enum(FAILURE_FIELD_KEYS) }))
+    .array(
+      z.object({
+        path: z.string().max(MAX_FAILURE_PATH_LENGTH),
+        key: z.enum(FAILURE_FIELD_KEYS),
+      }),
+    )
     .max(MAX_FAILURE_FIELDS)
     .optional(),
   retryAfter: z.number().int().min(1).max(3600).optional(),

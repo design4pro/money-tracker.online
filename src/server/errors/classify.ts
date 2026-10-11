@@ -64,14 +64,31 @@ const STATUS: Readonly<Record<FailureKind, number>> = {
   internal: 500,
 }
 
-/** A retry of an unknown failure is a guess, so `internal` is not here. */
-const RETRYABLE: ReadonlySet<FailureKind> = new Set([
-  'rate_limited',
-  'upstream',
-])
+/**
+ * A retry of an unknown failure is a guess, so `internal` is not here. `upstream` is not either:
+ * whether it can be retried depends on the error (see {@link isRetryablePolarError}), which is
+ * more than a kind can say.
+ */
+const RETRYABLE: ReadonlySet<FailureKind> = new Set(['rate_limited'])
 
-function classification(kind: FailureKind): Classification {
-  return { kind, status: STATUS[kind], retryable: RETRYABLE.has(kind) }
+function classification(
+  kind: FailureKind,
+  retryable: boolean = RETRYABLE.has(kind),
+): Classification {
+  return { kind, status: STATUS[kind], retryable }
+}
+
+/**
+ * Whether a retry of this Polar call can help. The same rule as the Polar client's own retry
+ * ladder (`polar-client.ts`): 429, any 5xx, and a timeout or transport failure (no status, code
+ * `TIMEOUT` or `TRANSPORT`). Every other 4xx is a refusal of the request itself, and a response
+ * that did not parse (`SCHEMA`, or `MALFORMED` with the status it arrived with) will not parse
+ * better a second time. 408 is a 4xx, so it stays non-retryable, as in the client.
+ */
+function isRetryablePolarError(error: PolarError): boolean {
+  const { status, code } = error
+  if (status === null) return code === 'TRANSPORT' || code === 'TIMEOUT'
+  return status === 429 || status >= 500
 }
 
 /** The repository `code`s of `src/server/repos/errors.ts`, mapped to a kind. Anything else is `internal`. */
@@ -93,7 +110,7 @@ export type ValidationIssue = {
   readonly code: string
 }
 
-/** The most issues the framework's validation error may carry before it is treated as forged. */
+/** The most issues read from a validation error; a longer list is cut here, never refused. */
 const MAX_INPUT_VALIDATION_ISSUES = 100
 
 /**
@@ -102,16 +119,33 @@ const MAX_INPUT_VALIDATION_ISSUES = 100
  * Two shapes qualify. A `ZodError` (a repository's second parse) carries its issues. The framework's
  * `inputValidator` failure is `new Error(JSON.stringify(issues))`, a plain `Error` that no class
  * identifies, so it is recognised by its structure and only when the constructor is exactly `Error`:
- * a message that parses to a non-empty array of at most 100 objects, each with a `path` array of
- * strings and numbers and a string `code`. Only `path` and `code` are carried out; the issue's
- * `message`, `input`, `expected` and every other key are dropped here, so a forged message can
- * produce nothing but a validation envelope built from sanitised paths and closed codes.
+ * a message that parses to a non-empty array whose first 100 items are objects, each with a `path`
+ * array of strings and numbers and a string `code`. Only `path` and `code` are carried out; the
+ * issue's `message`, `input`, `expected` and every other key are dropped here, so a forged message
+ * can produce nothing but a validation envelope built from sanitised paths and closed codes.
+ *
+ * Both shapes keep at most the first 100 issues. A bulk input with more bad rows than that is
+ * still a validation failure, and the envelope carries fewer fields than that anyway.
+ *
+ * Total: a value that cannot be read (a throwing getter, a revoked proxy) is `null`.
  */
 export function validationIssuesOf(
   error: unknown,
 ): ReadonlyArray<ValidationIssue> | null {
+  try {
+    return readValidationIssues(error)
+  } catch {
+    return null
+  }
+}
+
+function readValidationIssues(
+  error: unknown,
+): ReadonlyArray<ValidationIssue> | null {
   if (error instanceof ZodError) {
-    return error.issues.map((issue) => ({ path: issue.path, code: issue.code }))
+    return error.issues
+      .slice(0, MAX_INPUT_VALIDATION_ISSUES)
+      .map((issue) => ({ path: issue.path, code: issue.code }))
   }
   if (!(error instanceof Error)) return null
   if (Object.getPrototypeOf(error) !== Error.prototype) return null
@@ -122,16 +156,13 @@ export function validationIssuesOf(
   } catch {
     return null
   }
-  if (
-    !Array.isArray(parsed) ||
-    parsed.length === 0 ||
-    parsed.length > MAX_INPUT_VALIDATION_ISSUES
-  ) {
-    return null
-  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return null
 
   const issues: Array<ValidationIssue> = []
-  for (const item of parsed as Array<unknown>) {
+  for (const item of parsed.slice(
+    0,
+    MAX_INPUT_VALIDATION_ISSUES,
+  ) as Array<unknown>) {
     if (typeof item !== 'object' || item === null) return null
     const { path, code } = item as { path?: unknown; code?: unknown }
     if (
@@ -148,8 +179,20 @@ export function validationIssuesOf(
   return issues
 }
 
-/** Classify any thrown value. Total: it never throws for a value that is an ordinary object. */
+/**
+ * Classify any thrown value. Total: it never throws, whatever it is handed. It sits in `catch`
+ * paths, where a second failure would replace the first, so a value that cannot be inspected (a
+ * throwing getter, a revoked proxy) is `internal`, the answer for anything unrecognised.
+ */
 export function classifyFailure(error: unknown): Classification {
+  try {
+    return classifyReadable(error)
+  } catch {
+    return classification('internal')
+  }
+}
+
+function classifyReadable(error: unknown): Classification {
   if (isNotFound(error)) return classification('not_found')
 
   if (error instanceof AuthRequirementError) {
@@ -158,7 +201,10 @@ export function classifyFailure(error: unknown): Classification {
     )
   }
   if (error instanceof PolarError) {
-    return classification(error.status === 429 ? 'rate_limited' : 'upstream')
+    return classification(
+      error.status === 429 ? 'rate_limited' : 'upstream',
+      isRetryablePolarError(error),
+    )
   }
   if (error instanceof RateTimelineUnavailableError) {
     return classification('rate_unavailable')
