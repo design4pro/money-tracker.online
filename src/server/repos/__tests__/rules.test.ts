@@ -29,6 +29,7 @@ import { applyRules } from '#/server/rules/apply'
 import { createBudgetWorld, seedCategory } from './budget-harness'
 import { setLimitResolver } from '../base'
 import {
+  applyOutcome,
   createRule,
   deleteRule,
   getRule,
@@ -134,7 +135,10 @@ async function seedTransaction(input: {
   readonly id: string
   readonly organizationId?: string
   readonly accountId?: string
+  readonly bookedOn?: string
+  readonly isPlanned?: boolean
 }): Promise<string> {
+  const bookedOn = input.bookedOn ?? '2026-03-10'
   await db.insert(transactions).values({
     id: input.id,
     organizationId: input.organizationId ?? 'org-a',
@@ -145,8 +149,9 @@ async function seedTransaction(input: {
     refAmountMinor: 100_00,
     refCurrencyCode: 'PLN',
     rateE10: 10_000_000_000,
-    bookedOn: '2026-03-10',
-    bookedAt: new Date('2026-03-10T12:00:00.000Z'),
+    bookedOn,
+    bookedAt: new Date(`${bookedOn}T12:00:00.000Z`),
+    isPlanned: input.isPlanned ?? false,
     note: 'ZABKA 4471',
     createdAt: NOW,
     updatedAt: NOW,
@@ -435,6 +440,113 @@ describe('reorderRules, setRuleActive, deleteRule and recordMatch', () => {
     const after = await getRule(scope, created.id)
     expect(after.matchCount).toBe(15)
     expect(after.lastMatchedAt).not.toBeNull()
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* applyOutcome — the booking rule, second line                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `resolveOutcome` already drops `mark_planned: false` for a row dated after the cutoff, but
+ * `applyOutcome` takes any {@link RuleOutcome}, so it enforces the booking rule itself. These cases
+ * hand-build the outcome, the interface a future caller would use. The dates are far enough from
+ * the real clock that no fake one is needed.
+ */
+describe('applyOutcome and the booking rule', () => {
+  async function subjectOf(id: string) {
+    const [subject] = await loadRuleSubjects(scope, [id])
+    return subject
+  }
+
+  async function stored(id: string) {
+    const [row] = await db
+      .select({ isPlanned: transactions.isPlanned, note: transactions.note })
+      .from(transactions)
+      .where(eq(transactions.id, id))
+    return row
+  }
+
+  it('leaves a future-dated planned row planned, throws nothing and still writes the other fields', async () => {
+    await seedTransaction({
+      id: 'tx-future',
+      isPlanned: true,
+      bookedOn: '2999-01-01',
+    })
+
+    const changed = await applyOutcome(scope, await subjectOf('tx-future'), {
+      isPlanned: false,
+      note: 'tidied',
+      addTagIds: [],
+      removeTagIds: [],
+    })
+
+    expect(changed).toBe(true)
+    expect(await stored('tx-future')).toEqual({
+      isPlanned: true,
+      note: 'tidied',
+    })
+  })
+
+  it('writes nothing and returns false when the planned flag was all the outcome changed', async () => {
+    await seedTransaction({
+      id: 'tx-future',
+      isPlanned: true,
+      bookedOn: '2999-01-01',
+    })
+    const before = await db
+      .select({ updatedAt: transactions.updatedAt })
+      .from(transactions)
+      .where(eq(transactions.id, 'tx-future'))
+
+    const changed = await applyOutcome(scope, await subjectOf('tx-future'), {
+      isPlanned: false,
+      addTagIds: [],
+      removeTagIds: [],
+    })
+
+    expect(changed).toBe(false)
+    expect(await stored('tx-future')).toMatchObject({ isPlanned: true })
+    expect(
+      await db
+        .select({ updatedAt: transactions.updatedAt })
+        .from(transactions)
+        .where(eq(transactions.id, 'tx-future')),
+    ).toEqual(before)
+  })
+
+  it('still settles a bookable row, the converse', async () => {
+    await seedTransaction({
+      id: 'tx-past',
+      isPlanned: true,
+      bookedOn: '2026-03-10',
+    })
+
+    const changed = await applyOutcome(scope, await subjectOf('tx-past'), {
+      isPlanned: false,
+      addTagIds: [],
+      removeTagIds: [],
+    })
+
+    expect(changed).toBe(true)
+    expect(await stored('tx-past')).toMatchObject({ isPlanned: false })
+  })
+
+  it('still lets an outcome plan a future-dated row', async () => {
+    await seedTransaction({
+      id: 'tx-future',
+      isPlanned: false,
+      bookedOn: '2999-01-01',
+    })
+
+    const changed = await applyOutcome(scope, await subjectOf('tx-future'), {
+      isPlanned: true,
+      addTagIds: [],
+      removeTagIds: [],
+    })
+
+    expect(changed).toBe(true)
+    expect(await stored('tx-future')).toMatchObject({ isPlanned: true })
   })
 })
 

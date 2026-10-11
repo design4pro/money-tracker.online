@@ -1886,6 +1886,79 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
     })
   })
 
+  describe('a legacy settled row stored with a future date', () => {
+    const LEGACY_DATE = '2999-01-01'
+
+    /** A row saved before the booking rule existed: written straight into the table. */
+    async function seedLegacy(
+      currencyCode: 'PLN' | 'EUR',
+      amountMinor: number,
+    ) {
+      const at = new Date('2026-03-01T00:00:00.000Z')
+      await scope.db.insert(transactions).values({
+        id: 'tx-legacy',
+        organizationId: 'org-a',
+        accountId: 'acc-a',
+        direction: 'expense',
+        amountMinor,
+        currencyCode,
+        // Stored at the rate the look-back found for the stored date, then.
+        refAmountMinor: currencyCode === 'PLN' ? amountMinor : 4_000,
+        refCurrencyCode: 'PLN',
+        rateE10: currencyCode === 'PLN' ? 10_000_000_000 : 40_000_000_000,
+        bookedOn: LEGACY_DATE,
+        bookedAt: new Date(`${LEGACY_DATE}T12:00:00.000Z`),
+        isPlanned: false,
+        createdAt: at,
+        updatedAt: at,
+      })
+    }
+
+    it('keeps the identity conversion exact when the amount of a base-currency row is edited', async () => {
+      await seedLegacy('PLN', 5_000)
+
+      const updated = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion: conversionOf('PLN', []),
+        id: 'tx-legacy',
+        patch: { amountMinor: 7_000 },
+      })
+
+      expect(updated).toMatchObject({
+        bookedOn: LEGACY_DATE,
+        amountMinor: 7_000,
+        refAmountMinor: 7_000,
+        rateE10: 10_000_000_000,
+      })
+    })
+
+    it('re-anchors a foreign row at the stored date’s look-back rate, not at another day’s', async () => {
+      await seedLegacy('EUR', 1_000)
+
+      const updated = await updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        // The stored date resolves to 4.3218 (the look-back's answer); today's rate is different,
+        // so a re-anchor at the wrong day would show in the figure.
+        conversion: conversionOf('PLN', [
+          [`EUR:PLN:${LEGACY_DATE}`, 43_218_000_000],
+          [`EUR:PLN:${BOOKED_ON}`, 45_000_000_000],
+        ]),
+        id: 'tx-legacy',
+        patch: { amountMinor: 10_000 },
+      })
+
+      // 100.00 EUR at 4.3218 = 432.18 PLN, worked by hand.
+      expect(updated).toMatchObject({
+        bookedOn: LEGACY_DATE,
+        amountMinor: 10_000,
+        refAmountMinor: 43_218,
+        rateE10: 43_218_000_000,
+      })
+    })
+  })
+
   it('keeps a planned forecast bookable on any date, since it counts in no balance', async () => {
     const conversion = conversionOf('PLN', [])
 

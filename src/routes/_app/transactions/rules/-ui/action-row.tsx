@@ -234,6 +234,13 @@ function ActionValue({
         <Switch
           isSelected={value.flag}
           onChange={(flag) => onChange({ ...value, flag })}
+          // Un-planning settles a row, which the booking rule refuses for a future date: say so
+          // in text, where the rule asks for it (`#/server/rules/apply`).
+          description={
+            value.flag
+              ? undefined
+              : t('rules.action.value.planned.waitsForDate')
+          }
         >
           {t('rules.action.value.planned')}
         </Switch>

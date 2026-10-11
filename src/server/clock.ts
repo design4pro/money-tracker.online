@@ -86,25 +86,6 @@ export function serverToday(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-/** The furthest ahead of UTC any civil clock runs (Line Islands, Kiribati: UTC+14). */
-const MAX_UTC_OFFSET_MS = 14 * 60 * 60 * 1000
-
-/**
- * The latest calendar date it is, anywhere on Earth, at `now`.
- *
- * The ceiling for a booking date the server will accept. It is **not** {@link serverToday} plus a
- * day: `serverToday()` carries no hour, so "+1 day" would accept a date that has begun nowhere on
- * Earth for about ten hours of every UTC day. And it is not `serverToday()` itself, which would
- * refuse the own-today of a person in UTC+13 or UTC+14 for the hours their date is ahead of UTC's.
- *
- * Pure in `now`; the wall clock is read only by the default argument, so it is read when a schema
- * parses and never when the module loads. It ignores the development pins on purpose: a pinned
- * day moves a comparison, and this guard exists to refuse a date the real world has not reached.
- */
-export function latestCalendarDayOnEarth(now: Date = new Date()): string {
-  return new Date(now.getTime() + MAX_UTC_OFFSET_MS).toISOString().slice(0, 10)
-}
-
 /**
  * The pinned day, when there is a request carrying one.
  *

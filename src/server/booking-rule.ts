@@ -26,7 +26,7 @@
 
 import { z } from 'zod'
 
-import { latestCalendarDayOnEarth } from '#/server/clock'
+import { latestCalendarDayOnEarth } from '#/server/calendar-day'
 
 /** The two fields the rule reads. A row, a patch merged onto a row, or a leg about to be written. */
 export interface BookingPair {

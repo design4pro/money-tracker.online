@@ -2476,6 +2476,8 @@ const messages = {
   'rules.action.value.note': 'Note',
   'rules.action.value.paymentMethod': 'Payment method',
   'rules.action.value.planned': 'Planned',
+  'rules.action.value.planned.waitsForDate':
+    'An entry dated in the future stays planned until this rule next runs on it once its date has arrived (when an entry is added, edited or imported).',
   'rules.action.value.excluded': 'Excluded from statistics',
   'rules.action.value.empty': 'There is nothing to pick here yet.',
 
