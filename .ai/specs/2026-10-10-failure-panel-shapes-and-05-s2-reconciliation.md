@@ -30,7 +30,7 @@ halves that are not. No schema change, no migration, no new dependency, no serve
 
 Two things are deliberately **not** here: the offline-failure surface (plan `27-S1` owns `/offline`
 and the connection banner, `PWA-03`) and the removal of the repository's developer-facing message
-from the screen at 46 `detail=` sites and 33 `error instanceof Error ? error.message` sinks (a
+from the screen at 46 `detail=` sites and 31 `error instanceof Error ? error.message` sinks (a
 follow-up that needs `05-S1`'s classifier to know what to show instead; Phase 4 files it).
 
 ## 📝 Problem Statement
@@ -109,7 +109,7 @@ Verified against the repository at the time of writing (commands in Resolved ass
    offline surface is deferred to `27-S1` by name.
 8. **Disclosed, not fixed here: the repository's developer-facing message reaches the screen.**
    `grep -rn "detail=" src --include=*.tsx` finds 46 lines in 42 files, 21 of them
-   `detail={error.message}` (route `errorComponent`s), and 31 more lines in `-ui` files do
+   `detail={error.message}` (route `errorComponent`s), and 31 more lines (mostly in `-ui` files, plus seven route files) do
    `error instanceof Error ? error.message : ...` into a local `failure` state or a toast. Those are
    the after-action surface this panel is for, and they can carry `ForbiddenError` role lists and
    `QuotaExceededError` "(current/limit)" text from `src/server/repos/errors.ts`. That contradicts
@@ -170,6 +170,8 @@ recovery gained.
 | The frame, tone, alert/region, heading focus | `src/components/app/shell/error-panel.tsx` (edit)                          |
 | `FailurePanel`, the kind-to-recovery record  | `src/components/app/shell/failure-panel.tsx` (new)                         |
 | The reference line and its Copy button       | `src/components/app/shell/failure-reference.tsx` (new)                     |
+| The focus move and its restore               | `src/components/app/shell/use-focus-heading.ts` (new)                      |
+| The after-initial-render signal              | `src/components/app/shell/use-is-after-initial-render.ts` (new)            |
 | The whole-page failure                       | `src/components/app/shell/route-error.tsx` (edit)                          |
 | The router's floor boundary                  | `src/components/app/shell/default-error.tsx` (edit)                        |
 | The 404                                      | `src/components/app/shell/not-found.tsx` (unchanged)                       |
@@ -243,7 +245,7 @@ The four recoveries:
 | `feature_locked` | The same link and the envelope's sentence; it names nothing else (Resolved assumptions 7).                                                              |
 | `internal`       | The envelope's sentence, Retry when `onRetry` is passed, the optional reference line with Copy, and a link to `homeHref` when passed.                   |
 
-The record decides which extras appear (the reference line and the dashboard link belong to `internal`, the
+Every kind in the `internal` recovery shows the title `empty.error.title` over the envelope's own sentence ("This could not be found.", "You do not have access to this."); a per-kind title is not worth a key until a surface asks for one. The record decides which extras appear (the reference line and the dashboard link belong to `internal`, the
 billing link to `quota` and `feature_locked`), not whether Retry is meaningful: Retry appears when the caller
 passes `onRetry`. Two placements are deliberate, not oversights. `unauthenticated` renders as `internal`: its
 sentence reads "Sign in to continue.", the redirect to sign-in belongs to the route guard, and a sign-in link
@@ -325,9 +327,8 @@ the heading and sentence carry the meaning (Colour Is Never Alone). `negative`/`
   which only catches errors that happen outside the child matches. So `DefaultRouteError` decides
   its own placement, from `useMatches()` route ids: under `_app` it renders no `<main>` (the shell
   has one) and passes `homeHref="/dashboard"`; under `(auth)` it renders no `<main>` and no
-  `homeHref`; anywhere else (`index.tsx`, `invite.$invitationId.tsx`, `unsubscribe.tsx`) it renders
-  `<main id={MAIN_CONTENT_ID} tabIndex={-1}>` and no `homeHref`. Exactly one `<main>` and one
-  `MAIN_CONTENT_ID` exist on every page.
+  `homeHref`; anywhere else (`index.tsx` and `unsubscribe.tsx`; `invite.$invitationId.tsx` has its own `errorComponent` and never reaches the default) it renders
+  `<main id={MAIN_CONTENT_ID} tabIndex={-1}>` and no `homeHref`. Exactly one `<main>` and one `MAIN_CONTENT_ID` exist on every page the default boundary renders.
 - **Document title on an error page** (SC 2.4.2, level A). `RouteError` does not touch
   `document.title`. The router runs `head()` for the failed match too (`router-core`
   `projectLane`), so the tab already carries the failed route's own `pageHead` title, or the root's
@@ -508,7 +509,7 @@ Files: `src/components/app/shell/route-error.tsx` (edit), `src/components/app/sh
 1. `RouteError`: keep the frame, `empty.error.title`, `app.shell.error.body` and the `warning` tone.
    Change the heading to an `h1` of the same visual size, the root to a labelled region, and add
    `homeHref?`, `FailureReference` for `reference`, the focus rule from Accessibility (the shared
-   `useFocusHeading`, gated by `useIsAfterInitialRender`). Public props stay `onRetry`, `reference`,
+   `useFocusHeading`; only its mount-time focus is gated by `useIsAfterInitialRender`, the restore on unmount is not). Public props stay `onRetry`, `reference`,
    `className`, plus `homeHref`. It still takes no error.
 2. `useIsAfterInitialRender` (new, in the shell) is
    `useSyncExternalStore(subscribe, () => true, () => false)` read on the component's first render
@@ -543,12 +544,14 @@ entry beside `focus-harness.tsx`.
 1. Parameterise the harness bundling by entry rather than copying it. The new entry mounts
    `FailurePanel` in every shape and both placements, and `RouteError`, inside `I18nProvider` **and a
    TanStack router** (`createRouter` plus `RouterProvider`, as `not-found.test.tsx` does), because
-   the billing and dashboard `Link`s need router context and `focus-harness.tsx` has none. `en` and `pl`.
+   the billing and dashboard `Link`s need router context and `focus-harness.tsx` has none (the Phase 1 unit tests need the same router wrapper, as `not-found.test.tsx` does). `en` and `pl`.
 2. `errors.visual.spec.ts`: axe (`e2e/support/axe-scan.ts`, zero `serious`, zero `critical`) on the
    real 404 (`/does-not-exist`) and on one real forced failure, in both themes. **No signed-in route
    can produce a forced failure that reaches `RouteError`**: every one with a loader has its own
    `errorComponent`. The forced failure is therefore either `unsubscribe.tsx` (public, has a loader,
-   no `errorComponent`, so the router default answers) or the harness alone; the real 404 is the
+   no `errorComponent`, so the router default answers; its loader returns `INVALID` without a server call
+   unless the search carries a non-empty `t`, so the navigation targets `/unsubscribe?t=<any token>`, and
+   no public page links there, so the spec triggers it through the router rather than a click) or the harness alone; the real 404 is the
    in-app evidence, and the spec says which of the two it used. `failServerFns` is installed **after**
    the app is loaded and the failure is triggered by a client-side navigation, because a `page.goto`
    runs the loader during SSR. The spec asserts exactly one `<main>` and one `MAIN_CONTENT_ID` on the
@@ -597,7 +600,7 @@ Files: `DESIGN.md` (edit), `docs/plans/05-error-and-observability.md` (edit),
 3. **File the follow-up issue** (required): "Audit the `detail=` sites and remove those that carry
    the repository's message": the 46 `detail=` lines (21 of them `detail={error.message}`, the
    confirmed set; the rest need a look) and the 31 `error instanceof Error ? error.message` sinks,
-   showing the classifier's output instead. `Blocked by` the issue for `05-S1` Phases 3 and 4 (the reader and
+   showing the classifier's output instead. It also takes over the 63 `error.message` readers that `05-S1` Phase 4 degrades to a fixed sentence (its Resolved assumptions row 16; the grep is in its Problem 3), which that spec leaves to this follow-up. `Blocked by` the issue for `05-S1` Phases 3 and 4 (the reader and
    the middleware); if none exists when Phase 4 runs, the body names plan stage `05-S1` and is linked when `afk-to-tickets` creates that
    issue. It lists the greps that produced the numbers. The PR body names the issue number.
 
@@ -622,4 +625,4 @@ Verification: command gate (`pnpm generate-spec-index` and the plan/spec checks 
 | 13  | Panel verdicts on this spec (round 1)                                                                                   | Software architect: approve with conditions (medium). Product owner: approve with conditions (medium). Accessibility specialist: approve with conditions (medium). Security and tenancy reviewer: approve with conditions (medium).                                                                                                                                                                                                                                 | Every condition was applied in the revision that follows: the tone prop, `RouteError`'s copy and tone, the harness router, the focus signal, the first-load rule, `<main>` on the floor boundary, the Copy status region, the Polish copy, the opaque-id rule, the required follow-up issue and the open halves in `Delivered:`. Round 2 is the next row.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 14  | Panel verdicts on this spec (round 2, the last)                                                                         | Security and tenancy reviewer: approve with conditions (medium). Product owner: approve with conditions (medium). Software architect: approve with conditions (medium). Accessibility specialist: **revise** (medium).                                                                                                                                                                                                                                              | Every condition was applied in the revision after round 2: the boundary routing (a failing `_app` child is rendered by `DefaultRouteError` inside the shell, which places itself by route id), the Phase 3 forced failure and its SSR caveat, the shared `useIsAfterInitialRender` and `useFocusHeading` hooks, the layout-effect focus restore, clipboard detection after mount with a hydration test, the repeat-press announcement, the `Dom` Polish copy, `document.title` set by `RouteError`, the static tone class map, and the reworded opaque-id claim (it narrows; the producer must pass only event or request ids). Two rounds are the limit, so this revision was not reviewed again and the accessibility verdict stays at **revise**; see the handoff. |
 | 15  | Accessibility verdict on the revision after round 2                                                                     | Accessibility specialist: approve with conditions (medium). No imperative `document.title`; the initial-render signal is a hydration snapshot independent of the announcer; focus is restored to the enclosing dialog, else `<main>`, after the commit.                                                                                                                                                                                                             | Decided by accessibility-specialist sub-agent (confidence medium): `head()` runs for the failed match too, so the tab already names the failed route and an imperative title would survive a successful Retry; the announcer's first-paint ref is instance-local and cannot be shared; restoring to `<main>` from inside a modal sends focus behind the dialog. Every condition is applied in this revision, which supersedes the **revise** in row 14.                                                                                                                                                                                                                                                                                                               |
-| 16  | How does `05-S2` meet the envelope `05-S1` has shipped? (autopilot review round 1/3, on the head with `develop` merged) | `FailurePanel` takes a `FailureEnvelope` and derives the recovery from `kind`; the panel shows no plan name; the sentence is the envelope's own; `failure.quota.body` becomes `failure.quota.metric`, and `failure.featureLocked.body` and `failure.internal.body` are dropped; Phase 4 corrects `05-S1`'s Quota paragraph.                                                                                                                                         | Decided by software architect sub-agent (confidence high): option B of the decision brief. Rows 1, 7, 8 and 11 are rewritten to match; the numbers in row 12 were re-run on the merged head.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 16  | How does `05-S2` meet the envelope `05-S1` has shipped? (autopilot review round 1/3, on the head with `develop` merged) | `FailurePanel` takes a `FailureEnvelope` and derives the recovery from `kind`; the panel shows no plan name; the sentence is the envelope's own; `failure.quota.body` becomes `failure.quota.metric`, and `failure.featureLocked.body` and `failure.internal.body` are dropped; `05-S1` Phase 5 step 14 corrects its Quota paragraph and Phase 4 here only checks it.                                                                                               | Decided by software architect sub-agent (confidence high): option B of the decision brief. Rows 1, 7, 8 and 11 are rewritten to match; the numbers in row 12 were re-run on the merged head.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
