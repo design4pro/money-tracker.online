@@ -33,7 +33,8 @@ const EXPECTED_EN: Readonly<Record<string, string>> = {
   'failure.unauthenticated': 'Sign in to continue.',
   'failure.forbidden': 'You do not have access to this.',
   'failure.not_found': 'This could not be found.',
-  'failure.validation': 'Check the highlighted fields and try again.',
+  'failure.validation':
+    'Some fields need your attention. Check them and try again.',
   'failure.conflict':
     'This conflicts with what is already saved. Reload and try again.',
   'failure.quota': 'Your plan has reached its limit for this.',
