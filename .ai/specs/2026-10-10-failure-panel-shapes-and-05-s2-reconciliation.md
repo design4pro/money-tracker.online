@@ -73,7 +73,7 @@ Verified against the repository at the time of writing (commands in Resolved ass
    surface can say "limit reached: Accounts, here is where to change it", and the
    page-level failure (`RouteError`) has no way back to `/dashboard`. The route `/settings/billing`
    exists (`src/routes/_app/settings/billing.tsx`), and the catalogue already names every metric
-   (`billing.usage.metric.*`) and the envelope's `failure.*` sentences exist, so the copy needs no new vocabulary beyond the titles.
+   (`billing.usage.metric.*`) and the envelope's `failure.*` sentences exist, so the copy needs little new vocabulary (the titles, one metric line, the dashboard action and the reference strings).
    The envelope and its classifier exist (`src/lib/failure-envelope.ts`, `src/server/errors/`), but
    nothing on the client reads one yet: `readFailure` is `05-S1`'s Phase 3 and the middleware that
    puts an envelope on the wire is its Phase 4 (`2026-10-10-failure-classification-and-public-envelope.md`).
@@ -141,7 +141,7 @@ Keep the existing frame and make the **recovery** the unit of design. Three deci
    no parallel contract: classification stays `05-S1`'s (`kind`), and the panel only decides what to
    _offer_ for each kind, through one record that is total over `FailureKind` (a kind added without a
    recovery does not compile). The sentence it shows is the envelope's own `message.key`; the panel
-   never receives or renders a plan, because the envelope carries none by design
+   never receives or renders a plan name or id, because the envelope carries none by design
    (`src/server/errors/envelope.ts`). `05-S1` supplies `readFailure` and the middleware; this spec
    has no `Blocked by` on them, because the panel is unwired until a caller passes it an envelope.
 3. **`RouteError` is the whole-page failure** and stays a separate component, because it replaces a
@@ -200,8 +200,15 @@ const RECOVERY_OF: Readonly<Record<FailureKind, Recovery>> = {
 }
 ```
 
+`RECOVERY_OF` is a named export of `failure-panel.tsx` (the barrel does not re-export it), so the test can
+read it.
+
 The envelope has no `number` and no plan: `message.params.metric` is a `QuotaMetric` from the
-catalogue's own closed set, rendered through `billing.usage.metric.<metric>`. `not_found` and
+catalogue's own closed set. Its label key comes from a total `Readonly<Record<QuotaMetric, MessageKey>>`
+(`QUOTA_METRIC_LABEL_KEYS`), never a key built at runtime (`docs/I18N.md` §2.1); the record already exists as
+`METRIC_LABEL` in `src/routes/_app/settings/-ui/usage-meters.tsx`, which the shell cannot import, so Phase 1
+hoists it into `src/lib/plans.ts` (which already imports `MessageKey`) and `usage-meters.tsx` imports it from
+there, with no behaviour change. `not_found` and
 `forbidden` share the `internal` recovery, so the panel never offers different recoveries for a
 missing row and a foreign one (the 404/403 indistinguishability of `docs/SECURITY.md` and
 `src/server/repos/errors.ts` is unaffected: the sentence is the envelope's, not the panel's).
@@ -235,6 +242,17 @@ The four recoveries:
 | `quota`          | A link to `/settings/billing` (label `billing.title`), the envelope's sentence, and "Limit reached: Accounts." when `message.params.metric` is present. |
 | `feature_locked` | The same link and the envelope's sentence; it names nothing else (Resolved assumptions 7).                                                              |
 | `internal`       | The envelope's sentence, Retry when `onRetry` is passed, the optional reference line with Copy, and a link to `homeHref` when passed.                   |
+
+The record decides which extras appear (the reference line and the dashboard link belong to `internal`, the
+billing link to `quota` and `feature_locked`), not whether Retry is meaningful: Retry appears when the caller
+passes `onRetry`. Two placements are deliberate, not oversights. `unauthenticated` renders as `internal`: its
+sentence reads "Sign in to continue.", the redirect to sign-in belongs to the route guard, and a sign-in link
+in the panel is left to whoever wires `readFailure`. `rate_unavailable` renders as `retryable`: the sentence
+names the missing rate, and the call site passes `onRetry` only when trying again can help.
+
+The "Limit reached: {metric}." line of the `quota` recovery is a second translated string in the same `<p>`
+that `ErrorPanel` renders for `body` (`body` is a `ReactNode`): a fragment of two `t()` calls separated by JSX
+whitespace, never one concatenated message.
 
 ## 📝 Data Model
 
@@ -426,7 +444,8 @@ document, and takes the second reviewer.
 
 ### Phase 1 - the panel's shapes
 
-Files: `src/components/app/shell/error-panel.tsx` (edit),
+Files: `src/components/app/shell/error-panel.tsx` (edit), `src/lib/plans.ts` (edit: the hoisted
+`QUOTA_METRIC_LABEL_KEYS`), `src/routes/_app/settings/-ui/usage-meters.tsx` (edit: imports it),
 `src/components/app/shell/failure-panel.tsx` (new),
 `src/components/app/shell/failure-reference.tsx` (new), `src/components/app/shell/use-focus-heading.ts` (new),
 `src/components/app/shell/index.ts` (edit),
@@ -449,7 +468,7 @@ Files: `src/components/app/shell/error-panel.tsx` (edit),
 3. `FailurePanel`: the four shapes per the recovery table. `quota` and `feature_locked` pass
    `tone="warning"` and a router `Link` to `/settings/billing` styled with `buttonVariants` in
    `actions`. No `detail` prop. Export `FailurePanel` from the barrel.
-4. Add the nine keys to both catalogues; run the parity test.
+4. Add the seven keys to both catalogues; run the parity test.
 5. `error-panel.test.tsx`: the default render is `role="alert"`, an `h3`, `negative` tone, no focus
    move, Retry only; `mode="region"` is a labelled region and not an alert; `tone="warning"`;
    `focusHeading` moves focus to the heading, the heading comes first inside the alert, Retry is the
@@ -461,10 +480,11 @@ Files: `src/components/app/shell/error-panel.tsx` (edit),
 6. `failure-panel.test.tsx`: envelopes are built as literals of the shipped `FailureEnvelope` type; every
    kind in `FAILURE_KINDS` renders without throwing and the `RECOVERY_OF` record is total (a type-level
    case plus a loop over `FAILURE_KINDS`); `not_found` and `forbidden` render the same recovery; no
-   plan is rendered for `quota` or `feature_locked`; each recovery renders its own actions and not the
+   plan is rendered for `quota` or `feature_locked`; every kind renders no currency-shaped string (the case the plan's Money invariant names, _the panel renders no
+   amount for any envelope kind_); each recovery renders its own actions and not the
    others'; `role="alert"`
-   only for `after-action`; no shape renders a `<details>` element; the quota and feature-locked
-   bodies contain only catalogue names; **hostile references** (`1 234,56 EUR`, `€1,234`, a 65-character
+   only for `after-action`; no shape renders a `<details>` element; the body equals
+   `t(failure.message.key)` (plus the metric line for `quota`); **hostile references** (`1 234,56 EUR`, `€1,234`, a 65-character
    string, a sentence) produce no reference line and no Copy button, while `evt_7f3a91c2` renders; a
    digits-only string of 8 characters renders too, and the test says in its name that this is the
    documented residual (the producer's constraint, not the shape rule's);
@@ -560,11 +580,13 @@ Files: `DESIGN.md` (edit), `docs/plans/05-error-and-observability.md` (edit),
 2. The plan (`docs/plans/05-error-and-observability.md`): correct `05-S2`'s owned paths to the real
    ones; name the `negative` token family; amend its Verification text to say the quota and
    feature-locked shapes are captured through a harness (no route can produce them yet) while the
-   404 and a forced failure are captured in the app; correct `05-S1`'s Quota paragraph ("the metric and the
-   plan": the shipped envelope carries the metric only) and add that `FailurePanel` consumes the
-   `FailureEnvelope` that `readFailure(error)` (Phase 3) returns, that `RECOVERY_OF` sends
-   `not_found` and `forbidden` to the same recovery, and that the producer passes only an event or
-   request id as `reference`; update `05-S2`'s Money-invariant and Verification references to
+   404 and a forced failure are captured in the app; make the plan text say that `FailurePanel` consumes the `FailureEnvelope` that `readFailure(error)`
+   (`05-S1` Phase 3) returns, that `RECOVERY_OF` sends `not_found` and `forbidden` to the same
+   recovery, and that the producer passes only an event or request id as `reference`. `05-S1`'s
+   Phase 5 step 14 edits three places in the same file (its Quota paragraph at line 76, `05-S2`'s States
+   at line 157 and Money invariant at lines 179 and 180: the envelope carries the metric only, the panel
+   shows no plan); whichever of that step and this one merges second checks the text and does not
+   repeat the edit; update `05-S2`'s Money-invariant and Verification references to
    `failure-panel.test.tsx` and its "three shapes" wording to the four shapes, saying that the quota panel names the metric and not the plan (the envelope carries no plan); and add under the
    `## Stage 05-S2`
    heading `Delivered: <date> - <evidence>`, where the evidence names the paths and tests above **and
@@ -600,4 +622,4 @@ Verification: command gate (`pnpm generate-spec-index` and the plan/spec checks 
 | 13  | Panel verdicts on this spec (round 1)                                                                                   | Software architect: approve with conditions (medium). Product owner: approve with conditions (medium). Accessibility specialist: approve with conditions (medium). Security and tenancy reviewer: approve with conditions (medium).                                                                                                                                                                                                                                 | Every condition was applied in the revision that follows: the tone prop, `RouteError`'s copy and tone, the harness router, the focus signal, the first-load rule, `<main>` on the floor boundary, the Copy status region, the Polish copy, the opaque-id rule, the required follow-up issue and the open halves in `Delivered:`. Round 2 is the next row.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 14  | Panel verdicts on this spec (round 2, the last)                                                                         | Security and tenancy reviewer: approve with conditions (medium). Product owner: approve with conditions (medium). Software architect: approve with conditions (medium). Accessibility specialist: **revise** (medium).                                                                                                                                                                                                                                              | Every condition was applied in the revision after round 2: the boundary routing (a failing `_app` child is rendered by `DefaultRouteError` inside the shell, which places itself by route id), the Phase 3 forced failure and its SSR caveat, the shared `useIsAfterInitialRender` and `useFocusHeading` hooks, the layout-effect focus restore, clipboard detection after mount with a hydration test, the repeat-press announcement, the `Dom` Polish copy, `document.title` set by `RouteError`, the static tone class map, and the reworded opaque-id claim (it narrows; the producer must pass only event or request ids). Two rounds are the limit, so this revision was not reviewed again and the accessibility verdict stays at **revise**; see the handoff. |
 | 15  | Accessibility verdict on the revision after round 2                                                                     | Accessibility specialist: approve with conditions (medium). No imperative `document.title`; the initial-render signal is a hydration snapshot independent of the announcer; focus is restored to the enclosing dialog, else `<main>`, after the commit.                                                                                                                                                                                                             | Decided by accessibility-specialist sub-agent (confidence medium): `head()` runs for the failed match too, so the tab already names the failed route and an imperative title would survive a successful Retry; the announcer's first-paint ref is instance-local and cannot be shared; restoring to `<main>` from inside a modal sends focus behind the dialog. Every condition is applied in this revision, which supersedes the **revise** in row 14.                                                                                                                                                                                                                                                                                                               |
-| 16  | How does `05-S2` meet the envelope `05-S1` has shipped? (autopilot review round 1/3, on the head with `develop` merged) | `FailurePanel` takes a `FailureEnvelope` and derives the recovery from `kind`; the panel shows no plan; the sentence is the envelope's own; `failure.quota.body` becomes `failure.quota.metric`, and `failure.featureLocked.body` and `failure.internal.body` are dropped; Phase 4 corrects `05-S1`'s Quota paragraph.                                                                                                                                              | Decided by software architect sub-agent (confidence high): option B of the decision brief. Rows 1, 7, 8 and 11 are rewritten to match; the numbers in row 12 were re-run on the merged head.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 16  | How does `05-S2` meet the envelope `05-S1` has shipped? (autopilot review round 1/3, on the head with `develop` merged) | `FailurePanel` takes a `FailureEnvelope` and derives the recovery from `kind`; the panel shows no plan name; the sentence is the envelope's own; `failure.quota.body` becomes `failure.quota.metric`, and `failure.featureLocked.body` and `failure.internal.body` are dropped; Phase 4 corrects `05-S1`'s Quota paragraph.                                                                                                                                         | Decided by software architect sub-agent (confidence high): option B of the decision brief. Rows 1, 7, 8 and 11 are rewritten to match; the numbers in row 12 were re-run on the merged head.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
