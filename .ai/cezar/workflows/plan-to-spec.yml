@@ -15,7 +15,7 @@
 # list, which has no `Agent`.
 #
 # `$CEZ_HANDOFF_FILE` carries the `STAGE:` line and then one of a `DELIVERED:` line (stages marked in the
-# plan, a docs-only PR to open), an `UNAPPROVED:` line (a committed spec the panel would not approve:
+# plan, a docs-only PR to open), an `UNAPPROVED:` line (a committed spec the security reviewer would not approve:
 # its PR opens as a draft held by a person, so the stage stays covered and is not written again) or,
 # when the run ends with nothing to commit, a `STOP:` line. The later steps match them anywhere in the
 # file (cezar prepends its own entries to it).
@@ -31,7 +31,7 @@ steps:
     prompt: |
       /afk-plan-to-spec {{task}}
 
-      Append a line `STAGE: <stage id>` to the file `$CEZ_HANDOFF_FILE`; later steps read it. When the skill marked delivered stages in the plan instead of writing a spec (its step 2a), append a line `DELIVERED: <the stage ids, comma separated>`, then end with CEZ:DONE. When the skill committed a spec the panel would not approve (its step 5: still **revise** after the second round, or a security reviewer that does not approve), append a line `UNAPPROVED: <the verdict and the one thing a person must settle>`, then end with CEZ:DONE; the spec stays committed on its `spec/<slug>` branch. When the skill ends without a committed spec or marker - `NO_ACTION_NEEDED` or an issue filed as human-only - append a line `STOP: <reason>`, then end with CEZ:DONE. Later steps grep that file for `STOP:` and skip, for `DELIVERED:` and open the docs PR, and for `UNAPPROVED:` and open the draft PR.
+      Append a line `STAGE: <stage id>` to the file `$CEZ_HANDOFF_FILE`; later steps read it. When the skill marked delivered stages in the plan instead of writing a spec (its step 2a), append a line `DELIVERED: <the stage ids, comma separated>`, then end with CEZ:DONE. When the skill committed a spec the panel would not approve (its step 5: a security reviewer that does not approve, or a verdict that escalates an `afk-decide` § 5 case), append a line `UNAPPROVED: <the verdict and the one thing a person must settle>`, then end with CEZ:DONE; the spec stays committed on its `spec/<slug>` branch. When the skill ends without a committed spec or marker - `NO_ACTION_NEEDED` or an issue filed as human-only - append a line `STOP: <reason>`, then end with CEZ:DONE. Later steps grep that file for `STOP:` and skip, for `DELIVERED:` and open the docs PR, and for `UNAPPROVED:` and open the draft PR.
     # Agent: the open questions and the panel's verdicts go to independent specialist sub-agents.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
   - id: gate
@@ -51,7 +51,7 @@ steps:
 
       If `grep -q '^DELIVERED:' "$CEZ_HANDOFF_FILE"` succeeds, no spec was written. Open the docs-only PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `docs/plan-delivered-<plan slug>` (the skill's commit is already on it), labels `documentation`, `skip-qa`, `priority-low` and `risk-low`, and a body that lists each stage id of the `DELIVERED:` line with its evidence line from the plan. There is no issue to reference. Then end with CEZ:DONE.
 
-      If `grep -q '^UNAPPROVED:' "$CEZ_HANDOFF_FILE"` succeeds, the panel would not approve the spec. Open its PR anyway per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 5: branch `spec/<slug>`, a **draft**, labels `blocked`, `documentation`, `skip-qa`, one priority and one risk (never `review`), and the stage, the panel's verdicts and the Resolved assumptions table in the body. Then post on it one comment whose first line is exactly `🤖 HUMAN-ONLY: <the one thing a person must settle>` (the `UNAPPROVED:` line has it), and end with CEZ:DONE. The open PR adds a spec, so the Reconciler does not offer the stage again.
+      If `grep -q '^UNAPPROVED:' "$CEZ_HANDOFF_FILE"` succeeds, the security reviewer would not approve the spec. Open its PR anyway per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 5: branch `spec/<slug>`, a **draft**, labels `blocked`, `documentation`, `skip-qa`, one priority and one risk (never `review`), and the stage, the panel's verdicts and the Resolved assumptions table in the body. Then post on it one comment whose first line is exactly `🤖 HUMAN-ONLY: <the one thing a person must settle>` (the `UNAPPROVED:` line has it), and end with CEZ:DONE. The open PR adds a spec, so the Reconciler does not offer the stage again.
 
       Otherwise open the spec PR per om-open-pr and `.ai/skills/afk-plan-to-spec/SKILL.md` § 6: branch `spec/<slug>`, design-only and ready for review (not a draft), labels `review`, `documentation`, `skip-qa`, one priority and one risk, and the stage, the panel's verdicts and the Resolved assumptions table in the body. There is no issue to reference. Then put the PR number in the spec's `Spec PR` row, run `pnpm generate-spec-index`, and push that as a second commit.
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite]

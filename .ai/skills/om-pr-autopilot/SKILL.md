@@ -73,8 +73,9 @@ chains:
 The installed skill treats a spec-only design PR as draft-by-intent
 (`.claude/skills/om-pr-autopilot/references/state-matrix.md`, `.claude/skills/om-auto-fix-pr/references/pr-finalize.md`),
 and `om-approve-merge-pr` refuses a draft, so a spec-only PR ends at merge-ready and a person merges
-it. One kind is the exception, because a specialist panel has approved it before the PR exists
-(ADR 0030, which amends ADR 0027): a spec-only PR that **all** of these describe merges under
+it. One kind is the exception, because a specialist panel has approved it before the PR exists, or a
+second specialist has settled the one disagreement it left and the PR body says so
+(ADR 0030, which amends ADR 0027 and is itself amended 2026-10-11): a spec-only PR that **all** of these describe merges under
 `--allow-merge` like any other PR into `develop`:
 
 - its branch is `spec/<slug>` and the `plan-to-spec` workflow or `afk-plan-to-spec` opened it: the
