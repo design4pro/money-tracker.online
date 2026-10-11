@@ -139,42 +139,47 @@ export function validationIssuesOf(
   }
 }
 
+/** One item as a {@link ValidationIssue}, or `null` unless it has a `path` of strings and numbers and a string `code`. */
+function issueOf(item: unknown): ValidationIssue | null {
+  if (typeof item !== 'object' || item === null) return null
+  const { path, code } = item as { path?: unknown; code?: unknown }
+  if (
+    !Array.isArray(path) ||
+    !path.every(
+      (part) => typeof part === 'string' || typeof part === 'number',
+    ) ||
+    typeof code !== 'string'
+  ) {
+    return null
+  }
+  return { path, code }
+}
+
 function readValidationIssues(
   error: unknown,
 ): ReadonlyArray<ValidationIssue> | null {
+  let items: ReadonlyArray<unknown>
   if (error instanceof ZodError) {
-    return error.issues
-      .slice(0, MAX_INPUT_VALIDATION_ISSUES)
-      .map((issue) => ({ path: issue.path, code: issue.code }))
-  }
-  if (!(error instanceof Error)) return null
-  if (Object.getPrototypeOf(error) !== Error.prototype) return null
+    items = error.issues
+  } else {
+    if (!(error instanceof Error)) return null
+    if (Object.getPrototypeOf(error) !== Error.prototype) return null
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(error.message)
-  } catch {
-    return null
-  }
-  if (!Array.isArray(parsed) || parsed.length === 0) return null
-
-  const issues: Array<ValidationIssue> = []
-  for (const item of parsed.slice(
-    0,
-    MAX_INPUT_VALIDATION_ISSUES,
-  ) as Array<unknown>) {
-    if (typeof item !== 'object' || item === null) return null
-    const { path, code } = item as { path?: unknown; code?: unknown }
-    if (
-      !Array.isArray(path) ||
-      !path.every(
-        (part) => typeof part === 'string' || typeof part === 'number',
-      ) ||
-      typeof code !== 'string'
-    ) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(error.message)
+    } catch {
       return null
     }
-    issues.push({ path, code })
+    if (!Array.isArray(parsed) || parsed.length === 0) return null
+    items = parsed as Array<unknown>
+  }
+
+  const issues: Array<ValidationIssue> = []
+  for (const item of items.slice(0, MAX_INPUT_VALIDATION_ISSUES)) {
+    const issue = issueOf(item)
+    if (issue === null) return null
+    issues.push(issue)
   }
   return issues
 }

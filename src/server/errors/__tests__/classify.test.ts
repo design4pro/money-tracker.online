@@ -749,6 +749,24 @@ describe('classifyFailure and buildEnvelope never throw', () => {
     })
   })
 
+  it.each([
+    ['an undefined path', undefined],
+    ['a string path', 'abc'],
+    ['a path holding an object', [{}]],
+    ['a revoked proxy path', revokedProxy()],
+  ])(
+    'a hand-built ZodError with %s is internal, not a throw',
+    (_name, path) => {
+      const error = new z.ZodError([
+        { code: 'custom', path: path as never, message: 'x' },
+      ])
+
+      expect(() => classified(error)).not.toThrow()
+      expect(classified(error).kind).toBe('internal')
+      expect(validationIssuesOf(error)).toBeNull()
+    },
+  )
+
   it('buildEnvelope given a revoked proxy and a quota or validation kind has no params and no fields', () => {
     const proxy = revokedProxy()
     for (const kind of ['quota', 'feature_locked', 'validation'] as const) {

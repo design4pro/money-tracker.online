@@ -61,14 +61,19 @@ function inServerTree(path: string, root: string = SOURCE_ROOT): boolean {
 }
 
 /**
- * Every module specifier a source file imports: `import`, `import type`, `export ... from` and a
- * bare `import 'x'`. Anchored at the start of a line, and with no `=`, `(` or `;` allowed in the
- * clause, so prose in a comment and an expression are not read as an import.
+ * Every module specifier a source file imports: `import`, `import type`, `export ... from`, a bare
+ * `import 'x'` and a dynamic `import('x')` with a literal specifier. Comments are blanked first, so
+ * a quote in one cannot cut a clause short and prose in one is not read as an import. A static clause
+ * is anchored at the start of a line with no `=`, `(` or `;` in it, so an expression is not read as
+ * an import either. A computed `import(expr)` and `import.meta.glob` are not followed.
  */
 function importSpecifiers(source: string): Array<string> {
+  const code = source.replace(/\/\*[\s\S]*?\*\/|(^|\s)\/\/[^\n]*/g, '$1')
   const pattern =
-    /^\s*(?:import|export)\b[^;'"=()]*?\bfrom\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gm
-  return [...source.matchAll(pattern)].map((match) => match[1] ?? match[2])
+    /^\s*(?:import|export)\b[^;'"=()]*?\bfrom\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/gm
+  return [...code.matchAll(pattern)].map(
+    (match) => match[1] ?? match[2] ?? match[3],
+  )
 }
 
 /**
@@ -254,14 +259,18 @@ describe('field paths', () => {
     expect(pathOf([...wide, 'y'])).toBe('')
   })
 
-  it.each(['__proto__', 'constructor', 'prototype'])(
-    'a %s segment sends the whole path to form level',
-    (name) => {
-      expect(pathOf([name])).toBe('')
-      expect(pathOf(['lines', 0, name])).toBe('')
-      expect(pathOf([name, 'amount'])).toBe('')
-    },
-  )
+  it.each([
+    '__proto__',
+    'constructor',
+    'prototype',
+    'toString',
+    'valueOf',
+    'hasOwnProperty',
+  ])('a %s segment sends the whole path to form level', (name) => {
+    expect(pathOf([name])).toBe('')
+    expect(pathOf(['lines', 0, name])).toBe('')
+    expect(pathOf([name, 'amount'])).toBe('')
+  })
 
   it('still reports an ordinary name that merely contains a denied one', () => {
     expect(pathOf(['constructor_id'])).toBe('constructor_id')
@@ -325,11 +334,13 @@ describe('client safety', () => {
           "import { z } from 'zod'",
           '// import { nope } from "#/server/in-a-comment"',
           'import {',
-          '  middle,',
+          "  middle, // don't stop reading here (really)",
           "} from '#/lib/middle'",
+          "const later = () => import('#/lib/lazy')",
         ].join('\n'),
       ],
       [`${root}/lib/middle.ts`, "export { leaf } from './deep/leaf'"],
+      [`${root}/lib/lazy.ts`, 'export const lazy = 1'],
       [
         `${root}/lib/deep/leaf.ts`,
         "import type { Secret } from '../../server/repos/secret'",
@@ -344,6 +355,7 @@ describe('client safety', () => {
     expect([...reached].sort()).toEqual([
       `${root}/lib/deep/leaf.ts`,
       `${root}/lib/entry.ts`,
+      `${root}/lib/lazy.ts`,
       `${root}/lib/middle.ts`,
       `${root}/server/repos/secret.ts`,
     ])

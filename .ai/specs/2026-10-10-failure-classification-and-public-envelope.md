@@ -520,10 +520,12 @@ on the spec PR.
 What the code does differently from the text above after the follow-up to #647:
 
 - **A longer issue list is cut, not refused.** `validationIssuesOf` keeps the first 100 issues of a `ZodError` or of the
-  framework's validation error and shape-checks those; 101 or more bad rows is still `validation` (422), never `internal`.
-  The envelope still carries at most 20 fields.
-- **A field path is bounded.** A path of more than `MAX_FAILURE_PATH_SEGMENTS` (8) segments, or one with a segment named
-  `__proto__`, `constructor` or `prototype`, is reported at form level (`''`). `failureEnvelopeSchema` bounds `fields[].path`
+  framework's validation error and shape-checks those with one rule (a `path` of strings and numbers and a string `code`);
+  101 or more bad rows is still `validation` (422), never `internal`, and a hand-built `ZodError` with a malformed path is
+  `internal`. The envelope still carries at most 20 fields.
+- **A field path is bounded.** A path of more than `MAX_FAILURE_PATH_SEGMENTS` (8) segments, or one with a segment that
+  resolves on a plain object's prototype chain (`__proto__`, `constructor`, `toString`, `hasOwnProperty`, ...) or is named
+  `prototype`, is reported at form level (`''`). `failureEnvelopeSchema` bounds `fields[].path`
   at `MAX_FAILURE_PATH_LENGTH` (519: eight segments of 64 characters and seven dots). This is the one change to the wire shape.
 - **`retryable` is per error for `upstream`.** A `PolarError` is retryable for 429, any status of 500 or above, and a
   transport failure or timeout (no status, code `TRANSPORT` or `TIMEOUT`), the Polar client's own retry rule. Every other
@@ -531,4 +533,6 @@ What the code does differently from the text above after the follow-up to #647:
   "`retryable` is true exactly for `rate_limited` and `upstream`" no longer holds.
 - **`classifyFailure`, `validationIssuesOf` and `buildEnvelope` never throw.** A throwing getter or a revoked proxy yields
   `internal`, no `params` and no `fields`.
-- **The client-safety test walks the import closure** of `src/lib/failure-envelope.ts`, not only its direct specifiers.
+- **The client-safety test walks the import closure** of `src/lib/failure-envelope.ts`, not only its direct specifiers. It
+  follows static imports, `export ... from` and a dynamic `import('literal')`; a computed `import(expr)` and
+  `import.meta.glob` are not followed.

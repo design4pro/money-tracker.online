@@ -37,15 +37,14 @@ const SAFE_SEGMENT = new RegExp(
 )
 
 /**
- * Identifier-shaped, yet names that resolve on every object's prototype chain. A reader that
- * indexes `fields` by path into a plain object would let one of them reach the prototype, so the
- * path is not reported at all.
+ * Identifier-shaped, yet a name that resolves on a plain object's prototype chain (`__proto__`,
+ * `constructor`, `toString`, `hasOwnProperty`, ...), or `prototype`. A reader that indexes `fields`
+ * by path into a plain object would let one of them reach the prototype, so the path is not
+ * reported at all.
  */
-const PROTOTYPE_SEGMENTS: ReadonlySet<string> = new Set([
-  '__proto__',
-  'constructor',
-  'prototype',
-])
+function namesPrototypeMember(segment: string): boolean {
+  return segment === 'prototype' || segment in Object.prototype
+}
 
 /** The closed field key for a Zod issue code; every code but the two length codes is `invalid`. */
 function fieldKeyFor(code: string): FailureFieldKey {
@@ -67,7 +66,7 @@ function fieldPathOf(path: ReadonlyArray<unknown>): string {
       : '',
   )
   return segments.every(
-    (segment) => SAFE_SEGMENT.test(segment) && !PROTOTYPE_SEGMENTS.has(segment),
+    (segment) => SAFE_SEGMENT.test(segment) && !namesPrototypeMember(segment),
   )
     ? segments.join('.')
     : ''
