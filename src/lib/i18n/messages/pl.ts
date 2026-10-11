@@ -1302,13 +1302,14 @@ const messages = {
   'failure.unauthenticated': 'Zaloguj się, aby kontynuować.',
   'failure.forbidden': 'Nie masz do tego dostępu.',
   'failure.not_found': 'Nie możemy tego znaleźć.',
-  'failure.validation': 'Sprawdź zaznaczone pola i spróbuj ponownie.',
+  'failure.validation':
+    'Niektóre pola wymagają poprawy. Sprawdź je i spróbuj ponownie.',
   'failure.conflict':
     'To koliduje z tym, co jest już zapisane. Odśwież stronę i spróbuj ponownie.',
   'failure.quota': 'Twój plan osiągnął limit w tym zakresie.',
   'failure.feature_locked': 'To nie wchodzi w skład Twojego planu.',
   'failure.rate_unavailable': 'Brak kursu waluty na ten dzień.',
-  'failure.rate_limited': 'Zbyt wiele żądań. Spróbuj za chwilę.',
+  'failure.rate_limited': 'Zbyt wiele prób. Spróbuj za chwilę.',
   'failure.upstream':
     'Usługa, z której korzystamy, nie odpowiedziała. Spróbuj ponownie.',
   'failure.field.invalid': 'Ta wartość jest nieprawidłowa.',
