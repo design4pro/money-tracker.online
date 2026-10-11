@@ -749,8 +749,10 @@ describe('redactError', () => {
       class Base extends Error {}
       Object.defineProperty(Base.prototype, 'message', { value: 'boom' })
       class Derived extends Base {
+        // Returns the same string as the data property it shadows, so only "the nearest descriptor
+        // decides" yields no frames: reading the data property further up would keep them.
         override get message(): string {
-          return FAKE
+          return 'boom'
         }
       }
       expect(redactError(new Derived()).frames).toEqual([])
