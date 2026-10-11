@@ -20,8 +20,8 @@ the browser evidence, and the guideline `DESIGN.md` has never had. This spec cov
 
 Phase 1 adds five opt-in props to the existing shell `ErrorPanel` (tone, alert or region, heading
 level, focus the heading, extra actions; the default render unchanged for its 41 consumers) and a
-sibling `FailurePanel` with a small browser-safe `FailureView` contract keyed by recovery shape
-(`retryable | quota | feature_locked | internal`). Phase 2 makes `RouteError`, the floor under every
+sibling `FailurePanel` that takes the `FailureEnvelope` `05-S1` has shipped (`src/lib/failure-envelope.ts`)
+and derives one of four recoveries from its `kind` (`retryable | quota | feature_locked | internal`). Phase 2 makes `RouteError`, the floor under every
 route, the page-level internal failure: a region with an `h1`, focus handled by one explicit rule, a
 link back to `/dashboard` inside the shell, and a copyable reference. Phase 3 adds
 `e2e/errors.visual.spec.ts` and the browser evidence. Phase 4 writes the `DESIGN.md` guideline,
@@ -73,10 +73,13 @@ Verified against the repository at the time of writing (commands in Resolved ass
    surface can say "plan Free, limit reached: Accounts, here is where to change it", and the
    page-level failure (`RouteError`) has no way back to `/dashboard`. The route `/settings/billing`
    exists (`src/routes/_app/settings/billing.tsx`), and the catalogue already names every metric
-   (`billing.usage.metric.*`) and plan (`plans.<id>.name`), so the copy needs no new vocabulary.
-   There is no producer of a quota failure on the client yet (that is `05-S1`'s envelope and
-   `22-billing`), so the quota and feature-locked shapes are specified against a contract and are
-   not reachable in production until a mapper exists (Resolved assumptions 11).
+   (`billing.usage.metric.*`) and the envelope's `failure.*` sentences exist, so the copy needs no new vocabulary beyond the titles.
+   The envelope and its classifier exist (`src/lib/failure-envelope.ts`, `src/server/errors/`), but
+   nothing on the client reads one yet: `readFailure` is `05-S1`'s Phase 3 and the middleware that
+   puts an envelope on the wire is its Phase 4 (`2026-10-10-failure-classification-and-public-envelope.md`).
+   The quota and feature-locked shapes are therefore specified against the shipped envelope type and
+   are not reachable in production until a caller passes `readFailure(error)` to the panel (Resolved
+   assumptions 11).
 2. **Alert versus region is not a decision anyone made.** `ErrorPanel` and `RouteError` are
    `role="alert"` unconditionally. The route-level `errorComponent`s render an alert on initial
    render, which the plan calls out ("an alert on initial render is announced before the person has
@@ -106,14 +109,15 @@ Verified against the repository at the time of writing (commands in Resolved ass
    offline surface is deferred to `27-S1` by name.
 8. **Disclosed, not fixed here: the repository's developer-facing message reaches the screen.**
    `grep -rn "detail=" src --include=*.tsx` finds 46 lines in 42 files, 21 of them
-   `detail={error.message}` (route `errorComponent`s), and 33 more lines in `-ui` files do
+   `detail={error.message}` (route `errorComponent`s), and 31 more lines in `-ui` files do
    `error instanceof Error ? error.message : ...` into a local `failure` state or a toast. Those are
    the after-action surface this panel is for, and they can carry `ForbiddenError` role lists and
    `QuotaExceededError` "(current/limit)" text from `src/server/repos/errors.ts`. That contradicts
-   `05-S1`'s "no detail at all", but the right replacement depends on the classifier that does not
-   exist yet. The new components never accept or forward an error message; Phase 4 files the
+   `05-S1`'s "no detail at all", but the right replacement depends on the client reader and the
+   middleware (`05-S1` Phases 3 and 4), which have not shipped. The new components never accept or
+   forward an error message; Phase 4 files the
    follow-up that audits every one of these sites (the 46 `detail=` lines include uses that do not
-   carry an error, so only the 21 `error.message` ones and the 33 `error instanceof Error` sinks are
+   carry an error, so only the 21 `error.message` ones and the 31 `error instanceof Error` sinks are
    the confirmed set). `RouteError.reference` is also never passed by any caller today.
 
 **Why now.** Plans `04` (`04-auth-and-tenancy.md:315`, a route failure rendering `ErrorPanel` inside
@@ -132,12 +136,14 @@ Keep the existing frame and make the **recovery** the unit of design. Three deci
    (default `3`, as today; `2 | 3 | 4`), `focusHeading` (default `false`) and `actions` (extra nodes
    beside the Retry button). The 41 consumers and the ownership test do not change.
 2. **A sibling `FailurePanel` is the kind-aware surface for a block of the page or the result of
-   an action**, in the same shell module and barrel. It takes a `FailureView` and composes
-   `ErrorPanel`; it adds copy and recovery per shape. The shape is the discriminant, **not**
-   `05-S1`'s ten `kind` strings: `src/server/repos/errors.ts` says only the classifier switches on
-   `code`, and a `shapeOf(kind)` in the shell would be a second classifier. `05-S1` owns the
-   one-function mapper from its envelope to `FailureView`; this spec amends that stage's text in the
-   plan (Phase 4) so the handoff is written down, with no `Blocked by` on it.
+   an action**, in the same shell module and barrel. It takes the shipped `FailureEnvelope` (the type
+   from `#/lib/failure-envelope`, isomorphic by its own docblock) and composes `ErrorPanel`. There is
+   no parallel contract: classification stays `05-S1`'s (`kind`), and the panel only decides what to
+   _offer_ for each kind, through one record that is total over `FailureKind` (a kind added without a
+   recovery does not compile). The sentence it shows is the envelope's own `message.key`; the panel
+   never receives or renders a plan, because the envelope carries none by design
+   (`src/server/errors/envelope.ts`). `05-S1` supplies `readFailure` and the middleware; this spec
+   has no `Blocked by` on them, because the panel is unwired until a caller passes it an envelope.
 3. **`RouteError` is the whole-page failure** and stays a separate component, because it replaces a
    route rather than a block: its own frame, copy (`app.shell.error.body`) and `warning` tone are
    kept, so the 41 panels and the page-level state do not change look as a side effect. It gains the
@@ -146,9 +152,11 @@ Keep the existing frame and make the **recovery** the unit of design. Three deci
 The reference line (the opaque id, its label and its Copy button) is one small component,
 `FailureReference` in the shell, used by `FailurePanel` and `RouteError` (DRY).
 
-**Alternatives considered.** (a) Make `05-S1` a hard precondition and import its envelope type:
-simplest contract, but the plan puts both stages in Wave 1 with `05-S2`'s blockers "None", and the
-spec could not be sliced until an unreviewed interface merged. (b) A `src/components/feedback/`
+**Alternatives considered.** (a) A shell-owned `FailureView` keyed by recovery shape, with `05-S1`
+owning a mapper from its envelope (this spec's first draft, written when `src/server/errors` did not
+exist): rejected once the envelope shipped, because it is a second vocabulary beside
+`FailureKind`, and its `quota` and `feature_locked` shapes needed a `plan` that the envelope
+never carries. (b) A `src/components/feedback/`
 directory as the plan names it: breaks `docs/SPEC.md` §8's single owner and the 41 imports. (c)
 Rewriting the `detail=` and `error.message` sites in this spec: other areas' route modules, no
 classifier to show instead, not reversible. (d) An offline shape: duplicates `27-S1`. (e) Re-express
@@ -157,60 +165,76 @@ recovery gained.
 
 ## 📝 Architecture
 
-| Concept                                      | Owner module                                                         |
-| -------------------------------------------- | -------------------------------------------------------------------- |
-| The frame, tone, alert/region, heading focus | `src/components/app/shell/error-panel.tsx` (edit)                    |
-| `FailureView`, `FailurePanel`                | `src/components/app/shell/failure-panel.tsx` (new)                   |
-| The reference line and its Copy button       | `src/components/app/shell/failure-reference.tsx` (new)               |
-| The whole-page failure                       | `src/components/app/shell/route-error.tsx` (edit)                    |
-| The router's floor boundary                  | `src/components/app/shell/default-error.tsx` (edit)                  |
-| The 404                                      | `src/components/app/shell/not-found.tsx` (unchanged)                 |
-| Quota metric and plan vocabulary             | `src/lib/plans.ts` (`QuotaMetric`, `PlanId`; imported, not restated) |
-| Envelope to `FailureView` mapper             | `05-S1` (`src/server/errors/`), recorded in the plan by Phase 4      |
+| Concept                                      | Owner module                                                               |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| The frame, tone, alert/region, heading focus | `src/components/app/shell/error-panel.tsx` (edit)                          |
+| `FailurePanel`, the kind-to-recovery record  | `src/components/app/shell/failure-panel.tsx` (new)                         |
+| The reference line and its Copy button       | `src/components/app/shell/failure-reference.tsx` (new)                     |
+| The whole-page failure                       | `src/components/app/shell/route-error.tsx` (edit)                          |
+| The router's floor boundary                  | `src/components/app/shell/default-error.tsx` (edit)                        |
+| The 404                                      | `src/components/app/shell/not-found.tsx` (unchanged)                       |
+| The envelope type and its kinds              | `src/lib/failure-envelope.ts` (`FailureEnvelope`, `FailureKind`; imported) |
+| Reading an envelope off a thrown error       | `05-S1` Phase 3, `src/lib/failure.ts` (`readFailure`); not built yet       |
 
 `failure-panel.tsx` and `failure-reference.tsx` are browser-safe and import nothing from `#/server`
-(`#/server/errors` does not exist yet); they may import the types `QuotaMetric` and `PlanId` from
-`#/lib/plans`, which is isomorphic and binding-free by its own docblock. The shell barrel
-(`src/components/app/shell/index.ts`) exports `FailurePanel` and the `FailureView` type.
+(`src/server/errors/` exists, but the client reaches the envelope only through
+`#/lib/failure-envelope`, which imports nothing from `#/server` by its own docblock). The shell
+barrel (`src/components/app/shell/index.ts`) exports `FailurePanel`.
 
 ```ts
-// The discriminant is the recovery, not the server's kind.
-export type FailureView =
-  | { shape: 'retryable' }
-  | { shape: 'quota'; metric: QuotaMetric; plan: PlanId }
-  | { shape: 'feature_locked'; plan: PlanId }
-  | { shape: 'internal'; reference?: string }
+// What the panel offers for each kind. Total over FailureKind: a kind added without a recovery
+// does not compile. The record is presentation (what to offer), not classification.
+type Recovery = 'retryable' | 'quota' | 'feature_locked' | 'internal'
+const RECOVERY_OF: Readonly<Record<FailureKind, Recovery>> = {
+  quota: 'quota',
+  feature_locked: 'feature_locked',
+  validation: 'retryable',
+  conflict: 'retryable',
+  rate_limited: 'retryable',
+  rate_unavailable: 'retryable',
+  upstream: 'retryable',
+  unauthenticated: 'internal',
+  forbidden: 'internal',
+  not_found: 'internal',
+  internal: 'internal',
+}
 ```
 
-There is no `number` in it, and `metric` and `plan` are closed unions of the catalogue's own ids,
-rendered through `billing.usage.metric.<metric>` and `plans.<plan>.name`. `reference` is the only
-free-form string, so a narrowing rule sits on the rendering side:
+The envelope has no `number` and no plan: `message.params.metric` is a `QuotaMetric` from the
+catalogue's own closed set, rendered through `billing.usage.metric.<metric>`. `not_found` and
+`forbidden` share the `internal` recovery, so the panel never offers different recoveries for a
+missing row and a foreign one (the 404/403 indistinguishability of `docs/SECURITY.md` and
+`src/server/repos/errors.ts` is unaffected: the sentence is the envelope's, not the panel's).
+`reference` is no longer part of a view type: it is a `FailurePanel` prop and the only free-form
+string, so a narrowing rule sits on the rendering side:
 **a reference is rendered only when it matches the opaque-id shape `/^[A-Za-z0-9_-]{8,64}$/`**
 (a Sentry event id or a request id); anything else is dropped and the reference line, with its Copy
 button, is omitted. The same rule holds in `RouteError`. **The rule narrows the string; it does not
 prove it is not an amount**: a digits-only string of 8 to 64 characters passes it. What keeps an
-amount out is the producer (`05-S3` or the `05-S1` mapper) passing only an event or request id, and
-that constraint is written into the plan by Phase 4. `title` and `body` are catalogue strings by
-convention only; the type cannot say so, and a test cannot prove it.
+amount out is the producer (`05-S3`) passing only an event or request id, and that constraint is
+written into the plan by Phase 4. `title` and `body` are catalogue strings by convention only; the
+type cannot say so, and a test cannot prove it.
 
-`FailurePanel` props: `failure: FailureView`, `placement: 'after-action' | 'in-place'`, `onRetry?`,
-`isRetrying?`, `homeHref?` (the dashboard link of the `internal` shape, passed only by a caller
-inside the shell, so the panel never decides by itself whether the reader is signed in), `title?` and
-`body?` (required for `retryable`, whose wording is the call site's, as `ErrorPanel`'s docblock
-explains; **catalogue copy, never `error.message`**; ignored by the other shapes, which own their
-copy) and `className?`. **It has no `detail` prop and never forwards one to `ErrorPanel`**, so no
+`FailurePanel` props: `failure: FailureEnvelope`, `placement: 'after-action' | 'in-place'`, `onRetry?`,
+`isRetrying?`, `reference?` (the `internal` recovery only), `homeHref?` (the dashboard link of the
+`internal` recovery, passed only by a caller inside the shell, so the panel never decides by itself
+whether the reader is signed in), `title?` and `body?` (optional overrides for the `retryable`
+recovery, whose wording may be the call site's, as `ErrorPanel`'s docblock explains; **catalogue
+copy, never `error.message`**; ignored by the other recoveries, which own their copy) and
+`className?`. The default title is `empty.error.title`; the default body is the envelope's own
+sentence, `t(failure.message.key)`. **It has no `detail` prop and never forwards one to `ErrorPanel`**, so no
 shape renders a `<details>`. `placement` decides `mode`: `after-action` -> `alert`, `in-place` ->
 `region`. `in-place` is a block that failed to load (a widget, a tab); it never moves focus by
 itself.
 
 The four recoveries:
 
-| Shape            | Recovery rendered                                                                                                                            |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `retryable`      | The Retry button (`onRetry`, pending while `isRetrying`). The panel is rendered **beside** the form, never instead of it, so input survives. |
-| `quota`          | A link to `/settings/billing` (label `billing.title`) and the body "Plan: Free. Limit reached: Accounts."                                    |
-| `feature_locked` | The same link, and a body naming the plan only (Resolved assumptions 7).                                                                     |
-| `internal`       | An apology, Retry when `onRetry` is passed, the optional reference line with Copy, and a link to `homeHref` when passed.                     |
+| Shape            | Recovery rendered                                                                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `retryable`      | The Retry button (`onRetry`, pending while `isRetrying`). The panel is rendered **beside** the form, never instead of it, so input survives.            |
+| `quota`          | A link to `/settings/billing` (label `billing.title`), the envelope's sentence, and "Limit reached: Accounts." when `message.params.metric` is present. |
+| `feature_locked` | The same link and the envelope's sentence; it names nothing else (Resolved assumptions 7).                                                              |
+| `internal`       | The envelope's sentence, Retry when `onRetry` is passed, the optional reference line with Copy, and a link to `homeHref` when passed.                   |
 
 ## 📝 Data Model
 
@@ -218,15 +242,13 @@ None. No table, no column, no migration, no KV key, no queue message.
 
 ## 📝 API Contracts
 
-No server function, route handler or envelope. The one contract is the in-process `FailureView`
-above, and it is internal to the shell. `05-S1`'s envelope is `{ v: 1, kind, message, fields?,
-retryAfter? }`; the mapper from it to `FailureView` is that stage's. Two constraints on that mapper
-are written into the plan by Phase 4: a `kind` with no panel shape (`validation`, `rate_limited`,
-`rate_unavailable`, `upstream`, `conflict`) is mapped to `retryable` or `internal` by that stage, and
-**`not_found` and `forbidden` map to the same shape**, so the panel never offers different recoveries
-for a missing row and a foreign one (the 404/403 indistinguishability of `docs/SECURITY.md` and
-`src/server/repos/errors.ts` survives once a mapper exists). `FailurePanel` and `RouteError` take no
-error object at all.
+No server function, route handler or new envelope. The one contract is the shipped
+`FailureEnvelope` (`src/lib/failure-envelope.ts`: `{ v: 1, kind, message: { key, params?: { metric? } },
+fields?, retryAfter? }`), which `FailurePanel` consumes read-only. The panel reads `kind`,
+`message.key` and `message.params.metric` and nothing else: `fields` belong to the form that owns the
+inputs, and `retryAfter` is reserved and unproduced. `RouteError` takes no envelope and no error at
+all. Two constraints are written into the plan by Phase 4: `readFailure(error)` (`05-S1` Phase 3) is
+what a caller passes in, and a caller passes `reference` only as an event or request id.
 
 ## 📝 UI/UX
 
@@ -326,29 +348,31 @@ the heading and sentence carry the meaning (Colour Is Never Alone). `negative`/`
 - **Double report.** Rendering a panel adds no `console` output of its own. A caught render error is
   also logged by React itself; `e2e/states.spec.ts` already declares that noise per test
   (`DELIBERATE_SERVER_FAILURE`), and the new spec does the same rather than weakening the console net.
-- **A rate-limited failure with `retryAfter`** is out of this spec (the mapper chooses `retryable`);
+- **A rate-limited failure with `retryAfter`** is out of this spec (`RECOVERY_OF` sends `rate_limited` to `retryable`);
   there is no countdown.
-- **A quota failure for a metric the catalogue does not know** is a compile error by the type; there
-  is no untyped path in this spec.
+- **A quota envelope with no `message.params.metric`** (the metric is optional in the envelope, and
+  the server drops one the catalogue does not know) renders the sentence and the billing link
+  without the "Limit reached" line.
+- **A kind the panel has no recovery for** cannot exist: `RECOVERY_OF` is total over `FailureKind`.
 
 ## 📝 Risks & Impact Review
 
-| Risk                                                                    | Mitigation                                                                                                                                                                                                 |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A prop added to `ErrorPanel` changes one of 41 consumers                | Every prop optional with today's default; `error-panel.test.tsx` pins the default render; the ownership test stays green                                                                                   |
-| A second `kind` vocabulary drifts from `05-S1`                          | The contract is keyed by recovery shape, not kind; the mapper is `05-S1`'s, written into its plan text                                                                                                     |
-| An amount reaches the panel through `reference`                         | The shape rule narrows the string (a digits-only one still passes); the producer passes only event or request ids, written into the plan; a test renders hostile strings and documents the digit-only case |
-| The panel is mistaken for a place to show `error.message`               | No `detail` prop, no `<details>`, titles and bodies are catalogue copy; the existing sites are tracked in the follow-up                                                                                    |
-| The internal shape claims "reported" before Sentry exists               | `failure.internal.body` makes no such claim; `empty.error.body` (which does) is untouched and noted in the plan                                                                                            |
-| The quota and feature-locked shapes are dead code until a mapper exists | Said so in the plan's `Delivered:` line; they are scanned and captured through a harness                                                                                                                   |
-| `DESIGN.md` is a governance document                                    | The guideline ships in its own phase so the PR is `risk-high` with the second reviewer (`SDLC.md`)                                                                                                         |
-| The panel looks right in the harness and wrong in the app               | Phase 3 captures the real 404 and a real forced failure in the app, not only the harness                                                                                                                   |
-| Focus handling hides the skip link on an SSR error page                 | `RouteError` moves focus only after the initial render, or not at all                                                                                                                                      |
+| Risk                                                                               | Mitigation                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A prop added to `ErrorPanel` changes one of 41 consumers                           | Every prop optional with today's default; `error-panel.test.tsx` pins the default render; the ownership test stays green                                                                                   |
+| A second `kind` vocabulary drifts from `05-S1`                                     | The panel consumes `FailureEnvelope` and `FailureKind` directly; `RECOVERY_OF` is total over them, so a new kind breaks the build rather than the screen                                                   |
+| An amount reaches the panel through `reference`                                    | The shape rule narrows the string (a digits-only one still passes); the producer passes only event or request ids, written into the plan; a test renders hostile strings and documents the digit-only case |
+| The panel is mistaken for a place to show `error.message`                          | No `detail` prop, no `<details>`, titles and bodies are catalogue copy; the existing sites are tracked in the follow-up                                                                                    |
+| The internal shape claims "reported" before Sentry exists                          | The internal recovery shows the envelope's `failure.internal` sentence, which makes no such claim; `empty.error.body` (which does) is untouched and noted in the plan                                      |
+| The quota and feature-locked shapes are dead code until a caller reads an envelope | Said so in the plan's `Delivered:` line; they are scanned and captured through a harness                                                                                                                   |
+| `DESIGN.md` is a governance document                                               | The guideline ships in its own phase so the PR is `risk-high` with the second reviewer (`SDLC.md`)                                                                                                         |
+| The panel looks right in the harness and wrong in the app                          | Phase 3 captures the real 404 and a real forced failure in the app, not only the harness                                                                                                                   |
+| Focus handling hides the skip link on an SSR error page                            | `RouteError` moves focus only after the initial render, or not at all                                                                                                                                      |
 
 ## 📝 Visual change expected
 
 - **A new quota / feature-locked panel** (`warning` tone) and **an internal panel with a reference
-  and a Copy button**: no route renders them until `05-S1` and `22-billing` supply a producer; they
+  and a Copy button**: no route renders them until `05-S1` Phases 3 and 4 and `22-billing` supply a producer; they
   are captured through a harness, with the real 404 and a real forced failure captured in the app.
 - **`RouteError`**: keeps its frame, copy and `warning` tone; its heading becomes an `h1` of the same
   visual size, it is a region and not an alert, it gains a "Back to the dashboard" link beside Retry
@@ -363,25 +387,24 @@ the heading and sentence carry the meaning (Colour Is Never Alone). `negative`/`
 ## 📝 Copy
 
 New keys, `en` and `pl` (the implementation lands each in both catalogues in the same change, per the
-`i18n-messages` skill). `{plan}` is a catalogue plan name and `{metric}` a catalogue metric label,
-both interpolated as a nominative after a colon, so Polish grammar does not depend on the plan
-name's case (`plans.free.name` is the adjective "Bezpłatny" in Polish). No count, so no plural
+`i18n-messages` skill). `{metric}` is a catalogue metric label (`billing.usage.metric.*`),
+interpolated as a nominative after a colon, so Polish grammar does not depend on its case. The
+panel renders the envelope's own sentence (`failure.quota`, `failure.feature_locked`,
+`failure.internal`, already in both catalogues) and shows no plan. No count, so no plural
 machinery.
 
-| Key                            | `en`                                               | `pl`                                                        |
-| ------------------------------ | -------------------------------------------------- | ----------------------------------------------------------- |
-| `failure.quota.title`          | `This workspace is at its limit`                   | `Ten dom osiągnął limit`                                    |
-| `failure.quota.body`           | `Plan: {plan}. Limit reached: {metric}.`           | `Plan: {plan}. Osiągnięty limit: {metric}.`                 |
-| `failure.featureLocked.title`  | `Not part of your plan`                            | `Poza Twoim planem`                                         |
-| `failure.featureLocked.body`   | `Plan: {plan}. This is not included in it.`        | `Plan: {plan}. Tej funkcji nie obejmuje.`                   |
-| `failure.internal.body`        | `We could not finish that. Try again in a moment.` | `Nie udało się tego dokończyć. Spróbuj ponownie za chwilę.` |
-| `failure.dashboard.action`     | `Back to the dashboard`                            | `Wróć do pulpitu`                                           |
-| `failure.reference.copy`       | `Copy reference`                                   | `Skopiuj numer`                                             |
-| `failure.reference.copied`     | `Reference copied`                                 | `Numer skopiowany`                                          |
-| `failure.reference.copyFailed` | `Could not copy the reference`                     | `Nie udało się skopiować numeru`                            |
+| Key                            | `en`                             | `pl`                             |
+| ------------------------------ | -------------------------------- | -------------------------------- |
+| `failure.quota.title`          | `This workspace is at its limit` | `Ten dom osiągnął limit`         |
+| `failure.quota.metric`         | `Limit reached: {metric}.`       | `Osiągnięty limit: {metric}.`    |
+| `failure.featureLocked.title`  | `Not part of your plan`          | `Poza Twoim planem`              |
+| `failure.dashboard.action`     | `Back to the dashboard`          | `Wróć do pulpitu`                |
+| `failure.reference.copy`       | `Copy reference`                 | `Skopiuj numer`                  |
+| `failure.reference.copied`     | `Reference copied`               | `Numer skopiowany`               |
+| `failure.reference.copyFailed` | `Could not copy the reference`   | `Nie udało się skopiować numeru` |
 
 Reused as they are: `empty.error.title`, `empty.error.reference`, `app.shell.error.body`,
-`action.retry`, `billing.title` (the billing link), `billing.usage.metric.*`, `plans.<id>.name`. The
+`action.retry`, `billing.title` (the billing link), `billing.usage.metric.*`, `failure.quota`, `failure.feature_locked`, `failure.internal`. The
 Polish word for a workspace is `Dom` (the vocabulary rule at the top of `pl.ts`), which is why
 `failure.quota.title` reads `Ten dom osiągnął limit`.
 
@@ -394,7 +417,7 @@ document, and takes the second reviewer.
 
 | Phase | Ships                                                                                            | Depends on |
 | ----- | ------------------------------------------------------------------------------------------------ | ---------- |
-| 1     | `ErrorPanel` props; `FailureView`, `FailurePanel`, `FailureReference`; the copy; tests           | none       |
+| 1     | `ErrorPanel` props; `FailurePanel`, `FailureReference`; the copy; tests                          | none       |
 | 2     | `RouteError` and `DefaultRouteError`: region, `h1`, focus rule, dashboard link, reference; tests | 1          |
 | 3     | `e2e/errors.visual.spec.ts`, the harness entry, browser evidence                                 | 2          |
 | 4     | `DESIGN.md` guideline; the plan reconciled and `05-S2` marked delivered; the follow-up issue     | 3          |
@@ -425,7 +448,7 @@ Files: `src/components/app/shell/error-panel.tsx` (edit),
    under Accessibility.
 3. `FailurePanel`: the four shapes per the recovery table. `quota` and `feature_locked` pass
    `tone="warning"` and a router `Link` to `/settings/billing` styled with `buttonVariants` in
-   `actions`. No `detail` prop. Export from the barrel with the `FailureView` type.
+   `actions`. No `detail` prop. Export `FailurePanel` from the barrel.
 4. Add the nine keys to both catalogues; run the parity test.
 5. `error-panel.test.tsx`: the default render is `role="alert"`, an `h3`, `negative` tone, no focus
    move, Retry only; `mode="region"` is a labelled region and not an alert; `tone="warning"`;
@@ -435,7 +458,11 @@ Files: `src/components/app/shell/error-panel.tsx` (edit),
    dialog, not on `<main>`;
    `detail` still renders under a closed disclosure; Retry keeps a sibling input's value; a `console`
    spy records nothing.
-6. `failure-panel.test.tsx`: each shape renders its own recovery and not the others'; `role="alert"`
+6. `failure-panel.test.tsx`: envelopes are built as literals of the shipped `FailureEnvelope` type; every
+   kind in `FAILURE_KINDS` renders without throwing and the `RECOVERY_OF` record is total (a type-level
+   case plus a loop over `FAILURE_KINDS`); `not_found` and `forbidden` render the same recovery; no
+   plan is rendered for `quota` or `feature_locked`; each recovery renders its own actions and not the
+   others'; `role="alert"`
    only for `after-action`; no shape renders a `<details>` element; the quota and feature-locked
    bodies contain only catalogue names; **hostile references** (`1 234,56 EUR`, `€1,234`, a 65-character
    string, a sentence) produce no reference line and no Copy button, while `evt_7f3a91c2` renders; a
@@ -533,42 +560,44 @@ Files: `DESIGN.md` (edit), `docs/plans/05-error-and-observability.md` (edit),
 2. The plan (`docs/plans/05-error-and-observability.md`): correct `05-S2`'s owned paths to the real
    ones; name the `negative` token family; amend its Verification text to say the quota and
    feature-locked shapes are captured through a harness (no route can produce them yet) while the
-   404 and a forced failure are captured in the app; amend `05-S1` with the sentence that its mapper
-   builds `FailureView` (browser-safe, in the shell), must send `not_found` and `forbidden` to the
-   same shape, passes only an event or request id as `reference` and keeps every `quota` envelope
-   free of an amount; update `05-S2`'s Money-invariant and Verification references to
+   404 and a forced failure are captured in the app; correct `05-S1`'s Quota paragraph ("the metric and the
+   plan": the shipped envelope carries the metric only) and add that `FailurePanel` consumes the
+   `FailureEnvelope` that `readFailure(error)` (Phase 3) returns, that `RECOVERY_OF` sends
+   `not_found` and `forbidden` to the same recovery, and that the producer passes only an event or
+   request id as `reference`; update `05-S2`'s Money-invariant and Verification references to
    `failure-panel.test.tsx` and its "three shapes" wording to the four shapes; and add under the
    `## Stage 05-S2`
    heading `Delivered: <date> - <evidence>`, where the evidence names the paths and tests above **and
    states the two open halves**: the offline half of `OBS-06` (deferred to `27-S1`, `PWA-03`) and the
-   quota and feature-locked shapes having no producer until `05-S1` and `22-billing`. In
+   quota and feature-locked shapes having no producer until `05-S1` Phases 3 and 4 and `22-billing`. In
    `docs/plans/27-pwa-and-mobile.md`, one sentence on the `PWA-03` row saying the failure panel owns
    no offline shape.
 3. **File the follow-up issue** (required): "Audit the `detail=` sites and remove those that carry
    the repository's message": the 46 `detail=` lines (21 of them `detail={error.message}`, the
-   confirmed set; the rest need a look) and the 33 `error instanceof Error ? error.message` sinks,
-   showing the classifier's output instead. `Blocked by` the issue for `05-S1`; if none exists when
-   Phase 4 runs, the body names plan stage `05-S1` and is linked when `afk-to-tickets` creates that
+   confirmed set; the rest need a look) and the 31 `error instanceof Error ? error.message` sinks,
+   showing the classifier's output instead. `Blocked by` the issue for `05-S1` Phases 3 and 4 (the reader and
+   the middleware); if none exists when Phase 4 runs, the body names plan stage `05-S1` and is linked when `afk-to-tickets` creates that
    issue. It lists the greps that produced the numbers. The PR body names the issue number.
 
 Verification: command gate (`pnpm generate-spec-index` and the plan/spec checks it carries).
 
 ## 📝 Resolved assumptions (autonomous defaults)
 
-| #   | Question                                                                     | Applied default                                                                                                                                                                                                                                                                    | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | How does `05-S2` meet an envelope `05-S1` has not built?                     | A browser-safe `FailureView` keyed by recovery shape, owned by the shell; `05-S1` owns the mapper; no `Blocked by`.                                                                                                                                                                | Decided by software architect sub-agent (confidence high): the plan places both stages in Wave 1 and `05-S2` has no blockers; a `shapeOf(kind)` in the shell would be a second classifier.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 2   | Which part of the stage is still work, and are the `detail=` sites in scope? | The shapes, role and focus, `RouteError`, evidence, guideline and plan reconciliation. The `detail=` and `error.message` removals stay out, tracked by a required issue.                                                                                                           | Decided by product-owner sub-agent (confidence medium): everything in scope is additive and reversible; the removals touch other areas' modules and need `05-S1` to know what to show.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 3   | Extend `ErrorPanel` or add a sibling?                                        | Both, narrowly: `ErrorPanel` gains five optional props; `FailurePanel` is a sibling that composes it.                                                                                                                                                                              | The two verdicts differed (architect: sibling; product owner: opt-in props on the existing panel). This is the intersection and the more reversible one: the default render of the existing panel is unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 4   | Is an offline shape in this stage?                                           | No. `OBS-06` splits: the 404 closes here, the offline surface is deferred to `27-S1` (`PWA-03`).                                                                                                                                                                                   | Decided by product-owner sub-agent (confidence medium), over the architect's contract which listed `offline`: `27-S1` owns `/offline` and the banner and says `navigator.onLine` is unreliable. Taken as the smaller scope.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 5   | Where does the panel live, and what about the plan's owned paths?            | `src/components/app/shell/`; the plan is amended to the real paths.                                                                                                                                                                                                                | Decided by software architect sub-agent (confidence high): `docs/SPEC.md` §8, the ownership test and 41 consumers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 6   | Does the event id ship now?                                                  | As an optional `reference` rendered only when it is an opaque id, with a Copy button; no producer until `05-S3`.                                                                                                                                                                   | Decided by product-owner sub-agent (confidence medium): `RouteError.reference` and `empty.error.reference` already exist; no dependency on Sentry. The shape rule is the security reviewer's condition (below).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 7   | What does `feature_locked` name?                                             | The plan only, not the module.                                                                                                                                                                                                                                                     | Default: `FeatureLockedError.module` is a free string (`src/server/repos/errors.ts`) and there is no module-name catalogue to translate it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 8   | What does the internal body say, and what does `RouteError` keep?            | `FailurePanel` uses a new `failure.internal.body` that claims nothing about reporting. `RouteError` keeps `app.shell.error.body` and its `warning` tone. `empty.error.body` ("has been reported") is left alone.                                                                   | Default: nothing reports to Sentry until `05-S3`, so the existing sentence is untrue today, and `RouteError`'s copy is accurate for the page-level case; changing the page-level look is not this spec's change. Raised by the architect and product-owner reviews.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| 9   | Alert or region, and when does focus move?                                   | `after-action`: alert plus heading focus (double announcement accepted and tested). `in-place` and `RouteError`: region. `RouteError` focuses only after the initial render or not at all; on unmount focus goes to `<main>`.                                                      | Decided by accessibility-specialist sub-agent (confidence medium) in the panel review: the first-load fallback of the first draft was wrong because the skip link is the first tab stop.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| 10  | May `reference` carry any string?                                            | No: opaque-id shape `/^[A-Za-z0-9_-]{8,64}$/` or it is dropped; the panel has no `detail` prop and never renders a `<details>`.                                                                                                                                                    | Decided by security-tenancy-reviewer sub-agent (confidence medium) in the panel review: the type has no `number`, but `reference` is a free string, so the rule has to be on the rendering side.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| 11  | Is code with no producer acceptable?                                         | Yes, for the quota and feature-locked shapes: scanned and captured through a harness, and named as open in the plan's `Delivered:` line.                                                                                                                                           | Decided by product-owner sub-agent (confidence medium) in the panel review; the alternative (a shape with nothing to show) would leave `OBS-04` unbuilt.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| 12  | Which numbers and claims were measured?                                      | 41 files / 45 uses of `<ErrorPanel`; 46 `detail=` lines in 42 files, 21 of them `detail={error.message}`; 33 `error instanceof Error ? error.message` lines; 87 lines in `error-panel.tsx`; no `onLine` in `src`; `src/server/errors` absent; `RouteError.reference` never passed. | Commands run: `grep -rln "<ErrorPanel" src --include=*.tsx \| wc -l`; `grep -rn "<ErrorPanel" src --include=*.tsx \| wc -l`; `grep -rn "detail=" src --include=*.tsx \| wc -l`; `grep -rln "detail=" src --include=*.tsx \| wc -l`; `grep -rn "detail={error.message}" src --include=*.tsx \| wc -l`; `grep -rn "error instanceof Error ? error.message" src --include=*.tsx \| wc -l`; `wc -l`; `grep -rn "onLine" src`; `ls src/server/errors`; `grep -rn "<RouteError" src`.                                                                                                                                                                                                                                                                                       |
-| 13  | Panel verdicts on this spec (round 1)                                        | Software architect: approve with conditions (medium). Product owner: approve with conditions (medium). Accessibility specialist: approve with conditions (medium). Security and tenancy reviewer: approve with conditions (medium).                                                | Every condition was applied in the revision that follows: the tone prop, `RouteError`'s copy and tone, the harness router, the focus signal, the first-load rule, `<main>` on the floor boundary, the Copy status region, the Polish copy, the opaque-id rule, the required follow-up issue and the open halves in `Delivered:`. Round 2 is the next row.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 14  | Panel verdicts on this spec (round 2, the last)                              | Security and tenancy reviewer: approve with conditions (medium). Product owner: approve with conditions (medium). Software architect: approve with conditions (medium). Accessibility specialist: **revise** (medium).                                                             | Every condition was applied in the revision after round 2: the boundary routing (a failing `_app` child is rendered by `DefaultRouteError` inside the shell, which places itself by route id), the Phase 3 forced failure and its SSR caveat, the shared `useIsAfterInitialRender` and `useFocusHeading` hooks, the layout-effect focus restore, clipboard detection after mount with a hydration test, the repeat-press announcement, the `Dom` Polish copy, `document.title` set by `RouteError`, the static tone class map, and the reworded opaque-id claim (it narrows; the producer must pass only event or request ids). Two rounds are the limit, so this revision was not reviewed again and the accessibility verdict stays at **revise**; see the handoff. |
-| 15  | Accessibility verdict on the revision after round 2                          | Accessibility specialist: approve with conditions (medium). No imperative `document.title`; the initial-render signal is a hydration snapshot independent of the announcer; focus is restored to the enclosing dialog, else `<main>`, after the commit.                            | Decided by accessibility-specialist sub-agent (confidence medium): `head()` runs for the failed match too, so the tab already names the failed route and an imperative title would survive a successful Retry; the announcer's first-paint ref is instance-local and cannot be shared; restoring to `<main>` from inside a modal sends focus behind the dialog. Every condition is applied in this revision, which supersedes the **revise** in row 14.                                                                                                                                                                                                                                                                                                               |
+| #   | Question                                                                                                              | Applied default                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | How does `05-S2` meet the envelope `05-S1` has shipped?                                                               | `FailurePanel` takes a `FailureEnvelope` (`#/lib/failure-envelope`) and derives the recovery from `kind` through a record that is total over `FailureKind`; no parallel `FailureView`, no mapper handed to `05-S1`, no plan.                                                                                                                                                                                                                                        | Decided by software architect sub-agent (confidence high, 2026-10-11, replacing the first draft's decision): the envelope is isomorphic and the shell may import it; it carries no plan by design (`src/server/errors/envelope.ts`); a `FailureView` plus a mapper would be a second vocabulary; `readFailure` is `05-S1` Phase 3.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2   | Which part of the stage is still work, and are the `detail=` sites in scope?                                          | The shapes, role and focus, `RouteError`, evidence, guideline and plan reconciliation. The `detail=` and `error.message` removals stay out, tracked by a required issue.                                                                                                                                                                                                                                                                                            | Decided by product-owner sub-agent (confidence medium): everything in scope is additive and reversible; the removals touch other areas' modules and need `05-S1` to know what to show.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 3   | Extend `ErrorPanel` or add a sibling?                                                                                 | Both, narrowly: `ErrorPanel` gains five optional props; `FailurePanel` is a sibling that composes it.                                                                                                                                                                                                                                                                                                                                                               | The two verdicts differed (architect: sibling; product owner: opt-in props on the existing panel). This is the intersection and the more reversible one: the default render of the existing panel is unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 4   | Is an offline shape in this stage?                                                                                    | No. `OBS-06` splits: the 404 closes here, the offline surface is deferred to `27-S1` (`PWA-03`).                                                                                                                                                                                                                                                                                                                                                                    | Decided by product-owner sub-agent (confidence medium), over the architect's contract which listed `offline`: `27-S1` owns `/offline` and the banner and says `navigator.onLine` is unreliable. Taken as the smaller scope.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 5   | Where does the panel live, and what about the plan's owned paths?                                                     | `src/components/app/shell/`; the plan is amended to the real paths.                                                                                                                                                                                                                                                                                                                                                                                                 | Decided by software architect sub-agent (confidence high): `docs/SPEC.md` §8, the ownership test and 41 consumers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 6   | Does the event id ship now?                                                                                           | As an optional `reference` rendered only when it is an opaque id, with a Copy button; no producer until `05-S3`.                                                                                                                                                                                                                                                                                                                                                    | Decided by product-owner sub-agent (confidence medium): `RouteError.reference` and `empty.error.reference` already exist; no dependency on Sentry. The shape rule is the security reviewer's condition (below).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 7   | What does `feature_locked` name?                                                                                      | Nothing beyond the envelope's sentence (`failure.feature_locked`); the optional `metric` param is ignored.                                                                                                                                                                                                                                                                                                                                                          | Default: `FeatureLockedError.module` is a free string (`src/server/repos/errors.ts`), the envelope keeps it only when it is a catalogue metric, and a locked feature is not a quota.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 8   | What does the internal body say, and what does `RouteError` keep?                                                     | `FailurePanel` shows the envelope's `failure.internal` sentence, which claims nothing about reporting. `RouteError` keeps `app.shell.error.body` and its `warning` tone. `empty.error.body` ("has been reported") is left alone.                                                                                                                                                                                                                                    | Default: nothing reports to Sentry until `05-S3`, so the existing sentence is untrue today, and `RouteError`'s copy is accurate for the page-level case; changing the page-level look is not this spec's change. Raised by the architect and product-owner reviews.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 9   | Alert or region, and when does focus move?                                                                            | `after-action`: alert plus heading focus (double announcement accepted and tested). `in-place` and `RouteError`: region. `RouteError` focuses only after the initial render or not at all; on unmount focus goes to `<main>`.                                                                                                                                                                                                                                       | Decided by accessibility-specialist sub-agent (confidence medium) in the panel review: the first-load fallback of the first draft was wrong because the skip link is the first tab stop.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 10  | May `reference` carry any string?                                                                                     | No: opaque-id shape `/^[A-Za-z0-9_-]{8,64}$/` or it is dropped; the panel has no `detail` prop and never renders a `<details>`.                                                                                                                                                                                                                                                                                                                                     | Decided by security-tenancy-reviewer sub-agent (confidence medium) in the panel review: the type has no `number`, but `reference` is a free string, so the rule has to be on the rendering side.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 11  | Is code with no producer acceptable?                                                                                  | Yes, for the quota and feature-locked recoveries: scanned and captured through a harness, and named as open in the plan's `Delivered:` line.                                                                                                                                                                                                                                                                                                                        | Decided by product-owner sub-agent (confidence medium) in the panel review: the alternative (a shape with nothing to show) would leave `OBS-04` unbuilt. The producer is now `05-S1` Phases 3 and 4.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 12  | Which numbers and claims were measured?                                                                               | 41 files / 45 uses of `<ErrorPanel`; 46 `detail=` lines in 42 files, 21 of them `detail={error.message}`; 31 `error instanceof Error ? error.message` lines (33 at the spec's first base `73fa0c3`); 87 lines in `error-panel.tsx`; no `onLine` in `src`; `src/server/errors` absent at `73fa0c3` and present on `develop` since 2026-10-10 (`classify.ts`, `envelope.ts`, `redact.ts`; no `middleware.ts`, no `readFailure`); `RouteError.reference` never passed. | Commands run: `grep -rln "<ErrorPanel" src --include=*.tsx \| wc -l`; `grep -rn "<ErrorPanel" src --include=*.tsx \| wc -l`; `grep -rn "detail=" src --include=*.tsx \| wc -l`; `grep -rln "detail=" src --include=*.tsx \| wc -l`; `grep -rn "detail={error.message}" src --include=*.tsx \| wc -l`; `grep -rn "error instanceof Error ? error.message" src --include=*.tsx \| wc -l`; `wc -l`; `grep -rn "onLine" src`; `ls src/server/errors`; `grep -rn "<RouteError" src`.                                                                                                                                                                                                                                                                                       |
+| 13  | Panel verdicts on this spec (round 1)                                                                                 | Software architect: approve with conditions (medium). Product owner: approve with conditions (medium). Accessibility specialist: approve with conditions (medium). Security and tenancy reviewer: approve with conditions (medium).                                                                                                                                                                                                                                 | Every condition was applied in the revision that follows: the tone prop, `RouteError`'s copy and tone, the harness router, the focus signal, the first-load rule, `<main>` on the floor boundary, the Copy status region, the Polish copy, the opaque-id rule, the required follow-up issue and the open halves in `Delivered:`. Round 2 is the next row.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 14  | Panel verdicts on this spec (round 2, the last)                                                                       | Security and tenancy reviewer: approve with conditions (medium). Product owner: approve with conditions (medium). Software architect: approve with conditions (medium). Accessibility specialist: **revise** (medium).                                                                                                                                                                                                                                              | Every condition was applied in the revision after round 2: the boundary routing (a failing `_app` child is rendered by `DefaultRouteError` inside the shell, which places itself by route id), the Phase 3 forced failure and its SSR caveat, the shared `useIsAfterInitialRender` and `useFocusHeading` hooks, the layout-effect focus restore, clipboard detection after mount with a hydration test, the repeat-press announcement, the `Dom` Polish copy, `document.title` set by `RouteError`, the static tone class map, and the reworded opaque-id claim (it narrows; the producer must pass only event or request ids). Two rounds are the limit, so this revision was not reviewed again and the accessibility verdict stays at **revise**; see the handoff. |
+| 15  | Accessibility verdict on the revision after round 2                                                                   | Accessibility specialist: approve with conditions (medium). No imperative `document.title`; the initial-render signal is a hydration snapshot independent of the announcer; focus is restored to the enclosing dialog, else `<main>`, after the commit.                                                                                                                                                                                                             | Decided by accessibility-specialist sub-agent (confidence medium): `head()` runs for the failed match too, so the tab already names the failed route and an imperative title would survive a successful Retry; the announcer's first-paint ref is instance-local and cannot be shared; restoring to `<main>` from inside a modal sends focus behind the dialog. Every condition is applied in this revision, which supersedes the **revise** in row 14.                                                                                                                                                                                                                                                                                                               |
+| 16  | How does `05-S2` meet the envelope `05-S1` has shipped? (round 3, after the review of the head with `develop` merged) | `FailurePanel` takes a `FailureEnvelope` and derives the recovery from `kind`; the panel shows no plan; the sentence is the envelope's own; `failure.quota.body` becomes `failure.quota.metric`, and `failure.featureLocked.body` and `failure.internal.body` are dropped; Phase 4 corrects `05-S1`'s Quota paragraph.                                                                                                                                              | Decided by software architect sub-agent (confidence high): option B of the decision brief. Rows 1, 7, 8 and 11 are rewritten to match; the numbers in row 12 were re-run on the merged head.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
