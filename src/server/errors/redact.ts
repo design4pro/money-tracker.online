@@ -392,7 +392,8 @@ function inheritedString(error: Error, key: string): string | undefined {
 
 /**
  * The `name` of an error as a string data property found along the prototype chain, or `undefined`
- * when it is an accessor, not a string or contains a line break. Reads descriptors only.
+ * when it is an accessor, not a string or contains a line break. Reads descriptors only. Whatever the
+ * message is, a `name` that is refused here leaves the error without frames (see {@link framesOf}).
  */
 function plainName(error: Error): string | undefined {
   const name = inheritedString(error, 'name')
@@ -409,17 +410,19 @@ function plainName(error: Error): string | undefined {
  * so a newline-led prototype message is cut off with the header; one that is an accessor is never
  * read, and `framesOf` gives up before this point.
  *
- * An empty message leaves a header that is the bare name, or `Name: ` under some stack formatters. A
- * `name` that holds a line break would put its own text in the body, so it is not trusted either.
+ * An empty message leaves a header that is the bare name, or `Name: ` under some stack formatters, so
+ * the name is what the header is compared with. `name` is already trusted (see {@link plainName}):
+ * `framesOf` refuses an error whose name is not, for every message, because a `name` that holds a line
+ * break puts its own text in the body and can forge a frame that carries the message.
  */
 function bodyAfterHeader(
   text: string,
   message: string,
-  name: string | undefined,
+  name: string,
 ): string | undefined {
   const newline = text.indexOf('\n')
   if (message === '') {
-    if (name === undefined || newline < 0) return undefined
+    if (newline < 0) return undefined
     const header = text.slice(0, newline)
     return header === name || header === `${name}: `
       ? text.slice(newline + 1)
@@ -448,7 +451,10 @@ function bodyAfterHeader(
  * The header (`Name: message`) is what carries the message, and the message may itself hold a newline
  * and a line shaped like a frame. So everything up to the end of the *current* message is cut off
  * first, and only then is each remaining line kept if it is a strict frame. A message that was
- * changed after construction is not in the stack, so the header's extent is unknown: fail closed.
+ * changed after construction is not in the stack, so the header's extent is unknown: fail closed. The
+ * `name` fails closed the same way, whatever the message is: one that is an accessor, not a string or
+ * holds a line break yields no frames, since the header scan would read a frame forged in the name
+ * (`N: m\n    at fake (s.ts:1:1)`) as the body.
  *
  * One case cannot be told apart from a genuine header by looking at the stack: a multi-line message
  * whose later lines look like frames, shortened *after* `stack` was first read (the header is
@@ -474,12 +480,13 @@ function framesOf(error: Error): string[] {
   const message = inheritedString(error, 'message')
   if (message === undefined) return []
 
+  // The same for the name, for every message: a real error inherits `'Error'`, so a missing, accessor
+  // or non-string name, or one holding a line break, is not a name the header can be trusted with.
+  const name = plainName(error)
+  if (name === undefined) return []
+
   const text = stack.slice(0, MAX_STACK_LENGTH)
-  const body = bodyAfterHeader(
-    text,
-    message,
-    message === '' ? plainName(error) : undefined,
-  )
+  const body = bodyAfterHeader(text, message, name)
   if (body === undefined) return []
 
   const frames: string[] = []

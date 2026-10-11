@@ -933,6 +933,73 @@ describe('redactError', () => {
     })
   })
 
+  describe('a non-empty message with a name that cannot be trusted', () => {
+    const FORGED = 'N: m\n    at fake (s.ts:1:1)'
+
+    // The header scan finds `m` after the first `: ` of the first line, so the forged line reads as
+    // frame 0 and carries the message text unless the name itself is refused.
+    it.each(['\n', '\r'])(
+      'reads no fake frame out of an own name holding %j',
+      (separator) => {
+        const error = new Error('m')
+        error.name = `N: m${separator}    at fake (s.ts:1:1)`
+        expect(error.stack).toContain('fake')
+        const out = redactError(error)
+        expect(out.frames).toEqual([])
+        expect(JSON.stringify(out)).not.toContain('fake')
+      },
+    )
+
+    it('reads no fake frame out of a name returned by a getter', () => {
+      class Getter extends Error {
+        override get name(): string {
+          return FORGED
+        }
+      }
+      const error = new Getter('m')
+      expect(error.stack).toContain('fake')
+      expect(redactError(error).frames).toEqual([])
+    })
+
+    it('reads no fake frame out of a name set on the prototype as a data property', () => {
+      class Proto extends Error {}
+      Object.defineProperty(Proto.prototype, 'name', { value: FORGED })
+      const error = new Proto('m')
+      expect(error.stack).toContain('fake')
+      expect(redactError(error).frames).toEqual([])
+    })
+
+    it('yields no frames when the name is not a string', () => {
+      const error = new Error('m')
+      Object.defineProperty(error, 'name', { value: 42 })
+      expect(redactError(error).frames).toEqual([])
+    })
+
+    it('yields no frames when a name accessor returns a plain name, and never reads it itself', () => {
+      let calls = 0
+      class Getter extends Error {
+        override get name(): string {
+          calls += 1
+          return 'Error'
+        }
+      }
+      const error = new Getter('m')
+      void error.stack
+      const before = calls
+      expect(redactError(error).frames).toEqual([])
+      expect(calls).toBe(before)
+    })
+
+    it('keeps the real frames of a plain error and of a plain subclass', () => {
+      class T extends Error {}
+      for (const error of [new Error('m'), new T('m')]) {
+        const { frames } = redactError(error)
+        expect(frames.length).toBeGreaterThan(0)
+        for (const frame of frames) expect(frame).toMatch(/^at \S/)
+      }
+    })
+  })
+
   it('reads no fake frame when the message is changed before the stack is read', () => {
     const error = new Error('original\n    at fake (a.ts:1:1)')
     error.message = 'Biedronka 12,34 zł'
