@@ -256,25 +256,27 @@ the heading and sentence carry the meaning (Colour Is Never Alone). `negative`/`
   never moves focus, and the 41 existing `ErrorPanel` consumers keep `focusHeading` off.
 - **Focus when the panel goes away.** If the focused element is inside a panel with `focusHeading`
   set, or inside `RouteError`, when it unmounts, for example after a successful Retry, focus moves to
-  `#MAIN_CONTENT_ID` (`<main tabIndex={-1}>`) rather than falling to `<body>`. It does not apply to
-  `in-place` panels. The mechanism is a **`useLayoutEffect` cleanup** (or `focusin`/`focusout`
-  tracking): by the time a passive-effect cleanup runs the node is detached and
-  `document.activeElement` is already `body`. The test unmounts a panel that holds real focus. The
+  the enclosing dialog, or else to `#MAIN_CONTENT_ID` (`<main tabIndex={-1}>`), rather than falling
+  to `<body>`. It does not apply to `in-place` panels. In the **`useLayoutEffect` cleanup** the hook
+  records whether focus was inside the panel and resolves the target while the node is still
+  attached: `panel.closest('[role="dialog"],[role="alertdialog"]')`, else none (by the time a
+  passive-effect cleanup runs the node is detached and `document.activeElement` is already `body`).
+  After the commit (a microtask), and only if `document.activeElement` is `document.body`, it focuses
+  that dialog if it is still connected, otherwise the `#MAIN_CONTENT_ID` then in the document. It
+  never moves focus that something else has already placed. The test unmounts a panel that holds
+  real focus. The
   focus move and the restore are one shared hook, `useFocusHeading`, used by `ErrorPanel` and
   `RouteError` (DRY).
 - **Whole-page failure (`RouteError`).** It replaces the failing route's content and with it the
   route's `h1`, so it renders an `h1`. It moves focus to its heading **only when it mounts after the
   initial document render**; on the initial render the browser has already placed focus on the
-  document and the skip link must stay the first tab stop. The signal is one shared hook in the
-  shell, `useIsAfterInitialRender`, extracted from the "first paint" mechanism `route-announcer.tsx`
-  already has (the page the reader _arrived_ on is not announced) and used by both, rather than a
-  second mechanism. It must not depend on the order in which sibling effects run: it is decided at
-  render time or one tick after the first settle, and it returns **"initial, do not focus"** wherever
-  no announcer exists (`(auth)`, `AppShellFallback`, the floor boundary), so those never move focus.
-  A test mounts `RouteError` and `RouteAnnouncer` in one commit, in both sibling orders.
-  **If the signal cannot be made reliable, `RouteError` does not move focus at all;** it must not
-  fall back to focusing the heading in both cases (that puts a keyboard reader behind the whole rail
-  and header). The reason to move focus after a client navigation is that the content the reader
+  document and the skip link must stay the first tab stop. The signal is `useIsAfterInitialRender` in the
+  shell: `useSyncExternalStore(subscribe, () => true, () => false)` read on the component's first
+  render and kept in a ref. It is `false` on the server and while hydrating, `true` for any mount
+  after hydration, decided at render time, independent of effect order and of whether a
+  `RouteAnnouncer` exists. It therefore applies under `_app`, `(auth)` and the floor boundary alike.
+  `RouteAnnouncer` is not changed. `RouteError` never focuses its heading when the hook returns
+  `false`. The reason to move focus after a client navigation is that the content the reader
   asked for is gone.
 - **Which boundary renders a failing child route.** TanStack Router gives every match its own
   boundary, `route.options.errorComponent ?? router.options.defaultErrorComponent`
@@ -286,12 +288,12 @@ the heading and sentence carry the meaning (Colour Is Never Alone). `negative`/`
   `homeHref`; anywhere else (`index.tsx`, `invite.$invitationId.tsx`, `unsubscribe.tsx`) it renders
   `<main id={MAIN_CONTENT_ID} tabIndex={-1}>` and no `homeHref`. Exactly one `<main>` and one
   `MAIN_CONTENT_ID` exist on every page.
-- **Document title on an error page** (SC 2.4.2, level A). A boundary that keeps the previous
-  page's title after a client navigation leaves the tab naming a page the reader is no longer on
-  while the `h1` says something went wrong. `RouteError` therefore sets `document.title` to the
-  catalogue string `empty.error.title` after a client-side mount (never during render, so the server
-  render keeps the root's `meta.title`), and restores nothing: the next navigation sets its own. The
-  alternative, listing the gap in `docs/ACCESSIBILITY.md` §6, is not taken.
+- **Document title on an error page** (SC 2.4.2, level A). `RouteError` does not touch
+  `document.title`. The router runs `head()` for the failed match too (`router-core`
+  `projectLane`), so the tab already carries the failed route's own `pageHead` title, or the root's
+  where the route has none; an imperative write would compete with the `<title>` `HeadContent`
+  renders and would survive a successful Retry on the same route. No entry is added to
+  `docs/ACCESSIBILITY.md` §6, because there is no deviation.
 - **Copy button.** The `role="status"` element is rendered **empty from the first paint** and
   filled on success (a region inserted together with its text is not announced; `RouteAnnouncer`'s
   docblock says so), and the same text is visible beside the button. Clipboard support is detected
@@ -353,7 +355,7 @@ the heading and sentence carry the meaning (Colour Is Never Alone). `negative`/`
   inside the signed-in shell only, and a reference line with Copy when a reference is passed (none is
   today).
 - **`DefaultRouteError`** gains a `<main>` wrapper only outside `_app` and `(auth)`, and the
-  dashboard link under `_app`; the tab title names the failure after a client-side failure.
+  dashboard link under `_app`.
 - Everything else (the 404, the 41 `ErrorPanel` consumers) is unchanged on screen.
 - Light and dark, 360, 1280 and 2560 px. Evidence goes to `.ai/qa/artifacts_*/` or a scratchpad,
   never the repository.
@@ -413,7 +415,8 @@ Files: `src/components/app/shell/error-panel.tsx` (edit),
    Solution. The tone is a static class map. `mode="region"` renders `role="region"` with
    `aria-labelledby` the heading id from `useId`. `focusHeading` uses the shared `useFocusHeading`
    hook (new, in the shell, also used by `RouteError`): it focuses the heading on mount and, in a
-   `useLayoutEffect` cleanup, moves focus to `#MAIN_CONTENT_ID` if focus was inside the panel. Update
+   `useLayoutEffect` cleanup, restores focus as Accessibility says ("Focus when the panel goes away"): to the enclosing dialog,
+   else `#MAIN_CONTENT_ID`, after the commit and only if focus fell to `<body>`. Update
    the docblock: it currently justifies `role="alert"` by "appears in response to something the
    reader just did"; state the region case beside it.
 2. `FailureReference`: the `empty.error.reference` line, the opaque-id shape check, the Copy button
@@ -427,7 +430,9 @@ Files: `src/components/app/shell/error-panel.tsx` (edit),
 5. `error-panel.test.tsx`: the default render is `role="alert"`, an `h3`, `negative` tone, no focus
    move, Retry only; `mode="region"` is a labelled region and not an alert; `tone="warning"`;
    `focusHeading` moves focus to the heading, the heading comes first inside the alert, Retry is the
-   next tab stop, and unmounting a panel that holds real focus moves focus to `#MAIN_CONTENT_ID`;
+   next tab stop, unmounting a panel that holds real focus moves focus to `#MAIN_CONTENT_ID`, and a panel with
+   `focusHeading` holding real focus inside a `role="dialog"` unmounts and focus lands on the
+   dialog, not on `<main>`;
    `detail` still renders under a closed disclosure; Retry keeps a sibling input's value; a `console`
    spy records nothing.
 6. `failure-panel.test.tsx`: each shape renders its own recovery and not the others'; `role="alert"`
@@ -449,7 +454,6 @@ Verification: the two test files, the ownership test unchanged and green, the co
 
 Files: `src/components/app/shell/route-error.tsx` (edit), `src/components/app/shell/default-error.tsx`
 (edit), `src/routes/_app.tsx` (edit, only if the inner boundary keeps a use for it, see item 2),
-`src/components/app/shell/route-announcer.tsx` (edit: it adopts the shared hook),
 `src/components/app/shell/use-is-after-initial-render.ts` (new),
 `src/components/app/shell/__tests__/route-error.test.tsx` (edit),
 `src/components/app/shell/__tests__/default-error.test.tsx` (new).
@@ -457,12 +461,12 @@ Files: `src/components/app/shell/route-error.tsx` (edit), `src/components/app/sh
 1. `RouteError`: keep the frame, `empty.error.title`, `app.shell.error.body` and the `warning` tone.
    Change the heading to an `h1` of the same visual size, the root to a labelled region, and add
    `homeHref?`, `FailureReference` for `reference`, the focus rule from Accessibility (the shared
-   `useFocusHeading`, gated by `useIsAfterInitialRender`) and `document.title` set to
-   `empty.error.title` after a client-side mount. Public props stay `onRetry`, `reference`,
+   `useFocusHeading`, gated by `useIsAfterInitialRender`). Public props stay `onRetry`, `reference`,
    `className`, plus `homeHref`. It still takes no error.
-2. `useIsAfterInitialRender` (new, in the shell) extracts the first-paint signal from
-   `RouteAnnouncer`, which adopts it: decided at render time or one tick after the first settle,
-   independent of sibling effect order, and "initial, do not focus" where no announcer exists.
+2. `useIsAfterInitialRender` (new, in the shell) is
+   `useSyncExternalStore(subscribe, () => true, () => false)` read on the component's first render
+   and kept in a ref: `false` on the server and while hydrating, `true` for any mount after
+   hydration, independent of effect order and of whether a `RouteAnnouncer` exists.
    `DefaultRouteError` places itself with `useMatches()` route ids as described under Accessibility
    ("Which boundary renders a failing child route"): under `_app` no `<main>` and
    `homeHref="/dashboard"`; under `(auth)` no `<main>` and no `homeHref`; elsewhere `<main
@@ -473,10 +477,12 @@ id={MAIN_CONTENT_ID} tabIndex={-1}>` and no `homeHref`. `_app.tsx`'s inner `Catc
 3. `route-error.test.tsx`: the `role="alert"` assertions become a labelled region; every existing
    negative assertion (no message, no stack, no reference label without a reference) stays and the
    `app.shell.error.body` assertion is kept; add the `h1`, the dashboard link only when `homeHref` is
-   passed, the reference rules from Phase 1, `document.title` after a client-side mount and not on
-   the server render, focus moved after a client navigation and not on the initial render, `RouteError`
-   and `RouteAnnouncer` mounted in one commit in both sibling orders, and focus restored to `<main>`
-   when a `RouteError` that holds real focus unmounts. `default-error.test.tsx` covers all three
+   passed, the reference rules from Phase 1, `document.title` is unchanged by mounting and by
+   unmounting `RouteError`, focus is not moved when `RouteError` is server-rendered and hydrated with
+   `hydrateRoot`, and is moved to the `h1` when it is mounted by a client render, in a tree with no
+   `RouteAnnouncer`, focus restored to `<main>` when a `RouteError` that holds real focus unmounts,
+   and a `RouteError` inside `DefaultRouteError`'s own `<main>` that unmounts together with that
+   `<main>` leaves focus on the `#MAIN_CONTENT_ID` rendered next, not on `<body>`. `default-error.test.tsx` covers all three
    placements (under `_app`, under `(auth)`, elsewhere): exactly one `<main>`, one
    `MAIN_CONTENT_ID`, and the dashboard link only under `_app`.
 
@@ -499,7 +505,8 @@ entry beside `focus-harness.tsx`.
    in-app evidence, and the spec says which of the two it used. `failServerFns` is installed **after**
    the app is loaded and the failure is triggered by a client-side navigation, because a `page.goto`
    runs the loader during SSR. The spec asserts exactly one `<main>` and one `MAIN_CONTENT_ID` on the
-   failed page. Axe also scans the harness page for every shape. The forced failure declares its
+   failed page, and that `document.title` equals the destination route's `pageHead` title
+   (`unsubscribe.meta.title` followed by the product name), in `en` and `pl`. Axe also scans the harness page for every shape. The forced failure declares its
    deliberate console noise the way `states.spec.ts` does.
 3. Target size: bounding-box assertions of at least 44 x 44 px for Retry, Copy, the billing link and
    the dashboard link at 360 px, in `en` and `pl`; plus a 320 px reflow check with the longest Polish
@@ -519,8 +526,8 @@ Files: `DESIGN.md` (edit), `docs/plans/05-error-and-observability.md` (edit),
    section: the shape (radius, type, tokens), the tones and what each means (`negative` for a fault,
    `warning` for a limit), the states it has and lacks, what carries the meaning without colour, and
    the one thing it is not (an `EmptyState` and a toast). It states the alert-versus-region rule, the
-   focus rule, the document-title rule, and the rule "new code never renders `error.message`; the
-   reference is an event or request id", with the follow-up issue named as the tracked exception for
+   focus rule, the rule that an error surface never writes `document.title`, and the rule "new code
+   never renders `error.message`; the reference is an event or request id", with the follow-up issue named as the tracked exception for
    the existing sites. It cites `docs/ACCESSIBILITY.md` §1, states no conformance level and widens
    nothing.
 2. The plan (`docs/plans/05-error-and-observability.md`): correct `05-S2`'s owned paths to the real
@@ -564,3 +571,4 @@ Verification: command gate (`pnpm generate-spec-index` and the plan/spec checks 
 | 12  | Which numbers and claims were measured?                                      | 41 files / 45 uses of `<ErrorPanel`; 46 `detail=` lines in 42 files, 21 of them `detail={error.message}`; 33 `error instanceof Error ? error.message` lines; 87 lines in `error-panel.tsx`; no `onLine` in `src`; `src/server/errors` absent; `RouteError.reference` never passed. | Commands run: `grep -rln "<ErrorPanel" src --include=*.tsx \| wc -l`; `grep -rn "<ErrorPanel" src --include=*.tsx \| wc -l`; `grep -rn "detail=" src --include=*.tsx \| wc -l`; `grep -rln "detail=" src --include=*.tsx \| wc -l`; `grep -rn "detail={error.message}" src --include=*.tsx \| wc -l`; `grep -rn "error instanceof Error ? error.message" src --include=*.tsx \| wc -l`; `wc -l`; `grep -rn "onLine" src`; `ls src/server/errors`; `grep -rn "<RouteError" src`.                                                                                                                                                                                                                                                                                       |
 | 13  | Panel verdicts on this spec (round 1)                                        | Software architect: approve with conditions (medium). Product owner: approve with conditions (medium). Accessibility specialist: approve with conditions (medium). Security and tenancy reviewer: approve with conditions (medium).                                                | Every condition was applied in the revision that follows: the tone prop, `RouteError`'s copy and tone, the harness router, the focus signal, the first-load rule, `<main>` on the floor boundary, the Copy status region, the Polish copy, the opaque-id rule, the required follow-up issue and the open halves in `Delivered:`. Round 2 is the next row.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 14  | Panel verdicts on this spec (round 2, the last)                              | Security and tenancy reviewer: approve with conditions (medium). Product owner: approve with conditions (medium). Software architect: approve with conditions (medium). Accessibility specialist: **revise** (medium).                                                             | Every condition was applied in the revision after round 2: the boundary routing (a failing `_app` child is rendered by `DefaultRouteError` inside the shell, which places itself by route id), the Phase 3 forced failure and its SSR caveat, the shared `useIsAfterInitialRender` and `useFocusHeading` hooks, the layout-effect focus restore, clipboard detection after mount with a hydration test, the repeat-press announcement, the `Dom` Polish copy, `document.title` set by `RouteError`, the static tone class map, and the reworded opaque-id claim (it narrows; the producer must pass only event or request ids). Two rounds are the limit, so this revision was not reviewed again and the accessibility verdict stays at **revise**; see the handoff. |
+| 15  | Accessibility verdict on the revision after round 2                          | Accessibility specialist: approve with conditions (medium). No imperative `document.title`; the initial-render signal is a hydration snapshot independent of the announcer; focus is restored to the enclosing dialog, else `<main>`, after the commit.                            | Decided by accessibility-specialist sub-agent (confidence medium): `head()` runs for the failed match too, so the tab already names the failed route and an imperative title would survive a successful Retry; the announcer's first-paint ref is instance-local and cannot be shared; restoring to `<main>` from inside a modal sends focus behind the dialog. Every condition is applied in this revision, which supersedes the **revise** in row 14.                                                                                                                                                                                                                                                                                                               |
