@@ -347,7 +347,7 @@ describe('the strict input is refused before anything runs', () => {
   })
 
   it.each(Object.entries(FOREIGN_KEYS))(
-    'refuses the extra key %s on the create input, the update patch and the envelope',
+    'refuses the extra key %s on the create input, the update patch and every envelope',
     async (key, value) => {
       await expectRefused(handlers.create, {
         policies: POLICIES,
@@ -363,7 +363,18 @@ describe('the strict input is refused before anything runs', () => {
         input: CREATE_INPUT,
         [key]: value,
       })
+      await expectRefused(handlers.update, {
+        transactionId: 'txn-a',
+        policies: POLICIES,
+        patch: { note: 'x' },
+        [key]: value,
+      })
       await expectRefused(handlers.remove, {
+        transactionId: 'txn-a',
+        policies: POLICIES,
+        [key]: value,
+      })
+      await expectRefused(handlers.get, {
         transactionId: 'txn-a',
         policies: POLICIES,
         [key]: value,
