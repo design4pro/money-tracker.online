@@ -56,6 +56,19 @@ export interface SaveFailure {
 export const NO_SAVE_FAILURE: SaveFailure = {}
 
 /**
+ * The failure with its booking-date refusal dropped, for the moment a save starts.
+ *
+ * The date field says the refusal through a polite live region, which announces only when its text
+ * changes. Clearing it as the next save starts makes a second refusal of the very same date change
+ * the text again, instead of staying silent.
+ */
+export function withoutRefusal(failure: SaveFailure): SaveFailure {
+  return failure.serverError === undefined
+    ? NO_SAVE_FAILURE
+    : { serverError: failure.serverError }
+}
+
+/**
  * What to show for a failed save of `entry`.
  *
  * A booking-date refusal is remembered as the `(date, planned)` pair that was refused, so the form

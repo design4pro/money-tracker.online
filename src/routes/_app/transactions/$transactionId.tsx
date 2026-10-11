@@ -12,6 +12,7 @@ import {
   TransactionForm,
   TransactionListError,
   saveFailureOf,
+  withoutRefusal,
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
 import { cn } from '#/lib/cn'
@@ -298,6 +299,9 @@ function TransactionDetailScreen({
           },
         },
       })
+    },
+    onMutate: () => {
+      setFailure(withoutRefusal)
     },
     onSuccess: async () => {
       setFailure(NO_SAVE_FAILURE)

@@ -10,6 +10,7 @@ import {
   TransactionListError,
   emptyFormValues,
   saveFailureOf,
+  withoutRefusal,
 } from '#/components/app/transactions'
 import { Button, EmptyState, toast } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
@@ -330,6 +331,9 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
           },
         },
       })
+    },
+    onMutate: () => {
+      setFailure(withoutRefusal)
     },
     onSuccess: async (_created, input) => {
       setFailure(NO_SAVE_FAILURE)

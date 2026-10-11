@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { isBookedOnRefusal, saveFailureOf } from '../booking-refusal'
+import {
+  isBookedOnRefusal,
+  saveFailureOf,
+  withoutRefusal,
+} from '../booking-refusal'
 
 const REFUSAL_ISSUE = {
   code: 'custom' as const,
@@ -96,6 +100,21 @@ describe('saveFailureOf', () => {
   it('shows the fallback for a value that is not an Error', () => {
     expect(saveFailureOf('nope', entry, 'Fallback')).toEqual({
       serverError: 'Fallback',
+    })
+  })
+})
+
+describe('withoutRefusal', () => {
+  it('drops a remembered booking date so the next refusal changes the live region again', () => {
+    const refused = {
+      refusedBooking: { bookedOn: '2026-03-15', isPlanned: false },
+    }
+    expect(withoutRefusal(refused)).toEqual({})
+  })
+
+  it('keeps the banner message of another failure', () => {
+    expect(withoutRefusal({ serverError: 'Network down' })).toEqual({
+      serverError: 'Network down',
     })
   })
 })
