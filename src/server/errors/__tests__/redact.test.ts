@@ -704,6 +704,116 @@ describe('redactError', () => {
     expect(JSON.stringify(redactError(new Getter()))).not.toContain('fake')
   })
 
+  describe('a message set on the prototype as a data property', () => {
+    const FAKE = '\n    at fake (s.ts:1:1)'
+    const withPrototypeMessage = (message: unknown): Error => {
+      class Proto extends Error {}
+      Object.defineProperty(Proto.prototype, 'message', { value: message })
+      return new Proto()
+    }
+
+    it.each([FAKE, `Error${FAKE}`, `x${FAKE}`])(
+      'reads no fake frame out of %j',
+      (message) => {
+        const error = withPrototypeMessage(message)
+        expect(error.stack).toContain('fake')
+        const out = redactError(error)
+        expect(out.frames.length).toBeGreaterThan(0)
+        expect(JSON.stringify(out)).not.toContain('fake')
+      },
+    )
+
+    it('keeps the real frames when the message matches the header', () => {
+      const error = withPrototypeMessage('boom')
+      expect(error.stack).toMatch(/^Error: boom\n/)
+      const { frames } = redactError(error)
+      expect(frames.length).toBeGreaterThan(0)
+      for (const frame of frames) expect(frame).toMatch(/^at \S/)
+    })
+
+    it('yields no frames when the message is not a string', () => {
+      expect(redactError(withPrototypeMessage(42)).frames).toEqual([])
+    })
+
+    it('finds the message on the nearest prototype that has one', () => {
+      class Base extends Error {}
+      Object.defineProperty(Base.prototype, 'message', { value: FAKE })
+      class Derived extends Base {}
+      Object.defineProperty(Derived.prototype, 'message', { value: 'boom' })
+      const { frames } = redactError(new Derived())
+      expect(frames.length).toBeGreaterThan(0)
+      expect(JSON.stringify(frames)).not.toContain('fake')
+    })
+
+    it('yields no frames when a message accessor shadows a data message further up', () => {
+      class Base extends Error {}
+      Object.defineProperty(Base.prototype, 'message', { value: 'boom' })
+      class Derived extends Base {
+        // Returns the same string as the data property it shadows, so only "the nearest descriptor
+        // decides" yields no frames: reading the data property further up would keep them.
+        override get message(): string {
+          return 'boom'
+        }
+      }
+      expect(redactError(new Derived()).frames).toEqual([])
+    })
+  })
+
+  describe('a property that is only inherited from Object.prototype.value', () => {
+    // Setting it makes `'value' in descriptor` true for an accessor descriptor, so an accessor would
+    // be read as a data property holding the inherited value. `Object.defineProperty` reads `value`
+    // off its argument too, so everything is built before the window and only the scrubber runs in it.
+    const withInheritedValue = <T>(value: unknown, run: () => T): T => {
+      const holder = Object.prototype as { value?: unknown }
+      holder.value = value
+      try {
+        return run()
+      } finally {
+        Reflect.deleteProperty(holder, 'value')
+      }
+    }
+
+    it('still yields no frames for an accessor name', () => {
+      class Getter extends Error {
+        override get name(): string {
+          return 'Error'
+        }
+      }
+      const error = new Getter('')
+      expect(error.stack).toMatch(/^Error(: )?\n/)
+      expect(
+        withInheritedValue('Error', () => redactError(error)).frames,
+      ).toEqual([])
+    })
+
+    it('still yields no frames for an accessor message', () => {
+      const error = new Error()
+      error.stack = 'Error: x\n    at fake (s.ts:1:1)'
+      Object.defineProperty(error, 'message', { get: () => 'unrelated' })
+      expect(withInheritedValue('x', () => redactError(error)).frames).toEqual(
+        [],
+      )
+    })
+
+    it('still ignores an accessor code', () => {
+      const error = new Error('x')
+      Object.defineProperty(error, 'code', { get: () => 'CALLED' })
+      const out = withInheritedValue('ALIAS_TAKEN', () => redactError(error))
+      expect('code' in out).toBe(false)
+    })
+
+    it('still reports an accessor property as [getter]', () => {
+      const subject = {}
+      Object.defineProperty(subject, 'kind', {
+        enumerable: true,
+        get: () => 'CALLED',
+      })
+      expect(withInheritedValue('x', () => redact(subject))).toEqual({
+        kind: '[getter]',
+      })
+    })
+  })
+
   it('keeps the frames of an error with an empty message', () => {
     const out = redactError(new Error())
     expect(out.frames.length).toBeGreaterThan(0)
@@ -764,6 +874,29 @@ describe('redactError', () => {
       void error.stack
       error.name = 'TimeoutError'
       expect(JSON.stringify(redactError(error))).not.toContain('fake')
+    })
+
+    // KNOWN RESIDUAL, pinned so that a fix is a deliberate change: a `name` holding a forged frame is
+    // rewritten to the plain name after `stack` was read, so the stale header equals the current name
+    // and the forged line reads as frame 0. The stack alone cannot tell the two apart (see `framesOf`).
+    it('keeps a forged frame when the name was rewritten to the stale header after the stack was read (known residual)', () => {
+      const error = new Error('')
+      error.name = 'Error\n    at fake (s.ts:1:1)'
+      expect(error.stack).toContain('fake')
+      error.name = 'Error'
+      expect(redactError(error).frames[0]).toMatch(/^at fake \(s\.ts:1:1\)/)
+    })
+
+    it('yields no frames when an accessor name spells the string undefined', () => {
+      class Getter extends Error {
+        override get name(): string {
+          return 'undefined'
+        }
+      }
+      const error = new Getter('')
+      // Without the `name === undefined` guard the header `${undefined}: ` would match this one.
+      expect(error.stack).toMatch(/^undefined(: )?\n/)
+      expect(redactError(error).frames).toEqual([])
     })
 
     it('keeps the real frames of an error with no message and no name set', () => {

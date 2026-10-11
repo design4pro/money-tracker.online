@@ -213,7 +213,7 @@ function arrayLength(value: unknown[]): number {
 /** Reads an own data property without invoking a getter; `undefined` for an accessor or a miss. */
 function ownData(target: object, key: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(target, key)
-  return descriptor !== undefined && 'value' in descriptor
+  return descriptor !== undefined && Object.hasOwn(descriptor, 'value')
     ? descriptor.value
     : undefined
 }
@@ -272,7 +272,7 @@ function redactObject(object: object, depth: number, walk: Walk): unknown {
       const descriptor = Object.getOwnPropertyDescriptor(object, key)
       if (descriptor === undefined || descriptor.enumerable !== true) continue
       const emitted = IDENTIFIER.test(key) ? key : `[key:${index}]`
-      if (!('value' in descriptor)) {
+      if (!Object.hasOwn(descriptor, 'value')) {
         out[emitted] = '[getter]'
         continue
       }
@@ -356,24 +356,47 @@ export interface RedactedError {
 const MAX_PROTOTYPE_DEPTH = 32
 
 /**
- * The `name` of an error as a string data property found along the prototype chain, or `undefined`
- * when it is an accessor, not a string or contains a line break. Calls nothing.
+ * The first descriptor for `key` on the error or along its prototype chain, or `undefined` when none
+ * is found within {@link MAX_PROTOTYPE_DEPTH} links. Reads descriptors only: a getter is never
+ * called, though a Proxy on the chain still runs its descriptor and prototype traps.
  */
-function plainName(error: Error): string | undefined {
+function inheritedDescriptor(
+  error: Error,
+  key: string,
+): PropertyDescriptor | undefined {
   let target: object | null = error
   for (
     let depth = 0;
     target !== null && depth < MAX_PROTOTYPE_DEPTH;
     depth += 1
   ) {
-    const descriptor = Object.getOwnPropertyDescriptor(target, 'name')
-    if (descriptor !== undefined) {
-      const name = 'value' in descriptor ? descriptor.value : undefined
-      return typeof name === 'string' && !/[\r\n]/.test(name) ? name : undefined
-    }
+    const descriptor = Object.getOwnPropertyDescriptor(target, key)
+    if (descriptor !== undefined) return descriptor
     target = Object.getPrototypeOf(target)
   }
   return undefined
+}
+
+/**
+ * The string data property `key` found along the prototype chain, or `undefined` when it is an
+ * accessor, not a string or not found. The nearest descriptor decides: an accessor hides a data
+ * property further up.
+ */
+function inheritedString(error: Error, key: string): string | undefined {
+  const descriptor = inheritedDescriptor(error, key)
+  if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) {
+    return undefined
+  }
+  return typeof descriptor.value === 'string' ? descriptor.value : undefined
+}
+
+/**
+ * The `name` of an error as a string data property found along the prototype chain, or `undefined`
+ * when it is an accessor, not a string or contains a line break. Reads descriptors only.
+ */
+function plainName(error: Error): string | undefined {
+  const name = inheritedString(error, 'name')
+  return name !== undefined && !/[\r\n]/.test(name) ? name : undefined
 }
 
 /**
@@ -381,8 +404,10 @@ function plainName(error: Error): string | undefined {
  *
  * The header is `Name: message` and nothing else: one line before the message, and the message runs
  * to the end of the header. Anything different is a stale header (the message was changed after
- * `stack` was read) or came from a `message` getter on the prototype, which the descriptor read does
- * not see; its old message could still hold a line shaped like a frame, so fail closed.
+ * `stack` was read); its old message could still hold a line shaped like a frame, so fail closed. A
+ * `message` that is a data property on the prototype is read like an own one (see {@link framesOf}),
+ * so a newline-led prototype message is cut off with the header; one that is an accessor is never
+ * read, and `framesOf` gives up before this point.
  *
  * An empty message leaves a header that is the bare name, or `Name: ` under some stack formatters. A
  * `name` that holds a line break would put its own text in the body, so it is not trusted either.
@@ -429,8 +454,11 @@ function bodyAfterHeader(
  * whose later lines look like frames, shortened *after* `stack` was first read (the header is
  * rendered on that read). The shortened message is a clean prefix of the stale header (its leading
  * lines), a suffix of the header's first line, or empty after a leading newline; either way the old
- * lines are read as frames. That needs a layer that both reads `stack` and then rewrites `message`;
- * the stage that logs an error reads it once, from a fresh object.
+ * lines are read as frames. The same holds for `name`: a `name` that held a line break and a frame
+ * shape when `stack` was read, then rewritten to the plain name (`Error`), leaves a stale header equal
+ * to the current name, and the forged line reads as frame 0. That needs a layer that both reads
+ * `stack` and then rewrites `message` or `name`; the stage that logs an error reads it once, from a
+ * fresh object.
  */
 function framesOf(error: Error): string[] {
   let stack: unknown
@@ -441,13 +469,10 @@ function framesOf(error: Error): string[] {
   }
   if (typeof stack !== 'string') return []
 
-  const descriptor = Object.getOwnPropertyDescriptor(error, 'message')
-  let message = ''
-  if (descriptor !== undefined) {
-    if (!('value' in descriptor) || typeof descriptor.value !== 'string')
-      return []
-    message = descriptor.value
-  }
+  // The engine renders the header from the message it finds along the chain, so read it the same
+  // way. An accessor, a non-string or no message at all (every real error inherits `''`) fails closed.
+  const message = inheritedString(error, 'message')
+  if (message === undefined) return []
 
   const text = stack.slice(0, MAX_STACK_LENGTH)
   const body = bodyAfterHeader(
