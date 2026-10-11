@@ -709,6 +709,97 @@ describe('redactError', () => {
     expect(out.frames.length).toBeGreaterThan(0)
   })
 
+  describe('an empty message', () => {
+    const FAKE = '\n    at fake (secret.ts:1:1)'
+
+    it.each(['\n', '\r'])(
+      'reads no fake frame out of a name holding %j',
+      (separator) => {
+        const error = new Error('')
+        error.name = `X${separator}    at fake (secret.ts:1:1)`
+        expect(error.stack).toContain('fake')
+        const out = redactError(error)
+        expect(out.frames).toEqual([])
+        expect(JSON.stringify(out)).not.toContain('fake')
+      },
+    )
+
+    it('reads no fake frame out of a name holding a newline and nothing else', () => {
+      const error = new Error('')
+      error.name = `X${FAKE}`
+      expect(redactError(error)).toEqual({ name: 'Error', frames: [] })
+    })
+
+    it('yields no frames when the name is not a string', () => {
+      const error = new Error('')
+      Object.defineProperty(error, 'name', { value: 42 })
+      expect(redactError(error).frames).toEqual([])
+    })
+
+    it('yields no frames when the name is an accessor, and never reads it itself', () => {
+      let calls = 0
+      class Getter extends Error {
+        override get name(): string {
+          calls += 1
+          return 'Error'
+        }
+      }
+      const error = new Getter('')
+      // The engine reads the name once to render the header; the scrubber must add no read.
+      void error.stack
+      const before = calls
+      expect(redactError(error).frames).toEqual([])
+      expect(calls).toBe(before)
+    })
+
+    it('yields no frames when the header is not the name', () => {
+      const error = new Error('')
+      error.stack = 'Other\n    at fake (a.ts:1:1)'
+      expect(redactError(error).frames).toEqual([])
+    })
+
+    it('yields no frames when the name was changed after the stack was read', () => {
+      const error = new Error('')
+      error.name = `X${FAKE}`
+      void error.stack
+      error.name = 'TimeoutError'
+      expect(JSON.stringify(redactError(error))).not.toContain('fake')
+    })
+
+    it('keeps the real frames of an error with no message and no name set', () => {
+      for (const error of [new Error(''), new Error()]) {
+        const { frames } = redactError(error)
+        expect(frames.length).toBeGreaterThan(0)
+        for (const frame of frames) expect(frame).toMatch(/^at \S/)
+      }
+    })
+
+    it('keeps the real frames when the name is set on the prototype', () => {
+      class Timeout extends Error {}
+      Timeout.prototype.name = 'TimeoutError'
+      const error = new Timeout('')
+      // Some stack formatters render a bare name, others `Name: `.
+      expect(error.stack).toMatch(/^TimeoutError(: )?\n/)
+      expect(redactError(error).frames.length).toBeGreaterThan(0)
+    })
+
+    it('keeps the real frames when the constructor sets the name', () => {
+      class Timeout extends Error {
+        constructor() {
+          super('')
+          this.name = 'TimeoutError'
+        }
+      }
+      expect(redactError(new Timeout()).frames.length).toBeGreaterThan(0)
+    })
+
+    it('accepts a header that ends in the separator and nothing after it', () => {
+      const error = new Error('')
+      error.stack = 'Error: \n    at a (b.ts:1:1)'
+      expect(redactError(error).frames).toEqual(['at a (b.ts:1:1)'])
+    })
+  })
+
   it('reads no fake frame when the message is changed before the stack is read', () => {
     const error = new Error('original\n    at fake (a.ts:1:1)')
     error.message = 'Biedronka 12,34 zł'
@@ -722,6 +813,39 @@ describe('redactError', () => {
     const out = redactError(error)
     expect(out.frames.length).toBeGreaterThan(0)
     expect(JSON.stringify(out)).not.toContain('rr:')
+  })
+
+  describe('a message that is a prefix of the stack header', () => {
+    const named = (name: string, message: string): Error => {
+      const error = new Error(message)
+      error.name = name
+      return error
+    }
+
+    it.each([
+      ['Error', new Error('Error')],
+      ['E', new Error('E')],
+      ['Error: ', new Error('Error: ')],
+      ['Timeout, named TimeoutError', named('TimeoutError', 'Timeout')],
+    ])('keeps the real frames of an error whose message is %j', (_, error) => {
+      const { frames } = redactError(error)
+      expect(frames.length).toBeGreaterThan(0)
+      for (const frame of frames) expect(frame).toMatch(/^at \S/)
+    })
+
+    it('still reads no frame out of a multi-line message that starts like the header', () => {
+      const error = new Error('Error\n    at fake (a.ts:1:1)')
+      expect(JSON.stringify(redactError(error))).not.toContain('fake')
+    })
+
+    it('still fails closed when a message getter on the prototype hides a prefix', () => {
+      class Getter extends Error {
+        override get message(): string {
+          return 'Error\n    at fake (a.ts:1:1)'
+        }
+      }
+      expect(JSON.stringify(redactError(new Getter()))).not.toContain('fake')
+    })
   })
 
   it('yields no frames when the stack is a number, absent or a throwing getter', () => {

@@ -352,8 +352,29 @@ export interface RedactedError {
   frames: string[]
 }
 
-/** An empty message renders a bare name, or `Name: ` under some stack formatters, and nothing else. */
-const EMPTY_MESSAGE_HEADER = /^[^:]*(?::\s*)?$/
+/** A prototype chain longer than this is not a chain of errors; the name read gives up. */
+const MAX_PROTOTYPE_DEPTH = 32
+
+/**
+ * The `name` of an error as a string data property found along the prototype chain, or `undefined`
+ * when it is an accessor, not a string or contains a line break. Calls nothing.
+ */
+function plainName(error: Error): string | undefined {
+  let target: object | null = error
+  for (
+    let depth = 0;
+    target !== null && depth < MAX_PROTOTYPE_DEPTH;
+    depth += 1
+  ) {
+    const descriptor = Object.getOwnPropertyDescriptor(target, 'name')
+    if (descriptor !== undefined) {
+      const name = 'value' in descriptor ? descriptor.value : undefined
+      return typeof name === 'string' && !/[\r\n]/.test(name) ? name : undefined
+    }
+    target = Object.getPrototypeOf(target)
+  }
+  return undefined
+}
 
 /**
  * The part of the stack after its header, or `undefined` when the header cannot be trusted.
@@ -362,21 +383,32 @@ const EMPTY_MESSAGE_HEADER = /^[^:]*(?::\s*)?$/
  * to the end of the header. Anything different is a stale header (the message was changed after
  * `stack` was read) or came from a `message` getter on the prototype, which the descriptor read does
  * not see; its old message could still hold a line shaped like a frame, so fail closed.
+ *
+ * An empty message leaves a header that is the bare name, or `Name: ` under some stack formatters. A
+ * `name` that holds a line break would put its own text in the body, so it is not trusted either.
  */
-function bodyAfterHeader(text: string, message: string): string | undefined {
+function bodyAfterHeader(
+  text: string,
+  message: string,
+  name: string | undefined,
+): string | undefined {
   const newline = text.indexOf('\n')
   if (message === '') {
-    if (newline < 0 || !EMPTY_MESSAGE_HEADER.test(text.slice(0, newline)))
-      return undefined
-    return text.slice(newline + 1)
+    if (name === undefined || newline < 0) return undefined
+    const header = text.slice(0, newline)
+    return header === name || header === `${name}: `
+      ? text.slice(newline + 1)
+      : undefined
   }
 
   const headerEnd = newline < 0 ? text.length : newline
-  // The message starts the stack (no name) or follows the first `: ` of the first line.
+  // The message starts the stack (no name) or follows the first `: ` of the first line. A message
+  // that is only a prefix of the header (`Error`, `Timeout` in `TimeoutError: Timeout`) matches
+  // early and leaves text on the line, so the scan goes on to the next candidate.
   for (let at = 0; at <= headerEnd;) {
     if (text.startsWith(message, at)) {
       const rest = text.slice(at + message.length)
-      return rest === '' || rest.startsWith('\n') ? rest : undefined
+      if (rest === '' || rest.startsWith('\n')) return rest
     }
     const colon = text.indexOf(': ', at)
     if (colon < 0 || colon >= headerEnd) return undefined
@@ -394,10 +426,11 @@ function bodyAfterHeader(text: string, message: string): string | undefined {
  * changed after construction is not in the stack, so the header's extent is unknown: fail closed.
  *
  * One case cannot be told apart from a genuine header by looking at the stack: a multi-line message
- * whose later lines look like frames, shortened to its leading lines *after* `stack` was first read
- * (the header is rendered on that read). The shortened message is then a clean prefix of the stale
- * header and the old lines are read as frames. That needs a layer that both reads `stack` and then
- * rewrites `message`; the stage that logs an error reads it once, from a fresh object.
+ * whose later lines look like frames, shortened *after* `stack` was first read (the header is
+ * rendered on that read). The shortened message is a clean prefix of the stale header (its leading
+ * lines), a suffix of the header's first line, or empty after a leading newline; either way the old
+ * lines are read as frames. That needs a layer that both reads `stack` and then rewrites `message`;
+ * the stage that logs an error reads it once, from a fresh object.
  */
 function framesOf(error: Error): string[] {
   let stack: unknown
@@ -417,7 +450,11 @@ function framesOf(error: Error): string[] {
   }
 
   const text = stack.slice(0, MAX_STACK_LENGTH)
-  const body = bodyAfterHeader(text, message)
+  const body = bodyAfterHeader(
+    text,
+    message,
+    message === '' ? plainName(error) : undefined,
+  )
   if (body === undefined) return []
 
   const frames: string[] = []
