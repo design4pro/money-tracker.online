@@ -42,10 +42,10 @@ import {
   MoneyOverflowError,
   asCurrencyCode,
 } from '#/lib/money/types'
-import { FAILURE_KINDS } from '#/lib/failure-envelope'
+import { FAILURE_KINDS, MAX_FAILURE_FIELDS } from '#/lib/failure-envelope'
 
 import { buildEnvelope } from '../envelope'
-import { classifyFailure } from '../classify'
+import { classifyFailure, validationIssuesOf } from '../classify'
 
 import type { FailureKind } from '#/lib/failure-envelope'
 
@@ -213,8 +213,13 @@ describe('classifyFailure: one case per thrown class', () => {
       true,
     ],
     [
-      'PolarError with no status',
-      new PolarError({ operation: 'x', status: null, code: 'c', message: 'm' }),
+      'PolarError with no status (a transport failure)',
+      new PolarError({
+        operation: 'x',
+        status: null,
+        code: 'TRANSPORT',
+        message: 'm',
+      }),
       'upstream',
       502,
       true,
@@ -399,12 +404,45 @@ describe('validation', () => {
     expect(classified(new Error(forged)).kind).toBe('validation')
   })
 
-  it('refuses more than a hundred issues', () => {
-    const issues = Array.from({ length: 101 }, () => ({
+  it('keeps the first hundred of a longer issue list instead of turning it into a server fault', () => {
+    const issues = Array.from({ length: 150 }, (_, index) => ({
+      path: [`row${index}`],
+      code: 'invalid_type',
+    }))
+    const error = new Error(JSON.stringify(issues))
+
+    expect(classified(error)).toEqual({
+      kind: 'validation',
+      status: 422,
+      retryable: false,
+    })
+    expect(validationIssuesOf(error)).toHaveLength(100)
+    expect(validationIssuesOf(error)?.[99]).toEqual({
+      path: ['row99'],
+      code: 'invalid_type',
+    })
+    expect(envelopeOf(error).fields).toHaveLength(MAX_FAILURE_FIELDS)
+  })
+
+  it('shape-checks only the issues it keeps: a malformed one inside the first hundred still refuses the list', () => {
+    const issues: Array<unknown> = Array.from({ length: 101 }, () => ({
       path: ['x'],
       code: 'a',
     }))
+    issues[99] = { path: 'x', code: 'a' }
     expect(classified(new Error(JSON.stringify(issues))).kind).toBe('internal')
+  })
+
+  it('classifies a ZodError with more than a hundred issues as validation, bounded', () => {
+    const result = z
+      .array(z.object({ name: z.string() }))
+      .safeParse(Array.from({ length: 150 }, () => ({ name: 1 })))
+    const error = result.error as z.ZodError
+
+    expect(error.issues).toHaveLength(150)
+    expect(classified(error).kind).toBe('validation')
+    expect(validationIssuesOf(error)).toHaveLength(100)
+    expect(envelopeOf(error).fields).toHaveLength(MAX_FAILURE_FIELDS)
   })
 
   it('reports a path segment outside the identifier shape at form level', () => {
@@ -561,5 +599,185 @@ describe('the envelope of one kind is constant', () => {
         /\d{2,}|acc_|biedronka|EUR|2026/,
       )
     }
+  })
+})
+
+describe('PolarError retryability is decided per error', () => {
+  // Mirrors the Polar client's own ladder (`polar-client.ts`): it retries 429, 5xx and a timeout or
+  // transport failure. 408 is a 4xx and the client does not retry it, so neither does this.
+  it.each([
+    ['null / TRANSPORT', null, 'TRANSPORT', 'upstream', 502, true],
+    ['null / TIMEOUT', null, 'TIMEOUT', 'upstream', 502, true],
+    ['null / SCHEMA', null, 'SCHEMA', 'upstream', 502, false],
+    ['null / MALFORMED', null, 'MALFORMED', 'upstream', 502, false],
+    [
+      '200 / MALFORMED (a body that was not JSON)',
+      200,
+      'MALFORMED',
+      'upstream',
+      502,
+      false,
+    ],
+    ['429', 429, 'UPSTREAM', 'rate_limited', 429, true],
+    ['400', 400, 'REJECTED', 'upstream', 502, false],
+    ['401', 401, 'REJECTED', 'upstream', 502, false],
+    ['403', 403, 'REJECTED', 'upstream', 502, false],
+    ['404', 404, 'REJECTED', 'upstream', 502, false],
+    ['408', 408, 'REJECTED', 'upstream', 502, false],
+    ['422', 422, 'REJECTED', 'upstream', 502, false],
+    ['500', 500, 'UPSTREAM', 'upstream', 502, true],
+    ['503', 503, 'UPSTREAM', 'upstream', 502, true],
+  ] as const)('%s', (_label, status, code, kind, httpStatus, retryable) => {
+    const error = new PolarError({ operation: 'x', status, code, message: 'm' })
+    expect(classified(error)).toEqual({ kind, status: httpStatus, retryable })
+  })
+})
+
+describe('classifyFailure and buildEnvelope never throw', () => {
+  /** An instance of `prototype`'s class whose `property` throws when read. */
+  function withThrowingGetter<T extends object>(error: T, property: string): T {
+    Object.defineProperty(error, property, {
+      get() {
+        throw new Error(`the failure path read ${property}`)
+      },
+    })
+    return error
+  }
+
+  function revokedProxy(): object {
+    const { proxy, revoke } = Proxy.revocable({}, {})
+    revoke()
+    return proxy
+  }
+
+  it.each([
+    [
+      'AuthRequirementError.reason',
+      () =>
+        withThrowingGetter(
+          new AuthRequirementError('unauthenticated', 'x'),
+          'reason',
+        ),
+    ],
+    [
+      'PolarError.status',
+      () =>
+        withThrowingGetter(
+          new PolarError({
+            operation: 'x',
+            status: 500,
+            code: 'c',
+            message: 'm',
+          }),
+          'status',
+        ),
+    ],
+    [
+      'PolarError.code',
+      () =>
+        withThrowingGetter(
+          new PolarError({
+            operation: 'x',
+            status: null,
+            code: 'TRANSPORT',
+            message: 'm',
+          }),
+          'code',
+        ),
+    ],
+    [
+      'RepositoryError.code',
+      () => withThrowingGetter(new NotFoundError('a', 'b'), 'code'),
+    ],
+    ['a revoked proxy', revokedProxy],
+  ])('%s: classifyFailure answers internal', (_label, make) => {
+    const thrown = make()
+
+    expect(classified(thrown)).toEqual({
+      kind: 'internal',
+      status: 500,
+      retryable: false,
+    })
+    expect(envelopeOf(thrown)).toEqual(INTERNAL_ENVELOPE)
+  })
+
+  it.each([
+    [
+      'QuotaExceededError.metric',
+      withThrowingGetter(new QuotaExceededError('rules', 5, 4), 'metric'),
+      'quota',
+    ],
+    [
+      'FeatureLockedError.module',
+      withThrowingGetter(new FeatureLockedError('rules'), 'module'),
+      'feature_locked',
+    ],
+  ] as const)(
+    '%s: buildEnvelope falls back to no params',
+    (_l, thrown, kind) => {
+      expect(envelopeOf(thrown)).toEqual({
+        v: 1,
+        kind,
+        message: { key: `failure.${kind}` },
+      })
+    },
+  )
+
+  it('buildEnvelope falls back to no fields for a ZodError whose issues throw', () => {
+    // `issues` is a non-configurable own property of a ZodError, so a proxy stands in for the getter.
+    const error = new Proxy(
+      z.object({ a: z.string() }).safeParse({}).error as z.ZodError,
+      {
+        get(target, property, receiver) {
+          if (property === 'issues') throw new Error('issues was read')
+          return Reflect.get(target, property, receiver)
+        },
+      },
+    )
+
+    expect(() => classified(error)).not.toThrow()
+    expect(
+      buildEnvelope(error, {
+        kind: 'validation',
+        status: 422,
+        retryable: false,
+      }),
+    ).toEqual({
+      v: 1,
+      kind: 'validation',
+      message: { key: 'failure.validation' },
+    })
+  })
+
+  it.each([
+    ['an undefined path', undefined],
+    ['a string path', 'abc'],
+    ['a path holding an object', [{}]],
+    ['a revoked proxy path', revokedProxy()],
+  ])(
+    'a hand-built ZodError with %s is internal, not a throw',
+    (_name, path) => {
+      const error = new z.ZodError([
+        { code: 'custom', path: path as never, message: 'x' },
+      ])
+
+      expect(() => classified(error)).not.toThrow()
+      expect(classified(error).kind).toBe('internal')
+      expect(validationIssuesOf(error)).toBeNull()
+    },
+  )
+
+  it('buildEnvelope given a revoked proxy and a quota or validation kind has no params and no fields', () => {
+    const proxy = revokedProxy()
+    for (const kind of ['quota', 'feature_locked', 'validation'] as const) {
+      expect(
+        buildEnvelope(proxy, { kind, status: 402, retryable: false }),
+      ).toEqual({ v: 1, kind, message: { key: `failure.${kind}` } })
+    }
+  })
+
+  it('a plain Error whose message getter throws is internal, not a throw', () => {
+    const error = withThrowingGetter(new Error('x'), 'message')
+    expect(classified(error).kind).toBe('internal')
   })
 })

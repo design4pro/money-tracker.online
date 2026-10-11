@@ -11,12 +11,15 @@
  * `retryAfter` is never produced: no throw site has a source for it, and one that did would still
  * have to clamp it. The field stays in the type for the stage that has one.
  *
- * Written not to throw. A caller that must not turn one failure into another still wraps it.
+ * Total: it never throws. A thrown value that cannot be read (a throwing getter, a revoked proxy)
+ * yields an envelope without `params` or `fields` rather than a second failure inside a `catch`.
  */
 
 import {
   FAILURE_MESSAGE_KEYS,
   MAX_FAILURE_FIELDS,
+  MAX_FAILURE_PATH_SEGMENTS,
+  MAX_FAILURE_PATH_SEGMENT_LENGTH,
 } from '#/lib/failure-envelope'
 import { isQuotaMetric } from '#/lib/plans'
 import { FeatureLockedError, QuotaExceededError } from '#/server/repos/errors'
@@ -29,7 +32,19 @@ import type { QuotaMetric } from '#/lib/plans'
 import type { Classification, ValidationIssue } from './classify'
 
 /** A path segment is a field name only when it is shaped like a code identifier (or an array index). */
-const SAFE_SEGMENT = /^[A-Za-z0-9_]{1,64}$/
+const SAFE_SEGMENT = new RegExp(
+  `^[A-Za-z0-9_]{1,${MAX_FAILURE_PATH_SEGMENT_LENGTH}}$`,
+)
+
+/**
+ * Identifier-shaped, yet a name that resolves on a plain object's prototype chain (`__proto__`,
+ * `constructor`, `toString`, `hasOwnProperty`, ...), or `prototype`. A reader that indexes `fields`
+ * by path into a plain object would let one of them reach the prototype, so the path is not
+ * reported at all.
+ */
+function namesPrototypeMember(segment: string): boolean {
+  return segment === 'prototype' || segment in Object.prototype
+}
 
 /** The closed field key for a Zod issue code; every code but the two length codes is `invalid`. */
 function fieldKeyFor(code: string): FailureFieldKey {
@@ -39,17 +54,20 @@ function fieldKeyFor(code: string): FailureFieldKey {
 }
 
 /**
- * The issue's path joined with `.`, or `''` (the form as a whole) when any segment is not
- * identifier-shaped: a record key typed by a person (`['b', 'Biedronka Sp. z o.o.']`) is not
- * reported.
+ * The issue's path joined with `.`, or `''` (the form as a whole) when it is deeper than
+ * {@link MAX_FAILURE_PATH_SEGMENTS}, or when any segment is not identifier-shaped (a record key
+ * typed by a person, `['b', 'Biedronka Sp. z o.o.']`, is not reported) or names a prototype member.
  */
 function fieldPathOf(path: ReadonlyArray<unknown>): string {
+  if (path.length > MAX_FAILURE_PATH_SEGMENTS) return ''
   const segments = path.map((segment) =>
     typeof segment === 'string' || typeof segment === 'number'
       ? String(segment)
       : '',
   )
-  return segments.every((segment) => SAFE_SEGMENT.test(segment))
+  return segments.every(
+    (segment) => SAFE_SEGMENT.test(segment) && !namesPrototypeMember(segment),
+  )
     ? segments.join('.')
     : ''
 }
@@ -68,13 +86,18 @@ function fieldsOf(
  * holds a free string, so it is checked here rather than trusted.
  */
 function metricOf(error: unknown): QuotaMetric | undefined {
-  const candidate =
-    error instanceof QuotaExceededError
-      ? error.metric
-      : error instanceof FeatureLockedError
-        ? error.module
-        : undefined
-  return isQuotaMetric(candidate) ? candidate : undefined
+  try {
+    const candidate =
+      error instanceof QuotaExceededError
+        ? error.metric
+        : error instanceof FeatureLockedError
+          ? error.module
+          : undefined
+    return isQuotaMetric(candidate) ? candidate : undefined
+  } catch {
+    // A throwing getter or a revoked proxy: the failure is still a quota failure, just without a name.
+    return undefined
+  }
 }
 
 export function buildEnvelope(
