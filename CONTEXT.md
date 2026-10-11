@@ -82,6 +82,10 @@ already caused, or would obviously cause, two people to mean two things by one w
   public shape built only from closed sets, so two failures of one kind are identical. _Avoid_:
   "envelope" alone, which also names a budget idea; "error message" for what the reader is shown,
   which is a catalogue sentence chosen by kind, never the text of the thrown value.
+- **Recovery** — the way out the failure panel offers for a failure kind: `retryable` (try again),
+  `quota` and `feature_locked` (go to billing) or `internal` (the sentence, with a way home and a
+  reference where the caller has them). It is chosen from the kind alone, never from the message.
+  _Avoid_: "error type" for a failure kind; "fallback" for a recovery.
 - **Rollover** — what a budget period does with the difference between its limit and its spend:
   `none`, carry the surplus, or carry both surplus and overspend. _Avoid_: "carryover" and
   "rollover" for the same thing in different sentences.
