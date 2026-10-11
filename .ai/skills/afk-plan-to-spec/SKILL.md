@@ -78,7 +78,8 @@ Before the PR is opened, put the spec in front of independent specialists throug
 
 - Apply every CONDITIONS and every **revise** as a new commit, then ask again. At most two rounds.
 - Record each final verdict as a row in the spec's Resolved assumptions table and in the PR body.
-- A specialist that still answers **revise** after the second round, or a security reviewer that does not approve, means the spec is not mergeable by this pipeline: open the PR anyway as a draft, add `blocked` to it, and post a `🤖 HUMAN-ONLY:` comment naming the verdict and the one thing a person has to settle. Then end the run; the PR is the person's.
+- A **revise** from any specialist but the security reviewer that still stands after the second round is a design question, and a design question is a specialist's, never a person's (`afk-decide` § 5). Apply it as a new commit, then ask the same specialist once more, with the question narrowed to the points it raised: does the applied revision settle each one? A point it still rejects is a disagreement between the spec and the specialist: settle it as `afk-decide` § 4 says, with a second specialist from a different row, and take the more reversible option. Apply that verdict as a commit and record it as the final one; the PR then opens as any other spec PR. Its Resolved assumptions row and the PR body say `settled by a second specialist, original not approved`, so a person who disagrees can overturn it in review.
+- A security reviewer that does not approve (a **revise** from it included), or a verdict whose `ESCALATE: yes` names an `afk-decide` § 5 case, means the spec is not mergeable by this pipeline: open the PR anyway as a draft, add `blocked` to it, and post a `🤖 HUMAN-ONLY:` comment naming the verdict and the one thing a person has to settle. Then end the run; the PR is the person's.
 
 ## 6. Open the PR
 
@@ -86,4 +87,4 @@ The workflow's gate step runs first and its `pr` step opens the PR; run on its o
 
 ## Done when
 
-The spec is committed with its panel verdicts recorded and the metadata table complete (and, run on its own, on an open PR), or the delivered stages are marked in the plan on a docs-only PR, or the run ended with `NO_ACTION_NEEDED` and a reason, or an issue filed as `human-only`, or the spec the panel would not approve sits on a draft `blocked` PR with its `🤖 HUMAN-ONLY:` comment. Finish with `Spec: .ai/specs/<file>.md` and `PR: #<n>`, or, for the marked stages, `Delivered: <stage ids>` and `PR: #<n>`.
+The spec is committed with its panel verdicts recorded and the metadata table complete (and, run on its own, on an open PR), or the delivered stages are marked in the plan on a docs-only PR, or the run ended with `NO_ACTION_NEEDED` and a reason, or an issue filed as `human-only`, or the spec the security reviewer would not approve sits on a draft `blocked` PR with its `🤖 HUMAN-ONLY:` comment. Finish with `Spec: .ai/specs/<file>.md` and `PR: #<n>`, or, for the marked stages, `Delivered: <stage ids>` and `PR: #<n>`.

@@ -8,6 +8,8 @@
 
 import { describe, expect, it } from 'vitest'
 
+import en from '#/lib/i18n/messages/en'
+
 import {
   BILLING_INTERVALS,
   MissingProductError,
@@ -15,6 +17,7 @@ import {
   PLAN_IDS,
   PLAN_LIST,
   QUOTA_METRICS,
+  QUOTA_METRIC_LABEL_KEYS,
   QUOTA_METRIC_OWNERS,
   UNLIMITED,
   isPlanId,
@@ -42,6 +45,15 @@ describe('every tier sells every metered resource', () => {
     expect(Object.keys(QUOTA_METRIC_OWNERS).toSorted()).toEqual(
       [...QUOTA_METRICS].toSorted(),
     )
+  })
+
+  it('labels every metric with a key the catalogue defines', () => {
+    expect(Object.keys(QUOTA_METRIC_LABEL_KEYS).toSorted()).toEqual(
+      [...QUOTA_METRICS].toSorted(),
+    )
+    for (const metric of QUOTA_METRICS) {
+      expect(en).toHaveProperty([QUOTA_METRIC_LABEL_KEYS[metric]])
+    }
   })
 
   /**

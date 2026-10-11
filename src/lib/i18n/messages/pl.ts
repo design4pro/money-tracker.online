@@ -1315,6 +1315,14 @@ const messages = {
   'failure.field.invalid': 'Ta wartość jest nieprawidłowa.',
   'failure.field.tooShort': 'Ta wartość jest za krótka.',
   'failure.field.tooLong': 'Ta wartość jest za długa.',
+  // What `FailurePanel` adds around the envelope's own sentence above.
+  'failure.quota.title': 'Ten dom osiągnął limit',
+  'failure.quota.metric': 'Osiągnięty limit: {metric}.',
+  'failure.featureLocked.title': 'Poza Twoim planem',
+  'failure.dashboard.action': 'Wróć do pulpitu',
+  'failure.reference.copy': 'Skopiuj numer',
+  'failure.reference.copied': 'Numer skopiowany',
+  'failure.reference.copyFailed': 'Nie udało się skopiować numeru',
 
   /* -- Empty and failure states ------------------------------------------ */
   'empty.search.title': 'Nic nie znaleziono',

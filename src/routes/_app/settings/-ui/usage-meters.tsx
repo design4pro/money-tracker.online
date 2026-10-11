@@ -1,10 +1,9 @@
 import { Meter } from '#/components/ui'
-import { QUOTA_METRICS, UNLIMITED } from '#/lib/plans'
+import { QUOTA_METRICS, QUOTA_METRIC_LABEL_KEYS, UNLIMITED } from '#/lib/plans'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatNumber } from '#/lib/i18n/format'
 
 import type { PlanLimits, QuotaMetric } from '#/lib/plans'
-import type { MessageKey } from '#/lib/i18n'
 
 /**
  * One labelled bar per metered resource, with the numbers **always in text**.
@@ -17,19 +16,6 @@ import type { MessageKey } from '#/lib/i18n'
  * The counts are the resolver's own (`EffectiveLimits.usage`) and are never recomputed here: the
  * number a person reads and the number the repository enforces against have to be the same one.
  */
-
-const METRIC_LABEL: Readonly<Record<QuotaMetric, MessageKey>> = {
-  members: 'billing.usage.metric.members',
-  accounts: 'billing.usage.metric.accounts',
-  currencies: 'billing.usage.metric.currencies',
-  budgets: 'billing.usage.metric.budgets',
-  goals: 'billing.usage.metric.goals',
-  rules: 'billing.usage.metric.rules',
-  recurringSeries: 'billing.usage.metric.recurringSeries',
-  transactions: 'billing.usage.metric.transactions',
-  importsPerMonth: 'billing.usage.metric.importsPerMonth',
-  storageBytes: 'billing.usage.metric.storageBytes',
-}
 
 /** Bytes are the one metric a bare integer would be unreadable as. */
 const MEGABYTE = 1024 * 1024
@@ -57,7 +43,7 @@ export function UsageMeters({ limits, usage }: UsageMetersProps) {
         return (
           <li key={metric}>
             <Meter
-              label={t(METRIC_LABEL[metric])}
+              label={t(QUOTA_METRIC_LABEL_KEYS[metric])}
               // An unlimited metric still gets a bar so the list does not gap: its value is the
               // count against itself, which reads as full and says nothing misleading beside a
               // caption that states there is no limit.

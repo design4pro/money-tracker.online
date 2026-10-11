@@ -1274,6 +1274,14 @@ const messages = {
   'failure.field.invalid': 'This value is not valid.',
   'failure.field.tooShort': 'This value is too short.',
   'failure.field.tooLong': 'This value is too long.',
+  // What `FailurePanel` adds around the envelope's own sentence above.
+  'failure.quota.title': 'This workspace is at its limit',
+  'failure.quota.metric': 'Limit reached: {metric}.',
+  'failure.featureLocked.title': 'Not part of your plan',
+  'failure.dashboard.action': 'Back to the dashboard',
+  'failure.reference.copy': 'Copy reference',
+  'failure.reference.copied': 'Reference copied',
+  'failure.reference.copyFailed': 'Could not copy the reference',
 
   /* -- Empty and failure states ------------------------------------------ */
   'empty.search.title': 'Nothing found',

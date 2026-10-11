@@ -3,7 +3,12 @@ import { cva } from 'class-variance-authority'
 import { cn } from '#/lib/cn'
 
 import type { VariantProps } from 'class-variance-authority'
-import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react'
+import type {
+  ComponentPropsWithRef,
+  ComponentPropsWithoutRef,
+  ElementType,
+  ReactNode,
+} from 'react'
 
 export const cardVariants = cva('rounded-xl', {
   variants: {
@@ -30,7 +35,7 @@ export const cardVariants = cva('rounded-xl', {
 })
 
 export interface CardProps
-  extends ComponentPropsWithoutRef<'div'>, VariantProps<typeof cardVariants> {
+  extends ComponentPropsWithRef<'div'>, VariantProps<typeof cardVariants> {
   /**
    * Render as a different element. Use `as="section"` or `as="article"` when
    * the card is a landmark region — and give it an `aria-labelledby` pointing
