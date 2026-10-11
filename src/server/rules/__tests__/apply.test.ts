@@ -667,6 +667,30 @@ describe('mark_planned: false on a row dated after the cutoff', () => {
     ).toMatchObject({ isPlanned: true })
   })
 
+  it('ends a future row planned when one rule plans it and a later one un-plans it', () => {
+    const planning = rule({
+      id: 'rule-1',
+      conditions: EXPENSE,
+      actions: [{ kind: 'mark_planned', isPlanned: true }],
+    })
+    const settling = rule({
+      id: 'rule-2',
+      conditions: EXPENSE,
+      actions: [{ kind: 'mark_planned', isPlanned: false }],
+    })
+
+    const resolved = resolveOutcome(
+      [planning, settling],
+      subject({ bookedOn: '2999-01-01' }),
+      'edit',
+      NOW,
+    )
+
+    expect(resolved.outcome.isPlanned).toBe(true)
+    // Both still matched: the un-plan is withheld, the rule is not unmatched.
+    expect(resolved.matchedRuleIds).toEqual(['rule-1', 'rule-2'])
+  })
+
   it('leaves a future planned row planned and flips a past one, when run for real', async () => {
     await seedRule({
       id: 'rule-1',

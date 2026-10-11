@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { latestCalendarDayOnEarth } from '../clock'
+import { latestCalendarDayOnEarth } from '../calendar-day'
 
 describe('latestCalendarDayOnEarth', () => {
   it('is still day D one second before 10:00 UTC, when UTC+14 reaches midnight', () => {

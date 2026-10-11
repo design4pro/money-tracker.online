@@ -53,7 +53,8 @@ import {
   sumMinor,
 } from '#/lib/money'
 import { isLiabilityCategory } from '#/server/catalog/account-types'
-import { latestCalendarDayOnEarth, serverToday } from '#/server/clock'
+import { latestCalendarDayOnEarth } from '#/server/calendar-day'
+import { serverToday } from '#/server/clock'
 import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
 import { pauseRulesReferencing } from '#/server/rules/integrity'
