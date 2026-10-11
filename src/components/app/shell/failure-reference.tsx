@@ -17,6 +17,11 @@ import { useTranslate } from '#/lib/i18n'
  */
 const OPAQUE_ID = /^[A-Za-z0-9_-]{8,64}$/
 
+/** Whether `FailureReference` would render this string, so a caller can skip an empty slot. */
+export function hasOpaqueIdShape(reference: string | undefined) {
+  return reference !== undefined && OPAQUE_ID.test(reference)
+}
+
 const subscribeNever = () => () => {}
 const canWriteToClipboard = () =>
   typeof navigator !== 'undefined' &&
@@ -57,7 +62,7 @@ export function FailureReference({ reference }: FailureReferenceProps) {
   )
   const [status, setStatus] = useState('')
 
-  if (!reference || !OPAQUE_ID.test(reference)) return null
+  if (!reference || !hasOpaqueIdShape(reference)) return null
 
   async function copy(value: string) {
     // Committed before the write starts, so the refill below is a change and not a no-op.

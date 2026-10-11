@@ -271,6 +271,8 @@ describe('each recovery renders its own actions and not the others', () => {
     )
 
     expect(actionsOf(container)).toEqual([])
+    // No action row at all, not an empty one that adds a blank gap under the sentence.
+    expect(screen.getByRole('region').children).toHaveLength(1)
   })
 })
 

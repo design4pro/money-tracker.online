@@ -6,7 +6,7 @@ import { useTranslate } from '#/lib/i18n'
 import { QUOTA_METRIC_LABEL_KEYS } from '#/lib/plans'
 
 import { ErrorPanel } from './error-panel'
-import { FailureReference } from './failure-reference'
+import { FailureReference, hasOpaqueIdShape } from './failure-reference'
 
 import type { FailureEnvelope, FailureKind } from '#/lib/failure-envelope'
 import type { ReactNode } from 'react'
@@ -102,6 +102,10 @@ export interface FailurePanelProps {
  * The record decides which extras appear, not whether Retry is meaningful: `retryable` and
  * `internal` show Retry when the caller passes `onRetry`.
  *
+ * Focus moves to the heading on mount only, and an alert is announced on insertion only. A caller
+ * that retries should key the panel per attempt (`key={attempt}`), so a repeat failure remounts it
+ * and is announced and focused again.
+ *
  * `quota` and `feature_locked` use the `warning` tone because they are not faults. The links do
  * not decide anything: whether the workspace is over a limit was decided on the server.
  */
@@ -174,15 +178,19 @@ export function FailurePanel({
           body={sentence}
           onRetry={onRetry}
           isRetrying={isRetrying}
+          // `ErrorPanel` renders an action row for any truthy slot, so an empty fragment would
+          // leave a blank gap under the sentence.
           actions={
-            <>
-              {homeHref ? (
-                <Link to={homeHref} className={SECONDARY_LINK}>
-                  {t('failure.dashboard.action')}
-                </Link>
-              ) : null}
-              <FailureReference reference={reference} />
-            </>
+            homeHref || hasOpaqueIdShape(reference) ? (
+              <>
+                {homeHref ? (
+                  <Link to={homeHref} className={SECONDARY_LINK}>
+                    {t('failure.dashboard.action')}
+                  </Link>
+                ) : null}
+                <FailureReference reference={reference} />
+              </>
+            ) : undefined
           }
         />
       )

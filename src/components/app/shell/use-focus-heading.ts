@@ -23,8 +23,8 @@ import type { RefObject } from 'react'
  * The record has to be made in a *layout* effect cleanup. By the time a passive effect's cleanup
  * runs the node is detached and `document.activeElement` is already `body`.
  *
- * `enabled` is read once per mount: a panel either takes part in focus management for its whole
- * life or not at all.
+ * `enabled` is not expected to change while a panel is mounted: the one caller, `ErrorPanel`,
+ * passes a fixed prop per panel.
  */
 export function useFocusHeading(
   enabled: boolean,
