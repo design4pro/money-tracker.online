@@ -1269,7 +1269,7 @@ const messages = {
   'failure.quota': 'Your plan has reached its limit for this.',
   'failure.feature_locked': 'This is not part of your plan.',
   'failure.rate_unavailable': 'No exchange rate is available for that date.',
-  'failure.rate_limited': 'Too many requests. Try again shortly.',
+  'failure.rate_limited': 'The service is busy right now. Try again shortly.',
   'failure.upstream': 'A service we depend on did not answer. Try again.',
   'failure.field.invalid': 'This value is not valid.',
   'failure.field.tooShort': 'This value is too short.',
