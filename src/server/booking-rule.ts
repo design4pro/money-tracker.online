@@ -22,6 +22,12 @@
  * A refusal is a Zod `custom` issue at `bookedOn`, so the failure envelope renders it as
  * `failure.field.invalid` exactly as the balance-adjustment schemas do, and it is raised before
  * any conversion lookup, insert or update, so nothing is written.
+ *
+ * It is thrown as a `ZodRealError`: still a `ZodError`, so the classifier and `instanceof` checks
+ * see what they always saw, and also an `Error` carrying the JSON issue list as its message. That
+ * second part is what lets it cross a server-function boundary - the serialiser forwards only an
+ * `Error`'s message, and a plain `ZodError` is not an `Error` in this Zod major - so the transaction
+ * form can recognise a refused booking date and say it in the reader's language.
  */
 
 import { z } from 'zod'
@@ -57,7 +63,7 @@ export function assertBookable(
     return
   }
   if (isBookable(next, now)) return
-  throw new z.ZodError([
+  throw new z.ZodRealError([
     {
       code: 'custom',
       path: ['bookedOn'],

@@ -112,3 +112,36 @@ describe('assertBookable', () => {
     })
   })
 })
+
+describe('the refusal on the wire', () => {
+  /**
+   * A server function's thrown value reaches the client through TanStack Start's `$TSR/Error`
+   * serialisation plugin (`ShallowErrorPlugin`, `@tanstack/router-core`), which forwards a value
+   * only when `instanceof Error` and rebuilds it as `new Error(message)`. This Zod major's plain
+   * `ZodError` is not an `Error` (probed: `new z.ZodError([]) instanceof Error` is `false`), so the
+   * refusal has to be thrown as the `Error` subclass `ZodRealError`, whose message is the JSON issue
+   * list. `@tanstack/router-core` is not a direct dependency, so the plugin itself is not imported
+   * here; its two inputs, the class test and the message, are what this pins.
+   */
+  const error = refusal(() =>
+    assertBookable({ bookedOn: '2026-03-17', isPlanned: false }, { now: NOW }),
+  )
+
+  it('is an Error that is still a ZodError', () => {
+    expect(error).toBeInstanceOf(Error)
+    expect(error).toBeInstanceOf(z.ZodError)
+  })
+
+  it('carries the issue list as its message, so a client-side copy of the Error keeps it', () => {
+    const clientSide = new Error((error as Error).message)
+
+    expect(JSON.parse(clientSide.message)).toEqual([
+      expect.objectContaining({
+        code: 'custom',
+        path: ['bookedOn'],
+        message:
+          'A settled row cannot be dated after the latest calendar day on Earth.',
+      }),
+    ])
+  })
+})
