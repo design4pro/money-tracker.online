@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { I18nProvider } from '#/lib/i18n'
 import en from '#/lib/i18n/messages/en'
 
+import { GroupTreeSkeleton } from '../group-states'
 import { GroupsScreen } from '../groups-screen'
 
 import type { Catalogue } from '#/lib/i18n'
@@ -61,12 +62,18 @@ const GROUPS: ReadonlyArray<GroupItem> = [
 
 function renderScreen(groups: ReadonlyArray<GroupItem> = GROUPS) {
   const onRefresh = vi.fn().mockResolvedValue(undefined)
-  render(
+  const tree = (rows: ReadonlyArray<GroupItem>) => (
     <I18nProvider locale="en" messages={en as Catalogue}>
-      <GroupsScreen groups={groups} onRefresh={onRefresh} />
-    </I18nProvider>,
+      <GroupsScreen groups={rows} onRefresh={onRefresh} />
+    </I18nProvider>
   )
-  return { onRefresh, user: userEvent.setup() }
+  const { rerender } = render(tree(groups))
+  return {
+    onRefresh,
+    user: userEvent.setup(),
+    /** What the loader hands the screen once the refresh has landed. */
+    reload: (rows: ReadonlyArray<GroupItem>) => rerender(tree(rows)),
+  }
 }
 
 async function pickFromMenu(
@@ -292,6 +299,10 @@ describe('GroupsScreen form', () => {
       expect(dialog.textContent).toContain('The group was not saved'),
     )
     expect(dialog.textContent).toMatch(/does not fit the groups/)
+    // Announced: the refusal answers the button the person just pressed (4.1.3).
+    expect(within(dialog).getByRole('alert').textContent).toContain(
+      'The group was not saved',
+    )
     expect(document.body.textContent).not.toContain(RAW)
   })
 
@@ -302,5 +313,99 @@ describe('GroupsScreen form', () => {
     await user.type(within(dialog).getByRole('textbox'), 'Fun')
     await user.keyboard('{Escape}')
     expect(await screen.findByText('Keep editing')).not.toBeNull()
+  })
+})
+
+describe('GroupsScreen focus', () => {
+  const focusedKey = () => document.activeElement?.getAttribute('data-key')
+
+  async function deleteGroup(
+    user: ReturnType<typeof userEvent.setup>,
+    name: string,
+  ) {
+    await pickFromMenu(user, name, 'Delete group')
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: 'Delete group',
+      }),
+    )
+  }
+
+  it('goes to the next row once a deleted group has left', async () => {
+    server.deleteAccountGroup.mockResolvedValue(undefined)
+    const { user, reload, onRefresh } = renderScreen()
+    await deleteGroup(user, 'Business')
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    reload(GROUPS.filter((g) => g.id !== 'business'))
+    await waitFor(() => expect(focusedKey()).toBe('group:empty'))
+  })
+
+  it('goes to the previous row when the deleted group was the last', async () => {
+    server.deleteAccountGroup.mockResolvedValue(undefined)
+    const { user, reload, onRefresh } = renderScreen()
+    await deleteGroup(user, 'Empty')
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    reload(GROUPS.filter((g) => g.id !== 'empty'))
+    await waitFor(() => expect(focusedKey()).toBe('group:business'))
+  })
+
+  it('goes to the New group button when the last group is deleted', async () => {
+    server.deleteAccountGroup.mockResolvedValue(undefined)
+    const { user, reload, onRefresh } = renderScreen([group('only', 'Only')])
+    await deleteGroup(user, 'Only')
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    reload([])
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getAllByRole('button', { name: 'New group' })[0],
+      ),
+    )
+  })
+
+  it('stays on the row that was moved', async () => {
+    server.reorderAccountGroups.mockResolvedValue(undefined)
+    const { user, reload, onRefresh } = renderScreen()
+    await pickFromMenu(user, 'Business', 'Move up')
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    reload([GROUPS[2]!, GROUPS[0]!, GROUPS[1]!, GROUPS[3]!])
+    await waitFor(() => expect(focusedKey()).toBe('group:business'))
+  })
+})
+
+describe('GroupsScreen reload failures', () => {
+  it('does not report a failed reload as a failed write', async () => {
+    server.reorderAccountGroups.mockResolvedValue(undefined)
+    const { user, onRefresh } = renderScreen()
+    onRefresh.mockRejectedValue(new Error(RAW))
+    await pickFromMenu(user, 'Business', 'Move up')
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    expect(screen.getByRole('alert').textContent).toBe('')
+    expect(document.body.textContent).not.toContain(RAW)
+  })
+
+  it('reloads when the re-parenting landed but the reorder was refused', async () => {
+    server.updateAccountGroup.mockResolvedValue(undefined)
+    server.reorderAccountGroups.mockRejectedValue(new Error('network'))
+    const { user, onRefresh } = renderScreen()
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for Business' }),
+    )
+    await user.click(await screen.findByRole('menuitem', { name: 'Move to…' }))
+    const submenu = (await screen.findAllByRole('menu')).at(-1)!
+    await user.click(within(submenu).getByRole('menuitem', { name: 'Joint' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('GroupTreeSkeleton', () => {
+  it('says it is loading in text a status region can announce', () => {
+    render(
+      <I18nProvider locale="en" messages={en as Catalogue}>
+        <GroupTreeSkeleton />
+      </I18nProvider>,
+    )
+    expect(screen.getByRole('status').textContent).toContain(
+      en['accounts.groups.loading'],
+    )
   })
 })

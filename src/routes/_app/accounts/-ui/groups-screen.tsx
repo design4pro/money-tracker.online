@@ -90,8 +90,30 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   }, [focusRequest, groups])
 
   const close = () => setPending({ kind: 'none' })
-  const refresh = onRefresh
   const byId = new Map(groups.map((group) => [group.id, group]))
+
+  /**
+   * Reloads after a write that already landed. A failed reload must not read as a failed write, and
+   * must not surface as the dialog's raw-message panel, so it is swallowed: the next load shows the
+   * truth.
+   */
+  async function refresh() {
+    try {
+      await onRefresh()
+    } catch {
+      // The write succeeded; there is nothing for the reader to act on.
+    }
+  }
+
+  /** The toast for a group that changed parent. */
+  function announceReparent(name: string, parentId: string | null) {
+    const parent = parentId === null ? undefined : byId.get(parentId)
+    toast.success(
+      parent === undefined
+        ? t('accounts.group.toast.reparentedTop', { name })
+        : t('accounts.group.toast.reparented', { name, parent: parent.name }),
+    )
+  }
 
   /** Puts the refusal on screen. A group that no longer exists means the list is stale: reload it. */
   function refuse(error: unknown) {
@@ -103,32 +125,25 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   async function applyMove(move: TreeMove): Promise<boolean> {
     const current = byId.get(move.id)
     if (current === undefined) return false
+    let isReparented = false
     try {
       if (current.parentId !== move.parentId) {
         await updateAccountGroup({
           data: { groupId: move.id, patch: { parentId: move.parentId } },
         })
+        isReparented = true
       }
       await reorderAccountGroups({ data: { ids: [...move.orderedIds] } })
     } catch (error) {
       refuse(error)
+      // The first write landed even though the second did not: show the server's state, not ours.
+      if (isReparented) void refresh()
       return false
     }
     setRefusal(null)
     setFocusRequest({ key: groupKey(move.id) })
     await refresh()
-    if (current.parentId !== move.parentId) {
-      const parent =
-        move.parentId === null ? undefined : byId.get(move.parentId)
-      toast.success(
-        parent === undefined
-          ? t('accounts.group.toast.reparentedTop', { name: current.name })
-          : t('accounts.group.toast.reparented', {
-              name: current.name,
-              parent: parent.name,
-            }),
-      )
-    }
+    if (isReparented) announceReparent(current.name, move.parentId)
     return true
   }
 
@@ -160,7 +175,14 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
           }
         }
         setFocusRequest({ key: groupKey(group.id) })
-        toast.success(t('accounts.group.toast.renamed', { name: values.name }))
+        // A form that only changed "Inside" is a move, not a rename.
+        if (isReparented && values.name === group.name) {
+          announceReparent(values.name, values.parentId)
+        } else {
+          toast.success(
+            t('accounts.group.toast.renamed', { name: values.name }),
+          )
+        }
       }
       setRefusal(null)
       await refresh()

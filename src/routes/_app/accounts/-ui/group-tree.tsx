@@ -264,7 +264,9 @@ function GroupRow({
           />
         ) : null}
         <Folder aria-hidden="true" className="size-4 shrink-0 text-ink-2" />
-        <span className="truncate text-label text-ink">{group.name}</span>
+        <span className="min-w-0 break-words text-label text-ink">
+          {group.name}
+        </span>
         <Badge tone="neutral" size="sm">
           {t('accounts.count', { count: group.accounts.length })}
         </Badge>
@@ -307,7 +309,9 @@ function MemberRow({ entry }: { readonly entry: MemberEntry }) {
           style={{ display: 'none' }}
         />
         <Wallet aria-hidden="true" className="size-4 shrink-0 text-ink-2" />
-        <span className="truncate text-label text-ink-2">{member.name}</span>
+        <span className="min-w-0 break-words text-label text-ink-2">
+          {member.name}
+        </span>
         {member.isArchived ? (
           <Badge tone="warning" size="sm">
             {t('common.archived')}

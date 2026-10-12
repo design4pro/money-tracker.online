@@ -49,9 +49,10 @@ function kindOf(error: unknown): FailureKind | undefined {
  * envelope's when there is one, otherwise the repository `code` (see {@link KIND_BY_CODE}).
  *
  * `GroupDepthError` is a `ConflictError`, and both routes keep the kind and drop the class, so
- * "too deep" and any other conflict arrive as the same `conflict`. The menu already disables every
- * item that would nest a third level, which leaves a two-tab race as the only way to reach it, so
- * one sentence covers both and names the rule. A kind this screen has no sentence for - a
+ * "too deep" and any other conflict arrive as the same `conflict`. The menu disables every item
+ * that would nest a third level, but a drop cannot know which row is being dragged, so dropping a
+ * group that has children beside a child reaches the repository too (as does a two-tab race). One
+ * sentence covers both and names the rule. A kind this screen has no sentence for - a
  * database or foreign-key failure from a race, a validation failure, a plain `Error` - reads as
  * the generic line.
  */

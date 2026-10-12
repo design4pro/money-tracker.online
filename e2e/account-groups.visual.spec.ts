@@ -143,7 +143,17 @@ test('create, nest, move out and delete leave the console silent and the workspa
 }) => {
   const parent = uniqueToken('Joint')
   const child = uniqueToken('Trips')
-  await gotoApp(page, '/accounts/groups')
+  // The only way in is the link under the accounts subtitle.
+  await gotoApp(page, '/accounts')
+  await page
+    .getByRole('link', { name: say('en', 'accounts.groups.manage') })
+    .click()
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: say('en', 'accounts.groups.title'),
+    }),
+  ).toBeVisible()
 
   try {
     await createGroup(page, parent)
@@ -162,7 +172,6 @@ test('create, nest, move out and delete leave the console silent and the workspa
     await page
       .getByRole('menuitem', { name: say('en', 'accounts.group.parent.none') })
       .click()
-    await expect(groupRow(page, child)).toContainText(child)
     await expect(
       page.getByRole('row', { name: new RegExp(`^${escape(child)}, group`) }),
     ).toBeVisible()
@@ -179,8 +188,9 @@ test('create, nest, move out and delete leave the console silent and the workspa
 test('the controls on an indented sub-group are a 44 px target at 360 px, and nothing scrolls sideways', async ({
   page,
 }) => {
-  const parent = uniqueToken('Joint')
-  const child = uniqueToken('Trips')
+  // Long names (the field allows 100 characters) are what push a handle or a menu off a 360 px row.
+  const parent = `${uniqueToken('Joint')} ${'wide '.repeat(14)}`.trim()
+  const child = `${uniqueToken('Trips')} ${'wide '.repeat(14)}`.trim()
   await gotoApp(page, '/accounts/groups')
 
   try {
@@ -225,5 +235,32 @@ test('the controls on an indented sub-group are a 44 px target at 360 px, and no
     await page.setViewportSize({ width: 1280, height: 800 })
     await removeIfPresent(page, child)
     await removeIfPresent(page, parent)
+  }
+})
+
+test('the reason on a disabled menu item is not dimmed with its label', async ({
+  page,
+}) => {
+  const name = uniqueToken('Solo')
+  await gotoApp(page, '/accounts/groups')
+
+  try {
+    await createGroup(page, name)
+    await openActions(page, name)
+    // A group just created sits last in its run, so "Move down" is disabled and says why.
+    const item = page.getByRole('menuitem', {
+      name: say('en', 'action.moveDown'),
+    })
+    await expect(item).toHaveAttribute('aria-disabled', 'true')
+    const reason = item.getByText(say('en', 'accounts.group.disabled.last'))
+    await expect(reason).toBeVisible()
+    // The row is not faded, so the reason keeps its text colour's full contrast (1.4.3).
+    const rowOpacity = await item.evaluate(
+      (element) => getComputedStyle(element).opacity,
+    )
+    expect(rowOpacity).toBe('1')
+    await page.keyboard.press('Escape')
+  } finally {
+    await removeIfPresent(page, name)
   }
 })

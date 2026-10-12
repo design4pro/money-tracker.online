@@ -865,14 +865,18 @@ because what a row can do differs (a category archives, a group deletes).
   Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
   after their row, and their parent for a child.
 - **Disabled, never hidden, and the reason is written.** An item that would change nothing, or
-  that the one-level rule forbids, stays in the menu disabled with its reason as the item's
-  description ("Already first", "A sub-group cannot have its own sub-groups"). It is read with the
-  item and painted under it, so the reason does not depend on a tooltip.
+  that the one-level rule forbids, stays in the menu disabled. The group tree also writes the
+  reason as the item's description ("Already first", "A sub-group cannot have its own
+  sub-groups"), painted under the item at full contrast (only the label dims) and wired as its
+  description, so the reason does not depend on a tooltip. Arrow keys skip a disabled item, so it
+  is reached by a virtual cursor and by sight; the category tree disables the item without a description yet.
 - **Drop and focus rules.** A drop lands _beside_ a row, never on it, and the dropped row takes
   that row's parent: one rule, no nesting-by-hovering. Rows that are not part of the order
   (accounts inside a group) are not drop targets - the target is cancelled, so no indicator is
   drawn and a keyboard drag skips it - and cannot start a drag. The group tree offers each
-  boundary between two rows of a run once, as _before_ the later one; _after_ exists for the last
+  boundary between two rows of a run once, as _before_ the later one (a drop cannot know which
+  row is being dragged, so a group that has children can still be dropped beside a child: the
+  repository refuses it and the reader gets the refusal sentence, while the menu disables it); _after_ exists for the last
   row of a run only, and its indicator is drawn directly under that row. For the last top-level group, which
   has its accounts beneath it, that reads as "inside" - a known limit of a row-based indicator and
   the reason the menu is not optional. After a move, a rename or a create, focus stays on (or goes

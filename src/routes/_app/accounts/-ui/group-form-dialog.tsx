@@ -132,7 +132,6 @@ export function GroupFormDialog({
               <DialogBody className="flex flex-col gap-5">
                 {failure === null ? null : (
                   <ErrorPanel
-                    mode="region"
                     title={t('accounts.group.form.error.title')}
                     body={t(failure.messageKey)}
                   />

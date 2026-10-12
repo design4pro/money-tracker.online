@@ -90,6 +90,8 @@ export function MenuItem<T extends object>({
       className={composeTw(
         className,
         collectionItemBase,
+        // The reason a disabled item is disabled has to stay readable: dim the label, not the row.
+        description && 'group data-[disabled]:opacity-100',
         isDestructive &&
           'text-negative data-[focused]:bg-negative-soft data-[focused]:text-negative',
       )}
@@ -119,7 +121,10 @@ export function MenuItem<T extends object>({
           ) : null}
           {description ? (
             <span className="flex min-w-0 flex-1 flex-col">
-              <RACText slot="label" className="truncate">
+              <RACText
+                slot="label"
+                className="truncate group-data-[disabled]:opacity-45"
+              >
                 {typeof children === 'function'
                   ? children(renderProps)
                   : children}

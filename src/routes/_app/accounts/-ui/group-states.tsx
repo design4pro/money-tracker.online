@@ -45,9 +45,9 @@ export function GroupTreeSkeleton() {
     <div
       role="status"
       aria-live="polite"
-      aria-label={t('accounts.groups.loading')}
       className="flex max-w-list flex-col gap-1"
     >
+      <span className="sr-only">{t('accounts.groups.loading')}</span>
       {[0, 1, 2].map((row) => (
         <div
           key={row}
