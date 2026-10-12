@@ -231,6 +231,28 @@ test('the controls on an indented sub-group are a 44 px target at 360 px, and no
       () => document.documentElement.scrollWidth - window.innerWidth,
     )
     expect(overflow).toBeLessThanOrEqual(0)
+
+    // The "Move to..." submenu opens under the menu on a phone: beside it, it ran off the screen.
+    await openActions(page, child)
+    await page
+      .getByRole('menuitem', {
+        name: new RegExp(`^${say('en', 'action.moveTo')}`),
+      })
+      .click()
+    const submenu = page.getByRole('menu').last()
+    await expect(
+      submenu.getByRole('menuitem', {
+        name: say('en', 'accounts.group.parent.none'),
+      }),
+    ).toBeVisible()
+    const menuBox = await submenu.boundingBox()
+    expect(menuBox).not.toBeNull()
+    expect(menuBox!.x).toBeGreaterThanOrEqual(0)
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(360)
+    // One Escape closes the submenu, the second the menu under it.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
   } finally {
     await page.setViewportSize({ width: 1280, height: 800 })
     await removeIfPresent(page, child)

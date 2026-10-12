@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useDragAndDrop } from 'react-aria-components/useDragAndDrop'
 import {
   ArrowDownToLine,
@@ -90,13 +90,26 @@ export function GroupTree({
   const t = useTranslate()
   const entries = useMemo(() => buildEntries(groups), [groups])
   const [announcement, setAnnouncement] = useState('')
+  // The group being dragged, so a drop the one-level rule would refuse is never offered.
+  const draggedRef = useRef<string | undefined>(undefined)
 
   const { dragAndDropHooks } = useDragAndDrop({
     // The payload is the row key and nothing else, as in the category tree.
     getItems: (keys) => [...keys].map((key) => ({ 'text/plain': String(key) })),
+    onDragStart: (event) => {
+      draggedRef.current = groupIdOf(String([...event.keys][0])) ?? undefined
+    },
+    onDragEnd: () => {
+      draggedRef.current = undefined
+    },
     getDropOperation: (target) =>
       target.type === 'item' &&
-      acceptsDrop(groups, String(target.key), target.dropPosition)
+      acceptsDrop(
+        groups,
+        String(target.key),
+        target.dropPosition,
+        draggedRef.current,
+      )
         ? 'move'
         : 'cancel',
     onReorder(event) {
@@ -325,6 +338,27 @@ function MemberRow({ entry }: { readonly entry: MemberEntry }) {
 /** The submenu key that means "no parent". A reserved string, never a group id. */
 const TOP_LEVEL = '__top_level__'
 
+/**
+ * Below this width the "Move to..." submenu opens under the menu instead of beside it: beside it, at
+ * 360px, it ran off the right edge of the screen. The server has no viewport, so it reports the wide
+ * layout and a phone corrects it in the first effect (the menu is closed until then).
+ */
+const NARROW_QUERY = '(max-width: 40rem)'
+
+function subscribeNarrow(onChange: () => void): () => void {
+  const list = window.matchMedia(NARROW_QUERY)
+  list.addEventListener('change', onChange)
+  return () => list.removeEventListener('change', onChange)
+}
+
+function useIsNarrow(): boolean {
+  return useSyncExternalStore(
+    subscribeNarrow,
+    () => window.matchMedia(NARROW_QUERY).matches,
+    () => false,
+  )
+}
+
 const STEPS: ReadonlyArray<{
   readonly step: MoveStep
   readonly label: MessageKey
@@ -380,6 +414,7 @@ function GroupRowMenu({
 }) {
   const t = useTranslate()
   const { group, parent } = entry
+  const isNarrow = useIsNarrow()
 
   // A group that still holds sub-groups cannot sit inside another group, and a sub-group cannot
   // hold any: the repository refuses both, so neither is offered as something that can work.
@@ -462,7 +497,10 @@ function GroupRowMenu({
             >
               {t('action.moveTo')}
             </MenuItem>
-            <Popover placement="end top">
+            <Popover
+              placement={isNarrow ? 'bottom end' : 'end top'}
+              className="max-w-[calc(100vw-1rem)]"
+            >
               <Menu onAction={applyReparent}>
                 <MenuItem
                   id={TOP_LEVEL}

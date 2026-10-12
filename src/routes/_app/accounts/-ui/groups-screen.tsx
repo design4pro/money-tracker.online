@@ -115,11 +115,13 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
     )
   }
 
-  /** Puts the refusal on screen. A group that no longer exists means the list is stale: reload it. */
+  /**
+   * Puts the refusal on screen and reloads. Today's wire carries no kind, so a refusal cannot be told
+   * from a stale list; a reload is cheap and shows the truth either way.
+   */
   function refuse(error: unknown) {
-    const { messageKey, isStale } = refusalFor(error)
-    setRefusal(messageKey)
-    if (isStale) void refresh()
+    setRefusal(refusalFor(error))
+    void refresh()
   }
 
   async function applyMove(move: TreeMove): Promise<boolean> {
@@ -136,8 +138,6 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
       await reorderAccountGroups({ data: { ids: [...move.orderedIds] } })
     } catch (error) {
       refuse(error)
-      // The first write landed even though the second did not: show the server's state, not ours.
-      if (isReparented) void refresh()
       return false
     }
     setRefusal(null)
@@ -149,7 +149,6 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
 
   /** Create or edit. Rejects with the original error so the dialog can show its own sentence. */
   async function saveGroup(group: GroupItem | null, values: GroupFormValues) {
-    let hasUpdated = false
     try {
       if (group === null) {
         const created = await createAccountGroup({
@@ -168,7 +167,6 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
             },
           },
         })
-        hasUpdated = true
         if (isReparented) {
           // Re-filed through the form lands at the end of its new run, as "Move to…" does.
           const move = reparentMove(groups, group.id, values.parentId)
@@ -189,8 +187,8 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
       setRefusal(null)
       await refresh()
     } catch (error) {
-      // An update that landed before a later write failed is already on the server.
-      if (hasUpdated || refusalFor(error).isStale) void refresh()
+      // An update may have landed before a later write failed, and the list may be stale: reload.
+      void refresh()
       throw error
     }
   }

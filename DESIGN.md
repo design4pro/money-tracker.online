@@ -874,9 +874,9 @@ because what a row can do differs (a category archives, a group deletes).
   that row's parent: one rule, no nesting-by-hovering. Rows that are not part of the order
   (accounts inside a group) are not drop targets - the target is cancelled, so no indicator is
   drawn and a keyboard drag skips it - and cannot start a drag. The group tree offers each
-  boundary between two rows of a run once, as _before_ the later one (a drop cannot know which
-  row is being dragged, so a group that has children can still be dropped beside a child: the
-  repository refuses it and the reader gets the refusal sentence, while the menu disables it); _after_ exists for the last
+  boundary between two rows of a run once, as _before_ the later one (the target is also cancelled
+  for a dragged group that has children when the target is a sub-group, which the one-level rule would
+  refuse); _after_ exists for the last
   row of a run only, and its indicator is drawn directly under that row. For the last top-level group, which
   has its accounts beneath it, that reads as "inside" - a known limit of a row-based indicator and
   the reason the menu is not optional. After a move, a rename or a create, focus stays on (or goes

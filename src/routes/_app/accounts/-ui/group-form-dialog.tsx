@@ -17,6 +17,7 @@ import { useTranslate } from '#/lib/i18n'
 
 import { refusalFor } from './group-refusal'
 
+import type { MessageKey } from '#/lib/i18n'
 import type { Key } from 'react-aria-components'
 
 import type { GroupItem } from './group-rows'
@@ -74,9 +75,7 @@ export function GroupFormDialog({
     parentId: group === null ? (initialParentId ?? null) : group.parentId,
   }))
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<ReturnType<typeof refusalFor> | null>(
-    null,
-  )
+  const [failure, setFailure] = useState<MessageKey | null>(null)
   // Validation appears after the first submit: an empty field is not a mistake until it is offered.
   const [hasTriedToSubmit, setHasTriedToSubmit] = useState(false)
 
@@ -133,7 +132,7 @@ export function GroupFormDialog({
                 {failure === null ? null : (
                   <ErrorPanel
                     title={t('accounts.group.form.error.title')}
-                    body={t(failure.messageKey)}
+                    body={t(failure)}
                   />
                 )}
 

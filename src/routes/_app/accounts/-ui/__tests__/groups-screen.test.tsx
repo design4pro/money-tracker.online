@@ -3,11 +3,13 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { I18nProvider } from '#/lib/i18n'
+import { FAILURE_MESSAGE_KEYS } from '#/lib/failure-envelope'
 import en from '#/lib/i18n/messages/en'
 
 import { GroupTreeSkeleton } from '../group-states'
 import { GroupsScreen } from '../groups-screen'
 
+import type { FailureKind } from '#/lib/failure-envelope'
 import type { Catalogue } from '#/lib/i18n'
 import type { GroupItem } from '../group-rows'
 
@@ -30,9 +32,18 @@ vi.mock('#/server/fns/accounts', () => server)
 
 const RAW = 'account_group g-7 in org org-1 SQLITE_CONSTRAINT'
 
-/** The error the framework rebuilds today: `name`, `message` and the repository's own `code`. */
-function refused(name: string, code: string): Error {
-  return Object.assign(new Error(RAW), { name, code })
+/**
+ * A refusal as it will arrive once the redaction middleware is registered (#649): the message and
+ * the public envelope. Today's wire carries the message alone, which `refusedToday` stands for.
+ */
+function refused(kind: FailureKind): Error {
+  return Object.assign(new Error(RAW), {
+    envelope: { v: 1, kind, message: { key: FAILURE_MESSAGE_KEYS[kind] } },
+  })
+}
+
+function refusedToday(): Error {
+  return new Error(RAW)
 }
 
 function group(
@@ -95,14 +106,19 @@ describe('GroupsScreen refusals', () => {
     expect(screen.getByRole('alert').textContent).toBe('')
   })
 
-  it.each([
-    ['Forbidden', 'FORBIDDEN', /Only an owner or an admin/],
-    ['Conflict', 'CONFLICT', /does not fit the groups as they are/],
-    ['Anything else', 'SQLITE', /Something went wrong/],
+  it.each<[string, () => Error, RegExp]>([
+    ['Forbidden', () => refused('forbidden'), /Only an owner or an admin/],
+    [
+      'Conflict',
+      () => refused('conflict'),
+      /does not fit the groups as they are/,
+    ],
+    ['Anything else', () => refused('internal'), /Something went wrong/],
+    ['today’s kindless', refusedToday, /Something went wrong/],
   ])(
-    'says a %s refusal as a catalogue sentence, never the raw message',
-    async (name, code, sentence) => {
-      server.reorderAccountGroups.mockRejectedValue(refused(name, code))
+    'says a %s refusal as a catalogue sentence, never the raw message, and reloads',
+    async (_name, make, sentence) => {
+      server.reorderAccountGroups.mockRejectedValue(make())
       const { user, onRefresh } = renderScreen()
       await pickFromMenu(user, 'Business', 'Move up')
 
@@ -110,14 +126,12 @@ describe('GroupsScreen refusals', () => {
       await waitFor(() => expect(region.textContent).toMatch(sentence))
       expect(region.textContent).toContain('That change was not made')
       expect(document.body.textContent).not.toContain(RAW)
-      expect(onRefresh).not.toHaveBeenCalled()
+      await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
     },
   )
 
   it('reloads the list and says so when the group is gone', async () => {
-    server.reorderAccountGroups.mockRejectedValue(
-      refused('NotFoundError', 'NOT_FOUND'),
-    )
+    server.reorderAccountGroups.mockRejectedValue(refused('not_found'))
     const { user, onRefresh } = renderScreen()
     await pickFromMenu(user, 'Business', 'Move up')
 
@@ -131,7 +145,7 @@ describe('GroupsScreen refusals', () => {
 
   it('clears the sentence after the next move succeeds', async () => {
     server.reorderAccountGroups
-      .mockRejectedValueOnce(refused('ConflictError', 'CONFLICT'))
+      .mockRejectedValueOnce(refused('conflict'))
       .mockResolvedValueOnce(undefined)
     const { user } = renderScreen()
     await pickFromMenu(user, 'Business', 'Move up')
@@ -180,9 +194,7 @@ describe('GroupsScreen moves', () => {
   })
 
   it('does not reorder when the re-parenting is refused', async () => {
-    server.updateAccountGroup.mockRejectedValue(
-      refused('GroupDepthError', 'CONFLICT'),
-    )
+    server.updateAccountGroup.mockRejectedValue(refused('conflict'))
     const { user } = renderScreen()
     await user.click(
       screen.getByRole('button', { name: 'Actions for Business' }),
@@ -236,9 +248,7 @@ describe('GroupsScreen delete', () => {
   })
 
   it('puts a refusal in the alert region, closes the dialog and prints no raw message', async () => {
-    server.deleteAccountGroup.mockRejectedValue(
-      refused('ForbiddenError', 'FORBIDDEN'),
-    )
+    server.deleteAccountGroup.mockRejectedValue(refused('forbidden'))
     const { user } = renderScreen()
     await pickFromMenu(user, 'Empty', 'Delete group')
     await user.click(
@@ -286,9 +296,7 @@ describe('GroupsScreen form', () => {
   })
 
   it('keeps the dialog open with the sentence when the save is refused', async () => {
-    server.createAccountGroup.mockRejectedValue(
-      refused('ConflictError', 'CONFLICT'),
-    )
+    server.createAccountGroup.mockRejectedValue(refused('conflict'))
     const { user } = renderScreen()
     await user.click(screen.getByRole('button', { name: 'New group' }))
     const dialog = await screen.findByRole('dialog')
@@ -381,7 +389,9 @@ describe('GroupsScreen reload failures', () => {
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: /Inside/ }))
     await user.click(await screen.findByRole('option', { name: 'Joint' }))
-    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save changes' }),
+    )
     await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
     expect(dialog.textContent).toContain('The group was not saved')
   })

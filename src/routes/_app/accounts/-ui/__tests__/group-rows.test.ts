@@ -99,6 +99,16 @@ describe('acceptsDrop', () => {
     expect(acceptsDrop(groups, 'group:bills', 'after')).toBe(true)
     expect(acceptsDrop(groups, 'group:savings', 'after')).toBe(true)
   })
+
+  it('refuses a group that has sub-groups beside a sub-group, which would nest a third level', () => {
+    // "joint" holds trips and bills: beside either of them it would become a sub-group itself.
+    expect(acceptsDrop(groups, 'group:trips', 'before', 'joint')).toBe(false)
+    expect(acceptsDrop(groups, 'group:bills', 'after', 'joint')).toBe(false)
+    // Top level stays open to it, and a childless group may go beside a sub-group.
+    expect(acceptsDrop(groups, 'group:business', 'before', 'joint')).toBe(true)
+    expect(acceptsDrop(groups, 'group:trips', 'before', 'business')).toBe(true)
+    expect(acceptsDrop(groups, 'group:bills', 'after', 'savings')).toBe(true)
+  })
 })
 
 describe('focusKeyAfterDelete', () => {

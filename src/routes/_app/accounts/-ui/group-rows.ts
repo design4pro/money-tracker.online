@@ -126,6 +126,10 @@ export function buildEntries(
  * everything inside it" on screen rather than only in the arithmetic. The last group of a run has
  * no following sibling, so its `after` is the only way to name the end of the run.
  *
+ * A group that has children cannot go beside a sub-group, because it would become a sub-group
+ * itself and a third level is refused. `draggedId` is the group being dragged; the target is
+ * cancelled for it, which is what keeps a drop the repository would refuse from being offered.
+ *
  * The indicator for that last `after` is drawn directly under the group's own row. For the last
  * top-level group, which has its accounts beneath it, that reads as a drop *inside* the group: a
  * known limit of a row-based indicator, and the reason the menu path ships beside the drag.
@@ -134,12 +138,20 @@ export function acceptsDrop(
   groups: ReadonlyArray<GroupItem>,
   key: string,
   position: 'before' | 'after' | 'on',
+  draggedId?: string,
 ): boolean {
   if (position === 'on') return false
   const id = groupIdOf(key)
   if (id === null) return false
   const group = groups.find((candidate) => candidate.id === id)
   if (group === undefined) return false
+  if (
+    draggedId !== undefined &&
+    group.parentId !== null &&
+    groups.some((candidate) => candidate.parentId === draggedId)
+  ) {
+    return false
+  }
   if (position === 'before') return true
 
   const run = groups.filter(
