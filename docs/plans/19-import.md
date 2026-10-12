@@ -518,6 +518,9 @@ the batch row survives so the history says so.
 
 ### Quota
 
+Before writing this spec read `07-S1`'s Quota section in `docs/plans/07-transactions-core.md`: the
+`transactions` ceiling has no enforcement point today and four documents disagree about where it is.
+
 `assertWithinLimit('transactions', ...)` is enforced **per chunk** inside the write path. Hitting the
 ceiling mid-import stops the job cleanly, leaves the batch `failed` with `imported_count` recording
 exactly how many rows landed, and reports how many remain — it does not roll back what succeeded,
