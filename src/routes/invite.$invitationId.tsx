@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { Button, Card, CardBody, Link, Skeleton, toast } from '#/components/ui'
+import { readFailure } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
@@ -44,10 +45,7 @@ export const Route = createFileRoute('/invite/$invitationId')({
       // An unauthenticated visitor is sent to sign in and brought back here, rather than being
       // told the invitation is broken — which it is not.
       if (isUnauthenticated(error)) {
-        throw redirect({
-          to: '/login',
-          search: { redirect: `/invite/${params.invitationId}` },
-        })
+        throw redirect(signInTarget(params.invitationId))
       }
       throw error
     }
@@ -63,20 +61,28 @@ export const Route = createFileRoute('/invite/$invitationId')({
   component: InvitationRoute,
 })
 
+/** The sign-in screen, carrying this invitation as the return target (`safeRedirect`'s contract). */
+function signInTarget(invitationId: string) {
+  return {
+    to: '/login',
+    search: { redirect: `/invite/${invitationId}` },
+  } as const
+}
+
 /**
  * Whether the loader failed because nobody is signed in.
  *
- * `AuthRequirementError` is raised on the server and reaches this loader through the server
- * function boundary, where `instanceof` does not survive the serialisation — the name and the
- * message do. Both are checked: the name is the reliable half, and the sentence is the fallback for
- * a client that flattens the error further.
+ * The server's failure middleware replaces the error with one whose name and message are fixed, so
+ * the answer is the `unauthenticated` kind of its public envelope (`readFailure`). The error's name
+ * stays as a second condition for one release, for a Worker that predates the middleware; the
+ * message regex is gone, because the sentence is no longer the server's to vary.
+ *
+ * A banned account is refused with a 403 by the same user guard, which classifies as `forbidden`:
+ * it no longer takes the sign-in redirect, because signing in again cannot help it.
  */
 function isUnauthenticated(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  return (
-    error.name === 'AuthRequirementError' ||
-    /sign in to continue/i.test(error.message)
-  )
+  if (readFailure(error)?.kind === 'unauthenticated') return true
+  return error instanceof Error && error.name === 'AuthRequirementError'
 }
 
 /**
@@ -160,9 +166,17 @@ function InvitationRoute() {
               // inside their previous workspace's already-fetched data.
               window.location.assign('/dashboard')
             })
-            .catch((error: Error) => {
-              toast.error(error.message)
+            .catch((error: unknown) => {
               setJoining(false)
+              // The session ended between loading this card and pressing the button: sign in and
+              // come back, as the loader does, rather than toasting a sentence with no way on.
+              if (readFailure(error)?.kind === 'unauthenticated') {
+                void router.navigate(signInTarget(params.invitationId))
+                return
+              }
+              toast.error(
+                error instanceof Error ? error.message : String(error),
+              )
               void router.invalidate()
             })
         }}
