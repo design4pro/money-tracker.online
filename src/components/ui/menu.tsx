@@ -115,7 +115,10 @@ export function MenuItem<T extends object>({
             </span>
           )}
           {icon ? (
-            <span aria-hidden="true" className="shrink-0 [&_svg]:size-4">
+            <span
+              aria-hidden="true"
+              className="shrink-0 group-data-[disabled]:opacity-45 [&_svg]:size-4"
+            >
               {icon}
             </span>
           ) : null}
@@ -141,12 +144,15 @@ export function MenuItem<T extends object>({
             </span>
           )}
           {meta ? (
-            <span className="shrink-0 text-caption text-ink-2 tabular">
+            <span className="shrink-0 text-caption text-ink-2 tabular group-data-[disabled]:opacity-45">
               {meta}
             </span>
           ) : null}
           {hasSubmenu ? (
-            <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+            <ChevronRight
+              aria-hidden="true"
+              className="size-4 shrink-0 group-data-[disabled]:opacity-45"
+            />
           ) : null}
         </>
       )}

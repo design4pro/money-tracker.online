@@ -373,6 +373,19 @@ describe('GroupsScreen focus', () => {
 })
 
 describe('GroupsScreen reload failures', () => {
+  it('reloads when the form re-parented the group but the reorder failed', async () => {
+    server.updateAccountGroup.mockResolvedValue(undefined)
+    server.reorderAccountGroups.mockRejectedValue(new Error('network'))
+    const { user, onRefresh } = renderScreen()
+    await pickFromMenu(user, 'Business', 'Rename')
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /Inside/ }))
+    await user.click(await screen.findByRole('option', { name: 'Joint' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
+    expect(dialog.textContent).toContain('The group was not saved')
+  })
+
   it('does not report a failed reload as a failed write', async () => {
     server.reorderAccountGroups.mockResolvedValue(undefined)
     const { user, onRefresh } = renderScreen()

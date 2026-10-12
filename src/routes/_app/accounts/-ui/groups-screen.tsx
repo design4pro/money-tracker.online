@@ -149,6 +149,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
 
   /** Create or edit. Rejects with the original error so the dialog can show its own sentence. */
   async function saveGroup(group: GroupItem | null, values: GroupFormValues) {
+    let hasUpdated = false
     try {
       if (group === null) {
         const created = await createAccountGroup({
@@ -167,6 +168,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
             },
           },
         })
+        hasUpdated = true
         if (isReparented) {
           // Re-filed through the form lands at the end of its new run, as "Move to…" does.
           const move = reparentMove(groups, group.id, values.parentId)
@@ -187,7 +189,8 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
       setRefusal(null)
       await refresh()
     } catch (error) {
-      if (refusalFor(error).isStale) void refresh()
+      // An update that landed before a later write failed is already on the server.
+      if (hasUpdated || refusalFor(error).isStale) void refresh()
       throw error
     }
   }
