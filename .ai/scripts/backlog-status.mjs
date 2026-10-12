@@ -1097,7 +1097,7 @@ function printFlow(report) {
 
 /**
  * Every issue with its author, body and comments - what `firstBriefAt` reads - newest first,
- * bounded like the issue report's `--limit 200`. Closed issues count: an issue that went all the
+ * bounded to the newest `pages` x 50 (200 by default). Closed issues count: an issue that went all the
  * way through is exactly the one whose latency is measurable, and leaving them out would report
  * only the stalls.
  */
