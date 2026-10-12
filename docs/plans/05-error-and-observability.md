@@ -119,7 +119,7 @@ loosened — only, possibly, documented.
 
 ## Stage 05-S2 — `ErrorPanel` and the boundaries
 
-Delivered: 2026-10-12 - the failure panel, the page-level failure and the browser evidence exist as built, merged in #684 (`ErrorPanel` options, `FailurePanel` and the reference line), #699 (`RouteError` as the page-level failure, `DefaultRouteError` placing itself) and #712 (the axe gate, the target-size and reflow checks, the frames); `pnpm vitest run` on `error-panel.test.tsx`, `failure-panel.test.tsx`, `route-error.test.tsx`, `default-error.test.tsx`, `not-found.test.tsx` and `error-panel-ownership.test.ts` passes 115 tests (16, 71, 19, 4, 3 and 2), and `e2e/errors.visual.spec.ts` is run by CI, not by the gate. Two halves are open: the offline half of `OBS-06` (the offline-failure surfaces) is deferred to `27-S1` (`PWA-03`), and the `quota` and `feature_locked` shapes have no producer: the envelope reader and the middleware (`05-S1` Phases 3 and 4, #648 and #649) are merged, but no screen renders `FailurePanel` from `readFailure(error)` yet (`grep -rn "<FailurePanel" src` finds no render outside the tests), and the plan they point at is `22-billing`'s, so they are captured through a harness. The guideline is `DESIGN.md` -> Error panel; the sites that still render a thrown message are #718.
+Delivered: 2026-10-12 - the failure panel, the page-level failure and the browser evidence exist as built, merged in #684 (`ErrorPanel` options, `FailurePanel` and the reference line), #699 (`RouteError` as the page-level failure, `DefaultRouteError` placing itself) and #712 (the axe gate, the target-size and reflow checks, the frames); `pnpm vitest run` on `error-panel.test.tsx`, `failure-panel.test.tsx`, `route-error.test.tsx`, `default-error.test.tsx`, `not-found.test.tsx` and `error-panel-ownership.test.ts` passes 115 tests (16, 71, 19, 4, 3 and 2), and `e2e/errors.visual.spec.ts` is run by CI, not by the gate. Two halves are open: the offline half of `OBS-06` (the offline-failure surfaces) is deferred to `27-S1` (`PWA-03`), and `FailurePanel` has no producer: the envelope reader and the middleware (`05-S1` Phases 3 and 4, issues #648 and #649) are merged, but no screen renders `FailurePanel` from `readFailure(error)` yet (`grep -rn "<FailurePanel" src` finds no render outside the tests), so only `RouteError` through `DefaultRouteError` is live. The `quota` and `feature_locked` shapes also wait on `22-billing`, which owns the plan they point at, so they are captured through a harness. The guideline is `DESIGN.md` -> Error panel; the sites that still render a thrown message are #718.
 
 ### Stage id
 
@@ -138,11 +138,12 @@ Delivered: 2026-10-12 - the failure panel, the page-level failure and the browse
 - `src/components/app/shell/failure-panel.tsx` — new, `FailurePanel` and `RECOVERY_OF`
 - `src/components/app/shell/failure-reference.tsx` — new, the reference line and its Copy button
 - `src/components/app/shell/use-focus-heading.ts` and `use-is-after-initial-render.ts` — new
-- `src/components/app/shell/route-error.tsx`, `default-error.tsx` and `dashboard-link.tsx` — the
-  page-level failure, the router's default boundary placing itself, and the way back
+- `src/components/app/shell/route-error.tsx` — the page-level failure
+- `src/components/app/shell/default-error.tsx` and `dashboard-link.tsx` — new, the router's default
+  boundary placing itself, and the way back
 - `src/components/app/shell/not-found.tsx` — the 404, mounted by `src/routes/__root.tsx`
 - `src/components/app/shell/__tests__/error-panel.test.tsx`, `failure-panel.test.tsx`,
-  `route-error.test.tsx`, `default-error.test.tsx` and `not-found.test.tsx` — new
+  `route-error.test.tsx` and `not-found.test.tsx` — extended; `default-error.test.tsx` — new
 - `e2e/errors.visual.spec.ts` and `e2e/support/failure-harness.tsx` — new
 - `DESIGN.md` -> Error panel
 
@@ -191,8 +192,8 @@ the two even if it wanted to.
 ### Money invariant
 
 `FailurePanel` **never renders a value from the envelope's `params` into a currency-shaped string.** The
-envelope carries a metric name and a plan id for quota failures — never an amount, never a balance —
-because `05-S1`'s scrubber has already removed them and a component that renders "you have spent
+envelope carries a metric name for quota failures, and no plan and no ceiling — never an amount, never
+a balance — because `05-S1`'s scrubber has already removed them and a component that renders "you have spent
 €1,234" from an error payload would be rendering something that no longer exists. Held by
 `failure-panel.test.tsx` → _names no plan and shows no amount for each failure kind_.
 

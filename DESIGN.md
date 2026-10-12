@@ -795,8 +795,8 @@ failure kind calls for, so a screen never invents its own way out. Both live in
   the caller says `h2` or `h4`; the sentence under it is `body` in `ink-2`. Actions wrap below: Retry
   and the way back to the dashboard are `secondary`, the link to billing is `primary`. `RouteError`, the page-level
   failure, is a frame of its own: a centred `rounded-xl` card on `border-subtle`, a 48px disc, an
-  `h1` in `title`, and it keeps the `warning` glyph it shipped with. That is the one fault that is
-  not `negative`, recorded here and not changed.
+  `h1` in `title`, a `primary` Retry, and it keeps the `warning` glyph it shipped with. That is the
+  one fault that is not `negative`, recorded here and not changed.
 - **The tones.** `negative` is a fault: something broke and nobody did anything wrong. `warning`
   is a limit the reader can act on: the workspace is at a quota or the feature is not in its plan.
   `negative` is the default. A call site does not pick a tone for a failure: `FailurePanel` derives
@@ -807,7 +807,7 @@ failure kind calls for, so a screen never invents its own way out. Both live in
   that was reached), `feature_locked` (a link to billing and nothing else) and `internal` (the
   sentence, Retry when the caller has one, a way back to the dashboard where the reader is known to
   be signed in, and a reference). `not_found` and `forbidden` share the `internal` recovery on
-  purpose, so the screen never offers a different way out for a missing row and a foreign one
+  purpose, so the screen never offers a different way out (the sentence still differs) for a missing row and a foreign one
   (`RECOVERY_OF`). The sentence is the envelope's own catalogue key, so two failures of one kind
   read the same, and no recovery shows a plan name or an amount.
 - **The states.** It has two placements, `after-action` and `in-place` (the alert-versus-region
@@ -843,8 +843,8 @@ the enclosing dialog or else to `#main-content`, never to `<body>` (`useFocusHea
 the failed match as well, so the tab already carries the failed route's own title, and an imperative
 write would compete with the rendered `<title>` and outlive a successful Retry.
 
-**The Reference Rule.** New code never renders an error's message. The panel has no `detail` prop and
-no `<details>`, `title` and `body` are catalogue copy, and the only free-form string it is given is
+**The Reference Rule.** New code never renders an error's message. `FailurePanel` has no `detail` prop
+and no `<details>` (`ErrorPanel` still has both until #718), `title` and `body` are catalogue copy, and the only free-form string it is given is
 a `reference`, which is an event id or a request id and nothing else: the panel drops anything that
 is not 8 to 64 letters, digits, `_` or `-`, but the shape narrows a string and does not prove it is
 not an amount, so the producer passes an id and never a value of its own. The existing `ErrorPanel`
