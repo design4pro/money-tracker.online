@@ -18,8 +18,9 @@ exists. `src/start.ts` registers no global middleware and says the redaction bou
 `failureRedactionMiddleware` and `classifyFailure` as if they were built.
 
 The stage was written before the code, and the code has moved around it in five ways the spec has to absorb: the
-framework serialises a thrown `Error` **with its stack and every own property**, so the thrown value itself has to be
-replaced, not only filtered in a log; 63 places in `src/routes` read `error.message` (three of them branch on
+framework returns a thrown `Error` as data and serialises its `message` with the response status left at 200 (the stack and
+own properties do not travel, see the amendment for #649), so the thrown value itself has to be replaced, not only
+filtered in a log; 63 places in `src/routes` read `error.message` (three of them branch on
 it); the stage's taxonomy has no kind for an unauthenticated request; `QuotaExceededError` does not know the plan; and
 the logger that exists today writes `errorMessage` and `errorStack`.
 
@@ -59,8 +60,10 @@ through it, so none of them can start honestly before it.
    thrown by a handler, a per-function middleware or an input validator is caught by `callNextMiddleware` and returned as
    `{ ...ctx, error }`. `handleServerAction` then serialises that whole `{ result, error, context }` object with seroval's
    `toCrossJSONStream` and answers with `getResponse().status`, which is 200 unless something set it. A probe with seroval
-   1.6.4 (the version the lockfile resolves for the TanStack packages) on an `Error` subclass with one own property shows the wire carries `message`, `name`, **`stack`** (absolute file
-   paths) and the own property, and the client rebuilds a real `Error` from it. A repository sentence such as
+   1.6.4 (the version the lockfile resolves for the TanStack packages) on an `Error` subclass with one own property was
+   read as showing that the wire carries `message`, `name`, **`stack`** and the own property. **That reading was wrong for
+   the shipped framework:** the `$TSR/Error` plugin (`ShallowErrorPlugin`) writes the `message` only, and the client
+   rebuilds `new Error(message)` (amendment for #649). A repository sentence such as
    `AliasTakenError`'s (it interpolates a normalised payee name), `InvitationAddresseeError`'s (an email) or
    `InvalidAmountError`'s (`Not an integer minor-unit amount: 12.5`) therefore reaches the browser today. A log filter alone
    cannot fix this: the thrown value has to be replaced, and the status has to be set by the middleware. A second path
@@ -131,7 +134,8 @@ Five tickets, each one pull request. No schema change, no queue change, no new d
    every kind that is not a pass-through it sets the response status and throws a `PublicFailureError`: an `Error` whose `message` is a fixed
    English fallback per kind, whose `stack` is `''`, with no `cause`, whose `name` is `PublicFailureError`, and whose only
    own data property is `envelope`.
-7. The client rebuilds that error from the wire. `readFailure(error)` returns the envelope or `null`.
+7. The client rebuilds that error from the wire through the `publicFailure` serialization adapter (`src/lib/public-failure.ts`),
+   which carries the envelope and nothing else. `readFailure(error)` returns the envelope or `null`.
 
 The middleware is outside `runWithLedgerBatch` by construction: the batch is opened inside handler bodies, so the
 `finally` flush has already run when the error reaches the middleware.
@@ -151,9 +155,10 @@ Owner modules, per `docs/SPEC.md` §8 ("one redaction middleware").
 | Which kind a thrown value is          | `src/server/errors/classify.ts` (new)   | `classifyFailure(error)`; the only switch on a `RepositoryError.code`                                                                                     |
 | What the client is told               | `src/server/errors/envelope.ts` (new)   | `buildEnvelope`; reads `FAILURE_MESSAGE_KEYS` from the shared module                                                                                      |
 | The envelope's shape, both sides      | `src/lib/failure-envelope.ts` (new)     | `FailureEnvelope` type, `failureEnvelopeSchema`, `FAILURE_KINDS`, `FAILURE_MESSAGE_KEYS`, `FAILURE_FIELD_KEYS`; isomorphic, the one owner of the key list |
-| The boundary                          | `src/server/errors/middleware.ts` (new) | `failureRedactionMiddleware`, `createFailureMiddleware(ports)`, `PublicFailureError`                                                                      |
+| The boundary                          | `src/server/errors/middleware.ts` (new) | `failureRedactionMiddleware`, `createFailureMiddleware(ports)`                                                                                            |
+| The thrown class and its wire         | `src/lib/public-failure.ts` (new)       | `PublicFailureError`, `publicFailureAdapter`; isomorphic (amendment for #649)                                                                             |
 | Reading an envelope in the browser    | `src/lib/failure.ts` (new)              | `readFailure(error)`                                                                                                                                      |
-| Where the boundary is installed       | `src/start.ts`                          | `functionMiddleware: [failureRedactionMiddleware]`                                                                                                        |
+| Where the boundary is installed       | `src/start.ts`                          | `functionMiddleware: [failureRedactionMiddleware]`, `serializationAdapters: [publicFailureAdapter]`                                                       |
 | Copy for each key                     | `src/lib/i18n/messages/{en,pl}.ts`      | Namespace `failure.*`                                                                                                                                     |
 
 Dependency direction: `classify.ts` imports `#/server/repos/errors`, `#/server/auth/tenant`, `#/server/files/upload`,
@@ -225,14 +230,14 @@ type FailureEnvelope = {
 - The envelope has no `requestId`, no timestamp, no entity and no id: two failures of the same kind are byte-identical.
   `retryAfter` is **omitted in this stage** for every kind (`PolarError` carries no `Retry-After`, and a throw site that knew one would still have to clamp it); the field stays in the type for the stage that has a source. It is never present on `not_found`. The Sentry event id `05-S2` shows is added by the report sink, not here.
 
-**`PublicFailureError`.** `class PublicFailureError extends Error { readonly envelope: FailureEnvelope }`, constructed only
-by the middleware. `message` is `FALLBACK_MESSAGES[kind]`, a constant English sentence per kind that says nothing about
+**`PublicFailureError`.** `class PublicFailureError extends Error { readonly envelope: FailureEnvelope }`, built
+by the middleware and rebuilt in the browser by the adapter. `message` is `FALLBACK_MESSAGES[kind]`, a constant English sentence per kind that says nothing about
 the cause (`"You need to sign in to continue."` for `unauthenticated`; `"This could not be completed."` for the others),
 `stack` is set to `''` after construction and `cause` is never set. A reader that still prints `error.message` shows the
 fallback, which is why the unmigrated sites keep working as a generic line until the follow-up issue that the `05-S2` spec files in its Phase 4 re-points them (row 3).
 
-**`readFailure(error: unknown): FailureEnvelope | null`.** Reads `error.envelope` (duck-typed: `instanceof` does not
-survive the wire) and parses it with `failureEnvelopeSchema` (`z.object` at the top level and for `params`, so an unknown extra key is ignored and a new `params` key needs no version bump; `v: z.literal(1)`); an unknown `v` or
+**`readFailure(error: unknown): FailureEnvelope | null`.** Reads `error.envelope` (duck-typed: an error from a Worker that
+predates the adapter, or one the default plugin rebuilt, has no `envelope`) and parses it with `failureEnvelopeSchema` (`z.object` at the top level and for `params`, so an unknown extra key is ignored and a new `params` key needs no version bump; `v: z.literal(1)`); an unknown `v` or
 shape is `null`, so an old tab never throws on a newer shape and a newer tab against an older Worker falls back to its
 generic panel.
 
@@ -536,3 +541,24 @@ What the code does differently from the text above after the follow-up to #647:
 - **The client-safety test walks the import closure** of `src/lib/failure-envelope.ts`, not only its direct specifiers. It
   follows static imports, `export ... from` and a dynamic `import('literal')`; a computed `import(expr)` and
   `import.meta.glob` are not followed.
+
+## Amendment — the envelope crosses the wire through a serialization adapter (#649)
+
+Phase 4 probed the running app and found that the spec's premise about the wire was wrong for the pinned framework
+(`@tanstack/router-core` 1.171.27): the default `$TSR/Error` plugin (`ShallowErrorPlugin`) serialises only the `message` of
+an `Error`. `name`, `stack`, `cause` and own properties never reach the browser, so (a) the leak the middleware closes is
+the `message` plus a status of 200, and (b) an `envelope` own property would have stopped at the server: `readFailure`
+would read `null` for every kind and the invitation route's `unauthenticated` redirect would have regressed on a client
+navigation.
+
+**Decision** (security-tenancy-reviewer, confidence high; `.ai/cezar` run 4cccb1f5, Resolved assumption 2 of its
+handoff): `PublicFailureError` and a `createSerializationAdapter` entry live in the isomorphic `src/lib/public-failure.ts`
+and are registered in `src/start.ts` as `serializationAdapters: [publicFailureAdapter]`. Custom adapters are consulted
+before the default plugins, so the adapter claims this class and no other value; a plain `Error`, a `redirect()`
+`Response` and a `notFound()` object serialise as before. `toSerializable` and `fromSerializable` both pass the value
+through `failureEnvelopeSchema` and fall back to the constant `internal` envelope; neither throws. The message is derived
+from the kind on both sides and never travels. No dependency was added.
+
+**Residual, unchanged by this amendment:** a failure thrown outside a server function (a route loader, `beforeLoad`, the
+framework's outer `catch`, a failure before the chain runs) still dehydrates or serialises with its `message` only. The API
+routes, the queue handlers and the Durable Object keep logging through the raw logger until `05-S3`.

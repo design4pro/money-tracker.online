@@ -147,6 +147,13 @@ filename leaves this system in an error report.**
   event is constructed.
 - The **public failure envelope** is built from typed error codes and parameters, never from an
   interpolated message. `classifyFailure` maps every thrown error to a stable code.
+- The failure boundary replaces the value a server function throws, so neither the message nor the
+  stack reaches the browser; the envelope crosses the wire through a serialization adapter that
+  carries the validated envelope and nothing else. **Not covered:** a failure thrown outside a
+  server function (a route loader, `beforeLoad`, the framework's outer `catch`, a failure before the
+  chain runs) still serialises its `message`, and the API routes, the queue handlers and the
+  Durable Object log through the raw logger until the Sentry stage routes them through the same
+  scrubber.
 - An exception message that embeds an amount is a data-protection incident, not a debugging
   convenience. This is checked in review and is the reason error constructors take structured
   fields rather than template strings.
