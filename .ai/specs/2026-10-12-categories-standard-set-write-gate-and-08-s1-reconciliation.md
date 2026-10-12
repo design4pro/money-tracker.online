@@ -166,9 +166,17 @@ stated in `colorSchema`); a colour picker or new icons; payees and tags (`08-S2`
   **A lost race is a result, not an error.** `insertMany` has no `ON CONFLICT`, and matching the text of a unique
   violation is not portable (`base.ts`, `notifications.ts` say so). When a chunk's insert throws, the seed re-reads
   the workspace's slugs once: if any slug of that chunk now exists, someone else created it, the seed re-plans the
-  remainder from the fresh read and continues; if none does, the original error is rethrown unchanged. At most one
-  re-plan per chunk. Two tabs pressing the action together therefore end with one copy of each row and no raw driver
-  error.
+  remainder from the fresh read and continues; if none does, the original error is rethrown unchanged. At most one re-plan per chunk, and the outcomes are fixed: a re-planned chunk that throws
+  again rethrows **that** second error unchanged; a failing slug re-read propagates its own error; a non-race failure
+  (a foreign-key error after a concurrent delete of a planned parent, a connection error) is rethrown unchanged and, like
+  every other write today, reaches the client with its driver text until `05-S1` redacts it (the route shows no server
+  text). `created` counts only rows **this run** inserted; a row another tab created counts in `skipped`
+  (`created + skipped` is always 36). Two tabs pressing the action together therefore end with one copy of each row and
+  no raw driver error. The plan is read once, so a concurrent `moveCategory` or archive of an existing `food` between
+  the read and the child insert can leave a child under a row that has just become a child or been archived;
+  `createCategory` has the same window and no database constraint closes it, so the "valid two-level tree" claim covers
+  the seed's **own** rows. `insertOnConflictDoNothing` exists in `base.ts` but is single-row; chunked `insertMany` is
+  chosen on purpose, so a later reader does not "fix" it into 36 statements.
 - **The depth rule has one implementation.** `assertMayParent` keeps deciding it for `createCategory` and
   `moveCategory`; its one line, "a parent that is itself a child cannot take children", is extracted into a pure
   predicate (`canTakeChildren(parent)`, behaviour-neutral, in the same file) that `assertMayParent` and the seed both
@@ -266,9 +274,11 @@ the order below.
 Rules of the application, all in `seedStandardCategories`. **Skipped, never renamed, resurrected or overwritten:** a row
 whose slug the workspace already holds (archived or not, system or not). **A child is created only under a parent that
 can take it**, resolved by slug: the parent is the row just planned or an existing row that is top-level, **active**
-(an archived parent would make an active child under an archived row), and of the **same kind** as the child. A child
-whose parent slug resolves to a row that is itself a child (`canTakeChildren` is false), is archived, has another kind,
-or does not resolve, is **skipped and counted in `skipped`**. A child under an existing parent takes **that parent's
+(an archived parent would make an active child under an archived row), and of the child's kind **or `both`** (the
+repository enforces no kind match, so this is the seed's own sanity rule: an expense child is not filed under an income
+parent, and a hand-made `both` parent takes every child). A child whose parent slug resolves to a row that is itself a
+child (`canTakeChildren` is false), is archived, has another kind, or does not resolve, is **skipped and counted in
+`skipped`**. A child under an existing parent takes **that parent's
 stored colour** (the hue the person gave it), not the table's, so the inheritance invariant the repository maintains
 holds from the first write. `position` continues after the highest in each sibling run (`nextPosition`'s rule) so the
 set lands after what the person already has. `color` is written lowercase, as `colorSchema` stores it. The names are the
@@ -311,24 +321,35 @@ spec if that has changed.
   action, **Add a category** the secondary. While the seed runs the primary button is `isPending` (React Aria's own:
   it stays focusable) and the secondary is disabled. On success the page refreshes into the tree, a toast says how
   many were added, and **focus moves to the tree's first row** (React Aria's `autoFocus="first"` on the `GridList`),
-  because the button that held it has unmounted. When nothing was added, or the call fails, the empty state stays and
-  the primary button keeps focus. A failure shows in the refusal region (`role="alert"`): a plain `member`'s refusal as
+  because the button that held it has unmounted: the flag that sets `autoFocus="first"` is set **before** the refresh
+  that mounts the tree, because React Aria reads `autoFocus` once, on mount, and ignores a later change. When nothing was
+  added, or the call fails, the empty state stays and the primary button keeps focus. A failure shows in the refusal region (`role="alert"`): a plain `member`'s refusal as
   its own sentence with no retry, anything else as `categories.seed.failed` with `empty.error.body`; the primary button
   is the retry. The action appears **only** in the empty state, not in the header of a populated page. The "Show
   archived categories" switch is rendered above the empty-state branch, so a workspace whose categories are all
   archived (the empty state shows because `status=active`) can still reach them.
 - **Refusal** (Phase 3): the same assertive region (`role="alert"`, the one live region), holding an `ErrorPanel` in
-  `mode="region"` so it is not a second nested alert, remounted by a counter on every refusal so an identical repeat is
-  announced again. The body names the moved category and the target parent, built from the catalogue, in the active
+  `mode="region"` (so it is not a second nested alert) with `headingLevel={2}` (the page's `h1` is directly above it),
+  remounted by a counter on every refusal, intended so that an identical repeat is announced again; that is an
+  intent, not a verified screen-reader behaviour (`docs/ACCESSIBILITY.md` §5.4: no assistive-technology pass has been
+  done), and nothing in the spec or the PR reads as a conformance claim. The panel also scrolls itself into view
+  (`scrollIntoView({ block: 'nearest' })`) on every refusal **without taking focus**, because a refusal after a drag on a
+  36-row tree can land above the viewport, and `focusHeading` would pull a keyboard dragger off the row. The body names the moved category and the target parent, built from the catalogue, in the active
   locale. A `member`'s refusal and every other failure read their own catalogue sentences; **no server text is shown**.
   After any refused move the route refreshes, so the tree shows what the server holds.
-- **A parent dropped beside its own child** is a no-op, not a refusal (Phase 3).
+- **A parent dropped beside its own child** is a no-op, not a refusal (Phase 3). It is silent to a keyboard user, who
+  still hears React Aria's own "dropped" announcement; that is accepted, the drop target is not refused through
+  `getDropOperation`.
+- **The panel's title follows the source:** a move or a reorder reads `categories.move.refused`, a restore
+  `categories.restore.refused`, the seed `categories.seed.failed`. `status=all` with no category at all renders an empty
+  tree and no seed button; out of scope (the person toggles back to the empty state).
+- **The secondary button** is `variant="secondary"`.
 - **Tokens:** none new. The colour stays a swatch beside the name, never a row fill. **Quota:** none.
 
 ## 📝 Edge Cases & Failure Scenarios
 
 - Pressing **Add the standard set** twice (double click, or two tabs): the second run skips every slug the first
-  wrote; the toast says nothing was added when `created` is 0.
+  wrote; the toast says nothing new was added when `created` is 0 (see Copy).
 - A workspace with only archived categories shows the empty state (`status=active`) and the archived switch above it;
   the seed skips those slugs, so a person who archived `food` does not get a second one, and its would-be children
   skip too (an archived parent takes no new active child).
@@ -342,9 +363,12 @@ spec if that has changed.
   lost race is rethrown unchanged.
 - A parent dragged beside its own child: nothing is sent.
 - A refused move is followed by a refresh, so a tree that went stale shows the truth.
-- A plain `member` in a shared workspace presses the action, drags a row or edits a category: the repository throws
-  `ForbiddenError`; the route shows the `forbidden` sentence (a write panel) with no retry. They can still pick every
-  category.
+- A plain `member` in a shared workspace presses the action, drags a row or restores a category: the repository throws
+  `ForbiddenError`; the route shows the `forbidden` sentence with no retry. **Create, edit, archive and delete** go
+  through `CategoryFormDialog` and `ConfirmDialog`, which show their own generic body (the form also shows the raw
+  `error.message`); those sites are `05-S1`'s 63-site migration and are **not** changed here (row 19). The same member
+  still sees the buttons that always refuse, because no screen in the app hides controls by role (row 5). They can still
+  pick every category.
 - A move refused after the tree went stale in another tab: the sentence names the rows the person saw; the refresh
   that follows shows the truth.
 - A refusal whose cause is not a nest conflict (forbidden, not found, network, "cannot be its own parent"): its own
@@ -376,21 +400,31 @@ the 36-row tree and a toast. No other route changes.
 Every key lands in `src/lib/i18n/messages/en.ts` and `pl.ts` in the same change (skill `i18n-messages`; the parity
 test fails otherwise). New:
 
-- `categories.seed.action`: "Add the standard set"
-- `categories.seed.failed`: "The standard set could not be added" (body: the existing `empty.error.body`)
-- `categories.toast.seeded`: a plural message, `one`: "Added {count} category.", `other`: "Added {count} categories."
-  (the Polish entry carries `one`, `few`, `many` and `other`; no `if (n === 1)`)
-- `categories.toast.seeded.none`: "Everything in the standard set is already here."
-- `categories.move.refused.nest`: "{category} cannot go inside {parent}: categories nest only two levels."
-- `categories.move.refused.forbidden`: "Only an owner or an admin can change categories in a shared workspace."
+- `categories.seed.action`: EN "Add the standard set", PL "Dodaj zestaw standardowy"
+- `categories.seed.failed`: EN "The standard set could not be added", PL "Nie udało się dodać zestawu standardowego"
+  (body: the existing `empty.error.body`)
+- `categories.toast.seeded`: a plural message. EN `one` "Added {count} category.", `other` "Added {count} categories."
+  PL `one` "Dodaliśmy {count} kategorię.", `few` "Dodaliśmy {count} kategorie.", `many` "Dodaliśmy {count} kategorii.",
+  `other` "Dodaliśmy {count} kategorii." (no `if (n === 1)`)
+- `categories.toast.seeded.none`: EN "Nothing new was added. The standard set already exists here; archived categories are
+  under "Show archived categories"." PL "Nic nowego nie dodaliśmy. Zestaw standardowy już tu jest; zarchiwizowane kategorie
+  znajdziesz pod „Pokaż zarchiwizowane kategorie”." True when `created` is 0, which on the empty state means every slug
+  exists and the rows are archived. `skipped` is deliberately not surfaced (row 19).
+- `categories.move.refused.nest`: EN "The category "{category}" cannot go inside "{parent}": categories nest only two
+  levels." PL „Kategoria „{category}” nie może trafić do kategorii „{parent}”: kategorie mają tylko dwa poziomy.” The
+  names are quoted and preceded by a noun, because a Polish name cannot be declined inside a sentence.
+- `categories.refused.forbidden`: EN "Only an owner or an admin can change categories in a shared workspace." PL "Kategorie w
+  tym domu mogą zmieniać tylko właściciele i administratorzy." (Not move-named: the seed and the restore use it too.)
+- `categories.restore.refused`: EN "That category was not restored", PL "Nie przywróciliśmy kategorii"
 - Removed in both locales: `categories.move.refused.body` (the generic body is `empty.error.body`; no other reader,
   checked by `grep`).
 
 Changed (both locales): `categories.empty.body`, from "A category answers "what was this for". Add the first one and
-the reports have something to group by." to a sentence that offers the ready-made set first: "A category answers "what
-was this for". Start from a ready-made set you can rename, recolour or archive, or add your own." The Polish entries
-are a real Polish phrasing, not a translation pass. The standard set's **names** are data in
-`standard-set.ts` (table above), not catalogue keys: they are stored as text, like any category a person types.
+the reports have something to group by." to a sentence that offers the ready-made set first. EN: "A category answers
+"what was this for". Start from a ready-made set you can rename, recolour or archive, or add your own." PL: „Kategoria
+odpowiada na pytanie „na co to poszło”. Zacznij od gotowego zestawu, który możesz zmieniać, przemalować lub
+zarchiwizować, albo dodaj własną.” The standard set's **names** are data in `standard-set.ts` (table above), not
+catalogue keys: they are stored as text, like any category a person types.
 
 ## 📋 Phasing
 
@@ -398,14 +432,16 @@ are a real Polish phrasing, not a translation pass. The standard set's **names**
 | ----- | ------- | ---------- | ------------------------------------------------------------------------------------------------ |
 | 1     | 1       | -          | Tests only: isolation section, money case 19, handler test.                                      |
 | 2     | 1       | 1          | `assertMayAdminister` on six writes, with a case per function.                                   |
-| 3     | 1       | -          | Server messages name categories; `dropMove` no-op; refusal reader and panel; first browser case. |
-| 4a    | 1       | 2          | Data file, repository function, server function, tests.                                          |
-| 4b    | 1       | 3, 4a      | Empty state, route wiring, keys, focus.                                                          |
-| 5     | 1       | 3, 4b      | Rest of `e2e/categories.visual.spec.ts`, evidence frames.                                        |
+| 3     | 1       | 2          | Server messages name categories; `dropMove` no-op; refusal reader and panel; first browser case. |
+| 4a    | 1       | 3          | Data file, repository function, server function, tests.                                          |
+| 4b    | 1       | 4a         | Empty state, route wiring, keys, focus.                                                          |
+| 5     | 1       | 4b         | Rest of `e2e/categories.visual.spec.ts`, evidence frames.                                        |
 | 6     | 1       | 1 to 5     | Plan amendment, schema comment, one pointer sentence in `26-S1`, `Delivered:` line.              |
 
-That is seven tickets, within the eight an `afk-to-tickets` run slices. 4b waits for 3 because both edit the route
-(`src/routes/_app/categories/index.tsx`).
+That is seven tickets, within the eight an `afk-to-tickets` run slices. The chain is linear, 1, 2, 3, 4a, 4b, 5, 6, on purpose:
+Phases 2, 3 and 4a all edit `src/server/repos/categories.ts` and `categories.test.ts`, 4a calls the `canTakeChildren`
+predicate that Phase 3 extracts, and 3 and 4b both edit the route (`src/routes/_app/categories/index.tsx`). A slicer
+must not run two of them in parallel.
 
 ## 📋 Implementation Plan
 
@@ -463,7 +499,7 @@ changes.
 
 Tenant-isolation test: unchanged (Phase 1). Money invariant: none, the phase writes no amount.
 
-### Phase 3 (no blocker)
+### Phase 3 (blocked by Phase 2: same files)
 
 8. **Server messages.** `assertMayParent(scope, categoryId, categoryName, parentId)` (the shared predicate of the
    Architecture is extracted here). `CategoryDepthError` takes `categoryName` and `parentName` beside the ids:
@@ -476,21 +512,28 @@ subcategories (3); move them out before filing it inside another category.` Keep
    (a parent dropped beside its own child); one case in `move.test.ts`.
 10. **Refusal reader and panel.** Create `src/routes/_app/categories/-lib/refusal.ts` (`refusalOf`, Architecture) and
     `src/routes/_app/categories/-ui/refusal-panel.tsx`. In `index.tsx` replace the string `refusal` state with
-    `Refusal | null`, set by `applyMove` from the names in `byId` and the move's `parentId`: `nest` only when
-    `moveCategory` (not `reorderCategories`) failed, the target `parentId` is not `null` and `refusalOf` says so;
-    failures of `restoreCategory` and `reorderCategories` are read by `refusalOf` as `forbidden` or `generic`, never as
-    `nest`. After **any** refused move the route calls `refresh()`, so the tree shows what the server holds. The panel
-    keeps `categories.move.refused` as its title and **no longer receives `detail`**: no server text is shown. The body is
-    `categories.move.refused.nest` for `nest`, `categories.move.refused.forbidden` for `forbidden` and `empty.error.body` for
+    `Refusal | null`. `refusalOf(error, context)` takes `context: { call: 'move' | 'reorder' | 'restore' | 'seed';
+category?: string; parent?: string }` (the names the route holds in `byId`, `parent` only for a move whose target
+    `parentId` is not `null`) and returns `{ kind: 'nest', category, parent }`, `{ kind: 'forbidden' }` or
+    `{ kind: 'generic' }`, each with its `call`: `nest` only when `call` is `'move'` and the error has the nest shape;
+    `reorder`, `restore` and `seed` failures are read as `forbidden` or `generic`, never as `nest`. The route's own
+    `withRefusal` (which today stores `error.message`) takes the `call` and a names context. After **any** refused move the route calls `refresh()`, so the tree shows what the server holds. The panel
+    takes its title from the `call` (`move` and `reorder`: `categories.move.refused`; `restore`:
+    `categories.restore.refused`; `seed`: `categories.seed.failed`) and **no longer receives `detail`**: no server text
+    is shown. It sets `headingLevel={2}`, and scrolls itself into view with `scrollIntoView({ block: 'nearest' })` on
+    every refusal without taking focus. Correct the module header of `index.tsx`: it says a refusal lands "as well as in a
+    toast", which the code has never done. The body is
+    `categories.move.refused.nest` for `nest`, `categories.refused.forbidden` for `forbidden` and `empty.error.body` for
     `generic`. It is the
     `ErrorPanel` with `mode="region"` (so the wrapper `role="alert" aria-live="assertive"` stays the one live region and
     the panel is not a second, nested alert), keyed by a counter that increments on every refusal so a repeat of the
-    same sentence re-announces. Do not edit the other `error.message` sites of the file.
+    same sentence is meant to re-announce (an intent, not a verified behaviour). Do not edit the other `error.message` sites of the file.
 11. **Tests.** `refusal.test.ts`: the depth-error shape and the has-children shape read as `nest`; a plain
     `ConflictError("… cannot be its own parent.")` reads as `generic`; `code: 'FORBIDDEN'` reads as `forbidden`; `null`,
     a string and an object without `code` read as `generic`; no message text of the error ever reaches the result.
     `refusal-panel.test.tsx` (`@testing-library`): `nest` renders both names in `en` and in `pl`; `forbidden` and
-    `generic` render their own catalogue sentences; a second refusal with equal text remounts the panel.
+    `generic` render their own catalogue sentences; a second refusal with equal text remounts the panel; the panel renders an `h2` and calls `scrollIntoView` once per refusal
+    without moving focus.
 12. **First browser case, proving the premise.** Create `e2e/categories.visual.spec.ts` on the model of
     `e2e/rules.visual.spec.ts` (`storageStateFor('demo')`, `./support/console`, `expectNoSeriousViolations` from
     `./support/budgets`; the demo workspace is read and never written, `scripts/seed/verify.mjs` asserts its counts) with
@@ -501,13 +544,18 @@ subcategories (3); move them out before filing it inside another category.` Keep
     _Codzienne_ and _Dom_ (not the generic body, which is how this case fails if `code` does not survive the wire), that
     a reload shows the tree unchanged, and that the console stayed silent. If React Aria's keyboard drag cannot be
     driven to that drop target in Playwright, use the pointer drag (`dragTo`, Chromium) for the same drop; the
-    assertions do not change. A refusal writes nothing, so the demo stays intact.
+    assertions do not change. A refusal writes nothing, so the demo stays intact. **Stop rule:** if
+    the case reads the generic body because `code` or the own properties did not survive the Start transport, the ticket
+    stops and the spec is amended (the reader changes, or `05-S1` is asked for a kind); the implementer does not read
+    `error.message` and does not weaken the assertion. The ticket is not done until the case has actually run, locally or in
+    CI e2e (`scripts/ci/change-scope.mjs` runs the browser legs for any change that reaches the browser); an environment-less run reports the
+    case as not run.
 13. Add the keys (Copy) in both locales; remove `categories.move.refused.body` after `grep -rn "move.refused.body" src`
     shows no other reader; `pnpm vitest run src/lib/i18n` for parity.
 
 Tenant-isolation test: unchanged. Money invariant: none, the phase writes no amount.
 
-### Phase 4a (blocked by Phase 2)
+### Phase 4a (blocked by Phase 3: it calls `canTakeChildren`)
 
 14. Create `src/server/categories/standard-set.ts`: the typed table above as `STANDARD_CATEGORIES` (`slug`,
     `parentSlug | null`, `kind`, `hue` a lowercase `#rrggbb` string literal, `icon` typed `CategoryIconName` from
@@ -515,8 +563,9 @@ Tenant-isolation test: unchanged. Money invariant: none, the phase writes no amo
     `palette.ts` (that file imports `#/components/charts/encoding`, a UI module; `icon-names.ts` exists as names only for
     the same reason): the test of step 17 alone asserts that every `hue` is one of `CATEGORY_HUES`. No SQL, no import of
     the repository. `position` in the table is relative order only.
-15. Add `seedStandardCategories` and its schema to `categories.ts` as in API Contracts: the Phase 2 gate; one read of the
-    workspace's categories; the plan of Data Model "Rules of the application"; parents-first chunks of at most
+15. Add `seedStandardCategories` and its schema to `categories.ts` as in API Contracts: parse `input` with `seedStandardCategoriesSchema` (Zod twice), then
+    the Phase 2 `assertMayAdminister` gate, then one read of the workspace's categories; import `isSupportedLocale` and
+    `Locale` from `#/lib/i18n` (as `src/server/auth/config.ts` does); the plan of Data Model "Rules of the application"; parents-first chunks of at most
     `floor(100 / CATEGORY_INSERT_PARAMETERS)` rows with `CATEGORY_INSERT_PARAMETERS = 12` named beside a comment that
     states how it was measured; the lost-race re-plan of the Architecture; `isSystem: false`; the `{ created, skipped }`
     result.
@@ -530,43 +579,52 @@ Tenant-isolation test: unchanged. Money invariant: none, the phase writes no amo
     `groceries` and `dining-out` in `food`'s own stored colour and is not renamed; an **archived** `food` makes its
     would-be children skip and count in `skipped`; a hand-made child named `food`, and a hand-made `food` whose kind is
     `income`, make theirs skip; **every statement the seed ran bound at most 100 parameters**; a conflicting slug
-    inserted between two chunks (a driver hook) ends with no duplicate and no raw error, and an error that is not a
-    lost race is rethrown unchanged; an unknown locale and an extra field are refused; a `member` in a shared workspace
-    is refused; recolouring `housing` afterwards repaints its four children. Add `seedStandardCategories` to the
+    inserted between two chunks (a driver hook) ends with no duplicate and no raw error, a re-planned chunk that throws
+    again rethrows the second error unchanged, and an error that is not a lost race is rethrown unchanged; `created`
+    counts this run's rows only and a row inserted by the hook counts in `skipped`; a hand-made `both` parent takes the
+    set's children; an unknown locale and an extra field are refused; a `member` in a shared workspace
+    is refused; and extend `src/server/fns/__tests__/categories.test.ts` to the **tenth** handler: `requireOrg` is
+    called and its scope passed, no ledger batch is opened, an unknown locale and an extra field are refused at the
+    validator, a `member` in a shared workspace rejects with a `ForbiddenError`; recolouring `housing` afterwards repaints its four children. Add `seedStandardCategories` to the
     isolation section (A seeds; B's tree is byte-identical; B holding `food` does not make A skip it), to the gate table
     of step 6 and to money case 19.
 
 Tenant-isolation test and money invariant: step 17.
 
-### Phase 4b (blocked by Phases 3 and 4a, which edit the same route)
+### Phase 4b (blocked by Phase 4a; Phase 3 edited the same route)
 
 18. In `category-states.tsx` give `CategoryEmptyState` `onSeed`, `onCreate` and `isSeeding`: **Add the standard set** in
-    the `action` slot with `isPending`, **Add a category** in the `secondaryAction` slot (a non-primary variant) and
+    the `action` slot with `isPending`, **Add a category** in the `secondaryAction` slot (`variant="secondary"`) and
     disabled while seeding. In `index.tsx` render the "Show archived categories" `Switch` **above** the empty-state
     branch, so a workspace whose categories are all archived can reach them.
-19. Route wiring: call the server function with `locale` from `useLocale()`. On success `await` the invalidation and
-    cache refresh, then toast (`categories.toast.seeded` with `count`, or `.none` when `created` is 0) and, when
-    `created > 0`, set a state flag that makes `CategoryTree` pass `autoFocus="first"` to its `GridList`
-    (React Aria's own prop, forwarded by `components/ui/grid-list.tsx`, which spreads its props) so focus lands on the
-    first row once the tree has mounted. When `created` is 0 or the call fails, the empty state stays mounted and focus
+19. Route wiring: call the server function with `locale` from `useLocale()`. When the call returns with `created > 0`, **first** set a state flag
+    `focusTree`, **then** `await` the invalidation and cache refresh, then toast (`categories.toast.seeded` with `count`;
+    `.none` when `created` is 0). `CategoryTree` takes `autoFocus` and passes `autoFocus="first"` to its `GridList`
+    (React Aria's own prop, forwarded by `components/ui/grid-list.tsx`, which spreads its props). The order matters:
+    React Aria reads `autoFocus` once, on mount (`useSelectableCollection` holds it in a ref), so a flag set after the
+    tree has mounted does nothing and focus falls to `<body>`. The route clears the flag at the start of the next write
+    and on a filter change, so a later remount does not take focus. When `created` is 0 or the call fails, the empty state stays mounted and focus
     stays on the primary button (`isPending` keeps it focusable). A failure is read by `refusalOf` and shown in the
     refusal region: `forbidden` as its catalogue sentence with **no retry**, anything else as `categories.seed.failed`
     with `empty.error.body`; neither panel carries its own retry, because the primary button is the retry.
 20. Tests: the empty state renders both buttons, the primary first in tab order; `isPending` keeps the primary focusable
-    and disables the secondary; a click calls `onSeed` once; `CategoryTree` with `autoFocus="first"` focuses its first
-    row on mount. **The residual, stated:** jsdom cannot assert focus after an asynchronous refresh honestly
+    and disables the secondary; a click calls `onSeed` once; `CategoryTree` rendered with `autoFocus="first"` on its **first** render focuses
+    its first row, and one rerendered with the prop turned on afterwards does not (the test pins the order the route
+    relies on). **The residual, stated:** jsdom cannot assert focus after an asynchronous refresh honestly
     (`e2e/focus-restoration.spec.ts`), and Phase 5 does not press the seed in the shared demo workspace, so the
-    real-browser focus after a successful seed is verified by the implementer on an empty workspace and described in the
-    PR body, not by a committed spec. `DESIGN.md` needs no entry: the empty state is not a new shared component.
+    real-browser focus after a successful seed is verified by the implementer on an empty workspace and reported in the
+    PR body as an explicit pass or fail line (where focus landed), not by a committed spec. `DESIGN.md` needs no entry: the empty state is not a new shared component.
 21. Add the keys (Copy) in both locales; `pnpm vitest run src/lib/i18n`.
 
 Tenant-isolation test and money invariant: none in this ticket (Phase 4a).
 
-### Phase 5 (blocked by Phases 3 and 4b)
+### Phase 5 (blocked by Phase 4b)
 
 22. Complete `e2e/categories.visual.spec.ts`, each case in light and dark and in `en` and `pl` where it prints text,
     nothing writing to the demo workspace:
-    - axe on `/categories` at rest and on the refusal state of Phase 3's case: zero `serious`, zero `critical`;
+    - axe on `/categories` at rest and on the refusal state of Phase 3's case: zero `serious`, zero `critical`, and
+      `expectOutlineWithoutSkips` (`e2e/support/headings.ts`) on the refusal state, because `heading-order` is
+      best-practice and not in the AA scan;
     - the row menu opened **from the keyboard** on a child: the four ordering items and _Move to…_ are offered, the
       submenu lists the top-level parents and no child, and an item that would change nothing is disabled;
     - the empty state in the `empty` session (`storageStateFor('empty')`, as `states.spec.ts`): the two buttons by
@@ -575,7 +633,10 @@ Tenant-isolation test and money invariant: none in this ticket (Phase 4a).
       mode).
 23. Capture the browser evidence for the PR body with `scripts/visual/capture.mjs` (ADR 0016), frames outside the
     repository: a two-level tree of twelve categories, light and dark, **360 / 1280 / 2560 px**, the empty state, the
-    _Move to…_ menu open, the refusal sentence, and the focus position after a seed on an empty workspace. Run
+    _Move to…_ menu open, the refusal sentence, and the focus position after a seed on an empty workspace. The **360 px `pl`** frame of the seeded tree comes from
+    an empty workspace (Phase 5 never seeds the demo) and is read for clipping: "Czynsz lub rata kredytu" and
+    "Restauracje i kawiarnie" sit in a row that holds a grip, a corner icon, an icon, a swatch and a menu. If a name
+    clips, the row's name wraps (`break-words`, no `truncate`) in the same ticket; the set's names are not shortened. Run
     `pnpm exec playwright test e2e/categories.visual.spec.ts` against a running environment
     (`docs/agents/shared-checkout.md` ports) and say which one in the PR. `pnpm e2e` is not in the gate.
 
@@ -601,9 +662,13 @@ Tenant-isolation test and money invariant: none, the phase is a browser spec ove
     - Change nothing outside the `08-S1` block, with one exception: one pointer sentence in the `presets.ts` bullet of
       `## Stage 26-S1` in `docs/plans/26-onboarding.md` ("the category structures build on the standard set
       `src/server/categories/standard-set.ts` of `08-S1` and never redefine it").
-25. **Correct the `is_system` comment** in `src/server/db/schema.ts` (comment only; no `drizzle/` change, and
-    `pnpm db:generate` must stay a no-op) and the matching sentence of the `08-S1` block: system rows are reserved for a
-    row the product must find by slug, none exists today, and the standard set is not system.
+25. **Correct the stale comments** (comments only; no `drizzle/` change, and `pnpm db:generate` must stay a no-op):
+    the `is_system` rationale at `src/server/db/schema.ts` (the `categories` table docblock) and in the
+    `SystemCategoryError` docblock of `src/server/repos/categories.ts` (system rows are reserved for a row the product
+    must find by slug, none exists today, and the standard set is not system); the sentence in the same `schema.ts`
+    docblock that says "A stored colour survives the parent being recoloured", which contradicts `cascadeColor` (a child
+    that still carries the parent's old colour is repainted, a child with its own colour is not); and the matching
+    sentence of the `08-S1` block.
 26. **Add the `Delivered:` line** directly under `## Stage 08-S1`: `Delivered: <YYYY-MM-DD> - <evidence>`, dated the day
     Phase 6 is written, naming the paths of step 24, the Phase 1 to 5 pull requests, and the test counts re-read by
     running `pnpm vitest run` on the changed files in the Phase 6 pull request (the numbers at spec time were 41, 7, 4, 4
@@ -635,10 +700,15 @@ saying so on the spec PR.
 | 12  | Does Phase 6 add the `Delivered:` line, and when?                                 | **Yes, as its last step, after Phases 1 to 5 have merged.**                                                                                                                                                                                         | A marker nothing re-checks must follow the evidence it cites; the 07-S1, 03-S1 and 05-S2 specs do the same.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 13  | Do the handler tests mock repository code?                                        | **No. Only the framework seams (`createServerFn`, `requireOrg`, `cloudflare:workers`).**                                                                                                                                                            | A mocked repository would agree that the gate and the refusal are present whether or not they are.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 14  | Which numbers in this spec are measured?                                          | `906` lines, `41 + 7 + 4 + 4 + 21 = 77` tests (one run), `12` parameters per row and `96 / 108 / 432` for 8 / 9 / 36 rows, `36` rows (`12` parents, `24` children), `18` the highest money-invariant section.                                       | Read from the commands below, run while writing this spec at HEAD `bbd7c16`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 15  | Product owner: approve this spec?                                                 | _Filled in by the panel step._                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 16  | Software architect: approve this spec?                                            | _Filled in by the panel step._                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 17  | Security and tenancy reviewer: approve this spec?                                 | _Filled in by the panel step._                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 18  | Accessibility and UX specialist: approve this spec?                               | _Filled in by the panel step._                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 15  | The 36-row taxonomy itself: names, icons, the ten expense and two income parents  | **As in the Data Model table; original to this repository.**                                                                                                                                                                                        | A generic household-budget taxonomy; the plan fixes no list, and the product owner's condition was a real Polish set. It is data in one file, reversible by editing it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 16  | Hue reuse across the twelve parents                                               | **Allowed: `housing` and `finance` share blue, `transport` and `other-expenses` share teal, `food` and `salary` share green.**                                                                                                                      | Forced by twelve parents against eight hues (`CATEGORY_HUES`). The colour is a swatch beside the name, never the only signal; the donut's text table and non-colour encoding carry the distinction (ADR 0007, `DESIGN.md` → Charts).                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 17  | The rewritten `categories.empty.body`                                             | **Offers the ready-made set first; EN and PL in Copy.**                                                                                                                                                                                             | The empty state's primary action changes, so its body must not describe a screen with one button.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 18  | A plain member in a shared workspace still sees buttons that always refuse        | **Accepted; no UI hint.**                                                                                                                                                                                                                           | Row 5: no screen in the app hides controls by role. The move, restore and seed paths show the `forbidden` sentence; a UI hint is a separate stage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 19  | Dialogs (create, edit, archive, delete) and the seed's `skipped` count            | **Dialogs keep their generic body and the form its raw message; `skipped` is not shown.**                                                                                                                                                           | The dialogs' `error.message` sites belong to `05-S1`'s migration (out of scope, Proposed Solution) and, after it, can route a `forbidden` kind in one place. A skipped row is either the person's own or an archived one; the toast's none-sentence says where archived rows are, and a count of skips explains nothing the person can act on.                                                                                                                                                                                                                                                                                                                                           |
+| 20  | Product owner: approve this spec?                                                 | **Approve with conditions (round 2, confidence medium); conditions applied.**                                                                                                                                                                       | Round 2 conditions: 4a needs the predicate Phase 3 extracts (phasing now linear); the focus order (flag before the refresh); a stop rule for the real-wire browser case; the none-toast wording and the `both`/kind rule; rows 15 to 19. Round 1 conditions applied before.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 21  | Software architect: approve this spec?                                            | **Approve with conditions (round 2, confidence medium); conditions applied.**                                                                                                                                                                       | Round 2 conditions: focus order; linear phasing; the dialogs claim narrowed (row 19); `refusalOf` context and per-source titles defined; the lost-race outcomes fixed; the `is_system` and "colour survives" comments both corrected; the handler test extended to the tenth handler; import path and the single-row `insertOnConflictDoNothing` note.                                                                                                                                                                                                                                                                                                                                   |
+| 22  | Security and tenancy reviewer: approve this spec?                                 | **Approve with conditions (round 2, confidence medium); conditions applied.**                                                                                                                                                                       | The design holds against the code (base-repository inserts, `tenantFilter` reads, the workspace role dictionary, no existence oracle). Round 2 conditions: linear phasing; the dialogs claim narrowed; parse-then-gate-then-read stated; the seed handler's test; the lost-race outcomes and the on-wire driver text stated; the concurrent-parent window accepted.                                                                                                                                                                                                                                                                                                                      |
+| 23  | Accessibility and UX specialist: approve this spec?                               | **Approve with conditions (round 2, confidence medium); conditions applied.**                                                                                                                                                                       | Round 2 conditions: focus order (SC 2.4.3); the dialogs claim narrowed and recorded; per-source titles; scroll-into-view without focus; `headingLevel={2}` plus `expectOutlineWithoutSkips`; Polish strings written in the spec with quoted names; none-toast wording; the 360 px `pl` frame; live-region wording as intent; the secondary variant named. The AA claim is not widened.                                                                                                                                                                                                                                                                                                   |
 
 The commands behind row 14:
 
