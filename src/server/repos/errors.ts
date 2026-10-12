@@ -5,7 +5,7 @@
  * handler all describe the same refusal in the same vocabulary and the failure classifier
  * (`classifyFailure` in `src/server/errors/classify.ts`) has a single thing to switch on. Not every
  * constructor takes structured fields: some interpolate a value into their sentence, which is why
- * the server-function boundary replaces the sentence (`redactError` and the envelope in
+ * the failure middleware replaces the thrown value (`redactError` and the envelope in
  * `src/server/errors/`).
  *
  * **The load-bearing decision in this file is that a cross-tenant read is a {@link NotFoundError}
