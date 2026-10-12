@@ -20,6 +20,10 @@ import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-pas
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiUnsubscribeRouteImport } from './routes/api/unsubscribe'
 import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
+import { Route as Probe649IndexRouteImport } from './routes/probe649/index'
+import { Route as Probe649SsrRouteImport } from './routes/probe649/ssr'
+import { Route as Probe649SsrNotFoundRouteImport } from './routes/probe649/ssr-not-found'
+import { Route as Probe649SwallowedRouteImport } from './routes/probe649/swallowed'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
 import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
 import { Route as AppBudgetsIndexRouteImport } from './routes/_app/budgets/index'
@@ -104,6 +108,26 @@ const ApiUnsubscribeRoute = ApiUnsubscribeRouteImport.update({
 const InviteInvitationIdRoute = InviteInvitationIdRouteImport.update({
   id: '/invite/$invitationId',
   path: '/invite/$invitationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Probe649IndexRoute = Probe649IndexRouteImport.update({
+  id: '/probe649/',
+  path: '/probe649/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Probe649SsrRoute = Probe649SsrRouteImport.update({
+  id: '/probe649/ssr',
+  path: '/probe649/ssr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Probe649SsrNotFoundRoute = Probe649SsrNotFoundRouteImport.update({
+  id: '/probe649/ssr-not-found',
+  path: '/probe649/ssr-not-found',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Probe649SwallowedRoute = Probe649SwallowedRouteImport.update({
+  id: '/probe649/swallowed',
+  path: '/probe649/swallowed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
@@ -280,6 +304,10 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
+  '/probe649/ssr': typeof Probe649SsrRoute
+  '/probe649/ssr-not-found': typeof Probe649SsrNotFoundRoute
+  '/probe649/swallowed': typeof Probe649SwallowedRoute
+  '/probe649/': typeof Probe649IndexRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
@@ -323,6 +351,10 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
+  '/probe649/ssr': typeof Probe649SsrRoute
+  '/probe649/ssr-not-found': typeof Probe649SsrNotFoundRoute
+  '/probe649/swallowed': typeof Probe649SwallowedRoute
+  '/probe649': typeof Probe649IndexRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
@@ -369,6 +401,10 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
+  '/probe649/ssr': typeof Probe649SsrRoute
+  '/probe649/ssr-not-found': typeof Probe649SsrNotFoundRoute
+  '/probe649/swallowed': typeof Probe649SwallowedRoute
+  '/probe649/': typeof Probe649IndexRoute
   '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/_app/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/_app/goals/$goalId': typeof AppGoalsGoalIdRoute
@@ -414,6 +450,10 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/unsubscribe'
     | '/invite/$invitationId'
+    | '/probe649/ssr'
+    | '/probe649/ssr-not-found'
+    | '/probe649/swallowed'
+    | '/probe649/'
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
@@ -457,6 +497,10 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/unsubscribe'
     | '/invite/$invitationId'
+    | '/probe649/ssr'
+    | '/probe649/ssr-not-found'
+    | '/probe649/swallowed'
+    | '/probe649'
     | '/accounts/$accountId'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
@@ -502,6 +546,10 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/unsubscribe'
     | '/invite/$invitationId'
+    | '/probe649/ssr'
+    | '/probe649/ssr-not-found'
+    | '/probe649/swallowed'
+    | '/probe649/'
     | '/_app/accounts/$accountId'
     | '/_app/budgets/$budgetId'
     | '/_app/goals/$goalId'
@@ -544,6 +592,10 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiUnsubscribeRoute: typeof ApiUnsubscribeRoute
   InviteInvitationIdRoute: typeof InviteInvitationIdRoute
+  Probe649SsrRoute: typeof Probe649SsrRoute
+  Probe649SsrNotFoundRoute: typeof Probe649SsrNotFoundRoute
+  Probe649SwallowedRoute: typeof Probe649SwallowedRoute
+  Probe649IndexRoute: typeof Probe649IndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingCheckoutRoute: typeof ApiBillingCheckoutRoute
   ApiBillingPortalRoute: typeof ApiBillingPortalRoute
@@ -629,6 +681,34 @@ declare module '@tanstack/react-router' {
       path: '/invite/$invitationId'
       fullPath: '/invite/$invitationId'
       preLoaderRoute: typeof InviteInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/probe649/': {
+      id: '/probe649/'
+      path: '/probe649'
+      fullPath: '/probe649/'
+      preLoaderRoute: typeof Probe649IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/probe649/ssr': {
+      id: '/probe649/ssr'
+      path: '/probe649/ssr'
+      fullPath: '/probe649/ssr'
+      preLoaderRoute: typeof Probe649SsrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/probe649/ssr-not-found': {
+      id: '/probe649/ssr-not-found'
+      path: '/probe649/ssr-not-found'
+      fullPath: '/probe649/ssr-not-found'
+      preLoaderRoute: typeof Probe649SsrNotFoundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/probe649/swallowed': {
+      id: '/probe649/swallowed'
+      path: '/probe649/swallowed'
+      fullPath: '/probe649/swallowed'
+      preLoaderRoute: typeof Probe649SwallowedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/accounts/': {
@@ -944,6 +1024,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiUnsubscribeRoute: ApiUnsubscribeRoute,
   InviteInvitationIdRoute: InviteInvitationIdRoute,
+  Probe649SsrRoute: Probe649SsrRoute,
+  Probe649SsrNotFoundRoute: Probe649SsrNotFoundRoute,
+  Probe649SwallowedRoute: Probe649SwallowedRoute,
+  Probe649IndexRoute: Probe649IndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingCheckoutRoute: ApiBillingCheckoutRoute,
   ApiBillingPortalRoute: ApiBillingPortalRoute,
