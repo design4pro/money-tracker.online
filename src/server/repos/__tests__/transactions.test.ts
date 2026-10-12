@@ -183,6 +183,14 @@ beforeEach(async () => {
       updatedAt: now,
     },
     {
+      id: 'acc-a-eur',
+      organizationId: 'org-a',
+      name: 'Euro wallet',
+      currencyCode: 'EUR',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
       id: 'acc-b',
       organizationId: 'org-b',
       name: 'Theirs',
@@ -473,7 +481,12 @@ describe('ref_amount', () => {
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...BASE_INPUT, currencyCode: 'EUR', amountMinor: 12_345 },
+      input: {
+        ...BASE_INPUT,
+        accountId: 'acc-a-eur',
+        currencyCode: 'EUR',
+        amountMinor: 12_345,
+      },
     })
 
     expect(created.refAmountMinor).toBe(53_353)
@@ -489,6 +502,7 @@ describe('ref_amount', () => {
         conversion,
         input: {
           ...BASE_INPUT,
+          accountId: 'acc-a-eur',
           currencyCode: 'EUR',
           bookedOn: '2026-03-14',
         },
@@ -524,7 +538,7 @@ describe('ref_amount', () => {
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...BASE_INPUT, currencyCode: 'EUR' },
+      input: { ...BASE_INPUT, accountId: 'acc-a-eur', currencyCode: 'EUR' },
     })
 
     // The rate for that day changes. A read must not notice.
@@ -566,7 +580,7 @@ describe('updating', () => {
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...BASE_INPUT, currencyCode: 'EUR' },
+      input: { ...BASE_INPUT, accountId: 'acc-a-eur', currencyCode: 'EUR' },
     })
     const resolveRate = vi.fn(async () => APRIL_RATE)
 
@@ -589,7 +603,12 @@ describe('updating', () => {
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...BASE_INPUT, currencyCode: 'EUR', amountMinor: 12_345 },
+      input: {
+        ...BASE_INPUT,
+        accountId: 'acc-a-eur',
+        currencyCode: 'EUR',
+        amountMinor: 12_345,
+      },
     })
 
     const updated = await updateTransaction({
@@ -805,7 +824,12 @@ describe('the booking date', () => {
         scope,
         policies: EVERYTHING,
         conversion,
-        input: { ...BASE_INPUT, currencyCode: 'EUR', bookedOn },
+        input: {
+          ...BASE_INPUT,
+          accountId: 'acc-a-eur',
+          currencyCode: 'EUR',
+          bookedOn,
+        },
       }).catch((error: unknown) => error)
 
       expect(buildEnvelope(failure, classifyFailure(failure))).toMatchObject({
