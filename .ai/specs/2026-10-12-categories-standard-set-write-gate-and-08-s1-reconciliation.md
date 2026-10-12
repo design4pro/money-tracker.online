@@ -4,7 +4,7 @@
 | ------------------ | --------------------------------------- |
 | **Status**         | ready                                   |
 | **Issue**          | none                                    |
-| **Spec PR**        | #TBD                                    |
+| **Spec PR**        | #697                                    |
 | **Implementation** | none                                    |
 | **Plan**           | 08-S1 (docs/plans/08-classification.md) |
 
