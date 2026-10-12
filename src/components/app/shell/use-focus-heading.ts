@@ -23,19 +23,27 @@ import type { RefObject } from 'react'
  * The record has to be made in a *layout* effect cleanup. By the time a passive effect's cleanup
  * runs the node is detached and `document.activeElement` is already `body`.
  *
- * `enabled` is not expected to change while a panel is mounted: the one caller, `ErrorPanel`,
- * passes a fixed prop per panel.
+ * ## Restoring without moving
+ *
+ * `moveOnMount: false` keeps the hand-back and skips the move. `RouteError` uses it for a page
+ * that was server-rendered: the browser has already placed focus on the document and the skip
+ * link must stay the first tab stop, but if the reader later retries into focus on the error
+ * panel, giving focus back is still right.
+ *
+ * `enabled` and `moveOnMount` are not expected to change while a panel is mounted: the callers
+ * pass a fixed value per panel.
  */
 export function useFocusHeading(
   enabled: boolean,
   panelRef: RefObject<HTMLElement | null>,
   headingRef: RefObject<HTMLElement | null>,
+  moveOnMount = true,
 ) {
   useLayoutEffect(() => {
     const panel = panelRef.current
     if (!enabled || !panel) return
 
-    headingRef.current?.focus()
+    if (moveOnMount) headingRef.current?.focus()
 
     return () => {
       if (!panel.contains(document.activeElement)) return
@@ -49,5 +57,5 @@ export function useFocusHeading(
         if (target instanceof HTMLElement) target.focus()
       })
     }
-  }, [enabled, panelRef, headingRef])
+  }, [enabled, moveOnMount, panelRef, headingRef])
 }

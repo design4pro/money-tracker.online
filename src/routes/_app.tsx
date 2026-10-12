@@ -206,7 +206,9 @@ function AppLayout() {
       */}
       <CatchBoundary
         getResetKey={() => pathname}
-        errorComponent={({ reset }) => <RouteError onRetry={reset} />}
+        errorComponent={({ reset }) => (
+          <RouteError onRetry={reset} homeHref="/dashboard" />
+        )}
       >
         <Outlet />
       </CatchBoundary>
