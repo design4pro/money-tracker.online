@@ -39,6 +39,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { isNotFound } from '@tanstack/react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { asCurrencyCode } from '#/lib/money'
 import { organization, user } from '#/server/db/auth-schema'
 import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
@@ -47,9 +48,11 @@ import {
   accounts,
   attachments,
   budgetCategories,
+  categories,
   currencies,
   importBatches,
   payees,
+  transactions,
 } from '#/server/db/schema'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
@@ -128,9 +131,18 @@ import {
   UnscopedWriteError,
 } from '../errors'
 import { createScope } from '../scope'
+import {
+  createTransaction,
+  createTransactionSchema,
+  deleteTransaction,
+  findTransaction,
+  getTransaction,
+  updateTransaction,
+} from '../transactions'
 
 import type { BudgetWorld } from './budget-harness'
 import type { TenantScope } from '../scope'
+import type { ConversionContext, TransactionPolicies } from '../transactions'
 
 /* -------------------------------------------------------------------------- */
 /* Harness                                                                     */
@@ -1040,6 +1052,371 @@ describe('budgets cannot be reached across a workspace boundary', () => {
       markers,
     })
     expect(theirs.map((crossing) => crossing.budgetId)).toEqual(['bud-b'])
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Transactions                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The transaction write path, attacked through the real `createTransaction`, `updateTransaction`,
+ * `deleteTransaction`, `getTransaction` and `findTransaction`.
+ *
+ * `transactions.test.ts` already holds a few of these cases, but it asserts only that each call
+ * raises `NotFoundError`. This is the file a reviewer looks at for isolation, so the section here
+ * asks the stronger questions: is the refusal the same one an id that exists nowhere would produce
+ * (a 403, or a different `entity`, would confirm the row exists in somebody else's workspace), is
+ * the foreign parent really there (so the refusal is isolation and not an empty fixture), and are
+ * workspace B's complete rows — and A's — exactly as they were afterwards.
+ *
+ * The all-`include` policy set is used throughout: it contributes no predicate, so the id predicate
+ * and the tenant filter are the only things standing between A and B's row.
+ *
+ * The fixture is `budget-harness.ts`, as for the budgets above.
+ */
+describe('the transaction write path cannot reach or be aimed across a workspace boundary', () => {
+  const POLICIES: TransactionPolicies = {
+    planned: 'include',
+    adjustments: 'include',
+    transfers: 'include',
+    completeness: 'any',
+  }
+  /** Every row is PLN, the identity case, so no rate is ever asked for. */
+  const conversion: ConversionContext = {
+    baseCurrencyCode: asCurrencyCode('PLN'),
+    resolveRate: async () => null,
+  }
+  /** A payload that is valid for A: the base every create case perturbs one field of. */
+  const OWN_INPUT = {
+    accountId: 'acc-a',
+    direction: 'expense',
+    amountMinor: 12_345,
+    currencyCode: 'PLN',
+    bookedOn: '2026-03-10',
+  } as const
+  const categoryRepo = createTenantRepository(categories, 'category')
+
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    await seedCategory(world.db, { id: 'cat-a', name: 'Food' })
+    await seedCategory(world.db, {
+      id: 'cat-b',
+      name: 'Food',
+      organizationId: 'org-b',
+    })
+    await world.db.insert(payees).values([
+      {
+        id: 'pay-a',
+        organizationId: 'org-a',
+        name: 'Shop',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'pay-b',
+        organizationId: 'org-b',
+        name: 'Shop',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ])
+    await seedTransaction(world.db, {
+      id: 'tx-a',
+      refAmountMinor: 100_00,
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-b',
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      categoryId: 'cat-b',
+      refAmountMinor: 750_00,
+    })
+  })
+
+  /**
+   * Whole rows, every column, of everything an attack could have changed: B's four tables, and A's
+   * transactions (which carry A's patched row). A write that matched no row but changed one anyway
+   * is what a return-value assertion misses.
+   */
+  async function rowsAtStake() {
+    const inB = (table: typeof accounts | typeof categories | typeof payees) =>
+      world.otherScope.db
+        .select()
+        .from(table)
+        .where(eq(table.organizationId, 'org-b'))
+        .orderBy(table.id)
+    return {
+      bTransactions: await world.otherScope.db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.organizationId, 'org-b'))
+        .orderBy(transactions.id),
+      bAccounts: await inB(accounts),
+      bCategories: await inB(categories),
+      bPayees: await inB(payees),
+      aTransactions: await world.scope.db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.organizationId, 'org-a'))
+        .orderBy(transactions.id),
+    }
+  }
+
+  /** What A would aim at: ids of B's rows, or ids that exist nowhere. */
+  interface Target {
+    readonly transactionId: string
+    readonly accountId: string
+    readonly categoryId: string
+    readonly payeeId: string
+  }
+  const FOREIGN: Target = {
+    transactionId: 'tx-b',
+    accountId: 'acc-b',
+    categoryId: 'cat-b',
+    payeeId: 'pay-b',
+  }
+  const NOWHERE: Target = {
+    transactionId: 'tx-nowhere',
+    accountId: 'acc-nowhere',
+    categoryId: 'cat-nowhere',
+    payeeId: 'pay-nowhere',
+  }
+
+  /** Every hostile call, with the entity a refusal must name. Run as A, aimed at `target`. */
+  const ATTACKS: ReadonlyArray<{
+    readonly label: string
+    readonly entity: string
+    readonly run: (target: Target) => Promise<unknown>
+  }> = [
+    {
+      label: 'reads a transaction by id',
+      entity: 'transaction',
+      run: (target) =>
+        getTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          id: target.transactionId,
+        }),
+    },
+    {
+      label: 'updates a transaction by id',
+      entity: 'transaction',
+      run: (target) =>
+        updateTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          conversion,
+          id: target.transactionId,
+          patch: { note: 'mine now', amountMinor: 1 },
+        }),
+    },
+    {
+      label: 'deletes a transaction by id',
+      entity: 'transaction',
+      run: (target) =>
+        deleteTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          id: target.transactionId,
+        }),
+    },
+    {
+      label: 'creates on an account',
+      entity: 'account',
+      run: (target) =>
+        createTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          conversion,
+          input: { ...OWN_INPUT, accountId: target.accountId },
+        }),
+    },
+    {
+      label: 'creates under a category',
+      entity: 'category',
+      run: (target) =>
+        createTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          conversion,
+          input: { ...OWN_INPUT, categoryId: target.categoryId },
+        }),
+    },
+    {
+      label: 'creates with a payee',
+      entity: 'payee',
+      run: (target) =>
+        createTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          conversion,
+          input: { ...OWN_INPUT, payeeId: target.payeeId },
+        }),
+    },
+    {
+      label: 'moves its own row to an account',
+      entity: 'account',
+      run: (target) =>
+        updateTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          conversion,
+          id: 'tx-a',
+          patch: { accountId: target.accountId },
+        }),
+    },
+    {
+      label: 'files its own row under a category',
+      entity: 'category',
+      run: (target) =>
+        updateTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          conversion,
+          id: 'tx-a',
+          patch: { categoryId: target.categoryId },
+        }),
+    },
+    {
+      label: 'gives its own row a payee',
+      entity: 'payee',
+      run: (target) =>
+        updateTransaction({
+          scope: world.scope,
+          policies: POLICIES,
+          conversion,
+          id: 'tx-a',
+          patch: { payeeId: target.payeeId },
+        }),
+    },
+  ]
+
+  const rejection = (work: Promise<unknown>): Promise<unknown> =>
+    work.then(
+      () => {
+        throw new Error('the call was meant to be refused')
+      },
+      (error: unknown) => error,
+    )
+
+  it('has a real row behind every foreign id, so no refusal below is an empty fixture', async () => {
+    await expect(
+      getTransaction({
+        scope: world.otherScope,
+        policies: POLICIES,
+        id: FOREIGN.transactionId,
+      }),
+    ).resolves.toMatchObject({ id: 'tx-b', organizationId: 'org-b' })
+    await expect(
+      accountRepo.findById(world.otherScope, FOREIGN.accountId),
+    ).resolves.toMatchObject({ id: 'acc-b', organizationId: 'org-b' })
+    await expect(
+      categoryRepo.findById(world.otherScope, FOREIGN.categoryId),
+    ).resolves.toMatchObject({ id: 'cat-b', organizationId: 'org-b' })
+    await expect(
+      payeeRepo.findById(world.otherScope, FOREIGN.payeeId),
+    ).resolves.toMatchObject({ id: 'pay-b', organizationId: 'org-b' })
+  })
+
+  it('answers null to a find of another workspace’s id', async () => {
+    await expect(
+      findTransaction({
+        scope: world.scope,
+        policies: POLICIES,
+        id: FOREIGN.transactionId,
+      }),
+    ).resolves.toBeNull()
+  })
+
+  it.each(ATTACKS)(
+    'refuses a call that $label, as it would an id that exists nowhere, and moves no row',
+    async ({ entity, run }) => {
+      const before = await rowsAtStake()
+
+      const foreign = await rejection(run(FOREIGN))
+      const missing = await rejection(run(NOWHERE))
+
+      expect(foreign).toBeInstanceOf(NotFoundError)
+      expect(missing).toBeInstanceOf(NotFoundError)
+      // `entity` and `code` only: `message` and `id` embed the id the caller supplied.
+      const shape = (error: unknown) => ({
+        entity: (error as NotFoundError).entity,
+        code: (error as NotFoundError).code,
+      })
+      expect(shape(foreign)).toEqual(shape(missing))
+      expect(shape(foreign)).toEqual({ entity, code: 'NOT_FOUND' })
+
+      expect(await rowsAtStake()).toEqual(before)
+    },
+  )
+
+  it('lets A create, patch, read and delete with its own parents', async () => {
+    const created = await createTransaction({
+      scope: world.scope,
+      policies: POLICIES,
+      conversion,
+      input: {
+        ...OWN_INPUT,
+        categoryId: 'cat-a',
+        payeeId: 'pay-a',
+      },
+    })
+    expect(created).toMatchObject({
+      organizationId: 'org-a',
+      createdByUserId: 'user-a',
+      accountId: 'acc-a',
+      categoryId: 'cat-a',
+      payeeId: 'pay-a',
+    })
+
+    const patched = await updateTransaction({
+      scope: world.scope,
+      policies: POLICIES,
+      conversion,
+      id: 'tx-a',
+      patch: {
+        accountId: 'acc-a-hidden',
+        categoryId: 'cat-a',
+        payeeId: 'pay-a',
+      },
+    })
+    expect(patched).toMatchObject({
+      id: 'tx-a',
+      accountId: 'acc-a-hidden',
+      categoryId: 'cat-a',
+      payeeId: 'pay-a',
+    })
+    await expect(
+      getTransaction({ scope: world.scope, policies: POLICIES, id: 'tx-a' }),
+    ).resolves.toEqual(patched)
+
+    await deleteTransaction({
+      scope: world.scope,
+      policies: POLICIES,
+      id: 'tx-a',
+    })
+    await expect(
+      findTransaction({ scope: world.scope, policies: POLICIES, id: 'tx-a' }),
+    ).resolves.toBeNull()
+  })
+
+  it('refuses a create payload that names the tenant column or a transfer link', () => {
+    const own = { ...OWN_INPUT }
+    expect(createTransactionSchema.safeParse(own).success).toBe(true)
+
+    // The repository stamps the tenant from the scope, so the key must not exist on the payload.
+    expect(
+      createTransactionSchema.safeParse({ ...own, organizationId: 'org-b' })
+        .success,
+    ).toBe(false)
+    // The plan's "B's `transfer_id`" case in the only form it can take now: the key does not exist
+    // either, since transfers are written by their own module.
+    expect(
+      createTransactionSchema.safeParse({ ...own, transferId: 'tr-b' }).success,
+    ).toBe(false)
   })
 })
 

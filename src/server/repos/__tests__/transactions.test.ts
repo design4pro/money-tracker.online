@@ -33,6 +33,7 @@ import { touchLedgerAccount } from '../base'
 import { ConflictError, NotFoundError, RateUnavailableError } from '../errors'
 import { createScope } from '../scope'
 import {
+  applyPolicies,
   computeRefAmount,
   createTransaction,
   deleteTransaction,
@@ -387,6 +388,58 @@ describe('parent authorisation', () => {
       id: theirs.id,
     })
     expect(still?.note).toBeNull()
+  })
+
+  // `updateTransaction` and `deleteTransaction` hand `assertScopedWrite` a list that always holds
+  // the id predicate, so the assertion cannot fire through the exported API: it is a backstop, and
+  // it is pinned against the account repository in `tenant-isolation.test.ts` ("the write
+  // backstop"). What this case pins is the precondition of that argument: an all-`include` policy
+  // set contributes no predicate, so the id predicate alone scopes the statement, and the tenant
+  // filter still keeps it to the caller's workspace.
+  it('scopes a write by the id predicate alone under the all-`include` set, inside the workspace', async () => {
+    expect(applyPolicies(EVERYTHING)).toEqual([])
+
+    const mine = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: BASE_INPUT,
+    })
+    const theirs = await createTransaction({
+      scope: otherScope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...BASE_INPUT, accountId: 'acc-b' },
+    })
+    const theirRows = () =>
+      otherScope.db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.organizationId, 'org-b'))
+
+    const before = await theirRows()
+    expect(before).toHaveLength(1)
+
+    await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      id: mine.id,
+      patch: { note: 'mine' },
+    })
+    await expect(theirRows()).resolves.toEqual(before)
+
+    await deleteTransaction({ scope, policies: EVERYTHING, id: mine.id })
+    await expect(theirRows()).resolves.toEqual(before)
+    await expect(
+      findTransaction({ scope, policies: EVERYTHING, id: mine.id }),
+    ).resolves.toBeNull()
+
+    // The tenant filter stands: A's scope cannot delete B's row by its id, under the same set.
+    await expect(
+      deleteTransaction({ scope, policies: EVERYTHING, id: theirs.id }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(theirRows()).resolves.toEqual(before)
   })
 })
 
