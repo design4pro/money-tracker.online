@@ -82,14 +82,22 @@ const INTERNAL: Classification = {
   retryable: false,
 }
 
-/** Control flow, not a failure: returned to the framework exactly as it was thrown. */
+/**
+ * Control flow, not a failure: returned to the framework exactly as it was thrown. A value that
+ * cannot be inspected (a throwing getter, a revoked proxy) is a failure, not control flow: this
+ * runs inside a `catch`, where a throw would hand the raw value to the framework unredacted.
+ */
 function isControlFlow(error: unknown): boolean {
-  return (
-    isRedirect(error) ||
-    isNotFound(error) ||
-    error instanceof Response ||
-    error instanceof PublicFailureError
-  )
+  try {
+    return (
+      isRedirect(error) ||
+      isNotFound(error) ||
+      error instanceof Response ||
+      error instanceof PublicFailureError
+    )
+  } catch {
+    return false
+  }
 }
 
 /** Runs a port and swallows whatever it does: a sink must never change what is thrown. */

@@ -437,6 +437,27 @@ describe('control flow passes through as the same object', () => {
   })
 })
 
+describe('a thrown value that cannot be inspected', () => {
+  it('is a failure, replaced like any other, not control flow handed to the framework', async () => {
+    const hostile = {
+      get isNotFound(): boolean {
+        throw new Error('getter broke on Biedronka')
+      },
+    }
+    const { chain, calls, wire } = await failureOf({
+      handler: throwing(hostile),
+    })
+
+    expect(envelopeOf(chain)).toEqual({
+      v: 1,
+      kind: 'internal',
+      message: { key: 'failure.internal' },
+    })
+    expect(calls).toContainEqual(['setStatus', 500])
+    expect(wire).not.toContain('Biedronka')
+  })
+})
+
 describe('a failure while building the failure', () => {
   it('falls back to the constant internal envelope and status 500, never the original value', async () => {
     vi.mocked(buildEnvelope).mockImplementationOnce(() => {

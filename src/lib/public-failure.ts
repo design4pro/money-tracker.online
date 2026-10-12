@@ -33,18 +33,20 @@ import type { FailureEnvelope, FailureKind } from '#/lib/failure-envelope'
  * locale. No screen is designed to show it; a reader that still prints `error.message` shows this
  * instead of a repository sentence.
  */
+const GENERIC_MESSAGE = 'This could not be completed.'
+
 const FALLBACK_MESSAGES: Readonly<Record<FailureKind, string>> = {
   unauthenticated: 'You need to sign in to continue.',
-  forbidden: 'This could not be completed.',
-  not_found: 'This could not be completed.',
-  validation: 'This could not be completed.',
-  conflict: 'This could not be completed.',
-  quota: 'This could not be completed.',
-  feature_locked: 'This could not be completed.',
-  rate_unavailable: 'This could not be completed.',
-  rate_limited: 'This could not be completed.',
-  upstream: 'This could not be completed.',
-  internal: 'This could not be completed.',
+  forbidden: GENERIC_MESSAGE,
+  not_found: GENERIC_MESSAGE,
+  validation: GENERIC_MESSAGE,
+  conflict: GENERIC_MESSAGE,
+  quota: GENERIC_MESSAGE,
+  feature_locked: GENERIC_MESSAGE,
+  rate_unavailable: GENERIC_MESSAGE,
+  rate_limited: GENERIC_MESSAGE,
+  upstream: GENERIC_MESSAGE,
+  internal: GENERIC_MESSAGE,
 }
 
 /** The envelope of a failure that could not be read. A fresh object each time, never shared. */

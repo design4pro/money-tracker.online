@@ -243,8 +243,8 @@ generic panel.
 
 **Middleware.** `createFailureMiddleware(ports)` with
 `ports = { log(fields): void; report(fields, kind): void; setStatus(status): void }` returns a
-`createMiddleware({ type: 'function' })` whose `.server` wraps `next()` in `try/catch`. `failureRedactionMiddleware` is declared as one top-level `createMiddleware(...).server(...)` constant with the server-only imports reached only from inside the `.server()` closure, the shape `src/server/middleware/auth.ts` already uses, so the build strips them from the client chunk; Phase 4's build check proves it. A thrown `Response` passes through untouched: no site under `src/` throws one today (`grep -rn "throw new Response" src` is empty), and a test pins the pass-through so a future one is a conscious choice. `failureRedactionMiddleware` is
-`createFailureMiddleware(defaultPorts)`: `defaultPorts.log` writes one `error`-level line through the existing logger
+`createMiddleware({ type: 'function' })` whose `.server` wraps `next()` in `try/catch`. `failureRedactionMiddleware` is declared as one top-level `createMiddleware(...).server(...)` constant with the server-only imports reached only from inside the `.server()` closure, the shape `src/server/middleware/auth.ts` already uses, so the build strips them from the client chunk; Phase 4's build check proves it. A thrown `Response` passes through untouched: no site under `src/` throws one today (`grep -rn "throw new Response" src` is empty), and a test pins the pass-through so a future one is a conscious choice. `failureRedactionMiddleware` runs the
+same boundary over `defaultPorts`: `defaultPorts.log` writes one `error`-level line through the existing logger
 (`loggerFromEnv(env)`) with `redactError` output and the kind as its **only** fields; `report` is a no-op that `05-S3`
 replaces; `setStatus` is `setResponseStatus` from `@tanstack/react-start/server`. The middleware calls `log` and `report`
 with already-redacted fields only, so a sink cannot be handed a raw error by this module.
@@ -551,8 +551,7 @@ the `message` plus a status of 200, and (b) an `envelope` own property would hav
 would read `null` for every kind and the invitation route's `unauthenticated` redirect would have regressed on a client
 navigation.
 
-**Decision** (security-tenancy-reviewer, confidence high; `.ai/cezar` run 4cccb1f5, Resolved assumption 2 of its
-handoff): `PublicFailureError` and a `createSerializationAdapter` entry live in the isomorphic `src/lib/public-failure.ts`
+**Decision** (security-tenancy-reviewer, confidence high; PR #711, Resolved assumptions row 2): `PublicFailureError` and a `createSerializationAdapter` entry live in the isomorphic `src/lib/public-failure.ts`
 and are registered in `src/start.ts` as `serializationAdapters: [publicFailureAdapter]`. Custom adapters are consulted
 before the default plugins, so the adapter claims this class and no other value; a plain `Error`, a `redirect()`
 `Response` and a `notFound()` object serialise as before. `toSerializable` and `fromSerializable` both pass the value
@@ -561,4 +560,6 @@ from the kind on both sides and never travels. No dependency was added.
 
 **Residual, unchanged by this amendment:** a failure thrown outside a server function (a route loader, `beforeLoad`, the
 framework's outer `catch`, a failure before the chain runs) still dehydrates or serialises with its `message` only. The API
-routes, the queue handlers and the Durable Object keep logging through the raw logger until `05-S3`.
+routes, the queue handlers and the Durable Object keep logging through the raw logger until `05-S3`. The SSR document
+status is the router's (500 for any loader error), not the kind's; only the server-function response carries the kind's
+status.
