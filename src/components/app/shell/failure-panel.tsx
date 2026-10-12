@@ -5,6 +5,7 @@ import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 import { QUOTA_METRIC_LABEL_KEYS } from '#/lib/plans'
 
+import { DashboardLink } from './dashboard-link'
 import { ErrorPanel } from './error-panel'
 import { FailureReference, hasOpaqueIdShape } from './failure-reference'
 
@@ -41,19 +42,10 @@ export const RECOVERY_OF: Readonly<Record<FailureKind, Recovery>> = {
   internal: 'internal',
 }
 
-/**
- * Real links painted as buttons, as `not-found.tsx` does: these navigate, so they are `<a>`s.
- * `buttonVariants` paints React Aria's `data-[hovered]` and `data-[pressed]`, which a plain
- * anchor never receives, so both states are restated as CSS pseudo-classes. `target-min` in the
- * variants keeps the 44px hit area.
- */
+/** The billing link is painted as a button for the same reasons as `DashboardLink`. */
 const PRIMARY_LINK = cn(
   buttonVariants({ variant: 'primary' }),
   'no-underline hover:bg-accent-hover hover:shadow-elevated active:translate-y-px',
-)
-const SECONDARY_LINK = cn(
-  buttonVariants({ variant: 'secondary' }),
-  'no-underline hover:border-ink-2 hover:bg-surface-sunken active:translate-y-px',
 )
 
 export interface FailurePanelProps {
@@ -183,11 +175,7 @@ export function FailurePanel({
           actions={
             homeHref || hasOpaqueIdShape(reference) ? (
               <>
-                {homeHref ? (
-                  <Link to={homeHref} className={SECONDARY_LINK}>
-                    {t('failure.dashboard.action')}
-                  </Link>
-                ) : null}
+                {homeHref ? <DashboardLink to={homeHref} /> : null}
                 <FailureReference reference={reference} />
               </>
             ) : undefined
