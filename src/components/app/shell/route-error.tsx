@@ -1,8 +1,14 @@
 import { RotateCcw, TriangleAlert } from 'lucide-react'
+import { useId, useRef } from 'react'
 
 import { Button } from '#/components/ui'
 import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
+
+import { DashboardLink } from './dashboard-link'
+import { FailureReference, hasOpaqueIdShape } from './failure-reference'
+import { useFocusHeading } from './use-focus-heading'
+import { useIsAfterInitialRender } from './use-is-after-initial-render'
 
 export interface RouteErrorProps {
   /**
@@ -16,6 +22,12 @@ export interface RouteErrorProps {
    * reference is what lets a support conversation find the real one in the logs.
    */
   reference?: string
+  /**
+   * Where "Back to the dashboard" goes. Passed only from inside the signed-in shell: outside it a
+   * reader sent to the dashboard is bounced through sign-in, and a guard that just failed would
+   * loop. Without it there is no link.
+   */
+  homeHref?: string
   className?: string
 }
 
@@ -33,13 +45,44 @@ export interface RouteErrorProps {
  * The glyph is `aria-hidden` and the message never depends on it: the state is carried by the
  * heading and the sentence, with the icon and the warning colour as reinforcement, never as the
  * signal.
+ *
+ * ## The page's own heading, and a region
+ *
+ * It replaces the failing route's content, and with it that route's `h1`, so it renders the `h1`.
+ * It is the page's content rather than a response to something the reader just did, so it is a
+ * labelled region and not an alert: an alert on initial render is announced before the person has
+ * any context for it.
+ *
+ * ## Focus
+ *
+ * After a client navigation the content the reader asked for is gone, so focus moves to the
+ * heading. On the document's own first render it does not: the browser has already placed focus
+ * on the document and the skip link has to stay the first tab stop (`useIsAfterInitialRender`).
+ * Giving focus back when the panel goes away holding it applies either way (`useFocusHeading`).
+ *
+ * ## The tab title
+ *
+ * It never writes `document.title`. The router runs `head()` for the failed match too, so the tab
+ * already carries the failed route's own title; an imperative write would compete with the
+ * `<title>` the head renders and would outlive a successful Retry on the same route.
  */
-export function RouteError({ onRetry, reference, className }: RouteErrorProps) {
+export function RouteError({
+  onRetry,
+  reference,
+  homeHref,
+  className,
+}: RouteErrorProps) {
   const t = useTranslate()
+  const headingId = useId()
+  const panelRef = useRef<HTMLElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const moveFocus = useIsAfterInitialRender()
+  useFocusHeading(true, panelRef, headingRef, moveFocus)
 
   return (
-    <div
-      role="alert"
+    <section
+      ref={panelRef}
+      aria-labelledby={headingId}
       className={cn(
         'mx-auto flex max-w-lg flex-col items-center gap-4 rounded-xl border border-border-subtle bg-surface px-6 py-12 text-center',
         className,
@@ -53,25 +96,32 @@ export function RouteError({ onRetry, reference, className }: RouteErrorProps) {
       </span>
 
       <div>
-        <h2 className="text-title text-ink">{t('empty.error.title')}</h2>
+        <h1
+          ref={headingRef}
+          id={headingId}
+          tabIndex={moveFocus ? -1 : undefined}
+          className="text-title text-ink outline-none"
+        >
+          {t('empty.error.title')}
+        </h1>
         <p className="mt-2 text-body text-ink-2">{t('app.shell.error.body')}</p>
       </div>
 
-      {onRetry ? (
-        <Button
-          variant="primary"
-          onPress={onRetry}
-          icon={<RotateCcw className="size-4" />}
-        >
-          {t('action.retry')}
-        </Button>
+      {onRetry || homeHref || hasOpaqueIdShape(reference) ? (
+        <div className="flex flex-wrap justify-center gap-3">
+          {onRetry ? (
+            <Button
+              variant="primary"
+              onPress={onRetry}
+              icon={<RotateCcw className="size-4" />}
+            >
+              {t('action.retry')}
+            </Button>
+          ) : null}
+          {homeHref ? <DashboardLink to={homeHref} /> : null}
+          <FailureReference reference={reference} className="justify-center" />
+        </div>
       ) : null}
-
-      {reference ? (
-        <p className="text-caption text-ink-2 tabular">
-          {t('empty.error.reference', { reference })}
-        </p>
-      ) : null}
-    </div>
+    </section>
   )
 }

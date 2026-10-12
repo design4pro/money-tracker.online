@@ -4,6 +4,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ErrorPanel } from '#/components/app/shell'
 import { RuleEditorSkeleton } from '#/components/app/transactions'
 import { Button, Card, toast } from '#/components/ui'
+import { readFailure } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { createRule } from '#/server/fns/rules'
 
@@ -23,12 +24,13 @@ import { pageHead } from '#/routes/-lib/page-title'
  *
  * ## The locked branch lives here
  *
- * `createRule` answers a `FeatureLockedError` — code `FEATURE_LOCKED` — when the workspace's
- * plan meters rules at zero, which is the only place in the product where the answer to `OPEN-1`
- * exists today. So a refusal for that reason is shown as an upgrade path rather than as a stack
- * trace: *automation is not part of this plan*, and the rule the person wrote is still on the
- * screen. Every other refusal keeps the generic panel, because a rule naming a deleted category is
- * not an entitlement problem and must not read like one.
+ * `createRule` answers a `FeatureLockedError` — the `feature_locked` kind of the public failure
+ * envelope (`readFailure`) — when the workspace's plan meters rules at zero, which is the only
+ * place in the product where the answer to `OPEN-1` exists today. So a refusal for that reason is
+ * shown as an upgrade path rather than as a stack trace: *automation is not part of this plan*,
+ * and the rule the person wrote is still on the screen. Every other refusal keeps the generic
+ * panel, because a rule naming a deleted category is not an entitlement problem and must not read
+ * like one.
  */
 export const Route = createFileRoute('/_app/transactions/rules/new')({
   loader: async () => ({ reference: await loadTransactionReference() }),
@@ -85,12 +87,11 @@ function NewRuleRoute() {
       await Promise.all([router.invalidate(), refreshCaches()])
       await navigate({ to: '/transactions/rules' })
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      if (message.includes('FEATURE_LOCKED')) {
+      if (readFailure(error)?.kind === 'feature_locked') {
         setIsLocked(true)
         setFailure(t('rules.error.locked'))
       } else {
-        setFailure(message)
+        setFailure(error instanceof Error ? error.message : String(error))
       }
     } finally {
       setIsSaving(false)

@@ -830,6 +830,24 @@ export function firstPrSpans(issues, prLinks, prOpenedAt, trusted) {
   return spans;
 }
 
+/**
+ * How many open issues and PRs one `gh ... list` call asks for. A row outside the window is
+ * invisible to the report, and a blocker outside it counts as closed (planned.travel read 103 of
+ * 303 open issues as nonexistent at the old 200 and ran #913 under an open blocker).
+ */
+export const LIST_LIMIT = 1000;
+
+/**
+ * How many recently merged PRs `prLinks` sees. A merged PR is all that keeps an issue out of READY
+ * until housekeeping closes it, and housekeeping runs on weekdays only: 30 was a day or two of
+ * merges, and a weekend pushes the older ones out of view (planned.travel re-implemented six
+ * finished issues that way).
+ */
+export const MERGED_LIMIT = 200;
+
+/** True when a listing came back full, so rows past the limit may be missing. */
+export const isTruncated = (rows, limit = LIST_LIMIT) => rows.length >= limit;
+
 const gh = (args) =>
   JSON.parse(
     execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }),
@@ -1079,7 +1097,7 @@ function printFlow(report) {
 
 /**
  * Every issue with its author, body and comments - what `firstBriefAt` reads - newest first,
- * bounded like the issue report's `--limit 200`. Closed issues count: an issue that went all the
+ * bounded to the newest `pages` x 50 (200 by default). Closed issues count: an issue that went all the
  * way through is exactly the one whose latency is measurable, and leaving them out would report
  * only the stalls.
  */
@@ -1148,17 +1166,21 @@ function main(argv) {
   const { labels } = JSON.parse(readFileSync(CONFIG, "utf8"));
   const trusted = trustedAuthors(JSON.parse(readFileSync(AUTOMATIONS, "utf8")));
   const prs = gh([
-    "pr", "list", "--state", "open", "--limit", "200",
+    "pr", "list", "--state", "open", "--limit", String(LIST_LIMIT),
     "--json", `number,title,body,headRefName,author,labels,baseRefName,updatedAt${plan ? ",files" : ""}`,
   ]);
   const merged = gh([
-    "pr", "list", "--state", "merged", "--limit", "30",
+    "pr", "list", "--state", "merged", "--limit", String(MERGED_LIMIT),
     "--json", "number,title,body,headRefName",
   ]).map((pr) => ({ ...pr, merged: true }));
   const openIssues = gh([
-    "issue", "list", "--state", "open", "--limit", "200",
+    "issue", "list", "--state", "open", "--limit", String(LIST_LIMIT),
     "--json", "number,title,url,labels,updatedAt,body,comments,author",
   ]);
+
+  for (const [what, rows] of [["open pull requests", prs], ["open issues", openIssues]])
+    if (isTruncated(rows))
+      console.error(`backlog-status: ${rows.length} ${what} fill the limit of ${LIST_LIMIT}; some are not classified. Raise LIST_LIMIT.`);
 
   const records = readRunRecords();
   const context = {

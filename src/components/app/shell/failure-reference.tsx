@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
 
 import { Button } from '#/components/ui'
+import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 
 /**
@@ -32,6 +33,8 @@ const noClipboardOnServer = () => false
 export interface FailureReferenceProps {
   /** An event id or a request id. **Never a message, a stack or a value.** */
   reference?: string
+  /** For the caller's alignment: the line is left-aligned unless told otherwise. */
+  className?: string
 }
 
 /**
@@ -53,7 +56,10 @@ export interface FailureReferenceProps {
  * the same text, so the region is cleared first and refilled once the write settles, otherwise the
  * repeat would change nothing and say nothing.
  */
-export function FailureReference({ reference }: FailureReferenceProps) {
+export function FailureReference({
+  reference,
+  className,
+}: FailureReferenceProps) {
   const t = useTranslate()
   const canCopy = useSyncExternalStore(
     subscribeNever,
@@ -77,7 +83,12 @@ export function FailureReference({ reference }: FailureReferenceProps) {
 
   return (
     // `basis-full`: in a panel's wrapping action row the reference takes a line of its own.
-    <div className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1">
+    <div
+      className={cn(
+        'flex basis-full flex-wrap items-center gap-x-3 gap-y-1',
+        className,
+      )}
+    >
       <p className="break-all text-caption text-ink-2 tabular">
         {t('empty.error.reference', { reference })}
       </p>
