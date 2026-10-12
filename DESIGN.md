@@ -780,6 +780,79 @@ a sentence that says what to do, not a blank.
 - `src/components/ui/__tests__/empty-state-ownership.test.ts` fails when `variant="dashed"`
   appears outside `src/components/ui`.
 
+### Error panel
+
+What replaces a region, or the page, when something did not work. `ErrorPanel` is the frame and
+`FailurePanel` chooses what goes in it: it reads the failure envelope and offers the recovery its
+failure kind calls for, so a screen never invents its own way out. Both live in
+`src/components/app/shell/`. `RouteError` is the same idea for a whole page.
+
+- **The shape.** A default card (Cards, above) at `md` padding with a 12px gap, `xl` radius and the
+  one-pixel `--shadow-card` under-edge, its rule repainted from `border-subtle` to the tone at 30%
+  opacity (`border-negative/30`, `border-warning/30`). A 32px round disc in the tone's `-soft` wash
+  holds a 16px triangle glyph in the tone's ink; the disc is round because it is a glyph, and
+  nothing else about the panel is. The heading is `subtitle` at semibold in `ink`, an `h3` unless
+  the caller says `h2` or `h4`; the sentence under it is `body` in `ink-2`. Actions wrap below: Retry
+  and the way back to the dashboard are `secondary`, the link to billing is `primary`. `RouteError`, the page-level
+  failure, is a frame of its own: a centred `rounded-xl` card on `border-subtle`, a 48px disc, an
+  `h1` in `title`, and it keeps the `warning` glyph it shipped with. That is the one fault that is
+  not `negative`, recorded here and not changed.
+- **The tones.** `negative` is a fault: something broke and nobody did anything wrong. `warning`
+  is a limit the reader can act on: the workspace is at a quota or the feature is not in its plan.
+  `negative` is the default. A call site does not pick a tone for a failure: `FailurePanel` derives
+  it from the recovery, so `warning` appears only on the `quota` and `feature_locked` recoveries
+  and every other one is `negative`. A reader asks "did the product fail, or did it decline?"; when
+  it is hard to say, the answer is `negative`. The four recoveries are `retryable` (Retry, beside
+  the form and never instead of it, so input survives), `quota` (a link to billing and the metric
+  that was reached), `feature_locked` (a link to billing and nothing else) and `internal` (the
+  sentence, Retry when the caller has one, a way back to the dashboard where the reader is known to
+  be signed in, and a reference). `not_found` and `forbidden` share the `internal` recovery on
+  purpose, so the screen never offers a different way out for a missing row and a foreign one
+  (`RECOVERY_OF`). The sentence is the envelope's own catalogue key, so two failures of one kind
+  read the same, and no recovery shows a plan name or an amount.
+- **The states.** It has two placements, `after-action` and `in-place` (the alert-versus-region
+  rule below), and Retry has a pending state (the Pending-Not-Disabled Rule). It does not have
+  hover, press, selected, disabled or invalid: a panel is not interactive, only its buttons and
+  links are, and each answers with its own states and the 44px hit area. It has no dismiss and no
+  timer, so it stays until the failure is gone or the reader leaves. The heading takes focus
+  programmatically and is never a tab stop, so like `<main>` it draws no focus ring.
+- **What carries the meaning without colour.** The heading and the sentence. The glyph is
+  `aria-hidden` and the tone is reinforcement, never the signal (Colour Is Never Alone). The title
+  says what did not happen and the body says whether anything was changed, which is the sentence a
+  reader of a finance app needs first. Under forced colours the panel is a bordered card with
+  text, so the text and the rule survive; no forced-colours capture of it has been made.
+- **The one thing it is not.** An `EmptyState` (nothing here yet, which is not a failure) and a
+  toast (transient, and it cannot hold a recovery). A failure that needs a way out stays on the
+  screen and carries its action. A panel is not a place to show what went wrong in a developer's
+  words either.
+
+**The Alert-Versus-Region Rule.** `placement="after-action"` is the result of something the reader
+just did, so it is `role="alert"`. `placement="in-place"`, and `RouteError`, are the content of a
+page or a block that failed to load on arrival, so they are a region labelled by their heading:
+an alert on initial render is announced before the person has any context for it. The heading is the
+first element inside the alert.
+
+**The Focus Rule.** Only an after-action panel moves focus, to its heading, so a keyboard reader
+lands on the explanation and Retry is the next tab stop. An in-place panel never moves focus.
+`RouteError` moves it only when it mounts after the document's first render, because on the first
+render the browser has already placed focus on the document and the skip link must stay the first
+tab stop. A panel that held focus when it goes away, after a successful Retry say, gives it back to
+the enclosing dialog or else to `#main-content`, never to `<body>` (`useFocusHeading`).
+
+**The Tab-Title Rule.** An error surface never writes `document.title`. The router runs `head()` for
+the failed match as well, so the tab already carries the failed route's own title, and an imperative
+write would compete with the rendered `<title>` and outlive a successful Retry.
+
+**The Reference Rule.** New code never renders an error's message. The panel has no `detail` prop and
+no `<details>`, `title` and `body` are catalogue copy, and the only free-form string it is given is
+a `reference`, which is an event id or a request id and nothing else: the panel drops anything that
+is not 8 to 64 letters, digits, `_` or `-`, but the shape narrows a string and does not prove it is
+not an amount, so the producer passes an id and never a value of its own. The existing `ErrorPanel`
+sites that still pass `detail` are the tracked exception, owned by #718 (audit the `detail=` sites
+and remove those that carry the repository's message), after which the prop goes.
+
+The guideline states no conformance level and widens none: the claim is `docs/ACCESSIBILITY.md` §1.
+
 ### Badges
 
 A word with a run of pen behind it. Every badge, in every tone, is the pen mark (`mark-pen` in
