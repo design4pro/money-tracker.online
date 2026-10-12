@@ -24,11 +24,9 @@
     "$ruleId, $batchId) are absent on purpose: their ids come from the seed and would pin",
     "this file to the fixture. The e2e suite covers them with ids it looked up at run time.",
     "",
-    "/accounts/groups is absent for a different reason than the rest: it does not exist, but it",
-    "also does not 404. `/accounts/$accountId` matches `groups` as an id, so the route answered",
-    "HTTP 500 where every other missing path answered 404. That turned out not to be about this",
-    "path at all - seven of the eight dynamic-segment screens answer 500 for an id that names no",
-    "row - and it is now issue #16 rather than a note here."
+    "/accounts/groups is a static segment beside /accounts/$accountId. Before the screen existed",
+    "`$accountId` matched `groups` as an id and the path answered HTTP 500 where every other",
+    "missing path answered 404 (issue #16). The route exists now, so it is scanned like the rest."
   ],
   "routes": [
     { "path": "/", "name": "Landing", "access": "public" },
@@ -40,6 +38,11 @@
 
     { "path": "/dashboard", "name": "Dashboard", "access": "session" },
     { "path": "/accounts", "name": "Accounts", "access": "session" },
+    {
+      "path": "/accounts/groups",
+      "name": "Account groups",
+      "access": "session"
+    },
     { "path": "/transactions", "name": "Transactions", "access": "session" },
     {
       "path": "/transactions/new",

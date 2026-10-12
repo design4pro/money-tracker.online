@@ -65,6 +65,9 @@ export const SURFACES: readonly Surface[] = [
   { name: 'sign in', path: '/login', session: undefined },
   { name: 'dashboard', path: '/dashboard', session: 'demo' },
   ACCOUNTS,
+  // The demo workspace holds two groups, so the scan reads a rendered tree - a group row, its
+  // drag handle and menu trigger, and the account rows beneath - rather than the empty state.
+  { name: 'account groups', path: '/accounts/groups', session: 'demo' },
   { name: 'transactions', path: '/transactions', session: 'demo' },
   // `.github/a11y/routes.json` has scanned this route all along; this list had not, which is how
   // issue #20 was able to name a `/categories` row nobody here could reproduce. The two are

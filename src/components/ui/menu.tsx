@@ -8,6 +8,7 @@ import {
   Separator as RACSeparator,
   SubmenuTrigger as RACSubmenuTrigger,
 } from 'react-aria-components/Menu'
+import { Text as RACText } from 'react-aria-components/Text'
 import { Check, ChevronRight } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
@@ -55,6 +56,12 @@ export function Menu<T extends object>({ className, ...props }: MenuProps<T>) {
 
 export interface MenuItemProps<T extends object> extends RACMenuItemProps<T> {
   icon?: ReactNode
+  /**
+   * A second line under the label: why an item is disabled, or what it will do. It is wired as
+   * the item's `aria-describedby`, so a screen reader hears it with the item, and it stays
+   * visible, so a disabled item explains itself to a sighted keyboard user as well.
+   */
+  description?: ReactNode
   /** A keyboard hint, a count, an amount. Decoration. */
   meta?: ReactNode
   /** Paint the row as destructive. Still requires a confirmation step. */
@@ -67,6 +74,7 @@ export function MenuItem<T extends object>({
   className,
   children,
   icon,
+  description,
   meta,
   isDestructive = false,
   hasSubmenu = false,
@@ -109,9 +117,24 @@ export function MenuItem<T extends object>({
               {icon}
             </span>
           ) : null}
-          <span className="min-w-0 flex-1 truncate">
-            {typeof children === 'function' ? children(renderProps) : children}
-          </span>
+          {description ? (
+            <span className="flex min-w-0 flex-1 flex-col">
+              <RACText slot="label" className="truncate">
+                {typeof children === 'function'
+                  ? children(renderProps)
+                  : children}
+              </RACText>
+              <RACText slot="description" className="text-caption text-ink-2">
+                {description}
+              </RACText>
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate">
+              {typeof children === 'function'
+                ? children(renderProps)
+                : children}
+            </span>
+          )}
           {meta ? (
             <span className="shrink-0 text-caption text-ink-2 tabular">
               {meta}

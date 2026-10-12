@@ -45,6 +45,8 @@ import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import {
+  accountGroupMembers,
+  accountGroups,
   accounts,
   attachments,
   budgetCategories,
@@ -52,6 +54,7 @@ import {
   currencies,
   importBatches,
   payees,
+  rules,
   transactions,
 } from '#/server/db/schema'
 import { materializeSeries } from '#/server/recurring/materialize'
@@ -99,7 +102,15 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
-import { getAccountBalanceOn } from '../accounts'
+import {
+  createAccountGroup,
+  deleteAccountGroup,
+  getAccountBalanceOn,
+  listAccountGroups,
+  reorderAccountGroups,
+  setAccountGroupMembers,
+  updateAccountGroup,
+} from '../accounts'
 import { isMember, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
@@ -415,6 +426,146 @@ describe('the balance on a day cannot be read across a workspace boundary', () =
     await expect(
       getAccountBalanceOn(b, { accountId: B_ACCOUNTS[0], on: '2026-03-15' }),
     ).resolves.toEqual({ balanceMinor: expect.any(Number) })
+  })
+})
+
+describe('account groups cannot be reached or aimed across a workspace boundary', () => {
+  const A_GROUP = 'grp-a-01'
+  const B_GROUP = 'grp-b-01'
+  const B_CHILD = 'grp-b-02'
+
+  beforeEach(async () => {
+    await db.insert(accountGroups).values([
+      {
+        id: A_GROUP,
+        organizationId: ORG_A,
+        name: 'A group',
+        position: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: B_GROUP,
+        organizationId: ORG_B,
+        name: 'B group',
+        position: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: B_CHILD,
+        organizationId: ORG_B,
+        name: 'B child',
+        parentId: B_GROUP,
+        position: 1,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ])
+    await db.insert(accountGroupMembers).values([
+      {
+        organizationId: ORG_A,
+        groupId: A_GROUP,
+        accountId: A_ACCOUNTS[0],
+        position: 0,
+      },
+      {
+        organizationId: ORG_B,
+        groupId: B_GROUP,
+        accountId: B_ACCOUNTS[0],
+        position: 0,
+      },
+    ])
+    await db.insert(rules).values({
+      id: 'rule-b-group',
+      organizationId: ORG_B,
+      name: 'B rule on the group',
+      position: 0,
+      matchMode: 'all',
+      conditions: JSON.stringify([
+        { field: 'account_group', operator: 'is_any_of', ids: [B_GROUP] },
+      ]),
+      actions: JSON.stringify([
+        { kind: 'set_excluded', excludeFromStats: true },
+      ]),
+      isActive: true,
+      pausedReason: null,
+      matchCount: 0,
+      lastMatchedAt: null,
+      runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+  })
+
+  /** B's groups, memberships and rules, read through B's own scope: the control group. */
+  async function bState() {
+    return {
+      groups: await listAccountGroups(b),
+      rules: await b.db
+        .select()
+        .from(rules)
+        .where(eq(rules.organizationId, ORG_B)),
+    }
+  }
+
+  /** A's groups, so a refused write is also shown to have created nothing on A's side. */
+  async function aState() {
+    return listAccountGroups(a)
+  }
+
+  /** The sentence every case asserts: refused as not found, and nothing moved on either side. */
+  async function expectRefused(attempt: Promise<unknown>) {
+    const before = { a: await aState(), b: await bState() }
+    const error = await attempt.catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(NotFoundError)
+    expect(await bState()).toEqual(before.b)
+    expect(await aState()).toEqual(before.a)
+  }
+
+  it('lists nothing of B’s for A, and B’s list is still there', async () => {
+    const listed = await listAccountGroups(a)
+
+    expect(listed.map((entry) => entry.group.id)).toEqual([A_GROUP])
+    expect(listed.flatMap((entry) => entry.accountIds)).toEqual([A_ACCOUNTS[0]])
+    expect((await listAccountGroups(b)).map((entry) => entry.group.id)).toEqual(
+      [B_GROUP, B_CHILD],
+    )
+  })
+
+  it('createAccountGroup refuses B’s group as the parent', async () => {
+    await expectRefused(
+      createAccountGroup(a, { name: 'Sneaky', parentId: B_GROUP }),
+    )
+  })
+
+  it('updateAccountGroup refuses a foreign group id and a foreign parent id', async () => {
+    await expectRefused(updateAccountGroup(a, B_GROUP, { name: 'Mine now' }))
+    await expectRefused(updateAccountGroup(a, A_GROUP, { parentId: B_GROUP }))
+  })
+
+  it('deleteAccountGroup refuses B’s group and pauses none of B’s rules', async () => {
+    await expectRefused(deleteAccountGroup(a, B_GROUP))
+
+    const [rule] = await b.db
+      .select()
+      .from(rules)
+      .where(eq(rules.id, 'rule-b-group'))
+    expect(rule?.pausedReason).toBeNull()
+  })
+
+  it('setAccountGroupMembers refuses B’s accounts in A’s group and A’s accounts in B’s group', async () => {
+    await expectRefused(setAccountGroupMembers(a, A_GROUP, [B_ACCOUNTS[0]]))
+    await expectRefused(
+      setAccountGroupMembers(a, A_GROUP, [A_ACCOUNTS[0], B_ACCOUNTS[1]]),
+    )
+    await expectRefused(setAccountGroupMembers(a, B_GROUP, [A_ACCOUNTS[0]]))
+  })
+
+  it('reorderAccountGroups refuses an order that names B’s group', async () => {
+    await expectRefused(reorderAccountGroups(a, [B_GROUP, A_GROUP]))
+    await expectRefused(reorderAccountGroups(a, [B_GROUP]))
   })
 })
 
