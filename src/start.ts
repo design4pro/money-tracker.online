@@ -3,13 +3,24 @@
  *
  * It exists as its own module because `tsr.config.json` registers its options type onto
  * `@tanstack/react-start`'s `Register` interface from the generated route tree, and because it is
- * where global server-function middleware is registered when there is any. There is none yet:
- * the redaction boundary that every `createServerFn` call site will run behind belongs with the
- * error layer, which lands with the finance domain. Registering it here rather than per call site
- * is the whole reason this seam is created up front — "a diagnostic never reaches the browser"
- * has to be true in one place, not in every handler.
+ * where global server-function middleware is registered. There is one: the failure redaction
+ * boundary, which every `createServerFn` call site runs behind. Registering it here rather than per
+ * call site is the whole reason this seam exists - "a diagnostic never reaches the browser" has to
+ * be true in one place, not in every handler, and a function added tomorrow cannot forget it.
+ * Global function middleware runs before a function's own, so the boundary also wraps the auth
+ * guards. It covers server functions only; see the header of `#/server/errors/middleware`.
+ *
+ * The other entry is the serialization adapter that carries the boundary's envelope to the browser:
+ * the framework's default plugin writes only the `message` of an `Error`, so without it the envelope
+ * would stop at the server. It is consulted before the default plugins and matches one class.
  */
 
 import { createStart } from '@tanstack/react-start'
 
-export const startInstance = createStart(() => ({}))
+import { publicFailureAdapter } from '#/lib/public-failure'
+import { failureRedactionMiddleware } from '#/server/errors/middleware'
+
+export const startInstance = createStart(() => ({
+  functionMiddleware: [failureRedactionMiddleware],
+  serializationAdapters: [publicFailureAdapter],
+}))
