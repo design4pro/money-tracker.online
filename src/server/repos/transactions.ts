@@ -505,7 +505,8 @@ async function requireAccountCurrency(
 
 /**
  * Holds the invariant "a transaction is in its account's currency" (`CONTEXT.md`: an account has
- * exactly one currency; `docs/MONEY.md` §4: a native balance is the plain sum of `amount_minor`).
+ * exactly one currency; `docs/MONEY.md` §5.1: a balance is the native units held on a day, which only
+ * means something when every row of the account is in the account's currency).
  *
  * A mismatch is **refused, not derived**: the caller's currency is a field of the payload and of the
  * stored row, and silently re-denominating it would turn "12.00 EUR" into "12.00 PLN". The refusal
