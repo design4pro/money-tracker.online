@@ -29,7 +29,7 @@
  * leg of an `internal` transfer so a paired delete cannot be bypassed before plan `10` exists.
  */
 
-import { eq, isNotNull, isNull, lte, or, sql } from 'drizzle-orm'
+import { count, eq, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -480,18 +480,58 @@ async function assertInScope(
   }
 }
 
-/** Validates every parent id present on a payload, in a fixed order so errors are reproducible. */
+/**
+ * The currency of an account in the caller's workspace.
+ *
+ * It is also the scope proof for the account id, so the account is read once for both questions: a
+ * miss is a {@link NotFoundError} and never a `ForbiddenError`, for the reason {@link assertInScope}
+ * gives, and the currency of an account in another workspace is never reached.
+ */
+async function requireAccountCurrency(
+  scope: TenantScope,
+  accountId: string,
+): Promise<CurrencyCode> {
+  const rows = await scope.db
+    .select({ currencyCode: accounts.currencyCode })
+    .from(accounts)
+    .where(tenantFilter(scope, accounts, eq(accounts.id, accountId)))
+    .limit(1)
+  const row = rows.at(0)
+  if (row === undefined) {
+    throw new NotFoundError('account', accountId)
+  }
+  return asCurrencyCode(row.currencyCode)
+}
+
+/**
+ * Holds the invariant "a transaction is in its account's currency" (`CONTEXT.md`: an account has
+ * exactly one currency; `docs/MONEY.md` §5.1: a balance is the native units held on a day, which only
+ * means something when every row of the account is in the account's currency).
+ *
+ * A mismatch is **refused, not derived**: the caller's currency is a field of the payload and of the
+ * stored row, and silently re-denominating it would turn "12.00 EUR" into "12.00 PLN". The refusal
+ * names both codes so the person can see which side to change.
+ */
+function assertCurrencyMatchesAccount(
+  accountId: string,
+  accountCurrencyCode: CurrencyCode,
+  currencyCode: CurrencyCode,
+): void {
+  if (accountCurrencyCode !== currencyCode) {
+    throw new ConflictError(
+      `Account ${accountId} is in ${accountCurrencyCode} and the transaction is in ${currencyCode}. A transaction is written in its account's currency.`,
+    )
+  }
+}
+
+/** Validates the category and payee ids present on a payload, in a fixed order so errors are reproducible. */
 async function assertParentsInScope(
   scope: TenantScope,
   payload: {
-    readonly accountId?: string
     readonly categoryId?: string | null
     readonly payeeId?: string | null
   },
 ): Promise<void> {
-  if (payload.accountId !== undefined) {
-    await assertInScope(scope, accounts, 'account', payload.accountId)
-  }
   if (payload.categoryId !== undefined && payload.categoryId !== null) {
     await assertInScope(scope, categories, 'category', payload.categoryId)
   }
@@ -580,11 +620,21 @@ export async function createTransaction(
     isPlanned: input.isPlanned ?? false,
   })
 
+  const accountCurrencyCode = await requireAccountCurrency(
+    scope,
+    input.accountId,
+  )
   await assertParentsInScope(scope, {
-    accountId: input.accountId,
     categoryId: input.categoryId ?? null,
     payeeId: input.payeeId ?? null,
   })
+  // Unconditional: no policy reaches it, and it runs before any rate is asked for or row written.
+  const currencyCode = asCurrencyCode(input.currencyCode)
+  assertCurrencyMatchesAccount(
+    input.accountId,
+    accountCurrencyCode,
+    currencyCode,
+  )
 
   const subject: PolicySubject = {
     isPlanned: input.isPlanned ?? false,
@@ -596,7 +646,6 @@ export async function createTransaction(
   assertPolicySatisfied(subject, policies)
 
   const amountMinor = asMinor(input.amountMinor)
-  const currencyCode = asCurrencyCode(input.currencyCode)
   const ref = await computeRefAmount(
     { amountMinor, currencyCode, bookedOn: input.bookedOn },
     conversion,
@@ -665,8 +714,11 @@ export async function updateTransaction(
     { stored: { bookedOn: current.bookedOn, isPlanned: current.isPlanned } },
   )
 
+  const patchedAccountCurrencyCode =
+    patch.accountId === undefined
+      ? undefined
+      : await requireAccountCurrency(scope, patch.accountId)
   await assertParentsInScope(scope, {
-    accountId: patch.accountId,
     categoryId: patch.categoryId,
     payeeId: patch.payeeId,
   })
@@ -680,6 +732,22 @@ export async function updateTransaction(
       ? asCurrencyCode(current.currencyCode)
       : asCurrencyCode(patch.currencyCode)
   const bookedOn = patch.bookedOn ?? current.bookedOn
+
+  // Judged on the merged pair, and only when it differs from the stored one: a legacy row that
+  // already disagrees with its account (`findAccountCurrencyMismatches`) must still take a note or
+  // an amount, and what it must not do is move onto a pair that disagrees as well.
+  const accountId = patch.accountId ?? current.accountId
+  if (
+    accountId !== current.accountId ||
+    currencyCode !== current.currencyCode
+  ) {
+    assertCurrencyMatchesAccount(
+      accountId,
+      patchedAccountCurrencyCode ??
+        (await requireAccountCurrency(scope, accountId)),
+      currencyCode,
+    )
+  }
 
   const conversionChanged =
     amountMinor !== current.amountMinor ||
@@ -721,7 +789,7 @@ export async function updateTransaction(
   const rows = await scope.db
     .update(transactions)
     .set({
-      accountId: patch.accountId ?? current.accountId,
+      accountId,
       direction: patch.direction ?? current.direction,
       amountMinor,
       currencyCode,
@@ -805,6 +873,75 @@ export async function deleteTransaction(
     throw new NotFoundError('transaction', id)
   }
   touchLedgerAccount(deleted.accountId)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Integrity                                                                   */
+/* -------------------------------------------------------------------------- */
+
+const MAX_MISMATCH_SAMPLE = 100
+
+export const findAccountCurrencyMismatchesSchema = z.strictObject({
+  /** How many ids to sample. The count is never capped. */
+  limit: z.number().int().min(1).max(MAX_MISMATCH_SAMPLE).default(20),
+})
+export type FindAccountCurrencyMismatchesInput = z.input<
+  typeof findAccountCurrencyMismatchesSchema
+>
+
+/** A transaction whose currency is not its account's, by id alone: no amount, note or payee. */
+export interface CurrencyMismatch {
+  readonly transactionId: string
+  readonly accountId: string
+}
+
+export interface CurrencyMismatchReport {
+  readonly count: number
+  readonly sample: ReadonlyArray<CurrencyMismatch>
+}
+
+/**
+ * Reports the transactions whose `currency_code` differs from their account's **current**
+ * `currency_code`: how many there are, and a capped sample of their ids.
+ *
+ * Read-only, and the safety net for rows the write rule cannot reach — one written before the rule
+ * existed, or one stranded when {@link updateAccount} changed the account's currency under its
+ * history. It updates, deletes and backfills nothing; what to do about the rows it names is a
+ * separate decision. Both joined tables carry the tenant predicate.
+ */
+export async function findAccountCurrencyMismatches(
+  scope: TenantScope,
+  input: FindAccountCurrencyMismatchesInput = {},
+): Promise<CurrencyMismatchReport> {
+  const { limit } = findAccountCurrencyMismatchesSchema.parse(input)
+  const joinedAccount = tenantFilter(
+    scope,
+    accounts,
+    eq(accounts.id, transactions.accountId),
+  )
+  const disagrees = tenantFilter(
+    scope,
+    transactions,
+    ne(transactions.currencyCode, accounts.currencyCode),
+  )
+
+  const [total] = await scope.db
+    .select({ value: count() })
+    .from(transactions)
+    .innerJoin(accounts, joinedAccount)
+    .where(disagrees)
+  const sample = await scope.db
+    .select({
+      transactionId: transactions.id,
+      accountId: transactions.accountId,
+    })
+    .from(transactions)
+    .innerJoin(accounts, joinedAccount)
+    .where(disagrees)
+    .orderBy(transactions.id)
+    .limit(limit)
+
+  return { count: total?.value ?? 0, sample }
 }
 
 /* -------------------------------------------------------------------------- */

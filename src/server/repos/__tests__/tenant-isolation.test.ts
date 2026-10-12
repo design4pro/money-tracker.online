@@ -135,6 +135,7 @@ import {
   createTransaction,
   createTransactionSchema,
   deleteTransaction,
+  findAccountCurrencyMismatches,
   findTransaction,
   getTransaction,
   updateTransaction,
@@ -1401,6 +1402,35 @@ describe('the transaction write path cannot reach or be aimed across a workspace
     await expect(
       findTransaction({ scope: world.scope, policies: POLICIES, id: 'tx-a' }),
     ).resolves.toBeNull()
+  })
+
+  it('reports a currency mismatch to the workspace that holds it and to no other', async () => {
+    // B's row is booked in EUR on a PLN account. A has no such row, and must not learn of B's.
+    await world.db
+      .update(transactions)
+      .set({ currencyCode: 'EUR' })
+      .where(eq(transactions.id, 'tx-b'))
+    harnessExecuted.length = 0
+
+    await expect(findAccountCurrencyMismatches(world.scope)).resolves.toEqual({
+      count: 0,
+      sample: [],
+    })
+    const asA = harnessExecuted.filter((query) => /join/i.test(query))
+    await expect(
+      findAccountCurrencyMismatches(world.otherScope),
+    ).resolves.toEqual({
+      count: 1,
+      sample: [{ transactionId: 'tx-b', accountId: 'acc-b' }],
+    })
+
+    // The predicate is on both joined tables, in the count and in the sample alike.
+    expect(asA.length).toBeGreaterThanOrEqual(2)
+    for (const query of asA) {
+      expect(
+        query.match(/"organization_id" = \?/g)?.length,
+      ).toBeGreaterThanOrEqual(2)
+    }
   })
 
   it('refuses a create payload that names the tenant column or a transfer link', () => {

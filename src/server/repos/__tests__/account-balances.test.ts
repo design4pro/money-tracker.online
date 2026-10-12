@@ -370,6 +370,17 @@ describe('a transaction written through the repository', () => {
   })
 
   it('rebuilds both accounts when an edit moves a transaction between them', async () => {
+    // A second PLN account: a transaction is in its account's currency, so a move has to land on
+    // an account in the same one.
+    const at = new Date('2026-09-01T00:00:00.000Z')
+    await scope.db.insert(accounts).values({
+      id: 'acc-pln-savings',
+      organizationId: 'org-a',
+      name: 'Savings',
+      currencyCode: 'PLN',
+      createdAt: at,
+      updatedAt: at,
+    })
     const created = await spend('acc-pln', 120_00, '2026-09-10')
     await runWithLedgerBatch(() =>
       updateTransaction({
@@ -377,12 +388,12 @@ describe('a transaction written through the repository', () => {
         policies: EVERYTHING,
         conversion,
         id: created.id,
-        patch: { accountId: 'acc-usd' },
+        patch: { accountId: 'acc-pln-savings' },
       }),
     )
 
     await endsAtTheCachedBalance('acc-pln')
-    await endsAtTheCachedBalance('acc-usd')
+    await endsAtTheCachedBalance('acc-pln-savings')
     expect((await cachedBalanceOf('acc-pln')).currentBalanceMinor).toBe(
       1_000_00,
     )
