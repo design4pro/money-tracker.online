@@ -412,19 +412,25 @@ traffic during the migrate-then-deploy window.
 | Polar webhook unsigned                            | 400, never processed                                | HMAC over `id.timestamp.body`, 300s tolerance, constant-time compare            |
 | D1 approaching 10 GB                              | Writes eventually fail                              | Size alarm; §7's lever list                                                     |
 | A session survives a ban                          | Cannot happen for longer than one request           | No cookie session cache; the role is re-read per request                        |
-| An amount reaches Sentry                          | A data-protection incident                          | Money-aware scrubber in the redaction middleware; typed error envelopes         |
+| An amount reaches Sentry                          | A data-protection incident                          | `redactError` in the failure middleware (server functions); typed envelopes     |
 | A cron expression is mistyped in `wrangler.jsonc` | The branch throws instead of silently doing nothing | `scheduled()` switches on four literal constants with a default that throws     |
 
 ---
 
 ## 11. Observability
 
-- **Sentry** on both the Worker and the client, release from `CF_VERSION_METADATA`. The
-  `failureRedactionMiddleware` scrubs money-shaped fields by key before anything is sent, and the
-  public failure envelope is built from typed codes rather than interpolated messages.
+- **Sentry** on both the Worker and the client, release from `CF_VERSION_METADATA`; **planned
+  (`05-S3`), not installed**. What exists today is the failure boundary: `failureRedactionMiddleware`
+  (`src/server/errors/middleware.ts`) wraps every server function and hands its sinks
+  `redactError(error)` and the kind, never the raw error, and the report port is a no-op until Sentry
+  is wired in. The public failure envelope is built from typed codes rather than interpolated
+  messages. The API routes, the queue handlers and the Durable Object still log through the raw
+  logger until `05-S3` routes them through the same scrubber (`docs/SECURITY.md` §6.1).
 - **Workers observability** is on with 100% head sampling and invocation logs in both environments;
   the cost is small and the alternative is debugging a money bug from a 1% sample.
 - **`/api/health`** returns `200` with the version, the environment and a D1 round-trip. It is what
   the deploy smoke check asserts.
-- `classifyFailure` maps every thrown error to a stable public code, so a client can branch on the
-  cause without the server leaking the reason.
+- `classifyFailure` (`src/server/errors/classify.ts`) maps a thrown error, by class or repository
+  `code` and never by message, to one of eleven kinds (`unauthenticated` among them) and a status;
+  anything it does not name is `internal`. The browser branches on the envelope through
+  `readFailure` (`src/lib/failure.ts`), not on `error.message`.

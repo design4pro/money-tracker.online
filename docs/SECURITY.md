@@ -143,20 +143,35 @@ Two role dictionaries that are never mixed:
 **No amount, no payee name, no account name, no transaction note, no email address and no attachment
 filename leaves this system in an error report.**
 
-- `failureRedactionMiddleware` scrubs by key against a money- and PII-aware deny list before an
-  event is constructed.
-- The **public failure envelope** is built from typed error codes and parameters, never from an
-  interpolated message. `classifyFailure` maps every thrown error to a stable code.
-- The failure boundary replaces the value a server function throws, so neither the message nor the
-  stack reaches the browser; the envelope crosses the wire through a serialization adapter that
-  carries the validated envelope and nothing else. **Not covered:** a failure thrown outside a
-  server function (a route loader, `beforeLoad`, the framework's outer `catch`, a failure before the
-  chain runs) still serialises its `message`, and the API routes, the queue handlers and the
-  Durable Object log through the raw logger until the Sentry stage routes them through the same
-  scrubber. The SSR document status is the router's (500 for any loader error), not the kind's.
+- `failureRedactionMiddleware` (`src/server/errors/middleware.ts`, registered globally in
+  `src/start.ts`) wraps every server function. It hands the sinks `redactError(error)` and the kind,
+  never the raw error. `redactError` (`src/server/errors/redact.ts`) is the one scrubber and what
+  survives it is the error's constructor name, a repository error `code` and up to twenty stack
+  frames: no message, no stack header, no `cause`, no own property, because `AliasTakenError`,
+  `InvitationAddresseeError` and `InvalidAmountError` interpolate a payee name, an email and an
+  amount into their sentence. `redact(value)` is the default-deny scrubber for a payload: a string
+  survives only under an allow-listed id-shaped key, and an amount-shaped substring never does. The
+  report port is a no-op until the Sentry stage installs it; the log port writes the redacted fields
+  only.
+- The **public failure envelope** is built from closed sets (`src/server/errors/envelope.ts`): a
+  kind, a catalogue key, a quota metric, a field path of identifier characters. It is never built
+  from a thrown value's message, name, entity or id, so a missing row and another workspace's row
+  leave byte-identical. `classifyFailure` (`src/server/errors/classify.ts`) maps every thrown error
+  to a kind by class or repository `code`; anything it does not name is `internal`.
+- The failure boundary replaces the value a server function throws with a `PublicFailureError`, so
+  neither the message nor the stack reaches the browser; the envelope crosses the wire through a
+  serialization adapter that carries the validated envelope and nothing else.
+- **Not covered, two residual gaps.** (1) A failure that happens before the middleware chain runs
+  (a malformed payload, an unknown function id, an oversized payload) is served by the framework's
+  outer `catch`, which still serialises the error's `message` and logs it raw; so does a failure
+  thrown outside a server function (a route loader, `beforeLoad`). (2) The API routes, the queue
+  handlers and the Durable Object log through the raw logger until plan stage `05-S3` routes them
+  through the same scrubber. The SSR document status is the router's (500 for any loader error),
+  not the kind's.
 - An exception message that embeds an amount is a data-protection incident, not a debugging
-  convenience. This is checked in review and is the reason error constructors take structured
-  fields rather than template strings.
+  convenience. This is checked in review. Error constructors do **not** all take structured fields
+  (`ConflictError` takes a sentence, and `AliasTakenError` and `InvitationAddresseeError` interpolate
+  a value), which is why the scrubber, and not the constructor, is what keeps the value out.
 
 ### 6.2 File access
 
