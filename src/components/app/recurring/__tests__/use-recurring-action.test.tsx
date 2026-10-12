@@ -96,4 +96,16 @@ describe('useRecurringAction', () => {
     expect(toast.error).toHaveBeenCalledTimes(1)
     expect(refresh).toHaveBeenCalledTimes(1)
   })
+
+  it('does not reject when the refresh itself fails', async () => {
+    const { run, refresh } = setup()
+    refresh.mockRejectedValueOnce(new Error('network down'))
+
+    await expect(
+      run(() => Promise.resolve('stored'), 'Period skipped'),
+    ).resolves.toBeUndefined()
+
+    expect(toast.success).toHaveBeenCalledExactlyOnceWith('Period skipped')
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
 })

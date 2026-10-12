@@ -33,7 +33,8 @@ export function useRecurringAction(
       } catch {
         toast.error(t('recurring.toast.failed'))
       }
-      await refresh()
+      // The outcome is already on screen; a failed re-read must not escape as an unhandled rejection.
+      await refresh().catch(() => undefined)
     },
     [refresh, t],
   )
