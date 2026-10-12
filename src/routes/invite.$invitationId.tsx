@@ -61,7 +61,7 @@ export const Route = createFileRoute('/invite/$invitationId')({
   component: InvitationRoute,
 })
 
-/** The sign-in screen, carrying this invitation as the return target (`safeRedirect`'s contract). */
+/** The sign-in screen, carrying this invitation as the return target (`safeRedirect` contract). */
 function signInTarget(invitationId: string) {
   return {
     to: '/login',

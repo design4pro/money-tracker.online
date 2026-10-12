@@ -26,10 +26,11 @@ import { pageHead } from '#/routes/-lib/page-title'
  *
  * `createRule` answers a `FeatureLockedError` — the `feature_locked` kind of the public failure
  * envelope (`readFailure`) — when the workspace's plan meters rules at zero, which is the only
- * place in the product where the answer to `OPEN-1` exists today. So a refusal for that reason is shown as an upgrade path rather than as a stack
- * trace: *automation is not part of this plan*, and the rule the person wrote is still on the
- * screen. Every other refusal keeps the generic panel, because a rule naming a deleted category is
- * not an entitlement problem and must not read like one.
+ * place in the product where the answer to `OPEN-1` exists today. So a refusal for that reason is
+ * shown as an upgrade path rather than as a stack trace: *automation is not part of this plan*,
+ * and the rule the person wrote is still on the screen. Every other refusal keeps the generic
+ * panel, because a rule naming a deleted category is not an entitlement problem and must not read
+ * like one.
  */
 export const Route = createFileRoute('/_app/transactions/rules/new')({
   loader: async () => ({ reference: await loadTransactionReference() }),
