@@ -45,7 +45,10 @@ import {
   humanHours,
   intakeSpans,
   isAlive,
+  isTruncated,
+  LIST_LIMIT,
   linkOpenPrs,
+  MERGED_LIMIT,
   marksDeliveredStages,
   parseArgs,
   pickNext,
@@ -1624,5 +1627,18 @@ describe("staleClaims", () => {
     });
     expect(report.claims.open.map((c) => c.number)).toEqual([381]);
     expect(report.notMeasured.join(" ")).not.toMatch(/stale claims/);
+  });
+});
+
+describe("list limits", () => {
+  it("asks for more rows than the old 200 open and 30 merged", () => {
+    expect(LIST_LIMIT).toBeGreaterThan(200);
+    expect(MERGED_LIMIT).toBeGreaterThan(30);
+  });
+
+  it("flags a listing that filled the limit and passes one that did not", () => {
+    expect(isTruncated(new Array(LIST_LIMIT).fill({}))).toBe(true);
+    expect(isTruncated(new Array(LIST_LIMIT - 1).fill({}))).toBe(false);
+    expect(isTruncated(new Array(5).fill({}), 5)).toBe(true);
   });
 });
