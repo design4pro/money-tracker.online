@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
 
-import { PeriodGrid, SeriesDetailSkeleton } from '#/components/app/recurring'
+import {
+  PeriodGrid,
+  SeriesDetailSkeleton,
+  useRecurringAction,
+} from '#/components/app/recurring'
 import { ErrorPanel } from '#/components/app/shell'
 import { Badge, Button, Card, toast } from '#/components/ui'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
@@ -121,9 +125,9 @@ function SeriesDetailRoute() {
   const locale = useLocale()
   const { detail, accounts, categories, payees } = Route.useLoaderData()
   const { markPaid } = Route.useSearch()
-  const router = useRouter()
   const navigate = Route.useNavigate()
   const refreshCaches = useDataRefresh()
+  const runAction = useRecurringAction(refreshCaches)
 
   const [pending, setPending] = useState<Pending>(() => {
     const reopened = detail.periods.find(
@@ -142,7 +146,6 @@ function SeriesDetailRoute() {
       void navigate({ search: {}, replace: true })
     }
   }
-  const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
   const { series, periods, links } = detail
   const accountRefs = accounts.accounts.map((account) => ({
@@ -205,11 +208,9 @@ function SeriesDetailRoute() {
               onEdit={() => setPending({ kind: 'form' })}
               onPause={() => setPending({ kind: 'pause' })}
               onResume={() => {
-                void resumeSeries({ data: { seriesId: series.id } }).then(
-                  () => {
-                    toast.success(t('recurring.toast.resumed'))
-                    refresh()
-                  },
+                void runAction(
+                  () => resumeSeries({ data: { seriesId: series.id } }),
+                  t('recurring.toast.resumed'),
                 )
               }}
               onComplete={() => setPending({ kind: 'complete' })}
@@ -249,25 +250,28 @@ function SeriesDetailRoute() {
           }
           onMarkPaid={(period) => setPending({ kind: 'markPaid', period })}
           onSkip={(period) => {
-            void skipPeriod({
-              data: { seriesId: series.id, periodStart: period.periodStart },
-            })
-              .then(() => {
-                toast.success(t('recurring.toast.periodSkipped'))
-              })
-              .catch(() => {
-                toast.error(t('recurring.toast.failed'))
-              })
-              // Success or refusal, the row on screen may be stale: show what is stored.
-              .finally(refresh)
+            void runAction(
+              () =>
+                skipPeriod({
+                  data: {
+                    seriesId: series.id,
+                    periodStart: period.periodStart,
+                  },
+                }),
+              t('recurring.toast.periodSkipped'),
+            )
           }}
           onRevert={(period) => {
-            void revertPeriod({
-              data: { seriesId: series.id, periodStart: period.periodStart },
-            }).then(() => {
-              toast.success(t('recurring.toast.periodReverted'))
-              refresh()
-            })
+            void runAction(
+              () =>
+                revertPeriod({
+                  data: {
+                    seriesId: series.id,
+                    periodStart: period.periodStart,
+                  },
+                }),
+              t('recurring.toast.periodReverted'),
+            )
           }}
         />
       </Card>
@@ -324,15 +328,16 @@ function SeriesDetailRoute() {
                       size="sm"
                       variant="ghost"
                       onPress={() => {
-                        void unlinkTransaction({
-                          data: {
-                            seriesId: series.id,
-                            transactionId: link.transactionId,
-                          },
-                        }).then(() => {
-                          toast.success(t('recurring.toast.unlinked'))
-                          refresh()
-                        })
+                        void runAction(
+                          () =>
+                            unlinkTransaction({
+                              data: {
+                                seriesId: series.id,
+                                transactionId: link.transactionId,
+                              },
+                            }),
+                          t('recurring.toast.unlinked'),
+                        )
                       }}
                     >
                       {t('recurring.links.unlink')}
@@ -361,7 +366,7 @@ function SeriesDetailRoute() {
           onSaved={() => {
             toast.success(t('recurring.toast.saved'))
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
@@ -379,7 +384,7 @@ function SeriesDetailRoute() {
           onSaved={() => {
             toast.success(t('recurring.toast.periodPaid'))
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
@@ -399,7 +404,7 @@ function SeriesDetailRoute() {
             await pauseSeries({ data: { seriesId: series.id } })
             toast.success(t('recurring.toast.paused'))
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
@@ -419,7 +424,7 @@ function SeriesDetailRoute() {
             await completeSeries({ data: { seriesId: series.id } })
             toast.success(t('recurring.toast.completed'))
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
