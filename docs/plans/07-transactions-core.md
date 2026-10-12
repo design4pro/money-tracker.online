@@ -23,6 +23,8 @@ What this plan does not own: transfers and their four ref-amount cases (plan `10
 
 ## Stage 07-S1 — The write path, policies and `ref_amount`
 
+Delivered: 2026-10-12 - the owned paths listed below exist as built: `src/server/repos/transactions.ts`, `src/server/fns/transactions.ts`, and the tests `src/server/repos/__tests__/transactions.test.ts`, `src/server/repos/__tests__/money-invariants.test.ts`, the write-path section of `src/server/repos/__tests__/tenant-isolation.test.ts` (#691) and `src/server/fns/__tests__/transactions.test.ts` (#692); `pnpm vitest run` on those four files passes 229 tests in 4 files (38, 67, 97 and 27), 13 of them the write-path section of `tenant-isolation.test.ts`; the three files the plan once named are not built and not owed, and the `transactions` ceiling has no enforcement point yet, which `19-S3` inherits (see Quota).
+
 ### Stage id
 
 `07-S1` · Wave 2 · effort **XL**.
@@ -35,23 +37,39 @@ What this plan does not own: transfers and their four ref-amount cases (plan `10
 
 ### Owned paths
 
-- `src/server/repos/transactions.ts` — new
-- `src/server/repos/transaction-policies.ts` — new
-- `src/server/transactions/ref-amount.ts` — new
-- `src/server/fns/transactions.ts` — new
-- `src/server/repos/__tests__/transactions.test.ts` — new
-- `src/server/repos/__tests__/money-invariants.test.ts` — new
-- `src/server/transactions/__tests__/ref-amount.test.ts` — new
+- `src/server/repos/transactions.ts` — the four policy types, `applyPolicies`, `computeRefAmount`,
+  the Zod schemas, and `createTransaction`, `updateTransaction`, `deleteTransaction`,
+  `getTransaction` and `findTransaction`
+- `src/server/fns/transactions.ts` — the four server functions
+- `src/server/repos/__tests__/transactions.test.ts`
+- `src/server/repos/__tests__/money-invariants.test.ts`
+- `src/server/repos/__tests__/tenant-isolation.test.ts` — the write-path section
+- `src/server/fns/__tests__/transactions.test.ts` — the four handlers and the ledger wrapper
+
+The plan once named three more files: `src/server/repos/transaction-policies.ts`,
+`src/server/transactions/ref-amount.ts` and `src/server/transactions/__tests__/ref-amount.test.ts`.
+None exists and none is owed: the policies and `computeRefAmount` live in the one module
+`transactions.ts`, which 26 non-test files import, so splitting it is a later refactor and not a
+deliverable of this stage.
 
 ### Data and migration
 
 `transactions` exists from `00-S5`. No schema change.
 
-Columns written here: `account_id`, `direction`, `amount_minor`, `currency_code`, `ref_amount_minor`,
-`ref_currency_code`, `rate_e10`, `booked_on`, `booked_at`, `category_id`, `payee_id`,
-`payee_locked`, `note`, `payment_method`, `transfer_kind`, `transfer_id`, `is_planned`,
-`is_balance_adjustment`, `refund_linked`, `import_batch_id`, `import_source_hash`,
-`categorization_source`, `created_by_user_id`.
+Columns written here, by `createTransaction`: `account_id`, `direction`, `amount_minor`,
+`currency_code`, `ref_amount_minor`, `ref_currency_code`, `rate_e10`, `booked_on`, `booked_at`,
+`category_id`, `payee_id`, `payee_locked`, `note`, `payment_method`, `is_planned`,
+`is_balance_adjustment`, `exclude_from_stats`, `created_by_user_id`.
+
+Six columns of the table are not written by this stage: `transfer_kind`, `transfer_id` and
+`refund_linked` (plan `10`), `categorization_source` (plans `08` and `13`, and `19` for the import
+mapping) and `import_batch_id` and `import_source_hash` (plan `19`). Each is written through its
+owning plan's own function, and the create schema refuses all six (`z.strictObject`), so a
+half-accepted field cannot reach the row.
+
+The booking-date rule (`assertBookable`, `src/server/booking-rule.ts`) runs first on create and on
+update, before any parent is read or any row is written; on update it judges the merged pair
+(patch over the stored row).
 
 `booked_on` is a **calendar date the person chooses**, defaulted from their timezone
 (`docs/MONEY.md` §6). `booked_at` is epoch-ms and exists only for intraday ordering — it is never a
@@ -60,17 +78,29 @@ day bucket, and no query truncates it to a date.
 ### Server (repo, server function, Zod)
 
 - **Repository.** `src/server/repos/transactions.ts`: `createTransaction`, `updateTransaction`,
-  `deleteTransaction`, `getTransaction`, and the read functions of `07-S2`.
-- **`transaction-policies.ts`** exports the four policy types and `applyPolicies(query, policies)`.
-  Every exported function of `transactions.ts` takes a `policies` argument with **no default**. A
-  caller that wants everything says so explicitly with `{ planned: 'include', adjustments:
-'include', transfers: 'include', completeness: 'any' }`, and that call is greppable.
-- **`assertScopedWrite`** (from `04-S2`) runs on every write. A dynamically-built predicate list that
-  collapses to empty throws _"refusing to write to every transactions row"_.
-- `src/server/transactions/ref-amount.ts` exports `computeRefAmount({ amountMinor, currencyCode,
-bookedOn, scope })`, returning `{ refAmountMinor, refCurrencyCode, rateE10 }`. It calls
-  `resolveRate` from `03-S3` for `booked_on` — **not today** — and throws `RateUnavailableError`
-  rather than defaulting.
+  `deleteTransaction`, `getTransaction` and `findTransaction` (the read of one row, which answers
+  `null` where `getTransaction` throws). The list loader and the query layer are `07-S2`'s, not this
+  stage's.
+- **Policies.** `transactions.ts` exports the four policy types and `applyPolicies(policies)`, which
+  returns the predicates a query composes (an `Array<SQL>`) rather than wrapping a query. Every
+  exported function of `transactions.ts` takes a `policies` argument with **no default**. A caller
+  that wants everything says so explicitly with `{ planned: 'include', adjustments: 'include',
+transfers: 'include', completeness: 'any' }`, and that call is greppable.
+- **`assertScopedWrite`** (from `04-S2`) runs on every write, and a predicate list that collapses to
+  empty throws _"refusing to write to every transactions row"_. On these two writes it is a
+  backstop and cannot fire through the exported API: `updateTransaction` and `deleteTransaction`
+  build `[eq(transactions.id, id), ...applyPolicies(policies)]`, so the id predicate is always in
+  the list and the all-`include` set (which contributes no predicate) still scopes the statement to
+  one row of the caller's workspace. The assertion itself is pinned against the account repository
+  (`tenant-isolation.test.ts`, "the write backstop"); for transactions the precondition is pinned
+  instead (see Verification).
+- **`computeRefAmount(input, conversion)`** is in `transactions.ts`. `input` is `{ amountMinor,
+currencyCode, bookedOn }` and `conversion` is the `ConversionContext` (`{ baseCurrencyCode,
+resolveRate }`) that `conversionContextFor(scope)` in `workspace-currencies.ts` builds from the
+  workspace's base currency and `resolveRate` from `03-S3`. It returns `{ refAmountMinor,
+refCurrencyCode, rateE10 }`, resolves the rate for `booked_on` — **not today** — and throws
+  `RateUnavailableError` rather than defaulting. A row already in the base currency takes the
+  identity case before the resolver is asked.
 - **Server function.** `createTransaction`, `updateTransaction`, `deleteTransaction` (POST),
   `getTransaction` (GET).
 - **Zod.** `amountMinor` is `z.number().int().positive()` — the **sign lives in `direction`**, not in
@@ -95,22 +125,43 @@ bookedOn, scope })`, returning `{ refAmountMinor, refCurrencyCode, rateE10 }`. I
 
 ### Quota
 
-Transactions are **not metered** — a person's own history is not a thing to ration, and a quota on it
-would make the product useless at exactly the moment it becomes valuable. Stated in one sentence
-rather than left implicit, because every other write path in this plan set has a quota heading with a
-metric in it and a reader will wonder.
+What is true today, as facts and not as a ruling: `createTransaction` (manual entry and the recurring
+auto-recorder both write through it) calls no `assertWithinLimit`, so these writes are **not
+metered**. Whether manual and recurring entry count toward the `transactions` plan metric of
+`src/lib/plans.ts` (the free plan's ceiling is 5 000) is for `19-S3` and plan `22` to decide. Until
+they do, the ceiling is enforced nowhere: the import preview only warns
+(`src/server/fns/import-mapping-data.ts`, `quotaWarning`), so the ceiling must not be read as a
+guarantee.
 
 What **is** bounded: `IMPORT_MAX_ROWS` per batch (plan `19`), which is a job size, not a quota.
 
+**Hand-off to `19-S3`.** Four statements disagree about where the `transactions` ceiling is
+enforced, and `19-S3` must reconcile them:
+
+- `QUOTA_METRIC_OWNERS.transactions` (`src/lib/plans.ts`, line 97) names
+  `src/server/fns/import-mapping.ts — commitImport`; `commitImport` exists nowhere in `src`.
+- `docs/plans/19-import.md`, Stage `19-S3`, Quota: the check is enforced "per chunk inside the write
+  path", and the importer writes through `createTransaction`, which checks no quota.
+- `docs/ARCHITECTURE.md` (the server-function shape, line 66) shows
+  `assertWithinLimit(scope, 'transactions', 1)` in a write handler.
+- This stage: the create write is unmetered.
+
 ### Tenant isolation test
 
-Added to `tenant-isolation.test.ts`: A, in A's scope, attempts `getTransaction`,
+Added to `tenant-isolation.test.ts`, as the section _the transaction write path cannot reach or be
+aimed across a workspace boundary_: A, in A's scope, attempts `getTransaction`, `findTransaction`,
 `updateTransaction` and `deleteTransaction` on B's transaction ids, and `createTransaction` with B's
-`account_id`, B's `category_id` and B's `payee_id`. Every one is a `NotFoundError`, and B's rows are
-unchanged. Functions covered: all four write-path exports.
+`account_id`, B's `category_id` and B's `payee_id`; `updateTransaction` of A's own row is also aimed
+at B's account, category and payee. Every one is a `NotFoundError` (`null` for `findTransaction`),
+the error discloses nothing beyond an id that exists nowhere, and B's rows are unchanged, compared
+whole. Positive controls with A's own parents succeed, so no refusal comes from another cause.
+Functions covered: all five write-path exports.
 
-**Plus the parenting case that matters most here:** a `transfer_id` belonging to B, supplied by A,
-does not link A's new row to B's transfer — it is a `NotFoundError` before the insert.
+**Plus the parenting case that matters most here**, in the only form it can now take:
+`createTransaction` accepts no `transfer_id`, because `createTransactionSchema` is a
+`z.strictObject` that names neither it nor `organization_id`. A payload carrying either is a schema
+rejection, so a `transfer_id` of B's cannot link A's new row to B's transfer. Transfer parenting is
+`10-S1`'s.
 
 ### Money invariant
 
@@ -138,12 +189,20 @@ extends. The invariants it holds:
 
 - Command gate: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 - `transactions.test.ts`: the policy argument is required (a `@ts-expect-error` fixture proves a
-  policy-free call does not compile); `assertScopedWrite` fires on a collapsed predicate list; the two
-  deletion guards; the ledger batch enqueues one rebuild per touched account, once, including on
-  throw.
-- `ref-amount.test.ts`: EUR→PLN at a known rate produces a hand-computed integer; a missing rate
-  throws rather than defaulting; the base-currency identity case; a 0-digit currency (JPY) and a
-  3-digit currency (KWD) both round correctly at the single final step.
+  policy-free call does not compile); the two deletion guards; the ledger touches (once per
+  account, none when a write was refused); and the precondition of `assertScopedWrite` — the
+  all-`include` set contributes no predicate, and an update or delete under it still touches only
+  the one row of the caller's workspace.
+- `tenant-isolation.test.ts`: the write-path section above, and the write backstop (the empty
+  predicate list refused) against the account repository.
+- `src/server/fns/__tests__/transactions.test.ts`: the three writes are wrapped in
+  `runWithLedgerBatch` (one rebuild per touched account, once; none for a refused write); the guard
+  is the authorisation point; the strict input is refused before anything runs.
+- `computeRefAmount` cases (`transactions.test.ts`, describes `ref_amount` and `computeRefAmount`)
+  and section 7 of `money-invariants.test.ts`: a known-rate conversion produces a hand-computed
+  integer; a missing rate throws rather than defaulting; the base-currency identity case; a 0-digit
+  currency (JPY) and a 3-digit currency (KWD) both scale correctly, and rounding is half to even at
+  the single final step.
 - `money-invariants.test.ts` with the seven cases above.
 - No browser evidence and no axe run: this stage ships no surface.
 
