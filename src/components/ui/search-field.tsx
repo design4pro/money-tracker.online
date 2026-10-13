@@ -11,6 +11,7 @@ import {
   Label,
   fieldEndButton,
   fieldRow,
+  resolveInvalid,
 } from './field'
 import { composeTw, fieldSizes } from './shared'
 
@@ -49,6 +50,7 @@ export function SearchField({
   label,
   description,
   errorMessage,
+  isInvalid,
   placeholder,
   size = 'md',
   clearLabel = 'Clear search',
@@ -58,6 +60,7 @@ export function SearchField({
   return (
     <RACSearchField
       {...props}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow, 'group/search')}
     >
       {label === undefined ? null : <Label>{label}</Label>}
