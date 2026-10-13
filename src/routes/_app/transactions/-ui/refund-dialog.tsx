@@ -155,7 +155,7 @@ export function RefundDialog({
                     failure={failure}
                     placement="after-action"
                     title={t('refunds.dialog.error.title')}
-                    // A refused link (over-refund, another currency, the wrong direction) is a
+                    // A refused link (over-refund, another currency, the wrong direction, a link that already exists) is a
                     // conflict or a validation failure, and the kind sentence alone would say
                     // "reload": the dialog's own sentence says what to change instead.
                     body={

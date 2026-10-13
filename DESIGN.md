@@ -788,9 +788,10 @@ the frame, `FailurePanel` is the one that reads a failure and chooses the senten
 - **`FailurePanel`** is for a failure that arrived as a thrown value: a refused save in a dialog,
   a preview that did not load, a move that was rejected. It takes the failure envelope
   (`failureOf(error)` in the `catch`) and shows the catalogue sentence of its kind, so two failures
-  of one kind read the same on every screen. Its recovery follows the kind: Retry beside the form
-  for a retryable failure, a link to billing for a quota or a locked feature, the sentence plus a
-  reference for an internal one.
+  of one kind read the same on every screen. The kind decides the recovery (`RECOVERY_OF`:
+  `retryable`, `quota`, `feature_locked`, `internal`): a link to billing for a quota or a locked
+  feature, the kind's own sentence otherwise. Retry, a reference and a link home are extras the
+  caller supplies (`onRetry`, `reference`, `homeHref`), so a dialog that passes none shows none.
 - **`ErrorPanel`** is the frame for a route whose loader failed (`errorComponent`) and the shape
   `FailurePanel` renders into. A route passes it catalogue copy only; there is no `detail` prop
   and no `<details>`.
@@ -803,7 +804,8 @@ the frame, `FailurePanel` is the one that reads a failure and chooses the senten
   the quota, locked and internal recoveries keep their own sentences. A site never renders what the
   error said - a repository message is written for a developer, English-only, and can carry an id
   or a count - and `failure-message-guard.test.ts` fails on a file that reads one back in.
-- **Tone.** `danger` for a fault; `warning` for a quota or a locked feature, which are not faults.
+- **Tone.** `negative` (the default) for a fault; `warning` for a quota or a locked feature, which are not
+  faults, and which `FailurePanel` sets by itself.
   The icon is `aria-hidden` and never carries a word the sentence does not say.
 - **It is not** `EmptyState` (nothing here yet) and not a toast: a toast is for an outcome that needs
   no decision, a failure that leaves the form open belongs in the panel beside the input.
