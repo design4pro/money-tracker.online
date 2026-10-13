@@ -31,6 +31,7 @@ import {
 } from '#/server/db/schema'
 
 import { createScope } from '../scope'
+import { sqliteBatchCallback } from './db-harness'
 
 import type { TenantScope } from '../scope'
 
@@ -51,6 +52,13 @@ export const fault: { when: ((query: string) => boolean) | null } = {
   when: null,
 }
 
+function record(query: string): void {
+  executed.push(query)
+  if (fault.when?.(query) === true) {
+    throw new Error(`injected fault: ${query}`)
+  }
+}
+
 export function openTestDb() {
   const sqlite = new DatabaseSync(':memory:')
   sqlite.exec('PRAGMA foreign_keys = ON;')
@@ -65,21 +73,21 @@ export function openTestDb() {
       if (trimmed.length > 0) sqlite.exec(trimmed)
     }
   }
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    if (fault.when?.(query) === true) {
-      throw new Error(`injected fault: ${query}`)
-    }
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      record(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, record),
+  )
 }
 
 export const NOW = new Date('2026-03-15T10:00:00.000Z')

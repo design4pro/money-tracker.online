@@ -57,7 +57,10 @@ import { latestCalendarDayOnEarth } from '#/server/calendar-day'
 import { serverToday } from '#/server/clock'
 import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
-import { pauseRulesReferencing } from '#/server/rules/integrity'
+import {
+  pauseRulesReferencing,
+  pauseRulesReferencingStatement,
+} from '#/server/rules/integrity'
 import {
   ACCOUNT_CATEGORIES,
   accountGroupMembers,
@@ -72,6 +75,7 @@ import {
   assertWithinLimit,
   createTenantRepository,
   createTenantTableAccess,
+  runTenantBatch,
   tenantFilter,
   touchLedgerAccount,
 } from './base'
@@ -1029,17 +1033,15 @@ export async function updateAccountGroup(
  * not be able to delete the money. Child groups survive too — their foreign key sets `parent_id`
  * to null, which promotes them to the top level rather than taking them along.
  *
- * **The destructive part is one statement.** The group row is the only thing removed explicitly:
- * `account_group_members.group_id` is `ON DELETE cascade` (the memberships go with it, the
- * accounts stay) and `account_groups.parent_id` is `ON DELETE set null`, so a failure leaves the
- * group, its memberships and its children exactly as they were, never a listed group with no
- * accounts.
+ * **One atomic unit** (`runTenantBatch`): the memberships, the group row and the pause of every
+ * rule that names the group are written together or not at all, so a failure leaves a group that is
+ * still listed with all its accounts and its rules still running, never one without the other. The
+ * pause is the last statement. Elsewhere it is written after a delete that succeeded, so that a
+ * refused delete cannot leave a banner about a row that is still there; inside a batch that
+ * guarantee comes from the rollback, which takes the pause with it.
  *
- * **The rule pause is a second statement, and cannot join the first.** It has to be written after
- * a delete that succeeded (`rules/integrity`: a pause written first would be a banner about a row
- * that is still there), and this layer has no batching seam — the tenant base executes statements,
- * a batch needs builders (#724). If the pause throws, the group is already gone and rules naming
- * it keep running until the weekly `checkRuleIntegrity` sweep pauses them.
+ * The group's name and the ids of the rules that name it are read before the batch, through the
+ * scope. A rule saved in between is not in it; `checkRuleIntegrity` is what pauses that one.
  */
 export async function deleteAccountGroup(
   scope: TenantScope,
@@ -1049,16 +1051,25 @@ export async function deleteAccountGroup(
   await assertMayAdminister(scope, 'delete an account group')
   const row = await groupRepo.requireById(scope, id)
 
-  await groupRepo.requireRemove(scope, id)
-
   // `14-S3`: the deleting operation writes the pause itself, carrying the name the row had a
-  // statement ago — after this line there is nowhere left to read it from.
-  await pauseRulesReferencing({
+  // statement ago — after the delete there is nowhere left to read it from.
+  const pause = await pauseRulesReferencingStatement({
     scope,
     refType: 'account_group',
     refId: id,
     label: row.name,
   })
+
+  const [, removed] = await runTenantBatch(scope, [
+    membershipRepo.removeWhereStatement(
+      scope,
+      eq(accountGroupMembers.groupId, id),
+    ),
+    groupRepo.removeWhereStatement(scope, eq(accountGroups.id, id)),
+    ...(pause === null ? [] : [pause]),
+  ])
+  // Gone between the read above and the batch: the same answer `requireRemove` gave.
+  if (removed.length === 0) throw new NotFoundError('account group', id)
 }
 
 /**

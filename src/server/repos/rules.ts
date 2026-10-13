@@ -80,7 +80,7 @@ import type {
   RuleMatchMode,
   RuleTrigger,
 } from '#/server/rules/schema'
-import type { KeyedTenantTable, TenantScope } from './base'
+import type { KeyedTenantTable, TenantScope, TenantStatement } from './base'
 
 /* -------------------------------------------------------------------------- */
 /* Schemas                                                                    */
@@ -359,21 +359,38 @@ export async function pauseRules(
   ruleIds: ReadonlyArray<string>,
   pausedReason: string,
 ): Promise<number> {
+  const { where, patch } = pausePlan(ruleIds, pausedReason)
+  const rows = await ruleRepo.updateWhere(scope, where, patch)
+  return rows.length
+}
+
+/**
+ * The statement {@link pauseRules} runs, for a delete path that writes the pause in the same
+ * `runTenantBatch` as the delete. Same predicate, same patch; the batch result is the paused rules.
+ */
+export function pauseRulesStatement(
+  scope: TenantScope,
+  ruleIds: ReadonlyArray<string>,
+  pausedReason: string,
+): TenantStatement {
+  const { where, patch } = pausePlan(ruleIds, pausedReason)
+  return ruleRepo.updateWhereStatement(scope, where, patch)
+}
+
+function pausePlan(ruleIds: ReadonlyArray<string>, pausedReason: string) {
   const ids = z
     .array(idSchema)
     .min(1)
     .max(MAX_RULES_PER_WORKSPACE)
     .parse([...new Set(ruleIds)])
 
-  const rows = await ruleRepo.updateWhere(
-    scope,
-    allOf(inArray(rules.id, ids), isNull(rules.pausedReason)),
-    {
+  return {
+    where: allOf(inArray(rules.id, ids), isNull(rules.pausedReason)),
+    patch: {
       pausedReason: z.string().min(1).parse(pausedReason),
       updatedAt: new Date(),
     },
-  )
-  return rows.length
+  }
 }
 
 async function requireOwnedReferences(

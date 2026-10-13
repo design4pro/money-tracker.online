@@ -59,6 +59,7 @@ import {
 } from '#/server/db/schema'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
+import { sqliteBatchCallback } from './db-harness'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
@@ -125,7 +126,7 @@ import {
 } from '../imports'
 
 import { createSeries, getUpcoming } from '../recurring'
-import { createTenantRepository, tenantFilter } from '../base'
+import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
   MissingTenantContextError,
@@ -133,6 +134,7 @@ import {
   TenantIsolationError,
   UnscopedWriteError,
 } from '../errors'
+import { pauseRulesStatement } from '../rules'
 import { createScope } from '../scope'
 import {
   createTransaction,
@@ -175,18 +177,21 @@ function openTestDb() {
     }
   }
 
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      executed.push(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, (query) => executed.push(query)),
+  )
 }
 
 const ORG_A = 'org-a'
@@ -664,6 +669,158 @@ describe('deletes cannot reach another workspace’s row', () => {
   })
 })
 
+describe('deleting an account group reaches only the caller’s workspace', () => {
+  /** B owns a group with a member and a rule naming it; A owns a rule naming B's group id. */
+  async function seedGroupOfB() {
+    await db.insert(accountGroups).values({
+      id: 'grp-b',
+      organizationId: ORG_B,
+      name: 'Cards',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await db.insert(accountGroupMembers).values({
+      organizationId: ORG_B,
+      groupId: 'grp-b',
+      accountId: B_ACCOUNTS[0],
+      position: 0,
+    })
+    await db.insert(rules).values(
+      [ORG_A, ORG_B].map((organizationId) => ({
+        id: `rule-${organizationId}`,
+        organizationId,
+        name: 'Names the group',
+        position: 0,
+        matchMode: 'all' as const,
+        conditions: JSON.stringify([
+          { field: 'account_group', operator: 'is_any_of', ids: ['grp-b'] },
+        ]),
+        actions: JSON.stringify([
+          { kind: 'set_excluded', excludeFromStats: true },
+        ]),
+        isActive: true,
+        matchCount: 0,
+        runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })),
+    )
+  }
+
+  async function stateOfB() {
+    return {
+      groups: await db.select().from(accountGroups),
+      members: await db.select().from(accountGroupMembers),
+      rules: await db.select().from(rules).orderBy(rules.id),
+    }
+  }
+
+  it('answers not-found for a foreign group id and changes no group, member or rule', async () => {
+    await seedGroupOfB()
+    const before = await stateOfB()
+
+    await expect(deleteAccountGroup(a, 'grp-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+
+    await expect(stateOfB()).resolves.toEqual(before)
+  })
+
+  it('pauses only the caller’s rules when both workspaces have a rule naming the same group id', async () => {
+    await db.insert(accountGroups).values({
+      id: 'grp-a',
+      organizationId: ORG_A,
+      name: 'Mine',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await db.insert(rules).values(
+      [ORG_A, ORG_B].map((organizationId) => ({
+        id: `rule-${organizationId}`,
+        organizationId,
+        name: 'Names the group',
+        position: 0,
+        matchMode: 'all' as const,
+        conditions: JSON.stringify([
+          { field: 'account_group', operator: 'is_any_of', ids: ['grp-a'] },
+        ]),
+        actions: JSON.stringify([
+          { kind: 'set_excluded', excludeFromStats: true },
+        ]),
+        isActive: true,
+        matchCount: 0,
+        runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })),
+    )
+
+    await deleteAccountGroup(a, 'grp-a')
+
+    const paused = new Map(
+      (await db.select().from(rules)).map((rule) => [
+        rule.organizationId,
+        rule.pausedReason,
+      ]),
+    )
+    expect(paused.get(ORG_A)).not.toBeNull()
+    expect(paused.get(ORG_B)).toBeNull()
+  })
+
+  it('builds a pause statement that cannot pause a rule of another workspace', async () => {
+    await db.insert(rules).values({
+      id: 'rule-foreign',
+      organizationId: ORG_B,
+      name: 'Not mine',
+      position: 0,
+      matchMode: 'all' as const,
+      conditions: '[]',
+      actions: '[]',
+      isActive: true,
+      matchCount: 0,
+      runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    executed.length = 0
+
+    await runTenantBatch(a, [
+      pauseRulesStatement(a, ['rule-foreign'], '{"kind":"missing_reference"}'),
+    ])
+
+    const [foreign] = await db
+      .select()
+      .from(rules)
+      .where(eq(rules.id, 'rule-foreign'))
+    expect(foreign?.pausedReason).toBeNull()
+    const updates = statementsMatching('update "rules"')
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toContain('organization_id')
+  })
+
+  it('puts the tenant column in every statement of the batch it runs', async () => {
+    await db.insert(accountGroups).values({
+      id: 'grp-a',
+      organizationId: ORG_A,
+      name: 'Mine',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    executed.length = 0
+
+    await deleteAccountGroup(a, 'grp-a')
+
+    const deletes = statementsMatching('delete from "account_group')
+    expect(deletes).toHaveLength(2)
+    for (const statement of deletes) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+})
+
 /* -------------------------------------------------------------------------- */
 /* The backstops                                                               */
 /* -------------------------------------------------------------------------- */
@@ -828,6 +985,17 @@ describe('no repository forks the tenant predicate', () => {
   it('never writes the tenant column into an insert payload outside the base', () => {
     const offenders = repositorySources().filter((file) =>
       /organizationId:\s*scope\.ctx\.organizationId/.test(file.source),
+    )
+    expect(offenders.map((file) => file.name)).toEqual([])
+  })
+
+  it('never calls batch on a database handle outside the base', () => {
+    // `Database.batch` is public so `runTenantBatch` can reach it, which makes it reachable by a
+    // repository holding raw builders too: that call is what would bypass the origin check.
+    const code = (source: string) =>
+      source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const offenders = repositorySources().filter((file) =>
+      /\.batch\(/.test(code(file.source)),
     )
     expect(offenders.map((file) => file.name)).toEqual([])
   })
@@ -2263,71 +2431,6 @@ describe('membership is a question about one workspace at a time', () => {
     // Nothing written in either workspace — not A’s, and not the one `user-b` does belong to.
     expect(await countUnread(world.scope)).toBe(0)
     expect(await countUnread(world.otherScope)).toBe(0)
-  })
-})
-
-describe('an account group cannot be deleted from another workspace', () => {
-  let world: BudgetWorld
-
-  beforeEach(async () => {
-    world = await createBudgetWorld()
-  })
-
-  it('refuses B’s group id and leaves B’s group, members and rules as they were', async () => {
-    await world.db.insert(accountGroups).values({
-      id: 'grp-b',
-      organizationId: 'org-b',
-      name: 'Theirs',
-      position: 0,
-      createdAt: NOW,
-      updatedAt: NOW,
-    })
-    await world.db.insert(accountGroupMembers).values({
-      organizationId: 'org-b',
-      groupId: 'grp-b',
-      accountId: 'acc-b',
-      position: 0,
-    })
-    await world.db.insert(rules).values({
-      id: 'rule-b',
-      organizationId: 'org-b',
-      name: 'rule-b',
-      position: 0,
-      matchMode: 'all',
-      conditions: JSON.stringify([
-        { field: 'account_group', operator: 'is_any_of', ids: ['grp-b'] },
-      ]),
-      actions: JSON.stringify([
-        { kind: 'set_excluded', excludeFromStats: true },
-      ]),
-      isActive: true,
-      pausedReason: null,
-      matchCount: 0,
-      lastMatchedAt: null,
-      runOn: JSON.stringify(['manual_create', 'import', 'edit']),
-      createdAt: NOW,
-      updatedAt: NOW,
-    })
-
-    await expect(
-      deleteAccountGroup(world.scope, 'grp-b'),
-    ).rejects.toBeInstanceOf(NotFoundError)
-
-    const groups = await world.db
-      .select()
-      .from(accountGroups)
-      .where(eq(accountGroups.organizationId, 'org-b'))
-    expect(groups.map((group) => group.id)).toEqual(['grp-b'])
-    const members = await world.db
-      .select()
-      .from(accountGroupMembers)
-      .where(eq(accountGroupMembers.organizationId, 'org-b'))
-    expect(members.map((entry) => entry.accountId)).toEqual(['acc-b'])
-    const theirRules = await world.db
-      .select({ pausedReason: rules.pausedReason })
-      .from(rules)
-      .where(eq(rules.organizationId, 'org-b'))
-    expect(theirRules).toEqual([{ pausedReason: null }])
   })
 })
 
