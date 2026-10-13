@@ -38,6 +38,9 @@ export interface MenuProps<T extends object> extends RACMenuProps<T> {}
  * activation and announces `menuitem`, and using one to choose a filter leaves
  * a screen-reader user with no way to hear what is currently chosen.
  *
+ * The menu sets no height cap: the `Popover` bounds it to the room left in the
+ * viewport, so a menu that fits never scrolls (DESIGN.md -> Menu).
+ *
  * Type-ahead, arrow navigation, Escape, submenu timing and the focus restore
  * to the trigger all come from React Aria.
  */
@@ -47,7 +50,7 @@ export function Menu<T extends object>({ className, ...props }: MenuProps<T>) {
       {...props}
       className={composeTw(
         className,
-        'flex max-h-80 min-w-44 flex-col overflow-y-auto outline-hidden focus-safe',
+        'flex min-w-44 flex-col overflow-y-auto outline-hidden focus-safe',
       )}
     />
   )
@@ -82,6 +85,9 @@ export function MenuItem<T extends object>({
       className={composeTw(
         className,
         collectionItemBase,
+        // `shrink-0`: the menu is a column flex container bounded by the popover, and a row
+        // that may shrink is squeezed under its 44px minimum when a long label wraps.
+        'shrink-0',
         isDestructive &&
           'text-negative data-[focused]:bg-negative-soft data-[focused]:text-negative',
       )}
