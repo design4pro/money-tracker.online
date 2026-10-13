@@ -49,9 +49,11 @@ import { materializeSeries } from '#/server/recurring/materialize'
 import { matchesPeriod } from '#/server/recurring/match'
 import { organization, user } from '#/server/db/auth-schema'
 import {
+  accountBalances,
   accounts,
   budgetCategories,
   currencies,
+  exchangeRates,
   transactionSplits,
   transactions,
 } from '#/server/db/schema'
@@ -74,6 +76,18 @@ import { createLogger, createMemorySink } from '#/server/observability/logger'
 import { adjustAccountBalance, updateAccount } from '../accounts'
 import { touchLedgerAccount } from '../base'
 import { budgetSpend, getBudget } from '../budgets'
+import {
+  archiveCategory,
+  createCategory,
+  deleteCategory,
+  getCategory,
+  listCategories,
+  moveCategory,
+  reorderCategories,
+  restoreCategory,
+  spendingByCategory,
+  updateCategory,
+} from '../categories'
 import { ConflictError } from '../errors'
 import {
   createSeries,
@@ -99,6 +113,7 @@ import {
   seedBudget,
   seedCategory,
   seedPeriod,
+  seedSplit,
   seedTransaction,
 } from './budget-harness'
 import { seedSeries } from './planned-harness'
@@ -2426,5 +2441,159 @@ describe('21 — the recurring pass declines a series whose currency is not its 
     const third = await run()
     expect(third.posted).toBe(1)
     expect(await world.db.select().from(transactions)).toHaveLength(2)
+  })
+})
+
+describe('22 — a category write never touches an amount', () => {
+  /** The five tables a category write must not touch (amounts, balances, rates), as the SQL names them. */
+  const AMOUNT_TABLES = [
+    '"transactions"',
+    '"transaction_splits"',
+    '"accounts"',
+    '"account_balances"',
+    '"exchange_rates"',
+  ] as const
+
+  /** The world: a transaction and a split under categories the sequence below will move about. */
+  async function worldWithAmounts() {
+    const world = await createBudgetWorld()
+    await seedCategory(world.db, { id: 'cat-food', name: 'Food' })
+    await seedCategory(world.db, {
+      id: 'cat-groceries',
+      name: 'Groceries',
+      parentId: 'cat-food',
+    })
+    await seedCategory(world.db, { id: 'cat-home', name: 'Home' })
+    await seedCategory(world.db, { id: 'cat-unused', name: 'Unused' })
+
+    await seedTransaction(world.db, {
+      id: 'tx-filed',
+      categoryId: 'cat-groceries',
+      refAmountMinor: 123_45,
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-split',
+      refAmountMinor: 200_00,
+    })
+    await seedSplit(world.db, {
+      id: 'split-1',
+      transactionId: 'tx-split',
+      categoryId: 'cat-groceries',
+      refAmountMinor: 120_00,
+    })
+    await seedSplit(world.db, {
+      id: 'split-2',
+      transactionId: 'tx-split',
+      categoryId: 'cat-home',
+      refAmountMinor: 80_00,
+      position: 1,
+    })
+    await world.db.insert(accountBalances).values({
+      organizationId: 'org-a',
+      accountId: 'acc-a',
+      date: '2026-03-10',
+      nativeMinor: -323_45,
+      refMinor: -323_45,
+      rateE10: 10_000_000_000,
+    })
+    await world.db.insert(exchangeRates).values({
+      baseCode: 'EUR',
+      quoteCode: 'PLN',
+      date: '2026-03-10',
+      rateE10: 43_000_000_000,
+      source: 'manual',
+      fetchedAt: new Date('2026-03-10T00:00:00.000Z'),
+    })
+    return world
+  }
+
+  /** Whole rows, every column, of everything that carries an amount, a balance or a rate. */
+  async function amountsOf(world: BudgetWorld) {
+    return {
+      transactions: await world.db
+        .select()
+        .from(transactions)
+        .orderBy(transactions.id),
+      splits: await world.db
+        .select()
+        .from(transactionSplits)
+        .orderBy(transactionSplits.id),
+      accounts: await world.db.select().from(accounts).orderBy(accounts.id),
+      balances: await world.db.select().from(accountBalances),
+      rates: await world.db.select().from(exchangeRates),
+    }
+  }
+
+  it('runs every write export, re-parent, cascade, restore and delete included, over amounts it leaves exactly as they were', async () => {
+    const world = await worldWithAmounts()
+    const before = await amountsOf(world)
+    const mark = budgetExecuted.length
+
+    const created = await createCategory(world.scope, {
+      name: 'Dining out',
+      parentId: 'cat-food',
+    })
+    await updateCategory(world.scope, 'cat-food', { color: '#625106' })
+    // The re-parent of a row that holds a transaction and a split.
+    await moveCategory(world.scope, {
+      id: 'cat-groceries',
+      parentId: 'cat-home',
+    })
+    await reorderCategories(world.scope, ['cat-home', 'cat-food'])
+    // The archive cascades to the child that was just moved in; the restore revives one row.
+    await archiveCategory(world.scope, 'cat-home')
+    await restoreCategory(world.scope, 'cat-home')
+    await deleteCategory(world.scope, 'cat-unused')
+    await deleteCategory(world.scope, created.id)
+    await listCategories(world.scope, { includeArchived: true })
+    await getCategory(world.scope, 'cat-food')
+    await spendingByCategory(world.scope, {
+      from: '2026-03-01',
+      to: '2026-03-31',
+    })
+
+    const log = budgetExecuted.slice(mark)
+    const writes = log.filter((query) =>
+      /^\s*(update|insert|delete)\b/iu.test(query),
+    )
+    // A guard on the guard: the sequence did write, so an empty list is not a pass.
+    expect(writes.length).toBeGreaterThanOrEqual(8)
+    for (const statement of writes) {
+      for (const table of AMOUNT_TABLES) expect(statement).not.toContain(table)
+    }
+    expect(touchLedgerAccount).not.toHaveBeenCalled()
+
+    const after = await amountsOf(world)
+    expect(after).toEqual(before)
+
+    // The columns the plan names, stated as numbers so a regression reads as a number.
+    const filed = after.transactions.find((row) => row.id === 'tx-filed')
+    expect(filed).toMatchObject({
+      amountMinor: 123_45,
+      currencyCode: 'PLN',
+      refAmountMinor: 123_45,
+      refCurrencyCode: 'PLN',
+      rateE10: 10_000_000_000,
+      categoryId: 'cat-groceries',
+    })
+    expect(
+      after.splits.map((row) => [
+        row.id,
+        row.categoryId,
+        row.amountMinor,
+        row.refAmountMinor,
+      ]),
+    ).toEqual([
+      ['split-1', 'cat-groceries', 120_00, 120_00],
+      ['split-2', 'cat-home', 80_00, 80_00],
+    ])
+    expect(after.balances).toHaveLength(1)
+    expect(after.rates).toHaveLength(1)
+
+    // And the categories did move, so the unchanged amounts are not a no-op sequence.
+    expect((await getCategory(world.scope, 'cat-groceries')).parentId).toBe(
+      'cat-home',
+    )
+    await expect(getCategory(world.scope, 'cat-unused')).rejects.toThrow()
   })
 })
