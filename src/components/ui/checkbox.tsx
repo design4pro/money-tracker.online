@@ -3,7 +3,13 @@ import { CheckboxGroup as RACCheckboxGroup } from 'react-aria-components/Checkbo
 import { Check, Minus } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { Description, FieldError, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 import { composeTw, transitionBase } from './shared'
 
 import type {
@@ -123,12 +129,14 @@ export function CheckboxGroup({
   orientation = 'vertical',
   className,
   isRequired,
+  isInvalid,
   ...props
 }: CheckboxGroupProps) {
   return (
     <RACCheckboxGroup
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (

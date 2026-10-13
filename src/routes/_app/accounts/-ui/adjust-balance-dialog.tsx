@@ -315,7 +315,9 @@ export function AdjustBalanceDialog({
                       calendarLabel={t('common.date')}
                       value={bookedOn}
                       maxValue={todayValue}
-                      errorMessage={t('validation.date.future')}
+                      errorMessage={
+                        isFuture ? t('validation.date.future') : undefined
+                      }
                       onChange={(value) => {
                         if (value !== null) {
                           refocusStatus.current = false

@@ -6,7 +6,13 @@ import {
 import { ChevronDown } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { Description, FieldError, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 import { ListBox } from './list-box'
 import { Popover } from './popover'
 import { composeTw, fieldSizes, fieldSurface, focusRing } from './shared'
@@ -67,12 +73,14 @@ export function Select<T extends object>({
   items,
   className,
   isRequired,
+  isInvalid,
   ...props
 }: SelectProps<T>) {
   return (
     <RACSelect
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (
