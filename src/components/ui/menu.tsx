@@ -85,6 +85,9 @@ export function MenuItem<T extends object>({
       className={composeTw(
         className,
         collectionItemBase,
+        // `shrink-0`: the menu is a column flex container bounded by the popover, and a row
+        // that may shrink is squeezed under its 44px minimum when a long label wraps.
+        'shrink-0',
         isDestructive &&
           'text-negative data-[focused]:bg-negative-soft data-[focused]:text-negative',
       )}

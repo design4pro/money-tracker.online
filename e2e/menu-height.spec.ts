@@ -31,7 +31,9 @@ test.describe('menu height', () => {
   async function openMenu(page: Page) {
     await mountHarness(page, 'menu-harness.tsx', { title: 'Menu harness' })
     await page.getByRole('button', { name: 'Actions' }).click()
-    await expect(page.getByRole('menu', { name: 'Actions' })).toBeVisible()
+    await expect(
+      page.getByRole('menu', { name: 'Actions', exact: true }),
+    ).toBeVisible()
   }
 
   for (const viewport of viewports) {
@@ -44,7 +46,7 @@ test.describe('menu height', () => {
       })
       await openMenu(page)
 
-      const menu = page.getByRole('menu', { name: 'Actions' })
+      const menu = page.getByRole('menu', { name: 'Actions', exact: true })
       const { scrollHeight, clientHeight } = await menu.evaluate((node) => ({
         scrollHeight: node.scrollHeight,
         clientHeight: node.clientHeight,
@@ -84,6 +86,6 @@ test.describe('menu height', () => {
 
     const last = page.getByRole('menuitem', { name: 'Delete group' })
     await expect(last).toBeFocused()
-    await expect(last).toBeInViewport()
+    await expect(last).toBeInViewport({ ratio: 1 })
   })
 })

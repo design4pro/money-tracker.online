@@ -759,6 +759,15 @@ label kept in the DOM under the spinner so the button holds its width.
   type-ahead) and React Aria scrolls the focused row into view, so the scrolling case stays
   keyboard-complete. `e2e/menu-height.spec.ts` asserts all of it in a browser at 360px and 1280px,
   with a submenu open, and in a viewport too short for the menu.
+- **Known limit.** The axe guarantee holds while the menu fits. In a viewport too short for it
+  (about 280px, a landscape phone or 400% zoom) with a submenu open, the parent menu scrolls again
+  with every item at `tabindex="-1"`, and axe's `scrollable-region-focusable` can return; the
+  keyboard path stays complete because `Escape` closes the submenu.
+- **A long submenu grows to the viewport.** A submenu with many entries (the category tree's "Move
+  to") is no longer cut at 320px; it takes the room React Aria leaves it, then scrolls.
+- **Every `Popover` is a column flex container.** The rule above lives in the base `Popover`, so
+  `Select`, `ComboBox`, `DatePicker` and `PopoverDialog` share it; their children stretch to the
+  panel width and only a child that already scrolls (`ListBox`, `Menu`) shrinks.
 - **The one thing it is not:** a `ListBox` or a `Select`, which hold values and keep their own
   `max-h-72` (`ListBox`).
 
