@@ -330,8 +330,13 @@ describe('the depth cap', () => {
       parentId: child.id,
     })
     await expect(attempt).rejects.toBeInstanceOf(CategoryDepthError)
-    await expect(attempt).rejects.toThrow(child.id)
-    await expect(attempt).rejects.toThrow('Groceries')
+    await expect(attempt).rejects.toMatchObject({
+      code: 'CONFLICT',
+      categoryId: '(new)',
+      parentId: child.id,
+      message:
+        'Categories nest two levels: "Bakery" cannot sit inside "Groceries", which is already inside another category.',
+    })
   })
 
   it('refuses the same shape on the move path', async () => {
@@ -342,20 +347,33 @@ describe('the depth cap', () => {
     })
     const loose = await createCategory(scope, { name: 'Bakery' })
 
-    await expect(
-      moveCategory(scope, { id: loose.id, parentId: child.id }),
-    ).rejects.toBeInstanceOf(CategoryDepthError)
+    const attempt = moveCategory(scope, { id: loose.id, parentId: child.id })
+    await expect(attempt).rejects.toBeInstanceOf(CategoryDepthError)
+    await expect(attempt).rejects.toMatchObject({
+      categoryId: loose.id,
+      parentId: child.id,
+      message:
+        'Categories nest two levels: "Bakery" cannot sit inside "Groceries", which is already inside another category.',
+    })
     expect((await categoryRow(loose.id))?.parentId).toBeNull()
   })
 
   it('refuses to push a category that already holds children onto the second level', async () => {
     const parent = await createCategory(scope, { name: 'Food' })
     await createCategory(scope, { name: 'Groceries', parentId: parent.id })
+    await createCategory(scope, { name: 'Dining', parentId: parent.id })
     const other = await createCategory(scope, { name: 'Home' })
 
-    await expect(
-      moveCategory(scope, { id: parent.id, parentId: other.id }),
-    ).rejects.toBeInstanceOf(CategoryHasChildrenError)
+    const attempt = moveCategory(scope, { id: parent.id, parentId: other.id })
+    await expect(attempt).rejects.toBeInstanceOf(CategoryHasChildrenError)
+    // No hand-rolled plural: the count follows the name, the noun is always the plain word.
+    await expect(attempt).rejects.toMatchObject({
+      code: 'CONFLICT',
+      categoryId: parent.id,
+      childCount: 2,
+      message:
+        'Category "Food" has subcategories (2); move them out before filing it inside another category.',
+    })
   })
 
   it('refuses a category as its own parent before SQL has to', async () => {
