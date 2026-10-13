@@ -820,8 +820,11 @@ const messages = {
   'categories.move.top': 'Move to top',
   'categories.move.bottom': 'Move to bottom',
   'categories.move.refused': 'That move was not made',
-  'categories.move.refused.body':
-    'Categories go two levels deep. A category that already holds subcategories cannot be filed inside another one.',
+  'categories.move.refused.nest':
+    'The category "{category}" cannot go inside "{parent}": categories nest only two levels.',
+  'categories.refused.forbidden':
+    'Only an owner or an admin can change categories in a shared workspace.',
+  'categories.restore.refused': 'That category was not restored',
   'categories.filter.showArchived': 'Show archived categories',
   'categories.field.kind': 'Used for',
   'categories.field.kind.help':
