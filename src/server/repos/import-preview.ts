@@ -177,16 +177,13 @@ export async function listImportRowErrors(
  * of the mapping they are looking at — not those four plus whatever the new mapping produced. The
  * delete is bounded to this batch, so another batch's report is untouched.
  *
- * **Why this is not one `db.batch()`, which the plan text asks for.** A batch needs statement
- * *builders* and the base's `removeWhere` / `insertMany` execute; composing the statements here
- * instead would mean hand-stamping `organization_id`, which the fork guard in
- * `__tests__/tenant-isolation.test.ts` forbids a repository from doing — and is right to.
- * `repos/account-balances` and `repos/splits` weighed the same pair and ruled the same way. Of the
- * two rules the tenant one is enforced and atomicity is not, and **the worst case of the window
- * here is a valid state**: an error set that was deleted and not re-inserted is an empty error
- * report on a batch that has written no transactions, and the next preview rebuilds it from the
- * same bytes. Nothing a person could act on is lost, because nothing was committed. The seam that
- * would close it belongs in `base.ts`, not in a fourth repository reaching around it.
+ * **Why this is not yet one `db.batch()`, which the plan text asks for.** The base now has the seam
+ * (`removeWhereStatement` / `insertManyStatement` and `runTenantBatch` in `../base`, which stamp the
+ * tenant column themselves, adopted first by `deleteAccountGroup`), but this replace has not moved
+ * onto it: that is its own change. **The worst case of the window until it does is a valid state**:
+ * an error set that was deleted and not re-inserted is an empty error report on a batch that has
+ * written no transactions, and the next preview rebuilds it from the same bytes. Nothing a person
+ * could act on is lost, because nothing was committed.
  */
 export async function replaceImportRowErrors(
   scope: TenantScope,

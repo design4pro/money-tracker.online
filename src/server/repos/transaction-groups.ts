@@ -12,8 +12,8 @@
  *    instead of the memberships. `transaction_group_items.group_id` is
  *    `ON DELETE CASCADE`, so that single `DELETE` removes the last members and the group together
  *    — one statement, so there is no window in which a one-member group exists to be read. That is
- *    stronger than the `db.batch` the plan asks for and needs no statement builder to get it (see
- *    `./splits`' note on why a batch is not available to a repository built on `./base`).
+ *    stronger than the `db.batch` the plan asks for and needs no statement builder to get it (the
+ *    `runTenantBatch` seam in `./base` exists now, and this path has no use for it).
  *
  *    The reason it matters is not tidiness. A one-member group is a group lying about being a
  *    grouping — it is a label, and this product already has labels — and leaving one around forces

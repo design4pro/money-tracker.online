@@ -25,6 +25,10 @@
  *    dynamically assembled predicate list that collapses to nothing because every branch was
  *    skipped. Every `UPDATE` and `DELETE` below passes through it, and the transaction repository's
  *    policy predicates go through it explicitly.
+ * 6. **A batch is composed of statements this file built.** {@link TenantTableAccess.insertManyStatement},
+ *    `updateWhereStatement` and `removeWhereStatement` return an opaque {@link TenantStatement}
+ *    that only this file can produce, and {@link runTenantBatch} refuses anything else, so a
+ *    repository gets atomicity without ever writing the tenant column or holding a raw statement.
  *
  * And the disclosure rule that makes all of the above observable rather than merely true: a foreign
  * id answers {@link NotFoundError}, never `ForbiddenError`, and a foreign row is absent from counts
@@ -55,6 +59,7 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, clampPageSize } from './pagination'
 import { createScope, tenantContextSchema } from './scope'
 
 import type { SQL } from 'drizzle-orm'
+import type { BatchItem } from 'drizzle-orm/batch'
 import type {
   SQLiteColumn,
   SQLiteInsertValue,
@@ -340,6 +345,103 @@ export function touchLedgerAccount(accountId: string): void {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Seam: the tenant batch                                                     */
+/* -------------------------------------------------------------------------- */
+
+declare const tenantStatementBrand: unique symbol
+
+/**
+ * One write statement, built by this file under one scope and not yet run. `TResult` is what the
+ * batch hands back for it (the `RETURNING` rows).
+ *
+ * Opaque on purpose: the only producers are the `…Statement` builders on {@link TenantTableAccess},
+ * which stamp and scope it exactly as the executing methods do, and the only consumer is
+ * {@link runTenantBatch}. A repository can therefore compose writes into one atomic unit without
+ * writing `organization_id` itself, which the fork guard in `tenant-isolation.test.ts` forbids.
+ *
+ * **It is a handle, not the Drizzle query.** A Drizzle query is a thenable, so awaiting one — or
+ * returning it from an `async` function — runs it on the spot instead of handing it on. The handle
+ * has no `then`, so a statement can be built in one `await`ed function and batched in another.
+ *
+ * It remembers the workspace and the database handle, not the role: the permission check belongs to
+ * the repository function that builds the statement, before it builds it.
+ */
+export interface TenantStatement<TResult = unknown> {
+  readonly [tenantStatementBrand]: TResult
+}
+
+/** What {@link runTenantBatch} resolves to: one result per statement, in order. */
+export type TenantBatchResults<T extends ReadonlyArray<TenantStatement>> = {
+  [K in keyof T]: T[K] extends TenantStatement<infer TResult> ? TResult : never
+}
+
+/**
+ * The query behind each handle, and which workspace and database handle built it.
+ *
+ * The brand is a type; this is its runtime half, for the caller who casts around the type. A
+ * `WeakMap` so the record cannot be read or rewritten from outside this file, and so a statement
+ * nobody runs is not kept alive by it.
+ */
+const statementOrigins = new WeakMap<
+  object,
+  {
+    readonly query: BatchItem<'sqlite'>
+    readonly organizationId: string
+    readonly db: Database
+  }
+>()
+
+function brandStatement<TResult>(
+  scope: TenantScope,
+  query: BatchItem<'sqlite'>,
+): TenantStatement<TResult> {
+  // The handle is an empty object: its identity is the key, and the brand exists only as a type.
+  const handle = {} as TenantStatement<TResult>
+  statementOrigins.set(handle, {
+    query,
+    organizationId: scope.ctx.organizationId,
+    db: scope.db,
+  })
+  return handle
+}
+
+/**
+ * Runs `statements` as one atomic unit: all of them are applied or none is.
+ *
+ * Refuses before anything runs an empty batch ({@link ConflictError}) and any statement that was not
+ * built here under **this** scope and **this** database handle ({@link TenantIsolationError}).
+ * Without that check a batch could carry another workspace's statement under the caller's name.
+ *
+ * Results come back in statement order. A statement that matched nothing contributes an empty
+ * list; it does not fail the batch, so a caller that needs "this row must exist" reads the results
+ * and decides.
+ */
+export async function runTenantBatch<
+  T extends Readonly<[TenantStatement, ...Array<TenantStatement>]>,
+>(scope: TenantScope, statements: T): Promise<TenantBatchResults<T>> {
+  if (statements.length === 0) {
+    throw new ConflictError('A batch needs at least one statement.')
+  }
+  const queries = statements.map((statement) => {
+    const origin = statementOrigins.get(statement)
+    if (
+      origin === undefined ||
+      origin.organizationId !== scope.ctx.organizationId ||
+      origin.db !== scope.db
+    ) {
+      throw new TenantIsolationError('a batch statement')
+    }
+    return origin.query
+  })
+  // `map` loses the tuple shape Drizzle's `batch` wants, and the results' types were fixed per
+  // statement when it was built; both widenings stay inside this function.
+  const results = await scope.db.batch(
+    queries as unknown as [BatchItem<'sqlite'>, ...Array<BatchItem<'sqlite'>>],
+  )
+  return results as unknown as TenantBatchResults<T>
+}
+
+/* -------------------------------------------------------------------------- */
 /* Generic access for tables without a single-column primary key              */
 /* -------------------------------------------------------------------------- */
 
@@ -399,6 +501,31 @@ export interface TenantTableAccess<TTable extends TenantTable> {
     patch: TenantPatch<TTable>,
   ) => Promise<Array<TTable['$inferSelect']>>
   removeWhere: (scope: TenantScope, where: SQL) => Promise<number>
+  /**
+   * The statement {@link TenantTableAccess.insertMany} runs, for {@link runTenantBatch}. Same
+   * stamping; the batch result is the inserted rows. An empty list builds nothing and throws.
+   */
+  insertManyStatement: (
+    scope: TenantScope,
+    values: readonly [TenantInsert<TTable>, ...Array<TenantInsert<TTable>>],
+  ) => TenantStatement<Array<TTable['$inferSelect']>>
+  /**
+   * The statement {@link TenantTableAccess.updateWhere} runs, for {@link runTenantBatch}. Same
+   * guards; the batch result is the updated rows. An empty patch builds nothing and throws.
+   */
+  updateWhereStatement: (
+    scope: TenantScope,
+    where: SQL,
+    patch: TenantPatch<TTable>,
+  ) => TenantStatement<Array<TTable['$inferSelect']>>
+  /**
+   * The statement {@link TenantTableAccess.removeWhere} runs, for {@link runTenantBatch}. Same
+   * guards; the batch result is the deleted rows.
+   */
+  removeWhereStatement: (
+    scope: TenantScope,
+    where: SQL,
+  ) => TenantStatement<Array<TTable['$inferSelect']>>
 }
 
 /**
@@ -470,12 +597,10 @@ export function createTenantTableAccess<TTable extends TenantTable>(
     return value === undefined || value === null ? 0 : Number(value)
   }
 
-  async function insertMany(
+  function buildInsertMany(
     scope: TenantScope,
     values: ReadonlyArray<TenantInsert<TTable>>,
-  ): Promise<Array<Row>> {
-    if (values.length === 0) return []
-
+  ) {
     // The tenant column is stamped from the scope and written *after* the caller's payload is
     // spread, so a value smuggled in through a cast is overwritten rather than honoured.
     const records = values.map(
@@ -486,7 +611,15 @@ export function createTenantTableAccess<TTable extends TenantTable>(
         }) as SQLiteInsertValue<TTable>,
     )
 
-    return await scope.db.insert(table).values(records).returning()
+    return scope.db.insert(table).values(records).returning()
+  }
+
+  async function insertMany(
+    scope: TenantScope,
+    values: ReadonlyArray<TenantInsert<TTable>>,
+  ): Promise<Array<Row>> {
+    if (values.length === 0) return []
+    return await buildInsertMany(scope, values)
   }
 
   async function insert(
@@ -523,13 +656,29 @@ export function createTenantTableAccess<TTable extends TenantTable>(
     return rows.at(0) ?? null
   }
 
+  function assertUpdatable(where: SQL, patch: TenantPatch<TTable>): void {
+    assertScopedWrite([where], entityName)
+    assertPatchCannotMoveRow(patch, entityName)
+  }
+
+  function buildUpdateWhere(
+    scope: TenantScope,
+    where: SQL,
+    patch: TenantPatch<TTable>,
+  ) {
+    return scope.db
+      .update(table)
+      .set(patch as SQLiteUpdateSetSource<TTable>)
+      .where(tenantFilter(scope, table, where))
+      .returning()
+  }
+
   async function updateWhere(
     scope: TenantScope,
     where: SQL,
     patch: TenantPatch<TTable>,
   ): Promise<Array<Row>> {
-    assertScopedWrite([where], entityName)
-    assertPatchCannotMoveRow(patch, entityName)
+    assertUpdatable(where, patch)
 
     if (Object.keys(patch).length === 0) {
       // An empty patch is a no-op, not an `UPDATE … SET` with nothing to set (which is a syntax
@@ -537,20 +686,20 @@ export function createTenantTableAccess<TTable extends TenantTable>(
       return findMany(scope, { where })
     }
 
-    return await scope.db
-      .update(table)
-      .set(patch as SQLiteUpdateSetSource<TTable>)
+    return await buildUpdateWhere(scope, where, patch)
+  }
+
+  function buildRemoveWhere(scope: TenantScope, where: SQL) {
+    assertScopedWrite([where], entityName)
+
+    return scope.db
+      .delete(table)
       .where(tenantFilter(scope, table, where))
       .returning()
   }
 
   async function removeWhere(scope: TenantScope, where: SQL): Promise<number> {
-    assertScopedWrite([where], entityName)
-
-    const rows = (await scope.db
-      .delete(table)
-      .where(tenantFilter(scope, table, where))
-      .returning()) as Array<Row>
+    const rows = (await buildRemoveWhere(scope, where)) as Array<Row>
 
     return rows.length
   }
@@ -567,6 +716,19 @@ export function createTenantTableAccess<TTable extends TenantTable>(
     insertMany,
     updateWhere,
     removeWhere,
+    insertManyStatement: (scope, values) =>
+      brandStatement(scope, buildInsertMany(scope, values)),
+    updateWhereStatement(scope, where, patch) {
+      assertUpdatable(where, patch)
+      if (Object.keys(patch).length === 0) {
+        throw new ConflictError(
+          `Updating a ${entityName} row with an empty patch builds no statement.`,
+        )
+      }
+      return brandStatement(scope, buildUpdateWhere(scope, where, patch))
+    },
+    removeWhereStatement: (scope, where) =>
+      brandStatement(scope, buildRemoveWhere(scope, where)),
   }
 }
 
