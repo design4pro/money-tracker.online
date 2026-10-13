@@ -746,6 +746,8 @@ const messages = {
   'refunds.dialog.submit': 'Link the refund',
   'refunds.dialog.cancel': 'Cancel',
   'refunds.dialog.error.title': 'The refund was not linked',
+  'refunds.dialog.error.refused':
+    'Nothing was changed. This refund does not fit that transaction: it may be larger than what is left, in another currency or in the wrong direction. Pick another one and try again.',
   'refunds.suggest.loading': 'Looking for what this refunds…',
   'refunds.suggest.empty':
     'Nothing with the same payee in the last 90 days is large enough to be what this refunds.',

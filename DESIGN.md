@@ -780,6 +780,34 @@ a sentence that says what to do, not a blank.
 - `src/components/ui/__tests__/empty-state-ownership.test.ts` fails when `variant="dashed"`
   appears outside `src/components/ui`.
 
+### Failure panels
+
+Two components say "something went wrong", and a screen picks one by what failed: `ErrorPanel` is
+the frame, `FailurePanel` is the one that reads a failure and chooses the sentence.
+
+- **`FailurePanel`** is for a failure that arrived as a thrown value: a refused save in a dialog,
+  a preview that did not load, a move that was rejected. It takes the failure envelope
+  (`failureOf(error)` in the `catch`) and shows the catalogue sentence of its kind, so two failures
+  of one kind read the same on every screen. Its recovery follows the kind: Retry beside the form
+  for a retryable failure, a link to billing for a quota or a locked feature, the sentence plus a
+  reference for an internal one.
+- **`ErrorPanel`** is the frame for a route whose loader failed (`errorComponent`) and the shape
+  `FailurePanel` renders into. A route passes it catalogue copy only; there is no `detail` prop
+  and no `<details>`.
+- **Placement.** `after-action` is the result of something the reader just did: `role="alert"`, and
+  focus moves to the heading. `in-place` is a block that failed to load on arrival: a labelled
+  region that never moves focus, because an alert on first render is announced without context.
+  A form clears its failure before it submits again, so a repeat failure remounts the panel and is
+  announced again.
+- **Copy.** `title` and `body` are catalogue copy and are used for the retryable recovery only;
+  the quota, locked and internal recoveries keep their own sentences. A site never renders what the
+  error said - a repository message is written for a developer, English-only, and can carry an id
+  or a count - and `failure-message-guard.test.ts` fails on a file that reads one back in.
+- **Tone.** `danger` for a fault; `warning` for a quota or a locked feature, which are not faults.
+  The icon is `aria-hidden` and never carries a word the sentence does not say.
+- **It is not** `EmptyState` (nothing here yet) and not a toast: a toast is for an outcome that needs
+  no decision, a failure that leaves the form open belongs in the panel beside the input.
+
 ### Badges
 
 A word with a run of pen behind it. Every badge, in every tone, is the pen mark (`mark-pen` in

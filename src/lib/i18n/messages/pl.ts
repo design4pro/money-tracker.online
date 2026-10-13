@@ -770,6 +770,8 @@ const messages = {
   'refunds.dialog.submit': 'Powiąż zwrot',
   'refunds.dialog.cancel': 'Anuluj',
   'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
+  'refunds.dialog.error.refused':
+    'Nic się nie zmieniło. Ten zwrot nie pasuje do tej transakcji: może być większy niż pozostała kwota, w innej walucie albo w złym kierunku. Wybierz inną i spróbuj ponownie.',
   'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
   'refunds.suggest.empty':
     'Żaden wydatek u tego samego odbiorcy z ostatnich 90 dni nie jest dość duży, aby to był jego zwrot.',
