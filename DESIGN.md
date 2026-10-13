@@ -744,6 +744,33 @@ label kept in the DOM under the spinner so the button holds its width.
   untouched.
 - **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.
 
+### Menu
+
+- **The shape.** A column of 44px-minimum rows inside the base `Popover`, at least `11rem` wide
+  (`min-w-44`) and not tied to a trigger width.
+- **The height rule.** A menu sets no height cap of its own. The `Popover` is a column flex
+  container and React Aria writes the room left in the viewport onto it as `max-height`, so a menu
+  that fits is never a scroll container, and one that cannot fit (a short landscape phone) shrinks
+  to that room and scrolls. The old fixed `max-h-80` (320px) hid the eighth row of an eight-item
+  menu at 48px a row and made the menu a scrollable region with no focusable content while a
+  submenu held focus, which axe reports as `scrollable-region-focusable` (#728). A new cap on a
+  `Menu` brings both back: change the number of items, not the cap.
+- **Reaching the last row.** Every item is reachable from the keyboard (arrows, `Home`, `End`,
+  type-ahead) and React Aria scrolls the focused row into view, so the scrolling case stays
+  keyboard-complete. `e2e/menu-height.spec.ts` asserts all of it in a browser at 360px and 1280px,
+  with a submenu open, and in a viewport too short for the menu.
+- **Known limit.** The axe guarantee holds while the menu fits. In a viewport too short for it
+  (about 280px, a landscape phone or 400% zoom) with a submenu open, the parent menu scrolls again
+  with every item at `tabindex="-1"`, and axe's `scrollable-region-focusable` can return; the
+  keyboard path stays complete because `Escape` closes the submenu.
+- **A long submenu grows to the viewport.** A submenu with many entries (the category tree's "Move
+  to") is no longer cut at 320px; it takes the room React Aria leaves it, then scrolls.
+- **Every `Popover` is a column flex container.** The rule above lives in the base `Popover`, so
+  `Select`, `ComboBox`, `DatePicker` and `PopoverDialog` share it; their children stretch to the
+  panel width and only a child that already scrolls (`ListBox`, `Menu`) shrinks.
+- **The one thing it is not:** a `ListBox` or a `Select`, which hold values and keep their own
+  `max-h-72` (`ListBox`).
+
 ### Focus
 
 One treatment product-wide, drawn outside the control: a 2px `focus-gap` band (a `box-shadow`)
