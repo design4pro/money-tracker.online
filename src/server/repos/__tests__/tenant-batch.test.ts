@@ -159,6 +159,12 @@ describe('runTenantBatch', () => {
     ).toThrow()
   })
 
+  it('builds no statement from an empty insert list', () => {
+    expect(() =>
+      payeeRepo.insertManyStatement(a, [] as unknown as [never]),
+    ).toThrow()
+  })
+
   it('refuses an empty batch', async () => {
     await expect(
       runTenantBatch(a, [] as unknown as Parameters<typeof runTenantBatch>[1]),

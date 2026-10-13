@@ -362,6 +362,9 @@ declare const tenantStatementBrand: unique symbol
  * **It is a handle, not the Drizzle query.** A Drizzle query is a thenable, so awaiting one — or
  * returning it from an `async` function — runs it on the spot instead of handing it on. The handle
  * has no `then`, so a statement can be built in one `await`ed function and batched in another.
+ *
+ * It remembers the workspace and the database handle, not the role: the permission check belongs to
+ * the repository function that builds the statement, before it builds it.
  */
 export interface TenantStatement<TResult = unknown> {
   readonly [tenantStatementBrand]: TResult

@@ -126,7 +126,7 @@ import {
 } from '../imports'
 
 import { createSeries, getUpcoming } from '../recurring'
-import { createTenantRepository, tenantFilter } from '../base'
+import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
   MissingTenantContextError,
@@ -134,6 +134,7 @@ import {
   TenantIsolationError,
   UnscopedWriteError,
 } from '../errors'
+import { pauseRulesStatement } from '../rules'
 import { createScope } from '../scope'
 import {
   createTransaction,
@@ -726,6 +727,79 @@ describe('deleting an account group reaches only the caller’s workspace', () =
     await expect(stateOfB()).resolves.toEqual(before)
   })
 
+  it('pauses only the caller’s rules when both workspaces have a rule naming the same group id', async () => {
+    await db.insert(accountGroups).values({
+      id: 'grp-a',
+      organizationId: ORG_A,
+      name: 'Mine',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await db.insert(rules).values(
+      [ORG_A, ORG_B].map((organizationId) => ({
+        id: `rule-${organizationId}`,
+        organizationId,
+        name: 'Names the group',
+        position: 0,
+        matchMode: 'all' as const,
+        conditions: JSON.stringify([
+          { field: 'account_group', operator: 'is_any_of', ids: ['grp-a'] },
+        ]),
+        actions: JSON.stringify([
+          { kind: 'set_excluded', excludeFromStats: true },
+        ]),
+        isActive: true,
+        matchCount: 0,
+        runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })),
+    )
+
+    await deleteAccountGroup(a, 'grp-a')
+
+    const paused = new Map(
+      (await db.select().from(rules)).map((rule) => [
+        rule.organizationId,
+        rule.pausedReason,
+      ]),
+    )
+    expect(paused.get(ORG_A)).not.toBeNull()
+    expect(paused.get(ORG_B)).toBeNull()
+  })
+
+  it('builds a pause statement that cannot pause a rule of another workspace', async () => {
+    await db.insert(rules).values({
+      id: 'rule-foreign',
+      organizationId: ORG_B,
+      name: 'Not mine',
+      position: 0,
+      matchMode: 'all' as const,
+      conditions: '[]',
+      actions: '[]',
+      isActive: true,
+      matchCount: 0,
+      runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    executed.length = 0
+
+    await runTenantBatch(a, [
+      pauseRulesStatement(a, ['rule-foreign'], '{"kind":"missing_reference"}'),
+    ])
+
+    const [foreign] = await db
+      .select()
+      .from(rules)
+      .where(eq(rules.id, 'rule-foreign'))
+    expect(foreign?.pausedReason).toBeNull()
+    const updates = statementsMatching('update "rules"')
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toContain('organization_id')
+  })
+
   it('puts the tenant column in every statement of the batch it runs', async () => {
     await db.insert(accountGroups).values({
       id: 'grp-a',
@@ -911,6 +985,17 @@ describe('no repository forks the tenant predicate', () => {
   it('never writes the tenant column into an insert payload outside the base', () => {
     const offenders = repositorySources().filter((file) =>
       /organizationId:\s*scope\.ctx\.organizationId/.test(file.source),
+    )
+    expect(offenders.map((file) => file.name)).toEqual([])
+  })
+
+  it('never calls batch on a database handle outside the base', () => {
+    // `Database.batch` is public so `runTenantBatch` can reach it, which makes it reachable by a
+    // repository holding raw builders too: that call is what would bypass the origin check.
+    const code = (source: string) =>
+      source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const offenders = repositorySources().filter((file) =>
+      /\.batch\(/.test(code(file.source)),
     )
     expect(offenders.map((file) => file.name)).toEqual([])
   })
