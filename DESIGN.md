@@ -744,6 +744,24 @@ label kept in the DOM under the spinner so the button holds its width.
   untouched.
 - **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.
 
+### Menu
+
+- **The shape.** A column of 44px-minimum rows inside the base `Popover`, at least `11rem` wide
+  (`min-w-44`) and not tied to a trigger width.
+- **The height rule.** A menu sets no height cap of its own. The `Popover` is a column flex
+  container and React Aria writes the room left in the viewport onto it as `max-height`, so a menu
+  that fits is never a scroll container, and one that cannot fit (a short landscape phone) shrinks
+  to that room and scrolls. The old fixed `max-h-80` (320px) hid the eighth row of an eight-item
+  menu at 48px a row and made the menu a scrollable region with no focusable content while a
+  submenu held focus, which axe reports as `scrollable-region-focusable` (#728). A new cap on a
+  `Menu` brings both back: change the number of items, not the cap.
+- **Reaching the last row.** Every item is reachable from the keyboard (arrows, `Home`, `End`,
+  type-ahead) and React Aria scrolls the focused row into view, so the scrolling case stays
+  keyboard-complete. `e2e/menu-height.spec.ts` asserts all of it in a browser at 360px and 1280px,
+  with a submenu open, and in a viewport too short for the menu.
+- **The one thing it is not:** a `ListBox` or a `Select`, which hold values and keep their own
+  `max-h-72` (`ListBox`).
+
 ### Focus
 
 One treatment product-wide, drawn outside the control: a 2px `focus-gap` band (a `box-shadow`)

@@ -39,6 +39,11 @@ export interface PopoverProps extends Omit<RACPopoverProps, 'children'> {
  * focus to `<body>` on close is the single most common keyboard trap in a
  * hand-rolled design system.
  *
+ * The panel is a column flex container so that a scrolling child (a `Menu`, a
+ * `ListBox`) shrinks to the `max-height` React Aria writes on this element, the
+ * room left in the viewport, instead of overflowing past it. A child that fits
+ * never scrolls.
+ *
  * `--trigger-width` is published by RAC on the popover element, which is how a
  * Select's listbox matches its button's width without a measurement effect.
  */
@@ -58,7 +63,7 @@ export function Popover({
         className,
         layerSurface,
         popMotion,
-        'z-dropdown min-w-(--trigger-width) p-1',
+        'z-dropdown flex min-w-(--trigger-width) flex-col p-1',
       )}
     >
       {showArrow ? (
