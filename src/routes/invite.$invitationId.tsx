@@ -2,7 +2,7 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { Button, Card, CardBody, Link, Skeleton, toast } from '#/components/ui'
-import { readFailure } from '#/lib/failure'
+import { failureOf, readFailure } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
@@ -174,9 +174,7 @@ function InvitationRoute() {
                 void router.navigate(signInTarget(params.invitationId))
                 return
               }
-              toast.error(
-                error instanceof Error ? error.message : String(error),
-              )
+              toast.error(t(failureOf(error).message.key))
               void router.invalidate()
             })
         }}

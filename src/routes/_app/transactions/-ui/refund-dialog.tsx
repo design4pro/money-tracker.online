@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { ErrorPanel, FormModal } from '#/components/app/shell'
+import { FailurePanel, FormModal } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -12,10 +12,12 @@ import {
   RadioGroup,
   Spinner,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import { linkRefund, suggestRefundTargets } from '#/server/fns/refunds'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { Locale, Translate } from '#/lib/i18n'
 import type { RefundTarget } from '#/server/repos/refunds'
 
@@ -76,7 +78,7 @@ export function RefundDialog({
   )
   const [selected, setSelected] = useState<string>(EXTERNAL)
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   // `EXTERNAL` is what the group is seeded with, so it is the pristine value rather than a choice
   // anybody made. Moving off it is the only edit this form has to lose.
@@ -91,7 +93,7 @@ export function RefundDialog({
       .catch((error: unknown) => {
         if (cancelled) return
         setTargets([])
-        setFailure(error instanceof Error ? error.message : String(error))
+        setFailure(failureOf(error))
       })
     return () => {
       cancelled = true
@@ -117,7 +119,7 @@ export function RefundDialog({
     } catch (error) {
       // The over-refund and cross-currency refusals land here, and they are the point of the
       // stage: the dialog stays open with the reason on it rather than closing on a failure.
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -149,10 +151,10 @@ export function RefundDialog({
             >
               <DialogBody className="flex flex-col gap-5">
                 {failure === null ? null : (
-                  <ErrorPanel
+                  <FailurePanel
+                    failure={failure}
+                    placement="after-action"
                     title={t('refunds.dialog.error.title')}
-                    body={t('empty.error.body')}
-                    detail={failure}
                   />
                 )}
 

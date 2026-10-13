@@ -2341,10 +2341,7 @@ const messages = {
   'rules.editor.load.error.body':
     'No rule was created or changed. Try again in a moment.',
   'rules.error.title': 'The rules could not be loaded',
-  'rules.error.body':
-    'Nothing was changed. Try again, and if it keeps happening the detail below is what to send us.',
-  'rules.error.locked':
-    'Rules are not part of this plan, so nothing was saved.',
+  'rules.error.body': 'Nothing was changed. Try again in a moment.',
 
   'rules.empty.title': 'No rules yet',
   'rules.empty.body':

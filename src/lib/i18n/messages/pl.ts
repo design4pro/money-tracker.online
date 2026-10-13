@@ -2384,10 +2384,7 @@ const messages = {
   'rules.editor.load.error.body':
     'Żadna zasada nie została utworzona ani zmieniona. Spróbuj ponownie za chwilę.',
   'rules.error.title': 'Nie udało się wczytać zasad',
-  'rules.error.body':
-    'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli będzie się powtarzać, prześlij nam szczegóły poniżej.',
-  'rules.error.locked':
-    'Zasady nie wchodzą w skład tego planu, więc nic nie zapisano.',
+  'rules.error.body': 'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
 
   'rules.empty.title': 'Nie ma jeszcze żadnej zasady',
   'rules.empty.body':

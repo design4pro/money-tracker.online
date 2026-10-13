@@ -8,8 +8,9 @@ import {
   CategoryTree,
   CategoryTreeSkeleton,
 } from '#/components/app/categories'
-import { ErrorPanel } from '#/components/app/shell'
+import { ErrorPanel, FailurePanel } from '#/components/app/shell'
 import { Button, Switch, toast } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { CATEGORY_KINDS } from '#/lib/enums'
 import {
@@ -25,6 +26,7 @@ import { useDataRefresh } from '../-lib/refresh'
 import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 import { CategoryFormDialog } from './-ui/category-form-dialog'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type {
   CategoryMove,
   CategoryTreeItem,
@@ -73,20 +75,13 @@ export const Route = createFileRoute('/_app/categories/')({
   component: CategoriesRoute,
 })
 
-function CategoriesError({
-  error,
-  reset,
-}: {
-  error: Error
-  reset: () => void
-}) {
+function CategoriesError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       className="max-w-list"
       title={t('categories.error.title')}
       body={t('empty.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -108,8 +103,8 @@ function CategoriesRoute() {
   const refreshCaches = useDataRefresh()
 
   const [pending, setPending] = useState<Pending>({ kind: 'none' })
-  // The last server refusal, in the server's own words. Cleared by the next successful write.
-  const [refusal, setRefusal] = useState<string | null>(null)
+  // The last server refusal, as the failure it was. Cleared by the next successful write.
+  const [refusal, setRefusal] = useState<FailureEnvelope | null>(null)
   const close = () => setPending({ kind: 'none' })
 
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
@@ -127,7 +122,7 @@ function CategoriesRoute() {
         refresh()
       },
       (error: unknown) => {
-        setRefusal(error instanceof Error ? error.message : String(error))
+        setRefusal(failureOf(error))
       },
     )
   }
@@ -169,10 +164,11 @@ function CategoriesRoute() {
       */}
       <div role="alert" aria-live="assertive">
         {refusal === null ? null : (
-          <ErrorPanel
+          <FailurePanel
+            failure={refusal}
+            placement="in-place"
             title={t('categories.move.refused')}
             body={t('categories.move.refused.body')}
-            detail={refusal}
           />
         )}
       </div>

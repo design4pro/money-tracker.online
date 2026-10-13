@@ -22,12 +22,12 @@ import type { ReactNode } from 'react'
  * changed" is the sentence a person reading a finance app needs first, and it is why the copy is
  * a prop rather than a generic string baked in here.
  *
- * ## Why the raw message is behind a disclosure
+ * ## What it never shows
  *
- * A repository error reads `Account 01k… still has 412 transaction(s)`. It is written for a
- * developer, it is English-only, and putting it in the body would replace a localised sentence
- * with a technical one. It stays available — a person filing a bug needs it — inside a
- * `<details>` that starts closed.
+ * A thrown error's message. A repository error reads `Account 01k… still has 412 transaction(s)`:
+ * it is written for a developer and is English-only, so it has no prop to arrive through. A caller
+ * passes catalogue copy, or renders `FailurePanel`, which shows the sentence of the failure's kind;
+ * `failure-message-guard.test.ts` fails on a call site that reads a message back in.
  *
  * ## Alert or region
  *
@@ -48,8 +48,6 @@ import type { ReactNode } from 'react'
 export interface ErrorPanelProps {
   title: ReactNode
   body: ReactNode
-  /** The raw error text, shown under a disclosure. Never the primary message. */
-  detail?: string | null
   onRetry?: () => void
   isRetrying?: boolean
   /** `negative` is a fault; `warning` is a limit the reader can act on. */
@@ -80,7 +78,6 @@ const TONE_CLASSES = {
 export function ErrorPanel({
   title,
   body,
-  detail,
   onRetry,
   isRetrying = false,
   tone = 'negative',
@@ -128,15 +125,6 @@ export function ErrorPanel({
           <p className="mt-1 text-body text-ink-2">{body}</p>
         </div>
       </div>
-
-      {detail ? (
-        <details className="rounded-md bg-surface-sunken px-3 py-2">
-          <summary className="cursor-pointer text-caption font-medium text-ink-2 target-min-h">
-            {t('common.description')}
-          </summary>
-          <p className="mt-2 break-words text-caption text-ink-2">{detail}</p>
-        </details>
-      ) : null}
 
       {onRetry || actions ? (
         <div className="flex flex-wrap justify-start gap-3">
