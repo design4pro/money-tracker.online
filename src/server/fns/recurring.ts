@@ -36,10 +36,9 @@ import { serverToday } from '#/server/clock'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { confidenceBand, detectCandidates } from '#/server/recurring/detect'
 import { materializeSeries } from '#/server/recurring/materialize'
+import { SERIES_AHEAD, writeSeries } from '#/server/recurring/series-write'
 import {
-  acceptCandidate as acceptCandidateRow,
   candidateSchema,
-  createSeries as createSeriesRow,
   createSeriesSchema,
   completeSeries as completeSeriesRow,
   deleteSeries as deleteSeriesRow,
@@ -58,10 +57,8 @@ import {
   pauseSeries as pauseSeriesRow,
   periodKeySchema,
   replacePendingCandidates,
-  resumeSeries as resumeSeriesRow,
   revertPeriod as revertPeriodRow,
   unlinkTransaction as unlinkTransactionRow,
-  updateSeries as updateSeriesRow,
   updateSeriesSchema,
 } from '#/server/repos/recurring'
 
@@ -80,9 +77,6 @@ const seriesIdSchema = z.strictObject({
 const listInputSchema = z.strictObject({
   includeInactive: z.boolean().default(false),
 })
-
-/** How far ahead the list and the detail screen materialise. Three periods is one screen's worth. */
-const AHEAD = 3
 
 /** How far back the detector reads. Eighteen months is enough for an annual series to show thrice. */
 const DETECTION_MONTHS = 18
@@ -131,7 +125,7 @@ export const loadRecurring = createServerFn({ method: 'GET' })
         await materializeSeries(scope, {
           seriesId: one.id,
           today,
-          ahead: AHEAD,
+          ahead: SERIES_AHEAD,
         })
       }
     }
@@ -187,7 +181,7 @@ export const loadSeriesDetail = createServerFn({ method: 'GET' })
       await materializeSeries(scope, {
         seriesId: series.id,
         today,
-        ahead: AHEAD,
+        ahead: SERIES_AHEAD,
       })
     }
     const [periods, links] = await Promise.all([
@@ -243,13 +237,11 @@ export const createSeries = createServerFn({ method: 'POST' })
   .inputValidator(createSeriesSchema)
   .handler(async ({ data }): Promise<{ readonly seriesId: string }> => {
     const scope = await requireOrg()
-    const series = await createSeriesRow(scope, data)
-    await materializeSeries(scope, {
-      seriesId: series.id,
+    return writeSeries(scope, {
       today: serverToday(),
-      ahead: AHEAD,
+      ahead: SERIES_AHEAD,
+      change: { kind: 'create', input: data },
     })
-    return { seriesId: series.id }
   })
 
 const updateInputSchema = z.strictObject({
@@ -270,11 +262,10 @@ export const updateSeries = createServerFn({ method: 'POST' })
   .inputValidator(updateInputSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
-    await updateSeriesRow(scope, data.seriesId, data.patch)
-    await materializeSeries(scope, {
-      seriesId: data.seriesId,
+    await writeSeries(scope, {
       today: serverToday(),
-      ahead: AHEAD,
+      ahead: SERIES_AHEAD,
+      change: { kind: 'update', seriesId: data.seriesId, patch: data.patch },
     })
   })
 
@@ -291,11 +282,10 @@ export const resumeSeries = createServerFn({ method: 'POST' })
   .inputValidator(seriesIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
-    await resumeSeriesRow(scope, data.seriesId)
-    await materializeSeries(scope, {
-      seriesId: data.seriesId,
+    await writeSeries(scope, {
       today: serverToday(),
-      ahead: AHEAD,
+      ahead: SERIES_AHEAD,
+      change: { kind: 'resume', seriesId: data.seriesId },
     })
   })
 
@@ -461,16 +451,15 @@ export const acceptCandidate = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }): Promise<{ readonly seriesId: string }> => {
     const scope = await requireOrg()
-    const series = await acceptCandidateRow(scope, {
-      candidateId: data.candidateId,
-      series: data.series,
-    })
-    await materializeSeries(scope, {
-      seriesId: series.id,
+    return writeSeries(scope, {
       today: serverToday(),
-      ahead: AHEAD,
+      ahead: SERIES_AHEAD,
+      change: {
+        kind: 'accept',
+        candidateId: data.candidateId,
+        series: data.series,
+      },
     })
-    return { seriesId: series.id }
   })
 
 // No route imports `terminationOf` from here, and a re-export of a repository function is the one
