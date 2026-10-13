@@ -17,6 +17,7 @@ import type {
   GroupProps as RACGroupProps,
   LabelProps as RACLabelProps,
   TextProps as RACTextProps,
+  ValidationResult,
 } from 'react-aria-components'
 import type { ReactNode } from 'react'
 
@@ -126,6 +127,31 @@ export function Description({
       {children}
     </RACText>
   )
+}
+
+/**
+ * The `isInvalid` a field hands its React Aria container.
+ *
+ * `FieldError` renders only on an invalid container, so a message the caller passes as
+ * `errorMessage` is invisible, and the control carries no `aria-invalid`, unless something also
+ * flips the container invalid (WCAG 3.3.1). A caller that owns a message has already decided the
+ * field is wrong, so the message is what flips it and no call site has to say it twice.
+ *
+ * An explicit `isInvalid` wins, either way. A function message is React Aria's render form: it
+ * reads the live native validation, so it cannot decide validity and is left to that validation.
+ */
+export function resolveInvalid(
+  isInvalid: boolean | undefined,
+  errorMessage: ReactNode | ((result: ValidationResult) => ReactNode),
+): boolean | undefined {
+  if (isInvalid !== undefined) return isInvalid
+  if (typeof errorMessage === 'function') return undefined
+  const isEmpty =
+    errorMessage === undefined ||
+    errorMessage === null ||
+    errorMessage === false ||
+    errorMessage === ''
+  return isEmpty ? undefined : true
 }
 
 export interface FieldErrorProps extends RACFieldErrorProps {}
