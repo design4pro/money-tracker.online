@@ -771,6 +771,30 @@ label kept in the DOM under the spinner so the button holds its width.
 - **The one thing it is not:** a `ListBox` or a `Select`, which hold values and keep their own
   `max-h-72` (`ListBox`).
 
+### Toast
+
+- **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
+  button; the copy is the caller's `closeLabel` (`action.close`, EN + PL), never a default string
+  and never an icon-only control without a name.
+- **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
+  §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
+  never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
+  `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
+  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-7` so text never runs
+  under the box.
+- **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
+  so the close button's size, position and transform are `!` utilities. `left` and `right` read the
+  opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
+- **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
+  box-shadow is switched off.
+- **Contrast.** The chip's edge is `border-subtle`, a decorative edge below 3:1 by design; the glyph
+  (`ink-2`, forced with `!` like the rest; measured 8.6:1 in light and 8.1:1 in dark on the chip, #730) carries the 1.4.11 contrast.
+- **A toast action.** No toast has an `action` or `cancel` button today. If one is added it must
+  not sit in the top 44px of the inline-end corner, which the close box owns.
+- **Verified by:** `src/components/ui/__tests__/toast.test.tsx` (name, hidden glyph, classes) and
+  `e2e/toast-close-button.spec.ts` (measured box, axe, EN, PL and RTL, 360px and 1280px, both
+  themes, keyboard).
+
 ### Focus
 
 One treatment product-wide, drawn outside the control: a 2px `focus-gap` band (a `box-shadow`)
