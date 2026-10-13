@@ -16,6 +16,7 @@ import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { ZodError } from 'zod'
 
 import { member, organization, user } from '#/server/db/auth-schema'
 import {
@@ -36,6 +37,7 @@ import {
   DEFAULT_CATEGORY_COLOR,
   SystemCategoryError,
   archiveCategory,
+  assertCategoryUsable,
   createCategory,
   deleteCategory,
   getCategory,
@@ -617,24 +619,207 @@ describe('deleteCategory', () => {
 
     expect((await categoryRow(child.id))?.parentId).toBeNull()
   })
+})
 
-  it('needs owner or admin once the workspace has a second member', async () => {
-    const row = await createCategory(scope, { name: 'Food' })
-    await addSecondMember()
-    const memberScope = createScope(db, {
-      userId: 'user-b',
-      organizationId: 'org-a',
-      role: 'member',
+/* -------------------------------------------------------------------------- */
+/* The write gate                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** The rows every gate case starts from, all in A: a parent with a child, a loose row, an archived one. */
+interface GateFixture {
+  readonly parent: string
+  readonly child: string
+  readonly loose: string
+  readonly archived: string
+}
+
+async function seedGateFixture(): Promise<GateFixture> {
+  const parent = await createCategory(scope, { name: 'Food' })
+  const child = await createCategory(scope, {
+    name: 'Groceries',
+    parentId: parent.id,
+  })
+  const loose = await createCategory(scope, { name: 'Home' })
+  const archived = await createCategory(scope, { name: 'Old' })
+  await archiveCategory(scope, archived.id)
+  return {
+    parent: parent.id,
+    child: child.id,
+    loose: loose.id,
+    archived: archived.id,
+  }
+}
+
+/**
+ * One row of the gate table. The label is the name of the function the row calls (`fn.name`), so
+ * a row cannot be titled for one function and exercise another.
+ */
+interface GatedWrite {
+  readonly name: string
+  readonly run: (as: TenantScope, rows: GateFixture) => Promise<unknown>
+  /** The same call aimed at B's id, which every function must still refuse as not found. */
+  readonly foreign: (as: TenantScope) => Promise<unknown>
+  /** The same call with input the validator refuses, which must be refused before the gate. */
+  readonly malformed: (as: TenantScope) => Promise<unknown>
+}
+
+/** The three calls a row makes, each handed the function the row is named for. */
+interface GateCalls<Fn> {
+  readonly run: (fn: Fn, as: TenantScope, rows: GateFixture) => Promise<unknown>
+  readonly foreign: (fn: Fn, as: TenantScope) => Promise<unknown>
+  readonly malformed: (fn: Fn, as: TenantScope) => Promise<unknown>
+}
+
+function gated<Fn extends (...args: never) => Promise<unknown>>(
+  fn: Fn,
+  calls: GateCalls<Fn>,
+): GatedWrite {
+  return {
+    name: fn.name,
+    run: (as, rows) => calls.run(fn, as, rows),
+    foreign: (as) => calls.foreign(fn, as),
+    malformed: (as) => calls.malformed(fn, as),
+  }
+}
+
+const GATED_WRITES: ReadonlyArray<GatedWrite> = [
+  gated(createCategory, {
+    run: (fn, as) => fn(as, { name: 'Pets' }),
+    foreign: (fn, as) => fn(as, { name: 'Pets', parentId: 'cat-b' }),
+    malformed: (fn, as) => fn(as, { name: '' }),
+  }),
+  gated(updateCategory, {
+    run: (fn, as, rows) => fn(as, rows.parent, { name: 'Meals' }),
+    foreign: (fn, as) => fn(as, 'cat-b', { name: 'Meals' }),
+    malformed: (fn, as) => fn(as, '', { name: 'Meals' }),
+  }),
+  gated(archiveCategory, {
+    run: (fn, as, rows) => fn(as, rows.loose),
+    foreign: (fn, as) => fn(as, 'cat-b'),
+    malformed: (fn, as) => fn(as, ''),
+  }),
+  gated(restoreCategory, {
+    run: (fn, as, rows) => fn(as, rows.archived),
+    foreign: (fn, as) => fn(as, 'cat-b'),
+    malformed: (fn, as) => fn(as, ''),
+  }),
+  gated(deleteCategory, {
+    run: (fn, as, rows) => fn(as, rows.loose),
+    foreign: (fn, as) => fn(as, 'cat-b'),
+    malformed: (fn, as) => fn(as, ''),
+  }),
+  gated(reorderCategories, {
+    run: (fn, as, rows) => fn(as, [rows.loose, rows.parent]),
+    foreign: (fn, as) => fn(as, ['cat-b']),
+    malformed: (fn, as) => fn(as, []),
+  }),
+  gated(moveCategory, {
+    run: (fn, as, rows) => fn(as, { id: rows.child, parentId: rows.loose }),
+    foreign: (fn, as) => fn(as, { id: 'cat-b', parentId: null }),
+    malformed: (fn, as) => fn(as, { id: '', parentId: null }),
+  }),
+]
+
+describe('the write gate', () => {
+  /** Whole rows of every workspace, so a refusal can be shown to have changed none of them. */
+  const allCategories = () =>
+    db.select().from(categories).orderBy(categories.id)
+
+  const scopeAs = (role: 'owner' | 'admin' | 'member') =>
+    createScope(db, { userId: 'user-b', organizationId: 'org-a', role })
+
+  let rows: GateFixture
+
+  beforeEach(async () => {
+    rows = await seedGateFixture()
+  })
+
+  it('covers the seven writes and nothing else', () => {
+    expect(GATED_WRITES.map(({ name }) => name)).toEqual([
+      'createCategory',
+      'updateCategory',
+      'archiveCategory',
+      'restoreCategory',
+      'deleteCategory',
+      'reorderCategories',
+      'moveCategory',
+    ])
+  })
+
+  describe.each(GATED_WRITES)('$name', ({ run, foreign, malformed }) => {
+    it('refuses a plain member in a shared workspace and changes no row', async () => {
+      await addSecondMember()
+      const before = await allCategories()
+
+      await expect(run(scopeAs('member'), rows)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      )
+
+      expect(await allCategories()).toEqual(before)
     })
 
-    await expect(deleteCategory(memberScope, row.id)).rejects.toBeInstanceOf(
-      ForbiddenError,
-    )
+    it.each(['admin', 'owner'] as const)('passes for %s', async (role) => {
+      await addSecondMember()
+
+      await expect(run(scopeAs(role), rows)).resolves.not.toBeInstanceOf(Error)
+    })
+
+    it('passes for a member in a solo workspace', async () => {
+      await expect(run(scopeAs('member'), rows)).resolves.not.toBeInstanceOf(
+        Error,
+      )
+    })
+
+    it('still refuses a wrong-workspace id as not found once the gate is passed', async () => {
+      await addSecondMember()
+      const before = await allCategories()
+
+      await expect(foreign(scopeAs('admin'))).rejects.toBeInstanceOf(
+        NotFoundError,
+      )
+
+      expect(await allCategories()).toEqual(before)
+    })
+
+    it('parses first: malformed input is a validation failure, not a role failure', async () => {
+      await addSecondMember()
+
+      const failure = await malformed(scopeAs('member')).then(
+        () => null,
+        (error: unknown) => error,
+      )
+
+      expect(failure).toBeInstanceOf(ZodError)
+    })
+
+    it('gates before it reads: a member learns nothing about a wrong-workspace id', async () => {
+      await addSecondMember()
+
+      await expect(foreign(scopeAs('member'))).rejects.toBeInstanceOf(
+        ForbiddenError,
+      )
+    })
+  })
+
+  it('leaves the reads open to a plain member in a shared workspace', async () => {
+    await addSecondMember()
+    const asMember = scopeAs('member')
+
+    await expect(listCategories(asMember)).resolves.toHaveLength(3)
+    await expect(getCategory(asMember, rows.parent)).resolves.toMatchObject({
+      id: rows.parent,
+    })
+    await expect(
+      spendingByCategory(asMember, { from: '2026-03-01', to: '2026-03-31' }),
+    ).resolves.not.toBeInstanceOf(Error)
+    await expect(
+      assertCategoryUsable(asMember, rows.parent),
+    ).resolves.not.toBeInstanceOf(Error)
   })
 })
 
 /* -------------------------------------------------------------------------- */
-/* Ordering                                                                    */
+/* Ordering                                                                   */
 /* -------------------------------------------------------------------------- */
 
 describe('reorderCategories', () => {

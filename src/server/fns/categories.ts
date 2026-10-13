@@ -12,6 +12,11 @@
  * `beforeLoad`. A route guard is UX; an id in a URL is not an authorised id until a tenant-scoped
  * query has failed to find it somewhere else.
  *
+ * **Writes are gated, reads are not.** Every write needs `owner | admin` once the workspace has a
+ * second member, and the repository enforces it — after its own parse, before it reads or writes
+ * anything. This file adds no role check of its own: `requireOrg()` says who is asking, the
+ * repository says what they may do. The reads stay open to every member.
+ *
  * **No write here is batched.** A category carries no amount and no balance, so nothing it does
  * can move a day of an account's history — see `runWithLedgerBatch`'s contract in `fns/accounts`.
  * Archiving a category does not touch a transaction row, and stating that here is what stops
