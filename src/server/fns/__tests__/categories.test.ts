@@ -22,10 +22,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { categories } from '#/server/db/schema'
 import {
+  addSecondMember,
   createBudgetWorld,
   seedCategory,
 } from '#/server/repos/__tests__/budget-harness'
-import { NotFoundError } from '#/server/repos/errors'
+import { ForbiddenError, NotFoundError } from '#/server/repos/errors'
+import { createScope } from '#/server/repos/scope'
 
 import {
   archiveCategory,
@@ -387,6 +389,26 @@ describe('another workspace’s id is refused as not found', () => {
     await expect(run()).rejects.toBeInstanceOf(NotFoundError)
 
     expect(requireOrg).toHaveBeenCalledTimes(1)
+    expect(await allCategories()).toEqual(before)
+  })
+})
+
+describe('the write gate reaches the handlers', () => {
+  it('refuses a plain member in a shared workspace through the create handler and writes nothing', async () => {
+    await addSecondMember(world.db)
+    requireOrg.mockResolvedValue(
+      createScope(world.db, {
+        userId: 'user-b',
+        organizationId: 'org-a',
+        role: 'member',
+      }),
+    )
+    const before = await allCategories()
+
+    await expect(call(createCategory, { name: 'Pets' })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    )
+
     expect(await allCategories()).toEqual(before)
   })
 })

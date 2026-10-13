@@ -32,6 +32,12 @@
  *    one implementation that would break that — a well-meaning "re-categorise the descendants" —
  *    is exactly the one this rule forbids.
  *
+ * **Writes are gated, reads are not.** Every write — create, edit, archive, restore, delete,
+ * reorder and move — needs `owner | admin` once the workspace has a second member
+ * ({@link assertMayAdminister}), because a rename, an archive or a re-parent regroups what every
+ * other member files transactions under. {@link listCategories}, {@link getCategory},
+ * {@link spendingByCategory} and {@link assertCategoryUsable} stay open to every member.
+ *
  * {@link spendingByCategory} is the read the dashboard donut is drawn from. It rolls a child's
  * spending up into its parent, sums the **stored** `ref_amount_minor` with SQL's integer `SUM`, and
  * converts nothing: the figure it returns is the same integer the ledger footer sums.
@@ -310,12 +316,18 @@ export const DEFAULT_CATEGORY_COLOR = '#0d6abb'
 /* -------------------------------------------------------------------------- */
 
 /**
- * The destructive writes need `owner | admin` — but only in a shared workspace.
+ * Every category write needs `owner | admin` — but only in a shared workspace.
  *
  * The same rule, and the same reasoning, as `repos/accounts`: a solo workspace has one member who
  * is its owner, so a role gate there can only ever produce a bug report. The member count is read
  * live rather than taken from the session, because a claim minted before somebody was invited is a
  * claim about a workspace that no longer exists.
+ *
+ * Each write calls it right after its input is parsed and before it reads or writes anything:
+ * validation stays shape and this stays permission, and a refused member learns nothing about
+ * which ids exist (the per-id tenant refusal runs only once the gate is passed). The reads and
+ * {@link assertCategoryUsable} are deliberately not gated — every member files transactions under
+ * these categories and has to pick one.
  */
 async function assertMayAdminister(
   scope: TenantScope,
@@ -517,6 +529,7 @@ export async function createCategory(
   input: CreateCategoryInput,
 ): Promise<Category> {
   const parsed = createCategorySchema.parse(input)
+  await assertMayAdminister(scope, 'create a category')
   await assertMayParent(scope, null, parsed.parentId)
 
   const parent =
@@ -560,6 +573,7 @@ export async function updateCategory(
 ): Promise<Category> {
   const id = idSchema.parse(categoryId)
   const parsed = updateCategorySchema.parse(patch)
+  await assertMayAdminister(scope, 'edit a category')
   const before = await categoryRepo.requireById(scope, id)
 
   const row = await categoryRepo.requireUpdate(scope, id, {
@@ -607,6 +621,7 @@ export async function archiveCategory(
   categoryId: string,
 ): Promise<Category> {
   const id = idSchema.parse(categoryId)
+  await assertMayAdminister(scope, 'archive a category')
   const now = new Date()
   const row = await categoryRepo.requireUpdate(scope, id, {
     archivedAt: now,
@@ -638,6 +653,7 @@ export async function restoreCategory(
   categoryId: string,
 ): Promise<Category> {
   const id = idSchema.parse(categoryId)
+  await assertMayAdminister(scope, 'restore a category')
   return categoryRepo.requireUpdate(scope, id, {
     archivedAt: null,
     updatedAt: new Date(),
@@ -721,6 +737,7 @@ export async function reorderCategories(
   ids: ReadonlyArray<string>,
 ): Promise<void> {
   const parsed = reorderCategoriesSchema.parse({ ids: [...ids] })
+  await assertMayAdminister(scope, 'reorder categories')
   await requireAllOwned(scope, parsed.ids)
 
   const match = inArray(categories.id, parsed.ids)
@@ -744,6 +761,7 @@ export async function moveCategory(
   input: MoveCategoryInput,
 ): Promise<Category> {
   const parsed = moveCategorySchema.parse(input)
+  await assertMayAdminister(scope, 'move a category')
   const before = await categoryRepo.requireById(scope, parsed.id)
   await assertMayParent(scope, parsed.id, parsed.parentId)
 
