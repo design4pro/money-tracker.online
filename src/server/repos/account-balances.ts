@@ -408,16 +408,14 @@ async function revaluationFor(
  * The bounds cover every stored row by construction (`grid.ts` puts both existing extremes into
  * them), so the delete leaves nothing behind for this account.
  *
- * **Why this is not one `db.batch()`, which `docs/MONEY.md` §5.2 item 6 asks for.** A batch would
- * need statement *builders*, and the base's `insertMany` executes. Writing the statements here
- * instead means hand-stamping `organization_id`, which `__tests__/tenant-isolation.test.ts`
- * forbids in a repository and is right to: the tenant column is the base's to write, and a
- * repository that spells it itself is correct until the next edit to it. Of the two rules, the
- * tenant one is enforced and this one is not, and the exposure a non-atomic replace leaves is
- * narrow: `AccountLedger` serialises every rebuild of an account, so no second *writer* can see
- * the gap, and no reader of `account_balances` exists yet — the series repository is
+ * **Why this is not yet one `db.batch()`, which `docs/MONEY.md` §5.2 item 6 asks for.** The base now
+ * has the seam (`removeWhereStatement` / `insertManyStatement` and `runTenantBatch` in
+ * `../base`, which stamp the tenant column themselves, adopted first by `deleteAccountGroup`), but
+ * this replace has not moved onto it: that is its own change. The exposure a non-atomic replace
+ * leaves is narrow: `AccountLedger` serialises every rebuild of an account, so no second *writer*
+ * can see the gap, and no reader of `account_balances` exists yet — the series repository is
  * `docs/plans/09-balance-history.md`'s `09-S1`, and the stage that adds it is the one that should
- * add a batching seam to `base.ts` and bring this back into one statement group.
+ * bring this back into one statement group through that seam.
  */
 async function replaceRange(
   scope: TenantScope,

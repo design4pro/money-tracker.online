@@ -31,11 +31,11 @@
  * a filtered view. A policy set here could load one leg and hide the other, and every operation
  * below is defined over both.
  *
- * Not batched into one `db.batch()` for the reason `./account-balances` gives at `replaceRange`: a
- * batch needs statement *builders* and the tenant base executes, and hand-stamping
- * `organization_id` to get builders is the one thing `__tests__/tenant-isolation.test.ts` forbids a
- * repository to do. A create writes its legs in a single multi-row `INSERT` regardless; an edit and
- * a delete are two statements, and the ledger batch re-derives both accounts either way.
+ * Not yet one atomic batch. The base offers the seam (`runTenantBatch` over the `…Statement`
+ * builders in `./base`, adopted first by `deleteAccountGroup`), but this module has not moved onto
+ * it: that is its own change, as `./account-balances` says at `replaceRange`. A create writes its
+ * legs in a single multi-row `INSERT` regardless; an edit and a delete are two statements, and the
+ * ledger batch re-derives both accounts either way.
  */
 
 import { eq } from 'drizzle-orm'

@@ -40,6 +40,7 @@ import { buildEnvelope } from '#/server/errors/envelope'
 import { setLimitResolver, touchLedgerAccount } from '../base'
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors'
 import { createScope } from '../scope'
+import { sqliteBatchCallback } from './db-harness'
 import {
   AccountHasTransactionsError,
   CurrencyNotHeldError,
@@ -104,18 +105,21 @@ function openTestDb() {
       }
     }
   }
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      executed.push(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, (query) => executed.push(query)),
+  )
 }
 
 const NOW = new Date('2026-03-15T10:00:00.000Z')
