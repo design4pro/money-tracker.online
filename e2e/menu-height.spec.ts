@@ -10,7 +10,7 @@ import type { Page } from '@playwright/test'
  * A tall menu keeps every item reachable, and an open menu raises no
  * `scrollable-region-focusable` finding (#728, found on the groups screen in #701).
  *
- * The primitive used to cap itself at 320px, which is 6.7 rows at the 48px row height, so the
+ * The primitive used to cap itself at 320px, which is about 7.3 rows at the 44px row height, so the
  * eighth item of a row menu sat below the fold and the capped box scrolled. A scrolling box whose
  * items are all `tabindex="-1"` (which is what the parent menu is while a submenu holds focus) is
  * exactly what axe reports. The cap is now whatever room React Aria leaves the popover, so a menu
