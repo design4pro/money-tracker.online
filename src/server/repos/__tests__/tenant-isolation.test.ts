@@ -45,6 +45,8 @@ import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import {
+  accountGroupMembers,
+  accountGroups,
   accounts,
   attachments,
   budgetCategories,
@@ -52,10 +54,12 @@ import {
   currencies,
   importBatches,
   payees,
+  rules,
   transactions,
 } from '#/server/db/schema'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
+import { sqliteBatchCallback } from './db-harness'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
@@ -99,7 +103,7 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
-import { getAccountBalanceOn } from '../accounts'
+import { deleteAccountGroup, getAccountBalanceOn } from '../accounts'
 import { isMember, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
@@ -172,18 +176,21 @@ function openTestDb() {
     }
   }
 
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      executed.push(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, (query) => executed.push(query)),
+  )
 }
 
 const ORG_A = 'org-a'
@@ -655,6 +662,85 @@ describe('deletes cannot reach another workspace’s row', () => {
 
     const deletes = statementsMatching('delete from "accounts"')
     expect(deletes).not.toHaveLength(0)
+    for (const statement of deletes) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+})
+
+describe('deleting an account group reaches only the caller’s workspace', () => {
+  /** B owns a group with a member and a rule naming it; A owns a rule naming B's group id. */
+  async function seedGroupOfB() {
+    await db.insert(accountGroups).values({
+      id: 'grp-b',
+      organizationId: ORG_B,
+      name: 'Cards',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await db.insert(accountGroupMembers).values({
+      organizationId: ORG_B,
+      groupId: 'grp-b',
+      accountId: B_ACCOUNTS[0],
+      position: 0,
+    })
+    await db.insert(rules).values(
+      [ORG_A, ORG_B].map((organizationId) => ({
+        id: `rule-${organizationId}`,
+        organizationId,
+        name: 'Names the group',
+        position: 0,
+        matchMode: 'all' as const,
+        conditions: JSON.stringify([
+          { field: 'account_group', operator: 'is_any_of', ids: ['grp-b'] },
+        ]),
+        actions: JSON.stringify([
+          { kind: 'set_excluded', excludeFromStats: true },
+        ]),
+        isActive: true,
+        matchCount: 0,
+        runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })),
+    )
+  }
+
+  async function stateOfB() {
+    return {
+      groups: await db.select().from(accountGroups),
+      members: await db.select().from(accountGroupMembers),
+      rules: await db.select().from(rules).orderBy(rules.id),
+    }
+  }
+
+  it('answers not-found for a foreign group id and changes no group, member or rule', async () => {
+    await seedGroupOfB()
+    const before = await stateOfB()
+
+    await expect(deleteAccountGroup(a, 'grp-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+
+    await expect(stateOfB()).resolves.toEqual(before)
+  })
+
+  it('puts the tenant column in every statement of the batch it runs', async () => {
+    await db.insert(accountGroups).values({
+      id: 'grp-a',
+      organizationId: ORG_A,
+      name: 'Mine',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    executed.length = 0
+
+    await deleteAccountGroup(a, 'grp-a')
+
+    const deletes = statementsMatching('delete from "account_group')
+    expect(deletes).toHaveLength(2)
     for (const statement of deletes) {
       expect(statement).toContain('organization_id')
     }
