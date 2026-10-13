@@ -81,6 +81,7 @@ import {
 } from '../budgets'
 import {
   archiveCategory,
+  assertCategoryUsable,
   createCategory,
   deleteCategory,
   getCategory,
@@ -1640,8 +1641,9 @@ describe('the transaction write path cannot reach or be aimed across a workspace
 /**
  * The category repository, attacked through every exported function that takes an id or a parent.
  *
- * `categories.test.ts` holds a local two-workspace case, but it skips `createCategory` and it is not
- * the file `AGENTS.md` names. A category id sits in a URL and in a drag payload, and a parent id
+ * `categories.test.ts` holds a local two-workspace case, but it asserts only the refusal: not that
+ * B's rows are untouched afterwards, nor that a foreign id is refused exactly as an id that exists
+ * nowhere is. It is also not the file `AGENTS.md` names. A category id sits in a URL and in a drag payload, and a parent id
  * decides where a row lands, so there are two ways to aim at B: *at* B's row (read, patch, archive,
  * restore, delete, reorder, move) and *with* B's row as the destination (`parentId` on a create or a
  * move). Both are run, each refusal is compared with the one an id that exists nowhere produces
@@ -1794,6 +1796,11 @@ describe('categories cannot be reached or be aimed across a workspace boundary',
       label: 'moves its own category under the target’s parent',
       run: (target) =>
         moveCategory(world.scope, { id: OWN.loose, parentId: target.parent }),
+    },
+    {
+      // Payees call this to vet a default category; a foreign id must not pass as usable.
+      label: 'offers the category as a payee default',
+      run: (target) => assertCategoryUsable(world.scope, target.parent),
     },
     {
       label: 'creates a category under the target’s parent',

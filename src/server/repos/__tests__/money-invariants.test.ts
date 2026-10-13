@@ -2445,7 +2445,7 @@ describe('21 — the recurring pass declines a series whose currency is not its 
 })
 
 describe('22 — a category write never touches an amount', () => {
-  /** Every table an amount, a balance or a rate lives in, as the SQL names it. */
+  /** The five tables a category write must not touch (amounts, balances, rates), as the SQL names them. */
   const AMOUNT_TABLES = [
     '"transactions"',
     '"transaction_splits"',
@@ -2524,7 +2524,7 @@ describe('22 — a category write never touches an amount', () => {
     }
   }
 
-  it('runs every export, re-parent, cascade, restore and delete included, over amounts it leaves exactly as they were', async () => {
+  it('runs every write export, re-parent, cascade, restore and delete included, over amounts it leaves exactly as they were', async () => {
     const world = await worldWithAmounts()
     const before = await amountsOf(world)
     const mark = budgetExecuted.length
