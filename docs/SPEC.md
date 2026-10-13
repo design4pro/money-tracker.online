@@ -265,6 +265,7 @@ src/
     db/            schema.ts (shared path), auth-schema.ts
     repos/         ALL SQL. Tenant-scoped base repository. __tests__/ lives here
     catalog/       a tenancy carve-out (§5.2 lists all three)
+    errors/        failure classification, the public envelope, the scrubber and the redaction middleware
     fns/           server functions
     ledger/        the balance-history rebuild and the LEDGER DO client
     import/        ofx/, qif/, csv/ parsers

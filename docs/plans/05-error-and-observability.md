@@ -18,6 +18,8 @@ makes it true regardless of who writes the next `throw`.
 
 ## Stage 05-S1 — Failure classification and the public envelope
 
+Delivered: 2026-10-12 - the owned paths listed below exist as built, merged in #653 (the scrubber), #655 (the classifier, the envelope and the `failure.*` keys), #693 (the client reader and the two route readers moved onto it) and #711 (the global middleware and the wire adapter); `pnpm vitest run` on those eight files passes 612 tests (351 `redact`, 93 `classify`, 22 `envelope`, 24 `middleware`, 2 `failure-readers`, 8 `failure`, 15 `public-failure`, 97 `tenant-isolation`, the failure section among them); the API routes, the queue handlers and the Durable Object are not behind the middleware and the framework's outer `catch` is not either (`docs/SECURITY.md` §6.1), and no Sentry client is installed, all `05-S3`'s.
+
 ### Stage id
 
 `05-S1` · Wave 1 · effort **M**.
@@ -30,12 +32,21 @@ makes it true regardless of who writes the next `throw`.
 
 ### Owned paths
 
+- `src/server/errors/redact.ts` — new, the scrubber (`redact`, `redactError`)
 - `src/server/errors/classify.ts` — new
 - `src/server/errors/envelope.ts` — new
-- `src/server/errors/redact.ts` — new
 - `src/server/errors/middleware.ts` — new
-- `src/server/errors/__tests__/classify.test.ts` — new
-- `src/server/errors/__tests__/redact.test.ts` — new
+- `src/lib/failure-envelope.ts` — new, the envelope's shape and closed sets, isomorphic
+- `src/lib/public-failure.ts` — new, `PublicFailureError` and its serialization adapter
+- `src/lib/failure.ts` — new, `readFailure` (the browser reader)
+- `src/start.ts` — registers the middleware and the adapter
+- `src/lib/i18n/messages/{en,pl}.ts` — the `failure.*` keys
+- `src/routes/invite.$invitationId.tsx` and `src/routes/_app/transactions/rules/new.tsx` — the
+  readers moved off `error.message`
+- `src/server/errors/__tests__/classify.test.ts`, `envelope.test.ts`, `redact.test.ts`,
+  `middleware.test.ts` and `failure-readers.test.ts` — new
+- `src/lib/__tests__/failure.test.ts` and `public-failure.test.ts` — new
+- the failure section of `src/server/repos/__tests__/tenant-isolation.test.ts`
 
 ### Data and migration
 
@@ -45,8 +56,9 @@ None.
 
 - **Repository.** None. This layer sits above every repository and below every route.
 - `classifyFailure(err)` maps a thrown value to `{ kind, status, retryable }` where `kind` is one of
-  `not_found | forbidden | conflict | validation | quota | feature_locked | rate_unavailable |
-rate_limited | upstream | internal`. **The default is `internal`**, and an unrecognised throw is
+  `unauthenticated | forbidden | not_found | validation | conflict | quota | feature_locked |
+rate_unavailable | rate_limited | upstream | internal` (`unauthenticated` is the 401 for an anonymous
+  request, so a screen can say "sign in" where `forbidden` says "refused"). **The default is `internal`**, and an unrecognised throw is
   never optimistically classified as something friendlier.
 - **The public envelope is versioned**: `{ v: 1, kind, message, fields?, retryAfter? }`. A version on
   the envelope is what lets the client keep rendering an old shape while a new one rolls out, which
@@ -54,9 +66,14 @@ rate_limited | upstream | internal`. **The default is `internal`**, and an unrec
 - **`message` is an i18n key plus params, never a sentence.** A server that returns English prose
   cannot be rendered in Polish, and a server that returns a raw error message returns whatever the
   driver said, which is where connection strings leak.
-- `failureRedactionMiddleware` wraps every `createServerFn`. Inside it: classify, redact, log, then
-  return the envelope. **An unclassified throw returns `{ kind: 'internal' }` with no detail at all**
-  — not a truncated message, not a stack, not the error's `name`.
+- `failureRedactionMiddleware` is registered globally in `src/start.ts` and wraps every
+  `createServerFn`. Inside it: classify, redact, log, set the status, then **throw a replacement
+  `PublicFailureError` that carries the envelope** (the framework returns whatever is thrown as data,
+  so the value itself has to be replaced). **An unclassified throw becomes `{ kind: 'internal' }`
+  with no detail at all** — not a truncated message, not a stack, not the error's `name`. It covers
+  server functions only: the API routes, the queue handlers and the Durable Object are `05-S3`'s,
+  and a failure before the chain runs is the framework's own outer `catch`
+  (`docs/SECURITY.md` §6.1).
 - **Ledger batching.** Not applicable, but stated: the middleware is **outside** `runWithLedgerBatch`,
   so a throw still flushes the ledger batch. Rows already committed must still be rebuilt.
 
@@ -73,8 +90,9 @@ rate_limited | upstream | internal`. **The default is `internal`**, and an unrec
 ### Quota
 
 `QuotaExceededError` and `FeatureLockedError` classify to `quota` and `feature_locked` with **status
-402**, and their envelopes carry the metric and the plan so the UI can render an accurate upgrade
-prompt rather than a generic one. This stage does not enforce a quota; it defines how one is reported.
+402**, and their envelopes carry the metric (and no plan, ceiling or count: the error does not know
+the plan, and the middleware must not invent one), so the screen names the metric and resolves the
+plan itself to render an accurate upgrade prompt rather than a generic one. This stage does not enforce a quota; it defines how one is reported.
 
 ### Tenant isolation test
 
@@ -256,7 +274,9 @@ None.
   `05-S1` before emitting. `LOG_LEVEL` comes from `wrangler.jsonc` vars (`info` in production,
   `debug` in staging).
 - `sentry.ts` configures `@sentry/cloudflare` with `release` from `CF_VERSION_METADATA` and
-  `beforeSend` calling the same scrubber. **Two sinks, one scrubber** — a second redaction
+  `beforeSend` calling the same scrubber. It also routes the API routes, the queue handlers and the
+  Durable Object through the same scrubber: `05-S1`'s middleware covers server functions only, and
+  until then those three log through the raw logger. **Two sinks, one scrubber** — a second redaction
   implementation is how one of them ends up more permissive.
 - `/api/health` returns `200` with `{ ok: true, version }` and performs **one** cheap D1 read to prove
   the binding resolves. It does **not** check the queue, R2 or the FX provider: a health endpoint that
