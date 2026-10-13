@@ -80,6 +80,18 @@ import {
   updateBudget,
 } from '../budgets'
 import {
+  archiveCategory,
+  createCategory,
+  deleteCategory,
+  getCategory,
+  listCategories,
+  moveCategory,
+  reorderCategories,
+  restoreCategory,
+  spendingByCategory,
+  updateCategory,
+} from '../categories'
+import {
   closePeriod,
   listPeriods,
   materializePeriods,
@@ -1618,6 +1630,263 @@ describe('the transaction write path cannot reach or be aimed across a workspace
     expect(
       createTransactionSchema.safeParse({ ...own, transferId: 'tr-b' }).success,
     ).toBe(false)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Categories                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The category repository, attacked through every exported function that takes an id or a parent.
+ *
+ * `categories.test.ts` holds a local two-workspace case, but it skips `createCategory` and it is not
+ * the file `AGENTS.md` names. A category id sits in a URL and in a drag payload, and a parent id
+ * decides where a row lands, so there are two ways to aim at B: *at* B's row (read, patch, archive,
+ * restore, delete, reorder, move) and *with* B's row as the destination (`parentId` on a create or a
+ * move). Both are run, each refusal is compared with the one an id that exists nowhere produces
+ * (a different `entity` or a `403` would confirm the row exists in somebody else's workspace), and
+ * each shape has a positive control against A's own ids so a refusal is not a typo.
+ *
+ * B's tree has a parent with a child, a loose top-level row and an archived row, so an archive that
+ * cascaded, a restore that landed or a re-parent that took would each change a row the comparison
+ * reads. The fixture is `budget-harness.ts`, as for the budgets above.
+ */
+describe('categories cannot be reached or be aimed across a workspace boundary', () => {
+  /** One workspace's tree: ids are prefixed so a row names the workspace it was seeded for. */
+  interface Tree {
+    readonly parent: string
+    readonly child: string
+    readonly loose: string
+    readonly archived: string
+  }
+  const treeOf = (prefix: 'a' | 'b' | 'nowhere'): Tree => ({
+    parent: `cat-${prefix}-food`,
+    child: `cat-${prefix}-groceries`,
+    loose: `cat-${prefix}-home`,
+    archived: `cat-${prefix}-old`,
+  })
+  const OWN = treeOf('a')
+  const FOREIGN = treeOf('b')
+  const NOWHERE = treeOf('nowhere')
+
+  let world: BudgetWorld
+
+  async function seedTree(tree: Tree, organizationId: 'org-a' | 'org-b') {
+    // The same names in both workspaces: the case a `WHERE name = ?` would get wrong.
+    await seedCategory(world.db, {
+      id: tree.parent,
+      name: 'Food',
+      organizationId,
+    })
+    await seedCategory(world.db, {
+      id: tree.child,
+      name: 'Groceries',
+      parentId: tree.parent,
+      organizationId,
+    })
+    await seedCategory(world.db, {
+      id: tree.loose,
+      name: 'Home',
+      organizationId,
+    })
+    await seedCategory(world.db, {
+      id: tree.archived,
+      name: 'Old',
+      organizationId,
+    })
+    await world.db
+      .update(categories)
+      .set({ archivedAt: NOW })
+      .where(eq(categories.id, tree.archived))
+  }
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    await seedTree(OWN, 'org-a')
+    await seedTree(FOREIGN, 'org-b')
+    await seedTransaction(world.db, {
+      id: 'tx-a',
+      categoryId: OWN.child,
+      refAmountMinor: 100_00,
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-b',
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      categoryId: FOREIGN.child,
+      refAmountMinor: 750_00,
+    })
+  })
+
+  /**
+   * Whole rows, every column, of both workspaces' categories, and of B's transactions: a write that
+   * matched no row but changed one anyway is what a return-value assertion misses. A's are read too,
+   * because a `reorderCategories` that named one foreign id must not move A's own rows either.
+   */
+  async function rowsAtStake() {
+    const categoriesOf = (organizationId: string) =>
+      world.db
+        .select()
+        .from(categories)
+        .where(eq(categories.organizationId, organizationId))
+        .orderBy(categories.id)
+    return {
+      aCategories: await categoriesOf('org-a'),
+      bCategories: await categoriesOf('org-b'),
+      bTransactions: await world.db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.organizationId, 'org-b'))
+        .orderBy(transactions.id),
+    }
+  }
+
+  /**
+   * Every hostile call, run as A and aimed at `target`. Where the call also names a row of A's it
+   * names {@link OWN}, so the same function is the positive control when `target` is {@link OWN}.
+   */
+  const ATTACKS: ReadonlyArray<{
+    readonly label: string
+    readonly run: (target: Tree) => Promise<unknown>
+  }> = [
+    {
+      label: 'reads a category by id',
+      run: (target) => getCategory(world.scope, target.parent),
+    },
+    {
+      label: 'edits a category',
+      run: (target) =>
+        updateCategory(world.scope, target.parent, {
+          name: 'mine now',
+          color: '#625106',
+        }),
+    },
+    {
+      label: 'archives a category with children',
+      run: (target) => archiveCategory(world.scope, target.parent),
+    },
+    {
+      label: 'restores an archived category',
+      run: (target) => restoreCategory(world.scope, target.archived),
+    },
+    {
+      label: 'deletes an unused category',
+      run: (target) => deleteCategory(world.scope, target.loose),
+    },
+    {
+      // The foreign id leads, so a leak would move A's row from 0 to 1.
+      label: 'reorders a run that mixes its own row with one of the target’s',
+      run: (target) =>
+        reorderCategories(world.scope, [target.parent, OWN.loose]),
+    },
+    {
+      label: 'moves a category to the top level',
+      run: (target) =>
+        moveCategory(world.scope, { id: target.child, parentId: null }),
+    },
+    {
+      label: 'moves a category under one of its own',
+      run: (target) =>
+        moveCategory(world.scope, { id: target.loose, parentId: OWN.parent }),
+    },
+    {
+      label: 'moves its own category under the target’s parent',
+      run: (target) =>
+        moveCategory(world.scope, { id: OWN.loose, parentId: target.parent }),
+    },
+    {
+      label: 'creates a category under the target’s parent',
+      run: (target) =>
+        createCategory(world.scope, { name: 'Mine', parentId: target.parent }),
+    },
+  ]
+
+  const rejection = (work: Promise<unknown>): Promise<unknown> =>
+    work.then(
+      () => {
+        throw new Error('the call was meant to be refused')
+      },
+      (error: unknown) => error,
+    )
+
+  it('has a real row behind every foreign id, so no refusal below is an empty fixture', async () => {
+    for (const id of Object.values(FOREIGN)) {
+      await expect(getCategory(world.otherScope, id)).resolves.toMatchObject({
+        id,
+        organizationId: 'org-b',
+      })
+    }
+    await expect(
+      getCategory(world.otherScope, FOREIGN.archived),
+    ).resolves.not.toHaveProperty('archivedAt', null)
+  })
+
+  it.each(ATTACKS)(
+    'refuses a call that $label, as it would an id that exists nowhere, and moves no row',
+    async ({ run }) => {
+      const before = await rowsAtStake()
+
+      const foreign = await rejection(run(FOREIGN))
+      const missing = await rejection(run(NOWHERE))
+
+      expect(foreign).toBeInstanceOf(NotFoundError)
+      expect(missing).toBeInstanceOf(NotFoundError)
+      // `entity` and `code` only: `message` and `id` embed the id the caller supplied.
+      const shape = (error: unknown) => ({
+        entity: (error as NotFoundError).entity,
+        code: (error as NotFoundError).code,
+      })
+      expect(shape(foreign)).toEqual(shape(missing))
+      expect(shape(foreign)).toEqual({ entity: 'category', code: 'NOT_FOUND' })
+
+      expect(await rowsAtStake()).toEqual(before)
+    },
+  )
+
+  it.each(ATTACKS)(
+    'lets the same call through against A’s own ids, and leaves B alone: $label',
+    async ({ run }) => {
+      const before = await rowsAtStake()
+
+      // A refusal here would reject, and a rejected promise fails the test.
+      await run(OWN)
+
+      const after = await rowsAtStake()
+      expect(after.bCategories).toEqual(before.bCategories)
+      expect(after.bTransactions).toEqual(before.bTransactions)
+    },
+  )
+
+  it('lists none of B’s categories, archived ones included', async () => {
+    const listed = await listCategories(world.scope, { includeArchived: true })
+
+    expect(listed.map((row) => row.id).sort()).toEqual(
+      Object.values(OWN).sort(),
+    )
+    for (const row of listed) expect(row.organizationId).toBe('org-a')
+    // The control: B's own list is not empty, so A's is not empty by accident.
+    expect(
+      await listCategories(world.otherScope, { includeArchived: true }),
+    ).toHaveLength(Object.values(FOREIGN).length)
+  })
+
+  it('counts none of B’s spending under an identically named category', async () => {
+    const window = { from: '2026-03-01', to: '2026-03-31' }
+
+    // 100,00, not 850,00: the roll-up joins `categories` on the child's parent, and both
+    // workspaces call that parent "Food".
+    const mine = await spendingByCategory(world.scope, window)
+    expect(mine.totalMinor).toBe(100_00)
+    expect(mine.categories).toEqual([
+      expect.objectContaining({ categoryId: OWN.parent, amountMinor: 100_00 }),
+    ])
+
+    const theirs = await spendingByCategory(world.otherScope, window)
+    expect(theirs.totalMinor).toBe(750_00)
+    expect(theirs.categories.map((slice) => slice.categoryId)).toEqual([
+      FOREIGN.parent,
+    ])
   })
 })
 
