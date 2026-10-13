@@ -723,6 +723,8 @@ export function SeriesFormDialog({
                       remindBefore: remindBefore.slice(0, MAX_REMINDERS),
                     })
                   }
+                  // The cap is a limit, not a mistake: a message here must not flip the group invalid.
+                  isInvalid={false}
                   errorMessage={
                     draft.remindBefore.length >= MAX_REMINDERS
                       ? t('recurring.reminders.max')

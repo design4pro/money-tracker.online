@@ -4,7 +4,14 @@ import { NumberField as RACNumberField } from 'react-aria-components/NumberField
 import { Minus, Plus } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { Description, FieldError, FieldGroup, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  FieldGroup,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 import { composeTw, controlWash, fieldSizes, transitionBase } from './shared'
 
 import type { NumberFieldProps as RACNumberFieldProps } from 'react-aria-components'
@@ -82,12 +89,14 @@ export function NumberField({
   hideStepper = false,
   className,
   isRequired,
+  isInvalid,
   ...props
 }: NumberFieldProps) {
   return (
     <RACNumberField
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (

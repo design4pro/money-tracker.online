@@ -4,7 +4,14 @@ import { ComboBox as RACComboBox } from 'react-aria-components/ComboBox'
 import { ChevronDown } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
-import { Description, FieldError, FieldGroup, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  FieldGroup,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 import { ListBox } from './list-box'
 import { Popover } from './popover'
 import { composeTw, controlWash, fieldSizes, transitionBase } from './shared'
@@ -73,6 +80,7 @@ export function ComboBox<T extends object>({
   items,
   className,
   isRequired,
+  isInvalid,
   emptyState,
   ...props
 }: ComboBoxProps<T>) {
@@ -80,6 +88,7 @@ export function ComboBox<T extends object>({
     <RACComboBox
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       /*
         Without this the popover closes the moment the filter matches nothing,
         and `renderEmptyState` below never gets a listbox to render into — the

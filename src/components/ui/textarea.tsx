@@ -1,7 +1,13 @@
 import { TextArea as RACTextArea } from 'react-aria-components/TextArea'
 import { TextField as RACTextField } from 'react-aria-components/TextField'
 
-import { Description, FieldError, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 import { composeTw, fieldSurface, focusRing } from './shared'
 
 import type {
@@ -60,12 +66,14 @@ export function TextAreaField({
   rows,
   className,
   isRequired,
+  isInvalid,
   ...props
 }: TextAreaFieldProps) {
   return (
     <RACTextField
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (
