@@ -2,7 +2,13 @@ import { Input as RACInput } from 'react-aria-components/ColorField'
 import { TextField as RACTextField } from 'react-aria-components/TextField'
 
 import { cn } from '#/lib/cn'
-import { Description, FieldError, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 import { composeTw, fieldSizes, fieldSurface, focusRing } from './shared'
 
 import type {
@@ -45,9 +51,11 @@ export interface TextFieldProps extends Omit<RACTextFieldProps, 'children'> {
   label?: ReactNode
   description?: ReactNode
   /**
-   * A message the caller owns — a server-side validation failure, say. RAC
-   * merges it with any native constraint message and flips the field invalid,
-   * so a caller never has to set `aria-invalid` by hand.
+   * A message the caller owns — a server-side validation failure, say. Passing
+   * one flips the field invalid (`resolveInvalid`), so the message shows and the
+   * control carries `aria-invalid` without the caller also setting `isInvalid`;
+   * an explicit `isInvalid` wins. The function form reads native validation and
+   * leaves validity to it.
    */
   errorMessage?: FieldErrorMessage
   placeholder?: string
@@ -82,6 +90,7 @@ export function TextField({
   suffix,
   className,
   isRequired,
+  isInvalid,
   ...props
 }: TextFieldProps) {
   const adorned = prefix !== undefined || suffix !== undefined
@@ -90,6 +99,7 @@ export function TextField({
     <RACTextField
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (
