@@ -156,6 +156,23 @@ for (const locale of LOCALES) {
         labels.nestSentence(PARENT, TARGET_PARENT),
       )
       await expect(region).not.toContainText(labels.genericBody)
+      // The panel rests below the sticky header, not under it. The tree refresh that follows a
+      // refusal makes the router restore the scroll position, which used to undo the panel
+      // scrolling itself into view, so this settles by polling rather than reading once.
+      const header = page.getByRole('banner').first()
+      await expect
+        .poll(
+          async () => {
+            const [regionBox, headerBox] = await Promise.all([
+              region.boundingBox(),
+              header.boundingBox(),
+            ])
+            if (regionBox === null || headerBox === null) return -Infinity
+            return regionBox.y - (headerBox.y + headerBox.height)
+          },
+          { message: 'the refusal panel is hidden under the sticky header' },
+        )
+        .toBeGreaterThanOrEqual(-2)
 
       // A refusal writes nothing: the tree after a reload is the tree before the drag.
       await page.reload()

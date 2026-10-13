@@ -121,7 +121,8 @@ function CategoriesRoute() {
   } | null>(null)
   const close = () => setPending({ kind: 'none' })
 
-  const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
+  const refreshed = () => Promise.all([router.invalidate(), refreshCaches()])
+  const refresh = () => void refreshed()
 
   const rows = categories.map(toTreeItem)
   const parents = categories
@@ -136,12 +137,15 @@ function CategoriesRoute() {
         refresh()
       },
       (error: unknown) => {
-        setRefusal((previous) => ({
-          value: refusalOf(error, context),
-          attempt: (previous?.attempt ?? 0) + 1,
-        }))
+        const show = () =>
+          setRefusal((previous) => ({
+            value: refusalOf(error, context),
+            attempt: (previous?.attempt ?? 0) + 1,
+          }))
         // The tree may have gone stale in another tab; show the reader what the server holds.
-        refresh()
+        // The panel waits for it: the router puts the scroll position back after an invalidation,
+        // which would undo the panel scrolling itself into view and leave it under the header.
+        void refreshed().then(show, show)
       },
     )
   }
