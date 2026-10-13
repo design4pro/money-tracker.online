@@ -701,8 +701,10 @@ label kept in the DOM under the spinner so the button holds its width.
   invalid field, which is why a message with no invalid state is invisible. An explicit `isInvalid`
   wins either way; the function form of `errorMessage` reads native validation and does not decide
   validity. Compute the message from state (`hasTriedToSubmit && trimmedName === ''`), so it clears
-  when the value is fixed: a message passed unconditionally is shown unconditionally. A new field component takes the same `errorMessage` and `isInvalid` pair
-  and hands its container `isInvalid={resolveInvalid(isInvalid, errorMessage)}`.
+  when the value is fixed: a message passed unconditionally is shown unconditionally. A notice that
+  is not an error (a limit reached, a hint) is not an `errorMessage`; where one already is, pass
+  `isInvalid={false}`. A new field component takes the same `errorMessage` and `isInvalid` pair and
+  hands its container `isInvalid={resolveInvalid(isInvalid, errorMessage)}`.
 
 ### Select and ComboBox popover
 

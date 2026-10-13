@@ -60,3 +60,28 @@ describe('SeriesFormDialog name', () => {
     },
   )
 })
+
+/**
+ * The reminder cap is a limit, not a mistake: the boxes past it are disabled and the selection is
+ * sliced. Handing the cap sentence to the group as `errorMessage` must not turn a valid selection
+ * into an invalid one.
+ */
+describe('SeriesFormDialog reminders', () => {
+  it('does not show the cap as an error once three reminders are ticked', async () => {
+    renderDialog()
+    const group = screen.getByRole('group', { name: 'Remind me' })
+
+    for (const name of ['On the day', 'A day before', 'Two days before']) {
+      const box = screen.getByRole('checkbox', { name })
+      if (!(box as HTMLInputElement).checked) await user.click(box)
+    }
+
+    expect(
+      screen
+        .getAllByRole('checkbox', { checked: true })
+        .filter((box) => group.contains(box)),
+    ).toHaveLength(3)
+    expect(screen.queryByText(en['recurring.reminders.max'])).toBeNull()
+    expect(group.hasAttribute('data-invalid')).toBe(false)
+  })
+})
