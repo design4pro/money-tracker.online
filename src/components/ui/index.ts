@@ -69,7 +69,14 @@ export type { DrawerProps } from './drawer'
 export { EmptyState } from './empty-state'
 export type { EmptyStateProps } from './empty-state'
 
-export { Description, FieldError, FieldGroup, Label, fieldRow } from './field'
+export {
+  Description,
+  FieldError,
+  FieldGroup,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 export type {
   DescriptionProps,
   FieldErrorProps,
