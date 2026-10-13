@@ -19,6 +19,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  accountGroupMembers,
   accountGroups,
   accounts,
   categories,
@@ -46,6 +47,7 @@ import { ruleDefinitionSchema } from '#/server/rules/schema'
 import {
   createBudgetWorld,
   executed,
+  fault,
   seedCategory,
 } from '#/server/repos/__tests__/budget-harness'
 
@@ -127,10 +129,16 @@ async function seedPayee(id: string, name: string, organizationId = 'org-a') {
   return id
 }
 
-async function seedGroup(id: string, name: string, organizationId = 'org-a') {
+async function seedGroup(
+  id: string,
+  name: string,
+  organizationId = 'org-a',
+  parentId: string | null = null,
+) {
   await db.insert(accountGroups).values({
     id,
     organizationId,
+    parentId,
     name,
     position: 0,
     createdAt: NOW,
@@ -268,6 +276,92 @@ describe('the deleting operation pauses the rules that named the row', () => {
       ref_type: 'account_group',
       ref_id: 'grp-cards',
       label: 'Cards',
+    })
+  })
+
+  describe('deleteAccountGroup is never half-applied', () => {
+    /** A group with a member and a child, named by a live rule: everything a delete touches. */
+    async function seedGroupWithEverything() {
+      await seedGroup('grp-cards', 'Cards')
+      await seedGroup('grp-kids', 'Kids', 'org-a', 'grp-cards')
+      await seedAccount('acc-spare', 'Spare wallet')
+      await db.insert(accountGroupMembers).values({
+        organizationId: 'org-a',
+        groupId: 'grp-cards',
+        accountId: 'acc-spare',
+        position: 0,
+      })
+      await seedRule({
+        id: 'rule-grp',
+        conditions: [
+          {
+            field: 'account_group',
+            operator: 'is_any_of',
+            ids: ['grp-cards'],
+          },
+        ],
+      })
+    }
+
+    const parentOfKids = async () =>
+      (
+        await db
+          .select({ parentId: accountGroups.parentId })
+          .from(accountGroups)
+          .where(eq(accountGroups.id, 'grp-kids'))
+      ).at(0)?.parentId
+
+    it('leaves the group, its members, its children and the rule untouched when the delete fails', async () => {
+      await seedGroupWithEverything()
+      fault.when = (query) => /^delete\s+from\s+"account_groups"/i.test(query)
+
+      await expect(deleteAccountGroup(scope, 'grp-cards')).rejects.toThrow(
+        'Failed query: delete from "account_groups"',
+      )
+
+      expect(
+        await db
+          .select({ id: accountGroups.id })
+          .from(accountGroups)
+          .where(eq(accountGroups.id, 'grp-cards')),
+      ).toHaveLength(1)
+      expect(await db.select().from(accountGroupMembers)).toHaveLength(1)
+      expect(await parentOfKids()).toBe('grp-cards')
+      expect(await pausedReasonOf('rule-grp')).toBeNull()
+    })
+
+    it('leaves a consistent deleted group when only the pause fails, and the sweep pauses the rule', async () => {
+      await seedGroupWithEverything()
+      fault.when = (query) => /^update\s+"rules"/i.test(query)
+
+      await expect(deleteAccountGroup(scope, 'grp-cards')).rejects.toThrow(
+        'Failed query: update "rules"',
+      )
+
+      expect(
+        await db
+          .select({ id: accountGroups.id })
+          .from(accountGroups)
+          .where(eq(accountGroups.id, 'grp-cards')),
+      ).toHaveLength(0)
+      expect(await db.select().from(accountGroupMembers)).toHaveLength(0)
+      expect(await parentOfKids()).toBeNull()
+      expect(await pausedReasonOf('rule-grp')).toBeNull()
+
+      fault.when = null
+      const report = await checkRuleIntegrity({
+        scope,
+        logger: testLogger(),
+        at: PAUSED_AT,
+      })
+
+      expect(report.paused).toEqual([
+        { ruleId: 'rule-grp', refType: 'account_group', refId: 'grp-cards' },
+      ])
+      expect(await pausedReasonOf('rule-grp')).toMatchObject({
+        ref_type: 'account_group',
+        ref_id: 'grp-cards',
+      })
     })
   })
 

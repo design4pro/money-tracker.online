@@ -11,10 +11,13 @@
  * on classifying an import for three weeks into a category nobody can name, because the failure of
  * an automation is *silence*, and silence is indistinguishable from working.
  *
- * So {@link pauseRulesReferencing} is called **by the deleting operation, in the same batch**, and
- * `#/server/repos/categories`, `#/server/repos/payees` and `#/server/repos/accounts` each call it
- * from their delete paths. Doing it on a later sweep instead would leave a window — one import
- * long is long enough — in which a rule quietly no-ops.
+ * So {@link pauseRulesReferencing} is called **by the deleting operation, right after the delete
+ * succeeded**, and `#/server/repos/categories`, `#/server/repos/payees` and
+ * `#/server/repos/accounts` each call it from their delete paths. It is a second statement, not
+ * part of the delete's own unit: the repository layer has no batching seam (#724), so a failure
+ * between the two leaves the row gone and its rules running until {@link checkRuleIntegrity}
+ * pauses them. Doing it on a later sweep alone would leave a window — one import long is long
+ * enough — in which a rule quietly no-ops.
  *
  * {@link checkRuleIntegrity} is the belt and braces, run weekly. **It is expected to find
  * nothing.** A finding is logged at `warn` with the rule id because it does not mean a rule broke;

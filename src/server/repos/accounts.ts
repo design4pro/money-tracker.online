@@ -1028,6 +1028,18 @@ export async function updateAccountGroup(
  * Not a refusal and not a cascade: an account is not owned by a group, so deleting the folder must
  * not be able to delete the money. Child groups survive too — their foreign key sets `parent_id`
  * to null, which promotes them to the top level rather than taking them along.
+ *
+ * **The destructive part is one statement.** The group row is the only thing removed explicitly:
+ * `account_group_members.group_id` is `ON DELETE cascade` (the memberships go with it, the
+ * accounts stay) and `account_groups.parent_id` is `ON DELETE set null`, so a failure leaves the
+ * group, its memberships and its children exactly as they were, never a listed group with no
+ * accounts.
+ *
+ * **The rule pause is a second statement, and cannot join the first.** It has to be written after
+ * a delete that succeeded (`rules/integrity`: a pause written first would be a banner about a row
+ * that is still there), and this layer has no batching seam — the tenant base executes statements,
+ * a batch needs builders (#724). If the pause throws, the group is already gone and rules naming
+ * it keep running until the weekly `checkRuleIntegrity` sweep pauses them.
  */
 export async function deleteAccountGroup(
   scope: TenantScope,
@@ -1037,7 +1049,6 @@ export async function deleteAccountGroup(
   await assertMayAdminister(scope, 'delete an account group')
   const row = await groupRepo.requireById(scope, id)
 
-  await membershipRepo.removeWhere(scope, eq(accountGroupMembers.groupId, id))
   await groupRepo.requireRemove(scope, id)
 
   // `14-S3`: the deleting operation writes the pause itself, carrying the name the row had a

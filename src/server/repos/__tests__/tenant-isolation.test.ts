@@ -45,6 +45,8 @@ import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import {
+  accountGroupMembers,
+  accountGroups,
   accounts,
   attachments,
   budgetCategories,
@@ -52,6 +54,7 @@ import {
   currencies,
   importBatches,
   payees,
+  rules,
   transactions,
 } from '#/server/db/schema'
 import { materializeSeries } from '#/server/recurring/materialize'
@@ -99,7 +102,7 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
-import { getAccountBalanceOn } from '../accounts'
+import { deleteAccountGroup, getAccountBalanceOn } from '../accounts'
 import { isMember, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
@@ -2260,6 +2263,71 @@ describe('membership is a question about one workspace at a time', () => {
     // Nothing written in either workspace — not A’s, and not the one `user-b` does belong to.
     expect(await countUnread(world.scope)).toBe(0)
     expect(await countUnread(world.otherScope)).toBe(0)
+  })
+})
+
+describe('an account group cannot be deleted from another workspace', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('refuses B’s group id and leaves B’s group, members and rules as they were', async () => {
+    await world.db.insert(accountGroups).values({
+      id: 'grp-b',
+      organizationId: 'org-b',
+      name: 'Theirs',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await world.db.insert(accountGroupMembers).values({
+      organizationId: 'org-b',
+      groupId: 'grp-b',
+      accountId: 'acc-b',
+      position: 0,
+    })
+    await world.db.insert(rules).values({
+      id: 'rule-b',
+      organizationId: 'org-b',
+      name: 'rule-b',
+      position: 0,
+      matchMode: 'all',
+      conditions: JSON.stringify([
+        { field: 'account_group', operator: 'is_any_of', ids: ['grp-b'] },
+      ]),
+      actions: JSON.stringify([
+        { kind: 'set_excluded', excludeFromStats: true },
+      ]),
+      isActive: true,
+      pausedReason: null,
+      matchCount: 0,
+      lastMatchedAt: null,
+      runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    await expect(
+      deleteAccountGroup(world.scope, 'grp-b'),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const groups = await world.db
+      .select()
+      .from(accountGroups)
+      .where(eq(accountGroups.organizationId, 'org-b'))
+    expect(groups.map((group) => group.id)).toEqual(['grp-b'])
+    const members = await world.db
+      .select()
+      .from(accountGroupMembers)
+      .where(eq(accountGroupMembers.organizationId, 'org-b'))
+    expect(members.map((entry) => entry.accountId)).toEqual(['acc-b'])
+    const theirRules = await world.db
+      .select({ pausedReason: rules.pausedReason })
+      .from(rules)
+      .where(eq(rules.organizationId, 'org-b'))
+    expect(theirRules).toEqual([{ pausedReason: null }])
   })
 })
 

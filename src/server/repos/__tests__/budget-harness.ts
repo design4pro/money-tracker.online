@@ -43,6 +43,14 @@ export type TestDb = ReturnType<typeof openTestDb>
 /** Every statement the tests caused, so a test can assert what the SQL did and did not do. */
 export const executed: Array<string> = []
 
+/**
+ * Fault injection: while `when` is set, a statement it returns true for throws instead of running,
+ * so a test can fail one named statement of a multi-statement write. Reset by every world.
+ */
+export const fault: { when: ((query: string) => boolean) | null } = {
+  when: null,
+}
+
 export function openTestDb() {
   const sqlite = new DatabaseSync(':memory:')
   sqlite.exec('PRAGMA foreign_keys = ON;')
@@ -59,6 +67,9 @@ export function openTestDb() {
   }
   return drizzle(async (query, params, method) => {
     executed.push(query)
+    if (fault.when?.(query) === true) {
+      throw new Error(`injected fault: ${query}`)
+    }
     const statement = sqlite.prepare(query)
     if (method === 'run') {
       statement.run(...(params as Array<never>))
@@ -84,6 +95,7 @@ export interface BudgetWorld {
 
 export async function createBudgetWorld(): Promise<BudgetWorld> {
   executed.length = 0
+  fault.when = null
   const db = openTestDb()
 
   await db
