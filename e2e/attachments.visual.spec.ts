@@ -154,7 +154,18 @@ test('attaching is a button, not a drag gesture', async ({ page }) => {
 
 test('a renamed executable is refused, and the reason names that file', async ({
   page,
+  expectConsole,
 }) => {
+  // The refusal is a validation failure, and the failure boundary answers one with its own status
+  // (`422`) rather than `200`, so the browser reports the response once, as it does for any
+  // non-2xx. The message is the test's own doing, and the pattern is anchored to that status.
+  expectConsole([
+    {
+      why: 'the browser reporting the 422 the server answers a refused upload with, which is the behaviour under test',
+      match:
+        /^Failed to load resource: the server responded with a status of 422 \(Unprocessable Entity\)$/,
+    },
+  ])
   const labels = LABELS.en
   const panel = await openReceipts(page, labels)
 

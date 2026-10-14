@@ -64,7 +64,7 @@ import type { TransactionPolicies } from './transactions'
  *
  * **Every** read and write below goes through it, so `organization_id` is composed and stamped by
  * one function that cannot be handed a different value — including the replace in
- * {@link setSplits}. See the note on that function for why it is not one `db.batch`.
+ * {@link setSplits}. See the note on that function for why it is not yet one `db.batch`.
  */
 const splitAccess = createTenantTableAccess(
   transactionSplits,
@@ -286,23 +286,20 @@ async function assertCategoriesInScope(
  * rejected `setSplits` writes nothing, and the previous set survives untouched, because the throw
  * happens before either statement is composed.
  *
- * **Why the replace is not one `db.batch`, which `11-S1` asks for.** A batch needs statement
- * *builders*, and the base's `removeWhere` / `insertMany` execute; composing the statements here
- * instead means hand-stamping `organization_id`, which `__tests__/tenant-isolation.test.ts`'s fork
- * guard forbids a repository from doing — and is right to, because a hand-rolled tenant column is
- * correct until the next edit to it. `repos/account-balances` weighed the same pair and ruled the
- * same way; of the two rules, the tenant one is enforced and atomicity is not, and the exposure
- * left is one D1 round trip wide between a validated `DELETE` and the `INSERT` whose every value
- * was checked before either statement was composed.
+ * **Why the replace is not yet one `db.batch`, which `11-S1` asks for.** The base now has the seam
+ * (`removeWhereStatement` / `insertManyStatement` and `runTenantBatch` in `./base`, which stamp the
+ * tenant column themselves, adopted first by `deleteAccountGroup`), but this replace has not moved
+ * onto it: that is its own change. Until it does, the exposure is one D1 round trip wide between a
+ * validated `DELETE` and the `INSERT` whose every value was checked before either statement was
+ * composed.
  *
  * **And the worst case of that window is a *valid* state, which is what makes the gap acceptable
  * rather than merely consistent.** If the `DELETE` lands and the `INSERT` does not, the transaction
  * is unsplit — and an unsplit transaction is filed under the parent's own `category_id`, which is a
  * complete and correct row. `Σ splits = parent` is never left violated, because there are no splits
  * to violate it: the invariant has no half-state to be caught in. Somebody loses a split they
- * typed, which is bad and is why the seam is still worth adding; nobody is left with a ledger that
- * disagrees with itself, which is the failure that would make this trade indefensible. The seam
- * that would close it belongs in `base.ts`, not in a fifth repository that reaches around it.
+ * typed, which is bad and is why this replace should adopt the seam; nobody is left with a ledger
+ * that disagrees with itself, which is the failure that would make this trade indefensible.
  *
  * `ref_amount_minor` comes from {@link allocate} over the parent's own figure. The leftover minor
  * units go to the lines with the largest discarded fraction, ties broken by the larger line and

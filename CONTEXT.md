@@ -22,7 +22,8 @@ already caused, or would obviously cause, two people to mean two things by one w
   connected account and no account type that behaves differently because of where its rows came
   from. _Avoid_: "account" for a login or a workspace; "wallet"; "bank account".
 - **Transaction** — one movement of money against one account, in one direction, on one calendar
-  date. It is `income` or `expense`; there is no third direction. Everything else the product shows
+  date. It is `income` or `expense`; there is no third direction. It is written in its account's
+  currency, and the repository refuses a write in any other. Everything else the product shows
   — budgets, categories, cash flow, net worth — is a lens over transactions. _Avoid_: "entry",
   "record", "operation" as synonyms; "transaction" for a transfer as a whole.
 - **Direction** — `income` or `expense`, the sign of a transaction against its account. _Avoid_:

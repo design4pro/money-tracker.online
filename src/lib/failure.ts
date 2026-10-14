@@ -2,9 +2,10 @@
  * The browser's reader for the public failure envelope.
  *
  * The server's middleware replaces every thrown error with one whose `name` and `message` are fixed
- * and whose only payload is an `envelope` property. A server function's error is rebuilt on the
- * client from the wire, so `instanceof` does not survive it: the reader duck-types `error.envelope`
- * and parses it with the client-safe schema instead.
+ * and whose only payload is an `envelope` property, which the serialization adapter in
+ * `#/lib/public-failure` carries across the wire. The reader still duck-types `error.envelope` and
+ * parses it with the client-safe schema instead of trusting `instanceof`: an error from a Worker
+ * that predates the adapter, or one rebuilt by the default plugin, has no such property.
  *
  * Anything that is not a version-1 envelope — a plain `Error`, a newer `v`, a shape from a Worker
  * that predates the middleware — reads as `null`, and the caller falls back to its generic line.

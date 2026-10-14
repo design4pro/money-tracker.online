@@ -28,6 +28,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -41,13 +42,18 @@ import {
 } from '#/lib/money'
 import { listEnabledCurrencies } from '#/server/catalog/currencies'
 import { projectCompletion } from '#/server/goals/project'
+import { runAutoRecord } from '#/server/recurring/auto-record'
 import { medianOf } from '#/server/recurring/detect'
+import { autoRecordMarkerKey } from '#/server/recurring/markers'
+import { materializeSeries } from '#/server/recurring/materialize'
 import { matchesPeriod } from '#/server/recurring/match'
 import { organization, user } from '#/server/db/auth-schema'
 import {
+  accountBalances,
   accounts,
   budgetCategories,
   currencies,
+  exchangeRates,
   transactionSplits,
   transactions,
 } from '#/server/db/schema'
@@ -67,9 +73,27 @@ import { pageForReader } from '#/server/repos/notifications'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 
-import { adjustAccountBalance } from '../accounts'
+import { adjustAccountBalance, updateAccount } from '../accounts'
+import { touchLedgerAccount } from '../base'
 import { budgetSpend, getBudget } from '../budgets'
-import { periodVarianceMinor } from '../recurring'
+import {
+  archiveCategory,
+  createCategory,
+  deleteCategory,
+  getCategory,
+  listCategories,
+  moveCategory,
+  reorderCategories,
+  restoreCategory,
+  spendingByCategory,
+  updateCategory,
+} from '../categories'
+import { ConflictError } from '../errors'
+import {
+  createSeries,
+  listPeriods as listSeriesPeriods,
+  periodVarianceMinor,
+} from '../recurring'
 import {
   listPeriods,
   materializePeriods,
@@ -89,6 +113,7 @@ import {
   seedBudget,
   seedCategory,
   seedPeriod,
+  seedSplit,
   seedTransaction,
 } from './budget-harness'
 import { seedSeries } from './planned-harness'
@@ -101,6 +126,7 @@ import {
 import {
   computeRefAmount,
   createTransaction,
+  findAccountCurrencyMismatches,
   getTransaction,
   updateTransaction,
 } from '../transactions'
@@ -188,6 +214,7 @@ let scope: TenantScope
 
 beforeEach(async () => {
   executed.length = 0
+  vi.mocked(touchLedgerAccount).mockClear()
   const db = openTestDb()
   const now = new Date('2026-03-15T10:00:00.000Z')
   // `.onConflictDoNothing()` because `drizzle/0002_seed_currency_catalogue.sql` — which this
@@ -217,14 +244,24 @@ beforeEach(async () => {
     slug: 'a',
     createdAt: now,
   })
-  await db.insert(accounts).values({
-    id: 'acc-a',
-    organizationId: 'org-a',
-    name: 'Everyday',
-    currencyCode: 'PLN',
-    createdAt: now,
-    updatedAt: now,
-  })
+  await db.insert(accounts).values([
+    {
+      id: 'acc-a',
+      organizationId: 'org-a',
+      name: 'Everyday',
+      currencyCode: 'PLN',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'acc-eur',
+      organizationId: 'org-a',
+      name: 'Euro wallet',
+      currencyCode: 'EUR',
+      createdAt: now,
+      updatedAt: now,
+    },
+  ])
 
   scope = createScope(db, {
     userId: 'user-a',
@@ -252,7 +289,7 @@ describe('1 — ref_amount is written once, at booked_on’s rate', () => {
       scope,
       policies: EVERYTHING,
       conversion: march,
-      input: { ...INPUT, currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
     })
     expect(created.refAmountMinor).toBe(53_353)
 
@@ -280,7 +317,12 @@ describe('1 — ref_amount is written once, at booked_on’s rate', () => {
       scope,
       policies: EVERYTHING,
       conversion: book,
-      input: { ...INPUT, currencyCode: 'EUR', bookedOn: BOOKED_ON },
+      input: {
+        ...INPUT,
+        accountId: 'acc-eur',
+        currencyCode: 'EUR',
+        bookedOn: BOOKED_ON,
+      },
     })
     expect(created.rateE10).toBe(43_218_000_000)
   })
@@ -334,7 +376,12 @@ describe('3 — rate_e10 travels on the row', () => {
       conversion: conversionOf('PLN', [
         [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
       ]),
-      input: { ...INPUT, currencyCode: 'EUR', amountMinor: 12_345 },
+      input: {
+        ...INPUT,
+        accountId: 'acc-eur',
+        currencyCode: 'EUR',
+        amountMinor: 12_345,
+      },
     })
 
     expect(created.rateE10).toBeGreaterThan(0)
@@ -431,7 +478,7 @@ describe('6 — changing booked_on recomputes, and it is a write', () => {
       scope,
       policies: EVERYTHING,
       conversion: book,
-      input: { ...INPUT, currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
     })
 
     const moved = await updateTransaction({
@@ -452,7 +499,7 @@ describe('6 — changing booked_on recomputes, and it is a write', () => {
       scope,
       policies: EVERYTHING,
       conversion: book,
-      input: { ...INPUT, currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
     })
 
     const resolveRate = vi.fn(async () => asRateE10(1))
@@ -1146,7 +1193,7 @@ describe('12 — a split allocates the parent’s figures and never re-converts'
       conversion: conversionOf('PLN', [
         [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
       ]),
-      input: { ...INPUT, currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
     })
   }
 
@@ -1251,7 +1298,7 @@ describe('13 — a refund is subtracted on read and never written to the origina
       scope,
       policies: EVERYTHING,
       conversion: MARCH_AND_APRIL(),
-      input: { ...INPUT, currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
     })
   }
 
@@ -1262,6 +1309,7 @@ describe('13 — a refund is subtracted on read and never written to the origina
       conversion: MARCH_AND_APRIL(),
       input: {
         ...INPUT,
+        accountId: 'acc-eur',
         direction: 'income',
         currencyCode: 'EUR',
         amountMinor,
@@ -1801,15 +1849,6 @@ describe('17 — a correction is a transaction, never an overwrite', () => {
   })
 
   it('is in the account’s own currency, with the reference amount at the booking date’s rate', async () => {
-    const now = new Date('2026-03-15T10:00:00.000Z')
-    await scope.db.insert(accounts).values({
-      id: 'acc-eur',
-      organizationId: 'org-a',
-      name: 'Euro savings',
-      currencyCode: 'EUR',
-      createdAt: now,
-      updatedAt: now,
-    })
     const conversion = conversionOf('PLN', [
       [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
       [`EUR:PLN:${APRIL}`, 40_000_000_000],
@@ -1848,7 +1887,12 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
         scope,
         policies: EVERYTHING,
         conversion,
-        input: { ...INPUT, currencyCode: 'EUR', bookedOn: '2026-03-17' },
+        input: {
+          ...INPUT,
+          accountId: 'acc-eur',
+          currencyCode: 'EUR',
+          bookedOn: '2026-03-17',
+        },
       }),
     ).rejects.toThrow()
 
@@ -1865,7 +1909,7 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...INPUT, currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
     })
 
     await expect(
@@ -1898,7 +1942,7 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
       await scope.db.insert(transactions).values({
         id: 'tx-legacy',
         organizationId: 'org-a',
-        accountId: 'acc-a',
+        accountId: currencyCode === 'EUR' ? 'acc-eur' : 'acc-a',
         direction: 'expense',
         amountMinor,
         currencyCode,
@@ -1970,5 +2014,586 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
     })
 
     expect(planned).toMatchObject({ isPlanned: true, bookedOn: '2999-01-01' })
+  })
+})
+
+describe('19 — a transaction is in its account’s currency', () => {
+  /** 1 EUR = 4.3218 PLN on the booking day: enough for every case that is allowed to convert. */
+  const book = () =>
+    conversionOf('PLN', [[`EUR:PLN:${BOOKED_ON}`, 43_218_000_000]])
+
+  /** A row written straight into the table, the way a legacy one got there: EUR in a PLN account. */
+  async function seedLegacyMismatch() {
+    const at = new Date('2026-03-01T00:00:00.000Z')
+    await scope.db.insert(transactions).values({
+      id: 'tx-legacy-mismatch',
+      organizationId: 'org-a',
+      accountId: 'acc-a',
+      direction: 'expense',
+      amountMinor: 1_000,
+      currencyCode: 'EUR',
+      refAmountMinor: 4_322,
+      refCurrencyCode: 'PLN',
+      rateE10: 43_218_000_000,
+      bookedOn: BOOKED_ON,
+      bookedAt: new Date(`${BOOKED_ON}T12:00:00.000Z`),
+      isPlanned: false,
+      createdAt: at,
+      updatedAt: at,
+    })
+    return 'tx-legacy-mismatch'
+  }
+
+  async function storedRows() {
+    return scope.db.select().from(transactions).orderBy(transactions.id)
+  }
+
+  it('refuses a create whose currency is not the account’s, naming both, before any rate or write', async () => {
+    const resolveRate = vi.fn(async () => asRateE10(43_218_000_000))
+    executed.length = 0
+
+    const failure = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: { baseCurrencyCode: asCurrencyCode('PLN'), resolveRate },
+      input: { ...INPUT, accountId: 'acc-a', currencyCode: 'EUR' },
+    }).catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(ConflictError)
+    expect((failure as ConflictError).message).toContain('EUR')
+    expect((failure as ConflictError).message).toContain('PLN')
+    // No rate was asked for, no row exists, and the ledger was not told anything moved.
+    expect(resolveRate).not.toHaveBeenCalled()
+    expect(executed.filter((query) => /^\s*insert/i.test(query))).toEqual([])
+    expect(await storedRows()).toEqual([])
+    expect(touchLedgerAccount).not.toHaveBeenCalled()
+  })
+
+  it('refuses the same mismatch whatever the policies say', async () => {
+    await expect(
+      createTransaction({
+        scope,
+        policies: {
+          planned: 'exclude',
+          adjustments: 'exclude',
+          transfers: 'exclude',
+          completeness: 'complete',
+        },
+        conversion: book(),
+        input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'PLN' },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError)
+  })
+
+  it('accepts a foreign-currency account written in its own currency, converted at booked_on’s rate', async () => {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+    })
+
+    expect(created).toMatchObject({
+      accountId: 'acc-eur',
+      currencyCode: 'EUR',
+      refAmountMinor: 53_353,
+      rateE10: 43_218_000_000,
+    })
+  })
+
+  it('refuses an update that moves a row onto an account in another currency, and leaves the row alone', async () => {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      input: INPUT,
+    })
+    const before = await storedRows()
+    vi.mocked(touchLedgerAccount).mockClear()
+
+    const failure = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      id: created.id,
+      patch: { accountId: 'acc-eur' },
+    }).catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(ConflictError)
+    expect((failure as ConflictError).message).toContain('EUR')
+    expect((failure as ConflictError).message).toContain('PLN')
+    expect(await storedRows()).toEqual(before)
+    expect(touchLedgerAccount).not.toHaveBeenCalled()
+  })
+
+  it('refuses an update that patches the currency onto an account in another currency', async () => {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      input: INPUT,
+    })
+    const before = await storedRows()
+
+    await expect(
+      updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion: book(),
+        id: created.id,
+        patch: { currencyCode: 'EUR' },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError)
+    expect(await storedRows()).toEqual(before)
+  })
+
+  it('refuses an update that changes the account and the currency to a pair that still disagrees', async () => {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      input: INPUT,
+    })
+
+    await expect(
+      updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion: book(),
+        id: created.id,
+        patch: { accountId: 'acc-eur', currencyCode: 'PLN' },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError)
+  })
+
+  it('takes an update that moves the pair to one that agrees, re-anchoring at booked_on’s rate', async () => {
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      input: INPUT,
+    })
+
+    const moved = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      id: created.id,
+      patch: { accountId: 'acc-eur', currencyCode: 'EUR' },
+    })
+
+    expect(moved).toMatchObject({
+      accountId: 'acc-eur',
+      currencyCode: 'EUR',
+      refAmountMinor: 53_353,
+      rateE10: 43_218_000_000,
+    })
+  })
+
+  it('lets a legacy mismatched row take an edit that does not move it to a mismatching pair', async () => {
+    const id = await seedLegacyMismatch()
+
+    const noted = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      id,
+      // The detail screen re-sends the pair it already holds on every save.
+      patch: { note: 'still here', accountId: 'acc-a', currencyCode: 'EUR' },
+    })
+    expect(noted).toMatchObject({
+      note: 'still here',
+      accountId: 'acc-a',
+      currencyCode: 'EUR',
+      refAmountMinor: 4_322,
+    })
+
+    const reamounted = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      id,
+      patch: { amountMinor: 2_000 },
+    })
+    // 20.00 EUR × 4.3218 = 86.436 → 86.44 PLN, worked by hand.
+    expect(reamounted).toMatchObject({
+      amountMinor: 2_000,
+      refAmountMinor: 8_644,
+    })
+  })
+
+  it('still refuses to move a legacy mismatched row to another mismatching account', async () => {
+    const id = await seedLegacyMismatch()
+    // A second PLN account: the row is EUR, so this pair differs from the stored one and disagrees.
+    await scope.db.insert(accounts).values({
+      id: 'acc-a2',
+      organizationId: 'org-a',
+      name: 'Savings',
+      currencyCode: 'PLN',
+      createdAt: new Date('2026-03-15T10:00:00.000Z'),
+      updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+    })
+
+    await expect(
+      updateTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion: book(),
+        id,
+        patch: { accountId: 'acc-a2' },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError)
+  })
+
+  describe('the detection of rows that already disagree', () => {
+    it('reports nothing when every row agrees with its account', async () => {
+      await createTransaction({
+        scope,
+        policies: EVERYTHING,
+        conversion: book(),
+        input: INPUT,
+      })
+
+      await expect(findAccountCurrencyMismatches(scope)).resolves.toEqual({
+        count: 0,
+        sample: [],
+      })
+    })
+
+    it('reports a legacy row by transaction and account id only, with no amount, note or payee', async () => {
+      const id = await seedLegacyMismatch()
+
+      const report = await findAccountCurrencyMismatches(scope)
+
+      expect(report).toEqual({
+        count: 1,
+        sample: [{ transactionId: id, accountId: 'acc-a' }],
+      })
+    })
+
+    it('caps the sample but not the count', async () => {
+      const at = new Date('2026-03-01T00:00:00.000Z')
+      await scope.db.insert(transactions).values(
+        ['a', 'b', 'c'].map((suffix) => ({
+          id: `tx-m-${suffix}`,
+          organizationId: 'org-a',
+          accountId: 'acc-a',
+          direction: 'expense' as const,
+          amountMinor: 100,
+          currencyCode: 'EUR',
+          refAmountMinor: 432,
+          refCurrencyCode: 'PLN',
+          rateE10: 43_218_000_000,
+          bookedOn: BOOKED_ON,
+          bookedAt: at,
+          createdAt: at,
+          updatedAt: at,
+        })),
+      )
+
+      const report = await findAccountCurrencyMismatches(scope, { limit: 2 })
+
+      expect(report.count).toBe(3)
+      expect(report.sample).toHaveLength(2)
+    })
+
+    it('rejects a limit outside the allowed range', async () => {
+      await expect(
+        findAccountCurrencyMismatches(scope, { limit: 0 }),
+      ).rejects.toThrow()
+      await expect(
+        findAccountCurrencyMismatches(scope, { limit: 10_000 }),
+      ).rejects.toThrow()
+    })
+  })
+})
+
+describe('20 — changing an account’s currency leaves rows the detection can see', () => {
+  it('reports a row booked in the old currency after updateAccount changes the account’s currency', async () => {
+    const world = await createBudgetWorld()
+    const conversion = conversionOf('PLN', [
+      [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
+    ])
+    await createTransaction({
+      scope: world.scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, accountId: 'acc-a', currencyCode: 'PLN' },
+    })
+    await expect(
+      findAccountCurrencyMismatches(world.scope),
+    ).resolves.toMatchObject({ count: 0 })
+
+    await updateAccount(
+      world.scope,
+      'acc-a',
+      { currencyCode: 'EUR' },
+      conversion,
+    )
+
+    const report = await findAccountCurrencyMismatches(world.scope)
+    expect(report.count).toBe(1)
+    expect(report.sample.at(0)?.accountId).toBe('acc-a')
+  })
+})
+
+describe('21 — the recurring pass declines a series whose currency is not its account’s', () => {
+  const TODAY = '2026-03-15'
+
+  async function seriesFor(
+    world: BudgetWorld,
+    patch: { name: string; accountId: string; expectedCurrencyCode: string },
+  ) {
+    const series = await createSeries(world.scope, {
+      expectedAmountMinor: 250_000,
+      frequency: 'monthly',
+      startDate: '2026-03-01',
+      autoRecord: true,
+      ...patch,
+    })
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    return series
+  }
+
+  async function worldWithEuroAccount() {
+    const world = await createBudgetWorld()
+    const at = new Date('2026-03-15T10:00:00.000Z')
+    await world.db.insert(accounts).values({
+      id: 'acc-a-eur',
+      organizationId: 'org-a',
+      name: 'Euro wallet',
+      currencyCode: 'EUR',
+      createdAt: at,
+      updatedAt: at,
+    })
+    return world
+  }
+
+  it('names the refusal, posts nothing for it, carries on with the healthy series and stays idempotent', async () => {
+    const world = await worldWithEuroAccount()
+    // The bad series first, so the loop has to survive it to reach the good one.
+    const bad = await seriesFor(world, {
+      name: 'Euro rent',
+      accountId: 'acc-a-eur',
+      expectedCurrencyCode: 'PLN',
+    })
+    const good = await seriesFor(world, {
+      name: 'Phone',
+      accountId: 'acc-a',
+      expectedCurrencyCode: 'PLN',
+    })
+    const markers = createMemoryMarkerStore()
+    const refusals: Array<string> = []
+    const run = () =>
+      runAutoRecord({
+        scope: world.scope,
+        markers,
+        today: TODAY,
+        onRefusal: (outcome) => refusals.push(outcome.skipped ?? ''),
+      })
+
+    const first = await run()
+
+    expect(first.posted).toBe(1)
+    expect(
+      first.outcomes.find((outcome) => outcome.seriesId === bad.id),
+    ).toMatchObject({ skipped: 'currency-mismatch', transactionId: null })
+    expect(
+      first.outcomes.find((outcome) => outcome.seriesId === good.id)
+        ?.transactionId,
+    ).not.toBeNull()
+    expect(refusals).toEqual(['currency-mismatch'])
+    const written = await world.db.select().from(transactions)
+    expect(written).toHaveLength(1)
+    expect(written.at(0)?.accountId).toBe('acc-a')
+
+    // Neither paid nor remembered: the period posts once the series or the account is fixed.
+    const badPeriod = (await listSeriesPeriods(world.scope, bad.id, TODAY)).at(
+      0,
+    )
+    expect(badPeriod?.derivedStatus).not.toBe('paid')
+    expect(
+      await markers.seen(
+        autoRecordMarkerKey({
+          seriesId: bad.id,
+          periodStart: badPeriod?.periodStart ?? '',
+        }),
+      ),
+    ).toBe(false)
+
+    // A redelivery declines again, writes nothing more, and still does not throw.
+    const second = await run()
+    // The paid period is no longer due, so only the refusal is repeated.
+    expect(second.outcomes.map((outcome) => outcome.skipped)).toEqual([
+      'currency-mismatch',
+    ])
+    expect(await world.db.select().from(transactions)).toHaveLength(1)
+
+    // Fix the account, and the very same period posts.
+    await world.db
+      .update(accounts)
+      .set({ currencyCode: 'PLN' })
+      .where(eq(accounts.id, 'acc-a-eur'))
+    const third = await run()
+    expect(third.posted).toBe(1)
+    expect(await world.db.select().from(transactions)).toHaveLength(2)
+  })
+})
+
+describe('22 — a category write never touches an amount', () => {
+  /** The five tables a category write must not touch (amounts, balances, rates), as the SQL names them. */
+  const AMOUNT_TABLES = [
+    '"transactions"',
+    '"transaction_splits"',
+    '"accounts"',
+    '"account_balances"',
+    '"exchange_rates"',
+  ] as const
+
+  /** The world: a transaction and a split under categories the sequence below will move about. */
+  async function worldWithAmounts() {
+    const world = await createBudgetWorld()
+    await seedCategory(world.db, { id: 'cat-food', name: 'Food' })
+    await seedCategory(world.db, {
+      id: 'cat-groceries',
+      name: 'Groceries',
+      parentId: 'cat-food',
+    })
+    await seedCategory(world.db, { id: 'cat-home', name: 'Home' })
+    await seedCategory(world.db, { id: 'cat-unused', name: 'Unused' })
+
+    await seedTransaction(world.db, {
+      id: 'tx-filed',
+      categoryId: 'cat-groceries',
+      refAmountMinor: 123_45,
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-split',
+      refAmountMinor: 200_00,
+    })
+    await seedSplit(world.db, {
+      id: 'split-1',
+      transactionId: 'tx-split',
+      categoryId: 'cat-groceries',
+      refAmountMinor: 120_00,
+    })
+    await seedSplit(world.db, {
+      id: 'split-2',
+      transactionId: 'tx-split',
+      categoryId: 'cat-home',
+      refAmountMinor: 80_00,
+      position: 1,
+    })
+    await world.db.insert(accountBalances).values({
+      organizationId: 'org-a',
+      accountId: 'acc-a',
+      date: '2026-03-10',
+      nativeMinor: -323_45,
+      refMinor: -323_45,
+      rateE10: 10_000_000_000,
+    })
+    await world.db.insert(exchangeRates).values({
+      baseCode: 'EUR',
+      quoteCode: 'PLN',
+      date: '2026-03-10',
+      rateE10: 43_000_000_000,
+      source: 'manual',
+      fetchedAt: new Date('2026-03-10T00:00:00.000Z'),
+    })
+    return world
+  }
+
+  /** Whole rows, every column, of everything that carries an amount, a balance or a rate. */
+  async function amountsOf(world: BudgetWorld) {
+    return {
+      transactions: await world.db
+        .select()
+        .from(transactions)
+        .orderBy(transactions.id),
+      splits: await world.db
+        .select()
+        .from(transactionSplits)
+        .orderBy(transactionSplits.id),
+      accounts: await world.db.select().from(accounts).orderBy(accounts.id),
+      balances: await world.db.select().from(accountBalances),
+      rates: await world.db.select().from(exchangeRates),
+    }
+  }
+
+  it('runs every write export, re-parent, cascade, restore and delete included, over amounts it leaves exactly as they were', async () => {
+    const world = await worldWithAmounts()
+    const before = await amountsOf(world)
+    const mark = budgetExecuted.length
+
+    const created = await createCategory(world.scope, {
+      name: 'Dining out',
+      parentId: 'cat-food',
+    })
+    await updateCategory(world.scope, 'cat-food', { color: '#625106' })
+    // The re-parent of a row that holds a transaction and a split.
+    await moveCategory(world.scope, {
+      id: 'cat-groceries',
+      parentId: 'cat-home',
+    })
+    await reorderCategories(world.scope, ['cat-home', 'cat-food'])
+    // The archive cascades to the child that was just moved in; the restore revives one row.
+    await archiveCategory(world.scope, 'cat-home')
+    await restoreCategory(world.scope, 'cat-home')
+    await deleteCategory(world.scope, 'cat-unused')
+    await deleteCategory(world.scope, created.id)
+    await listCategories(world.scope, { includeArchived: true })
+    await getCategory(world.scope, 'cat-food')
+    await spendingByCategory(world.scope, {
+      from: '2026-03-01',
+      to: '2026-03-31',
+    })
+
+    const log = budgetExecuted.slice(mark)
+    const writes = log.filter((query) =>
+      /^\s*(update|insert|delete)\b/iu.test(query),
+    )
+    // A guard on the guard: the sequence did write, so an empty list is not a pass.
+    expect(writes.length).toBeGreaterThanOrEqual(8)
+    for (const statement of writes) {
+      for (const table of AMOUNT_TABLES) expect(statement).not.toContain(table)
+    }
+    expect(touchLedgerAccount).not.toHaveBeenCalled()
+
+    const after = await amountsOf(world)
+    expect(after).toEqual(before)
+
+    // The columns the plan names, stated as numbers so a regression reads as a number.
+    const filed = after.transactions.find((row) => row.id === 'tx-filed')
+    expect(filed).toMatchObject({
+      amountMinor: 123_45,
+      currencyCode: 'PLN',
+      refAmountMinor: 123_45,
+      refCurrencyCode: 'PLN',
+      rateE10: 10_000_000_000,
+      categoryId: 'cat-groceries',
+    })
+    expect(
+      after.splits.map((row) => [
+        row.id,
+        row.categoryId,
+        row.amountMinor,
+        row.refAmountMinor,
+      ]),
+    ).toEqual([
+      ['split-1', 'cat-groceries', 120_00, 120_00],
+      ['split-2', 'cat-home', 80_00, 80_00],
+    ])
+    expect(after.balances).toHaveLength(1)
+    expect(after.rates).toHaveLength(1)
+
+    // And the categories did move, so the unchanged amounts are not a no-op sequence.
+    expect((await getCategory(world.scope, 'cat-groceries')).parentId).toBe(
+      'cat-home',
+    )
+    await expect(getCategory(world.scope, 'cat-unused')).rejects.toThrow()
   })
 })

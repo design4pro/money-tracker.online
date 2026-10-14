@@ -11,10 +11,18 @@
  * on classifying an import for three weeks into a category nobody can name, because the failure of
  * an automation is *silence*, and silence is indistinguishable from working.
  *
- * So {@link pauseRulesReferencing} is called **by the deleting operation, in the same batch**, and
- * `#/server/repos/categories`, `#/server/repos/payees` and `#/server/repos/accounts` each call it
- * from their delete paths. Doing it on a later sweep instead would leave a window — one import
- * long is long enough — in which a rule quietly no-ops.
+ * So the pause is written **by the deleting operation**, and `#/server/repos/categories`,
+ * `#/server/repos/payees` and `#/server/repos/accounts` each do it from their delete paths. Doing it
+ * on a later sweep instead would leave a window — one import long is long enough — in which a rule
+ * quietly no-ops.
+ *
+ * Two ways in. {@link pauseRulesReferencingStatement} returns the pause as a statement, for a delete
+ * that composes it into one `runTenantBatch` with the delete itself (`deleteAccountGroup`, the first
+ * to adopt the seam: the row, its dependants and the pause land together or not at all).
+ * {@link pauseRulesReferencing} writes it straight away, right after the delete, for the paths that
+ * have not adopted the seam yet (`deleteAccount`, `deleteCategory`, `deletePayee`): a failure
+ * between their two statements leaves the row gone and its rules running until
+ * {@link checkRuleIntegrity} pauses them.
  *
  * {@link checkRuleIntegrity} is the belt and braces, run weekly. **It is expected to find
  * nothing.** A finding is logged at `warn` with the rule id because it does not mean a rule broke;
@@ -46,10 +54,11 @@ import {
   listExistingReferenceIds,
   listRules,
   pauseRules,
+  pauseRulesStatement,
 } from '#/server/repos/rules'
 
 import type { Logger } from '#/server/observability/logger'
-import type { TenantScope } from '#/server/repos/base'
+import type { TenantScope, TenantStatement } from '#/server/repos/base'
 import type { RuleReferenceType } from '#/server/repos/rules'
 import type {
   RuleAction,
@@ -296,7 +305,9 @@ export interface PauseRulesReferencingArgs {
 /**
  * Pauses every rule in this workspace that names `refId`, in one `UPDATE`.
  *
- * **Called after the delete has succeeded, not before.** A pause written first and then abandoned
+ * **Called after the delete has succeeded, not before** — by the paths that write it as a second
+ * statement; a path that batches it (see {@link pauseRulesReferencingStatement}) gets the same
+ * guarantee from the rollback. A pause written first and then abandoned
  * by a delete that refused — a category still in use, an account with history — would be a warning
  * banner about a row that is still there, and the only way out of it is an edit the person should
  * never have been asked for. Written second, the exposure is the microseconds between two
@@ -311,11 +322,37 @@ export interface PauseRulesReferencingArgs {
 export async function pauseRulesReferencing(
   args: PauseRulesReferencingArgs,
 ): Promise<number> {
+  const plan = await planPause(args)
+  if (plan === null) return 0
+
+  return pauseRules(args.scope, plan.ruleIds, plan.reason)
+}
+
+/**
+ * The same pause as {@link pauseRulesReferencing}, as a statement for `runTenantBatch` instead of a
+ * write: `null` when no live rule names `refId`, so the common path adds nothing to the batch.
+ *
+ * Which rules are affected is read through the tenant predicate **before** the batch, as is the
+ * label. A rule saved in the gap that names the vanishing row is not in the batch; it is the one
+ * thing {@link checkRuleIntegrity} still exists to find.
+ */
+export async function pauseRulesReferencingStatement(
+  args: PauseRulesReferencingArgs,
+): Promise<TenantStatement | null> {
+  const plan = await planPause(args)
+  if (plan === null) return null
+
+  return pauseRulesStatement(args.scope, plan.ruleIds, plan.reason)
+}
+
+async function planPause(
+  args: PauseRulesReferencingArgs,
+): Promise<{ ruleIds: Array<string>; reason: string } | null> {
   const refType = z.enum(RULE_REFERENCE_TYPES).parse(args.refType)
   const refId = idSchema.parse(args.refId)
   const label = z.string().parse(args.label).slice(0, MAX_LABEL_LENGTH)
 
-  const affected = (await listRules(args.scope))
+  const ruleIds = (await listRules(args.scope))
     .filter((rule) => rule.pausedReason === null)
     .filter((rule) =>
       ruleReferences(rule).some(
@@ -325,13 +362,17 @@ export async function pauseRulesReferencing(
     )
     .map((rule) => rule.id)
 
-  if (affected.length === 0) return 0
+  if (ruleIds.length === 0) return null
 
-  return pauseRules(
-    args.scope,
-    affected,
-    writeReason({ refType, refId, label, at: args.at ?? new Date() }),
-  )
+  return {
+    ruleIds,
+    reason: writeReason({
+      refType,
+      refId,
+      label,
+      at: args.at ?? new Date(),
+    }),
+  }
 }
 
 function writeReason(input: {

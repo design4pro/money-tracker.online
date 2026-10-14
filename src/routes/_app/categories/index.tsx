@@ -23,7 +23,9 @@ import {
 
 import { useDataRefresh } from '../-lib/refresh'
 import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
+import { refusalOf } from './-lib/refusal'
 import { CategoryFormDialog } from './-ui/category-form-dialog'
+import { RefusalPanel } from './-ui/refusal-panel'
 
 import type {
   CategoryMove,
@@ -31,6 +33,7 @@ import type {
 } from '#/components/app/categories'
 import type { CategoryKind } from '#/server/db/schema'
 import type { Category } from '#/server/repos/categories'
+import type { Refusal, RefusalContext } from './-lib/refusal'
 import { pageHead } from '#/routes/-lib/page-title'
 
 /**
@@ -52,10 +55,12 @@ import { pageHead } from '#/routes/-lib/page-title'
  *
  * ## The depth-cap refusal is announced, not just drawn
  *
- * Every refusal lands in a `role="alert"` region above the tree as well as in a toast. A toast is
+ * Every refusal lands in a `role="alert"` region above the tree, and nowhere else. A toast is
  * dismissed on a timer; the sentence that explains why a category cannot go where somebody just
  * put it has to stay until they have read it, and has to reach a screen reader without them going
- * looking for it.
+ * looking for it. The sentence is the catalogue's, built from the names this route already holds
+ * (`refusalOf`), and after any refused move the tree is refreshed so it shows what the server
+ * holds.
  */
 
 const searchSchema = z.object({
@@ -108,11 +113,16 @@ function CategoriesRoute() {
   const refreshCaches = useDataRefresh()
 
   const [pending, setPending] = useState<Pending>({ kind: 'none' })
-  // The last server refusal, in the server's own words. Cleared by the next successful write.
-  const [refusal, setRefusal] = useState<string | null>(null)
+  // The last refusal, and a counter that remounts its panel so an identical repeat is announced
+  // again. Cleared by the next successful write.
+  const [refusal, setRefusal] = useState<{
+    readonly value: Refusal
+    readonly attempt: number
+  } | null>(null)
   const close = () => setPending({ kind: 'none' })
 
-  const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
+  const refreshed = () => Promise.all([router.invalidate(), refreshCaches()])
+  const refresh = () => void refreshed()
 
   const rows = categories.map(toTreeItem)
   const parents = categories
@@ -120,14 +130,22 @@ function CategoriesRoute() {
     .map((row) => ({ id: row.id, name: row.name }))
   const byId = new Map(categories.map((row) => [row.id, row]))
 
-  function withRefusal(work: () => Promise<unknown>) {
+  function withRefusal(context: RefusalContext, work: () => Promise<unknown>) {
     void work().then(
       () => {
         setRefusal(null)
         refresh()
       },
       (error: unknown) => {
-        setRefusal(error instanceof Error ? error.message : String(error))
+        const show = () =>
+          setRefusal((previous) => ({
+            value: refusalOf(error, context),
+            attempt: (previous?.attempt ?? 0) + 1,
+          }))
+        // The tree may have gone stale in another tab; show the reader what the server holds.
+        // The panel waits for it: the router puts the scroll position back after an invalidation,
+        // which would undo the panel scrolling itself into view and leave it under the header.
+        void refreshed().then(show, show)
       },
     )
   }
@@ -135,12 +153,21 @@ function CategoriesRoute() {
   function applyMove(move: CategoryMove) {
     const current = byId.get(move.id)
     if (current === undefined) return
-    withRefusal(async () => {
-      if (current.parentId !== move.parentId) {
-        await moveCategory({ data: { id: move.id, parentId: move.parentId } })
-      }
-      await reorderCategories({ data: { ids: [...move.orderedIds] } })
-    })
+    const isReparent = current.parentId !== move.parentId
+    withRefusal(
+      {
+        call: isReparent ? 'move' : 'reorder',
+        category: current.name,
+        parent:
+          move.parentId === null ? undefined : byId.get(move.parentId)?.name,
+      },
+      async () => {
+        if (isReparent) {
+          await moveCategory({ data: { id: move.id, parentId: move.parentId } })
+        }
+        await reorderCategories({ data: { ids: [...move.orderedIds] } })
+      },
+    )
   }
 
   return (
@@ -169,11 +196,7 @@ function CategoriesRoute() {
       */}
       <div role="alert" aria-live="assertive">
         {refusal === null ? null : (
-          <ErrorPanel
-            title={t('categories.move.refused')}
-            body={t('categories.move.refused.body')}
-            detail={refusal}
-          />
+          <RefusalPanel key={refusal.attempt} refusal={refusal.value} />
         )}
       </div>
 
@@ -217,7 +240,7 @@ function CategoriesRoute() {
                   setPending({ kind: 'archive', category })
               }}
               onRestore={(id) =>
-                withRefusal(async () => {
+                withRefusal({ call: 'restore' }, async () => {
                   await restoreCategory({ data: { categoryId: id } })
                   toast.success(t('categories.toast.restored'))
                 })
