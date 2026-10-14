@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { z } from 'zod'
 
@@ -13,7 +13,7 @@ import {
 } from '#/components/app/accounts'
 import { SegmentedFilter } from '#/components/app/nav'
 import { ErrorPanel } from '#/components/app/shell'
-import { Button, Card, toast } from '#/components/ui'
+import { Button, Card, buttonVariants, toast } from '#/components/ui'
 import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import {
   archiveAccount,
@@ -167,6 +167,17 @@ function AccountsListRoute() {
           <p className="mt-1 max-w-prose text-body text-ink-2">
             {t('accounts.subtitle')}
           </p>
+          {/*
+            A link under the subtitle rather than a second button beside "New account": the header
+            is deliberately one row at every width, and a second 40px button would take the title
+            block's room on a phone.
+          */}
+          <Link
+            to="/accounts/groups"
+            className={buttonVariants({ variant: 'link', size: 'sm' })}
+          >
+            {t('accounts.groups.manage')}
+          </Link>
         </div>
         <Button
           variant="primary"

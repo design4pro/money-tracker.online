@@ -22,6 +22,7 @@ import { Route as ApiUnsubscribeRouteImport } from './routes/api/unsubscribe'
 import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
 import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
+import { Route as AppAccountsGroupsRouteImport } from './routes/_app/accounts/groups'
 import { Route as AppBudgetsIndexRouteImport } from './routes/_app/budgets/index'
 import { Route as AppBudgetsBudgetIdRouteImport } from './routes/_app/budgets/$budgetId'
 import { Route as AppCategoriesIndexRouteImport } from './routes/_app/categories/index'
@@ -114,6 +115,11 @@ const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
 const AppAccountsAccountIdRoute = AppAccountsAccountIdRouteImport.update({
   id: '/accounts/$accountId',
   path: '/accounts/$accountId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAccountsGroupsRoute = AppAccountsGroupsRouteImport.update({
+  id: '/accounts/groups',
+  path: '/accounts/groups',
   getParentRoute: () => AppRoute,
 } as any)
 const AppBudgetsIndexRoute = AppBudgetsIndexRouteImport.update({
@@ -281,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/accounts/groups': typeof AppAccountsGroupsRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
@@ -324,6 +331,7 @@ export interface FileRoutesByTo {
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/accounts/groups': typeof AppAccountsGroupsRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
@@ -370,6 +378,7 @@ export interface FileRoutesById {
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/_app/accounts/groups': typeof AppAccountsGroupsRoute
   '/_app/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/_app/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/_app/import/$batchId': typeof AppImportBatchIdRoute
@@ -415,6 +424,7 @@ export interface FileRouteTypes {
     | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/accounts/$accountId'
+    | '/accounts/groups'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
     | '/import/$batchId'
@@ -458,6 +468,7 @@ export interface FileRouteTypes {
     | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/accounts/$accountId'
+    | '/accounts/groups'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
     | '/import/$batchId'
@@ -503,6 +514,7 @@ export interface FileRouteTypes {
     | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/_app/accounts/$accountId'
+    | '/_app/accounts/groups'
     | '/_app/budgets/$budgetId'
     | '/_app/goals/$goalId'
     | '/_app/import/$batchId'
@@ -643,6 +655,13 @@ declare module '@tanstack/react-router' {
       path: '/accounts/$accountId'
       fullPath: '/accounts/$accountId'
       preLoaderRoute: typeof AppAccountsAccountIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/accounts/groups': {
+      id: '/_app/accounts/groups'
+      path: '/accounts/groups'
+      fullPath: '/accounts/groups'
+      preLoaderRoute: typeof AppAccountsGroupsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/budgets/': {
@@ -878,6 +897,7 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
+  AppAccountsGroupsRoute: typeof AppAccountsGroupsRoute
   AppBudgetsBudgetIdRoute: typeof AppBudgetsBudgetIdRoute
   AppGoalsGoalIdRoute: typeof AppGoalsGoalIdRoute
   AppImportBatchIdRoute: typeof AppImportBatchIdRoute
@@ -907,6 +927,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,
+  AppAccountsGroupsRoute: AppAccountsGroupsRoute,
   AppBudgetsBudgetIdRoute: AppBudgetsBudgetIdRoute,
   AppGoalsGoalIdRoute: AppGoalsGoalIdRoute,
   AppImportBatchIdRoute: AppImportBatchIdRoute,

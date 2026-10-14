@@ -907,6 +907,53 @@ rules and rows by `border-subtle` horizontal ones, cell padding 12 / 10px. Hover
 wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 (`inset 0 0 0 1px`): a box, not a bar. Amounts are end-aligned and tabular.
 
+### Reorderable tree
+
+A two-level list of rows that a person can put in order, by dragging **and** by keyboard. Two
+screens draw one: the category tree (`CategoryTree`) and the account group tree (`GroupTree`).
+They share the arithmetic in `#/components/app/tree` and nothing else; each builds its own menu,
+because what a row can do differs (a category archives, a group deletes).
+
+- **Shape:** one flat `GridList` in reading order, never nested lists, so arrow keys travel
+  linearly. A child row is indented one step (`ms-6`) and carries a corner arrow; a row an
+  account sits on (group tree only) is indented one more. Row, radius and padding are the
+  `GridListItem`'s. The drag handle and the menu trigger are `ghost` icon buttons on the 44px hit
+  area (`target-min`), also on an indented row at 360px.
+- **Both paths ship together.** Every gesture the pointer can make is a menu item built from the
+  same pure move functions: _Move up_, _Move down_, _Move to top_, _Move to bottom_, _Move to…_
+  (which re-parents). Neither path is the fallback for the other, and a keyboard drag and the
+  matching menu item must produce the same move; a component test holds that.
+- **Names say where a row is.** A child row's accessible name carries its parent ("Trips, inside
+  Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
+  after their row, and their parent for a child.
+- **Disabled, never hidden, and the reason is written.** An item that would change nothing, or
+  that the one-level rule forbids, stays in the menu disabled. The group tree also writes the
+  reason as the item's description ("Already first", "A sub-group cannot have its own
+  sub-groups"), painted under the item at full contrast (only the label dims) and wired as its
+  description, so the reason does not depend on a tooltip. Arrow keys skip a disabled item, so it
+  is reached by a virtual cursor and by sight; the category tree disables the item without a description yet.
+- **Drop and focus rules.** A drop lands _beside_ a row, never on it, and the dropped row takes
+  that row's parent: one rule, no nesting-by-hovering. Rows that are not part of the order
+  (accounts inside a group) are not drop targets - the target is cancelled, so no indicator is
+  drawn and a keyboard drag skips it - and cannot start a drag. The group tree offers each
+  boundary between two rows of a run once, as _before_ the later one (the target is also cancelled
+  for a dragged group that has children when the target is a sub-group, which the one-level rule would
+  refuse); _after_ exists for the last
+  row of a run only, and its indicator is drawn directly under that row. For the last top-level group, which
+  has its accounts beneath it, that reads as "inside" - a known limit of a row-based indicator and
+  the reason the menu is not optional. After a move, a rename or a create, focus stays on (or goes
+  to) the row; after a delete it goes to the next row, then the previous, then the screen's create
+  button.
+- **In the group tree a menu move is said aloud, politely:** "Business moved to position 2 of 3", qualified by the
+  parent for a child. A drag has React Aria's own announcements.
+- **A refusal is a sentence in an always-mounted `role="alert"` region** above the tree, and a
+  toast is for what succeeded. The group tree chooses its sentence from the catalogue by the kind
+  of failure and never prints the server's message.
+- **Non-colour meaning:** the row's kind or count is a word or a number beside the name, never a
+  hue alone.
+- **It is not** a data table (no columns, no sort) and not a `ListBox` (a menu of values to
+  choose from): its rows are things with an order, and the order is the data.
+
 ### Period actions
 
 The buttons on one row of a recurring period, drawn by one component wherever a period is listed:
