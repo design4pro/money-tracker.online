@@ -929,8 +929,11 @@ const messages = {
   'categories.kind.both': 'Wpływy i wydatki',
   'categories.parent.none': 'Poziom główny',
   'categories.move.refused': 'Nie udało się przenieść kategorii',
-  'categories.move.refused.body':
-    'Kategorie mają dwa poziomy. Kategorii, która ma już podkategorie, nie można umieścić wewnątrz innej.',
+  'categories.move.refused.nest':
+    'Kategoria „{category}” nie może trafić do kategorii „{parent}”: kategorie mają tylko dwa poziomy.',
+  'categories.refused.forbidden':
+    'Kategorie w tym domu mogą zmieniać tylko właściciele i administratorzy.',
+  'categories.restore.refused': 'Nie przywróciliśmy kategorii',
   'categories.filter.showArchived': 'Pokaż zarchiwizowane kategorie',
   'categories.field.kind': 'Stosowana do',
   'categories.field.kind.help':

@@ -10,6 +10,7 @@ import {
   Label,
   composeTw,
   fieldRow,
+  resolveInvalid,
 } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
@@ -64,6 +65,7 @@ export function PasswordField({
   labelAction,
   className,
   isRequired,
+  isInvalid,
   ...props
 }: PasswordFieldProps) {
   const t = useTranslate()
@@ -76,6 +78,7 @@ export function PasswordField({
       // so the caret position and the selection survive the toggle.
       type={revealed ? 'text' : 'password'}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       <Label isRequired={isRequired} action={labelAction}>

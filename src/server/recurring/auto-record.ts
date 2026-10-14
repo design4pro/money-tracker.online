@@ -32,6 +32,12 @@
  * A series whose account has been archived does **not** post. It logs and moves on: an archived
  * account is one somebody deliberately closed, and quietly writing into it is how a closed account
  * grows a balance nobody is watching.
+ *
+ * A series whose expected currency is not its account's does not post either. A transaction is in
+ * its account's currency, so `createTransaction` would refuse it; the pass declines first, with a
+ * named outcome, so the refusal is a line in the report and not an exception that ends the loop for
+ * every healthy series after it. The period is neither paid nor remembered, so it posts once the
+ * series or the account is fixed, and a redelivery declines again.
  */
 
 import { z } from 'zod'
@@ -80,7 +86,12 @@ export interface AutoRecordOutcome {
   readonly periodStart: string
   readonly dueOn: string
   readonly transactionId: string | null
-  readonly skipped: 'already-posted' | 'no-account' | 'archived-account' | null
+  readonly skipped:
+    | 'already-posted'
+    | 'no-account'
+    | 'archived-account'
+    | 'currency-mismatch'
+    | null
 }
 
 export interface AutoRecordReport {
@@ -141,6 +152,10 @@ export async function runAutoRecord(
       const account = await getAccount(scope, series.accountId)
       if (account.status === 'archived') {
         outcomes.push(decline(args, period, series.id, 'archived-account'))
+        continue
+      }
+      if (account.currencyCode !== series.expectedCurrencyCode) {
+        outcomes.push(decline(args, period, series.id, 'currency-mismatch'))
         continue
       }
 

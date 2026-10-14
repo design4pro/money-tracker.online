@@ -31,6 +31,7 @@ import {
 } from '#/server/db/schema'
 
 import { createScope } from '../scope'
+import { sqliteBatchCallback } from './db-harness'
 
 import type { TenantScope } from '../scope'
 
@@ -42,6 +43,21 @@ export type TestDb = ReturnType<typeof openTestDb>
 
 /** Every statement the tests caused, so a test can assert what the SQL did and did not do. */
 export const executed: Array<string> = []
+
+/**
+ * Fault injection: while `when` is set, a statement it returns true for throws instead of running,
+ * so a test can fail one named statement of a multi-statement write. Reset by every world.
+ */
+export const fault: { when: ((query: string) => boolean) | null } = {
+  when: null,
+}
+
+function record(query: string): void {
+  executed.push(query)
+  if (fault.when?.(query) === true) {
+    throw new Error(`injected fault: ${query}`)
+  }
+}
 
 export function openTestDb() {
   const sqlite = new DatabaseSync(':memory:')
@@ -57,18 +73,21 @@ export function openTestDb() {
       if (trimmed.length > 0) sqlite.exec(trimmed)
     }
   }
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      record(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, record),
+  )
 }
 
 export const NOW = new Date('2026-03-15T10:00:00.000Z')
@@ -84,6 +103,7 @@ export interface BudgetWorld {
 
 export async function createBudgetWorld(): Promise<BudgetWorld> {
   executed.length = 0
+  fault.when = null
   const db = openTestDb()
 
   await db

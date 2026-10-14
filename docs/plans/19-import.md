@@ -356,12 +356,12 @@ the file's own text, comma decimal separator and all, and no repository reads it
   mapping through the parser `registry.ts` resolved, scores every row, and returns the whole decision
   set in one response — the counts, the per-row decision and the errors. It persists only the
   rejected rows, replacing that batch's previous `import_row_errors` delete-range then insert, so a
-  re-preview after a mapping change is idempotent. **Not one atomic `db.batch()`**, and the earlier
-  text claiming otherwise was wrong about our own layer: batching needs statement builders, while the
-  tenant-scoped base executes, and hand-composing statements would mean hand-stamping the tenant
-  column - which the fork guard forbids and which is the whole point of the base. `account-balances`
-  and `splits` resolved the same pair the same way. The worst case of the window between the two
-  writes is a correct state: an empty error report on a batch that wrote nothing.
+  re-preview after a mapping change is idempotent. **Not yet one atomic `db.batch()`.** The
+  tenant-scoped base now offers the seam (`removeWhereStatement` / `insertManyStatement` and
+  `runTenantBatch` in `repos/base.ts`, which stamp the tenant column themselves; #724), adopted first
+  by `deleteAccountGroup`, but this replace has not moved onto it: that is its own change.
+  `account-balances` and `splits` are in the same position. The worst case of the window between the
+  two writes is a correct state: an empty error report on a batch that wrote nothing.
   The commit re-runs this same parse over the same bytes, which is why the preview cannot promise a
   number the commit does not write.
 
@@ -517,6 +517,9 @@ the batch row survives so the history says so.
   an `AlertDialog` naming the exact count to be removed.
 
 ### Quota
+
+Before writing this spec read `07-S1`'s Quota section in `docs/plans/07-transactions-core.md`: the
+`transactions` ceiling has no enforcement point today and four documents disagree about where it is.
 
 `assertWithinLimit('transactions', ...)` is enforced **per chunk** inside the write path. Hitting the
 ceiling mid-import stops the job cleanly, leaves the batch `failed` with `imported_count` recording

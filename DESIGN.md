@@ -694,6 +694,17 @@ label kept in the DOM under the spinner so the button holds its width.
 - **Hover** darkens the rule to `ink-2`; **focus** moves it to `brand` and draws the ring.
 - **Invalid** moves the rule to `negative`; the error renders below, wired by `aria-describedby`,
   with an icon and a message. **Disabled:** `surface-sunken`, `ink-2`, `not-allowed`.
+- **How an error is shown.** A caller passes the sentence as `errorMessage` and nothing else: every
+  field in `components/ui` turns a non-empty `errorMessage` into the invalid state through
+  `resolveInvalid` (`field.tsx`), so the message renders and the control carries `aria-invalid`
+  (WCAG 3.3.1) without a matching `isInvalid` at the call site. `FieldError` renders only on an
+  invalid field, which is why a message with no invalid state is invisible. An explicit `isInvalid`
+  wins either way; the function form of `errorMessage` reads native validation and does not decide
+  validity. Compute the message from state (`hasTriedToSubmit && trimmedName === ''`), so it clears
+  when the value is fixed: a message passed unconditionally is shown unconditionally. A notice that
+  is not an error (a limit reached, a hint) is not an `errorMessage`; where one already is, pass
+  `isInvalid={false}`. A new field component takes the same `errorMessage` and `isInvalid` pair and
+  hands its container `isInvalid={resolveInvalid(isInvalid, errorMessage)}`.
 
 ### Select and ComboBox popover
 
@@ -732,6 +743,57 @@ label kept in the DOM under the spinner so the button holds its width.
 - Keyboard navigation, selection and focus return to the trigger are React Aria's and are
   untouched.
 - **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.
+
+### Menu
+
+- **The shape.** A column of 44px-minimum rows inside the base `Popover`, at least `11rem` wide
+  (`min-w-44`) and not tied to a trigger width.
+- **The height rule.** A menu sets no height cap of its own. The `Popover` is a column flex
+  container and React Aria writes the room left in the viewport onto it as `max-height`, so a menu
+  that fits is never a scroll container, and one that cannot fit (a short landscape phone) shrinks
+  to that room and scrolls. The old fixed `max-h-80` (320px) hid the eighth row of an eight-item
+  menu at 48px a row and made the menu a scrollable region with no focusable content while a
+  submenu held focus, which axe reports as `scrollable-region-focusable` (#728). A new cap on a
+  `Menu` brings both back: change the number of items, not the cap.
+- **Reaching the last row.** Every item is reachable from the keyboard (arrows, `Home`, `End`,
+  type-ahead) and React Aria scrolls the focused row into view, so the scrolling case stays
+  keyboard-complete. `e2e/menu-height.spec.ts` asserts all of it in a browser at 360px and 1280px,
+  with a submenu open, and in a viewport too short for the menu.
+- **Known limit.** The axe guarantee holds while the menu fits. In a viewport too short for it
+  (about 280px, a landscape phone or 400% zoom) with a submenu open, the parent menu scrolls again
+  with every item at `tabindex="-1"`, and axe's `scrollable-region-focusable` can return; the
+  keyboard path stays complete because `Escape` closes the submenu.
+- **A long submenu grows to the viewport.** A submenu with many entries (the category tree's "Move
+  to") is no longer cut at 320px; it takes the room React Aria leaves it, then scrolls.
+- **Every `Popover` is a column flex container.** The rule above lives in the base `Popover`, so
+  `Select`, `ComboBox`, `DatePicker` and `PopoverDialog` share it; their children stretch to the
+  panel width and only a child that already scrolls (`ListBox`, `Menu`) shrinks.
+- **The one thing it is not:** a `ListBox` or a `Select`, which hold values and keep their own
+  `max-h-72` (`ListBox`).
+
+### Toast
+
+- **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
+  button; the copy is the caller's `closeLabel` (`action.close`, EN + PL), never a default string
+  and never an icon-only control without a name.
+- **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
+  §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
+  never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
+  `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
+  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-7` so text never runs
+  under the box.
+- **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
+  so the close button's size, position and transform are `!` utilities. `left` and `right` read the
+  opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
+- **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
+  box-shadow is switched off.
+- **Contrast.** The chip's edge is `border-subtle`, a decorative edge below 3:1 by design; the glyph
+  (`ink-2`, forced with `!` like the rest; measured 8.6:1 in light and 8.1:1 in dark on the chip, #730) carries the 1.4.11 contrast.
+- **A toast action.** No toast has an `action` or `cancel` button today. If one is added it must
+  not sit in the top 44px of the inline-end corner, which the close box owns.
+- **Verified by:** `src/components/ui/__tests__/toast.test.tsx` (name, hidden glyph, classes) and
+  `e2e/toast-close-button.spec.ts` (measured box, axe, EN, PL and RTL, 360px and 1280px, both
+  themes, keyboard).
 
 ### Focus
 

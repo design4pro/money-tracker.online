@@ -158,6 +158,39 @@ describe('Menu', () => {
       expect(item.classList.contains('target-min-h')).toBe(true)
     }
   })
+  it('reaches the last of many items from the keyboard and sets no fixed height cap', async () => {
+    const user = userEvent.setup()
+    const labels = Array.from(
+      { length: 8 },
+      (_, index) => `Action ${index + 1}`,
+    )
+    render(
+      <MenuTrigger>
+        <Button>Actions</Button>
+        <Popover>
+          <Menu aria-label="Group actions">
+            {labels.map((label) => (
+              <MenuItem key={label} id={label}>
+                {label}
+              </MenuItem>
+            ))}
+          </Menu>
+        </Popover>
+      </MenuTrigger>,
+    )
+
+    await user.tab()
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{End}')
+
+    expect(document.activeElement).toBe(
+      screen.getByRole('menuitem', { name: 'Action 8' }),
+    )
+    // A fixed `max-h-*` is what hid the eighth row below the fold (#728); the
+    // popover's own `max-height` is the only bound. Real layout is asserted in
+    // `e2e/menu-height.spec.ts`, which jsdom cannot run.
+    expect(screen.getByRole('menu').className).not.toMatch(/(^|\s)max-h-/)
+  })
 })
 
 describe('MenuItem description', () => {
