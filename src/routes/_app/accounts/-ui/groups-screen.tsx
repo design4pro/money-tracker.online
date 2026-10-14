@@ -116,8 +116,8 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   }
 
   /**
-   * Puts the refusal on screen and reloads. Today's wire carries no kind, so a refusal cannot be told
-   * from a stale list; a reload is cheap and shows the truth either way.
+   * Puts the refusal on screen and reloads. Whatever the kind, the list the writer saw may be the
+   * reason (a group deleted, or given a child, in another window), and a reload is cheap.
    */
   function refuse(error: unknown) {
     setRefusal(refusalFor(error))

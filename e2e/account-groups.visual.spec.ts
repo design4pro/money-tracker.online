@@ -102,10 +102,17 @@ async function createSubGroup(
 /** Deletes a group through its menu when it is still there; a no-op otherwise. */
 async function removeIfPresent(page: Page, name: string): Promise<void> {
   if ((await groupRow(page, name).count()) === 0) return
-  await openActions(page, name)
-  await page
-    .getByRole('menuitem', { name: say('en', 'accounts.group.delete.action') })
-    .click()
+  const remove = page.getByRole('menuitem', {
+    name: say('en', 'accounts.group.delete.action'),
+  })
+  // A page that has only just loaded can swallow its first press on the trigger, so the press is
+  // retried until the menu is there; a press on an open menu never happens, the retry only runs
+  // when the menu did not open.
+  await expect(async () => {
+    await openActions(page, name)
+    await expect(remove).toBeVisible({ timeout: 2000 })
+  }).toPass()
+  await remove.click()
   await page
     .getByRole('alertdialog')
     .getByRole('button', { name: say('en', 'accounts.group.delete.action') })
@@ -257,6 +264,58 @@ test('the controls on an indented sub-group are a 44 px target at 360 px, and no
     await page.setViewportSize({ width: 1280, height: 800 })
     await removeIfPresent(page, child)
     await removeIfPresent(page, parent)
+  }
+})
+
+test('a group deleted in another window reads as "list changed" and the list reloads', async ({
+  page,
+  browser,
+  expectConsole,
+}) => {
+  // The refusal is a not-found, and the failure boundary answers one with its own status (`404`),
+  // so the browser reports the response once, as it does for any non-2xx. It is the behaviour under test.
+  expectConsole([
+    {
+      why: 'the browser reporting the 404 the server answers a write on a deleted group with',
+      match:
+        /^Failed to load resource: the server responded with a status of 404 \(Not Found\)$/,
+    },
+  ])
+  const name = uniqueToken('Gone')
+  await gotoApp(page, '/accounts/groups')
+
+  try {
+    await createGroup(page, name)
+
+    // The other window removes it; this one still shows it.
+    // A context of its own: a second tab in this one sits behind the first, unfocused, and a
+    // React Aria menu does not stay open in a window that has no focus.
+    const elsewhere = await browser.newContext({
+      baseURL: test.info().project.use.baseURL,
+      storageState: storageStateFor('demo'),
+    })
+    try {
+      const other = await elsewhere.newPage()
+      await gotoApp(other, '/accounts/groups')
+      await removeIfPresent(other, name)
+    } finally {
+      await elsewhere.close()
+    }
+    await expect(groupRow(page, name)).toBeVisible()
+
+    // The refusal crosses the real failure boundary: only its kind selects the sentence.
+    await openActions(page, name)
+    await page
+      .getByRole('menuitem', { name: say('en', 'action.moveUp') })
+      .click()
+    await expect(
+      page
+        .getByRole('alert')
+        .getByText(say('en', 'accounts.group.refused.notFound')),
+    ).toBeVisible()
+    await expect(groupRow(page, name)).toHaveCount(0)
+  } finally {
+    await removeIfPresent(page, name)
   }
 })
 

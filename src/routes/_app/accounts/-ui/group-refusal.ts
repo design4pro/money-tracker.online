@@ -23,10 +23,10 @@ const REFUSAL_BY_KIND: Partial<Readonly<Record<FailureKind, MessageKey>>> = {
  * sentence for - a database or foreign-key failure from a race, a validation failure, a plain
  * `Error` - reads as the generic line.
  *
- * Today's server-function wire carries the `message` and neither a `code` nor an envelope: the
- * redaction middleware is not registered (tracked as #649), so until it is every refusal reads as
- * the generic line. The screen reloads after any refusal for that reason, and the classification
- * starts to work with no change here once the envelope arrives.
+ * The envelope is what a failing server function delivers: the failure middleware builds it and the
+ * serialization adapter in `#/lib/public-failure` carries it to the browser as a `PublicFailureError`.
+ * An error that did not come through it (a dropped connection, a framework error) has no kind and
+ * reads as the generic line.
  */
 export function refusalFor(error: unknown): MessageKey {
   const failure = readFailure(error)

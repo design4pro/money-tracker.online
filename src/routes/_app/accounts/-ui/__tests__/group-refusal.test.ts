@@ -9,9 +9,9 @@ import type { FailureKind } from '#/lib/failure-envelope'
 /**
  * What the screen says for each kind of group-write refusal.
  *
- * The sentence follows the public envelope's kind and never the message. The 05-S1 redaction
- * middleware is not registered (#649), so today's wire carries neither: the real-boundary shape is
- * pinned in `server/errors/__tests__/account-group-failures.test.ts`.
+ * The sentence follows the public envelope's kind and never the message. What a repository error
+ * becomes on its way to the browser is pinned in
+ * `server/errors/__tests__/account-group-failures.test.ts`.
  */
 
 function withKind(kind: FailureKind): Error {

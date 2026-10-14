@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
+import { PublicFailureError } from '#/lib/public-failure'
 import { refusalFor } from '#/routes/_app/accounts/-ui/group-refusal'
 import {
   ConflictError,
@@ -18,29 +19,18 @@ import { classifyFailure } from '../classify'
  * server-function boundary.
  *
  * The boundary keeps a **kind** and drops the class: `GroupDepthError` and any other
- * `ConflictError` arrive as the same `conflict`. This file records that, per class, for both the
- * public envelope (what the redaction middleware of plan stage 05-S1 will send) and the error
- * object the framework rebuilds today, before the middleware is registered (#649). The envelope picks
- * the sentence; today's wire carries no kind, so every refusal reads as the generic line there. The
- * sentence never depends on the message.
+ * `ConflictError` arrive as the same `conflict`. This file records that, per class, for what the
+ * browser holds after the failure middleware and the wire adapter: a `PublicFailureError` carrying
+ * the envelope the server built. The boundary itself is covered in `middleware.test.ts`. The
+ * sentence follows the envelope's kind and never the message; an error that did not come through
+ * the boundary has no kind and reads as the generic line.
  */
 
 const GENERIC = 'accounts.group.refused.generic'
 
-/** What the client holds after the boundary once the middleware is registered. */
-function throughEnvelope(error: unknown): Error {
-  return Object.assign(new Error('fixed'), {
-    envelope: buildEnvelope(error, classifyFailure(error)),
-  })
-}
-
-/**
- * What it holds today, probed against the running server: a plain `Error` carrying the message and
- * nothing else - no `name`, no `code`, no envelope. The middleware that would add the envelope is
- * not registered (#649).
- */
-function throughWireToday(error: Error): Error {
-  return new Error(error.message)
+/** What the client holds after the boundary. */
+function throughBoundary(error: unknown): PublicFailureError {
+  return new PublicFailureError(buildEnvelope(error, classifyFailure(error)))
 }
 
 const refusedZod = (() => {
@@ -93,11 +83,11 @@ const CASES: ReadonlyArray<{
 ]
 
 describe.each(CASES)('$label', ({ error, messageKey }) => {
-  it('reads as its sentence through the envelope', () => {
-    expect(refusalFor(throughEnvelope(error))).toBe(messageKey)
+  it('reads as its sentence through the boundary', () => {
+    expect(refusalFor(throughBoundary(error))).toBe(messageKey)
   })
 
-  it('reads as the generic sentence through today’s wire, which carries no kind', () => {
-    expect(refusalFor(throughWireToday(error))).toBe(GENERIC)
+  it('reads as the generic sentence when it did not come through the boundary', () => {
+    expect(refusalFor(new Error(error.message))).toBe(GENERIC)
   })
 })

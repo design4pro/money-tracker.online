@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 
 import { I18nProvider } from '#/lib/i18n'
 import { FAILURE_MESSAGE_KEYS } from '#/lib/failure-envelope'
+import { PublicFailureError } from '#/lib/public-failure'
 import en from '#/lib/i18n/messages/en'
 
 import { GroupTreeSkeleton } from '../group-states'
@@ -33,16 +34,19 @@ vi.mock('#/server/fns/accounts', () => server)
 const RAW = 'account_group g-7 in org org-1 SQLITE_CONSTRAINT'
 
 /**
- * A refusal as it will arrive once the redaction middleware is registered (#649): the message and
- * the public envelope. Today's wire carries the message alone, which `refusedToday` stands for.
+ * A refusal as the browser receives it: the failure middleware's envelope, carried by the wire
+ * adapter as a `PublicFailureError`. `RAW` stays on the plain-error case only, to prove it is never
+ * printed.
  */
 function refused(kind: FailureKind): Error {
-  return Object.assign(new Error(RAW), {
-    envelope: { v: 1, kind, message: { key: FAILURE_MESSAGE_KEYS[kind] } },
+  return new PublicFailureError({
+    v: 1,
+    kind,
+    message: { key: FAILURE_MESSAGE_KEYS[kind] },
   })
 }
 
-function refusedToday(): Error {
+function refusedPlain(): Error {
   return new Error(RAW)
 }
 
@@ -114,7 +118,7 @@ describe('GroupsScreen refusals', () => {
       /does not fit the groups as they are/,
     ],
     ['Anything else', () => refused('internal'), /Something went wrong/],
-    ['today’s kindless', refusedToday, /Something went wrong/],
+    ['plain (no envelope)', refusedPlain, /Something went wrong/],
   ])(
     'says a %s refusal as a catalogue sentence, never the raw message, and reloads',
     async (_name, make, sentence) => {
