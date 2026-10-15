@@ -192,3 +192,47 @@ describe('Menu', () => {
     expect(screen.getByRole('menu').className).not.toMatch(/(^|\s)max-h-/)
   })
 })
+
+describe('MenuItem description', () => {
+  it('shows the reason beside a disabled item and names the item without it', async () => {
+    const user = userEvent.setup()
+    render(
+      <MenuTrigger>
+        <Button>Actions</Button>
+        <Popover>
+          <Menu aria-label="Group actions" disabledKeys={['up']}>
+            <MenuItem id="up" description="Already first">
+              Move up
+            </MenuItem>
+            <MenuItem id="down">Move down</MenuItem>
+          </Menu>
+        </Popover>
+      </MenuTrigger>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }))
+
+    // The reason is on screen as text, not in a tooltip a keyboard user never opens …
+    expect(screen.getByText('Already first')).toBeTruthy()
+    // … the item's name stays the label alone …
+    const item = screen.getByRole('menuitem', { name: 'Move up' })
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    // … and the reason is its description, so a screen reader hears it with the item.
+    expect(item.getAttribute('aria-describedby')).toBe(
+      screen.getByText('Already first').id,
+    )
+  })
+
+  it('leaves an item without a description exactly as it was', async () => {
+    const user = userEvent.setup()
+    render(<Example />)
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }))
+
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Edit' })
+        .getAttribute('aria-describedby'),
+    ).toBeNull()
+  })
+})

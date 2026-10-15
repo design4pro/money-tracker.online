@@ -95,13 +95,17 @@ const TRANSITION_SETTLE_MS = 250
  * `/` and `/login` are marketing and a form; `/dashboard` draws its account lines inside widgets
  * that are not row targets, at rest; `/categories` is a `GridList`, whose rows carry their own
  * hover treatment on `GridListItem` and whose only secondary-ink descendants are decorative icons
- * — a 3:1 question (§1.4.11), not a 7:1 one.
+ * — a 3:1 question (§1.4.11), not a 7:1 one. `/accounts/groups` is a `GridList` too, but its rows
+ * do carry secondary text (the account names and the count). It is listed because those rows
+ * take no `rowWash`, not because nothing there needs a number: pointing the hovered scan at every
+ * `role="row"` there (a throwaway edit of `WASH_ROW`) held the floor in both themes.
  */
 const NO_WASH_ROWS: readonly string[] = [
   '/',
   '/login',
   '/dashboard',
   '/categories',
+  '/accounts/groups',
 ]
 
 interface Measured {
