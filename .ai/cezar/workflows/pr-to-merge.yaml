@@ -24,18 +24,14 @@ nodes:
   # Cezar's worktree must hold the PR head before anything else runs. A check command does not get
   # `{{task}}` (only `{{nodes.*}}` is rendered in 0.15.2, probed), so the number comes from
   # CEZ_GITHUB_NUMBER, which cezar sets for a run an automation started. That also keeps free text
-  # out of a shell. Only a same-repository PR into the base branch is taken: `origin` is not a
-  # fork, and the push below goes to `origin`.
+  # out of a shell. pr-guard.sh takes only an open same-repository PR into the base branch whose
+  # head is not main or the base branch: `origin` is not a fork, and the push below goes to `origin`.
   - id: checkout
     name: 'Check out PR branch'
     type: check
     command: |-
-      n="${CEZ_GITHUB_NUMBER:-}"
-      case "$n" in ''|*[!0-9]*) echo "CEZ_GITHUB_NUMBER is not set: start pr-to-merge from a pull_request automation"; exit 1 ;; esac
-      base=$(node -p 'require("./.ai/agentic.config.json").baseBranch')
-      meta=$(gh pr view "$n" --json baseRefName,isCrossRepository --jq '"\(.baseRefName) \(.isCrossRepository)"')
-      [ "$meta" = "$base false" ] || { echo "PR #$n is not a same-repository PR into $base ($meta): refusing"; exit 1; }
-      gh pr checkout "$n"
+      bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}" >/dev/null
+      gh pr checkout "$CEZ_GITHUB_NUMBER"
 
   # ---------- SYNC ----------
   # After the checkout, so the PR lockfile is what gets installed.
@@ -132,16 +128,15 @@ nodes:
     type: git.commit
     message: 'fix: address review feedback'
   # cezar's git.push pushes the run's own task branch (cez/<id8>), not the branch `gh pr checkout`
-  # fetched, so the PR head is pushed here with an explicit refspec (AGENTS.md, Git). A PR that was
-  # merged or closed while the run worked is not pushed to: that would recreate its deleted branch.
+  # fetched, so the PR head is pushed here with an explicit refspec (AGENTS.md, Git). pr-guard.sh
+  # runs again: a PR that was merged or closed while the run worked is not pushed to (that would
+  # recreate its deleted branch), and the head it prints is never main or the base branch.
   - id: push
     name: 'Push branch'
     type: check
     command: |-
-      state=$(gh pr view "$CEZ_GITHUB_NUMBER" --json state --jq .state)
-      [ "$state" = OPEN ] || { echo "PR #$CEZ_GITHUB_NUMBER is $state: not pushing"; exit 1; }
-      b=$(git branch --show-current)
-      git push origin "HEAD:refs/heads/$b"
+      head=$(bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}")
+      git push origin "HEAD:refs/heads/$head"
   - id: pushguard
     name: 'Verify push target'
     type: check

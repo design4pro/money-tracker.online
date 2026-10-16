@@ -31,8 +31,12 @@ case "${1:-}" in
     # AGENTS.md, Never: no deleted test, no .skip/.only/.todo/.fixme, no lint or type suppression.
     # `git add -A` first so a new, untracked file is part of the diff.
     git add -A
-    del=$(git diff "$mb" --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
-    skip=$(git diff "$mb" -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
+    # The diffs are assigned first: a failing `git diff` stops the script (`set -e`) instead of
+    # leaving an empty pipe for the greps to pass.
+    deleted=$(git diff "$mb" --name-only --diff-filter=D)
+    added=$(git diff "$mb" -U0)
+    del=$(printf '%s\n' "$deleted" | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
+    skip=$(printf '%s\n' "$added" | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
     if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
     ;;
   *)

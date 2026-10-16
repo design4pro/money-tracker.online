@@ -16,10 +16,18 @@ const SCRIPT = resolve(import.meta.dirname, '../branch-vs-base.sh')
 
 let repo
 
+// A commit made from a worktree runs the pre-commit hook with GIT_DIR and GIT_INDEX_FILE exported.
+// Inherited, they turn `git init` below into a re-init of the real repository (#429). The scratch
+// repository gets none of them.
+const cleanEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
+)
+
 const git = (...args) =>
   spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
     cwd: repo,
     encoding: 'utf8',
+    env: cleanEnv,
   })
 
 const write = (file, text) => {
@@ -36,7 +44,7 @@ const run = (mode) =>
   spawnSync('bash', [SCRIPT, mode], {
     cwd: repo,
     encoding: 'utf8',
-    env: { ...process.env, CEZ_BASE: 'develop' },
+    env: { ...cleanEnv, CEZ_BASE: 'develop' },
   })
 
 beforeEach(() => {
