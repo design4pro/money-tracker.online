@@ -26,11 +26,12 @@ nodes:
   # CEZ_GITHUB_NUMBER, which cezar sets for a run an automation started. That also keeps free text
   # out of a shell. pr-guard.sh takes only an open same-repository PR into the base branch whose
   # head is not main or the base branch: `origin` is not a fork, and the push below goes to `origin`.
+  # A check runs as `bash -lc` with no `set -e`, so a guard's exit status is passed on with `|| exit 1`.
   - id: checkout
     name: 'Check out PR branch'
     type: check
     command: |-
-      bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}" >/dev/null
+      bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}" >/dev/null || exit 1
       gh pr checkout "$CEZ_GITHUB_NUMBER"
 
   # ---------- SYNC ----------
@@ -135,7 +136,7 @@ nodes:
     name: 'Push branch'
     type: check
     command: |-
-      head=$(bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}")
+      head=$(bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}") || exit 1
       git push origin "HEAD:refs/heads/$head"
   - id: pushguard
     name: 'Verify push target'
