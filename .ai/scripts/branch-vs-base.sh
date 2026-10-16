@@ -29,12 +29,15 @@ case "${1:-}" in
     ;;
   test-guard)
     # AGENTS.md, Never: no deleted test, no .skip/.only/.todo/.fixme, no lint or type suppression.
+    # Added lines are scanned in code, not in markdown prose and not in this script and its test
+    # (they hold the patterns). A legitimate conditional `test.skip(` still fails the guard: the run
+    # escalates, which is the safe side.
     # `git add -A` first so a new, untracked file is part of the diff.
     git add -A
     # The diffs are assigned first: a failing `git diff` stops the script (`set -e`) instead of
     # leaving an empty pipe for the greps to pass.
     deleted=$(git diff "$mb" --name-only --diff-filter=D)
-    added=$(git diff "$mb" -U0)
+    added=$(git diff "$mb" -U0 -- . ':!*.md' ':!.ai/scripts/branch-vs-base.sh' ':!.ai/scripts/__tests__/branch-vs-base.test.mjs')
     del=$(printf '%s\n' "$deleted" | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
     skip=$(printf '%s\n' "$added" | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
     if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi

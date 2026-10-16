@@ -81,6 +81,15 @@ describe('test-guard', () => {
     expect(result.stdout).toContain('Test weakening detected')
   })
 
+  it('does not read prose: a markdown file may mention a suppression', () => {
+    write(
+      'docs/note.md',
+      'Never add // @ts-expect-error or eslint-disable to a test.\n',
+    )
+    commit('docs')
+    expect(run('test-guard').status).toBe(0)
+  })
+
   it('fails on a test file deleted in a commit', () => {
     git('rm', '-q', 'src/a.test.ts')
     commit('delete')
