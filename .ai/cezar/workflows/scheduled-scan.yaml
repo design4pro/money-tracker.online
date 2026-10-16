@@ -41,7 +41,8 @@ nodes:
       EOF
       fi
       report "tracked secret-bearing files" "$(git ls-files | grep -Ei '(^|/)\.env(\.|$)|\.(pem|p12|pfx)$|(^|/)id_(rsa|ed25519)$' | grep -Eiv '\.(example|sample|template)$' || true)"
-      report "secret-like strings" "$(git grep -nIE 'AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,}' -- . ':!*.lock' || true)"
+      # file:line only: a matched value must never reach the agent prompts or a GitHub comment.
+      report "secret-like strings" "$(git grep -nIE 'AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,}' -- . ':!*.lock' | cut -d: -f1,2 || true)"
       report "unresolved merge conflict markers" "$(git grep -nIE '^(<<<<<<<|>>>>>>>) ' -- . || true)"
       echo "FINDINGS=$n THRESHOLD=$threshold"
       if [ "$n" -ge "$threshold" ]; then echo "SCAN_RESULT=findings"; else echo "SCAN_RESULT=clean"; fi
@@ -271,6 +272,17 @@ nodes:
       End with CEZ:VERDICT fixed if you changed code, or CEZ:VERDICT infra if the failure is a
       flake or infrastructure problem that code cannot fix.
 
+  # The CI fix agent edits the tree too, so it passes the same deterministic guard before anything
+  # is committed. `git add -A` first: new files are not in `git diff HEAD` until staged.
+  - id: ciguard
+    name: 'Test guard (CI fix)'
+    type: check
+    command: |-
+      git add -A
+      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
+      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
+      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+
   - id: commitfix
     name: 'Commit CI fix'
     type: git.commit
@@ -419,7 +431,9 @@ edges:
   - { from: ci.failed, to: escalate }
   - { from: ciloop.repeat, to: cifix }
   - { from: ciloop.exhausted, to: escalate }
-  - { from: cifix.fixed, to: commitfix }
+  - { from: cifix.fixed, to: ciguard }
+  - { from: ciguard.pass, to: commitfix }
+  - { from: ciguard.fail, to: escalate }
   - { from: cifix.infra, to: escalate }
   - { from: cifix.failed, to: escalate }
   - { from: commitfix.done, to: pushfix }
