@@ -1,0 +1,446 @@
+version: 2
+name: scheduled-scan
+description: 'Cyclic security and quality scan. Deterministic detection first (validation commands from .ai/agentic.config.json plus read-only git/grep checks); an agent runs only when findings reach the threshold. Findings are classified: small fix -> TDD fix, validation gate, independent review panel + judge, draft PR; larger -> an intent issue; dismissal -> a justified comment on the scan log issue. Launch it from Cezar Automation with a schedule trigger; this workflow creates no automation config. Nothing merges without om-approve-merge-pr (QA gate, blocking labels, checks) and a human approval on risk-high. Cezar owns git/PR/CI; agents only edit the worktree.'
+nodes:
+  - id: start
+    type: start
+
+  # Dependencies and the route tree, with retries (the script every workflow here leads with).
+  - id: bootstrap
+    name: 'Install dependencies'
+    type: check
+    command: |-
+      bash .ai/scripts/bootstrap.sh
+
+  # ---------- DETECTION (deterministic, read-only) ----------
+  # Never invents toolchain commands: only validation.commands from the config run. Always exits 0
+  # unless the script itself breaks; the verdict is the SCAN_RESULT line read by the if node.
+  - id: detect
+    name: 'Detect findings'
+    type: check
+    command: |-
+      threshold=1   # findings needed before an agent is spent; raise to tolerate known noise
+      n=0
+      report() { # $1 = label, $2 = matching lines
+        if [ -n "$2" ]; then
+          echo "FINDING: $1"; printf '%s\n' "$2" | head -n 20
+          n=$((n + $(printf '%s\n' "$2" | grep -c .)))
+        fi
+      }
+      cmds=$(node -e 'const c = ((require("./.ai/agentic.config.json").validation) || {}).commands || []; console.log(c.join("\n"))')
+      if [ -z "$cmds" ]; then
+        report "no validation commands configured" "validation.commands is empty in .ai/agentic.config.json"
+      else
+        while IFS= read -r x; do
+          [ -n "$x" ] || continue
+          echo "\$ $x"
+          out=$(sh -c "$x" </dev/null 2>&1); rc=$?
+          [ "$rc" -eq 0 ] || report "validation command failed: $x" "$(printf '%s\n' "$out" | tail -n 20)"
+        done <<EOF
+      $cmds
+      EOF
+      fi
+      report "tracked secret-bearing files" "$(git ls-files | grep -Ei '(^|/)\.env(\.|$)|\.(pem|p12|pfx)$|(^|/)id_(rsa|ed25519)$' | grep -Eiv '\.(example|sample|template)$' || true)"
+      report "secret-like strings" "$(git grep -nIE 'AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,}' -- . ':!*.lock' || true)"
+      report "unresolved merge conflict markers" "$(git grep -nIE '^(<<<<<<<|>>>>>>>) ' -- . || true)"
+      echo "FINDINGS=$n THRESHOLD=$threshold"
+      if [ "$n" -ge "$threshold" ]; then echo "SCAN_RESULT=findings"; else echo "SCAN_RESULT=clean"; fi
+
+  - id: threshold
+    name: 'Findings reach threshold?'
+    type: if
+    condition:
+      kind: output
+      ref: detect.output
+      op: contains
+      value: 'SCAN_RESULT=findings'
+
+  # ---------- CLASSIFY ----------
+  - id: triage
+    name: 'Classify findings'
+    type: agent
+    verdicts: [smallfix, nofix]
+    prompt: |-
+      Scheduled scan scope: {{task}}
+      Deterministic detection reported:
+      {{nodes.detect.output}}
+      Verify each finding against the code (read-only for the source tree: do not edit files) and
+      classify it:
+      - false positive or accepted risk -> dismissal. Post a comment with the justification on the
+        open "Scheduled scan log" issue (create it if missing, search first).
+      - real but larger than a small, local, low-risk fix (design change, many files, schema, auth,
+        protected surface) -> file ONE intent issue per finding with om-prepare-issue (it dedupes
+        against open issues and PRs and links the covering spec). Do not implement it.
+      - real and small (a few files, no design decision) -> keep for the fix step.
+      Be idempotent: a finding already tracked in an open issue or PR is not filed again.
+      List the small fixes precisely (file, line, expected change) in your summary.
+      End with CEZ:VERDICT smallfix if at least one small fix remains, otherwise CEZ:VERDICT nofix
+
+  # ---------- SMALL FIX (TDD) ----------
+  - id: fix
+    name: 'Implement small fixes (TDD)'
+    type: agent
+    skill: om-fix
+    prompt: |-
+      Fix exactly these classified small findings and nothing else:
+      {{nodes.triage.summary}}
+      TDD: for each fix write a failing test first where a test is possible, confirm it fails for the
+      expected reason, then implement until it passes.
+      Work only in the current directory (Cezar already gave you an isolated worktree). Do not
+      create another worktree, do not commit, do not push, do not open a PR, do not claim or label
+      anything. Keep the change minimal (DRY, KISS, SOLID) and follow AGENTS.md (Always / Never).
+      Never remove a secret by committing a
+      rewrite of history; if a real credential is exposed, stop and say so in your summary so a
+      human can rotate it.
+      Do not invent validation commands; the gate is configured in .ai/agentic.config.json.
+
+  # Runs validation.commands from .ai/agentic.config.json. An empty list FAILS the gate, and
+  # `git add -A` comes first because the generator checks in the list compare with the index.
+  - id: gate
+    name: 'Validation gate'
+    type: check
+    command: |-
+      git add -A
+      node -e '
+      const c = (require("./.ai/agentic.config.json").validation || {}).commands || [];
+      if (!c.length) { console.log("FAIL: no validation commands configured - refusing to pass the gate"); process.exit(1); }
+      const { spawnSync } = require("child_process");
+      for (const x of c) { console.log("$ " + x); if (spawnSync(x, { shell: true, stdio: "inherit" }).status !== 0) process.exit(1); }
+      '
+
+  # Deterministic guard: the agent must not make the gate pass by weakening tests or silencing a
+  # linter or the type checker (AGENTS.md, Never). The gate stages everything first, so new files
+  # are part of `git diff HEAD`.
+  - id: testguard
+    name: 'Test guard'
+    type: check
+    command: |-
+      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
+      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
+      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+
+  # A small fix must stay small: more than 10 changed files means the classification was wrong.
+  - id: smallsize
+    name: 'Fix is still small?'
+    type: if
+    condition:
+      kind: diff-files
+      op: '>'
+      value: 10
+
+  - id: fixloop
+    name: 'Fix rounds (gate + review)'
+    type: loop
+    max: 4
+
+  - id: refix
+    name: 'Fix failing gate'
+    type: agent
+    skill: om-fix
+    session:
+      continue: fix
+    prompt: |-
+      A check failed (round {{nodes.fixloop.iteration}}/{{nodes.fixloop.max}}).
+      Validation gate: {{nodes.gate.output}}
+      Test guard: {{nodes.testguard.output}}
+      Fix the cause, not the tests: never delete, skip or weaken a test or a lint rule.
+      Re-run the failing command and paste the output. Do not commit or push.
+
+  # ---------- REVIEW (same panel as issue-to-merge) ----------
+  # Three fresh-context reviewers, each with one lens, then a judge. The author never reviews its
+  # own change (separation of duties).
+  - id: council
+    name: 'Review panel'
+    type: fork
+    branches: 3
+  - id: rvcorrect
+    name: 'Bugs + finding resolved'
+    type: agent
+    review: true
+    prompt: |-
+      Review the change made for these scan findings: {{nodes.triage.summary}}
+      Lens: Bugs and Compliance - does the diff really resolve each finding, logic errors, edge
+      cases, regressions, scope creep beyond the listed findings. Apply CODE_REVIEW.md if it
+      exists. Report only real problems, each with file and line, ranked Critical / Important /
+      Nit; say plainly when you found none.
+  - id: rvsecurity
+    name: 'Security + risk-high'
+    type: agent
+    review: true
+    prompt: |-
+      Review the change made for these scan findings: {{nodes.triage.summary}}
+      Lens: Security - does the fix introduce injection, authn/authz gaps, secrets, PII in logs,
+      tenant scoping (TenantScope first, Zod parsed twice), money, ledger, billing, schema migration
+      or protected-surface (BACKWARD_COMPATIBILITY.md) problems, or risky dependencies.
+      Apply the risk-high evidence rules from SDLC.md when the diff touches those areas.
+      Report only real problems, each with file and line, ranked Critical / Important / Nit;
+      say plainly when you found none.
+  - id: rvtests
+    name: 'Tests + accessibility'
+    type: agent
+    review: true
+    prompt: |-
+      Review the change made for these scan findings: {{nodes.triage.summary}}
+      Lens: Tests and Accessibility - is each fix proven by a test (or a stated reason why not), was
+      any test weakened or skipped, do UI changes meet WCAG 2.2 AA. Report only real problems,
+      each with file and line, ranked Critical / Important / Nit; say plainly when you found none.
+  - id: reports
+    name: 'All reports'
+    type: join
+    wait: all
+
+  - id: review
+    name: 'Review judge'
+    type: agent
+    verdicts: [approve, changes]
+    prompt: |-
+      Three independent reviewers checked the scan fix for: {{nodes.triage.summary}}
+
+      ## Bugs + finding resolved ({{nodes.rvcorrect.status}})
+      {{nodes.rvcorrect.summary}}
+
+      ## Security + risk-high ({{nodes.rvsecurity.status}})
+      {{nodes.rvsecurity.summary}}
+
+      ## Tests + accessibility ({{nodes.rvtests.status}})
+      {{nodes.rvtests.summary}}
+
+      Consolidate: drop duplicates and anything that is not a real problem, keep at most five
+      nits. A reviewer that crashed is a gap: do not treat it as a pass. Do not edit files.
+      List exactly what must change. End with CEZ:VERDICT approve if there is no Critical or
+      Important finding, otherwise CEZ:VERDICT changes
+
+  - id: reviewloop
+    name: 'Review rounds'
+    type: loop
+    max: 2
+
+  - id: reviewfix
+    name: 'Address review'
+    type: agent
+    skill: om-fix
+    session:
+      continue: fix
+    prompt: |-
+      Review round {{nodes.reviewloop.iteration}}/{{nodes.reviewloop.max}} requested changes:
+      {{nodes.review.summary}}
+      Fix every Critical and Important finding. Do not weaken tests. Do not commit or push.
+
+  # ---------- PR + CI ----------
+  - id: commit
+    name: 'Commit'
+    type: git.commit
+    message: 'fix: resolve scheduled scan findings'
+  - id: push
+    name: 'Push branch'
+    type: git.push
+  # Guards against push.default=upstream landing the commit on the wrong branch (AGENTS.md, Git).
+  - id: pushguard
+    name: 'Verify push target'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+  - id: openpr
+    name: 'Open draft PR'
+    type: github.draft-pr
+
+  - id: ci
+    name: 'Wait for CI'
+    type: github.wait-ci
+    timeoutMs: 2400000
+    pollMs: 60000
+
+  - id: ciloop
+    name: 'CI fix rounds'
+    type: loop
+    max: 3
+
+  - id: cifix
+    name: 'Fix red CI'
+    type: agent
+    skill: om-fix
+    verdicts: [fixed, infra]
+    prompt: |-
+      CI is red (round {{nodes.ciloop.iteration}}/{{nodes.ciloop.max}}):
+      {{nodes.ci.status}}
+      Inspect: gh pr checks; gh run view --log-failed.
+      Classify each failure: real bug / test bug / flake / infra.
+      Fix real bugs with a regression test; never fake green, never disable a check.
+      Do not commit or push.
+      End with CEZ:VERDICT fixed if you changed code, or CEZ:VERDICT infra if the failure is a
+      flake or infrastructure problem that code cannot fix.
+
+  - id: commitfix
+    name: 'Commit CI fix'
+    type: git.commit
+    message: 'fix: resolve failing CI checks'
+  - id: pushfix
+    name: 'Push CI fix'
+    type: git.push
+  - id: pushguard2
+    name: 'Verify push target (after CI fix)'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+
+  # ---------- SDLC LABELS + MERGE GATE ----------
+  - id: prready
+    name: 'Mark PR ready'
+    type: github.pr-update
+    ready: true
+
+  - id: labels
+    name: 'Apply SDLC labels'
+    type: agent
+    verdicts: [standard, riskhigh]
+    prompt: |-
+      The PR for the current branch is ready (gh pr view). Apply the SDLC.md label set and leave a
+      short comment explaining the choices, using only labels from .ai/agentic.config.json: exactly
+      one pipeline label (review), one category (security for security findings), needs-qa when the diff reaches src/routes/**, src/components/**, src/styles/** or src/lib/i18n/messages/*; skip-qa for docs, CI, tests, scripts/**, .ai/** and dependency bumps (never both),
+      one priority and one risk. Findings that touch auth, sessions, tenant scoping, money, the ledger, billing, migrations, protected decision documents or merge-policy surfaces (SDLC.md, "This repository") or real credentials are
+      risk-high. Do not change code. Do not apply qa, qa-approved or qa-self-verified.
+      End with CEZ:VERDICT riskhigh if you applied risk-high, otherwise CEZ:VERDICT standard
+
+  # Tier the autonomy: risk-high changes need a human decision before the merge agent runs.
+  - id: humanmerge
+    name: 'Human approval (risk-high)'
+    type: gate.human
+    message: |-
+      This scheduled-scan fix is labelled risk-high. Review the PR before the SDLC merge gate runs.
+      Findings fixed: {{nodes.triage.summary}}
+      Labels and rationale: {{nodes.labels.summary}}
+      Review judge: {{nodes.review.summary}}
+      Approve to let om-approve-merge-pr proceed (it still enforces the QA gate and the second reviewer).
+    timeoutMs: 259200000
+
+  - id: merge
+    name: 'SDLC merge gate'
+    type: agent
+    skill: om-approve-merge-pr
+    verdicts: [merged, blocked]
+    prompt: |-
+      Approve and squash-merge the PR of the current branch strictly through the om-approve-merge-pr
+      gates (QA gate, blocking labels, required checks, risk-high second reviewer).
+      If any gate refuses (for example needs-qa without qa-approved), do NOT work around it:
+      merge nothing and report which gate blocked.
+      End with CEZ:VERDICT merged if the PR is merged, otherwise CEZ:VERDICT blocked
+
+  # ---------- ESCALATION + ENDS ----------
+  - id: escalate
+    name: 'Escalate to human'
+    type: agent
+    prompt: |-
+      The scheduled scan stopped. Scope: {{task}}
+      Last known outputs:
+      detect: {{nodes.detect.output}}
+      triage: {{nodes.triage.summary}}
+      review: {{nodes.review.summary}}
+      gate: {{nodes.gate.output}}
+      ci: {{nodes.ci.status}}
+      merge: {{nodes.merge.summary}}
+      Comment on the open "Scheduled scan log" issue (create it if missing, search first) saying
+      where the run stopped, why, and the next human action (a merge refused for missing QA means:
+      run QA, then re-run om-approve-merge-pr). If a PR exists comment there too (gh pr view) and
+      add the blocked label only for a real defect, not when it merely awaits QA. A diff that grew
+      past a small fix means: the findings need intent issues instead. Do not change code.
+
+  - id: done
+    name: 'Merged'
+    type: end
+    status: success
+  - id: noop
+    name: 'Nothing to do'
+    type: end
+    status: success
+  - id: needshuman
+    name: 'Needs human'
+    type: end
+    status: failed
+
+edges:
+  - { from: start.next, to: bootstrap }
+  - { from: bootstrap.pass, to: detect }
+  - { from: bootstrap.fail, to: escalate }
+  - { from: detect.pass, to: threshold }
+  - { from: detect.fail, to: escalate }
+  - { from: threshold.true, to: triage }
+  - { from: threshold.false, to: noop }
+
+  - { from: triage.smallfix, to: fix }
+  - { from: triage.nofix, to: noop }
+  - { from: triage.failed, to: escalate }
+  - { from: fix.done, to: gate }
+  - { from: fix.failed, to: escalate }
+
+  - { from: gate.pass, to: testguard }
+  - { from: gate.fail, to: fixloop }
+  - { from: testguard.pass, to: smallsize }
+  - { from: testguard.fail, to: fixloop }
+  - { from: smallsize.true, to: escalate }
+  - { from: smallsize.false, to: council }
+  - { from: fixloop.repeat, to: refix }
+  - { from: fixloop.exhausted, to: escalate }
+  - { from: refix.done, to: gate }
+  - { from: refix.failed, to: escalate }
+
+  - { from: council.1, to: rvcorrect }
+  - { from: council.2, to: rvsecurity }
+  - { from: council.3, to: rvtests }
+  - { from: rvcorrect.done, to: reports }
+  - { from: rvsecurity.done, to: reports }
+  - { from: rvtests.done, to: reports }
+  # A reviewer that crashed still reaches the judge, who sees its status.
+  - { from: reports.done, to: review }
+  - { from: reports.failed, to: review }
+
+  - { from: review.approve, to: commit }
+  - { from: review.changes, to: reviewloop }
+  - { from: review.failed, to: escalate }
+  - { from: reviewloop.repeat, to: reviewfix }
+  - { from: reviewloop.exhausted, to: escalate }
+  - { from: reviewfix.done, to: gate }
+  - { from: reviewfix.failed, to: escalate }
+
+  - { from: commit.done, to: push }
+  - { from: commit.nothing, to: escalate }
+  - { from: commit.failed, to: escalate }
+  - { from: push.done, to: pushguard }
+  - { from: push.failed, to: escalate }
+  - { from: pushguard.pass, to: openpr }
+  - { from: pushguard.fail, to: escalate }
+  - { from: openpr.created, to: ci }
+  - { from: openpr.failed, to: escalate }
+
+  - { from: ci.green, to: prready }
+  - { from: ci.red, to: ciloop }
+  - { from: ci.timeout, to: escalate }
+  - { from: ci.failed, to: escalate }
+  - { from: ciloop.repeat, to: cifix }
+  - { from: ciloop.exhausted, to: escalate }
+  - { from: cifix.fixed, to: commitfix }
+  - { from: cifix.infra, to: escalate }
+  - { from: cifix.failed, to: escalate }
+  - { from: commitfix.done, to: pushfix }
+  - { from: commitfix.nothing, to: escalate }
+  - { from: commitfix.failed, to: escalate }
+  - { from: pushfix.done, to: pushguard2 }
+  - { from: pushfix.failed, to: escalate }
+  - { from: pushguard2.pass, to: ci }
+  - { from: pushguard2.fail, to: escalate }
+
+  - { from: prready.done, to: labels }
+  - { from: prready.failed, to: escalate }
+  - { from: labels.standard, to: merge }
+  - { from: labels.riskhigh, to: humanmerge }
+  - { from: labels.failed, to: escalate }
+  - { from: humanmerge.approve, to: merge }
+  - { from: humanmerge.reject, to: escalate }
+  - { from: humanmerge.timeout, to: escalate }
+  - { from: merge.merged, to: done }
+  - { from: merge.blocked, to: escalate }
+  - { from: merge.failed, to: escalate }
+
+  - { from: escalate.done, to: needshuman }
+  - { from: escalate.failed, to: needshuman }

@@ -1,0 +1,356 @@
+version: 2
+name: idea-to-spec
+description: 'Human-written brief -> design-only specification -> independent review panel + judge -> human spec acceptance. Plan+Design stages of the AI-native SDLC (spec rules: .ai/specs/AGENTS.md). om-brainstorm is interactive and runs BEFORE this graph. Cezar owns git/PR; agents only edit the worktree. Every port is wired, every cycle is bounded.'
+nodes:
+  - id: start
+    type: start
+
+  # Dependencies and the route tree, with retries (the script every workflow here leads with).
+  - id: bootstrap
+    name: 'Install dependencies'
+    type: check
+    command: |-
+      bash .ai/scripts/bootstrap.sh
+
+  # ---------- INTAKE ----------
+  # Task input: the path of a brief, e.g. .ai/specs/briefs/<date>-<slug>.md (the file the
+  # interactive om-brainstorm skill writes, which must not run inside this autonomous graph).
+  # The brief is read, never changed or committed by this workflow.
+  - id: intake
+    name: 'Check brief'
+    type: agent
+    skill: om-spec-writing
+    verdicts: [ready, incomplete]
+    prompt: |-
+      Brief: {{task}}
+      Read-only. Do not edit files.
+      1. The brief file exists and states intent, scope and non-goals in the human's words. Humans own intent, scope and non-goals: if any is missing or
+         ambiguous, the brief is incomplete. Never invent them.
+      2. Facts are yours to check, not to ask about: read .ai/specs/AGENTS.md (the contract for a
+         spec), the generated index .ai/specs/README.md, the area's plan in docs/plans/
+         (docs/plans/README.md names the areas), .ai/specs/product-brief.md when it exists (its
+         non-goals, rules and decisions are protected: SDLC.md "Product decisions as a protected
+         contract") and the specs the brief overlaps. Note overlaps, conflicts and the specs the
+         new one must link to.
+      3. Check that no spec for this brief already exists in .ai/specs/, implemented/ or archived/.
+      Summarize the verified facts and list every question the brief leaves open. Classify each as
+      FACT (resolved by you now, give the evidence), REVERSIBLE (low-risk, to be decided after the
+      review panel) or HIGH-RISK (intent, scope, non-goals, auth, tenant scoping, money, the ledger, billing,
+      migrations, protected surfaces - only a human decides).
+      End with exactly one line: CEZ:VERDICT ready | incomplete
+
+  # ---------- DRAFT ----------
+  - id: draft
+    name: 'Draft specification'
+    type: agent
+    skill: om-spec-writing
+    prompt: |-
+      Brief: {{task}}
+      Verified facts and classified questions:
+      {{nodes.intake.summary}}
+      Write the specification autonomously (om-spec-writing --autonomous building blocks, as used
+      by om-auto-write-spec, but WITHOUT opening a PR): skeleton first, with an Open Questions
+      section and an (initially empty) Resolved assumptions section, market-leader research, and an implementation breakdown into phases and steps.
+      Save it as .ai/specs/<date>-<slug>.md (top level of .ai/specs/) and link it to the related
+      specs and the docs/plans/ stage. Follow .ai/specs/AGENTS.md: the metadata table directly
+      under the H1 with Status draft and Issue, Spec PR and Implementation written out as
+      `none`, plus the sections .ai/skills/om-auto-write-spec/SKILL.md requires of every spec.
+      Rules:
+      - Design only. Do NOT edit docs/plans/, .ai/specs/product-brief.md, the briefs, or any source
+        code: specs precede ticket slicing and implementation PRs stay separate.
+      - .ai/specs/README.md is generated (`pnpm generate-spec-index`); never edit it by hand.
+      - Do not decide HIGH-RISK questions; keep them under Open Questions, marked HIGH-RISK.
+      - Work only in the current directory (Cezar gave you an isolated worktree). Do not create
+        another worktree, commit, push, open a PR, or touch labels.
+      - Write in English. Do not invent validation commands.
+
+  # Deterministic gate between draft and panel: only specs (and the generated index, which the
+  # spec-index generator from validation.commands rewrites) changed, structure present.
+  - id: specgate
+    name: 'Spec structure gate'
+    type: check
+    command: &speccheck |-
+      node -e '
+      const { execSync, spawnSync } = require("child_process"), fs = require("fs");
+      const cmds = (require("./.ai/agentic.config.json").validation || {}).commands || [];
+      const gen = cmds.find((c) => c.includes("generate-spec-index"));
+      if (!gen) { console.log("FAIL: no generate-spec-index command in validation.commands - refusing to pass"); process.exit(1); }
+      const run = gen.split("&&")[0].trim();
+      console.log("$ " + run);
+      if (spawnSync(run, { shell: true, stdio: "inherit" }).status !== 0) { console.log("FAIL: the spec index generator failed"); process.exit(1); }
+      const files = execSync("git status --porcelain --untracked-files=all").toString()
+        .split("\n").filter(Boolean).map((l) => l.slice(3));
+      const notSpec = [".ai/specs/README.md", ".ai/specs/AGENTS.md", ".ai/specs/product-brief.md"];
+      const bad = [];
+      if (!files.length) bad.push("no files changed");
+      for (const f of files) {
+        const isSpec = /^\.ai\/specs\/[^/]+\.md$/.test(f) && !notSpec.includes(f);
+        if (!isSpec && f !== ".ai/specs/README.md")
+          bad.push("out of scope for a design-only spec change (only a new top-level spec and the generated .ai/specs/README.md may change): " + f);
+      }
+      const specs = files.filter((f) => /^\.ai\/specs\/[^/]+\.md$/.test(f) && !notSpec.includes(f));
+      if (!specs.length) bad.push("no specification file changed");
+      for (const f of specs) {
+        const t = fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "";
+        if (!/^\|\s*\*\*Status\*\*\s*\|\s*draft\s*\|/m.test(t)) bad.push(f + ": metadata table with Status draft is missing (.ai/specs/AGENTS.md)");
+        if (!/^#+\s*Open Questions/im.test(t)) bad.push(f + ": missing Open Questions section");
+        if (!/^#+\s*Resolved assumptions/im.test(t)) bad.push(f + ": missing Resolved assumptions section");
+        if (/\b(TBD|TODO|FIXME)\b/.test(t)) bad.push(f + ": contains TBD/TODO/FIXME");
+      }
+      if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
+      console.log("ok: " + specs.join(", "));
+      '
+
+  - id: rounds
+    name: 'Revision rounds'
+    type: loop
+    max: 3
+
+  - id: revise
+    name: 'Revise specification'
+    type: agent
+    skill: om-spec-writing
+    session:
+      continue: draft
+    prompt: |-
+      Revision round {{nodes.rounds.iteration}}/{{nodes.rounds.max}}.
+      Structure gate output (empty when it passed): {{nodes.specgate.output}}
+      Review panel consolidation (empty before the first review): {{nodes.judge.summary}}
+      Human answer to the high-risk question (empty if none was asked): {{nodes.askhuman.answer}}
+      Fix every Critical and Important finding in the specification only. Same rules as before:
+      design only, no docs/plans or brief edit, no commit, no push. Do not paper over a finding by deleting
+      the requirement it concerns.
+
+  # ---------- INDEPENDENT REVIEW PANEL ----------
+  - id: panel
+    name: 'Review panel'
+    type: fork
+    branches: 3
+  - id: lensdesign
+    name: 'Correctness + architecture'
+    type: agent
+    review: true
+    prompt: |-
+      Review the specification drafted for: {{task}} (git status; git diff HEAD; the file is named in:
+      {{nodes.draft.summary}}). You did not write it. Your lens: correctness and architecture -
+      contradictions with related specs, the docs/plans/ stage and the protected decisions in
+      .ai/specs/product-brief.md, wrong or missing
+      boundaries, shared-contract impact, unrealistic phases, dependency gaps in the breakdown.
+      Report only real problems, each with file and line, ranked Critical / Important / Nit, and
+      say plainly when you found none. For each Open Question say whether it is FACT,
+      REVERSIBLE or HIGH-RISK and whether you agree with the draft's classification.
+  - id: lenssecurity
+    name: 'Security + risk'
+    type: agent
+    review: true
+    prompt: |-
+      Review the specification drafted for: {{task}} (git status; git diff HEAD; the file is named in:
+      {{nodes.draft.summary}}). You did not write it. Your lens: security and risk - auth,
+      tenant scoping, money, the ledger, billing, secrets, migrations, protected surfaces in
+      BACKWARD_COMPATIBILITY.md, abuse cases. State
+      whether the change is risk-high per SDLC.md and what evidence a high-risk implementation
+      would need. Report only real problems, each with file and line, ranked Critical / Important /
+      Nit, and say plainly when you found none. Flag any HIGH-RISK decision the draft made on its
+      own instead of leaving it to a human.
+  - id: lenstest
+    name: 'Testability + WCAG'
+    type: agent
+    review: true
+    prompt: |-
+      Review the specification drafted for: {{task}} (git status; git diff HEAD; the file is named in:
+      {{nodes.draft.summary}}). You did not write it. Your lens: testability and accessibility -
+      every requirement has an observable acceptance criterion, unit / integration / Playwright
+      coverage is identified, UI requirements meet WCAG 2.2 AA, responsive behavior is stated.
+      Report only real problems, each with file and line, ranked Critical / Important / Nit, and
+      say plainly when you found none.
+  - id: reports
+    name: 'All reports'
+    type: join
+    wait: all
+
+  - id: judge
+    name: 'Judge'
+    type: agent
+    verdicts: [accept, revise, ask]
+    prompt: |-
+      Three independent reviewers checked the specification for: {{task}}.
+
+      ## Correctness + architecture ({{nodes.lensdesign.status}})
+      {{nodes.lensdesign.summary}}
+
+      ## Security + risk ({{nodes.lenssecurity.status}})
+      {{nodes.lenssecurity.summary}}
+
+      ## Testability + WCAG ({{nodes.lenstest.status}})
+      {{nodes.lenstest.summary}}
+
+      Read-only. Consolidate: drop duplicates and non-problems, keep dissent visible with who
+      disagreed. Apply the question policy to every open question:
+      - FACT: verify it yourself from the repository; it never goes to a human.
+      - REVERSIBLE and low-risk: decide it now. List each as: question, decision, rationale, and
+        any dissent (the panel will record these under "Resolved assumptions").
+      - HIGH-RISK (intent, scope, non-goals, auth, tenant scoping, money, the ledger, billing, migrations,
+        protected surfaces): never decide. List the one most blocking question with options.
+      Verdict:
+      - revise: any Critical or Important finding remains. List exactly what must change.
+      - ask: no such finding, but a HIGH-RISK question needs a human answer first. Put that single
+        question with its options at the top of your summary.
+      - accept: no Critical or Important finding and no unanswered HIGH-RISK question.
+      End with exactly one line: CEZ:VERDICT accept | revise | ask
+
+  - id: askhuman
+    name: 'Ask the human'
+    type: ask-user
+    question: '{{nodes.judge.summary}}'
+    timeoutMs: 86400000
+
+  # ---------- RECORD ----------
+  - id: record
+    name: 'Record resolved assumptions'
+    type: agent
+    skill: om-spec-writing
+    session:
+      continue: draft
+    prompt: |-
+      The review panel accepted the specification. Judge consolidation:
+      {{nodes.judge.summary}}
+      Add or update a "Resolved assumptions" section in the specification: one entry per reversible
+      question decided after the panel (question, decision, rationale, dissent with who disagreed).
+      Move answered questions out of Open Questions; leave unanswered HIGH-RISK ones in place.
+      Do not change requirements. Do not edit docs/plans/. Do not commit or push.
+
+  - id: finalcheck
+    name: 'Final spec gate'
+    type: check
+    command: *speccheck
+
+  # ---------- PR + HUMAN ACCEPTANCE ----------
+  - id: commit
+    name: 'Commit specification'
+    type: git.commit
+    message: 'docs(spec): add specification drafted from brief'
+  - id: push
+    name: 'Push branch'
+    type: git.push
+  # Guards against push.default=upstream landing the commit on the wrong branch (AGENTS.md, Git).
+  - id: pushguard
+    name: 'Verify push target'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+  - id: openpr
+    name: 'Open draft PR'
+    type: github.draft-pr
+
+  - id: accept
+    name: 'Spec acceptance'
+    type: gate.human
+    message: |-
+      Spec review panel and judge accepted the specification for: {{task}}.
+      Review the draft PR (design-only: a spec and its generated index entry, no code). Approve only if the intent, scope and
+      non-goals match your brief and the Resolved assumptions are acceptable.
+
+      Judge summary:
+      {{nodes.judge.summary}}
+    timeoutMs: 604800000
+
+  - id: prready
+    name: 'Mark PR ready'
+    type: github.pr-update
+    ready: true
+
+  - id: labels
+    name: 'Apply SDLC labels'
+    type: agent
+    prompt: |-
+      The design-only spec PR for the current branch is ready (gh pr view). Apply the SDLC.md label
+      set using only labels from .ai/agentic.config.json: exactly one pipeline label (review),
+      category documentation, skip-qa, one priority and one risk (risk-high if the spec touches
+      auth, tenant scoping, money, the ledger, billing, migrations, protected decision documents or
+      merge-policy surfaces). Leave a short
+      comment explaining the choices. Do not change files. Do not approve or merge.
+
+  # ---------- ESCALATION + ENDS ----------
+  - id: escalate
+    name: 'Escalate to human'
+    type: agent
+    prompt: |-
+      The autonomous run stopped. Brief: {{task}}
+      Last known outputs:
+      intake: {{nodes.intake.summary}}
+      structure gate: {{nodes.specgate.output}}
+      judge: {{nodes.judge.summary}}
+      final gate: {{nodes.finalcheck.output}}
+      human decision: {{nodes.accept.comment}}
+      Write ONE concise note (comment on the PR if one exists: gh pr view; otherwise print it)
+      saying where it stopped, why, and the next human action. Do not edit files and do not
+      add labels beyond blocked when a PR exists and the stop is a real defect.
+
+  - id: done
+    name: 'Spec accepted'
+    type: end
+    status: success
+  - id: needshuman
+    name: 'Needs human'
+    type: end
+    status: failed
+
+edges:
+  - { from: start.next, to: bootstrap }
+  - { from: bootstrap.pass, to: intake }
+  - { from: bootstrap.fail, to: escalate }
+  - { from: intake.ready, to: draft }
+  - { from: intake.incomplete, to: needshuman }
+  - { from: intake.failed, to: escalate }
+
+  - { from: draft.done, to: specgate }
+  - { from: draft.failed, to: escalate }
+  - { from: specgate.pass, to: panel }
+  - { from: specgate.fail, to: rounds }
+  - { from: rounds.repeat, to: revise }
+  - { from: rounds.exhausted, to: escalate }
+  - { from: revise.done, to: specgate }
+  - { from: revise.failed, to: escalate }
+
+  - { from: panel.1, to: lensdesign }
+  - { from: panel.2, to: lenssecurity }
+  - { from: panel.3, to: lenstest }
+  - { from: lensdesign.done, to: reports }
+  - { from: lenssecurity.done, to: reports }
+  - { from: lenstest.done, to: reports }
+  - { from: reports.done, to: judge }
+  - { from: reports.failed, to: escalate }
+
+  - { from: judge.accept, to: record }
+  - { from: judge.revise, to: rounds }
+  - { from: judge.ask, to: askhuman }
+  - { from: judge.failed, to: escalate }
+  - { from: askhuman.answered, to: rounds }
+  - { from: askhuman.timeout, to: escalate }
+
+  - { from: record.done, to: finalcheck }
+  - { from: record.failed, to: escalate }
+  - { from: finalcheck.pass, to: commit }
+  - { from: finalcheck.fail, to: escalate }
+
+  - { from: commit.done, to: push }
+  - { from: commit.nothing, to: escalate }
+  - { from: commit.failed, to: escalate }
+  - { from: push.done, to: pushguard }
+  - { from: push.failed, to: escalate }
+  - { from: pushguard.pass, to: openpr }
+  - { from: pushguard.fail, to: escalate }
+  - { from: openpr.created, to: accept }
+  - { from: openpr.failed, to: escalate }
+
+  - { from: accept.approve, to: prready }
+  - { from: accept.reject, to: escalate }
+  - { from: accept.timeout, to: escalate }
+  - { from: prready.done, to: labels }
+  - { from: prready.failed, to: escalate }
+  - { from: labels.done, to: done }
+  - { from: labels.failed, to: escalate }
+
+  - { from: escalate.done, to: needshuman }
+  - { from: escalate.failed, to: needshuman }

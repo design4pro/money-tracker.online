@@ -1,0 +1,261 @@
+version: 2
+name: spec-to-backlog
+description: 'Accepted specification -> backlog tree (dry run) -> independent tree critic -> human consent gate -> filed issues (om-backlog) -> Definition of Ready pass -> backlog.md record PR. Plan -> Build handover of the AI-native SDLC. Writes to the tracker only after the human gate approves the exact tree. Cezar owns git/PR; agents only edit the worktree. Every port is wired, every cycle is bounded.'
+nodes:
+  - id: start
+    type: start
+
+  # ---------- INTAKE ----------
+  # Task input: the repo-relative path of an ACCEPTED specification already merged on the base
+  # branch, e.g. .ai/specs/<date>-<slug>.md with Status ready (see idea-to-spec for how it gets there).
+  - id: intake
+    name: 'Check accepted spec'
+    type: agent
+    skill: om-backlog
+    verdicts: [ready, notready]
+    prompt: |-
+      Specification: {{task}}
+      Read-only. Do not edit files, do not write to the tracker.
+      1. The file exists on the current base branch (it is merged, not only in an open PR), sits
+         at the top level of .ai/specs/ with Status ready (.ai/specs/AGENTS.md) and has a Phasing
+         or Implementation Plan section.
+      2. Apply the readiness rules of om-backlog step 1 and the Definition of Ready in SDLC.md:
+         no unanswered question blocks the Now scope, every decision it relies on is active.
+         HIGH-RISK questions (intent, scope, non-goals, auth, tenant scoping, money, the ledger,
+         billing, migrations, protected surfaces) left open in the spec are a stop: only a human answers them.
+      3. This workflow records the filed tree in .ai/specs/backlog.md. If that file does not
+         exist the verdict is notready, and the summary says so in these words: this repository
+         tracks its backlog in GitHub issues and docs/plans/ (node .ai/scripts/backlog-status.mjs),
+         it has no .ai/specs/backlog.md, and scripts/specs/index.ts (NOT_A_SPEC) would list such a
+         file as a spec; a maintainer must decide the record location before this workflow can run
+         (afk-to-tickets is the slicer this repository uses today). When the file exists, list the
+         ids and issues this source already maps, because they are preserved, never renumbered.
+      Summarize the verified facts and what is missing, if anything.
+      End with exactly one line: CEZ:VERDICT ready | notready
+
+  # ---------- TREE (dry run) ----------
+  - id: tree
+    name: 'Draft backlog tree'
+    type: agent
+    skill: om-backlog
+    prompt: |-
+      Specification: {{task}}
+      Verified facts: {{nodes.intake.summary}}
+      Run om-backlog for this source in --dry-run mode: draft the whole tree (epics, stories with
+      Given / When / Then acceptance criteria, tasks only where a story needs decomposition),
+      source-qualified stable ids, dependencies, inferred priority and risk per SDLC.md. Reuse the
+      existing ids and mappings from .ai/specs/backlog.md. Only leaf tasks are executable.
+      Write NOTHING: no files, no tracker, no labels. Print the complete tree (with every
+      acceptance criterion) as your summary; a human will read exactly that text.
+      Work in the current directory only. Do not commit or push. Do not invent validation commands.
+
+  # A fresh-context critic checks the tree before a human spends attention on it.
+  - id: treecrit
+    name: 'Tree critic'
+    type: agent
+    verdicts: [approve, revise]
+    prompt: |-
+      You did not draft this backlog tree. Specification: {{task}}
+      Tree:
+      {{nodes.tree.summary}}
+      Revised tree (empty on the first round): {{nodes.retree.summary}}
+      Read-only. Check: every phase and requirement of the specification maps to an item or is
+      listed under Held back; no item invents scope; ids are stable and source-qualified; the
+      dependency graph is acyclic and every task depends only on earlier tasks; stories are user
+      outcomes and tasks are leaves; each acceptance criterion is observable by someone who did
+      not write it; risk-high items (auth, tenant scoping, money, the ledger, billing, migrations,
+      protected decision documents, merge-policy surfaces) are marked; an epic carries the highest risk of its stories.
+      End with CEZ:VERDICT approve if sound, otherwise CEZ:VERDICT revise with the exact changes
+
+  - id: treeloop
+    name: 'Tree revision rounds'
+    type: loop
+    max: 2
+
+  - id: retree
+    name: 'Revise tree'
+    type: agent
+    skill: om-backlog
+    session:
+      continue: tree
+    prompt: |-
+      The tree critic requested changes (round {{nodes.treeloop.iteration}}/{{nodes.treeloop.max}}):
+      {{nodes.treecrit.summary}}
+      Revise the tree accordingly. Still a dry run: write nothing, print the complete revised tree.
+
+  # ---------- HUMAN CONSENT ----------
+  # om-backlog has a hard stop: nothing is written to the tracker before a human has seen the
+  # whole tree and said yes. This gate is that yes.
+  - id: consent
+    name: 'Backlog consent'
+    type: gate.human
+    message: |-
+      Approve to file these issues in the tracker (creates issues, writes labels):
+      {{nodes.tree.summary}}
+      {{nodes.retree.summary}}
+      Tree critic: {{nodes.treecrit.summary}}
+      Approve only if the scope matches the accepted specification.
+    timeoutMs: 604800000
+
+  # ---------- FILE ----------
+  - id: file
+    name: 'File issues'
+    type: agent
+    skill: om-backlog
+    verdicts: [filed, drift]
+    prompt: |-
+      The operator approved the tree at the Cezar human gate; that approval is om-backlog's
+      step-4 confirmation. Specification: {{task}}
+      Approved tree: {{nodes.tree.summary}}
+      Revised tree (empty if no revision happened): {{nodes.retree.summary}}
+      Run om-backlog for this source for real: dedupe against the tracker, adopt unmarked issues
+      that already cover an item, file the rest through om-prepare-issue, write epic checklists,
+      and update this source's section in .ai/specs/backlog.md. Edit only that file in the
+      worktree. Do not commit or push. Never apply pipeline labels, in-progress or qa labels.
+      If the real run needs a material change from the approved tree (an adoption that changes
+      scope, a different id, a missing dependency), write NOTHING further and report the
+      difference.
+      End with CEZ:VERDICT filed if the filed tree matches the approved one, otherwise
+      CEZ:VERDICT drift
+
+  - id: manage
+    name: 'Definition of Ready pass'
+    type: agent
+    skill: om-auto-manage-issues
+    prompt: |-
+      Issues just filed by om-backlog: {{nodes.file.summary}}
+      Run om-auto-manage-issues on exactly these issues, relabel and readiness check only
+      (--relabel-only; no implementation prep, no spec authoring). Report any issue that is
+      not-ready and what is missing. Mutate labels and comments only; do not edit files.
+
+  # ---------- RECORD PR ----------
+  - id: bgate
+    name: 'Backlog record gate'
+    type: check
+    command: |-
+      node -e '
+      const { execSync, spawnSync } = require("child_process"), fs = require("fs");
+      const cmds = (require("./.ai/agentic.config.json").validation || {}).commands || [];
+      const gen = cmds.find((c) => c.includes("generate-spec-index"));
+      if (!gen) { console.log("FAIL: no generate-spec-index command in validation.commands - refusing to pass"); process.exit(1); }
+      const run = gen.split("&&")[0].trim();
+      console.log("$ " + run);
+      if (spawnSync(run, { shell: true, stdio: "inherit" }).status !== 0) { console.log("FAIL: the spec index generator failed"); process.exit(1); }
+      const files = execSync("git status --porcelain --untracked-files=all").toString()
+        .split("\n").filter(Boolean).map((l) => l.slice(3));
+      const bad = [];
+      const extra = files.filter((f) => f !== ".ai/specs/backlog.md" && f !== ".ai/specs/README.md");
+      if (!files.includes(".ai/specs/backlog.md") || extra.length)
+        bad.push("only .ai/specs/backlog.md (and the generated .ai/specs/README.md) may change, got: " + files.join(", "));
+      const t = fs.existsSync(".ai/specs/backlog.md") ? fs.readFileSync(".ai/specs/backlog.md", "utf8") : "";
+      if (/\b(TBD|TODO|FIXME)\b/.test(t)) bad.push("backlog.md contains TBD/TODO/FIXME");
+      if (!/^\| Id \| Issue \| Title \| Epic \| Depends on \| Adopted \|/m.test(t)) bad.push("backlog.md table header changed");
+      if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
+      console.log("ok");
+      '
+
+  - id: commit
+    name: 'Commit backlog record'
+    type: git.commit
+    message: 'docs(backlog): record filed backlog tree'
+  - id: push
+    name: 'Push branch'
+    type: git.push
+  # Guards against push.default=upstream landing the commit on the wrong branch (AGENTS.md, Git).
+  - id: pushguard
+    name: 'Verify push target'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+  - id: openpr
+    name: 'Open draft PR'
+    type: github.draft-pr
+
+  - id: prready
+    name: 'Mark PR ready'
+    type: github.pr-update
+    ready: true
+
+  - id: labels
+    name: 'Apply SDLC labels'
+    type: agent
+    prompt: |-
+      The backlog-record PR for the current branch is ready (gh pr view). Apply the SDLC.md label
+      set using only labels from .ai/agentic.config.json: exactly one pipeline label (review),
+      category documentation, skip-qa, one priority and risk-low (only backlog.md and the generated spec index changed).
+      Leave a short comment listing the filed issues: {{nodes.file.summary}}
+      Do not change files. Do not approve or merge.
+
+  # ---------- ESCALATION + ENDS ----------
+  - id: escalate
+    name: 'Escalate to human'
+    type: agent
+    prompt: |-
+      The autonomous run stopped. Specification: {{task}}
+      Last known outputs:
+      intake: {{nodes.intake.summary}}
+      tree critic: {{nodes.treecrit.summary}}
+      human consent: {{nodes.consent.comment}}
+      file: {{nodes.file.summary}}
+      readiness pass: {{nodes.manage.summary}}
+      record gate: {{nodes.bgate.output}}
+      Write ONE concise note (comment on the PR if one exists: gh pr view; otherwise print it)
+      saying where it stopped, why, and the next human action. If issues were already filed,
+      list them: the next run adopts them instead of duplicating. Do not edit files and do not
+      add labels beyond blocked when a PR exists and the stop is a real defect.
+
+  - id: done
+    name: 'Backlog filed'
+    type: end
+    status: success
+  - id: needshuman
+    name: 'Needs human'
+    type: end
+    status: failed
+
+edges:
+  - { from: start.next, to: intake }
+  - { from: intake.ready, to: tree }
+  - { from: intake.notready, to: needshuman }
+  - { from: intake.failed, to: escalate }
+
+  - { from: tree.done, to: treecrit }
+  - { from: tree.failed, to: escalate }
+  - { from: treecrit.approve, to: consent }
+  - { from: treecrit.revise, to: treeloop }
+  - { from: treecrit.failed, to: escalate }
+  - { from: treeloop.repeat, to: retree }
+  - { from: treeloop.exhausted, to: escalate }
+  - { from: retree.done, to: treecrit }
+  - { from: retree.failed, to: escalate }
+
+  - { from: consent.approve, to: file }
+  - { from: consent.reject, to: escalate }
+  - { from: consent.timeout, to: escalate }
+
+  - { from: file.filed, to: manage }
+  - { from: file.drift, to: escalate }
+  - { from: file.failed, to: escalate }
+  - { from: manage.done, to: bgate }
+  - { from: manage.failed, to: escalate }
+
+  - { from: bgate.pass, to: commit }
+  - { from: bgate.fail, to: escalate }
+  - { from: commit.done, to: push }
+  - { from: commit.nothing, to: escalate }
+  - { from: commit.failed, to: escalate }
+  - { from: push.done, to: pushguard }
+  - { from: push.failed, to: escalate }
+  - { from: pushguard.pass, to: openpr }
+  - { from: pushguard.fail, to: escalate }
+  - { from: openpr.created, to: prready }
+  - { from: openpr.failed, to: escalate }
+
+  - { from: prready.done, to: labels }
+  - { from: prready.failed, to: escalate }
+  - { from: labels.done, to: done }
+  - { from: labels.failed, to: escalate }
+
+  - { from: escalate.done, to: needshuman }
+  - { from: escalate.failed, to: needshuman }

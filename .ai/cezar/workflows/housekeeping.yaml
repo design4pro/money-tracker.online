@@ -1,0 +1,137 @@
+version: 2
+name: housekeeping-graph
+description: 'Graph variant of housekeeping (the older housekeeping.yml is a different workflow). Scheduled backlog hygiene with no human in the path: issue Definition of Ready and labels -> close issues fixed by merged PRs -> changelog draft (only when the repo has CHANGELOG.md) -> pipeline retro. Launch it from Cezar Automation with a schedule trigger; this workflow creates no automation config. Issue/label/comment work happens through the tracker; any file change goes through Cezar commit/push/draft-PR nodes (agents never commit or push), and the resulting PR still passes the normal review and merge gates in SDLC.md. When nothing changed the run ends successfully without a PR.'
+nodes:
+  - id: start
+    type: start
+
+  # ---------- TRACKER HYGIENE (no files change) ----------
+  - id: manage
+    name: 'Definition of Ready + labels'
+    type: agent
+    skill: om-auto-manage-issues
+    prompt: |-
+      Scheduled housekeeping run. Scope: {{task}}
+      Bring the open issues up to standard per SDLC.md: apply missing labels from the taxonomy in
+      .ai/agentic.config.json, check each issue against the Definition of Ready and post the
+      not-ready comment where it fails. Be idempotent and respect claim locks: skip an issue that
+      another agent or person has claimed. Do not implement anything, do not edit files, do not
+      commit or push, and do not author specs.
+
+  - id: close
+    name: 'Close fixed issues'
+    type: agent
+    skill: om-close-fixed-issues
+    prompt: |-
+      Close the issues that recently merged PRs authoritatively fixed (closing keywords or
+      closingIssuesReferences only, never bare issue mentions) and post the informational comments
+      for PRs closed without merging. A merge into the base branch does not close an issue
+      natively here, so the PR's `Closes #n` is honoured by this step. Respect claim locks. Do not edit files, do not commit or push.
+
+  # ---------- CHANGELOG (only with an existing convention) ----------
+  # The changelog step is skipped on the fail port when CHANGELOG.md is missing, which is a normal
+  # path here and not an error.
+  - id: haschangelog
+    name: 'Repo has a changelog?'
+    type: check
+    command: |-
+      test -f CHANGELOG.md
+
+  - id: changelog
+    name: 'Draft changelog entry'
+    type: agent
+    skill: om-auto-update-changelog
+    prompt: |-
+      Draft the CHANGELOG.md entry for every PR merged since the last release, following the
+      existing format of CHANGELOG.md and the Supersede Credit Rule. If nothing was merged since
+      the last entry, leave the file untouched.
+      Work only in the current directory (Cezar already gave you an isolated worktree). Edit
+      CHANGELOG.md only. Do NOT delegate to om-auto-create-pr, do not create a branch or worktree,
+      do not commit, do not push, do not open a PR; Cezar owns git for this run.
+
+  # ---------- RETRO ----------
+  - id: retro
+    name: 'Pipeline retro'
+    type: agent
+    skill: om-pipeline-retro
+    prompt: |-
+      Read the finished pipeline runs and rank what second passes cost. If the report is worth
+      keeping, write it under the analysis path from .ai/agentic.config.json (a new dated file, never
+      overwriting an earlier report); otherwise write nothing.
+      Do not edit AGENTS.md, SDLC.md, CODE_REVIEW.md or workflow files: when a repeatable mistake
+      deserves a rule, file ONE follow-up issue proposing it (om-followup-issue-from-pr style).
+      Do not commit, do not push, do not open a PR. Never commit a report outside the analysis path.
+
+  # ---------- DELIVER FILE CHANGES (Cezar only) ----------
+  - id: commit
+    name: 'Commit'
+    type: git.commit
+    message: 'docs: scheduled housekeeping (changelog and retro report)'
+  - id: push
+    name: 'Push branch'
+    type: git.push
+  # Guards against push.default=upstream landing the commit on the wrong branch (AGENTS.md, Git).
+  - id: pushguard
+    name: 'Verify push target'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+  - id: openpr
+    name: 'Open draft PR'
+    type: github.draft-pr
+
+  # ---------- ESCALATION + ENDS ----------
+  - id: escalate
+    name: 'Escalate to human'
+    type: agent
+    prompt: |-
+      The scheduled housekeeping run stopped. Scope: {{task}}
+      Last known outputs:
+      manage: {{nodes.manage.summary}}
+      close: {{nodes.close.summary}}
+      changelog: {{nodes.changelog.summary}}
+      retro: {{nodes.retro.summary}}
+      push check: {{nodes.pushguard.output}}
+      Open ONE issue (search for an open "Housekeeping run stopped" issue first and comment there
+      instead) saying where it stopped, why, and the next human action. Do not change code.
+
+  - id: done
+    name: 'Housekeeping PR opened'
+    type: end
+    status: success
+  - id: noop
+    name: 'Nothing changed'
+    type: end
+    status: success
+  - id: needshuman
+    name: 'Needs human'
+    type: end
+    status: failed
+
+edges:
+  - { from: start.next, to: manage }
+  - { from: manage.done, to: close }
+  - { from: manage.failed, to: escalate }
+  - { from: close.done, to: haschangelog }
+  - { from: close.failed, to: escalate }
+
+  - { from: haschangelog.pass, to: changelog }
+  - { from: haschangelog.fail, to: retro }
+  - { from: changelog.done, to: retro }
+  - { from: changelog.failed, to: escalate }
+  - { from: retro.done, to: commit }
+  - { from: retro.failed, to: escalate }
+
+  - { from: commit.done, to: push }
+  - { from: commit.nothing, to: noop }
+  - { from: commit.failed, to: escalate }
+  - { from: push.done, to: pushguard }
+  - { from: push.failed, to: escalate }
+  - { from: pushguard.pass, to: openpr }
+  - { from: pushguard.fail, to: escalate }
+  - { from: openpr.created, to: done }
+  - { from: openpr.failed, to: escalate }
+
+  - { from: escalate.done, to: needshuman }
+  - { from: escalate.failed, to: needshuman }
