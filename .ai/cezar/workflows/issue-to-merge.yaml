@@ -116,15 +116,13 @@ nodes:
       '
 
   # Deterministic guard: the agent must not make the gate pass by weakening tests or silencing a
-  # linter or the type checker (AGENTS.md, Never). The gate stages everything first, so new files
-  # are part of `git diff HEAD`.
+  # linter or the type checker (AGENTS.md, Never). It reads the whole branch against its merge base
+  # with the base branch: cezar autosave-commits before every check, so `git diff HEAD` is empty.
   - id: testguard
     name: 'Test guard'
     type: check
     command: |-
-      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
-      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
-      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+      bash .ai/scripts/branch-vs-base.sh test-guard
 
   - id: fixloop
     name: 'Fix rounds (gate + review)'
@@ -229,6 +227,13 @@ nodes:
     name: 'Commit'
     type: git.commit
     message: 'feat: implement eligible leaf task'
+  # Cezar autosave-commits the agent's work before every check node, so git.commit reports `nothing`
+  # even when files changed. What matters is whether the branch holds work of its own.
+  - id: ahead
+    name: 'Branch has work?'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh ahead
   - id: push
     name: 'Push branch'
     type: git.push
@@ -261,6 +266,13 @@ nodes:
       specification. Never hand-edit a generated file (src/routeTree.gen.ts, drizzle/,
       .ai/specs/README.md): resolve its source, then regenerate it. Run the validation gate from .ai/agentic.config.json. Then git add the
       resolved files and complete the merge commit. Do not push.
+
+  # The conflict-resolution agent's edits are pushed by pushsync, so they pass the guard first.
+  - id: resguard
+    name: 'Test guard (conflict resolution)'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh test-guard
 
   - id: pushsync
     name: 'Push after sync'
@@ -299,15 +311,12 @@ nodes:
       flake or infrastructure problem that code cannot fix.
 
   # The CI fix agent edits the tree too, so it passes the same deterministic guard before anything
-  # is committed. `git add -A` first: new files are not in `git diff HEAD` until staged.
+  # is committed.
   - id: ciguard
     name: 'Test guard (CI fix)'
     type: check
     command: |-
-      git add -A
-      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
-      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
-      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+      bash .ai/scripts/branch-vs-base.sh test-guard
 
   - id: commitfix
     name: 'Commit CI fix'
@@ -452,7 +461,9 @@ edges:
   - { from: reviewfix.failed, to: escalate }
 
   - { from: commit.done, to: push }
-  - { from: commit.nothing, to: escalate }
+  - { from: commit.nothing, to: ahead }
+  - { from: ahead.pass, to: push }
+  - { from: ahead.fail, to: escalate }
   - { from: commit.failed, to: escalate }
   - { from: push.done, to: pushguard }
   - { from: push.failed, to: escalate }
@@ -466,7 +477,9 @@ edges:
   - { from: sync.failed, to: escalate }
   - { from: conflictloop.repeat, to: resolve }
   - { from: conflictloop.exhausted, to: escalate }
-  - { from: resolve.done, to: sync }
+  - { from: resolve.done, to: resguard }
+  - { from: resguard.pass, to: sync }
+  - { from: resguard.fail, to: escalate }
   - { from: resolve.failed, to: escalate }
 
   - { from: pushsync.done, to: pushguard2 }
@@ -486,7 +499,7 @@ edges:
   - { from: cifix.infra, to: escalate }
   - { from: cifix.failed, to: escalate }
   - { from: commitfix.done, to: sync }
-  - { from: commitfix.nothing, to: escalate }
+  - { from: commitfix.nothing, to: sync }
   - { from: commitfix.failed, to: escalate }
 
   - { from: prready.done, to: labels }

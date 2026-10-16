@@ -141,8 +141,9 @@ nodes:
       const run = gen.split("&&")[0].trim();
       console.log("$ " + run);
       if (spawnSync(run, { shell: true, stdio: "inherit" }).status !== 0) { console.log("FAIL: the spec index generator failed"); process.exit(1); }
-      const files = execSync("git status --porcelain --untracked-files=all").toString()
-        .split("\n").filter(Boolean).map((l) => l.slice(3));
+      // Not `git status`: cezar autosave-commits before every check, so it is empty by now.
+      const files = execSync("bash .ai/scripts/branch-vs-base.sh files").toString()
+        .split("\n").filter(Boolean);
       const bad = [];
       const extra = files.filter((f) => f !== ".ai/specs/backlog.md" && f !== ".ai/specs/README.md");
       if (!files.includes(".ai/specs/backlog.md") || extra.length)
@@ -158,6 +159,13 @@ nodes:
     name: 'Commit backlog record'
     type: git.commit
     message: 'docs(backlog): record filed backlog tree'
+  # Cezar autosave-commits the agent's work before every check node, so git.commit reports `nothing`
+  # even when files changed. What matters is whether the branch holds work of its own.
+  - id: ahead
+    name: 'Branch has work?'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh ahead
   - id: push
     name: 'Push branch'
     type: git.push
@@ -243,7 +251,9 @@ edges:
   - { from: bgate.pass, to: commit }
   - { from: bgate.fail, to: escalate }
   - { from: commit.done, to: push }
-  - { from: commit.nothing, to: escalate }
+  - { from: commit.nothing, to: ahead }
+  - { from: ahead.pass, to: push }
+  - { from: ahead.fail, to: escalate }
   - { from: commit.failed, to: escalate }
   - { from: push.done, to: pushguard }
   - { from: push.failed, to: escalate }

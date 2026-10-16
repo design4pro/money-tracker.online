@@ -67,6 +67,13 @@ nodes:
     name: 'Commit'
     type: git.commit
     message: 'docs: scheduled housekeeping (changelog and retro report)'
+  # Cezar autosave-commits the agent's work before every check node, so git.commit reports `nothing`
+  # even when files changed. What matters is whether the branch holds work of its own.
+  - id: ahead
+    name: 'Branch has work?'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh ahead
   - id: push
     name: 'Push branch'
     type: git.push
@@ -124,7 +131,9 @@ edges:
   - { from: retro.failed, to: escalate }
 
   - { from: commit.done, to: push }
-  - { from: commit.nothing, to: noop }
+  - { from: commit.nothing, to: ahead }
+  - { from: ahead.pass, to: push }
+  - { from: ahead.fail, to: noop }
   - { from: commit.failed, to: escalate }
   - { from: push.done, to: pushguard }
   - { from: push.failed, to: escalate }

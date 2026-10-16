@@ -35,7 +35,7 @@ nodes:
           [ -n "$x" ] || continue
           echo "\$ $x"
           out=$(sh -c "$x" </dev/null 2>&1); rc=$?
-          [ "$rc" -eq 0 ] || report "validation command failed: $x" "$(printf '%s\n' "$out" | tail -n 20)"
+          [ "$rc" -eq 0 ] || report "validation command failed: $x" "exit $rc: $(printf '%s\n' "$out" | tail -n 20)"
         done <<EOF
       $cmds
       EOF
@@ -110,15 +110,13 @@ nodes:
       '
 
   # Deterministic guard: the agent must not make the gate pass by weakening tests or silencing a
-  # linter or the type checker (AGENTS.md, Never). The gate stages everything first, so new files
-  # are part of `git diff HEAD`.
+  # linter or the type checker (AGENTS.md, Never). It reads the whole branch against its merge base
+  # with the base branch: cezar autosave-commits before every check, so `git diff HEAD` is empty.
   - id: testguard
     name: 'Test guard'
     type: check
     command: |-
-      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
-      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
-      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+      bash .ai/scripts/branch-vs-base.sh test-guard
 
   # A small fix must stay small: more than 10 changed files means the classification was wrong.
   - id: smallsize
@@ -232,6 +230,13 @@ nodes:
     name: 'Commit'
     type: git.commit
     message: 'fix: resolve scheduled scan findings'
+  # Cezar autosave-commits the agent's work before every check node, so git.commit reports `nothing`
+  # even when files changed. What matters is whether the branch holds work of its own.
+  - id: ahead
+    name: 'Branch has work?'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh ahead
   - id: push
     name: 'Push branch'
     type: git.push
@@ -273,15 +278,12 @@ nodes:
       flake or infrastructure problem that code cannot fix.
 
   # The CI fix agent edits the tree too, so it passes the same deterministic guard before anything
-  # is committed. `git add -A` first: new files are not in `git diff HEAD` until staged.
+  # is committed.
   - id: ciguard
     name: 'Test guard (CI fix)'
     type: check
     command: |-
-      git add -A
-      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
-      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
-      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+      bash .ai/scripts/branch-vs-base.sh test-guard
 
   - id: commitfix
     name: 'Commit CI fix'
@@ -416,7 +418,9 @@ edges:
   - { from: reviewfix.failed, to: escalate }
 
   - { from: commit.done, to: push }
-  - { from: commit.nothing, to: escalate }
+  - { from: commit.nothing, to: ahead }
+  - { from: ahead.pass, to: push }
+  - { from: ahead.fail, to: escalate }
   - { from: commit.failed, to: escalate }
   - { from: push.done, to: pushguard }
   - { from: push.failed, to: escalate }
@@ -437,7 +441,7 @@ edges:
   - { from: cifix.infra, to: escalate }
   - { from: cifix.failed, to: escalate }
   - { from: commitfix.done, to: pushfix }
-  - { from: commitfix.nothing, to: escalate }
+  - { from: commitfix.nothing, to: pushfix }
   - { from: commitfix.failed, to: escalate }
   - { from: pushfix.done, to: pushguard2 }
   - { from: pushfix.failed, to: escalate }

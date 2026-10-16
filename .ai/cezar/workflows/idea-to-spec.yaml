@@ -78,8 +78,9 @@ nodes:
       const run = gen.split("&&")[0].trim();
       console.log("$ " + run);
       if (spawnSync(run, { shell: true, stdio: "inherit" }).status !== 0) { console.log("FAIL: the spec index generator failed"); process.exit(1); }
-      const files = execSync("git status --porcelain --untracked-files=all").toString()
-        .split("\n").filter(Boolean).map((l) => l.slice(3));
+      // Not `git status`: cezar autosave-commits before every check, so it is empty by now.
+      const files = execSync("bash .ai/scripts/branch-vs-base.sh files").toString()
+        .split("\n").filter(Boolean);
       const notSpec = [".ai/specs/README.md", ".ai/specs/AGENTS.md", ".ai/specs/product-brief.md"];
       const bad = [];
       if (!files.length) bad.push("no files changed");
@@ -131,7 +132,7 @@ nodes:
     type: agent
     review: true
     prompt: |-
-      Review the specification drafted for: {{task}} (git status; git diff HEAD; the file is named in:
+      Review the specification drafted for: {{task}} (bash .ai/scripts/branch-vs-base.sh files; git diff $(git merge-base HEAD origin/develop); the file is named in:
       {{nodes.draft.summary}}). You did not write it. Your lens: correctness and architecture -
       contradictions with related specs, the docs/plans/ stage and the protected decisions in
       .ai/specs/product-brief.md, wrong or missing
@@ -144,7 +145,7 @@ nodes:
     type: agent
     review: true
     prompt: |-
-      Review the specification drafted for: {{task}} (git status; git diff HEAD; the file is named in:
+      Review the specification drafted for: {{task}} (bash .ai/scripts/branch-vs-base.sh files; git diff $(git merge-base HEAD origin/develop); the file is named in:
       {{nodes.draft.summary}}). You did not write it. Your lens: security and risk - auth,
       tenant scoping, money, the ledger, billing, secrets, migrations, protected surfaces in
       BACKWARD_COMPATIBILITY.md, abuse cases. State
@@ -157,7 +158,7 @@ nodes:
     type: agent
     review: true
     prompt: |-
-      Review the specification drafted for: {{task}} (git status; git diff HEAD; the file is named in:
+      Review the specification drafted for: {{task}} (bash .ai/scripts/branch-vs-base.sh files; git diff $(git merge-base HEAD origin/develop); the file is named in:
       {{nodes.draft.summary}}). You did not write it. Your lens: testability and accessibility -
       every requirement has an observable acceptance criterion, unit / integration / Playwright
       coverage is identified, UI requirements meet WCAG 2.2 AA, responsive behavior is stated.
@@ -229,6 +230,13 @@ nodes:
     name: 'Commit specification'
     type: git.commit
     message: 'docs(spec): add specification drafted from brief'
+  # Cezar autosave-commits the agent's work before every check node, so git.commit reports `nothing`
+  # even when files changed. What matters is whether the branch holds work of its own.
+  - id: ahead
+    name: 'Branch has work?'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh ahead
   - id: push
     name: 'Push branch'
     type: git.push
@@ -335,7 +343,9 @@ edges:
   - { from: finalcheck.fail, to: escalate }
 
   - { from: commit.done, to: push }
-  - { from: commit.nothing, to: escalate }
+  - { from: commit.nothing, to: ahead }
+  - { from: ahead.pass, to: push }
+  - { from: ahead.fail, to: escalate }
   - { from: commit.failed, to: escalate }
   - { from: push.done, to: pushguard }
   - { from: push.failed, to: escalate }

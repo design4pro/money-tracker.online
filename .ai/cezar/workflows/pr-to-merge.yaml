@@ -21,12 +21,21 @@ nodes:
       4. Otherwise claim it per SDLC.md (assign yourself, label in-progress, claim comment).
       End with exactly one line: CEZ:VERDICT ready | closed
 
-  # Cezar's worktree must hold the PR head before anything else runs. gh accepts a number or a URL.
+  # Cezar's worktree must hold the PR head before anything else runs. A check command does not get
+  # `{{task}}` (only `{{nodes.*}}` is rendered in 0.15.2, probed), so the number comes from
+  # CEZ_GITHUB_NUMBER, which cezar sets for a run an automation started. That also keeps free text
+  # out of a shell. Only a same-repository PR into the base branch is taken: `origin` is not a
+  # fork, and the push below goes to `origin`.
   - id: checkout
     name: 'Check out PR branch'
     type: check
     command: |-
-      gh pr checkout "{{task}}"
+      n="${CEZ_GITHUB_NUMBER:-}"
+      case "$n" in ''|*[!0-9]*) echo "CEZ_GITHUB_NUMBER is not set: start pr-to-merge from a pull_request automation"; exit 1 ;; esac
+      base=$(node -p 'require("./.ai/agentic.config.json").baseBranch')
+      meta=$(gh pr view "$n" --json baseRefName,isCrossRepository --jq '"\(.baseRefName) \(.isCrossRepository)"')
+      [ "$meta" = "$base false" ] || { echo "PR #$n is not a same-repository PR into $base ($meta): refusing"; exit 1; }
+      gh pr checkout "$n"
 
   # ---------- SYNC ----------
   # After the checkout, so the PR lockfile is what gets installed.
@@ -90,15 +99,13 @@ nodes:
       '
 
   # Deterministic guard: the agent must not make the gate pass by weakening tests or silencing a
-  # linter or the type checker (AGENTS.md, Never). The gate stages everything first, so new files
-  # are part of `git diff HEAD`.
+  # linter or the type checker (AGENTS.md, Never). It reads the whole branch against its merge base
+  # with the base branch: cezar autosave-commits before every check, so `git diff HEAD` is empty.
   - id: testguard
     name: 'Test guard'
     type: check
     command: |-
-      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
-      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
-      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+      bash .ai/scripts/branch-vs-base.sh test-guard
 
   - id: fixloop
     name: 'Fix rounds (gate)'
@@ -124,10 +131,17 @@ nodes:
     name: 'Commit'
     type: git.commit
     message: 'fix: address review feedback'
+  # cezar's git.push pushes the run's own task branch (cez/<id8>), not the branch `gh pr checkout`
+  # fetched, so the PR head is pushed here with an explicit refspec (AGENTS.md, Git). A PR that was
+  # merged or closed while the run worked is not pushed to: that would recreate its deleted branch.
   - id: push
     name: 'Push branch'
-    type: git.push
-  # Guards against push.default=upstream landing the commit on the wrong branch (AGENTS.md, Git).
+    type: check
+    command: |-
+      state=$(gh pr view "$CEZ_GITHUB_NUMBER" --json state --jq .state)
+      [ "$state" = OPEN ] || { echo "PR #$CEZ_GITHUB_NUMBER is $state: not pushing"; exit 1; }
+      b=$(git branch --show-current)
+      git push origin "HEAD:refs/heads/$b"
   - id: pushguard
     name: 'Verify push target'
     type: check
@@ -163,15 +177,12 @@ nodes:
       flake or infrastructure problem that code cannot fix.
 
   # The CI fix agent edits the tree too, so it passes the same deterministic guard before anything
-  # is committed. `git add -A` first: new files are not in `git diff HEAD` until staged.
+  # is committed.
   - id: ciguard
     name: 'Test guard (CI fix)'
     type: check
     command: |-
-      git add -A
-      del=$(git diff HEAD --name-only --diff-filter=D | grep -Ei '(^|/)(tests?|__tests__|e2e)/|\.(test|spec)\.' || true)
-      skip=$(git diff HEAD -U0 | grep -E '^\+[^+]' | grep -E '\.(skip|only|todo|fixme)\(|(^|[^A-Za-z])(xit|xdescribe|xtest)\(|eslint-disable|oxlint-disable|@ts-ignore|@ts-expect-error' || true)
-      if [ -n "$del$skip" ]; then echo "Test weakening detected:"; echo "$del"; echo "$skip"; exit 1; fi
+      bash .ai/scripts/branch-vs-base.sh test-guard
 
   - id: commitfix
     name: 'Commit CI fix'
@@ -325,8 +336,8 @@ edges:
   - { from: commit.done, to: push }
   - { from: commit.nothing, to: push }
   - { from: commit.failed, to: escalate }
-  - { from: push.done, to: pushguard }
-  - { from: push.failed, to: escalate }
+  - { from: push.pass, to: pushguard }
+  - { from: push.fail, to: escalate }
   - { from: pushguard.pass, to: ci }
   - { from: pushguard.fail, to: escalate }
 
@@ -342,7 +353,7 @@ edges:
   - { from: cifix.infra, to: escalate }
   - { from: cifix.failed, to: escalate }
   - { from: commitfix.done, to: push }
-  - { from: commitfix.nothing, to: escalate }
+  - { from: commitfix.nothing, to: push }
   - { from: commitfix.failed, to: escalate }
 
   - { from: verify.pass, to: merge }
