@@ -1,0 +1,375 @@
+version: 2
+name: pr-to-merge
+description: 'Deploy stage for an EXISTING open PR (task = PR number or URL) -> checkout -> sync with base -> address review comments -> validation gate + test guard -> push -> CI -> independent QA verifier -> risk-routed human gate -> SDLC merge gate -> housekeeping. Cezar owns git/PR/CI; agents only edit the worktree. Every port is wired, every cycle is bounded.'
+nodes:
+  - id: start
+    type: start
+
+  # ---------- INTAKE ----------
+  - id: intake
+    name: 'Intake PR'
+    type: agent
+    skill: om-verify-in-repo
+    verdicts: [ready, closed]
+    prompt: |-
+      Task (existing pull request, number or URL): {{task}}
+      Read-only triage. Do not edit files.
+      1. Read the PR (gh pr view --comments), its linked issue and its checks.
+      2. If it is already merged or closed, or carries blocked / do-not-merge, comment once with the
+         reason and stop.
+      3. If another agent holds an in-progress claim, back off and stop.
+      4. Otherwise claim it per SDLC.md (assign yourself, label in-progress, claim comment).
+      End with exactly one line: CEZ:VERDICT ready | closed
+
+  # Cezar's worktree must hold the PR head before anything else runs. A check command does not get
+  # `{{task}}` (only `{{nodes.*}}` is rendered in 0.15.2, probed), so the number comes from
+  # CEZ_GITHUB_NUMBER, which cezar sets for a run an automation started. That also keeps free text
+  # out of a shell. pr-guard.sh takes only an open same-repository PR into the base branch whose
+  # head is not main or the base branch: `origin` is not a fork, and the push below goes to `origin`.
+  # A check runs as `bash -lc` with no `set -e`, so a guard's exit status is passed on with `|| exit 1`.
+  - id: checkout
+    name: 'Check out PR branch'
+    type: check
+    command: |-
+      bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}" >/dev/null || exit 1
+      gh pr checkout "$CEZ_GITHUB_NUMBER"
+
+  # ---------- SYNC ----------
+  # After the checkout, so the PR lockfile is what gets installed.
+  - id: bootstrap
+    name: 'Install dependencies'
+    type: check
+    command: |-
+      bash .ai/scripts/bootstrap.sh
+
+  - id: sync
+    name: 'Sync with base'
+    type: git.sync-base
+  - id: conflictloop
+    name: 'Conflict rounds'
+    type: loop
+    max: 2
+  - id: resolve
+    name: 'Resolve merge conflict'
+    type: agent
+    skill: om-fix
+    prompt: |-
+      Syncing the PR branch with the base branch produced conflicts (round {{nodes.conflictloop.iteration}}/{{nodes.conflictloop.max}}):
+      {{nodes.sync.conflicts}}
+      Resolve every conflict preserving the intent of both sides and of the covering
+      specification. Never hand-edit a generated file (src/routeTree.gen.ts, drizzle/,
+      .ai/specs/README.md): resolve its source, then regenerate it. Run the validation gate from .ai/agentic.config.json. Then git add the
+      resolved files and complete the merge commit. Do not push.
+
+  # ---------- REVIEW FEEDBACK ----------
+  - id: feedback
+    name: 'Address review comments'
+    type: agent
+    skill: om-fix
+    prompt: |-
+      PR: {{task}}
+      Read every unresolved review comment and requested change (gh pr view --comments; gh api
+      repos/{owner}/{repo}/pulls/<n>/comments). Fix each Critical and Important one with a
+      regression test where the behavior changes; answer questions and nits in a short summary,
+      do not silently skip any. Never delete, skip or weaken a test or a lint rule.
+      Work only in the current directory (Cezar already checked out the PR branch). Do not
+      create another worktree, do not commit, do not push, do not claim or label anything.
+      Follow AGENTS.md (Always / Never). Do not invent validation commands; the gate is
+      configured in .ai/agentic.config.json.
+      If there is nothing to address, change nothing and say so.
+
+  # ---------- VALIDATION GATE ----------
+  # Runs validation.commands from .ai/agentic.config.json, in order. An empty list FAILS the gate:
+  # no commands means no evidence. `git add -A` comes first because the generator checks in the
+  # list (`git diff --exit-code`) compare with the index, so a correct but unstaged change would
+  # fail them (AGENTS.md, Validation Commands).
+  - id: gate
+    name: 'Validation gate'
+    type: check
+    command: |-
+      git add -A
+      node -e '
+      const c = (require("./.ai/agentic.config.json").validation || {}).commands || [];
+      if (!c.length) { console.log("FAIL: no validation commands configured - refusing to pass the gate"); process.exit(1); }
+      const { spawnSync } = require("child_process");
+      for (const x of c) { console.log("$ " + x); if (spawnSync(x, { shell: true, stdio: "inherit" }).status !== 0) process.exit(1); }
+      '
+
+  # Deterministic guard: the agent must not make the gate pass by weakening tests or silencing a
+  # linter or the type checker (AGENTS.md, Never). It reads the whole branch against its merge base
+  # with the base branch: cezar autosave-commits before every check, so `git diff HEAD` is empty.
+  - id: testguard
+    name: 'Test guard'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh test-guard
+
+  - id: fixloop
+    name: 'Fix rounds (gate)'
+    type: loop
+    max: 4
+
+  - id: fix
+    name: 'Fix failing gate'
+    type: agent
+    skill: om-fix
+    session:
+      continue: feedback
+    prompt: |-
+      A check failed (round {{nodes.fixloop.iteration}}/{{nodes.fixloop.max}}).
+      Validation gate: {{nodes.gate.output}}
+      Test guard: {{nodes.testguard.output}}
+      Fix the cause, not the tests: never delete, skip or weaken a test or a lint rule.
+      Re-run the failing command and paste the output. Do not commit or push.
+
+  # ---------- COMMIT + PUSH ----------
+  # Nothing to commit is fine here: the PR may need no change, or only the sync merge commit pushed.
+  - id: commit
+    name: 'Commit'
+    type: git.commit
+    message: 'fix: address review feedback'
+  # cezar's git.push pushes the run's own task branch (cez/<id8>), not the branch `gh pr checkout`
+  # fetched, so the PR head is pushed here with an explicit refspec (AGENTS.md, Git). pr-guard.sh
+  # runs again: a PR that was merged or closed while the run worked is not pushed to (that would
+  # recreate its deleted branch), and the head it prints is never main or the base branch.
+  - id: push
+    name: 'Push branch'
+    type: check
+    command: |-
+      head=$(bash .ai/scripts/pr-guard.sh "${CEZ_GITHUB_NUMBER:-}") || exit 1
+      git push origin "HEAD:refs/heads/$head"
+  - id: pushguard
+    name: 'Verify push target'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+
+  # ---------- CI ----------
+  - id: ci
+    name: 'Wait for CI'
+    type: github.wait-ci
+    timeoutMs: 2400000
+    pollMs: 60000
+
+  - id: ciloop
+    name: 'CI fix rounds'
+    type: loop
+    max: 3
+
+  - id: cifix
+    name: 'Fix red CI'
+    type: agent
+    skill: om-fix
+    verdicts: [fixed, infra]
+    prompt: |-
+      CI is red (round {{nodes.ciloop.iteration}}/{{nodes.ciloop.max}}):
+      {{nodes.ci.status}}
+      Inspect: gh pr checks; gh run view --log-failed.
+      Classify each failure: real bug / test bug / flake / infra.
+      Fix real bugs with a regression test; never fake green, never disable a check.
+      Do not commit or push.
+      End with CEZ:VERDICT fixed if you changed code, or CEZ:VERDICT infra if the failure is a
+      flake or infrastructure problem that code cannot fix.
+
+  # The CI fix agent edits the tree too, so it passes the same deterministic guard before anything
+  # is committed.
+  - id: ciguard
+    name: 'Test guard (CI fix)'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh test-guard
+
+  - id: commitfix
+    name: 'Commit CI fix'
+    type: git.commit
+    message: 'fix: resolve failing CI checks'
+
+  # ---------- INDEPENDENT VERIFICATION ----------
+  # Fresh context: this agent shares no session with the one that edited the branch.
+  - id: verify
+    name: 'Independent QA verifier'
+    type: agent
+    skill: om-auto-qa-pr
+    verdicts: [pass, human, fail]
+    prompt: |-
+      PR: {{task}}
+      You did not change this branch. Read the PR labels (gh pr view) and apply SDLC.md "The QA
+      gate" (the unattended sign-off, ADR 0031; the panel procedure is .ai/skills/afk-decide/SKILL.md):
+      - skip-qa (docs, CI, tests, scripts/**, .ai/**, dependency bumps): no QA needed. Verdict pass.
+      - needs-qa (src/routes/**, src/components/**, src/styles/**, src/lib/i18n/messages/*): run
+        om-auto-qa-pr --self-qa-signoff against the PR head, with the blind pair from
+        scripts/visual/capture.mjs as SDLC.md "This repository" requires. The evidence comment
+        must carry the line "QA head: <sha>" with the exact current head
+        (gh pr view --json headRefOid). Apply qa-approved together with qa-self-verified only on
+        every panel member's approving verdict. Verdict pass.
+      - risk-high (auth, tenant scoping, money, the ledger, billing, a migration, a protected
+        decision document or a merge-policy surface), or a diff touching those: the panel includes
+        the security and tenancy reviewer, and the verdict is human even when the panel approves,
+        so a person decides the merge. Post the evidence and the panel verdicts.
+      - QA is required but cannot be signed off (no usable test environment, evidence incomplete,
+        or the panel did not approve after its rounds): verdict human.
+      - QA ran and the change is broken: post the failing scenario, apply qa-failed. Verdict fail.
+      Do not edit files. Do not merge.
+      End with CEZ:VERDICT pass | human | fail
+
+  - id: qaloop
+    name: 'QA fix rounds'
+    type: loop
+    max: 2
+
+  - id: qafix
+    name: 'Fix QA findings'
+    type: agent
+    skill: om-fix
+    session:
+      continue: feedback
+    prompt: |-
+      QA failed (round {{nodes.qaloop.iteration}}/{{nodes.qaloop.max}}):
+      {{nodes.verify.summary}}
+      Fix the cause with a regression test. Never weaken a test. Do not commit or push.
+      qa-failed is removed by the verifier on the next pass, not by you.
+
+  # ---------- HUMAN GATE + MERGE ----------
+  - id: humanmerge
+    name: 'Human approval (risk-high or QA not self-approvable)'
+    type: gate.human
+    message: |-
+      The verifier did not clear this PR on its own (risk-high, or QA could not be signed off).
+      Verifier report: {{nodes.verify.summary}}
+      CI: {{nodes.ci.status}}
+      Approve to let om-approve-merge-pr proceed (it still enforces the QA gate and the second reviewer).
+    timeoutMs: 259200000
+
+  # The only node that can merge.
+  - id: merge
+    name: 'SDLC merge gate'
+    type: agent
+    skill: om-approve-merge-pr
+    verdicts: [merged, blocked]
+    prompt: |-
+      Approve and squash-merge the PR {{task}} strictly through the om-approve-merge-pr gates
+      (QA gate, blocking labels, required checks, risk-high second reviewer, QA head freshness).
+      If any gate refuses (for example needs-qa without qa-approved, or QA evidence older than
+      the head), do NOT work around it: merge nothing and report which gate blocked.
+      End with CEZ:VERDICT merged if the PR is merged, otherwise CEZ:VERDICT blocked
+
+  # ---------- HOUSEKEEPING ----------
+  - id: maintain
+    name: 'Post-merge housekeeping'
+    type: agent
+    skill: om-close-fixed-issues
+    prompt: |-
+      The PR {{task}} is merged.
+      Close the issues it authoritatively fixed with a comment linking the PR, release the
+      in-progress claim (a merge into the base branch does not close an issue natively here, so the
+      close is this step's), and file leftover asks as follow-up issues (om-followup-issue-from-pr).
+      Learning: CI fix rounds used {{nodes.ciloop.iteration}}, QA fix rounds used
+      {{nodes.qaloop.iteration}}. If either is above zero and the cause is a repeatable mistake,
+      file ONE follow-up issue proposing a rule for AGENTS.md or CODE_REVIEW.md. Do not edit
+      those files yourself. Do not change code.
+
+  # ---------- ESCALATION + ENDS ----------
+  - id: escalate
+    name: 'Escalate to human'
+    type: agent
+    prompt: |-
+      The autonomous run stopped. PR: {{task}}
+      Last known outputs:
+      intake: {{nodes.intake.summary}}
+      sync: {{nodes.sync.conflicts}}
+      gate: {{nodes.gate.output}}
+      ci: {{nodes.ci.status}}
+      verify: {{nodes.verify.summary}}
+      merge: {{nodes.merge.summary}}
+      Post ONE concise comment on the PR saying where it stopped, why, and the next human action
+      (a merge refused for missing QA means: run QA, then re-run om-approve-merge-pr). Release the
+      in-progress claim. Add the blocked label only when the stop is a real defect, not when it
+      merely awaits QA or a human decision. Do not change code.
+
+  - id: done
+    name: 'Merged'
+    type: end
+    status: success
+  - id: noop
+    name: 'Nothing to do'
+    type: end
+    status: success
+  - id: needshuman
+    name: 'Needs human'
+    type: end
+    status: failed
+
+edges:
+  - { from: start.next, to: intake }
+  - { from: intake.ready, to: checkout }
+  - { from: intake.closed, to: noop }
+  - { from: intake.failed, to: escalate }
+  - { from: checkout.pass, to: bootstrap }
+  - { from: bootstrap.pass, to: sync }
+  - { from: bootstrap.fail, to: escalate }
+  - { from: checkout.fail, to: escalate }
+
+  - { from: sync.done, to: feedback }
+  - { from: sync.conflict, to: conflictloop }
+  - { from: sync.failed, to: escalate }
+  - { from: conflictloop.repeat, to: resolve }
+  - { from: conflictloop.exhausted, to: escalate }
+  - { from: resolve.done, to: sync }
+  - { from: resolve.failed, to: escalate }
+
+  - { from: feedback.done, to: gate }
+  - { from: feedback.failed, to: escalate }
+  - { from: gate.pass, to: testguard }
+  - { from: gate.fail, to: fixloop }
+  - { from: testguard.pass, to: commit }
+  - { from: testguard.fail, to: fixloop }
+  - { from: fixloop.repeat, to: fix }
+  - { from: fixloop.exhausted, to: escalate }
+  - { from: fix.done, to: gate }
+  - { from: fix.failed, to: escalate }
+
+  - { from: commit.done, to: push }
+  - { from: commit.nothing, to: push }
+  - { from: commit.failed, to: escalate }
+  - { from: push.pass, to: pushguard }
+  - { from: push.fail, to: escalate }
+  - { from: pushguard.pass, to: ci }
+  - { from: pushguard.fail, to: escalate }
+
+  - { from: ci.green, to: verify }
+  - { from: ci.red, to: ciloop }
+  - { from: ci.timeout, to: escalate }
+  - { from: ci.failed, to: escalate }
+  - { from: ciloop.repeat, to: cifix }
+  - { from: ciloop.exhausted, to: escalate }
+  - { from: cifix.fixed, to: ciguard }
+  - { from: ciguard.pass, to: commitfix }
+  - { from: ciguard.fail, to: escalate }
+  - { from: cifix.infra, to: escalate }
+  - { from: cifix.failed, to: escalate }
+  - { from: commitfix.done, to: push }
+  - { from: commitfix.nothing, to: push }
+  - { from: commitfix.failed, to: escalate }
+
+  - { from: verify.pass, to: merge }
+  - { from: verify.human, to: humanmerge }
+  - { from: verify.fail, to: qaloop }
+  - { from: verify.failed, to: escalate }
+  - { from: qaloop.repeat, to: qafix }
+  - { from: qaloop.exhausted, to: escalate }
+  - { from: qafix.done, to: gate }
+  - { from: qafix.failed, to: escalate }
+
+  - { from: humanmerge.approve, to: merge }
+  - { from: humanmerge.reject, to: escalate }
+  - { from: humanmerge.timeout, to: escalate }
+  - { from: merge.merged, to: maintain }
+  - { from: merge.blocked, to: escalate }
+  - { from: merge.failed, to: escalate }
+
+  - { from: maintain.done, to: done }
+  - { from: maintain.failed, to: escalate }
+
+  - { from: escalate.done, to: needshuman }
+  - { from: escalate.failed, to: needshuman }
