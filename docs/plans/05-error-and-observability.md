@@ -137,6 +137,8 @@ loosened — only, possibly, documented.
 
 ## Stage 05-S2 — `ErrorPanel` and the boundaries
 
+Delivered: 2026-10-12 - the failure panel, the page-level failure and the browser evidence exist as built, merged in #684 (`ErrorPanel` options, `FailurePanel` and the reference line), #699 (`RouteError` as the page-level failure, `DefaultRouteError` placing itself) and #712 (the axe gate, the target-size and reflow checks, the frames); `pnpm vitest run` on `error-panel.test.tsx`, `failure-panel.test.tsx`, `route-error.test.tsx`, `default-error.test.tsx`, `not-found.test.tsx` and `error-panel-ownership.test.ts` passes 115 tests (16, 71, 19, 4, 3 and 2), and `e2e/errors.visual.spec.ts` is run by CI, not by the gate. Two halves are open: the offline half of `OBS-06` (the offline-failure surfaces) is deferred to `27-S1` (`PWA-03`), and `FailurePanel` has no producer: the envelope reader and the middleware (`05-S1` Phases 3 and 4, issues #648 and #649) are merged, but no screen renders `FailurePanel` from `readFailure(error)` yet (`grep -rn "<FailurePanel" src` finds no render outside the tests), so only `RouteError` through `DefaultRouteError` is live. The `quota` and `feature_locked` shapes also wait on `22-billing`, which owns the plan they point at, so they are captured through a harness. The guideline is `DESIGN.md` -> Error panel; the sites that still render a thrown message are #718.
+
 ### Stage id
 
 `05-S2` · Wave 1 · effort **M**.
@@ -145,15 +147,23 @@ loosened — only, possibly, documented.
 
 `OBS-04 missing → done` — `ErrorPanel` and its recovery affordances.
 `OBS-05 missing → done` — the root and route error boundaries.
-`OBS-06 missing → done` — the 404 and the offline-failure surfaces.
+`OBS-06 missing → done` — the 404 (the offline-failure surfaces are `27-S1`'s, `PWA-03`).
 
 ### Owned paths
 
-- `src/components/feedback/error-panel.tsx` — new
-- `src/components/feedback/not-found.tsx` — new
-- `src/components/feedback/__tests__/error-panel.test.tsx` — new
-- `src/routes/__root.tsx` — new
-- `e2e/errors.visual.spec.ts` — new
+- `src/components/app/shell/error-panel.tsx` — the existing panel, gains `tone`, `mode`,
+  `headingLevel`, `focusHeading` and `actions`
+- `src/components/app/shell/failure-panel.tsx` — new, `FailurePanel` and `RECOVERY_OF`
+- `src/components/app/shell/failure-reference.tsx` — new, the reference line and its Copy button
+- `src/components/app/shell/use-focus-heading.ts` and `use-is-after-initial-render.ts` — new
+- `src/components/app/shell/route-error.tsx` — the page-level failure
+- `src/components/app/shell/default-error.tsx` and `dashboard-link.tsx` — new, the router's default
+  boundary placing itself, and the way back
+- `src/components/app/shell/not-found.tsx` — the 404, mounted by `src/routes/__root.tsx`
+- `src/components/app/shell/__tests__/error-panel.test.tsx`, `failure-panel.test.tsx`,
+  `route-error.test.tsx` and `not-found.test.tsx` — extended; `default-error.test.tsx` — new
+- `e2e/errors.visual.spec.ts` and `e2e/support/failure-harness.tsx` — new
+- `DESIGN.md` -> Error panel
 
 ### Data and migration
 
@@ -168,14 +178,20 @@ None. `__root.tsx` mounts the i18n provider (`02-S1`'s requirement), the theme, 
 
 - **Route.** `src/routes/__root.tsx` — the document shell, `<html lang>` and `dir` from the negotiated
   locale, SSR.
-- **Components.** `error-panel.tsx` renders an envelope. Reuses `Card`, `Button` and `Link`.
-  `not-found.tsx` is the 404 surface.
-- **States.** `ErrorPanel` **is** a state, and it has three shapes, each with a different recovery:
-  `retryable` (a Retry button that refetches, and does not clear form input), `quota` /
-  `feature_locked` (a link to `/settings/billing` naming the metric; the panel shows no plan or ceiling), and `internal`
-  (an apology, the Sentry event id as copyable text, and a link back to `/dashboard`). A single
-  generic panel with a Reload button is the shape this stage exists to avoid.
-- **Tokens.** None new; the panel uses the `danger` and `warning` families already in `tokens.css`.
+- **Components.** `FailurePanel` consumes the `FailureEnvelope` that `readFailure(error)` (`05-S1`
+  Phase 3) returns and derives its recovery from `kind`, through `RECOVERY_OF`, which sends
+  `not_found` and `forbidden` to the same recovery so the screen never offers a different way out
+  for a missing row and a foreign one. It renders `ErrorPanel`, which reuses `Card`, `Button` and
+  `Link`. The producer passes only an event id or a request id as the `reference`, never a message
+  or a value. `not-found.tsx` is the 404 surface.
+- **States.** `FailurePanel` **is** a state, and it has four shapes, each with a different recovery:
+  `retryable` (a Retry button that refetches, and does not clear form input), `quota` (a link to
+  `/settings/billing` naming the metric; the panel shows no plan or ceiling), `feature_locked` (the
+  same link and the sentence, and nothing else), and `internal` (the sentence, the event or request
+  id as copyable text, and a link back to `/dashboard` inside the shell). A single generic panel
+  with a Reload button is the shape this stage exists to avoid.
+- **Tokens.** None new; the panel uses the `negative` and `warning` families already in
+  `tokens.css`.
 - **Accessibility.** The panel is `role="alert"` when it replaces content after an action, and a
   plain region when it _is_ the page's content — an alert on initial render is announced before the
   person has any context for it. Focus moves to the panel's heading on an action failure, and the
@@ -193,22 +209,24 @@ the two even if it wanted to.
 
 ### Money invariant
 
-`ErrorPanel` **never renders a value from the envelope's `params` into a currency-shaped string.** The
-envelope carries a metric name for quota failures — never a plan id, an amount or a balance —
-because `05-S1`'s scrubber has already removed them and a component that renders "you have spent
+`FailurePanel` **never renders a value from the envelope's `params` into a currency-shaped string.** The
+envelope carries a metric name for quota failures, and no plan and no ceiling — never an amount, never
+a balance — because `05-S1`'s scrubber has already removed them and a component that renders "you have spent
 €1,234" from an error payload would be rendering something that no longer exists. Held by
-`error-panel.test.tsx` → _the panel renders no amount for any envelope kind_.
+`failure-panel.test.tsx` → _names no plan and shows no amount for each failure kind_.
 
 ### Verification
 
 - Command gate.
-- `error-panel.test.tsx`: each of the three shapes renders its own recovery; `role="alert"` only in
-  the post-action case; focus moves to the heading; no amount is rendered.
-- Browser evidence: a route forced into each of the three failure shapes plus the 404, both themes,
-  at 360 / 1280 / 2560 px — the failure states **are** the point of the stage, so the resting screen
-  is not evidence here.
-- `e2e/errors.visual.spec.ts` runs axe on the 404 and on one forced failure: zero `serious`, zero
-  `critical`.
+- `failure-panel.test.tsx`: each of the four shapes renders its own recovery; `role="alert"` only in
+  the post-action case; focus moves to the heading; no amount is rendered. `error-panel.test.tsx`
+  pins the default render the other consumers keep.
+- Browser evidence: the `quota` and `feature_locked` shapes are captured through a harness (no
+  route can produce them yet), while the 404 and a forced failure are captured in the app, both
+  themes, at 360 / 1280 / 2560 px — the failure states **are** the point of the stage, so the
+  resting screen is not evidence here.
+- `e2e/errors.visual.spec.ts` runs axe on the 404, on one forced failure and on every shape of the
+  panel in the harness at the WCAG A/AA bar (`expectNoWcagViolations`).
 - Console: the boundary itself must not log. A caught error that also prints to the console is a
   double report and pollutes every other stage's silent-console assertion.
 
