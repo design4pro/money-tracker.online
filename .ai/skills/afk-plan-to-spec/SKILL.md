@@ -68,6 +68,7 @@ The `Plan` row stands in for the `Issue` a `ready` spec otherwise needs (`.ai/sp
 
 - Name the stage id and the plan file in the first section, so a reader and `backlog-status.mjs --plan` can both tell which stage this spec covers.
 - Carry the stage's owned paths, data change, tenant-isolation test and money invariant into the design, and split the work into phases an `afk-to-tickets` run can slice into at most eight tracer-bullet tickets. A stage that needs more is cut into slices here (`06-S3a`, `06-S3b`) inside the one spec, phase by phase.
+- Phases that become separate tickets write disjoint files: give each phase its own new test file, because two tickets that create the same path collide add/add (`docs/agents/issue-tracker.md` -> Dependencies; #651, #739). When another ready spec edits the same plan lines or files the same follow-up, name one owner in both specs (#635).
 - End with a Resolved assumptions table: every verdict from step 3, and every default you applied.
 
 Run `pnpm generate-spec-index` and commit the spec with `.ai/specs/README.md`. Commit on a branch `spec/<slug>`, message `docs(specs): <title> (plan stage <id>)`.
