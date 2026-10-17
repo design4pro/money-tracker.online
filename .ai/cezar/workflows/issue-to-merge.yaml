@@ -1,0 +1,521 @@
+version: 2
+name: issue-to-merge
+description: 'One eligible leaf GitHub issue (ready per the Definition of Ready in SDLC.md) -> triage -> plan + plan critic -> TDD implementation -> validation gate + test guard -> independent review panel -> PR -> sync/CI -> risk-routed SDLC merge gate -> housekeeping. Cezar owns git/PR/CI; agents only edit the worktree. Every port is wired, every cycle is bounded.'
+nodes:
+  - id: start
+    type: start
+
+  # Dependencies and the route tree, with retries (the script every workflow here leads with).
+  - id: bootstrap
+    name: 'Install dependencies'
+    type: check
+    command: |-
+      bash .ai/scripts/bootstrap.sh
+
+  # ---------- TRIAGE ----------
+  - id: triage
+    name: 'Triage issue'
+    type: agent
+    skill: om-verify-in-repo
+    verdicts: [ready, needsinfo, obsolete]
+    prompt: |-
+      Task (GitHub issue): {{task}}
+      Read-only triage. Do not edit files.
+      1. Read the issue with its comments, its `## Agent Brief` and its `Blocked by` list.
+         `node .ai/scripts/backlog-status.mjs` prints where the issue sits in the SDLC.md pipeline.
+      2. The issue must be an eligible LEAF task: not a parent story or epic, and every issue under
+         `Blocked by` is already closed (merged on the base branch).
+      3. For a feature, a covering specification (.ai/specs/, any status directory; the index is
+         .ai/specs/README.md) or the area's plan in docs/plans/ must exist and cover the task.
+      4. Not claimed by someone else and not covered by an open PR.
+      If the issue lacks what is needed, post ONE comment listing exactly what is missing.
+      If it is already fixed or a duplicate, comment with evidence.
+      If ready, claim it per SDLC.md (assign yourself, label in-progress, claim comment).
+      End with exactly one line: CEZ:VERDICT ready | needsinfo | obsolete
+
+  # ---------- IMPLEMENT ----------
+  - id: rootcause
+    name: 'Root cause / change surface'
+    type: agent
+    skill: om-root-cause
+    prompt: |-
+      Issue: {{task}}
+      Read-only. Identify the minimal change surface for this leaf task, guided by the covering
+      specification or docs/plans/ stage and the Agent Brief acceptance criteria. Read the
+      Task Router documents of AGENTS.md that the change touches. List files to change, the
+      unit/integration/Playwright tests that prove each acceptance criterion (a new repository
+      function also needs its tenant-isolation case, a money write path its money-invariants
+      case), and risks. Do not edit files.
+
+  # A fresh-context critic challenges the plan before any code is written (AI-native SDLC:
+  # plan review is cheaper than diff review). The approved plan is posted on the issue as the
+  # audit trail, so no plan.md is committed per task.
+  - id: critic
+    name: 'Plan critic'
+    type: agent
+    verdicts: [approve, revise]
+    prompt: |-
+      Issue: {{task}}
+      Proposed plan: {{nodes.rootcause.summary}}
+      Revised plan (empty on the first round): {{nodes.replan.summary}}
+      You did not write this plan. Challenge it against the covering specification and the
+      Agent Brief acceptance criteria: what could break, what is the riskiest step, which alternative
+      was rejected and why, is every acceptance criterion covered by a named test, is anything
+      out of scope. Do not edit files.
+      If the plan is sound, post it as ONE comment on the issue (heading "Implementation plan",
+      with the riskiest step and the rejected options) and restate the final plan in your summary.
+      End with CEZ:VERDICT approve if sound, otherwise CEZ:VERDICT revise with the exact changes required
+
+  - id: criticloop
+    name: 'Plan revision rounds'
+    type: loop
+    max: 1
+
+  - id: replan
+    name: 'Revise plan'
+    type: agent
+    session:
+      continue: rootcause
+    prompt: |-
+      The plan critic requested changes (round {{nodes.criticloop.iteration}}/{{nodes.criticloop.max}}):
+      {{nodes.critic.summary}}
+      Revise the plan accordingly. Read-only: do not edit files.
+
+  - id: implement
+    name: 'Implement (TDD)'
+    type: agent
+    skill: om-fix
+    prompt: |-
+      Issue: {{task}}
+      Approved plan: {{nodes.critic.summary}}
+      TDD: for each acceptance criterion write a failing test first, confirm it fails for the
+      expected reason, then implement until it passes.
+      Work only in the current directory (Cezar already gave you an isolated worktree). Do not
+      create another worktree, do not commit, do not push, do not open a PR, do not claim or
+      label anything. Keep the change minimal (DRY, KISS, SOLID); UI changes must meet WCAG 2.2 AA.
+      Follow AGENTS.md (Always / Never): money in integer minor units, SQL only in
+      src/server/repos, user-facing copy in both EN and PL catalogues, generated files
+      regenerated and never edited by hand.
+      Do not invent validation commands; the gate is configured in .ai/agentic.config.json.
+
+  # ---------- VALIDATION GATE ----------
+  # Runs validation.commands from .ai/agentic.config.json, in order. An empty list FAILS the gate:
+  # no commands means no evidence. `git add -A` comes first because the generator checks in the
+  # list (`git diff --exit-code`) compare with the index, so a correct but unstaged change would
+  # fail them (AGENTS.md, Validation Commands).
+  - id: gate
+    name: 'Validation gate'
+    type: check
+    command: |-
+      git add -A
+      node -e '
+      const c = (require("./.ai/agentic.config.json").validation || {}).commands || [];
+      if (!c.length) { console.log("FAIL: no validation commands configured - refusing to pass the gate"); process.exit(1); }
+      const { spawnSync } = require("child_process");
+      for (const x of c) { console.log("$ " + x); if (spawnSync(x, { shell: true, stdio: "inherit" }).status !== 0) process.exit(1); }
+      '
+
+  # Deterministic guard: the agent must not make the gate pass by weakening tests or silencing a
+  # linter or the type checker (AGENTS.md, Never). It reads the whole branch against its merge base
+  # with the base branch: cezar autosave-commits before every check, so `git diff HEAD` is empty.
+  - id: testguard
+    name: 'Test guard'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh test-guard
+
+  - id: fixloop
+    name: 'Fix rounds (gate + review)'
+    type: loop
+    max: 4
+
+  - id: fix
+    name: 'Fix failing gate'
+    type: agent
+    skill: om-fix
+    session:
+      continue: implement
+    prompt: |-
+      A check failed (round {{nodes.fixloop.iteration}}/{{nodes.fixloop.max}}).
+      Validation gate: {{nodes.gate.output}}
+      Test guard: {{nodes.testguard.output}}
+      Fix the cause, not the tests: never delete, skip or weaken a test or a lint rule.
+      Re-run the failing command and paste the output. Do not commit or push.
+
+  # ---------- REVIEW ----------
+  # Three fresh-context reviewers, each with one lens (the passes of CODE_REVIEW.md when present),
+  # then a judge. The author never reviews its own change (separation of duties).
+  - id: council
+    name: 'Review panel'
+    type: fork
+    branches: 3
+  - id: rvcorrect
+    name: 'Bugs + spec compliance'
+    type: agent
+    review: true
+    prompt: |-
+      Review the change for: {{task}}. Lens: Bugs and Compliance - logic errors, edge cases,
+      regressions, and whether the change matches the covering specification, the approved
+      plan ({{nodes.critic.summary}}) and the Agent Brief acceptance criteria. Apply CODE_REVIEW.md
+      and .ai/review-checklist.md. Report only real problems, each with file and line, ranked Critical /
+      Important / Nit; say plainly when you found none.
+  - id: rvsecurity
+    name: 'Security + risk-high'
+    type: agent
+    review: true
+    prompt: |-
+      Review the change for: {{task}}. Lens: Security - injection, authn/authz gaps, secrets,
+      PII in logs, tenant scoping (TenantScope first, Zod parsed twice, validation is shape and
+      never permission), money, the ledger, billing, schema migrations, protected surfaces in
+      BACKWARD_COMPATIBILITY.md, risky dependencies.
+      Apply the risk-high evidence rules from SDLC.md when the diff touches those areas.
+      Report only real problems, each with file and line, ranked Critical / Important / Nit;
+      say plainly when you found none.
+  - id: rvtests
+    name: 'Tests + accessibility'
+    type: agent
+    review: true
+    prompt: |-
+      Review the change for: {{task}}. Lens: Tests and Accessibility - does each acceptance
+      criterion have a test that proves it, was any test weakened or skipped, do UI changes meet
+      WCAG 2.2 AA. Report only real problems, each with file and line, ranked Critical /
+      Important / Nit; say plainly when you found none.
+  - id: reports
+    name: 'All reports'
+    type: join
+    wait: all
+
+  - id: review
+    name: 'Review judge'
+    type: agent
+    verdicts: [approve, changes]
+    prompt: |-
+      Three independent reviewers checked the change for: {{task}}.
+
+      ## Bugs + spec compliance ({{nodes.rvcorrect.status}})
+      {{nodes.rvcorrect.summary}}
+
+      ## Security + risk-high ({{nodes.rvsecurity.status}})
+      {{nodes.rvsecurity.summary}}
+
+      ## Tests + accessibility ({{nodes.rvtests.status}})
+      {{nodes.rvtests.summary}}
+
+      Consolidate: drop duplicates and anything that is not a real problem, keep at most five
+      nits. A reviewer that crashed is a gap: do not treat it as a pass. Do not edit files.
+      List exactly what must change. End with CEZ:VERDICT approve if there is no Critical or
+      Important finding, otherwise CEZ:VERDICT changes
+
+  - id: reviewloop
+    name: 'Review rounds'
+    type: loop
+    max: 2
+
+  - id: reviewfix
+    name: 'Address review'
+    type: agent
+    skill: om-fix
+    session:
+      continue: implement
+    prompt: |-
+      Review round {{nodes.reviewloop.iteration}}/{{nodes.reviewloop.max}} requested changes:
+      {{nodes.review.summary}}
+      Fix every Critical and Important finding. Do not weaken tests. Do not commit or push.
+
+  # ---------- PR + SYNC + CI ----------
+  - id: commit
+    name: 'Commit'
+    type: git.commit
+    message: 'feat: implement eligible leaf task'
+  # Cezar autosave-commits the agent's work before every check node, so git.commit reports `nothing`
+  # even when files changed. What matters is whether the branch holds work of its own.
+  - id: ahead
+    name: 'Branch has work?'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh ahead
+  - id: push
+    name: 'Push branch'
+    type: git.push
+  # Guards against push.default=upstream landing the commit on the wrong branch (AGENTS.md, Git).
+  - id: pushguard
+    name: 'Verify push target'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+  - id: openpr
+    name: 'Open draft PR'
+    type: github.draft-pr
+
+  - id: sync
+    name: 'Sync with base'
+    type: git.sync-base
+  - id: conflictloop
+    name: 'Conflict rounds'
+    type: loop
+    max: 2
+  - id: resolve
+    name: 'Resolve merge conflict'
+    type: agent
+    skill: om-fix
+    prompt: |-
+      Syncing with the base branch produced conflicts (round {{nodes.conflictloop.iteration}}/{{nodes.conflictloop.max}}):
+      {{nodes.sync.conflicts}}
+      Resolve every conflict preserving the intent of both sides and of the covering
+      specification. Never hand-edit a generated file (src/routeTree.gen.ts, drizzle/,
+      .ai/specs/README.md): resolve its source, then regenerate it. Run the validation gate from .ai/agentic.config.json. Then git add the
+      resolved files and complete the merge commit. Do not push.
+
+  # The conflict-resolution agent's edits are pushed by pushsync, so they pass the guard first.
+  - id: resguard
+    name: 'Test guard (conflict resolution)'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh test-guard
+
+  - id: pushsync
+    name: 'Push after sync'
+    type: git.push
+  - id: pushguard2
+    name: 'Verify push target (after sync)'
+    type: check
+    command: |-
+      b=$(git branch --show-current)
+      test "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$b" | cut -f1)"
+
+  - id: ci
+    name: 'Wait for CI'
+    type: github.wait-ci
+    timeoutMs: 2400000
+    pollMs: 60000
+
+  - id: ciloop
+    name: 'CI fix rounds'
+    type: loop
+    max: 3
+
+  - id: cifix
+    name: 'Fix red CI'
+    type: agent
+    skill: om-fix
+    verdicts: [fixed, infra]
+    prompt: |-
+      CI is red (round {{nodes.ciloop.iteration}}/{{nodes.ciloop.max}}):
+      {{nodes.ci.status}}
+      Inspect: gh pr checks; gh run view --log-failed.
+      Classify each failure: real bug / test bug / flake / infra.
+      Fix real bugs with a regression test; never fake green, never disable a check.
+      Do not commit or push.
+      End with CEZ:VERDICT fixed if you changed code, or CEZ:VERDICT infra if the failure is a
+      flake or infrastructure problem that code cannot fix.
+
+  # The CI fix agent edits the tree too, so it passes the same deterministic guard before anything
+  # is committed.
+  - id: ciguard
+    name: 'Test guard (CI fix)'
+    type: check
+    command: |-
+      bash .ai/scripts/branch-vs-base.sh test-guard
+
+  - id: commitfix
+    name: 'Commit CI fix'
+    type: git.commit
+    message: 'fix: resolve failing CI checks'
+
+  # ---------- SDLC LABELS + MERGE GATE ----------
+  - id: prready
+    name: 'Mark PR ready'
+    type: github.pr-update
+    ready: true
+
+  - id: labels
+    name: 'Apply SDLC labels'
+    type: agent
+    verdicts: [standard, riskhigh]
+    prompt: |-
+      The PR for the current branch is ready (gh pr view). Apply the SDLC.md label set, using only
+      labels from .ai/agentic.config.json, and leave a short comment explaining the choices:
+      exactly one pipeline label (review), one category, needs-qa when the diff reaches src/routes/**, src/components/**, src/styles/** or src/lib/i18n/messages/*; skip-qa for docs, CI, tests, scripts/**, .ai/** and dependency bumps (never both), one priority and one risk
+      (inherit from the source issue unless scope changed; risk-high for auth, sessions, tenant scoping, money, the ledger, billing, migrations, protected decision documents or merge-policy surfaces (SDLC.md, "This repository")).
+      Replace in-progress on the issue with ci-monitoring only if you still owe a CI follow-up.
+      Do not change code. Do not apply qa, qa-approved or qa-self-verified.
+      End with CEZ:VERDICT riskhigh if you applied risk-high, otherwise CEZ:VERDICT standard
+
+  # Tier the autonomy: risk-high changes need a human decision before the merge agent runs.
+  - id: humanmerge
+    name: 'Human approval (risk-high)'
+    type: gate.human
+    message: |-
+      This change is labelled risk-high. Review the PR before the SDLC merge gate runs.
+      Labels and rationale: {{nodes.labels.summary}}
+      Review judge: {{nodes.review.summary}}
+      Approve to let om-approve-merge-pr proceed (it still enforces the QA gate and the second reviewer).
+    timeoutMs: 259200000
+
+  - id: merge
+    name: 'SDLC merge gate'
+    type: agent
+    skill: om-approve-merge-pr
+    verdicts: [merged, blocked]
+    prompt: |-
+      Approve and squash-merge the PR of the current branch strictly through the om-approve-merge-pr
+      gates (QA gate, blocking labels, required checks, risk-high second reviewer).
+      If any gate refuses (for example needs-qa without qa-approved), do NOT work around it:
+      merge nothing and report which gate blocked.
+      End with CEZ:VERDICT merged if the PR is merged, otherwise CEZ:VERDICT blocked
+
+  # ---------- HOUSEKEEPING ----------
+  - id: maintain
+    name: 'Post-merge housekeeping'
+    type: agent
+    skill: om-close-fixed-issues
+    prompt: |-
+      The PR for this issue is merged. Issue: {{task}}
+      Close the issue the merged PR fixed with a comment linking the PR, release the in-progress
+      claim (a merge into the base branch does not close an issue natively here, so the close is
+      this step's). File leftover asks as follow-up issues (om-followup-issue-from-pr).
+      Learning: review rounds used {{nodes.reviewloop.iteration}}, CI fix rounds used
+      {{nodes.ciloop.iteration}}. If either is above zero and the cause is a repeatable mistake,
+      file ONE follow-up issue proposing a rule for AGENTS.md or CODE_REVIEW.md. Do not edit
+      those files yourself. Do not change code.
+
+  # ---------- ESCALATION + ENDS ----------
+  - id: escalate
+    name: 'Escalate to human'
+    type: agent
+    prompt: |-
+      The autonomous run stopped. Issue: {{task}}
+      Last known outputs:
+      triage: {{nodes.triage.summary}}
+      review: {{nodes.review.summary}}
+      gate: {{nodes.gate.output}}
+      sync: {{nodes.sync.conflicts}}
+      ci: {{nodes.ci.status}}
+      merge: {{nodes.merge.summary}}
+      Post ONE concise comment on the issue (and on the PR if one exists: gh pr view) saying where
+      it stopped, why, and the next human action (a merge refused for missing QA means: run QA,
+      then re-run om-approve-merge-pr, or start the pr-to-merge workflow on the PR). Release the in-progress claim. If a PR exists add the
+      blocked label only when the stop is a real defect, not when it merely awaits QA.
+      Do not change code.
+
+  - id: done
+    name: 'Merged'
+    type: end
+    status: success
+  - id: noop
+    name: 'Nothing to do'
+    type: end
+    status: success
+  - id: needshuman
+    name: 'Needs human'
+    type: end
+    status: failed
+
+edges:
+  - { from: start.next, to: bootstrap }
+  - { from: bootstrap.pass, to: triage }
+  - { from: bootstrap.fail, to: escalate }
+  - { from: triage.ready, to: rootcause }
+  - { from: triage.needsinfo, to: needshuman }
+  - { from: triage.obsolete, to: noop }
+  - { from: triage.failed, to: escalate }
+
+  - { from: rootcause.done, to: critic }
+  - { from: rootcause.failed, to: escalate }
+  - { from: critic.approve, to: implement }
+  - { from: critic.revise, to: criticloop }
+  - { from: critic.failed, to: escalate }
+  - { from: criticloop.repeat, to: replan }
+  - { from: criticloop.exhausted, to: escalate }
+  - { from: replan.done, to: critic }
+  - { from: replan.failed, to: escalate }
+  - { from: implement.done, to: gate }
+  - { from: implement.failed, to: escalate }
+
+  - { from: gate.pass, to: testguard }
+  - { from: gate.fail, to: fixloop }
+  - { from: testguard.pass, to: council }
+  - { from: testguard.fail, to: fixloop }
+
+  - { from: council.1, to: rvcorrect }
+  - { from: council.2, to: rvsecurity }
+  - { from: council.3, to: rvtests }
+  - { from: rvcorrect.done, to: reports }
+  - { from: rvsecurity.done, to: reports }
+  - { from: rvtests.done, to: reports }
+  # A reviewer that crashed still reaches the judge, who sees its status.
+  - { from: reports.done, to: review }
+  - { from: reports.failed, to: review }
+  - { from: fixloop.repeat, to: fix }
+  - { from: fixloop.exhausted, to: escalate }
+  - { from: fix.done, to: gate }
+  - { from: fix.failed, to: escalate }
+
+  - { from: review.approve, to: commit }
+  - { from: review.changes, to: reviewloop }
+  - { from: review.failed, to: escalate }
+  - { from: reviewloop.repeat, to: reviewfix }
+  - { from: reviewloop.exhausted, to: escalate }
+  - { from: reviewfix.done, to: gate }
+  - { from: reviewfix.failed, to: escalate }
+
+  - { from: commit.done, to: push }
+  - { from: commit.nothing, to: ahead }
+  - { from: ahead.pass, to: push }
+  - { from: ahead.fail, to: escalate }
+  - { from: commit.failed, to: escalate }
+  - { from: push.done, to: pushguard }
+  - { from: push.failed, to: escalate }
+  - { from: pushguard.pass, to: openpr }
+  - { from: pushguard.fail, to: escalate }
+  - { from: openpr.created, to: sync }
+  - { from: openpr.failed, to: escalate }
+
+  - { from: sync.done, to: pushsync }
+  - { from: sync.conflict, to: conflictloop }
+  - { from: sync.failed, to: escalate }
+  - { from: conflictloop.repeat, to: resolve }
+  - { from: conflictloop.exhausted, to: escalate }
+  - { from: resolve.done, to: resguard }
+  - { from: resguard.pass, to: sync }
+  - { from: resguard.fail, to: escalate }
+  - { from: resolve.failed, to: escalate }
+
+  - { from: pushsync.done, to: pushguard2 }
+  - { from: pushsync.failed, to: escalate }
+  - { from: pushguard2.pass, to: ci }
+  - { from: pushguard2.fail, to: escalate }
+
+  - { from: ci.green, to: prready }
+  - { from: ci.red, to: ciloop }
+  - { from: ci.timeout, to: escalate }
+  - { from: ci.failed, to: escalate }
+  - { from: ciloop.repeat, to: cifix }
+  - { from: ciloop.exhausted, to: escalate }
+  - { from: cifix.fixed, to: ciguard }
+  - { from: ciguard.pass, to: commitfix }
+  - { from: ciguard.fail, to: escalate }
+  - { from: cifix.infra, to: escalate }
+  - { from: cifix.failed, to: escalate }
+  - { from: commitfix.done, to: sync }
+  - { from: commitfix.nothing, to: sync }
+  - { from: commitfix.failed, to: escalate }
+
+  - { from: prready.done, to: labels }
+  - { from: prready.failed, to: escalate }
+  - { from: labels.standard, to: merge }
+  - { from: labels.riskhigh, to: humanmerge }
+  - { from: labels.failed, to: escalate }
+  - { from: humanmerge.approve, to: merge }
+  - { from: humanmerge.reject, to: escalate }
+  - { from: humanmerge.timeout, to: escalate }
+  - { from: merge.merged, to: maintain }
+  - { from: merge.blocked, to: escalate }
+  - { from: merge.failed, to: escalate }
+
+  - { from: maintain.done, to: done }
+  - { from: maintain.failed, to: escalate }
+
+  - { from: escalate.done, to: needshuman }
+  - { from: escalate.failed, to: needshuman }
