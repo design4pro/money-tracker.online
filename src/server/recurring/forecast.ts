@@ -49,6 +49,8 @@ export interface SeriesForecastInput {
   readonly schedule: RecurringSchedule
   readonly expectedAmountMinor: number
   readonly expectedCurrencyCode: string
+  /** A paused or finished series plans nothing ahead; what it already spent still counts. */
+  readonly isActive: boolean
   readonly today: string
   readonly links: ReadonlyArray<ForecastLink>
   readonly periods: ReadonlyArray<ForecastPeriod>
@@ -70,6 +72,7 @@ function expectedOpen(
   from: string,
   through: string,
 ): Minor {
+  if (!input.isActive) return asMinor(0)
   const byPeriod = new Map(
     input.periods.map((period) => [period.periodStart, period.derivedStatus]),
   )
