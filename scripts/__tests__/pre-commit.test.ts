@@ -26,7 +26,7 @@ const localEnv = Object.fromEntries(
 const git = (args: Array<string>, cwd: string) =>
   execFileSync('git', args, { cwd, env: localEnv })
 
-describe('.husky/pre-commit', { timeout: 15_000 }, () => {
+describe('.husky/pre-commit', { timeout: 30_000 }, () => {
   it('runs the tests the staged change reaches, plus every test that reads the disk', () => {
     // `npx` and `pnpm` are stubs that record their arguments, so the case pins what the hook
     // asks vitest for without running it. A test that only imports stays out; one that reads

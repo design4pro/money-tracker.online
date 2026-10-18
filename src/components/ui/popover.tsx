@@ -52,12 +52,14 @@ export function Popover({
   showArrow = false,
   children,
   offset = 8,
+  style,
   ...props
 }: PopoverProps) {
   return (
     <RACPopover
       {...props}
       offset={offset}
+      style={{ minWidth: 'var(--trigger-width)', ...style }}
       data-motion-transform=""
       className={composeTw(
         className,
