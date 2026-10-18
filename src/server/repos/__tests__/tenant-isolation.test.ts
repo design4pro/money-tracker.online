@@ -57,6 +57,7 @@ import {
   rules,
   transactions,
 } from '#/server/db/schema'
+import { forecastSeries } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { sqliteBatchCallback } from './db-harness'
@@ -146,7 +147,13 @@ import {
   toImportBatchDto,
 } from '../imports'
 
-import { createSeries, getUpcoming } from '../recurring'
+import {
+  createSeries,
+  getUpcoming,
+  listPeriods as listSeriesPeriods,
+  listSeriesLinkDetails,
+  markPaid,
+} from '../recurring'
 import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -2942,6 +2949,100 @@ describe('an unsubscribe link acts in the workspace it names and nowhere else', 
  * loses its `tenantFilter`. So A and B each own a series built from their own account, category and
  * payee - under identical names - and A's read must return A's ids and not one of B's.
  */
+describe('a recurring forecast cannot add another workspace’s linked amounts', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('sums only the caller’s linked transactions for spent this year', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+
+    await seedTransaction(world.db, {
+      id: 'txn-a-forecast',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-forecast',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-forecast',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-forecast',
+    })
+
+    const [periods, links] = await Promise.all([
+      listSeriesPeriods(world.scope, mine.id, today),
+      listSeriesLinkDetails(world.scope, mine.id),
+    ])
+    const forecast = forecastSeries({
+      schedule: {
+        frequency: 'monthly',
+        anchorDay: 20,
+        startDate: '2026-01-20',
+      },
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      today,
+      links,
+      periods,
+    })
+
+    expect(forecast.spentThisYearMinor).toBe(100_00)
+    expect(JSON.stringify(links)).not.toContain('txn-b-forecast')
+    expect(JSON.stringify(links)).not.toContain('777')
+  })
+})
+
 describe('the upcoming read cannot leak another workspace’s series ids', () => {
   let world: BudgetWorld
 

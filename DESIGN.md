@@ -1027,6 +1027,25 @@ because what a row can do differs (a category archives, a group deletes).
 - **It is not** a data table (no columns, no sort) and not a `ListBox` (a menu of values to
   choose from): its rows are things with an order, and the order is the data.
 
+### Forecast panel
+
+Spent this year, rest of this year, next twelve months — three amounts for a recurring series, or
+the same three rolled up per currency on `/recurring`. The second call site is the series detail.
+
+- **The shape:** a `Card` (`lg` padding) with a subtitle heading, a caption in `text-caption` /
+  `ink-2`, then a three-column `dl` from `sm` up (`grid gap-3 sm:grid-cols-3`). Each metric is a
+  `dt` in caption `ink-2` and a `dd` in subtitle, semibold, tabular. One currency per block; a
+  second currency is a second block, never a converted total.
+- **The tones:** none. These are plan figures, not alerts. Overdue copy lives on the series card
+  and _Due soon_, not here.
+- **The states:** resting only. There is no empty colour wash; an empty rollup is a sentence
+  (`recurring.forecast.empty`).
+- **What carries the meaning when the colour does not:** the three labels, and a visually-hidden
+  table of the same three cells so a screen reader gets tabular data rather than three adjacent
+  paragraphs. Amounts are formatted by `formatMoney`; they never become a float in the panel.
+- **It is not** a chart (no SVG, no second encoding) and not _Due soon_ (that list is periods you
+  act on). This panel is a year view of integer sums.
+
 ### Period actions
 
 The buttons on one row of a recurring period, drawn by one component wherever a period is listed:

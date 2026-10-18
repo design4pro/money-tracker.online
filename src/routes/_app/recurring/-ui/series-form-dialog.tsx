@@ -23,12 +23,14 @@ import {
 } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { currencyName } from '#/lib/money'
+import { JDG_DUTY_TEMPLATES } from '#/lib/recurring/jdg-duties'
 import { createSeries, updateSeries } from '#/server/fns/recurring'
 import { occurrences } from '#/server/recurring/schedule'
 
 import type { CalendarDate } from '@internationalized/date'
 import type { Key } from 'react-aria-components'
 import type { Minor } from '#/lib/money'
+import type { RecurringDutyCode } from '#/lib/enums'
 import type {
   CategoryRow,
   RecurringFrequency,
@@ -155,6 +157,8 @@ export interface Draft {
   currencyCode: string
   frequency: RecurringFrequency
   anchorDay: number | null
+  anchorMonth: number | null
+  dutyCode: RecurringDutyCode | null
   startDate: CalendarDate
   terminationKind: TerminationKind
   endDate: CalendarDate | null
@@ -184,6 +188,8 @@ function draftFrom(
     currencyCode: baseCurrencyCode,
     frequency: 'monthly',
     anchorDay: null,
+    anchorMonth: null,
+    dutyCode: null,
     startDate: todayIn('UTC'),
     terminationKind: 'open',
     endDate: null,
@@ -211,6 +217,8 @@ function draftFrom(
     currencyCode: series.expectedCurrencyCode,
     frequency: series.frequency as RecurringFrequency,
     anchorDay: series.anchorDay,
+    anchorMonth: series.anchorMonth,
+    dutyCode: (series.dutyCode as RecurringDutyCode | null) ?? null,
     startDate: parseDate(series.startDate),
     terminationKind:
       series.endDate !== null
@@ -319,6 +327,8 @@ export function SeriesFormDialog({
         expectedAmountMinor: draft.expectedAmountMinor ?? 0,
         frequency: draft.frequency,
         anchorDay: MONTH_SHAPED.has(draft.frequency) ? draft.anchorDay : null,
+        anchorMonth: draft.frequency === 'annual' ? draft.anchorMonth : null,
+        dutyCode: draft.dutyCode,
         termination,
         accountId: draft.accountId,
         categoryId: draft.categoryId,
@@ -428,7 +438,10 @@ export function SeriesFormDialog({
                     selectedKey={draft.frequency}
                     onSelectionChange={(key: Key | null) => {
                       if (key !== null) {
-                        patch({ frequency: key as RecurringFrequency })
+                        patch({
+                          frequency: key as RecurringFrequency,
+                          ...(key === 'annual' ? {} : { anchorMonth: null }),
+                        })
                       }
                     }}
                   >
@@ -439,6 +452,56 @@ export function SeriesFormDialog({
                     ))}
                   </Select>
                 </div>
+
+                {isEdit ? null : (
+                  <fieldset className="flex flex-col gap-2">
+                    <legend className="text-label font-medium text-ink">
+                      {t('recurring.form.duty.templates')}
+                    </legend>
+                    <p className="text-caption text-ink-2">
+                      {t('recurring.form.duty.help')}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {JDG_DUTY_TEMPLATES.map((template) => (
+                        <Button
+                          key={template.code}
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => {
+                            const name = t(`recurring.duty.${template.code}`)
+                            patch({
+                              dutyCode: template.code,
+                              kind: template.kind,
+                              frequency: template.frequency,
+                              anchorDay: template.anchorDay,
+                              anchorMonth: null,
+                              direction: 'expense',
+                              name:
+                                trimmedName === '' ||
+                                JDG_DUTY_TEMPLATES.some(
+                                  (row) =>
+                                    t(`recurring.duty.${row.code}`) ===
+                                    trimmedName,
+                                )
+                                  ? name
+                                  : draft.name,
+                            })
+                          }}
+                        >
+                          {t('recurring.form.duty.apply', {
+                            name: t(`recurring.duty.${template.code}`),
+                          })}
+                        </Button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+
+                {draft.dutyCode === null ? null : (
+                  <p className="text-caption text-ink-2">
+                    {t('recurring.duty.disclaimer')}
+                  </p>
+                )}
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <MoneyField
@@ -534,6 +597,46 @@ export function SeriesFormDialog({
                             {String(index + 1)}
                           </SelectItem>
                         )),
+                      ]}
+                    </Select>
+                  ) : null}
+
+                  {draft.frequency === 'annual' ? (
+                    <Select
+                      label={t('recurring.form.anchorMonth')}
+                      description={t('recurring.form.anchorMonth.help')}
+                      selectedKey={
+                        draft.anchorMonth === null
+                          ? 'auto'
+                          : String(draft.anchorMonth)
+                      }
+                      onSelectionChange={(key: Key | null) => {
+                        if (key === null) return
+                        patch({
+                          anchorMonth: key === 'auto' ? null : Number(key),
+                        })
+                      }}
+                    >
+                      {[
+                        <SelectItem key="auto" id="auto">
+                          {t('recurring.form.anchorMonth.auto')}
+                        </SelectItem>,
+                        ...Array.from({ length: 12 }, (_, index) => {
+                          const month = index + 1
+                          const label = new Intl.DateTimeFormat(locale, {
+                            month: 'long',
+                            timeZone: 'UTC',
+                          }).format(
+                            new Date(
+                              `2026-${String(month).padStart(2, '0')}-01T00:00:00Z`,
+                            ),
+                          )
+                          return (
+                            <SelectItem key={String(month)} id={String(month)}>
+                              {label}
+                            </SelectItem>
+                          )
+                        }),
                       ]}
                     </Select>
                   ) : null}
@@ -800,6 +903,7 @@ function SchedulePreview({ draft }: { readonly draft: Draft }) {
     {
       frequency: draft.frequency,
       anchorDay: MONTH_SHAPED.has(draft.frequency) ? draft.anchorDay : null,
+      anchorMonth: draft.frequency === 'annual' ? draft.anchorMonth : null,
       startDate: draft.startDate.toString(),
       endDate:
         draft.terminationKind === 'endDate'

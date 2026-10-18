@@ -194,6 +194,59 @@ describe('overdue is derived, never stored', () => {
   })
 })
 
+describe('yearly month and JDG duty shape', () => {
+  it('stores an annual month and materialises that month, not the start date’s', async () => {
+    const series = await createSeries(
+      world.scope,
+      seriesInput({
+        frequency: 'annual',
+        anchorDay: 10,
+        anchorMonth: 11,
+        startDate: '2026-03-15',
+      }),
+    )
+    expect(series.anchorMonth).toBe(11)
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: '2026-06-15',
+      ahead: 1,
+    })
+    const periods = await listPeriods(world.scope, series.id, '2026-06-15')
+    expect(periods.map((period) => period.dueOn)).toEqual(['2026-11-10'])
+  })
+
+  it('drops a leftover yearly month when the series is not annual', async () => {
+    const series = await createSeries(
+      world.scope,
+      seriesInput({
+        frequency: 'monthly',
+        anchorDay: 20,
+        anchorMonth: 11,
+        startDate: '2026-03-15',
+      }),
+    )
+    expect(series.anchorMonth).toBeNull()
+  })
+
+  it('stores a JDG duty code without inventing an amount', async () => {
+    const series = await createSeries(
+      world.scope,
+      seriesInput({
+        name: 'ZUS',
+        kind: 'bill',
+        dutyCode: 'zus',
+        frequency: 'monthly',
+        anchorDay: 20,
+        expectedAmountMinor: 1_234_00,
+        startDate: '2026-01-20',
+      }),
+    )
+    expect(series.dutyCode).toBe('zus')
+    expect(series.anchorDay).toBe(20)
+    expect(series.expectedAmountMinor).toBe(1_234_00)
+  })
+})
+
 describe('the termination is a union', () => {
   it('stores an end date and no occurrence count', async () => {
     const series = await createSeries(
