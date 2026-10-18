@@ -78,35 +78,40 @@ export function ForecastPanel({ forecasts, className }: ForecastPanelProps) {
           </dl>
           {/*
             A visually-hidden table so the three numbers are tabular data for a screen reader,
-            not three adjacent paragraphs. Colour is not carrying the meaning.
+            not three adjacent paragraphs. Colour is not carrying the meaning. The clip sits on a
+            wrapper, never on the `<table>`: a table lays out by its content and ignores
+            `width: 1px`, so an `sr-only` table is still as wide as its cells and widens the page
+            at 360px (the same shape as `ChartDataTable`).
           */}
-          <table className="sr-only">
-            <caption>{t('recurring.forecast.title')}</caption>
-            <thead>
-              <tr>
-                {METRICS.map((metric) => (
-                  <th key={metric} scope="col">
-                    {t(`recurring.forecast.${metric}`)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                {METRICS.map((metric) => (
-                  <td key={metric}>
-                    {formatMoney(
-                      locale,
-                      makeMoney(
-                        amountOf(forecast, metric),
-                        forecast.currencyCode,
-                      ),
-                    )}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+          <div className="sr-only">
+            <table>
+              <caption>{t('recurring.forecast.title')}</caption>
+              <thead>
+                <tr>
+                  {METRICS.map((metric) => (
+                    <th key={metric} scope="col">
+                      {t(`recurring.forecast.${metric}`)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {METRICS.map((metric) => (
+                    <td key={metric}>
+                      {formatMoney(
+                        locale,
+                        makeMoney(
+                          amountOf(forecast, metric),
+                          forecast.currencyCode,
+                        ),
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       ))}
     </Card>

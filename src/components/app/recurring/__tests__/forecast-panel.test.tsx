@@ -27,6 +27,25 @@ describe('ForecastPanel', () => {
     expect(screen.getByRole('table', { hidden: true })).toBeTruthy()
   })
 
+  it('clips the hidden table with a wrapper, because an sr-only table still widens the page', () => {
+    renderRecurring(
+      <ForecastPanel
+        forecasts={[
+          {
+            currencyCode: 'PLN',
+            spentThisYearMinor: asMinor(200_00),
+            restOfYearMinor: asMinor(700_00),
+            next12MonthsMinor: asMinor(1_200_00),
+          },
+        ]}
+      />,
+    )
+
+    const table = screen.getByRole('table', { hidden: true })
+    expect(table.classList.contains('sr-only')).toBe(false)
+    expect(table.parentElement?.classList.contains('sr-only')).toBe(true)
+  })
+
   it('says so when there is nothing to roll up', () => {
     renderRecurring(<ForecastPanel forecasts={[]} />)
     expect(screen.getByText('Nothing to forecast yet.')).toBeTruthy()
