@@ -114,6 +114,16 @@ const currencySchema = z
   .toUpperCase()
   .regex(/^[A-Z]{3}$/u, { error: 'An ISO 4217 alphabetic code.' })
 
+/**
+ * The most instalments one loan carries. Equal to the longest `termPeriods`, so a schedule is never
+ * longer than the term it claims, and bounded so one request cannot store (or price) an unbounded
+ * number of rows: instalments are not metered.
+ */
+export const MAX_INSTALMENTS = 600
+
+/** `docs/ARCHITECTURE.md` §4.3. */
+const D1_MAX_BOUND_PARAMETERS = 100
+
 const optionalMinor = z.number().int().positive().nullable().default(null)
 const optionalNonNegativeMinor = z
   .number()
@@ -170,7 +180,7 @@ export const createLoanSchema = z
     endsOn: z.iso.date().nullable().default(null),
     status: z.enum(LOAN_STATUSES).default('active'),
     note: noteSchema.nullable().default(null),
-    instalments: z.array(createInstalmentSchema).min(1),
+    instalments: z.array(createInstalmentSchema).min(1).max(MAX_INSTALMENTS),
   })
   .superRefine((value, ctx) => {
     if (
@@ -211,9 +221,13 @@ const TERM_FIELDS = [
   'termPeriods',
   'openedOn',
   'firstPaymentOn',
-  'currencyCode',
 ] as const
 
+/**
+ * The patch. `currencyCode` is absent on purpose: the instalment rows carry the loan's currency,
+ * so changing it would leave a schedule in one currency under a loan in another. A loan in the
+ * wrong currency is deleted and created again.
+ */
 export const updateLoanSchema = z
   .strictObject({
     name: nameSchema,
@@ -221,7 +235,6 @@ export const updateLoanSchema = z
     book: z.enum(BOOKS),
     lender: lenderSchema.nullable(),
     accountId: idSchema.nullable(),
-    currencyCode: currencySchema,
     principalMinor: z.number().int().positive().nullable(),
     instalmentMinor: z.number().int().positive(),
     outstandingMinor: z.number().int().nonnegative().nullable(),
@@ -546,6 +559,28 @@ export async function createLoan(
     throw new ConflictError('A loan must carry at least one instalment.')
   }
 
+  // One multi-row INSERT binds every column of every row, and D1 refuses more than
+  // `D1_MAX_BOUND_PARAMETERS` per statement. The chunk size is computed from the row's columns
+  // (plus the tenant id the base repository stamps) so a column added later cannot outgrow it;
+  // the subtraction is a whole-number division, kept free of `Math.*` for the invariants test.
+  // The chunks ride in the same batch as the loan, so the schedule stays all-or-nothing.
+  const columnsPerRow = Object.keys(firstInstalment).length + 1
+  const rowsPerStatement =
+    (D1_MAX_BOUND_PARAMETERS - (D1_MAX_BOUND_PARAMETERS % columnsPerRow)) /
+    columnsPerRow
+  const instalmentStatements = []
+  for (let at = 0; at < instalmentRows.length; at += rowsPerStatement) {
+    const [head, ...tail] = instalmentRows.slice(at, at + rowsPerStatement)
+    if (head === undefined) continue
+    instalmentStatements.push(
+      instalmentAccess.insertManyStatement(scope, [head, ...tail]),
+    )
+  }
+  const [firstChunk, ...otherChunks] = instalmentStatements
+  if (firstChunk === undefined) {
+    throw new ConflictError('A loan must carry at least one instalment.')
+  }
+
   await runTenantBatch(scope, [
     loanRepo.insertManyStatement(scope, [
       {
@@ -577,10 +612,8 @@ export async function createLoan(
         updatedAt: now,
       },
     ]),
-    instalmentAccess.insertManyStatement(scope, [
-      firstInstalment,
-      ...instalmentRows.slice(1),
-    ]),
+    firstChunk,
+    ...otherChunks,
   ])
   return getLoan(scope, loanId)
 }
@@ -592,18 +625,13 @@ export async function updateLoan(
 ): Promise<Loan> {
   const parsedId = idSchema.parse(loanId)
   const parsed = updateLoanSchema.parse(patch)
-  await getLoan(scope, parsedId)
+  const existing = await loanRepo.requireById(scope, parsedId)
 
   if (parsed.accountId !== undefined) {
     const account = await requireOwnedAccount(scope, parsed.accountId)
-    const currency = parsed.currencyCode
-    if (
-      account !== null &&
-      currency !== undefined &&
-      account.currencyCode !== currency
-    ) {
+    if (account !== null && account.currencyCode !== existing.currencyCode) {
       throw new ConflictError(
-        `Loan currency ${currency} does not match account ${account.id} (${account.currencyCode}).`,
+        `Loan currency ${existing.currencyCode} does not match account ${account.id} (${account.currencyCode}).`,
       )
     }
   }
@@ -614,24 +642,26 @@ export async function updateLoan(
   }
 
   const conversion = await conversionContextFor(scope)
-  const existing = await loanRepo.requireById(scope, parsedId)
-  const currencyCode = parsed.currencyCode ?? existing.currencyCode
+  const { currencyCode } = existing
   const openedOn = parsed.openedOn ?? existing.openedOn
 
-  const nextInstalmentMinor = parsed.instalmentMinor
+  // Every `ref_*` on the loan is priced at `opened_on`, so moving the date re-prices all three,
+  // whether or not the caller sent that amount.
+  const repriced = parsed.openedOn !== undefined
   const instalmentRef =
-    nextInstalmentMinor === undefined &&
-    parsed.currencyCode === undefined &&
-    parsed.openedOn === undefined
+    parsed.instalmentMinor === undefined && !repriced
       ? null
       : await refTriple(
-          nextInstalmentMinor ?? existing.instalmentMinor,
+          parsed.instalmentMinor ?? existing.instalmentMinor,
           currencyCode,
           openedOn,
           conversion,
         )
 
-  const nextPrincipal = parsed.principalMinor
+  const nextPrincipal =
+    parsed.principalMinor === undefined && repriced
+      ? existing.principalMinor
+      : parsed.principalMinor
   const principalRef =
     nextPrincipal === undefined
       ? undefined
@@ -639,7 +669,10 @@ export async function updateLoan(
         ? null
         : await refTriple(nextPrincipal, currencyCode, openedOn, conversion)
 
-  const nextOutstanding = parsed.outstandingMinor
+  const nextOutstanding =
+    parsed.outstandingMinor === undefined && repriced
+      ? existing.outstandingMinor
+      : parsed.outstandingMinor
   const outstandingRef =
     nextOutstanding === undefined
       ? undefined
@@ -653,13 +686,12 @@ export async function updateLoan(
     ...(parsed.book === undefined ? {} : { book: parsed.book }),
     ...(parsed.lender === undefined ? {} : { lender: parsed.lender }),
     ...(parsed.accountId === undefined ? {} : { accountId: parsed.accountId }),
-    ...(parsed.currencyCode === undefined
-      ? {}
-      : { currencyCode: parsed.currencyCode }),
-    ...(parsed.principalMinor === undefined
+    ...(principalRef === undefined
       ? {}
       : {
-          principalMinor: parsed.principalMinor,
+          ...(parsed.principalMinor === undefined
+            ? {}
+            : { principalMinor: parsed.principalMinor }),
           refPrincipalMinor: principalRef?.refAmountMinor ?? null,
         }),
     ...(instalmentRef === null
@@ -671,10 +703,12 @@ export async function updateLoan(
           refInstalmentMinor: instalmentRef.refAmountMinor,
           rateE10: instalmentRef.rateE10,
         }),
-    ...(parsed.outstandingMinor === undefined
+    ...(outstandingRef === undefined
       ? {}
       : {
-          outstandingMinor: parsed.outstandingMinor,
+          ...(parsed.outstandingMinor === undefined
+            ? {}
+            : { outstandingMinor: parsed.outstandingMinor }),
           refOutstandingMinor: outstandingRef?.refAmountMinor ?? null,
         }),
     ...(parsed.annualRateE10 === undefined

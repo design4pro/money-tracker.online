@@ -3322,6 +3322,47 @@ describe('loans cannot be reached across a workspace boundary', () => {
     expect(await listLoans(world.scope, { includeClosed: true })).toEqual([])
   })
 
+  it('refuses to settle its own instalment with another workspace’s transaction', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    await expect(
+      markInstalmentPaid(world.scope, {
+        loanId: own.id,
+        sequence: 1,
+        transactionId: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const [instalment] = await listInstalments(world.scope, { loanId: own.id })
+    expect(instalment).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+    })
+  })
+
+  it('refuses to re-parent its own loan onto another workspace’s account_id', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    await expect(
+      updateLoan(world.scope, own.id, { accountId: 'acc-b' }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect((await getLoan(world.scope, own.id)).accountId).toBeNull()
+  })
+
   it('never lists another workspace’s loan, even under an identical name', async () => {
     await createLoan(world.scope, {
       name: 'Loan B',
