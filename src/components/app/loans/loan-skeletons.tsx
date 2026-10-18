@@ -43,6 +43,26 @@ export function LoanListSkeleton() {
   )
 }
 
+/** The `/loans/months` pending view: filter row plus a reserved chart and grid. */
+export function LoanCalendarSkeleton() {
+  const t = useTranslate()
+  return (
+    <div className="flex flex-col gap-6">
+      <LoadingAnnouncement message={t('loans.calendar.loading')} />
+      <Skeleton shape="text" className="h-8 w-64" />
+      <Skeleton shape="text" className="h-4 w-96" />
+      <div className="flex gap-4">
+        <Skeleton shape="block" className="h-11 w-64" />
+        <Skeleton shape="block" className="h-11 w-64" />
+      </div>
+      <Card>
+        <Skeleton shape="block" className="h-60 w-full" />
+      </Card>
+      <Skeleton shape="block" className="h-40 w-full" />
+    </div>
+  )
+}
+
 /** The `/loans/$loanId` pending view: header card plus eight schedule rows. */
 export function LoanDetailSkeleton() {
   const t = useTranslate()

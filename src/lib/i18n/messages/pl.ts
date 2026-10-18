@@ -2541,6 +2541,31 @@ const messages = {
   'loans.markPaid.variance.under': 'o {amount} mniej niż w planie',
   'loans.toast.failed': 'Nie udało się',
 
+  'loans.calendar.title': 'Przegląd miesięcy',
+  'loans.calendar.link': 'Przegląd miesięcy',
+  'loans.calendar.subtitle':
+    'Każda rata w danym miesiącu: zapłacone wobec pozostałego. Lata od 2025. Kwoty to zapisane wartości w walucie bazowej, nie bieżące przeliczenie.',
+  'loans.calendar.loading': 'Wczytujemy przegląd miesięcy…',
+  'loans.calendar.error.title': 'Nie udało się wczytać przeglądu miesięcy',
+  'loans.calendar.error.body':
+    'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
+  'loans.calendar.filter.year': 'Rok',
+  'loans.calendar.caption':
+    'Zapłacone i pozostałe raty według miesiąca i roku, w walucie bazowej tej przestrzeni roboczej.',
+  'loans.calendar.year': 'Rok',
+  'loans.calendar.total': 'Suma roku',
+  'loans.calendar.paid': 'Zapłacone',
+  'loans.calendar.remaining': 'Pozostało',
+  'loans.calendar.thisMonth': 'Ten miesiąc',
+  'loans.calendar.cell.empty': 'Brak rat',
+  'loans.calendar.chart.title': 'Obciążenia w {year}',
+  'loans.calendar.chart.category': 'Miesiąc',
+  'loans.calendar.chart.emptyTitle': 'Nic nie zaplanowano w tym roku',
+  'loans.calendar.chart.emptyBody':
+    'Zmień rok albo dodaj zobowiązanie z harmonogramem, który go obejmuje.',
+  'loans.calendar.chart.noData': 'Brak odczytu',
+  'loans.calendar.chart.total': 'Plan',
+
   /* -- Zasady · baner wstrzymanej zasady ------------------------------------ */
   'rules.paused.badge': 'Wstrzymana',
   'rules.paused.title': 'Zasada „{name}” jest wstrzymana',

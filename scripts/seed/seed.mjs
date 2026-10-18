@@ -915,10 +915,17 @@ const LOANS = [
     lender: 'Harbour Bank',
     instalmentMinor: 400_00,
     paymentDay: 15,
-    openedOn: '2026-03-15',
+    openedOn: '2025-12-15',
     endsOn: '2026-05-15',
     status: 'settled',
     instalments: [
+      {
+        dueOn: '2025-12-15',
+        amountMinor: 400_00,
+        status: 'paid',
+        transactionId: 'demo-loan-tx-4',
+        isBuyout: false,
+      },
       {
         dueOn: '2026-04-15',
         amountMinor: 400_00,
