@@ -41,6 +41,8 @@ import type {
   recurringPeriods,
   recurringSeries,
   refunds,
+  loanInstalments,
+  loans,
   savingsGoals,
   subscriptions,
   tagReminders,
@@ -111,6 +113,12 @@ export type RecurringCandidate = BrandMoney<
 
 /** A savings goal. `contributedMinor` is a cache; the contribution links are the authority. */
 export type SavingsGoal = BrandMoney<typeof savingsGoals.$inferSelect>
+
+/** A borrowing in the register. `ref_*` amounts are historical; `annualRateE10` is not an FX rate. */
+export type Loan = BrandMoney<typeof loans.$inferSelect>
+
+/** One scheduled payment. Paid only by pointing at a transaction. */
+export type LoanInstalment = BrandMoney<typeof loanInstalments.$inferSelect>
 
 /** A tag reminder's threshold, which is an amount and so carries its own currency. */
 export type TagReminder = BrandMoney<typeof tagReminders.$inferSelect>
