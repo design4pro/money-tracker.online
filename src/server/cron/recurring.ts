@@ -16,8 +16,8 @@
  * workspace named. The alternative — a sweep that dies on the first bad row — fails silently for
  * everybody after it, which is the worst of both.
  *
- * Nothing here reads a clock except {@link cronToday}, once, at the top: every module below takes
- * the day as a parameter, which is what makes the whole path testable at a pinned date.
+ * Nothing here reads a clock except {@link cronToday}: tests pin `today`; production computes the
+ * workspace civil day per scope. Every module below takes the day as a parameter.
  */
 
 import { parseDate } from '@internationalized/date'
@@ -34,6 +34,11 @@ import {
   listSeries,
   readRemindBefore,
 } from '#/server/repos/recurring'
+import { getWorkspaceTimezone } from '#/server/repos/workspace-settings'
+import {
+  DEFAULT_WORKSPACE_TIMEZONE,
+  civilDayInTimeZone,
+} from '#/server/calendar-day'
 
 import { reminderMarkerKey } from '#/server/recurring/markers'
 
@@ -43,23 +48,40 @@ import type { Logger } from '#/server/observability/logger'
 import type { TenantScope } from '#/server/repos/base'
 
 /**
- * The UTC calendar day, decided once per invocation.
+ * The workspace civil day, decided from `now` in `timeZone`.
  *
- * UTC because that is `booked_on`'s and `due_on`'s own definition (`docs/MONEY.md` §6.1). A cron
- * that used the Worker's local idea of "today" would post a bill on the wrong calendar day for
- * every workspace east of it.
+ * Default `Europe/Warsaw` (`docs/MONEY.md` §6.4). UTC `toISOString().slice(0, 10)` is the wrong
+ * "today" around midnight: a bill due on the 16th in Warsaw would still look like the 15th.
+ * `booked_on` stays a timezone-free calendar date (§6.1); this is only due/overdue/cron.
  */
-export function cronToday(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10)
+export function cronToday(
+  now: Date = new Date(),
+  timeZone: string = DEFAULT_WORKSPACE_TIMEZONE,
+): string {
+  return civilDayInTimeZone(now, timeZone)
 }
 
 export interface RecurringCronArgs {
   readonly scopes: ReadonlyArray<TenantScope>
   readonly markers: MarkerStore
-  readonly today: string
+  /**
+   * Pinned civil day for tests. When omitted, each workspace uses
+   * {@link cronToday} in its own timezone.
+   */
+  readonly today?: string
+  /** Wall clock used when `today` is omitted. */
+  readonly now?: Date
   readonly logger: Logger
   /** How far ahead to materialise. The widget's horizon; see `recurring/materialize`. */
   readonly ahead?: number
+}
+
+async function civilDayForScope(
+  scope: TenantScope,
+  args: RecurringCronArgs,
+): Promise<string> {
+  if (args.today !== undefined) return args.today
+  return cronToday(args.now, await getWorkspaceTimezone(scope))
 }
 
 export interface RecurringCronReport {
@@ -85,10 +107,11 @@ export async function runRecurringHourly(
 
   for (const scope of args.scopes) {
     try {
+      const today = await civilDayForScope(scope, args)
       for (const series of await listSeries(scope, {})) {
         const result = await materializeSeries(scope, {
           seriesId: series.id,
-          today: args.today,
+          today,
           ...(args.ahead === undefined ? {} : { ahead: args.ahead }),
         })
         periodsCreated += result.created
@@ -97,7 +120,7 @@ export async function runRecurringHourly(
       const posted = await runAutoRecord({
         scope,
         markers: args.markers,
-        today: args.today,
+        today,
         onRefusal: (outcome) => {
           args.logger.warn('recurring auto-record declined a period', {
             organizationId: scope.ctx.organizationId,
@@ -153,8 +176,9 @@ export async function runRecurringReminderSweep(
 
   for (const scope of args.scopes) {
     try {
-      const subjects = await reminderSubjectsFor(scope, args.today)
-      const due = dueReminders(subjects, args.today)
+      const today = await civilDayForScope(scope, args)
+      const subjects = await reminderSubjectsFor(scope, today)
+      const due = dueReminders(subjects, today)
 
       const fresh = []
       for (const reminder of due) {

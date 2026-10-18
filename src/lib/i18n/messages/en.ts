@@ -1846,6 +1846,14 @@ const messages = {
   'recurring.filter.active': 'Active',
   'recurring.filter.all': 'All, including paused',
 
+  'book.filter.label': 'Book',
+  'book.filter.all': 'All',
+  'book.business': 'Business',
+  'book.personal': 'Personal',
+  'book.field.label': 'Book',
+  'book.field.description':
+    'Whether this series belongs to the business or to personal finances.',
+
   'recurring.error.title': 'Recurring series could not be loaded',
   'recurring.error.body':
     'The list did not come back. Nothing has been changed — try again.',

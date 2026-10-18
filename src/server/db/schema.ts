@@ -55,11 +55,12 @@
  * transactions with the double-entry transfer model, classification (categories, tags, payees),
  * budgets, recurring series, rules, goals, and import/export.
  *
- * The remaining SaaS-layer tables named in the blueprint's §3.2 — `organization_settings`,
- * `user_preferences`, `notifications`, `notification_preferences`, `audit_log`,
- * `platform_audit_log`, `dashboard_layouts`, `impersonation_sessions` — are **deliberately not
- * here**: they belong to the tenancy, notification and console plans, and a table sketched by the
- * wrong owner generates a migration that has to be reverted.
+ * `organization_settings` is here as a **timezone-only** 1:1 row so cron due/overdue can use the
+ * workspace civil day (`Europe/Warsaw` by default). The rest of that table's planned columns
+ * (`locale`, `week_start`, `date_format`, …), and `user_preferences`, `audit_log`,
+ * `platform_audit_log`, `dashboard_layouts`, `impersonation_sessions`, stay with the plans that
+ * own them — a table sketched by the wrong owner generates a migration that has to be reverted.
+ * `notifications` / `notification_prefs` already live below.
  *
  * ---------------------------------------------------------------------------
  * WHAT IS A `CHECK` AND WHAT IS A REPOSITORY INVARIANT
@@ -180,6 +181,7 @@ export type {
   AccountCategory,
   AccountStatus,
   RecurringKind,
+  Book,
   TransactionDirection,
   RecurringFrequency,
   RecurringDutyCode,
@@ -607,6 +609,43 @@ export const brandLogos = sqliteTable(
 )
 
 export type BrandLogoRow = typeof brandLogos.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Workspace settings — timezone only until plan 23 lands the rest            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One row per workspace. Today it carries the civil timezone cron uses for "today", due and
+ * overdue (`docs/MONEY.md` §6.4). Default `Europe/Warsaw`.
+ *
+ * Plan 23 still owns locale, week start, date format and the rest; those columns are not added
+ * here so a parallel settings PR can land them additively. A workspace without a row is treated
+ * as Warsaw at read time rather than as a crash.
+ */
+export const organizationSettings = sqliteTable(
+  'organization_settings',
+  {
+    organizationId: text('organization_id')
+      .primaryKey()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    timezone: text('timezone', { length: 64 })
+      .notNull()
+      .default('Europe/Warsaw'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    maxLengthCheck(
+      'organization_settings_timezone_length_check',
+      table.timezone,
+      64,
+    ),
+  ],
+)
+
+export type OrganizationSettingsRow = typeof organizationSettings.$inferSelect
+export type OrganizationSettingsInsert =
+  typeof organizationSettings.$inferInsert
 
 /* -------------------------------------------------------------------------- */
 /* Workspace currency layer                                                   */
@@ -1321,6 +1360,18 @@ export const recurringSeries = sqliteTable(
     showInWidget: integer('show_in_widget', { mode: 'boolean' })
       .notNull()
       .default(true),
+    /**
+     * Business vs personal, inside this workspace. Other tables that grow the same
+     * dimension reuse `BOOKS` rather than a second vocabulary. Default `personal`: this
+     * product is a household ledger first.
+     *
+     * Deliberately **no `CHECK` on this column**: SQLite cannot add a table-level `CHECK`
+     * without rebuilding the table, and a rebuild of `recurring_series` cascades into
+     * `recurring_periods`, `recurring_links` and `transactions` on D1 (the hazard documented at
+     * the top of `drizzle/0003`). The enum is a repository invariant instead: every write parses
+     * `z.enum(BOOKS)` in `repos/recurring.ts`.
+     */
+    book: text('book').notNull().default('personal'),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
 
@@ -1344,6 +1395,10 @@ export const recurringSeries = sqliteTable(
     index('recurring_series_organization_id_payee_id_idx').on(
       table.organizationId,
       table.payeeId,
+    ),
+    index('recurring_series_organization_id_book_idx').on(
+      table.organizationId,
+      table.book,
     ),
     enumCheck('recurring_series_kind_check', table.kind, RECURRING_KINDS),
     enumCheck(

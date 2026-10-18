@@ -37,6 +37,7 @@ import type {
   RecurringKind,
   TransactionDirection,
 } from '#/server/db/schema'
+import type { Book } from '#/lib/enums'
 import type {
   CreateSeriesInput,
   RemindBeforeOffset,
@@ -149,9 +150,12 @@ const MONTH_SHAPED: ReadonlySet<string> = new Set([
 type Automation = 'none' | 'auto' | 'match'
 type TerminationKind = 'open' | 'endDate' | 'maxOccurrences'
 
+const BOOKS: ReadonlyArray<Book> = ['business', 'personal']
+
 export interface Draft {
   name: string
   kind: RecurringKind
+  book: Book
   direction: TransactionDirection
   expectedAmountMinor: Minor | null
   currencyCode: string
@@ -183,6 +187,7 @@ function draftFrom(
   const base: Draft = {
     name: '',
     kind: 'subscription',
+    book: 'personal',
     direction: 'expense',
     expectedAmountMinor: null,
     currencyCode: baseCurrencyCode,
@@ -212,6 +217,7 @@ function draftFrom(
     ...base,
     name: series.name,
     kind: series.kind as RecurringKind,
+    book: series.book as Book,
     direction: series.direction as TransactionDirection,
     expectedAmountMinor: series.expectedAmountMinor,
     currencyCode: series.expectedCurrencyCode,
@@ -324,6 +330,7 @@ export function SeriesFormDialog({
       const shared = {
         name: trimmedName,
         kind: draft.kind,
+        book: draft.book,
         expectedAmountMinor: draft.expectedAmountMinor ?? 0,
         frequency: draft.frequency,
         anchorDay: MONTH_SHAPED.has(draft.frequency) ? draft.anchorDay : null,
@@ -417,6 +424,19 @@ export function SeriesFormDialog({
                       : undefined
                   }
                 />
+
+                <RadioGroup
+                  label={t('book.field.label')}
+                  description={t('book.field.description')}
+                  value={draft.book}
+                  onChange={(book) => patch({ book: book as Book })}
+                >
+                  {BOOKS.map((book) => (
+                    <Radio key={book} value={book}>
+                      {t(`book.${book}`)}
+                    </Radio>
+                  ))}
+                </RadioGroup>
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Select

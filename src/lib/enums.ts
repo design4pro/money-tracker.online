@@ -133,6 +133,18 @@ export const RECURRING_KINDS = [
 ] as const
 export type RecurringKind = (typeof RECURRING_KINDS)[number]
 
+/**
+ * Which set of books a row belongs to, inside **one** workspace.
+ *
+ * A household that also runs a business filters Firma / Prywatne; it does not split into two
+ * tenants, because "Wszystko" and net worth would then have no single answer. Other tables that
+ * grow this dimension reuse this tuple rather than minting a second vocabulary.
+ *
+ * _Avoid_ using "book" for `booked_on` (that is the calendar date) or for a second workspace.
+ */
+export const BOOKS = ['business', 'personal'] as const
+export type Book = (typeof BOOKS)[number]
+
 /** Which way the money moves. The same vocabulary as `transactions.direction`, deliberately. */
 export const TRANSACTION_DIRECTIONS = ['income', 'expense'] as const
 export type TransactionDirection = (typeof TRANSACTION_DIRECTIONS)[number]

@@ -104,10 +104,9 @@ afterEach(() => {
 })
 
 describe('cronToday', () => {
-  it('is the UTC calendar day, not the isolate’s local one', () => {
-    // 23:30 in Warsaw on the 16th is still the 15th in UTC, and `booked_on` is defined in UTC.
-    expect(cronToday(new Date('2026-03-15T23:30:00.000Z'))).toBe('2026-03-15')
-    expect(cronToday(new Date('2026-03-16T00:10:00.000Z'))).toBe('2026-03-16')
+  it('is the Warsaw civil day, not the UTC date, around midnight in summer', () => {
+    expect(cronToday(new Date('2026-07-15T22:30:00.000Z'))).toBe('2026-07-16')
+    expect(cronToday(new Date('2026-07-15T21:30:00.000Z'))).toBe('2026-07-15')
   })
 })
 

@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7778dd76-1136-496b-9b10-af82046899b1",
-  "prevId": "498b6c67-98c6-4ead-b4ba-65fe5e8ac457",
+  "id": "4fb4281a-f074-44fd-855c-d3d17740be3b",
+  "prevId": "c48623dc-8306-47fe-8b39-19adada580d2",
   "tables": {
     "account": {
       "name": "account",
@@ -3838,6 +3838,64 @@
         }
       }
     },
+    "organization_settings": {
+      "name": "organization_settings",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'Europe/Warsaw'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organization_settings_organization_id_organization_id_fk": {
+          "name": "organization_settings_organization_id_organization_id_fk",
+          "tableFrom": "organization_settings",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "organization_settings_timezone_length_check": {
+          "name": "organization_settings_timezone_length_check",
+          "value": "length(\"organization_settings\".\"timezone\") <= 64"
+        }
+      }
+    },
     "payee_aliases": {
       "name": "payee_aliases",
       "columns": {
@@ -4855,6 +4913,14 @@
           "autoincrement": false,
           "default": true
         },
+        "book": {
+          "name": "book",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'personal'"
+        },
         "is_active": {
           "name": "is_active",
           "type": "integer",
@@ -4928,6 +4994,14 @@
           "columns": [
             "organization_id",
             "payee_id"
+          ],
+          "isUnique": false
+        },
+        "recurring_series_organization_id_book_idx": {
+          "name": "recurring_series_organization_id_book_idx",
+          "columns": [
+            "organization_id",
+            "book"
           ],
           "isUnique": false
         }
