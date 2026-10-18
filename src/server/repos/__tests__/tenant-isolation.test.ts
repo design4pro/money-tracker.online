@@ -3096,19 +3096,21 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     })
     expect(forecast.spentThisYearMinor).toBe(0)
 
-    // The series filter, not only the join: org B's own link under org B's own series, read with
-    // org A's scope. Without `tenantFilter` on `recurring_links` this returns the row.
+    // The series filter, not only the join: org B's own link under org B's own series, pointing at
+    // an org A transaction (the row a bug elsewhere could leave behind). Org A's scope passes the
+    // join filter on that transaction, so only `tenantFilter` on `recurring_links` keeps the row
+    // out. Removing it makes this read return the link.
     await seedTransaction(world.db, {
-      id: 'txn-b-own-forecast',
+      id: 'txn-a-crossed',
       refAmountMinor: 55_00,
-      organizationId: 'org-b',
-      accountId: 'acc-b',
+      organizationId: 'org-a',
+      accountId: 'acc-a',
       bookedOn: '2026-02-20',
     })
     await world.db.insert(recurringLinks).values({
       organizationId: 'org-b',
       seriesId: theirs.id,
-      transactionId: 'txn-b-own-forecast',
+      transactionId: 'txn-a-crossed',
       createdAt: NOW,
       updatedAt: NOW,
     })

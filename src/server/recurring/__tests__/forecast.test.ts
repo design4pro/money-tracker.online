@@ -232,6 +232,60 @@ describe('forecastSeries', () => {
     expect(forecast.spentThisYearMinor).toBe(asMinor(100_00))
   })
 
+  it('does not count an expense row linked to an income series', () => {
+    const forecast = forecastSeries({
+      direction: 'income',
+      schedule: MONTHLY,
+      expectedAmountMinor: EXPECTED,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today: TODAY,
+      links: [
+        {
+          direction: 'expense',
+          bookedOn: '2026-01-20',
+          amountMinor: 100_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+      ],
+      periods: [],
+    })
+
+    expect(forecast.spentThisYearMinor).toBe(asMinor(0))
+  })
+
+  it('does not count a row booked after the end of this year as spent this year', () => {
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: MONTHLY,
+      expectedAmountMinor: EXPECTED,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today: TODAY,
+      links: [
+        {
+          direction: 'expense',
+          bookedOn: '2027-01-20',
+          amountMinor: 100_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+        {
+          direction: 'expense',
+          bookedOn: '2026-12-31',
+          amountMinor: 40_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+      ],
+      periods: [],
+    })
+
+    // 31 Dec is the last day of this year and counts; 20 Jan next year does not.
+    expect(forecast.spentThisYearMinor).toBe(asMinor(40_00))
+  })
+
   it('plans nothing ahead for a paused series but still reports what was spent', () => {
     const forecast = forecastSeries({
       direction: 'expense',

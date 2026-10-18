@@ -137,9 +137,9 @@ export const loadRecurring = createServerFn({ method: 'GET' })
     const scope = await requireOrg()
     const today = serverToday()
 
-    const series = await listSeriesRow(scope, {
-      includeInactive: data.includeInactive,
-    })
+    // Every series is read, whatever the filter: what a paused or finished series already spent
+    // still counts in "spent this year", so the rollup must not change with the list's filter.
+    const series = await listSeriesRow(scope, { includeInactive: true })
     for (const one of series) {
       if (one.isActive) {
         await materializeSeries(scope, {
@@ -187,7 +187,9 @@ export const loadRecurring = createServerFn({ method: 'GET' })
     )
 
     return {
-      rows,
+      rows: data.includeInactive
+        ? rows
+        : rows.filter((row) => row.series.isActive),
       upcoming,
       pendingCandidates: candidates.length,
       today,

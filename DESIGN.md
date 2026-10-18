@@ -1033,16 +1033,24 @@ Spent this year, rest of this year, next twelve months — three amounts for a r
 the same three rolled up per currency on `/recurring`. The second call site is the series detail.
 
 - **The shape:** a `Card` (`lg` padding) with a subtitle heading, a caption in `text-caption` /
-  `ink-2`, then a three-column `dl` from `sm` up (`grid gap-3 sm:grid-cols-3`). Each metric is a
-  `dt` in caption `ink-2` and a `dd` in subtitle, semibold, tabular. One currency per block; a
-  second currency is a second block, never a converted total.
+  `ink-2`, then a `dl` whose columns follow the card's own width
+  (`grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]`, never a viewport breakpoint: the panel sits
+  in a ~490px column at 1280px and a full-width card at 360px, and three six-digit amounts touched
+  under `sm:grid-cols-3`). Each metric is a `dt` in caption `ink-2` and a `dd` in subtitle,
+  semibold, tabular, `break-words`. One currency per block; a second currency is a second block,
+  never a converted total.
+- **What it counts:** expense series and expense links only. `amount_minor` is never negative, so
+  an income series (or a refund linked by hand) is a direction, not a negative spend; an income
+  series shows no panel. `/recurring` rolls up every series whatever its list filter, because a
+  paused series' spend still counts.
 - **The tones:** none. These are plan figures, not alerts. Overdue copy lives on the series card
   and _Due soon_, not here.
 - **The states:** resting only. There is no empty colour wash; an empty rollup is a sentence
   (`recurring.forecast.empty`).
 - **What carries the meaning when the colour does not:** the three labels, and a visually-hidden
   table of the same three cells so a screen reader gets tabular data rather than three adjacent
-  paragraphs. Amounts are formatted by `formatMoney`; they never become a float in the panel.
+  paragraphs. The clip (`sr-only`) sits on a wrapper `div`, never on the `<table>`: a table lays
+  out by its content and ignores `width: 1px`, so it widens the page at 360px. Amounts are formatted by `formatMoney`; they never become a float in the panel.
 - **It is not** a chart (no SVG, no second encoding) and not _Due soon_ (that list is periods you
   act on). This panel is a year view of integer sums.
 
