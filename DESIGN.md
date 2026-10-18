@@ -1128,6 +1128,17 @@ and nothing else — no headline is ever a caution tone, the verdict word and th
 first. What the 3:1 floor bought differs by theme and is measured rather than assumed: dark gets
 full chroma at nearly the old weight, light has to lighten to get any (`src/styles/tokens.css`).
 
+### Liability meter
+
+The share of a borrowing's imported schedule that is already linked to a transaction, drawn with
+the `AmountMeter` shell on the list card and again as the detail hero (`md` / `lg`). The
+**headline is remaining**, not paid: that is the number somebody acts on. Paid-of-total sits in the
+caption. Overdue changes four channels before colour: the word _Overdue_, the warning triangle, a
+hatched fill, then `warning-bold`. Settled uses a check and a positive fill. Remaining of zero is
+_Schedule paid_, never `0,00`. `aria-valuetext` names paid, remaining and the percentage, never a
+bare percent. The list and the detail share this component; inventing a second bar on the detail
+would be two opinions about the same money.
+
 ### Charts
 
 The forms drawn by the primitives in `src/components/charts` wherever a trend or a breakdown is

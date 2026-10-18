@@ -65,6 +65,8 @@ const PROPER_NOUNS: ReadonlyArray<string> = [
   // only the two bare labels are here.
   'rules.field.tag',
   'rules.action.value.tag',
+  // Polish kept the English legal noun for this kind of contract.
+  'loans.kind.leasing',
 ]
 
 const TOKEN = /\{([A-Za-z0-9_]+)\}/g
