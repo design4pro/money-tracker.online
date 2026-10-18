@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { asMinor } from '#/lib/money'
+import { CALENDAR_START_YEAR } from '#/lib/obligation-calendar'
 import {
   createBudgetWorld,
   seedTransaction,
@@ -8,7 +9,6 @@ import {
 import { setLimitResolver } from '#/server/repos/base'
 import { createLoan, markInstalmentPaid } from '#/server/repos/loans'
 import {
-  CALENDAR_START_YEAR,
   assembleCalendar,
   obligationCalendarFor,
   yearsThrough,

@@ -2481,6 +2481,8 @@ const messages = {
   'loans.calendar.filter.year': 'Year',
   'loans.calendar.caption':
     'Paid and remaining instalments by month and year, in the workspace base currency.',
+  'loans.calendar.key':
+    'In each month the first figure is paid, the second is remaining.',
   'loans.calendar.year': 'Year',
   'loans.calendar.total': 'Year total',
   'loans.calendar.paid': 'Paid',

@@ -8,6 +8,7 @@
  */
 
 import { ZERO_MINOR, sumMinor } from '#/lib/money'
+import { CALENDAR_START_YEAR } from '#/lib/obligation-calendar'
 import { listInstalments, listLoans } from '#/server/repos/loans'
 import { conversionContextFor } from '#/server/repos/workspace-currencies'
 
@@ -15,9 +16,6 @@ import type { Book } from '#/lib/enums'
 import type { Minor } from '#/lib/money'
 import type { TenantScope } from '#/server/repos/base'
 import type { InstalmentView } from '#/server/repos/loans'
-
-/** First year the overview draws. Years before this are out of the product's claimed range. */
-export const CALENDAR_START_YEAR = 2025
 
 export interface CalendarCell {
   readonly key: string

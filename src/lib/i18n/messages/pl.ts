@@ -2552,6 +2552,8 @@ const messages = {
   'loans.calendar.filter.year': 'Rok',
   'loans.calendar.caption':
     'Zapłacone i pozostałe raty według miesiąca i roku, w walucie bazowej tej przestrzeni roboczej.',
+  'loans.calendar.key':
+    'W każdym miesiącu pierwsza kwota jest zapłacona, druga pozostała.',
   'loans.calendar.year': 'Rok',
   'loans.calendar.total': 'Suma roku',
   'loans.calendar.paid': 'Zapłacone',

@@ -53,6 +53,19 @@ describe('CalendarGrid', () => {
   })
 })
 
+describe('CalendarGrid scroller', () => {
+  it('is a named tab stop and carries a visible paid-over-remaining key', () => {
+    renderCalendar()
+    const region = screen.getByRole('region', { name: 'Month overview' })
+    expect(region.getAttribute('tabindex')).toBe('0')
+    expect(within(region).getByRole('table')).toBeTruthy()
+    const key = screen.getByText(
+      /first figure is paid, the second is remaining/i,
+    )
+    expect(key.className).not.toContain('sr-only')
+  })
+})
+
 describe('CalendarChart', () => {
   it('ships a visually hidden table of the same paid and remaining integers', () => {
     renderCalendar()

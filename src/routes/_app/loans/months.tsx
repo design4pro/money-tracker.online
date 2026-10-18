@@ -11,9 +11,9 @@ import { SegmentedFilter } from '#/components/app/nav'
 import { ErrorPanel } from '#/components/app/shell'
 import { Card } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
+import { CALENDAR_START_YEAR } from '#/lib/obligation-calendar'
 import { pageHead } from '#/routes/-lib/page-title'
 import { loadObligationCalendar } from '#/server/fns/loans'
-import { CALENDAR_START_YEAR } from '#/server/loans/calendar'
 
 /**
  * `/loans/months` — paid vs remaining across 12 months × years from 2025 up.
@@ -24,7 +24,7 @@ import { CALENDAR_START_YEAR } from '#/server/loans/calendar'
 
 const searchSchema = z.object({
   book: z.enum(['all', 'business', 'personal']).default('all'),
-  year: z.coerce.number().int().min(2025).max(2100).optional(),
+  year: z.coerce.number().int().min(CALENDAR_START_YEAR).max(2100).optional(),
 })
 
 type BookFilter = z.infer<typeof searchSchema>['book']
