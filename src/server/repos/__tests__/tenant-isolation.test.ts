@@ -53,6 +53,7 @@ import {
   categories,
   currencies,
   importBatches,
+  organizationSettings,
   payees,
   rules,
   transactions,
@@ -103,6 +104,7 @@ import {
   addSecondMember,
   createBudgetWorld,
   executed as harnessExecuted,
+  NOW as budgetWorldNow,
   seedBudget,
   seedCategory,
   seedPeriod,
@@ -2634,14 +2636,47 @@ describe('workspace timezone cannot be aimed across a workspace boundary', () =>
     world = await createBudgetWorld()
   })
 
-  it('lets A set Honolulu and leaves B on the Warsaw default', async () => {
-    expect(await getWorkspaceTimezone(world.scope)).toBe('Europe/Warsaw')
-    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+  it('lets A UPDATE Honolulu and leaves B on its seeded timezone', async () => {
+    await world.db.insert(organizationSettings).values([
+      {
+        organizationId: 'org-a',
+        timezone: 'Europe/Warsaw',
+        createdAt: budgetWorldNow,
+        updatedAt: budgetWorldNow,
+      },
+      {
+        organizationId: 'org-b',
+        timezone: 'Pacific/Auckland',
+        createdAt: budgetWorldNow,
+        updatedAt: budgetWorldNow,
+      },
+    ])
 
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Europe/Warsaw')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe(
+      'Pacific/Auckland',
+    )
+
+    harnessExecuted.length = 0
     await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
 
+    const updates = harnessExecuted.filter((query) =>
+      /update\s+"organization_settings"/i.test(query),
+    )
+    expect(updates).not.toHaveLength(0)
+    for (const statement of updates) {
+      expect(statement).toContain('organization_id')
+    }
+    expect(
+      harnessExecuted.filter((query) =>
+        /insert\s+into\s+"organization_settings"/i.test(query),
+      ),
+    ).toHaveLength(0)
+
     expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
-    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe(
+      'Pacific/Auckland',
+    )
   })
 
   it('refuses a timezone that is not an IANA name, without writing B', async () => {

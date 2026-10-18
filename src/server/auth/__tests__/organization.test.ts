@@ -15,7 +15,6 @@ import {
   DEFAULT_WORKSPACE_CURRENCY_CODES,
 } from '#/server/catalog/data/currencies'
 import { member, organization } from '#/server/db/auth-schema'
-import { DEFAULT_WORKSPACE_TIMEZONE } from '#/server/calendar-day'
 import {
   currencies,
   organizationCurrencies,
@@ -420,13 +419,13 @@ describe('provisioned base currency', () => {
     )
   })
 
-  it('writes Europe/Warsaw as the workspace civil timezone in the same batch', async () => {
+  it('does not insert organization_settings; timezone defaults at read', async () => {
     const organizationId = await provisionPersonalWorkspace(db, ANNA)
-    const [settings] = await db
+    const rows = await db
       .select()
       .from(organizationSettings)
       .where(eq(organizationSettings.organizationId, organizationId))
-    expect(settings?.timezone).toBe(DEFAULT_WORKSPACE_TIMEZONE)
+    expect(rows).toHaveLength(0)
   })
 })
 
