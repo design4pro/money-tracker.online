@@ -14,6 +14,7 @@ import { createBudgetWorld, executed, seedTransaction } from './budget-harness'
 import { setLimitResolver } from '../base'
 import {
   LoanInstalmentSettledError,
+  LoanSettlementRefusedError,
   LoanTermsLockedError,
   MAX_INSTALMENTS,
   createLoan,
@@ -22,6 +23,7 @@ import {
   getLoan,
   listInstalments,
   listLoans,
+  listSettledTransactionIds,
   markInstalmentPaid,
   updateLoan,
 } from '../loans'
@@ -223,6 +225,60 @@ describe('paid instalments bind a transaction', () => {
         transactionId: 'tx-a2',
       }),
     ).rejects.toBeInstanceOf(LoanInstalmentSettledError)
+  })
+
+  it('refuses a transaction that already settles another instalment', async () => {
+    const loan = await createLoan(scope, importedInput())
+    await seedTransaction(world.db, {
+      id: 'tx-a',
+      refAmountMinor: 120_00,
+      bookedOn: '2026-02-20',
+    })
+    await markInstalmentPaid(scope, {
+      loanId: loan.id,
+      sequence: 1,
+      transactionId: 'tx-a',
+    })
+    expect([...(await listSettledTransactionIds(scope))]).toEqual(['tx-a'])
+
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 2,
+        transactionId: 'tx-a',
+      }),
+    ).rejects.toMatchObject({
+      constructor: LoanSettlementRefusedError,
+      reason: 'already-linked',
+    })
+    // Re-linking the same pair stays idempotent.
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-a',
+      }),
+    ).resolves.toMatchObject({ status: 'paid' })
+  })
+
+  it('refuses an income transaction as the settlement', async () => {
+    const loan = await createLoan(scope, importedInput())
+    await seedTransaction(world.db, {
+      id: 'tx-in',
+      direction: 'income',
+      refAmountMinor: 120_00,
+      bookedOn: '2026-02-20',
+    })
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-in',
+      }),
+    ).rejects.toMatchObject({
+      constructor: LoanSettlementRefusedError,
+      reason: 'not-an-expense',
+    })
   })
 
   it('lets the database refuse a paid row with no transaction id', async () => {

@@ -153,6 +153,7 @@ import {
   getLoan,
   listInstalments,
   listLoans,
+  listSettledTransactionIds,
   markInstalmentPaid,
   updateLoan,
 } from '../loans'
@@ -3345,6 +3346,19 @@ describe('loans cannot be reached across a workspace boundary', () => {
       status: 'upcoming',
       settledTransactionId: null,
     })
+  })
+
+  it('lists only its own settled transaction ids', async () => {
+    await markInstalmentPaid(world.otherScope, {
+      loanId: loanBId,
+      sequence: 1,
+      transactionId: 'tx-b-loan',
+    })
+
+    expect([...(await listSettledTransactionIds(world.scope))]).toEqual([])
+    expect([...(await listSettledTransactionIds(world.otherScope))]).toEqual([
+      'tx-b-loan',
+    ])
   })
 
   it('refuses to re-parent its own loan onto another workspace’s account_id', async () => {

@@ -2441,6 +2441,7 @@ const messages = {
     'Each row is one expected payment. Paid means it points at a recorded transaction.',
   'loans.schedule.missing':
     'This liability has no schedule. That should not happen; try again or delete it.',
+  'loans.schedule.title': 'Instalment schedule',
   'loans.schedule.sequence': 'No.',
   'loans.schedule.due': 'Due',
   'loans.schedule.amount': 'Amount',
@@ -2469,6 +2470,8 @@ const messages = {
   'loans.markPaid.variance.over': '{amount} more than planned',
   'loans.markPaid.variance.under': '{amount} less than planned',
   'loans.toast.failed': 'That did not go through',
+  'loans.markPaid.error.body':
+    'That payment could not be linked. It may already pay another instalment. Nothing has been changed.',
 
   /* -- Rules · the paused banner -------------------------------------------- */
   // A rule pauses when something it names is deleted. The banner has to say *what*

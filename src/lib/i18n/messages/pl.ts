@@ -2510,6 +2510,7 @@ const messages = {
     'Każdy wiersz to jedna oczekiwana płatność. Zapłacone oznacza wskazanie zapisanej transakcji.',
   'loans.schedule.missing':
     'To zobowiązanie nie ma harmonogramu. Tak nie powinno być; spróbuj ponownie albo je usuń.',
+  'loans.schedule.title': 'Harmonogram rat',
   'loans.schedule.sequence': 'Lp.',
   'loans.schedule.due': 'Termin',
   'loans.schedule.amount': 'Kwota',
@@ -2540,6 +2541,8 @@ const messages = {
   'loans.markPaid.variance.over': 'o {amount} więcej niż w planie',
   'loans.markPaid.variance.under': 'o {amount} mniej niż w planie',
   'loans.toast.failed': 'Nie udało się',
+  'loans.markPaid.error.body':
+    'Nie udało się powiązać tej płatności. Mogła już opłacać inną ratę. Nic nie zostało zmienione.',
 
   /* -- Zasady · baner wstrzymanej zasady ------------------------------------ */
   'rules.paused.badge': 'Wstrzymana',

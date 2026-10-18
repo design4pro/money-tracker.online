@@ -1074,6 +1074,9 @@ the series detail grid and _Due soon_ on `/recurring`.
   stacks the buttons from `sm` up). Every layout change is scoped below `sm`, so nothing changes
   at `sm` and above. The shared classes and the self-labelling
   cell are `stacked-table.tsx`.
+  The liability schedule (`/loans/$loanId`) is a second call site of both: the same classes, its
+  scroller a focusable named region, and `useRowFocusRecovery` returning focus to the schedule
+  (the heading when the saved row has no button left) after a mark-paid save.
   - _Semantics survive the `display` change:_ the table, both row groups, rows, column headers,
     the due-date row header and cells carry their `role` explicitly, with `<caption>` and `scope`
     kept, because a non-table `display` can drop a native role in some browser and screen reader
@@ -1134,7 +1137,7 @@ The share of a borrowing's imported schedule that is already linked to a transac
 the `AmountMeter` shell on the list card and again as the detail hero (`md` / `lg`). The
 **headline is remaining**, not paid: that is the number somebody acts on. Paid-of-total sits in the
 caption. Overdue changes four channels before colour: the word _Overdue_, the warning triangle, a
-hatched fill, then `warning-bold`. Settled uses a check and a positive fill. Remaining of zero is
+hatched fill, then `warning-bold`. Settled uses a check and a hatched positive fill. Remaining of zero is
 _Schedule paid_, never `0,00`. `aria-valuetext` names paid, remaining and the percentage, never a
 bare percent. The list and the detail share this component; inventing a second bar on the detail
 would be two opinions about the same money.
