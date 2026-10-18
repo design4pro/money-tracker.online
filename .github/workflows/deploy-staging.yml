@@ -1,11 +1,13 @@
 name: Deploy staging
 
-# Git Flow's preview leg: a push to `develop` migrates and deploys the `staging` environment
-# from wrangler.jsonc once CI has passed on that commit. ci.yml calls this workflow as its last job,
-# `deploy · staging`, behind `verify`, the unit suite and every e2e leg, so a red commit never
-# reaches staging (ADR 0003, amendment 2026-09-15). Production stays in deploy-production.yml, on
-# `main`. `workflow_dispatch` waits on nothing: it is for redeploying a commit by hand, or for
-# shipping while CI itself is down.
+# Git Flow's preview leg: a push to `develop` (a merged PR) migrates and deploys the `staging`
+# environment from wrangler.jsonc. Pull-request verification does not run on GitHub Actions
+# (ADR 0033): the agent that opened the PR must have posted a green full gate on that head before
+# autopilot merged it. This workflow only ships. Production stays in deploy-production.yml, on
+# `main`. `workflow_dispatch` waits on nothing: it is for redeploying a commit by hand.
+#
+# The last step is a smoke check of https://staging.money-tracker.online/api/health. The job is
+# not green — and staging is not considered deployed — until that check returns 200.
 #
 # ── GitHub configuration this workflow needs ──────────────────────────────────────────────────
 # secrets    CLOUDFLARE_API_TOKEN   Workers Scripts:Edit + D1:Edit on account 6cfdf3b5143cddc631383a4c14736c3a
@@ -21,7 +23,8 @@ name: Deploy staging
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 
 on:
-  workflow_call:
+  push:
+    branches: [develop]
   workflow_dispatch:
 
 permissions:
@@ -29,18 +32,16 @@ permissions:
 
 # `runs-on` below reads through `vars.RUNNER_DEPLOY`, a repository variable that is deliberately
 # unset: the fallback array selects the `ci` pool on the OVH VPS - x64 containers in the `vps`
-# runner group, one job per container, shared with design4pro/planned.travel - where the gate
-# runs too. Since 2026-09-24 that VPS is the only place this repository's jobs run (ADR 0022).
+# runner group, one job per container, shared with design4pro/planned.travel (ADR 0022). Deploys
+# keep that pool so the Cloudflare credential stays on machines the organisation runs. PR
+# verification no longer queues here (ADR 0033).
 #
-# A deploy queues behind whatever the pool is already running, and a VPS outage stops shipping
-# as well as the gate. Recovery is a variable, not a pull request, because the required checks
-# need the runners that are missing:
+# A deploy queues behind whatever the pool is already running, and a VPS outage stops shipping.
+# Recovery is a variable, not a pull request:
 #
 #   gh variable set RUNNER_DEPLOY '["ubuntu-latest"]'
 #
 # moves shipping onto GitHub-hosted machines; deleting the variable brings it back to the VPS.
-# `RUNNER_CI` and `RUNNER_AGENT` are the same lever for the gate and for the agent jobs. The
-# Cloudflare credential this workflow carries stays on machines the organisation runs.
 # See design4pro/cezar, `docs/host/README.md`, "Linux host".
 
 jobs:
@@ -50,7 +51,7 @@ jobs:
     timeout-minutes: 25
     # Never run two deploys at once, and never cancel one half-way: an interrupted
     # `d1 migrations apply` would leave the schema between two versions. On the job, so it holds
-    # the same way whether ci.yml calls this or a human dispatches it.
+    # the same way whether a push started this or a human dispatched it.
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
@@ -142,8 +143,9 @@ jobs:
       # the code - is serving against the NEW schema. Every migration must therefore be additive
       # (add tables, add nullable columns, add indexes) and never remove or narrow anything the
       # deployed code still reads. A destructive change is a two-release dance: release one stops
-      # using the column, release two drops it. CI's db-drift rung proves a migration exists; only
-      # review proves it is additive.
+      # using the column, release two drops it. The agent gate's db-drift rung proves a
+      # migration exists; review plus `scripts/ci/assert-additive-migrations.mjs` prove it is
+      # additive.
       - name: Apply D1 migrations
         if: steps.gate.outputs.configured == 'true'
         uses: cloudflare/wrangler-action@v4

@@ -5,16 +5,16 @@
  *
  *   BASE_SHA=<first parent> HEAD_SHA=<merge commit> node scripts/ci/change-scope.mjs
  *
- * It writes `browser=true|false` to `$GITHUB_OUTPUT`. `ci.yml` and `a11y.yml` skip the e2e legs,
- * their report and the axe scan when the answer is false (#455).
+ * It writes `browser=true|false` to `$GITHUB_OUTPUT`. Kept so an on-demand `a11y.yml` dispatch
+ * (or a future browser job) can skip when the diff cannot reach the browser (#455).
  *
  * The list below names what is known NOT to reach the browser; everything else does. So a new
  * directory, a new root config file or a failed diff runs the gate, and the only way to skip it is
  * a path someone deliberately put on this list. The unit suite is not scoped at all: it reads the
  * docs this list excludes (ADR numbering, plans, `SDLC.md`, the spec registry).
  *
- * Nothing here can ship an untested tree. `verified-tree.mjs` never reads a `pull_request` run, so
- * the push to `develop` that follows a merge runs every leg before `deploy · staging`.
+ * A docs-only classification does not skip the agent unit suite. After ADR 0033 the push to
+ * `develop` deploys; it does not re-run e2e.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -37,7 +37,6 @@ const OUTSIDE_PREFIXES = [
 const INSIDE_PREFIXES = [
   '.github/actions/',
   '.github/a11y/',
-  '.github/workflows/ci.yml',
   '.github/workflows/a11y.yml',
   'scripts/seed/',
 ]

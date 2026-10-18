@@ -3,8 +3,8 @@ name: Promote develop
 # Git Flow's promotion leg, kept open automatically: after every push to `develop` - which is
 # every merge into staging - this opens the `develop` → `main` pull request if one is not already
 # open, and otherwise leaves the existing one alone. It never merges anything; the owner
-# reviews and merges it, and merging is what deploys production (ci.yml's `deploy · production`, behind
-# a green CI run on `main`).
+# reviews and merges it, and merging is what deploys production (`deploy-production.yml` on push
+# to `main`).
 #
 # ADR 0003 names the drift between the two long-lived branches as the cost of this flow, and
 # cadence as the only mitigation. A promotion pull request that always exists is what makes the
@@ -14,12 +14,11 @@ name: Promote develop
 # A pull request opened with the default GITHUB_TOKEN does not trigger `pull_request` workflows,
 # so it shows no checks of its own. Set the repository secret `PROMOTE_PR_TOKEN` - a fine-grained
 # PAT or a GitHub App installation token with `contents: read` and `pull requests: write` on this
-# repository - and the promotion pull request runs ci.yml and a11y.yml like any other.
+# repository - so the promotion pull request is a real pull request from the API's point of view.
 #
 # Without that secret the expression below falls back to GITHUB_TOKEN and the workflow still
-# works; only the checks are missing. That is survivable, because ci.yml and a11y.yml also run
-# `on: push: branches: [main, develop]`, so the exact commit being promoted has already been
-# through the full gate on `develop`.
+# works. Pull-request Actions no longer run a verification suite (ADR 0033); the commit being
+# promoted already carried a green agent gate on `develop`.
 #
 # ── The label, and why the promotion opens carrying one ───────────────────────────────────────
 # Because PROMOTE_PR_TOKEN belongs to a maintainer, this pull request is indistinguishable, to the
@@ -36,8 +35,8 @@ name: Promote develop
 # human, this one included - is authored by the owner's one account, and the pipeline merges into
 # `develop` on its own (ADR 0027), so the author does not tell the release apart. Every cezar PR
 # automation excludes `do-not-merge` (docs/agents/cezar-automations.json), om-approve-merge-pr
-# refuses it, and set_pipeline_label never removes it (.ai/trackers/github.md). No CI check reads
-# it, so the owner merges as before. It is put back on an already open promotion on every run, and
+# refuses it, and set_pipeline_label never removes it (.ai/trackers/github.md). No Actions check
+# reads it, so the owner merges as before. It is put back on an already open promotion on every run, and
 # the `merge-queue` an older run left there is taken off, so the guard holds from the first run
 # after this change. Labelling a pull request goes through the issues endpoint, which GitHub grants
 # to `pull requests: write` as well as to `issues: write`, so it is covered by the permission this
@@ -64,9 +63,7 @@ permissions:
 # the `ci` pool the fallback array names: x64 containers on the OVH VPS (ADR 0022, ADR 0027).
 # Setting the variable (`gh variable set RUNNER_CI '["ubuntu-latest"]'`) moves every job that
 # reads it off the VPS without a pull request; deploys follow `vars.RUNNER_DEPLOY`
-# (deploy-production.yml). These are variables and not literal label arrays because reverting by
-# pull request would need the required checks, which need the runners that are missing. See
-# design4pro/cezar, `docs/host/README.md`, "Linux host".
+# (deploy-production.yml). See design4pro/cezar, `docs/host/README.md`, "Linux host".
 
 jobs:
   promote:
@@ -122,9 +119,8 @@ jobs:
             'Before merging, check that staging has actually been exercised:' \
             '<https://staging.money-tracker.online>.' \
             '' \
-            'Every commit below has already passed the full gate on `develop`. Whether this pull' \
-            'request also runs its own checks depends on the token that opened it - see the header of' \
-            '`.github/workflows/promote-develop.yml`.')
+            'Every commit below already sat on develop behind an agent-posted full gate (ADR 0033).' \
+            'Merging this is the owner release decision; GitHub Actions then deploys production.')
 
           gh pr create \
             --base main \

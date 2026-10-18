@@ -5,9 +5,9 @@ description: >
   build served by `vite preview` on port 3010, and the seeded demo workspace
   behind it.
 
-  Two workflows need this identical preparation - the e2e gate in ci.yml and the
-  accessibility gate in a11y.yml - and a drift between them would show up as a
-  suite that only fails in one of the two. So it lives here once.
+  Used by the dispatched `a11y.yml` scan. Cursor agents prepare the same stack
+  through `om-prepare-test-env` / `.ai/scripts/test-env-up.sh` on their VM
+  (ADR 0033).
 
   Installs the browsers rather than assuming them. The assumption held while
   these jobs ran in `mcr.microsoft.com/playwright:v<version>-noble`, and then

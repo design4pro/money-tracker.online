@@ -57,15 +57,13 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
 
 - Feature branches (named by the rule in `AGENTS.md`, `## Always`) open a pull request to
   **`develop`**.
-- Merging `develop` deploys **staging** once CI has passed on that commit:
-  https://staging.money-tracker.online (`deploy · staging`, the last job of `ci.yml`, calling
-  `deploy-staging.yml`).
-- Promotion is a pull request `develop` → **`main`**; merging deploys **production** once CI has
-  passed on that commit: https://money-tracker.online (`deploy · production`, calling
-  `deploy-production.yml`).
-- `ci.yml` runs lint · typecheck · unit tests · build · the route-tree and migration drift checks
-  and the browser suite on every pull request that can change what the browser sees
-  (`scripts/ci/change-scope.mjs`; every push to `develop` and `main` runs it regardless).
+- Merging `develop` deploys **staging** (`deploy-staging.yml` on push to `develop`), then smoke-
+  checks https://staging.money-tracker.online/api/health.
+- Promotion is a pull request `develop` → **`main`**, owner-merged; merging deploys **production**
+  (`deploy-production.yml` on push to `main`): https://money-tracker.online.
+- Pull-request verification is not GitHub Actions (ADR 0033). A Cursor cloud agent runs the full
+  gate (`validation.commands` plus e2e and axe) on its VM and posts `<!-- agent-gate-report -->`
+  on the PR. Autopilot merges to `develop` only with that comment green on the current head.
 - No screenshot is compared anywhere: `docs/adr/0016-journeys-replace-the-visual-gate.md` retired
   the baselines. What a screen _looks_ like is judged by `node scripts/visual/capture.mjs` and a
   human at review; what the suite asserts is that the screen answers, hydrates, says nothing in

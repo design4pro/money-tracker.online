@@ -25,11 +25,11 @@ runner group `vps`, scoped to this repository and `design4pro/planned.travel`. I
 image and the same `pool.sh` the Mac used (design4pro/cezar, `host/runner`, "Linux host"): one
 job per container, thrown away afterwards. There are three pools:
 
-| pool  | labels                                   | slots                | runs                                                                                  |
-| ----- | ---------------------------------------- | -------------------- | ------------------------------------------------------------------------------------- |
-| ci    | `["self-hosted","linux","X64","ci"]`    | 2 × 4 CPU / 8 GB     | `ci.yml`, `a11y.yml`, `deploy-staging.yml`, `deploy-production.yml`                   |
-| gate  | `["self-hosted","linux","X64","gate"]`  | small                | `merge-gate.yml`, `trusted-merge-gate.yml`, `governance-gate.yml`, `auto-merge.yml`, `promote-develop.yml` |
-| agent | `["self-hosted","linux","X64","agent"]` | small                | jobs that read `RUNNER_AGENT`                                                         |
+| pool  | labels                                  | slots            | runs                                                                                                       |
+| ----- | --------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| ci    | `["self-hosted","linux","X64","ci"]`    | 2 × 4 CPU / 8 GB | `ci.yml`, `a11y.yml`, `deploy-staging.yml`, `deploy-production.yml`                                        |
+| gate  | `["self-hosted","linux","X64","gate"]`  | small            | `merge-gate.yml`, `trusted-merge-gate.yml`, `governance-gate.yml`, `auto-merge.yml`, `promote-develop.yml` |
+| agent | `["self-hosted","linux","X64","agent"]` | small            | jobs that read `RUNNER_AGENT`                                                                              |
 
 The `gate` jobs take seconds. They get their own pool so they never queue behind a 20-minute e2e
 leg on one of the two `ci` slots.
@@ -58,8 +58,17 @@ allowance.
   The budgets move rather than the shard count, because two `ci` slots cannot run more legs at once
   and each leg pays the setup again: Playwright's `globalTimeout` on CI is 30 min and the e2e job's
   `timeout-minutes` is 40. Per-test timeouts are unchanged.
+
 - **One machine.** A VPS outage stops the gate, promotions and shipping together. Recovery is the
   kill switch above.
 - **One writable mount, shared.** Every job in the `vps` runner group can read and write every
   run's artifacts. It holds reports, never tools, and only the two repositories in the group can
   schedule jobs there.
+
+## Amendment 2026-10-18 (PR verification leaves the VPS)
+
+Amended by ADR 0033. The `ci` pool still runs **deploys** (`deploy-staging.yml`,
+`deploy-production.yml`), **promotion-PR opening** (`promote-develop.yml`), and an optional
+dispatched axe scan. It no longer runs a verification suite on every pull request. `ci.yml` is
+removed. The kill switch `RUNNER_DEPLOY` stays for shipping; `RUNNER_CI` remains for promote and
+dispatch-only axe. Cursor cloud agents run generate, typecheck, lint, unit tests, e2e and axe.

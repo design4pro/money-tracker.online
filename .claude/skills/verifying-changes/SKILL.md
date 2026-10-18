@@ -49,12 +49,16 @@ your own checkout use `pnpm dev` in one shell and `pnpm e2e` in another.
    `node scripts/visual/capture.mjs`, and it only catches it if somebody runs it and reads it. For
    a refactor with no intended visual change - a token retune, a shared layout edit, a Tailwind
    bump - that pair is the only thing between the change and `develop`.
-5. **In an agent worktree** the gate is `validation.commands` in `.ai/agentic.config.json`: both
-   drift gates, typecheck, lint, vitest and build, in that order, run by the om skills before a PR
-   opens and again by `om-auto-review-pr`. The browser suite is not in it: CI runs it on every pull
-   request, and `om-auto-qa-pr` drives the app through `.ai/scripts/test-env-up.sh` for evidence.
-6. **CI** runs lint, typecheck, unit tests, build, both drift gates, the browser suite and the axe
-   scan on every pull request. Since ADR 0016 there is no label to remember.
+5. **In an agent worktree** the iteration gate is `validation.commands` in `.ai/agentic.config.json`:
+   both drift gates, typecheck, lint, vitest and build, in that order, run by the om skills before a
+   PR opens and again by `om-auto-review-pr`.
+6. **Before merge into `develop`** the same agent runs the **full gate** (`prVerification` in that
+   config): every `validation.commands` rung, then `pnpm e2e` on `chromium` and `mobile-chromium`,
+   then `pnpm exec tsx .github/a11y/axe-scan.mjs`, then
+   `node scripts/ci/assert-additive-migrations.mjs`. Post the result on the PR as the
+   `<!-- agent-gate-report -->` comment for this head (ADR 0033). GitHub Actions no longer runs
+   that suite on pull requests. `om-auto-qa-pr` still drives the app through
+   `.ai/scripts/test-env-up.sh` for UI evidence. Since ADR 0016 there is no e2e label to remember.
 
 `pnpm check` (prettier over the whole repo) is **not** a gate and fails on 10 pre-existing files at
 the time of writing. Keep what you touch prettier-clean - the `Edit`/`Write` hook does it for you -

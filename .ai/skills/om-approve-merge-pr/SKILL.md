@@ -31,12 +31,35 @@ Read the base and the head off the pull request rather than off its title. The p
 by `.github/workflows/promote-develop.yml` under a fixed title, but a person can open the same pull
 request by hand under any title at all.
 
+## The agent full gate is the merge evidence (ADR 0033)
+
+Step 1 of the installed skill treats GitHub **required checks** as the CI gate. After the owner
+clears those contexts from the rulesets they will be empty; until then they may still block the
+GitHub merge button. Either way this overlay **refuses** `om-approve-merge-pr` into `develop`
+unless all of the following hold on the current head:
+
+1. A conversation comment contains `<!-- agent-gate-report -->` (`.ai/agentic.config.json` →
+   `prVerification.evidenceMarker`), `Head: <head SHA>`, and `Status: green`.
+2. That comment lists a pass for every `validation.commands` rung and for
+   `prVerification.browserCommands` (`pnpm e2e --project=chromium --project=mobile-chromium` and
+   `pnpm exec tsx .github/a11y/axe-scan.mjs`).
+3. `Migrations: additive` or `Migrations: none`, matching
+   `node scripts/ci/assert-additive-migrations.mjs` (unique journal `idx`, snapshot `prevId`
+   chain, no `DROP TABLE` / `DROP COLUMN` in SQL this branch added). Rebase onto `develop` and run
+   `pnpm db:generate` when two PRs added migrations from the same parent.
+4. Any GitHub required status checks that still remain in the ruleset are genuinely green — never
+   bypass them. Do not wait on `vps-ci-*` jobs whose workflows this repository no longer runs.
+
+A local `validation.commands` pass without the posted comment is this run's own notes, not merge
+evidence. If staging/`develop` is red, open a fix or revert PR; never push a commit onto
+`develop` outside a pull request.
+
 ## Rules
 
 - Merging into `develop` is `pr-autopilot`'s job (`om-pr-autopilot --allow-merge`, ADR 0027); a
   person merges the rest. The label rules in `SDLC.md` (`do-not-merge`, `blocked`, `qa-failed`,
   `in-progress`, and `needs-qa` without `qa-approved`) are a convention this skill reads and
-  honours; no CI check enforces them (ADR 0027).
+  honours; no GitHub Actions check enforces them (ADR 0027). The agent full gate above does.
 - The `develop` to `main` promotion requires a person's release decision. An unattended run
   (`CEZ_TASK_ID` is set, or no person is in the session) merges only a PR whose `baseRefName` is
   `develop`; any other base, or a PR carrying `do-not-merge` (the promotion carries it), is

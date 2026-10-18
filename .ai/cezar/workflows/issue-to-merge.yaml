@@ -360,7 +360,7 @@ nodes:
     verdicts: [merged, blocked]
     prompt: |-
       Approve and squash-merge the PR of the current branch strictly through the om-approve-merge-pr
-      gates (QA gate, blocking labels, required checks, risk-high second reviewer).
+      gates (QA gate, blocking labels, agent full gate, leftover GitHub required checks, risk-high second reviewer).
       If any gate refuses (for example needs-qa without qa-approved), do NOT work around it:
       merge nothing and report which gate blocked.
       End with CEZ:VERDICT merged if the PR is merged, otherwise CEZ:VERDICT blocked

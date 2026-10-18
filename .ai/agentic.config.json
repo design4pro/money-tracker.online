@@ -16,6 +16,15 @@
       "pnpm build"
     ]
   },
+  "prVerification": {
+    "provider": "cursor-cloud-agent",
+    "evidenceMarker": "<!-- agent-gate-report -->",
+    "browserCommands": [
+      "pnpm e2e --project=chromium --project=mobile-chromium",
+      "pnpm exec tsx .github/a11y/axe-scan.mjs"
+    ],
+    "migrationCheck": "node scripts/ci/assert-additive-migrations.mjs"
+  },
   "labels": {
     "enabled": true,
     "pipeline": [

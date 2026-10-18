@@ -90,10 +90,11 @@ gate in CI on a command it never ran.
 node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>console.log(c))"
 ```
 
-`pnpm e2e` is not in the gate because it needs a running environment: CI runs it on every pull
-request that can change what the browser sees (`scripts/ci/change-scope.mjs`) and on every push to
-`develop`, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
-repo) is not a gate either; keep what you touch prettier-clean.
+`pnpm e2e` and the axe scan are not in `validation.commands` because they need a running app:
+Cursor cloud agents run them on the PR VM as part of the **full gate** (`prVerification` in the
+same config) and post the evidence comment autopilot requires before merging to `develop`
+(ADR 0033). `om-auto-qa-pr` still drives the app for UI evidence. `pnpm check` (prettier over the
+whole repo) is not a gate either; keep what you touch prettier-clean.
 
 `pnpm test` takes 160-200 s (#472, #525, #588), longer than the Bash tool's 120 s default: pass
 `timeout: 600000` and write the output to a file (#525 saw a call over the default moved to the

@@ -11,6 +11,11 @@ Two rules govern this document:
   `.dev.vars.example` documents each one with the steps that obtain it and how the product degrades
   while it is missing.
 
+**GitHub Actions only ships** (ADR 0033). A push to `develop` runs `deploy-staging.yml` (migrate,
+deploy, smoke `/api/health`). A push to `main` runs `deploy-production.yml`. Pull-request
+verification is the Cursor agent full gate posted on the PR, not Actions. The owner, not an
+agent, changes branch-protection required checks.
+
 **One thing is not finished and a first deploy will want to assume it is:** §9.6's Polar sandbox
 acceptance matrix is **unwalked**. No credential has been issued to a build round, so no live
 checkout, upgrade, downgrade, cancellation or webhook delivery has ever been observed. A green

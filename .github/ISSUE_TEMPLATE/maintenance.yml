@@ -49,8 +49,8 @@ body:
         What breaks if this goes wrong, and how it would be noticed. A pinned version that appears
         in more than one file belongs in this box with every place it appears.
       placeholder: |
-        `@playwright/test` appears in package.json, in the container image tag in ci.yml and in
-        a11y.yml. All three move together or the browsers are missing.
+        `@playwright/test` appears in package.json and in `.github/actions/e2e-env`; those move
+        together or the browsers are missing on a dispatched axe scan.
     validations:
       required: true
 

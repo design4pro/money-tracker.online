@@ -15,7 +15,7 @@ every agent branch used to be held to by `scripts/agent/floor-guard.mjs`.
 - [ ] A user-facing change was looked at in a real browser: light and dark, 360px and 1280px, with
       the interaction state that is the point of the change. Nothing in CI compares a pixel
       (ADR 0016), so the PR names the screens and a human takes the pair with
-      `node scripts/visual/capture.mjs`.
+      `node scripts/visual/capture.mjs`. The agent full gate still runs e2e and axe (ADR 0033).
 - [ ] No `TODO`, no placeholder copy, no `console.log`, no commented-out code.
 - [ ] No file outside the change's stated scope was touched.
 - [ ] Every number in the PR body, commits and review came from a command whose output the author
