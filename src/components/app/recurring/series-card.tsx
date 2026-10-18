@@ -6,6 +6,7 @@ import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 
 import type { ReactNode } from 'react'
+import type { RecurringDutyCode } from '#/lib/enums'
 import type {
   RecurringFrequency,
   RecurringKind,
@@ -106,7 +107,11 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
               rowWashSecondary,
             )}
           >
-            <span>{t(`recurring.kind.${series.kind as RecurringKind}`)}</span>
+            <span>
+              {series.dutyCode === null
+                ? t(`recurring.kind.${series.kind as RecurringKind}`)
+                : t(`recurring.duty.${series.dutyCode as RecurringDutyCode}`)}
+            </span>
             <span aria-hidden="true">·</span>
             <span>
               {t(
@@ -126,6 +131,9 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
           {isPaused ? (
             <Badge tone="neutral">{t('recurring.series.paused')}</Badge>
           ) : null}
+          {series.dutyCode === null ? null : (
+            <Badge tone="neutral">{t('recurring.duty.badge')}</Badge>
+          )}
           {series.autoRecord ? (
             <Badge tone="info">{t('recurring.automation.badge.auto')}</Badge>
           ) : null}

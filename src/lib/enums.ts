@@ -148,6 +148,17 @@ export const RECURRING_FREQUENCIES = [
 ] as const
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number]
 
+/**
+ * A Polish JDG due-date shape on a series, not a tax engine.
+ *
+ * The column is nullable: ordinary subscriptions carry none. The three codes name **when** the
+ * person chose to be reminded (the 20th / 20th / 25th), never an amount the product computed.
+ * Amounts stay human-entered. _Avoid_: treating this as a filing status or a liability to the
+ * tax office.
+ */
+export const RECURRING_DUTY_CODES = ['zus', 'pit', 'vat_7'] as const
+export type RecurringDutyCode = (typeof RECURRING_DUTY_CODES)[number]
+
 /** A goal is being saved for, has been reached, or has been put away. */
 export const SAVINGS_GOAL_STATUSES = ['active', 'reached', 'archived'] as const
 export type SavingsGoalStatus = (typeof SAVINGS_GOAL_STATUSES)[number]

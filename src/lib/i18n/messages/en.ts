@@ -2136,6 +2136,35 @@ const messages = {
   'recurring.candidate.toast.dismissed': 'Suggestion dismissed',
   'recurring.candidate.toast.accepted': 'Series created from the suggestion',
 
+  'recurring.forecast.title': 'This year and the next twelve months',
+  'recurring.forecast.caption':
+    'Spent is what you already linked this year. The rest of the year and the next twelve months are the plan that is still open — expected amounts, not a live conversion.',
+  'recurring.forecast.spent': 'Spent this year',
+  'recurring.forecast.rest': 'Rest of this year',
+  'recurring.forecast.next12': 'Next 12 months',
+  'recurring.forecast.empty': 'Nothing to forecast yet.',
+
+  'recurring.form.anchorMonth': 'Month of the year',
+  'recurring.form.anchorMonth.help':
+    'The calendar month a yearly series falls in. Independent of the first due date.',
+  'recurring.form.anchorMonth.auto': 'Same month as the first due date',
+  'recurring.form.duty.templates': 'Polish due-date templates',
+  'recurring.form.duty.help':
+    'These fill the day of the month. You type the amount. This is a reminder, not tax advice.',
+  'recurring.form.duty.apply': 'Use {name}',
+
+  'recurring.duty.zus': 'ZUS contribution',
+  'recurring.duty.pit': 'PIT-36L advance',
+  'recurring.duty.vat_7': 'VAT-7',
+  'recurring.duty.badge': 'Duty',
+  'recurring.duty.disclaimer':
+    'A due date you chose — a deadline, a plan, and whether it is paid. Not a calculated tax and not advice.',
+  'recurring.duty.due': 'Due date',
+  'recurring.duty.plan': 'Plan',
+  'recurring.duty.paid': 'Paid',
+  'recurring.periods.duty.caption':
+    'Each row is one due date: the plan, what was paid, and the difference. Marking a row paid never creates an entry.',
+
   /* -- Savings goals ------------------------------------------------------ */
   /* -- The list ----------------------------------------------------------- */
   'goals.title': 'Savings goals',

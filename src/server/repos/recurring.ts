@@ -49,6 +49,7 @@ import { parseDate } from '@internationalized/date'
 
 import { asMinor } from '#/lib/money'
 import {
+  RECURRING_DUTY_CODES,
   RECURRING_FREQUENCIES,
   RECURRING_KINDS,
   RECURRING_MATCH_SOURCES,
@@ -227,6 +228,8 @@ export const createSeriesSchema = z.strictObject({
   expectedCurrencyCode: currencySchema,
   frequency: z.enum(RECURRING_FREQUENCIES).default('monthly'),
   anchorDay: z.number().int().min(1).max(31).nullable().default(null),
+  anchorMonth: z.number().int().min(1).max(12).nullable().default(null),
+  dutyCode: z.enum(RECURRING_DUTY_CODES).nullable().default(null),
   startDate: z.iso.date(),
   termination: terminationSchema,
   accountId: idSchema.nullable().default(null),
@@ -255,6 +258,8 @@ export const updateSeriesSchema = z
     expectedAmountMinor: z.number().int().positive(),
     frequency: z.enum(RECURRING_FREQUENCIES),
     anchorDay: z.number().int().min(1).max(31).nullable(),
+    anchorMonth: z.number().int().min(1).max(12).nullable(),
+    dutyCode: z.enum(RECURRING_DUTY_CODES).nullable(),
     termination: terminationSchema,
     accountId: idSchema.nullable(),
     categoryId: idSchema.nullable(),
@@ -915,6 +920,8 @@ export async function createSeries(
     expectedCurrencyCode: parsed.expectedCurrencyCode,
     frequency: parsed.frequency,
     anchorDay: parsed.anchorDay,
+    anchorMonth: parsed.frequency === 'annual' ? parsed.anchorMonth : null,
+    dutyCode: parsed.dutyCode,
     startDate: parsed.startDate,
     ...terminationColumns(parsed.termination),
     accountId: parsed.accountId,
@@ -979,6 +986,17 @@ export async function updateSeries(
       ...(parsed.anchorDay === undefined
         ? {}
         : { anchorDay: parsed.anchorDay }),
+      ...(parsed.anchorMonth === undefined && parsed.frequency === undefined
+        ? {}
+        : {
+            anchorMonth:
+              (parsed.frequency ?? existing.frequency) === 'annual'
+                ? parsed.anchorMonth === undefined
+                  ? existing.anchorMonth
+                  : parsed.anchorMonth
+                : null,
+          }),
+      ...(parsed.dutyCode === undefined ? {} : { dutyCode: parsed.dutyCode }),
       ...(parsed.termination === undefined
         ? {}
         : terminationColumns(parsed.termination)),

@@ -2190,6 +2190,35 @@ const messages = {
   'recurring.candidate.toast.dismissed': 'Propozycja odrzucona',
   'recurring.candidate.toast.accepted': 'Seria utworzona z propozycji',
 
+  'recurring.forecast.title': 'Ten rok i najbliższe dwanaście miesięcy',
+  'recurring.forecast.caption':
+    'Wydane to to, co już powiązano w tym roku. Reszta roku i najbliższe dwanaście miesięcy to wciąż otwarty plan — kwoty oczekiwane, nie przeliczenie na żywo.',
+  'recurring.forecast.spent': 'Wydane w tym roku',
+  'recurring.forecast.rest': 'Reszta tego roku',
+  'recurring.forecast.next12': 'Najbliższe 12 miesięcy',
+  'recurring.forecast.empty': 'Nie ma jeszcze nic do prognozy.',
+
+  'recurring.form.anchorMonth': 'Miesiąc roku',
+  'recurring.form.anchorMonth.help':
+    'Kalendarzowy miesiąc, w którym przypada seria roczna. Niezależny od pierwszego terminu.',
+  'recurring.form.anchorMonth.auto': 'Ten sam miesiąc co pierwszy termin',
+  'recurring.form.duty.templates': 'Szablony polskich terminów',
+  'recurring.form.duty.help':
+    'Uzupełniają dzień miesiąca. Kwotę wpisujesz samodzielnie. To przypomnienie, nie porada podatkowa.',
+  'recurring.form.duty.apply': 'Użyj: {name}',
+
+  'recurring.duty.zus': 'Składka ZUS',
+  'recurring.duty.pit': 'Zaliczka PIT-36L',
+  'recurring.duty.vat_7': 'VAT-7',
+  'recurring.duty.badge': 'Obowiązek',
+  'recurring.duty.disclaimer':
+    'Termin, plan i to, czy zapłacono — dzień, który wybrano. To nie wyliczony podatek i nie porada.',
+  'recurring.duty.due': 'Termin',
+  'recurring.duty.plan': 'Kwota planu',
+  'recurring.duty.paid': 'Zapłacono',
+  'recurring.periods.duty.caption':
+    'Każdy wiersz to jeden termin: plan, to, co zapłacono, i różnica. Oznaczenie wiersza jako zapłaconego nigdy nie tworzy wpisu.',
+
   /* -- Cele oszczędnościowe ----------------------------------------------- */
   /* -- Lista --------------------------------------------------------------- */
   'goals.title': 'Cele oszczędnościowe',
