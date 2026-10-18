@@ -926,6 +926,7 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
       },
       expectedAmountMinor: 100_00,
       expectedCurrencyCode: 'PLN',
+      isActive: true,
       today: '2026-06-15',
       links: [
         {
