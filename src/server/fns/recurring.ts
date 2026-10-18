@@ -69,7 +69,10 @@ import type {
   UpcomingPeriod,
 } from '#/server/repos/recurring'
 import type { RecurringCandidate, RecurringSeries } from '#/server/db/types'
-import type { RecurringFrequency } from '#/server/db/schema'
+import type {
+  RecurringFrequency,
+  TransactionDirection,
+} from '#/server/db/schema'
 import type { SeriesForecast } from '#/server/recurring/forecast'
 import type { WeakestSignal } from '#/server/recurring/detect'
 
@@ -173,6 +176,7 @@ export const loadRecurring = createServerFn({ method: 'GET' })
             schedule: scheduleOf(one),
             expectedAmountMinor: one.expectedAmountMinor,
             expectedCurrencyCode: one.expectedCurrencyCode,
+            direction: one.direction as TransactionDirection,
             isActive: one.isActive,
             today,
             links,
@@ -187,7 +191,12 @@ export const loadRecurring = createServerFn({ method: 'GET' })
       upcoming,
       pendingCandidates: candidates.length,
       today,
-      forecast: rollupForecasts(rows.map((row) => row.forecast)),
+      // An income series forecasts nothing, and a zero block for it would only add a row.
+      forecast: rollupForecasts(
+        rows
+          .filter((row) => row.series.direction === 'expense')
+          .map((row) => row.forecast),
+      ),
     }
   })
 
@@ -228,6 +237,7 @@ export const loadSeriesDetail = createServerFn({ method: 'GET' })
         schedule: scheduleOf(series),
         expectedAmountMinor: series.expectedAmountMinor,
         expectedCurrencyCode: series.expectedCurrencyCode,
+        direction: series.direction as TransactionDirection,
         isActive: series.isActive,
         today,
         links,

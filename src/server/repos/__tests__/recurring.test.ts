@@ -245,6 +245,70 @@ describe('yearly month and JDG duty shape', () => {
     expect(series.anchorDay).toBe(20)
     expect(series.expectedAmountMinor).toBe(1_234_00)
   })
+
+  describe('an update', () => {
+    it('clears the yearly month when the series stops being annual', async () => {
+      const series = await createSeries(
+        world.scope,
+        seriesInput({
+          frequency: 'annual',
+          anchorDay: 10,
+          anchorMonth: 11,
+          startDate: '2026-03-15',
+        }),
+      )
+      const updated = await updateSeries(world.scope, series.id, {
+        frequency: 'monthly',
+      })
+      expect(updated.anchorMonth).toBeNull()
+    })
+
+    it('keeps the yearly month when only another field changes on an annual series', async () => {
+      const series = await createSeries(
+        world.scope,
+        seriesInput({
+          frequency: 'annual',
+          anchorDay: 10,
+          anchorMonth: 11,
+          startDate: '2026-03-15',
+        }),
+      )
+      const updated = await updateSeries(world.scope, series.id, {
+        frequency: 'annual',
+        name: 'Renamed',
+      })
+      expect(updated.anchorMonth).toBe(11)
+    })
+
+    it('ignores a yearly month sent for a series that is not annual', async () => {
+      const series = await createSeries(
+        world.scope,
+        seriesInput({ frequency: 'monthly', anchorDay: 20 }),
+      )
+      const updated = await updateSeries(world.scope, series.id, {
+        anchorMonth: 5,
+      })
+      expect(updated.anchorMonth).toBeNull()
+    })
+
+    it('sets and clears a duty code, and refuses an unknown one', async () => {
+      const series = await createSeries(world.scope, seriesInput({}))
+      const withDuty = await updateSeries(world.scope, series.id, {
+        dutyCode: 'vat_7',
+      })
+      expect(withDuty.dutyCode).toBe('vat_7')
+      const cleared = await updateSeries(world.scope, series.id, {
+        dutyCode: null,
+      })
+      expect(cleared.dutyCode).toBeNull()
+      await expect(
+        updateSeries(world.scope, series.id, {
+          // The point of the case: a code outside the enum, past the type.
+          dutyCode: 'pit_28' as 'zus',
+        }),
+      ).rejects.toThrow()
+    })
+  })
 })
 
 describe('the termination is a union', () => {

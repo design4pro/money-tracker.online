@@ -919,6 +919,7 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
 
   it('forecasts spent, rest of year and next twelve months as integer minor units', () => {
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: {
         frequency: 'monthly',
         anchorDay: 20,
@@ -930,15 +931,25 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
       today: '2026-06-15',
       links: [
         {
+          direction: 'expense',
           bookedOn: '2026-01-20',
           amountMinor: 100_00,
           currencyCode: 'PLN',
           status: 'active',
         },
         {
+          direction: 'expense',
           bookedOn: '2026-02-20',
           amountMinor: 40_00,
           currencyCode: 'EUR',
+          status: 'active',
+        },
+        {
+          // Money in is never "spent": `amount_minor` is non-negative, the direction column decides.
+          direction: 'income',
+          bookedOn: '2026-03-20',
+          amountMinor: 25_00,
+          currencyCode: 'PLN',
           status: 'active',
         },
       ],

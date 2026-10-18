@@ -2150,7 +2150,7 @@ const messages = {
   'recurring.form.anchorMonth.auto': 'Same month as the first due date',
   'recurring.form.duty.templates': 'Polish due-date templates',
   'recurring.form.duty.help':
-    'These fill the day of the month. You type the amount. This is a reminder, not tax advice.',
+    'A template fills in the name, kind, frequency and day of the month. You type the amount. This is a reminder, not tax advice.',
   'recurring.form.duty.apply': 'Use {name}',
 
   'recurring.duty.zus': 'ZUS contribution',

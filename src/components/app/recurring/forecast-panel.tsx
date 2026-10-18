@@ -58,13 +58,19 @@ export function ForecastPanel({ forecasts, className }: ForecastPanelProps) {
 
       {forecasts.map((forecast) => (
         <div key={forecast.currencyCode} className="flex flex-col gap-3">
-          <dl className="grid gap-3 sm:grid-cols-3">
+          {/*
+            Columns by available width, not by viewport: this panel sits in a ~490px column at
+            1280px and in a full-width card at 360px, and `sm:grid-cols-3` packed three six-digit
+            amounts into the narrow one until they touched. Each column is at least 11rem, so a
+            narrow card stacks the figures instead.
+          */}
+          <dl className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-3">
             {METRICS.map((metric) => (
               <div key={metric} className="min-w-0">
                 <dt className="text-caption text-ink-2">
                   {t(`recurring.forecast.${metric}`)}
                 </dt>
-                <dd className="mt-0.5 text-subtitle font-semibold tabular text-ink">
+                <dd className="mt-0.5 text-subtitle font-semibold tabular break-words text-ink">
                   {formatMoney(
                     locale,
                     makeMoney(

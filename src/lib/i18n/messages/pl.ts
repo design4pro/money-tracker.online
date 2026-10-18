@@ -2204,7 +2204,7 @@ const messages = {
   'recurring.form.anchorMonth.auto': 'Ten sam miesiąc co pierwszy termin',
   'recurring.form.duty.templates': 'Szablony polskich terminów',
   'recurring.form.duty.help':
-    'Uzupełniają dzień miesiąca. Kwotę wpisujesz samodzielnie. To przypomnienie, nie porada podatkowa.',
+    'Szablon uzupełnia nazwę, rodzaj, częstotliwość i dzień miesiąca. Kwotę wpisujesz samodzielnie. To przypomnienie, nie porada podatkowa.',
   'recurring.form.duty.apply': 'Użyj: {name}',
 
   'recurring.duty.zus': 'Składka ZUS',

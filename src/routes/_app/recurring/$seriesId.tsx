@@ -247,7 +247,9 @@ function SeriesDetailRoute() {
         </p>
       </Card>
 
-      <ForecastPanel forecasts={[forecast]} />
+      {series.direction === 'expense' ? (
+        <ForecastPanel forecasts={[forecast]} />
+      ) : null}
 
       <Card className="flex flex-col gap-3">
         <h2 className="text-subtitle font-semibold text-ink">

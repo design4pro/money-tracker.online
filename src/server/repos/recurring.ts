@@ -836,6 +836,8 @@ export interface SeriesLink {
   readonly bookedOn: string
   readonly amountMinor: Minor
   readonly currencyCode: string
+  /** `amount_minor` is never negative: which way the money moved is this column (MONEY.md §1). */
+  readonly direction: TransactionDirection
   readonly note: string | null
 }
 
@@ -860,6 +862,7 @@ export async function listSeriesLinkDetails(
       bookedOn: transactions.bookedOn,
       amountMinor: transactions.amountMinor,
       currencyCode: transactions.currencyCode,
+      direction: transactions.direction,
       note: transactions.note,
     })
     .from(recurringLinks)
@@ -881,6 +884,7 @@ export async function listSeriesLinkDetails(
     bookedOn: row.bookedOn,
     amountMinor: asMinor(row.amountMinor),
     currencyCode: row.currencyCode,
+    direction: row.direction as TransactionDirection,
     note: row.note,
   }))
 }

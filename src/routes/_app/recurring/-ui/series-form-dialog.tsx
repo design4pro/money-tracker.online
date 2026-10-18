@@ -423,7 +423,13 @@ export function SeriesFormDialog({
                     label={t('recurring.kind.label')}
                     selectedKey={draft.kind}
                     onSelectionChange={(key: Key | null) => {
-                      if (key !== null) patch({ kind: key as RecurringKind })
+                      if (key !== null) {
+                        patch({
+                          kind: key as RecurringKind,
+                          // A duty template is a bill; any other kind leaves the template.
+                          ...(key === 'bill' ? {} : { dutyCode: null }),
+                        })
+                      }
                     }}
                   >
                     {KINDS.map((kind) => (
@@ -438,9 +444,12 @@ export function SeriesFormDialog({
                     selectedKey={draft.frequency}
                     onSelectionChange={(key: Key | null) => {
                       if (key !== null) {
+                        // `anchorMonth` stays in the draft: the submit and the preview only use it
+                        // for an annual series, so Monthly and back to Yearly keeps the month.
+                        // A duty template is monthly; any other frequency leaves the template.
                         patch({
                           frequency: key as RecurringFrequency,
-                          ...(key === 'annual' ? {} : { anchorMonth: null }),
+                          ...(key === 'monthly' ? {} : { dutyCode: null }),
                         })
                       }
                     }}

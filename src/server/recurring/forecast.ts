@@ -3,9 +3,11 @@
  *
  * Three questions, three sums, never a float:
  *
- * - **Spent this year** — linked transactions booked in the calendar year of `today`, in the
- *   series' own currency. A linked row in another currency is skipped, not converted
- *   (`docs/MONEY.md` §1, §3: no implied rate).
+ * - **Spent this year** — linked **expense** transactions booked in the calendar year of
+ *   `today`, in the series' own currency. A linked row in another currency is skipped, not
+ *   converted (`docs/MONEY.md` §1, §3: no implied rate); a linked income row is skipped too,
+ *   because `amount_minor` is never negative and the direction column is what says which way the
+ *   money moved (§1).
  * - **Rest of year** — expected amounts of occurrences due this calendar year that are still
  *   open (upcoming or overdue). Paid and skipped periods are out. This includes overdue unpaid
  *   rows: they are still to pay this year.
@@ -13,6 +15,9 @@
  *   calendar day twelve months later.
  *
  * The schedule is the plan; linked transactions are the record. Neither is rewritten here.
+ *
+ * **Only an expense series is forecast.** The panel answers "what goes out"; adding a salary to
+ * the rent would be a figure that is neither. An income series forecasts zero in all three.
  */
 
 import { parseDate } from '@internationalized/date'
@@ -22,7 +27,7 @@ import { occurrences } from './schedule'
 
 import type { CalendarDate } from '@internationalized/date'
 import type { Minor } from '#/lib/money'
-import type { RecurringPeriodStatus } from '#/lib/enums'
+import type { RecurringPeriodStatus, TransactionDirection } from '#/lib/enums'
 import type { RecurringSchedule } from './schedule'
 
 export interface SeriesForecast {
@@ -36,6 +41,7 @@ export interface ForecastLink {
   readonly bookedOn: string
   readonly amountMinor: number
   readonly currencyCode: string
+  readonly direction: TransactionDirection
   /** `unlinked` rows are history of a pointer, not spending. */
   readonly status: string
 }
@@ -49,6 +55,7 @@ export interface SeriesForecastInput {
   readonly schedule: RecurringSchedule
   readonly expectedAmountMinor: number
   readonly expectedCurrencyCode: string
+  readonly direction: TransactionDirection
   /** A paused or finished series plans nothing ahead; what it already spent still counts. */
   readonly isActive: boolean
   readonly today: string
@@ -72,7 +79,7 @@ function expectedOpen(
   from: string,
   through: string,
 ): Minor {
-  if (!input.isActive) return asMinor(0)
+  if (!input.isActive || input.direction !== 'expense') return asMinor(0)
   const byPeriod = new Map(
     input.periods.map((period) => [period.periodStart, period.derivedStatus]),
   )
@@ -96,6 +103,7 @@ export function forecastSeries(input: SeriesForecastInput): SeriesForecast {
   let spent = 0
   for (const link of input.links) {
     if (link.status === 'unlinked') continue
+    if (link.direction !== 'expense' || input.direction !== 'expense') continue
     if (link.currencyCode !== input.expectedCurrencyCode) continue
     if (link.bookedOn < year.start || link.bookedOn > year.end) continue
     if (!Number.isInteger(link.amountMinor)) {

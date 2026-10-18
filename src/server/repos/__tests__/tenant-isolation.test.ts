@@ -3024,6 +3024,7 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
       listSeriesLinkDetails(world.scope, mine.id),
     ])
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: {
         frequency: 'monthly',
         anchorDay: 20,
@@ -3080,6 +3081,7 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     const links = await listSeriesLinkDetails(world.scope, mine.id)
     expect(links).toEqual([])
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: {
         frequency: 'monthly',
         anchorDay: 20,
@@ -3094,6 +3096,22 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     })
     expect(forecast.spentThisYearMinor).toBe(0)
 
+    // The series filter, not only the join: org B's own link under org B's own series, read with
+    // org A's scope. Without `tenantFilter` on `recurring_links` this returns the row.
+    await seedTransaction(world.db, {
+      id: 'txn-b-own-forecast',
+      refAmountMinor: 55_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-02-20',
+    })
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-b',
+      seriesId: theirs.id,
+      transactionId: 'txn-b-own-forecast',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
     await expect(
       listSeriesLinkDetails(world.scope, theirs.id),
     ).resolves.toEqual([])

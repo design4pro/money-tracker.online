@@ -28,6 +28,7 @@ function paid(periodStart: string): ForecastPeriod {
 describe('forecastSeries', () => {
   it('counts spent as the integer sum of this year’s linked transactions', () => {
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
@@ -35,30 +36,35 @@ describe('forecastSeries', () => {
       today: TODAY,
       links: [
         {
+          direction: 'expense',
           bookedOn: '2026-01-20',
           amountMinor: 100_00,
           currencyCode: 'PLN',
           status: 'active',
         },
         {
+          direction: 'expense',
           bookedOn: '2026-02-20',
           amountMinor: 100_00,
           currencyCode: 'PLN',
           status: 'active',
         },
         {
+          direction: 'expense',
           bookedOn: '2025-12-20',
           amountMinor: 100_00,
           currencyCode: 'PLN',
           status: 'active',
         },
         {
+          direction: 'expense',
           bookedOn: '2026-03-20',
           amountMinor: 80_00,
           currencyCode: 'EUR',
           status: 'active',
         },
         {
+          direction: 'expense',
           bookedOn: '2026-04-20',
           amountMinor: 100_00,
           currencyCode: 'PLN',
@@ -81,6 +87,7 @@ describe('forecastSeries', () => {
 
   it('counts the rest of the year as expected amounts still open in this calendar year', () => {
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
@@ -103,6 +110,7 @@ describe('forecastSeries', () => {
 
   it('counts the next twelve months from tomorrow, excluding what is already paid', () => {
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
@@ -124,6 +132,7 @@ describe('forecastSeries', () => {
 
   it('keeps an overdue unpaid occurrence in the rest of this year', () => {
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
@@ -146,6 +155,7 @@ describe('forecastSeries', () => {
 
   it('forecasts an annual series on its yearly month, not the start date’s month', () => {
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: {
         frequency: 'annual',
         anchorDay: 10,
@@ -166,8 +176,65 @@ describe('forecastSeries', () => {
     expect(forecast.next12MonthsMinor).toBe(asMinor(500_00))
   })
 
+  it('forecasts nothing for an income series, which is not money going out', () => {
+    const forecast = forecastSeries({
+      direction: 'income',
+      schedule: MONTHLY,
+      expectedAmountMinor: EXPECTED,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today: TODAY,
+      links: [
+        {
+          direction: 'income',
+          bookedOn: '2026-01-20',
+          amountMinor: 100_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+      ],
+      periods: [],
+    })
+
+    expect(forecast.spentThisYearMinor).toBe(asMinor(0))
+    expect(forecast.restOfYearMinor).toBe(asMinor(0))
+    expect(forecast.next12MonthsMinor).toBe(asMinor(0))
+  })
+
+  it('does not count a linked income row as spent, even on an expense series', () => {
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: MONTHLY,
+      expectedAmountMinor: EXPECTED,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today: TODAY,
+      links: [
+        {
+          direction: 'expense',
+          bookedOn: '2026-01-20',
+          amountMinor: 100_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+        {
+          // A refund linked by hand: `amount_minor` is non-negative, the column says which way.
+          direction: 'income',
+          bookedOn: '2026-02-20',
+          amountMinor: 30_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+      ],
+      periods: [],
+    })
+
+    expect(forecast.spentThisYearMinor).toBe(asMinor(100_00))
+  })
+
   it('plans nothing ahead for a paused series but still reports what was spent', () => {
     const forecast = forecastSeries({
+      direction: 'expense',
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
@@ -175,6 +242,7 @@ describe('forecastSeries', () => {
       today: TODAY,
       links: [
         {
+          direction: 'expense',
           bookedOn: '2026-01-20',
           amountMinor: 100_00,
           currencyCode: 'PLN',
