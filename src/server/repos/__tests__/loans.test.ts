@@ -12,6 +12,7 @@ import { accounts, exchangeRates, loanInstalments } from '#/server/db/schema'
 import { createBudgetWorld, executed, seedTransaction } from './budget-harness'
 
 import { setLimitResolver } from '../base'
+import { ConflictError } from '../errors'
 import {
   LoanInstalmentSettledError,
   LoanTermsLockedError,
@@ -299,22 +300,80 @@ describe('updateLoan keeps the loan, its account and its schedule in one currenc
     )
   })
 
-  it('re-prices principal and outstanding when openedOn moves', async () => {
+  it('keeps openedOn out of the patch: every ref amount was priced at it', async () => {
+    const loan = await createLoan(scope, importedInput())
+
+    await expect(
+      updateLoan(scope, loan.id, { openedOn: '2026-02-15' } as UpdateLoanInput),
+    ).rejects.toThrow()
+    expect((await getLoan(scope, loan.id)).openedOn).toBe('2026-01-15')
+  })
+
+  it('refuses a first payment or an end date before the stored openedOn with a typed error', async () => {
+    const loan = await createLoan(scope, importedInput())
+
+    await expect(
+      updateLoan(scope, loan.id, { firstPaymentOn: '2026-01-01' }),
+    ).rejects.toBeInstanceOf(ConflictError)
+    await expect(
+      updateLoan(scope, loan.id, { endsOn: '2026-01-01' }),
+    ).rejects.toBeInstanceOf(ConflictError)
+  })
+})
+
+describe('a foreign-currency schedule is priced at openedOn', () => {
+  it('accepts instalments dated beyond the newest rate and prices them all at the opening rate', async () => {
     await seedEurRates()
     const loan = await createLoan(scope, {
       ...importedInput(),
       currencyCode: 'EUR',
       principalMinor: 100_00,
-      outstandingMinor: 60_00,
       instalmentMinor: 10_00,
-      instalments: [{ dueOn: '2026-03-20', amountMinor: 10_00 }],
+      instalments: [
+        { dueOn: '2026-03-20', amountMinor: 10_00 },
+        { dueOn: '2027-03-20', amountMinor: 10_00 },
+      ],
     })
-    expect(loan.refPrincipalMinor).toBe(400_00)
 
-    const moved = await updateLoan(scope, loan.id, { openedOn: '2026-02-15' })
-    expect(moved.refInstalmentMinor).toBe(50_00)
-    expect(moved.refPrincipalMinor).toBe(500_00)
-    expect(moved.refOutstandingMinor).toBe(300_00)
+    const rows = await listInstalments(scope, { loanId: loan.id })
+    expect(rows.map((row) => row.refAmountMinor)).toEqual([40_00, 40_00])
+    expect(new Set(rows.map((row) => row.rateE10))).toEqual(
+      new Set([loan.rateE10]),
+    )
+  })
+
+  it('looks the opening rate up once for the whole schedule', async () => {
+    await seedEurRates()
+    executed.length = 0
+    await createLoan(scope, {
+      ...importedInput(),
+      currencyCode: 'EUR',
+      instalments: Array.from({ length: 12 }, (_, index) => ({
+        dueOn: new Date(Date.UTC(2027, index, 20)).toISOString().slice(0, 10),
+        amountMinor: 10_00,
+      })),
+    })
+
+    const rateReads = executed.filter((query) =>
+      query.startsWith('select "rate_e10" from "exchange_rates"'),
+    )
+    expect(rateReads.length).toBeLessThanOrEqual(4)
+  })
+
+  it('accepts a schedule of exactly MAX_INSTALMENTS rows', async () => {
+    const loan = await createLoan(scope, {
+      ...importedInput(),
+      instalments: Array.from({ length: MAX_INSTALMENTS }, (_, index) => ({
+        dueOn: new Date(Date.UTC(2027, 0, 1 + index))
+          .toISOString()
+          .slice(0, 10),
+        amountMinor: 1_00,
+      })),
+    })
+
+    expect((await listInstalments(scope, { loanId: loan.id })).length).toBe(
+      MAX_INSTALMENTS,
+    )
   })
 })
 
