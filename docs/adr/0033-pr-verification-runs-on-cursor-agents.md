@@ -24,9 +24,14 @@ Deploys still need the VPS: `CLOUDFLARE_API_TOKEN` stays on machines the organis
 2. **Cursor cloud agents run the full gate** on their VM and post the result on the PR as a
    conversation comment marked `<!-- agent-gate-report -->` for the current head SHA. The rungs
    are every command in `.ai/agentic.config.json` → `validation.commands`, then
-   `prVerification.browserCommands` (`pnpm e2e` on `chromium` and `mobile-chromium`, and
-   `pnpm exec tsx .github/a11y/axe-scan.mjs`), then
-   `node scripts/ci/assert-additive-migrations.mjs`.
+   `prVerification.buildCheck` (`node scripts/ci/assert-build-output.mjs`, the two assertions
+   `ci.yml` made after its build: the route tree is untouched and the production build carries no
+   pinned day), `prVerification.browserCommands` (`pnpm e2e` on `chromium` and `mobile-chromium`,
+   and `pnpm exec tsx .github/a11y/axe-scan.mjs`; skipped only when
+   `scripts/ci/change-scope.mjs` says `browser=false`), then
+   `node scripts/ci/assert-additive-migrations.mjs`. The comment counts only when it is the newest
+   one with the marker, written by an account in `prVerification.evidenceAuthors`, and the merge
+   is made with `--match-head-commit` on that head.
 3. **`om-pr-autopilot --allow-merge` merges into `develop` only** when that comment is green on
    the current head and drizzle is an additive chain (unique journal `idx`, snapshot `prevId`
    equals the previous snapshot's `id`, no `DROP TABLE` / `DROP COLUMN` in SQL the branch added).

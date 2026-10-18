@@ -84,6 +84,14 @@ describe('sqlAdditiveFaults', () => {
     ).toMatch(/DROP COLUMN/)
   })
 
+  it.each([
+    'ALTER TABLE `accounts` DROP `iban`;',
+    'ALTER TABLE `accounts` RENAME COLUMN `iban` TO `code`;',
+    'ALTER TABLE `accounts` RENAME TO `ledgers`;',
+  ])('rejects %s', (sql) => {
+    expect(sqlAdditiveFaults(sql, 'drizzle/0006_x.sql')).toHaveLength(1)
+  })
+
   it('ignores DROP TABLE and DROP COLUMN inside a SQL comment', () => {
     expect(
       sqlAdditiveFaults(

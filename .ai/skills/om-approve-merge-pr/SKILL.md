@@ -38,11 +38,19 @@ clears those contexts from the rulesets they will be empty; until then they may 
 GitHub merge button. Either way this overlay **refuses** `om-approve-merge-pr` into `develop`
 unless all of the following hold on the current head:
 
-1. A conversation comment contains `<!-- agent-gate-report -->` (`.ai/agentic.config.json` →
-   `prVerification.evidenceMarker`), `Head: <head SHA>`, and `Status: green`.
-2. That comment lists a pass for every `validation.commands` rung and for
-   `prVerification.browserCommands` (`pnpm e2e --project=chromium --project=mobile-chromium` and
-   `pnpm exec tsx .github/a11y/axe-scan.mjs`).
+1. The **newest** conversation comment that contains `<!-- agent-gate-report -->`
+   (`.ai/agentic.config.json` → `prVerification.evidenceMarker`) was posted by one of
+   `prVerification.evidenceAuthors`, and says `Head: <the full 40-character head SHA>` and
+   `Status: green`. An older green comment does not outlive a newer red one, and a comment from
+   anyone else is not evidence. Read the head with **get-pr** (`headRefOid`) immediately before the
+   merge and merge with `gh pr merge --squash --match-head-commit <that SHA>`, so a push after the
+   read makes the merge fail instead of landing ungated code.
+2. That comment lists a pass for every `validation.commands` rung, for
+   `prVerification.buildCheck` and for `prVerification.browserCommands` (`pnpm e2e
+   --project=chromium --project=mobile-chromium` and `pnpm exec tsx .github/a11y/axe-scan.mjs`).
+   The browser rungs may read `skipped (change-scope)` only when `node scripts/ci/change-scope.mjs`
+   prints `browser=false` for this head: run it yourself and compare. A rung that fails is red even
+   when it fails identically on `develop`; the base is fixed first.
 3. `Migrations: additive` or `Migrations: none`, matching
    `node scripts/ci/assert-additive-migrations.mjs` (unique journal `idx`, snapshot `prevId`
    chain, no `DROP TABLE` / `DROP COLUMN` in SQL this branch added). Rebase onto `develop` and run

@@ -53,7 +53,8 @@ your own checkout use `pnpm dev` in one shell and `pnpm e2e` in another.
    both drift gates, typecheck, lint, vitest and build, in that order, run by the om skills before a
    PR opens and again by `om-auto-review-pr`.
 6. **Before merge into `develop`** the same agent runs the **full gate** (`prVerification` in that
-   config): every `validation.commands` rung, then `pnpm e2e` on `chromium` and `mobile-chromium`,
+   config): every `validation.commands` rung, then `node scripts/ci/assert-build-output.mjs` straight
+   after the plain build, then `pnpm e2e` on `chromium` and `mobile-chromium`,
    then `pnpm exec tsx .github/a11y/axe-scan.mjs`, then
    `node scripts/ci/assert-additive-migrations.mjs`. Post the result on the PR as the
    `<!-- agent-gate-report -->` comment for this head (ADR 0033). GitHub Actions no longer runs

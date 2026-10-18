@@ -128,12 +128,17 @@ typecheck · lint · build` / `unit tests · coverage` / `e2e · merged report` 
   (#596, #598, #604, #608, #609, #610). Merge evidence is the agent-posted full gate, not those
   jobs.
 - **Merge into `develop` only with a green agent full gate on this head.** Require a conversation
-  comment matching `scripts/ci/agent-gate-report.template.md`: it contains
+  comment matching `scripts/ci/agent-gate-report.template.md`: the newest one carrying
   `.ai/agentic.config.json` → `prVerification.evidenceMarker` (`<!-- agent-gate-report -->`),
-  `Head: <the PR's current head SHA>`, `Status: green`, a pass for every `validation.commands`
-  rung plus `prVerification.browserCommands` (e2e chromium + mobile-chromium, and axe), and
-  `Migrations: additive` or `Migrations: none` after `prVerification.migrationCheck`. Evidence
-  for an older SHA does not count: re-run the gate after a push. `--allow-merge` still means
+  posted by one of `prVerification.evidenceAuthors`, with `Head: <the PR's full current head
+  SHA>`, `Status: green`, a pass for every `validation.commands` rung plus
+  `prVerification.buildCheck` and `prVerification.browserCommands` (e2e chromium +
+  mobile-chromium, and axe; `skipped (change-scope)` only when `change-scope.mjs` prints
+  `browser=false` for the head), and `Migrations: additive` or `Migrations: none` after
+  `prVerification.migrationCheck`. Evidence for an older SHA does not count: re-run the gate after
+  a push. When the comment is missing or stale, this run is the agent that runs the full gate in
+  its worktree and posts the template comment; it never merges on a comment it did not read. A
+  rung red on the base too is still red. `--allow-merge` still means
   `develop` only; `main` is the owner's.
 - **Drizzle must stay a chain.** After merging or rebasing `develop`, run `pnpm db:generate
 < /dev/null` and commit what it writes. Snapshot N's `prevId` is snapshot N-1's `id`; journal

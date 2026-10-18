@@ -3,7 +3,7 @@
 /**
  * Asserts the committed drizzle journal is a unique sequential chain and that SQL this branch
  * adds (relative to BASE, default origin/develop) is additive: no DROP TABLE rebuild, no DROP
- * COLUMN. Snapshot N's prevId must equal snapshot N-1's id — the defect stacked PRs hit when
+ * COLUMN, no RENAME. Snapshot N's prevId must equal snapshot N-1's id — the defect stacked PRs hit when
  * two migrations fork from the same parent (#759: rebase then `pnpm db:generate`).
  *
  *   node scripts/ci/assert-additive-migrations.mjs
@@ -21,10 +21,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const DRIZZLE = join(ROOT, 'drizzle')
 const JOURNAL = join(DRIZZLE, 'meta', '_journal.json')
 
-// `DROP TABLE` opens a statement, but `DROP COLUMN` follows `ALTER TABLE <name>`, so the match is
-// not anchored to the start of a line. Comments are stripped first: drizzle's own rebuild notes
-// quote `DROP TABLE` in prose.
-const DROP_RE = /\bDROP\s+(TABLE|COLUMN)\b/i
+// `DROP TABLE` opens a statement, but a column drop or a rename follows `ALTER TABLE <name>`, and
+// SQLite accepts `DROP <column>` without the COLUMN keyword, so those are matched anywhere in the
+// statement. Comments are stripped first: drizzle's own rebuild notes quote `DROP TABLE` in prose.
+const DROP_RE =
+  /\bDROP\s+(TABLE|COLUMN)\b|\bALTER\s+TABLE\b[^;]*\b(DROP|RENAME)\b/i
 const SQL_LINE_COMMENT_RE = /--.*$/gm
 
 /**
@@ -92,7 +93,7 @@ export function sqlAdditiveFaults(sql, file) {
   const faults = []
   if (DROP_RE.test(sql.replace(SQL_LINE_COMMENT_RE, ''))) {
     faults.push(
-      `${file} contains DROP TABLE or DROP COLUMN; migrations are additive (docs/DEPLOY.md §4.1). A rebuild belongs on a later release after readers have moved.`,
+      `${file} contains DROP TABLE, DROP COLUMN or a RENAME; migrations are additive (docs/DEPLOY.md §4.1). A rebuild belongs on a later release after readers have moved.`,
     )
   }
   return faults

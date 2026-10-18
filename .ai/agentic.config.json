@@ -23,7 +23,9 @@
       "pnpm e2e --project=chromium --project=mobile-chromium",
       "pnpm exec tsx .github/a11y/axe-scan.mjs"
     ],
-    "migrationCheck": "node scripts/ci/assert-additive-migrations.mjs"
+    "buildCheck": "node scripts/ci/assert-build-output.mjs",
+    "migrationCheck": "node scripts/ci/assert-additive-migrations.mjs",
+    "evidenceAuthors": ["cursor[bot]", "rafalwolak"]
   },
   "labels": {
     "enabled": true,
