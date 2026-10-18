@@ -21,7 +21,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const DRIZZLE = join(ROOT, 'drizzle')
 const JOURNAL = join(DRIZZLE, 'meta', '_journal.json')
 
-const DROP_RE = /^\s*DROP\s+(TABLE|COLUMN)\b/im
+// `DROP TABLE` opens a statement, but `DROP COLUMN` follows `ALTER TABLE <name>`, so the match is
+// not anchored to the start of a line. Comments are stripped first: drizzle's own rebuild notes
+// quote `DROP TABLE` in prose.
+const DROP_RE = /\bDROP\s+(TABLE|COLUMN)\b/i
+const SQL_LINE_COMMENT_RE = /--.*$/gm
 
 /**
  * @param {string} journalJson
@@ -86,7 +90,7 @@ export function snapshotChainFaults(snapshots) {
  */
 export function sqlAdditiveFaults(sql, file) {
   const faults = []
-  if (DROP_RE.test(sql)) {
+  if (DROP_RE.test(sql.replace(SQL_LINE_COMMENT_RE, ''))) {
     faults.push(
       `${file} contains DROP TABLE or DROP COLUMN; migrations are additive (docs/DEPLOY.md §4.1). A rebuild belongs on a later release after readers have moved.`,
     )
@@ -103,8 +107,9 @@ function git(args) {
 }
 
 function addedSqlFiles(base) {
+  let out
   try {
-    const out = git([
+    out = git([
       'diff',
       '--name-only',
       '--diff-filter=A',
@@ -112,13 +117,17 @@ function addedSqlFiles(base) {
       '--',
       'drizzle',
     ])
-    return out
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.endsWith('.sql'))
-  } catch {
-    return []
+  } catch (error) {
+    // A gate that cannot see the diff must not pass: an empty list would read as "no SQL added".
+    console.error(
+      `cannot diff ${base}...HEAD (fetch the base branch or set BASE): ${error.message}`,
+    )
+    process.exit(1)
   }
+  return out
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.endsWith('.sql'))
 }
 
 export function loadSnapshots(drizzleDir = DRIZZLE) {

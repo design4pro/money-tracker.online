@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -74,12 +75,46 @@ describe('sqlAdditiveFaults', () => {
     ).toEqual([])
   })
 
+  it('rejects ALTER TABLE ... DROP COLUMN, which does not start its line', () => {
+    expect(
+      sqlAdditiveFaults(
+        'ALTER TABLE `accounts` DROP COLUMN `iban`;',
+        'drizzle/0006_x.sql',
+      ).join('\n'),
+    ).toMatch(/DROP COLUMN/)
+  })
+
+  it('ignores DROP TABLE and DROP COLUMN inside a SQL comment', () => {
+    expect(
+      sqlAdditiveFaults(
+        '-- `DROP TABLE` performs an implicit DELETE FROM.\nALTER TABLE `accounts` ADD `iban` text;',
+        'drizzle/0006_x.sql',
+      ),
+    ).toEqual([])
+  })
+
   it('rejects DROP TABLE in a new file', () => {
     expect(
       sqlAdditiveFaults('DROP TABLE `accounts`;', 'drizzle/0006_x.sql').join(
         '\n',
       ),
     ).toMatch(/DROP TABLE/)
+  })
+})
+
+describe('assert-additive-migrations CLI', () => {
+  it('fails closed when the base ref cannot be diffed', () => {
+    const run = () =>
+      execFileSync(
+        process.execPath,
+        [join(ROOT, 'scripts', 'ci', 'assert-additive-migrations.mjs')],
+        {
+          cwd: ROOT,
+          env: { ...process.env, BASE: 'refs/does-not-exist' },
+          stdio: 'pipe',
+        },
+      )
+    expect(run).toThrow(/does-not-exist/)
   })
 })
 
