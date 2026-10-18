@@ -31,6 +31,7 @@ describe('forecastSeries', () => {
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
+      isActive: true,
       today: TODAY,
       links: [
         {
@@ -83,6 +84,7 @@ describe('forecastSeries', () => {
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
+      isActive: true,
       today: TODAY,
       links: [],
       periods: [
@@ -104,6 +106,7 @@ describe('forecastSeries', () => {
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
+      isActive: true,
       today: TODAY,
       links: [],
       periods: [
@@ -124,6 +127,7 @@ describe('forecastSeries', () => {
       schedule: MONTHLY,
       expectedAmountMinor: EXPECTED,
       expectedCurrencyCode: 'PLN',
+      isActive: true,
       today: TODAY,
       links: [],
       periods: [
@@ -150,6 +154,7 @@ describe('forecastSeries', () => {
       },
       expectedAmountMinor: 500_00,
       expectedCurrencyCode: 'PLN',
+      isActive: true,
       today: TODAY,
       links: [],
       periods: [],
@@ -159,6 +164,29 @@ describe('forecastSeries', () => {
     expect(forecast.restOfYearMinor).toBe(asMinor(500_00))
     // 10 Nov 2026 is inside the next twelve months; 10 Nov 2027 is after 15 Jun 2027.
     expect(forecast.next12MonthsMinor).toBe(asMinor(500_00))
+  })
+
+  it('plans nothing ahead for a paused series but still reports what was spent', () => {
+    const forecast = forecastSeries({
+      schedule: MONTHLY,
+      expectedAmountMinor: EXPECTED,
+      expectedCurrencyCode: 'PLN',
+      isActive: false,
+      today: TODAY,
+      links: [
+        {
+          bookedOn: '2026-01-20',
+          amountMinor: 100_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+      ],
+      periods: [paid('2026-01-01')],
+    })
+
+    expect(forecast.spentThisYearMinor).toBe(asMinor(100_00))
+    expect(forecast.restOfYearMinor).toBe(asMinor(0))
+    expect(forecast.next12MonthsMinor).toBe(asMinor(0))
   })
 })
 
