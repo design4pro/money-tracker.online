@@ -53,7 +53,11 @@ import {
   DEFAULT_BASE_CURRENCY_CODE,
   DEFAULT_WORKSPACE_CURRENCY_CODES,
 } from '#/server/catalog/data/currencies'
-import { organizationCurrencies } from '#/server/db/schema'
+import {
+  organizationCurrencies,
+  organizationSettings,
+} from '#/server/db/schema'
+import { DEFAULT_WORKSPACE_TIMEZONE } from '#/server/calendar-day'
 
 import type { SQL } from 'drizzle-orm'
 
@@ -238,6 +242,14 @@ export async function provisionPersonalWorkspace(
             addedAt: now,
           })),
         ),
+        // Same batch exception as the currency rows: there is no TenantScope until this
+        // workspace exists. Cron "today" reads this timezone (`docs/MONEY.md` §6.4).
+        db.insert(organizationSettings).values({
+          organizationId,
+          timezone: DEFAULT_WORKSPACE_TIMEZONE,
+          createdAt: now,
+          updatedAt: now,
+        }),
       ])
       return organizationId
     } catch (error) {

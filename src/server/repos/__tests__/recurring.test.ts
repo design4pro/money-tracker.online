@@ -422,6 +422,51 @@ describe('money', () => {
   })
 })
 
+describe('the book dimension', () => {
+  it('defaults a new series to personal', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    expect(series.book).toBe('personal')
+  })
+
+  it('lists only the book a caller asked for', async () => {
+    await createSeries(
+      world.scope,
+      seriesInput({ name: 'Office', book: 'business' }),
+    )
+    await createSeries(
+      world.scope,
+      seriesInput({ name: 'Rent', book: 'personal' }),
+    )
+
+    const business = await listSeries(world.scope, { book: 'business' })
+    expect(business.map((row) => row.name)).toEqual(['Office'])
+    const personal = await listSeries(world.scope, { book: 'personal' })
+    expect(personal.map((row) => row.name)).toEqual(['Rent'])
+  })
+
+  it('keeps the other book off the upcoming list', async () => {
+    const office = await createSeries(
+      world.scope,
+      seriesInput({ name: 'Office', book: 'business' }),
+    )
+    await createSeries(
+      world.scope,
+      seriesInput({ name: 'Rent', book: 'personal' }),
+    )
+    await materializeSeries(world.scope, {
+      seriesId: office.id,
+      today: TODAY,
+      ahead: 1,
+    })
+
+    const upcoming = await getUpcoming(world.scope, {
+      today: TODAY,
+      book: 'personal',
+    })
+    expect(upcoming.every((period) => period.seriesId !== office.id)).toBe(true)
+  })
+})
+
 describe('tenant isolation', () => {
   async function seriesInB(): Promise<string> {
     const series = await createSeries(

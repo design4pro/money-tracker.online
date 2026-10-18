@@ -49,6 +49,7 @@ import { parseDate } from '@internationalized/date'
 
 import { asMinor } from '#/lib/money'
 import {
+  BOOKS,
   RECURRING_FREQUENCIES,
   RECURRING_KINDS,
   RECURRING_MATCH_SOURCES,
@@ -67,6 +68,7 @@ import { newId } from '#/server/db/ids'
 import { member } from '#/server/db/auth-schema'
 
 import {
+  allOf,
   assertWithinLimit,
   createScope,
   createTenantRepository,
@@ -215,6 +217,8 @@ export type Termination = z.infer<typeof terminationSchema>
 export const listSeriesSchema = z.strictObject({
   /** Paused and completed series still hold history, so a screen asks for them explicitly. */
   includeInactive: z.boolean().default(false),
+  /** Omit to include both books. */
+  book: z.enum(BOOKS).optional(),
 })
 export type ListSeriesInput = z.input<typeof listSeriesSchema>
 
@@ -237,6 +241,7 @@ export const createSeriesSchema = z.strictObject({
   remindBefore: remindBeforeSchema.default([]),
   notifyEmail: z.boolean().default(false),
   showInWidget: z.boolean().default(true),
+  book: z.enum(BOOKS).default('personal'),
 })
 export type CreateSeriesInput = z.input<typeof createSeriesSchema>
 
@@ -264,6 +269,7 @@ export const updateSeriesSchema = z
     remindBefore: remindBeforeSchema,
     notifyEmail: z.boolean(),
     showInWidget: z.boolean(),
+    book: z.enum(BOOKS),
   })
   .partial()
 export type UpdateSeriesInput = z.input<typeof updateSeriesSchema>
@@ -289,6 +295,7 @@ export const upcomingSchema = z.strictObject({
   /** How many days forward to look. Overdue periods are always included, however old. */
   within: z.number().int().min(0).max(365).default(30),
   limit: z.number().int().positive().max(200).default(50),
+  book: z.enum(BOOKS).optional(),
 })
 export type UpcomingInput = z.input<typeof upcomingSchema>
 
@@ -590,10 +597,22 @@ export async function listSeries(
   input: ListSeriesInput = {},
 ): Promise<ReadonlyArray<RecurringSeries>> {
   const parsed = listSeriesSchema.parse(input)
+  const whereParts: Array<ReturnType<typeof eq>> = []
+  if (!parsed.includeInactive) {
+    whereParts.push(eq(recurringSeries.isActive, true))
+  }
+  if (parsed.book !== undefined) {
+    whereParts.push(eq(recurringSeries.book, parsed.book))
+  }
   const rows = await seriesRepo.findMany(scope, {
-    ...(parsed.includeInactive
+    ...(whereParts.length === 0
       ? {}
-      : { where: eq(recurringSeries.isActive, true) }),
+      : {
+          where:
+            whereParts.length === 1
+              ? whereParts[0]
+              : allOf(whereParts[0]!, ...whereParts.slice(1)),
+        }),
     // Live series first, then by name — `collate nocase` so "Netflix" and "netflix" sort
     // together rather than in two blocks.
     orderBy: [
@@ -753,6 +772,9 @@ export async function getUpcoming(
         recurringSeries,
         eq(recurringSeries.id, recurringPeriods.seriesId),
         eq(recurringSeries.isActive, true),
+        parsed.book === undefined
+          ? undefined
+          : eq(recurringSeries.book, parsed.book),
       ),
     )
     .where(
@@ -928,6 +950,7 @@ export async function createSeries(
     remindBefore: JSON.stringify(parsed.remindBefore),
     notifyEmail: parsed.notifyEmail,
     showInWidget: parsed.showInWidget,
+    book: parsed.book,
     isActive: true,
     createdAt: now,
     updatedAt: now,
@@ -1009,6 +1032,7 @@ export async function updateSeries(
       ...(parsed.showInWidget === undefined
         ? {}
         : { showInWidget: parsed.showInWidget }),
+      ...(parsed.book === undefined ? {} : { book: parsed.book }),
       updatedAt: new Date(),
     }),
   )

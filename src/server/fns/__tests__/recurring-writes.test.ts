@@ -76,7 +76,10 @@ vi.mock('#/server/auth/guards', () => ({
   requireOrg: () => requireOrg(),
 }))
 
-vi.mock('#/server/clock', () => ({ serverToday: () => TODAY }))
+vi.mock('#/server/clock', () => ({
+  serverToday: () => TODAY,
+  workspaceCivilDay: () => TODAY,
+}))
 
 vi.mock('#/server/recurring/series-write', async (importOriginal) => ({
   ...(await importOriginal<typeof SeriesWriteModule>()),

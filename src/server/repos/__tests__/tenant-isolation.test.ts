@@ -147,6 +147,10 @@ import {
 } from '../imports'
 
 import { createSeries, getUpcoming } from '../recurring'
+import {
+  getWorkspaceTimezone,
+  setWorkspaceTimezone,
+} from '../workspace-settings'
 import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -2620,6 +2624,31 @@ describe('an attachment row cannot be used to reach another workspace’s object
     } finally {
       warn.mockRestore()
     }
+  })
+})
+
+describe('workspace timezone cannot be aimed across a workspace boundary', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('lets A set Honolulu and leaves B on the Warsaw default', async () => {
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Europe/Warsaw')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+  })
+
+  it('refuses a timezone that is not an IANA name, without writing B', async () => {
+    await expect(
+      setWorkspaceTimezone(world.scope, { timezone: 'Not/AZone' }),
+    ).rejects.toThrow()
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
   })
 })
 

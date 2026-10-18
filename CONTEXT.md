@@ -95,6 +95,10 @@ already caused, or would obviously cause, two people to mean two things by one w
   generates **recurring periods**, each of which is upcoming, paid, overdue or skipped. _Avoid_:
   "subscription" for a recurring series — in this repository "subscription" means the workspace's
   billing plan and nothing else.
+- **Book** — a workspace-local dimension on a row: `business` or `personal`. One workspace holds
+  both; the filter is All / Business / Personal (PL: Wszystko / Firma / Prywatne). It is not a
+  second tenant and not an account type. _Avoid_: "book" for the booked date; two workspaces as a
+  substitute for the filter.
 - **Subscription** — the workspace's paid plan with the billing provider. One per workspace.
   _Avoid_: using it for a recurring series, a streaming service the user pays for, or a plan tier.
 - **Rule** — an ordered automation: conditions over a transaction, actions applied when they match,

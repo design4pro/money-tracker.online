@@ -484,6 +484,10 @@ transactions are converted to UTC".
 They affect **nothing** about how a stored calendar date is bucketed, summed or charted. A workspace
 that changes its timezone sees no report change, and that is correct.
 
+Cron "today" for due and overdue (`cronToday`) is the workspace civil day in that timezone, default
+`Europe/Warsaw`. It is not a report bucket and it is not `toISOString().slice(0, 10)` in UTC: around
+midnight a Warsaw household would otherwise see the previous UTC date.
+
 ### 6.5 `booked_at` orders, it does not date
 
 `booked_at` (epoch millis) exists for one job: ordering two transactions that share a `booked_on`,

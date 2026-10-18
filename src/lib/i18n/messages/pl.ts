@@ -1881,6 +1881,14 @@ const messages = {
   'recurring.filter.active': 'Aktywne',
   'recurring.filter.all': 'Wszystkie, łącznie z wstrzymanymi',
 
+  'book.filter.label': 'Wymiar',
+  'book.filter.all': 'Wszystko',
+  'book.business': 'Firma',
+  'book.personal': 'Prywatne',
+  'book.field.label': 'Wymiar',
+  'book.field.description':
+    'Czy ta seria należy do firmy, czy do finansów prywatnych.',
+
   'recurring.error.title': 'Nie udało się wczytać serii cyklicznych',
   'recurring.error.body':
     'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
