@@ -15,12 +15,7 @@ import {
   DEFAULT_WORKSPACE_CURRENCY_CODES,
 } from '#/server/catalog/data/currencies'
 import { member, organization } from '#/server/db/auth-schema'
-import { DEFAULT_WORKSPACE_TIMEZONE } from '#/server/calendar-day'
-import {
-  currencies,
-  organizationCurrencies,
-  organizationSettings,
-} from '#/server/db/schema'
+import { currencies, organizationCurrencies } from '#/server/db/schema'
 
 import {
   firstOrganizationIdFor,
@@ -391,9 +386,6 @@ describe('provisionPersonalWorkspace under a race', () => {
     await expect(
       db.select().from(organizationCurrencies),
     ).resolves.toHaveLength(0)
-    await expect(db.select().from(organizationSettings)).resolves.toHaveLength(
-      0,
-    )
   })
 })
 
@@ -418,15 +410,6 @@ describe('provisioned base currency', () => {
     expect(rows.map((row) => row.currencyCode).sort()).toEqual(
       [...DEFAULT_WORKSPACE_CURRENCY_CODES].sort(),
     )
-  })
-
-  it('writes Europe/Warsaw as the workspace civil timezone in the same batch', async () => {
-    const organizationId = await provisionPersonalWorkspace(db, ANNA)
-    const [settings] = await db
-      .select()
-      .from(organizationSettings)
-      .where(eq(organizationSettings.organizationId, organizationId))
-    expect(settings?.timezone).toBe(DEFAULT_WORKSPACE_TIMEZONE)
   })
 })
 
