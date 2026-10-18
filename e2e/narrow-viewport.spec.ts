@@ -277,7 +277,10 @@ async function measurePanel(page: Page, kind: PopoverKind) {
   return popover.evaluate((element) => {
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
     return {
-      width: element.getBoundingClientRect().width,
+      // The laid-out width, not `getBoundingClientRect()`: the panel enters with `pop-in`
+      // (`scale(0.96)`), and the bounding box shrinks with the transform for the length of the
+      // animation, so a poll that lands on its tail reads a panel a few pixels under the trigger.
+      width: parseFloat(getComputedStyle(element).width),
       // React Aria publishes the trigger's width on the popover element itself.
       triggerWidth: parseFloat(
         getComputedStyle(element).getPropertyValue('--trigger-width'),
@@ -306,7 +309,7 @@ async function expectPanelWithinBounds(
     .toBe(true)
   const panel = await measurePanel(page, kind)
   // The trigger's width is the floor and wins over the cap: a trigger wider than 32rem keeps its
-  // own width. Two CSS pixels of slack covers subpixel layout (326.25 vs 328 on chromium).
+  // own width.
   const cap = Math.max(
     panel.triggerWidth,
     Math.min(panel.viewport - 2 * EDGE_PADDING, POPOVER_CAP_REM * panel.rem),
@@ -314,7 +317,7 @@ async function expectPanelWithinBounds(
   expect(
     panel.width,
     `${context}: the panel is narrower than its trigger`,
-  ).toBeGreaterThanOrEqual(panel.triggerWidth - 2)
+  ).toBeGreaterThanOrEqual(panel.triggerWidth - 1)
   expect(
     panel.width,
     `${context}: the panel is wider than min(viewport - 24px, 32rem)`,
