@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4f7b7498-0cda-404d-88d0-a97c106045c7",
+  "id": "c48623dc-8306-47fe-8b39-19adada580d2",
   "prevId": "498b6c67-98c6-4ead-b4ba-65fe5e8ac457",
   "tables": {
     "account": {
@@ -5065,10 +5065,6 @@
         "recurring_series_kind_check": {
           "name": "recurring_series_kind_check",
           "value": "\"recurring_series\".\"kind\" in ('subscription', 'bill', 'installment', 'income')"
-        },
-        "recurring_series_book_check": {
-          "name": "recurring_series_book_check",
-          "value": "\"recurring_series\".\"book\" in ('business', 'personal')"
         },
         "recurring_series_direction_check": {
           "name": "recurring_series_direction_check",

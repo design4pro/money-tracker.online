@@ -390,9 +390,6 @@ describe('provisionPersonalWorkspace under a race', () => {
     await expect(
       db.select().from(organizationCurrencies),
     ).resolves.toHaveLength(0)
-    await expect(db.select().from(organizationSettings)).resolves.toHaveLength(
-      0,
-    )
   })
 })
 

@@ -103,7 +103,6 @@ import {
   ACCOUNT_CATEGORIES,
   ACCOUNT_STATUSES,
   RECURRING_KINDS,
-  BOOKS,
   TRANSACTION_DIRECTIONS,
   RECURRING_FREQUENCIES,
   SAVINGS_GOAL_STATUSES,
@@ -145,7 +144,6 @@ export {
   ACCOUNT_CATEGORIES,
   ACCOUNT_STATUSES,
   RECURRING_KINDS,
-  BOOKS,
   TRANSACTION_DIRECTIONS,
   RECURRING_FREQUENCIES,
   SAVINGS_GOAL_STATUSES,
@@ -1354,6 +1352,12 @@ export const recurringSeries = sqliteTable(
      * Business vs personal, inside this workspace. Other tables that grow the same
      * dimension reuse `BOOKS` rather than a second vocabulary. Default `personal`: this
      * product is a household ledger first.
+     *
+     * Deliberately **no `CHECK` on this column**: SQLite cannot add a table-level `CHECK`
+     * without rebuilding the table, and a rebuild of `recurring_series` cascades into
+     * `recurring_periods`, `recurring_links` and `transactions` on D1 (the hazard documented at
+     * the top of `drizzle/0003`). The enum is a repository invariant instead: every write parses
+     * `z.enum(BOOKS)` in `repos/recurring.ts`.
      */
     book: text('book').notNull().default('personal'),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
@@ -1385,7 +1389,6 @@ export const recurringSeries = sqliteTable(
       table.book,
     ),
     enumCheck('recurring_series_kind_check', table.kind, RECURRING_KINDS),
-    enumCheck('recurring_series_book_check', table.book, BOOKS),
     enumCheck(
       'recurring_series_direction_check',
       table.direction,

@@ -2679,6 +2679,18 @@ describe('workspace timezone cannot be aimed across a workspace boundary', () =>
     )
   })
 
+  it('updates only A’s existing row when both workspaces already have one', async () => {
+    await setWorkspaceTimezone(world.scope, { timezone: 'Europe/London' })
+    await setWorkspaceTimezone(world.otherScope, { timezone: 'Asia/Tokyo' })
+
+    // Both rows exist now, so this takes the update branch: an update that lost its tenant
+    // predicate would rewrite B's row as well.
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Asia/Tokyo')
+  })
+
   it('refuses a timezone that is not an IANA name, without writing B', async () => {
     await expect(
       setWorkspaceTimezone(world.scope, { timezone: 'Not/AZone' }),
