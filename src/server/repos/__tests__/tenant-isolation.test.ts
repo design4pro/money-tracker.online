@@ -54,6 +54,7 @@ import {
   currencies,
   importBatches,
   payees,
+  recurringLinks,
   rules,
   transactions,
 } from '#/server/db/schema'
@@ -2941,13 +2942,11 @@ describe('an unsubscribe link acts in the workspace it names and nowhere else', 
 })
 
 /**
- * The upcoming read, which the planned screen widens by three ids of the series it joins.
- *
- * `getUpcoming` already scopes both halves of its join. What this case adds is the claim about the
- * **new** columns: `account_id`, `category_id` and `payee_id` are foreign keys, and three ids
- * leaving a repository are three more ways to hand one workspace another's row id if the join ever
- * loses its `tenantFilter`. So A and B each own a series built from their own account, category and
- * payee - under identical names - and A's read must return A's ids and not one of B's.
+ * The forecast reads a series' linked transactions through `listSeriesLinkDetails`, which joins
+ * `recurring_links` to `transactions`. Both halves are scoped, and a read of the caller's own series
+ * id cannot show it: B's links hang off B's series. So the case plants the leak the join guards
+ * against - a link row in A's workspace that points at B's transaction - and requires that neither
+ * the read nor the sum picks it up, and that B's series is not readable through A's scope.
  */
 describe('a recurring forecast cannot add another workspace’s linked amounts', () => {
   let world: BudgetWorld
@@ -3039,11 +3038,77 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     })
 
     expect(forecast.spentThisYearMinor).toBe(100_00)
-    expect(JSON.stringify(links)).not.toContain('txn-b-forecast')
-    expect(JSON.stringify(links)).not.toContain('777')
+    expect(links.map((link) => link.transactionId)).toEqual(['txn-a-forecast'])
+  })
+
+  it('does not read a foreign transaction through a link planted in the caller’s workspace', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-forecast',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    // The row a bug elsewhere could leave behind: org A's link, B's transaction.
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: mine.id,
+      transactionId: 'txn-b-forecast',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    const links = await listSeriesLinkDetails(world.scope, mine.id)
+    expect(links).toEqual([])
+    const forecast = forecastSeries({
+      schedule: {
+        frequency: 'monthly',
+        anchorDay: 20,
+        startDate: '2026-01-20',
+      },
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today,
+      links,
+      periods: [],
+    })
+    expect(forecast.spentThisYearMinor).toBe(0)
+
+    await expect(
+      listSeriesLinkDetails(world.scope, theirs.id),
+    ).resolves.toEqual([])
   })
 })
 
+/**
+ * The upcoming read, which the planned screen widens by three ids of the series it joins.
+ *
+ * `getUpcoming` already scopes both halves of its join. What this case adds is the claim about the
+ * **new** columns: `account_id`, `category_id` and `payee_id` are foreign keys, and three ids
+ * leaving a repository are three more ways to hand one workspace another's row id if the join ever
+ * loses its `tenantFilter`. So A and B each own a series built from their own account, category and
+ * payee - under identical names - and A's read must return A's ids and not one of B's.
+ */
 describe('the upcoming read cannot leak another workspace’s series ids', () => {
   let world: BudgetWorld
 
