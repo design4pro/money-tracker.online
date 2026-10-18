@@ -25,7 +25,9 @@
     ],
     "buildCheck": "node scripts/ci/assert-build-output.mjs",
     "migrationCheck": "node scripts/ci/assert-additive-migrations.mjs",
-    "evidenceAuthors": ["cursor[bot]", "rafalwolak"]
+    "evidenceAuthors": ["cursor[bot]", "rafalwolak"],
+    "baselineRef": "origin/develop",
+    "mergeWhenNoNewFailures": true
   },
   "labels": {
     "enabled": true,

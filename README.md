@@ -63,7 +63,8 @@ failure waiting to happen: `src/routeTree.gen.ts` and everything under `drizzle/
   (`deploy-production.yml` on push to `main`): https://money-tracker.online.
 - Pull-request verification is not GitHub Actions (ADR 0033). A Cursor cloud agent runs the full
   gate (`validation.commands` plus e2e and axe) on its VM and posts `<!-- agent-gate-report -->`
-  on the PR. Autopilot merges to `develop` only with that comment green on the current head.
+  on the PR. Autopilot merges to `develop` only with that comment gate-green on the current head
+  (`Status: green`, or no new failures vs `origin/develop`).
 - No screenshot is compared anywhere: `docs/adr/0016-journeys-replace-the-visual-gate.md` retired
   the baselines. What a screen _looks_ like is judged by `node scripts/visual/capture.mjs` and a
   human at review; what the suite asserts is that the screen answers, hydrates, says nothing in

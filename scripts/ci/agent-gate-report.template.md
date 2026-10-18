@@ -3,6 +3,8 @@
 Head: `<full sha of the PR head>`
 Status: green | red
 Host: cursor-cloud-agent
+Baseline-develop: `<full sha of origin/develop compared in this run>` (omit when Status is green and you did not compare)
+New-failures: none | listed as `file › title [project]`
 
 | Rung       | Command                                                                    | Result                               |
 | ---------- | -------------------------------------------------------------------------- | ------------------------------------ |
@@ -24,5 +26,7 @@ Migrations: additive | none | fail
 `BASE_SHA=$(git merge-base origin/develop HEAD)` and `HEAD_SHA=$(git rev-parse HEAD)`) prints
 `browser=false` for this head; say so in the Result cell. Any other skip is a failed rung.
 
-`om-approve-merge-pr` merges into `develop` only when Status is green, Head equals the current
-SHA, and Migrations is additive or none. Re-post after every push.
+`om-approve-merge-pr` merges into `develop` when Head equals the current SHA, Migrations is
+additive or none, and **either** Status is green **or** New-failures is `none` against the
+Baseline-develop SHA this comment recorded (same failing tests as `origin/develop` are allowed;
+a new failing test is not). Re-post after every push.

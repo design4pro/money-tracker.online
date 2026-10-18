@@ -127,19 +127,20 @@ typecheck · lint · build` / `unit tests · coverage` / `e2e · merged report` 
   ruleset the owner has not yet updated — do not burn `ci.maxWaitMinutes` on an empty pool
   (#596, #598, #604, #608, #609, #610). Merge evidence is the agent-posted full gate, not those
   jobs.
-- **Merge into `develop` only with a green agent full gate on this head.** Require a conversation
-  comment matching `scripts/ci/agent-gate-report.template.md`: the newest one carrying
+- **Merge into `develop` only with a gate-green agent full gate on this head.** Require a
+  conversation comment matching `scripts/ci/agent-gate-report.template.md`: the newest one carrying
   `.ai/agentic.config.json` → `prVerification.evidenceMarker` (`<!-- agent-gate-report -->`),
   posted by one of `prVerification.evidenceAuthors`, with `Head: <the PR's full current head
-  SHA>`, `Status: green`, a pass for every `validation.commands` rung plus
-  `prVerification.buildCheck` and `prVerification.browserCommands` (e2e chromium +
-  mobile-chromium, and axe; `skipped (change-scope)` only when `change-scope.mjs` prints
-  `browser=false` for the head), and `Migrations: additive` or `Migrations: none` after
-  `prVerification.migrationCheck`. Evidence for an older SHA does not count: re-run the gate after
-  a push. When the comment is missing or stale, this run is the agent that runs the full gate in
-  its worktree and posts the template comment; it never merges on a comment it did not read. A
-  rung red on the base too is still red. `--allow-merge` still means
-  `develop` only; `main` is the owner's.
+SHA>`, and `Migrations: additive` or `Migrations: none` after `prVerification.migrationCheck`.
+  Gate-green means `Status: green` (every `validation.commands` rung plus `prVerification.buildCheck`
+  and `prVerification.browserCommands` pass; `skipped (change-scope)` only when `change-scope.mjs`
+  prints `browser=false` for the head) **or**, when `prVerification.mergeWhenNoNewFailures` is
+  true, `New-failures: none` against `Baseline-develop:` the full SHA of `origin/develop` this run
+  gated. Same failing tests as that baseline are allowed; a new failing test is not. Evidence for
+  an older SHA does not count: re-run the gate after a push. When the comment is missing or stale,
+  this run is the agent that runs the full gate in its worktree (and the same commands on
+  `origin/develop` when the PR is red) and posts the template comment; it never merges on a
+  comment it did not read. `--allow-merge` still means `develop` only; `main` is the owner's.
 - **Drizzle must stay a chain.** After merging or rebasing `develop`, run `pnpm db:generate
 < /dev/null` and commit what it writes. Snapshot N's `prevId` is snapshot N-1's `id`; journal
   `idx` values are unique and equal to `0..n-1`. No `DROP TABLE` / `DROP COLUMN` in SQL this

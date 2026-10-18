@@ -32,10 +32,10 @@ Deploys still need the VPS: `CLOUDFLARE_API_TOKEN` stays on machines the organis
    `node scripts/ci/assert-additive-migrations.mjs`. The comment counts only when it is the newest
    one with the marker, written by an account in `prVerification.evidenceAuthors`, and the merge
    is made with `--match-head-commit` on that head.
-3. **`om-pr-autopilot --allow-merge` merges into `develop` only** when that comment is green on
-   the current head and drizzle is an additive chain (unique journal `idx`, snapshot `prevId`
-   equals the previous snapshot's `id`, no `DROP TABLE` / `DROP COLUMN` in SQL the branch added).
-   After rebase, run `pnpm db:generate`. `main` stays owner-only.
+3. **`om-pr-autopilot --allow-merge` merges into `develop` only** when that comment is
+   **gate-green** on the current head and drizzle is an additive chain (unique journal `idx`,
+   snapshot `prevId` equals the previous snapshot's `id`, no `DROP TABLE` / `DROP COLUMN` in SQL
+   the branch added). After rebase, run `pnpm db:generate`. `main` stays owner-only.
 4. **If `develop` is red** (staging deploy or smoke failed), open a fix or revert PR. Never
    commit straight to `develop`.
 5. **GitHub Actions keeps only shipping.** `deploy-staging.yml` on push to `develop` (migrate,
@@ -47,8 +47,19 @@ Deploys still need the VPS: `CLOUDFLARE_API_TOKEN` stays on machines the organis
 
 ## Consequences
 
-- A pull request is merge-ready when the agent evidence comment is green, labels allow it, and
+- A pull request is merge-ready when the agent evidence comment is gate-green, labels allow it, and
   (until the owner acts) any leftover required checks are green or gone.
+
+## Amendment 2026-10-18 (no new failures vs develop)
+
+Owner decision the same day: a red `<!-- agent-gate-report -->` may still be **gate-green for
+merge-to-develop** when the agent ran the same commands on `origin/develop`
+(`.ai/agentic.config.json` → `prVerification.baselineRef`) and the PR adds **no new failing
+tests** (`New-failures: none`, `Baseline-develop: <that SHA>`). `Status` stays the raw result
+(`red` if any rung failed). Identical failures on the baseline are allowed so a docs/CI PR is
+not blocked by a red `develop` tip; a new failure is not. A broken `develop` still needs its own
+fix or revert PR (decision 4). `main` stays owner-only.
+
 - Staging deploys without a second Actions unit/e2e run on the push. Quality was judged on the
   PR. The smoke check is what proves the new Worker is serving.
 - Two green PRs can still break `develop` together (ADR 0032). The repair is a fix or revert PR,

@@ -168,7 +168,8 @@ A red signal does not short-circuit the review either. A failing required check 
 
 None of this touches the merge rules. Reporting early is safe; merging early is not — the
 agent-posted full gate (ADR 0033) still gates every merge into `develop`, and the merge tooling
-refuses until that comment is green on the current head. Remaining GitHub required checks, until
+refuses until that comment is gate-green on the current head (`Status: green`, or no new
+failures vs `origin/develop`). Remaining GitHub required checks, until
 the owner removes them, still block the merge button.
 
 ## The automation contract
@@ -236,12 +237,14 @@ Three amendment rules are specific to this document's shape:
 ## This repository
 
 - **The base branch is `develop`.** Eligible PRs merge into `develop` by squash via
-  `om-pr-autopilot --allow-merge` once the **agent full gate** is green on that head (ADR 0033):
-  every command in `.ai/agentic.config.json` → `validation.commands`, then e2e (`chromium` and
-  `mobile-chromium`), then axe (`.github/a11y/axe-scan.mjs`), posted as `<!-- agent-gate-report -->`
-  for the current SHA, and drizzle is additive (`node scripts/ci/assert-additive-migrations.mjs`;
-  rebase then `pnpm db:generate` so snapshot `prevId` chains). GitHub Actions does not run that
-  suite on pull requests. A merge into `develop` does not close an issue natively, so the merger
+  `om-pr-autopilot --allow-merge` once the **agent full gate** is gate-green on that head
+  (ADR 0033): every command in `.ai/agentic.config.json` → `validation.commands`, then e2e
+  (`chromium` and `mobile-chromium`), then axe (`.github/a11y/axe-scan.mjs`), posted as
+  `<!-- agent-gate-report -->` for the current SHA, and drizzle is additive
+  (`node scripts/ci/assert-additive-migrations.mjs`; rebase then `pnpm db:generate` so snapshot
+  `prevId` chains). Gate-green is `Status: green`, or `New-failures: none` against a
+  `Baseline-develop` SHA of `origin/develop` this run gated (same failing tests allowed). GitHub
+  Actions does not run that suite on pull requests. A merge into `develop` does not close an issue natively, so the merger
   then runs `om-close-fixed-issues` and honours the PR's `Closes #n`. The `develop` → `main`
   promotion is a separate PR, **owner-only**, merged with **a merge commit** (ADR 0003). If
   `develop` (staging) is red after a merge, open a fix or revert PR — never commit straight to

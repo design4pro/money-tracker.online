@@ -184,7 +184,8 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   still list `generated · typecheck · lint · build`, `unit tests · coverage` and
   `e2e · merged report` (`integration_id` 15368). Those jobs are not in the tree any more
   (`ci.yml` is gone), so they never report. **Do not wait on them.** Merge evidence is the
-  `<!-- agent-gate-report -->` comment on the current head (ADR 0033). **get-pr-checks** still
+  `<!-- agent-gate-report -->` comment on the current head (ADR 0033), gate-green when `Status:
+green` or when it records `New-failures: none` vs `origin/develop`. **get-pr-checks** still
   reads whatever the ruleset names; an empty required set after the owner update means the
   GitHub button is not the gate.
 

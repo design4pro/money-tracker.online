@@ -57,7 +57,9 @@ your own checkout use `pnpm dev` in one shell and `pnpm e2e` in another.
    after the plain build, then `pnpm e2e` on `chromium` and `mobile-chromium`,
    then `pnpm exec tsx .github/a11y/axe-scan.mjs`, then
    `node scripts/ci/assert-additive-migrations.mjs`. Post the result on the PR as the
-   `<!-- agent-gate-report -->` comment for this head (ADR 0033). GitHub Actions no longer runs
+   `<!-- agent-gate-report -->` comment for this head (ADR 0033). When the PR is red, run the same
+   commands on `origin/develop` and record `Baseline-develop` / `New-failures` so merge-to-develop
+   can treat identical baseline failures as allowed. GitHub Actions no longer runs
    that suite on pull requests. `om-auto-qa-pr` still drives the app through
    `.ai/scripts/test-env-up.sh` for UI evidence. Since ADR 0016 there is no e2e label to remember.
 
