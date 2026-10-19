@@ -34,7 +34,7 @@ Background sync and push are out for the same family of reasons (BND-13).
 `PWA-01 missing → done` — the web app manifest and the icon set.
 `PWA-02 missing → done` — the service worker with a versioned precache and an explicit no-cache rule
 for data.
-`PWA-03 missing → done` — the offline screen and the connection-state banner.
+`PWA-03 missing → done` — the offline screen and the connection-state banner (the failure panel of `05-S2` owns no offline shape; this row is where it lives).
 
 ### Owned paths
 

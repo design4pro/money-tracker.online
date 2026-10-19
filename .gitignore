@@ -40,3 +40,4 @@ coverage/
 # om-qa-buddy's knowledge base (module history, risk hotspots) stays on the host that ran it.
 .ai/qa/knowledge-base/
 .ai/tmp/
+.impeccable/hook.cache.json

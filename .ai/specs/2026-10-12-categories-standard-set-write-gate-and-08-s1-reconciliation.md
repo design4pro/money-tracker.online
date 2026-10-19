@@ -205,6 +205,11 @@ stated in `colorSchema`); a colour picker or new icons; payees and tags (`08-S2`
   properties `code` and `childCount` round-trips through `seroval` 1.5.6 `toJSON` / `fromJSON` with both intact; that is
   not the Start transport, so the browser case that Phase 3 itself ships is the proof on the real wire, and it is the
   tripwire if `05-S1` ever strips `code`: the case then reads the generic body and fails.
+  _As built (#734):_ `src/lib/failure.ts` existed, and the failure middleware replaces every thrown error with the public
+  envelope, so no own property reaches the browser. The route reads `readFailure(error)?.kind` only: `forbidden` is
+  forbidden; `conflict` on a `move` whose two names the route holds is **nest**; everything else is generic. The
+  envelope cannot tell the depth refusal from "cannot be its own parent", which is why `dropMove` never sends that
+  gesture. Phase 4b widens `RefusalCall` when it adds the seed failure.
 - **A drop that asks for nothing sensible is not sent.** `dropMove` gives the dropped row the target row's parent, so
   a parent dropped beside its own child would send `moveCategory({ id, parentId: id })`, a self-parent conflict.
   `dropMove` returns `null` when the target's parent is the dragged row (Phase 3, with a case in `move.test.ts`);

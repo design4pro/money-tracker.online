@@ -158,4 +158,81 @@ describe('Menu', () => {
       expect(item.classList.contains('target-min-h')).toBe(true)
     }
   })
+  it('reaches the last of many items from the keyboard and sets no fixed height cap', async () => {
+    const user = userEvent.setup()
+    const labels = Array.from(
+      { length: 8 },
+      (_, index) => `Action ${index + 1}`,
+    )
+    render(
+      <MenuTrigger>
+        <Button>Actions</Button>
+        <Popover>
+          <Menu aria-label="Group actions">
+            {labels.map((label) => (
+              <MenuItem key={label} id={label}>
+                {label}
+              </MenuItem>
+            ))}
+          </Menu>
+        </Popover>
+      </MenuTrigger>,
+    )
+
+    await user.tab()
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{End}')
+
+    expect(document.activeElement).toBe(
+      screen.getByRole('menuitem', { name: 'Action 8' }),
+    )
+    // A fixed `max-h-*` is what hid the eighth row below the fold (#728); the
+    // popover's own `max-height` is the only bound. Real layout is asserted in
+    // `e2e/menu-height.spec.ts`, which jsdom cannot run.
+    expect(screen.getByRole('menu').className).not.toMatch(/(^|\s)max-h-/)
+  })
+})
+
+describe('MenuItem description', () => {
+  it('shows the reason beside a disabled item and names the item without it', async () => {
+    const user = userEvent.setup()
+    render(
+      <MenuTrigger>
+        <Button>Actions</Button>
+        <Popover>
+          <Menu aria-label="Group actions" disabledKeys={['up']}>
+            <MenuItem id="up" description="Already first">
+              Move up
+            </MenuItem>
+            <MenuItem id="down">Move down</MenuItem>
+          </Menu>
+        </Popover>
+      </MenuTrigger>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }))
+
+    // The reason is on screen as text, not in a tooltip a keyboard user never opens …
+    expect(screen.getByText('Already first')).toBeTruthy()
+    // … the item's name stays the label alone …
+    const item = screen.getByRole('menuitem', { name: 'Move up' })
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    // … and the reason is its description, so a screen reader hears it with the item.
+    expect(item.getAttribute('aria-describedby')).toBe(
+      screen.getByText('Already first').id,
+    )
+  })
+
+  it('leaves an item without a description exactly as it was', async () => {
+    const user = userEvent.setup()
+    render(<Example />)
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }))
+
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Edit' })
+        .getAttribute('aria-describedby'),
+    ).toBeNull()
+  })
 })

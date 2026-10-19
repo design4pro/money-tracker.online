@@ -19,6 +19,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  accountGroupMembers,
   accountGroups,
   accounts,
   categories,
@@ -46,6 +47,7 @@ import { ruleDefinitionSchema } from '#/server/rules/schema'
 import {
   createBudgetWorld,
   executed,
+  fault,
   seedCategory,
 } from '#/server/repos/__tests__/budget-harness'
 
@@ -269,6 +271,65 @@ describe('the deleting operation pauses the rules that named the row', () => {
       ref_id: 'grp-cards',
       label: 'Cards',
     })
+  })
+
+  it('deleteAccountGroup removes the group and its members and pauses the rules as one unit', async () => {
+    await seedGroup('grp-cards', 'Cards')
+    await seedAccount('acc-card', 'Card')
+    await db.insert(accountGroupMembers).values({
+      organizationId: 'org-a',
+      groupId: 'grp-cards',
+      accountId: 'acc-card',
+      position: 0,
+    })
+    await seedRule({
+      id: 'rule-grp',
+      conditions: [
+        { field: 'account_group', operator: 'is_any_of', ids: ['grp-cards'] },
+      ],
+    })
+
+    await deleteAccountGroup(scope, 'grp-cards')
+
+    expect(await db.select().from(accountGroups)).toEqual([])
+    expect(await db.select().from(accountGroupMembers)).toEqual([])
+    expect(await db.select({ id: accounts.id }).from(accounts)).toContainEqual({
+      id: 'acc-card',
+    })
+    expect(await pausedReasonOf('rule-grp')).toMatchObject({
+      ref_id: 'grp-cards',
+    })
+  })
+
+  it('deleteAccountGroup leaves the group, its members and the rules untouched when the last statement fails', async () => {
+    await seedGroup('grp-cards', 'Cards')
+    await seedAccount('acc-card', 'Card')
+    await db.insert(accountGroupMembers).values({
+      organizationId: 'org-a',
+      groupId: 'grp-cards',
+      accountId: 'acc-card',
+      position: 0,
+    })
+    await seedRule({
+      id: 'rule-grp',
+      conditions: [
+        { field: 'account_group', operator: 'is_any_of', ids: ['grp-cards'] },
+      ],
+    })
+    // The pause is the last statement of the unit, so the delete and the member removal have
+    // already run inside the batch when it throws.
+    fault.when = (query) => /^update\s+"rules"/i.test(query)
+
+    await expect(deleteAccountGroup(scope, 'grp-cards')).rejects.toThrow(
+      /injected fault/,
+    )
+
+    fault.when = null
+    expect(
+      (await db.select({ id: accountGroups.id }).from(accountGroups)).length,
+    ).toBe(1)
+    expect(await db.select().from(accountGroupMembers)).toHaveLength(1)
+    expect(await pausedReasonOf('rule-grp')).toBeNull()
   })
 
   it('deletePayee pauses a rule whose action set that payee', async () => {

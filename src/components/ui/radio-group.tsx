@@ -4,7 +4,13 @@ import {
 } from 'react-aria-components/RadioGroup'
 
 import { cn } from '#/lib/cn'
-import { Description, FieldError, Label, fieldRow } from './field'
+import {
+  Description,
+  FieldError,
+  Label,
+  fieldRow,
+  resolveInvalid,
+} from './field'
 import { composeTw, transitionBase } from './shared'
 
 import type {
@@ -107,6 +113,7 @@ export function RadioGroup({
   children,
   className,
   isRequired,
+  isInvalid,
   orientation = 'vertical',
   ...props
 }: RadioGroupProps) {
@@ -115,6 +122,7 @@ export function RadioGroup({
       {...props}
       orientation={orientation}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (

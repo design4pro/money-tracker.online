@@ -32,6 +32,7 @@ import {
   TenantIsolationError,
 } from './errors'
 
+import type { BatchItem, BatchResponse } from 'drizzle-orm/batch'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import type { OrganizationRole } from '#/server/db/auth-schema'
 
@@ -43,8 +44,16 @@ export type { OrganizationRole }
  * The Worker passes a D1 handle and the tests pass an in-memory SQLite one through Drizzle's proxy
  * driver. Both satisfy this type, which is what lets every repository be exercised against the real
  * generated DDL in a plain Node test rather than against a hand-written fake.
+ *
+ * Both also expose `batch`, one atomic unit of statements (D1 runs it as an implicit transaction;
+ * the test harness wraps it in `BEGIN`/`COMMIT`). No repository calls it directly (the fork guard in
+ * `tenant-isolation.test.ts` reads the sources to keep it so): a repository composes a batch from the statement builders and `runTenantBatch` there.
  */
-export type Database = BaseSQLiteDatabase<'async', unknown>
+export type Database = BaseSQLiteDatabase<'async', unknown> & {
+  batch: <U extends BatchItem<'sqlite'>, T extends Readonly<[U, ...U[]]>>(
+    batch: T,
+  ) => Promise<BatchResponse<T>>
+}
 
 /**
  * Who is asking, and the single workspace whose rows they may touch.

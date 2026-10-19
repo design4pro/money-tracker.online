@@ -45,6 +45,8 @@ import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import {
+  accountGroupMembers,
+  accountGroups,
   accounts,
   attachments,
   budgetCategories,
@@ -52,10 +54,12 @@ import {
   currencies,
   importBatches,
   payees,
+  rules,
   transactions,
 } from '#/server/db/schema'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
+import { sqliteBatchCallback } from './db-harness'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
@@ -75,6 +79,19 @@ import {
   setBudgetCategories,
   updateBudget,
 } from '../budgets'
+import {
+  archiveCategory,
+  assertCategoryUsable,
+  createCategory,
+  deleteCategory,
+  getCategory,
+  listCategories,
+  moveCategory,
+  reorderCategories,
+  restoreCategory,
+  spendingByCategory,
+  updateCategory,
+} from '../categories'
 import {
   closePeriod,
   listPeriods,
@@ -99,7 +116,15 @@ import {
   pageForReader,
   upsertPref,
 } from '../notifications'
-import { getAccountBalanceOn } from '../accounts'
+import {
+  createAccountGroup,
+  deleteAccountGroup,
+  getAccountBalanceOn,
+  listAccountGroups,
+  reorderAccountGroups,
+  setAccountGroupMembers,
+  updateAccountGroup,
+} from '../accounts'
 import { isMember, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
@@ -122,7 +147,7 @@ import {
 } from '../imports'
 
 import { createSeries, getUpcoming } from '../recurring'
-import { createTenantRepository, tenantFilter } from '../base'
+import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
   MissingTenantContextError,
@@ -130,6 +155,7 @@ import {
   TenantIsolationError,
   UnscopedWriteError,
 } from '../errors'
+import { pauseRulesStatement } from '../rules'
 import { createScope } from '../scope'
 import {
   createTransaction,
@@ -172,18 +198,21 @@ function openTestDb() {
     }
   }
 
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      executed.push(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, (query) => executed.push(query)),
+  )
 }
 
 const ORG_A = 'org-a'
@@ -416,6 +445,146 @@ describe('the balance on a day cannot be read across a workspace boundary', () =
     await expect(
       getAccountBalanceOn(b, { accountId: B_ACCOUNTS[0], on: '2026-03-15' }),
     ).resolves.toEqual({ balanceMinor: expect.any(Number) })
+  })
+})
+
+describe('account groups cannot be reached or aimed across a workspace boundary', () => {
+  const A_GROUP = 'grp-a-01'
+  const B_GROUP = 'grp-b-01'
+  const B_CHILD = 'grp-b-02'
+
+  beforeEach(async () => {
+    await db.insert(accountGroups).values([
+      {
+        id: A_GROUP,
+        organizationId: ORG_A,
+        name: 'A group',
+        position: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: B_GROUP,
+        organizationId: ORG_B,
+        name: 'B group',
+        position: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: B_CHILD,
+        organizationId: ORG_B,
+        name: 'B child',
+        parentId: B_GROUP,
+        position: 1,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ])
+    await db.insert(accountGroupMembers).values([
+      {
+        organizationId: ORG_A,
+        groupId: A_GROUP,
+        accountId: A_ACCOUNTS[0],
+        position: 0,
+      },
+      {
+        organizationId: ORG_B,
+        groupId: B_GROUP,
+        accountId: B_ACCOUNTS[0],
+        position: 0,
+      },
+    ])
+    await db.insert(rules).values({
+      id: 'rule-b-group',
+      organizationId: ORG_B,
+      name: 'B rule on the group',
+      position: 0,
+      matchMode: 'all',
+      conditions: JSON.stringify([
+        { field: 'account_group', operator: 'is_any_of', ids: [B_GROUP] },
+      ]),
+      actions: JSON.stringify([
+        { kind: 'set_excluded', excludeFromStats: true },
+      ]),
+      isActive: true,
+      pausedReason: null,
+      matchCount: 0,
+      lastMatchedAt: null,
+      runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+  })
+
+  /** B's groups, memberships and rules, read through B's own scope: the control group. */
+  async function bState() {
+    return {
+      groups: await listAccountGroups(b),
+      rules: await b.db
+        .select()
+        .from(rules)
+        .where(eq(rules.organizationId, ORG_B)),
+    }
+  }
+
+  /** A's groups, so a refused write is also shown to have created nothing on A's side. */
+  async function aState() {
+    return listAccountGroups(a)
+  }
+
+  /** The sentence every case asserts: refused as not found, and nothing moved on either side. */
+  async function expectRefused(attempt: Promise<unknown>) {
+    const before = { a: await aState(), b: await bState() }
+    const error = await attempt.catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(NotFoundError)
+    expect(await bState()).toEqual(before.b)
+    expect(await aState()).toEqual(before.a)
+  }
+
+  it('lists nothing of B’s for A, and B’s list is still there', async () => {
+    const listed = await listAccountGroups(a)
+
+    expect(listed.map((entry) => entry.group.id)).toEqual([A_GROUP])
+    expect(listed.flatMap((entry) => entry.accountIds)).toEqual([A_ACCOUNTS[0]])
+    expect((await listAccountGroups(b)).map((entry) => entry.group.id)).toEqual(
+      [B_GROUP, B_CHILD],
+    )
+  })
+
+  it('createAccountGroup refuses B’s group as the parent', async () => {
+    await expectRefused(
+      createAccountGroup(a, { name: 'Sneaky', parentId: B_GROUP }),
+    )
+  })
+
+  it('updateAccountGroup refuses a foreign group id and a foreign parent id', async () => {
+    await expectRefused(updateAccountGroup(a, B_GROUP, { name: 'Mine now' }))
+    await expectRefused(updateAccountGroup(a, A_GROUP, { parentId: B_GROUP }))
+  })
+
+  it('deleteAccountGroup refuses B’s group and pauses none of B’s rules', async () => {
+    await expectRefused(deleteAccountGroup(a, B_GROUP))
+
+    const [rule] = await b.db
+      .select()
+      .from(rules)
+      .where(eq(rules.id, 'rule-b-group'))
+    expect(rule?.pausedReason).toBeNull()
+  })
+
+  it('setAccountGroupMembers refuses B’s accounts in A’s group and A’s accounts in B’s group', async () => {
+    await expectRefused(setAccountGroupMembers(a, A_GROUP, [B_ACCOUNTS[0]]))
+    await expectRefused(
+      setAccountGroupMembers(a, A_GROUP, [A_ACCOUNTS[0], B_ACCOUNTS[1]]),
+    )
+    await expectRefused(setAccountGroupMembers(a, B_GROUP, [A_ACCOUNTS[0]]))
+  })
+
+  it('reorderAccountGroups refuses an order that names B’s group', async () => {
+    await expectRefused(reorderAccountGroups(a, [B_GROUP, A_GROUP]))
+    await expectRefused(reorderAccountGroups(a, [B_GROUP]))
   })
 })
 
@@ -661,6 +830,158 @@ describe('deletes cannot reach another workspace’s row', () => {
   })
 })
 
+describe('deleting an account group reaches only the caller’s workspace', () => {
+  /** B owns a group with a member and a rule naming it; A owns a rule naming B's group id. */
+  async function seedGroupOfB() {
+    await db.insert(accountGroups).values({
+      id: 'grp-b',
+      organizationId: ORG_B,
+      name: 'Cards',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await db.insert(accountGroupMembers).values({
+      organizationId: ORG_B,
+      groupId: 'grp-b',
+      accountId: B_ACCOUNTS[0],
+      position: 0,
+    })
+    await db.insert(rules).values(
+      [ORG_A, ORG_B].map((organizationId) => ({
+        id: `rule-${organizationId}`,
+        organizationId,
+        name: 'Names the group',
+        position: 0,
+        matchMode: 'all' as const,
+        conditions: JSON.stringify([
+          { field: 'account_group', operator: 'is_any_of', ids: ['grp-b'] },
+        ]),
+        actions: JSON.stringify([
+          { kind: 'set_excluded', excludeFromStats: true },
+        ]),
+        isActive: true,
+        matchCount: 0,
+        runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })),
+    )
+  }
+
+  async function stateOfB() {
+    return {
+      groups: await db.select().from(accountGroups),
+      members: await db.select().from(accountGroupMembers),
+      rules: await db.select().from(rules).orderBy(rules.id),
+    }
+  }
+
+  it('answers not-found for a foreign group id and changes no group, member or rule', async () => {
+    await seedGroupOfB()
+    const before = await stateOfB()
+
+    await expect(deleteAccountGroup(a, 'grp-b')).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+
+    await expect(stateOfB()).resolves.toEqual(before)
+  })
+
+  it('pauses only the caller’s rules when both workspaces have a rule naming the same group id', async () => {
+    await db.insert(accountGroups).values({
+      id: 'grp-a',
+      organizationId: ORG_A,
+      name: 'Mine',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await db.insert(rules).values(
+      [ORG_A, ORG_B].map((organizationId) => ({
+        id: `rule-${organizationId}`,
+        organizationId,
+        name: 'Names the group',
+        position: 0,
+        matchMode: 'all' as const,
+        conditions: JSON.stringify([
+          { field: 'account_group', operator: 'is_any_of', ids: ['grp-a'] },
+        ]),
+        actions: JSON.stringify([
+          { kind: 'set_excluded', excludeFromStats: true },
+        ]),
+        isActive: true,
+        matchCount: 0,
+        runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+        createdAt: NOW,
+        updatedAt: NOW,
+      })),
+    )
+
+    await deleteAccountGroup(a, 'grp-a')
+
+    const paused = new Map(
+      (await db.select().from(rules)).map((rule) => [
+        rule.organizationId,
+        rule.pausedReason,
+      ]),
+    )
+    expect(paused.get(ORG_A)).not.toBeNull()
+    expect(paused.get(ORG_B)).toBeNull()
+  })
+
+  it('builds a pause statement that cannot pause a rule of another workspace', async () => {
+    await db.insert(rules).values({
+      id: 'rule-foreign',
+      organizationId: ORG_B,
+      name: 'Not mine',
+      position: 0,
+      matchMode: 'all' as const,
+      conditions: '[]',
+      actions: '[]',
+      isActive: true,
+      matchCount: 0,
+      runOn: JSON.stringify(['manual_create', 'import', 'edit']),
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    executed.length = 0
+
+    await runTenantBatch(a, [
+      pauseRulesStatement(a, ['rule-foreign'], '{"kind":"missing_reference"}'),
+    ])
+
+    const [foreign] = await db
+      .select()
+      .from(rules)
+      .where(eq(rules.id, 'rule-foreign'))
+    expect(foreign?.pausedReason).toBeNull()
+    const updates = statementsMatching('update "rules"')
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toContain('organization_id')
+  })
+
+  it('puts the tenant column in every statement of the batch it runs', async () => {
+    await db.insert(accountGroups).values({
+      id: 'grp-a',
+      organizationId: ORG_A,
+      name: 'Mine',
+      position: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    executed.length = 0
+
+    await deleteAccountGroup(a, 'grp-a')
+
+    const deletes = statementsMatching('delete from "account_group')
+    expect(deletes).toHaveLength(2)
+    for (const statement of deletes) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+})
+
 /* -------------------------------------------------------------------------- */
 /* The backstops                                                               */
 /* -------------------------------------------------------------------------- */
@@ -825,6 +1146,17 @@ describe('no repository forks the tenant predicate', () => {
   it('never writes the tenant column into an insert payload outside the base', () => {
     const offenders = repositorySources().filter((file) =>
       /organizationId:\s*scope\.ctx\.organizationId/.test(file.source),
+    )
+    expect(offenders.map((file) => file.name)).toEqual([])
+  })
+
+  it('never calls batch on a database handle outside the base', () => {
+    // `Database.batch` is public so `runTenantBatch` can reach it, which makes it reachable by a
+    // repository holding raw builders too: that call is what would bypass the origin check.
+    const code = (source: string) =>
+      source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const offenders = repositorySources().filter((file) =>
+      /\.batch\(/.test(code(file.source)),
     )
     expect(offenders.map((file) => file.name)).toEqual([])
   })
@@ -1447,6 +1779,269 @@ describe('the transaction write path cannot reach or be aimed across a workspace
     expect(
       createTransactionSchema.safeParse({ ...own, transferId: 'tr-b' }).success,
     ).toBe(false)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Categories                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The category repository, attacked through every exported function that takes an id or a parent.
+ *
+ * `categories.test.ts` holds a local two-workspace case, but it asserts only the refusal: not that
+ * B's rows are untouched afterwards, nor that a foreign id is refused exactly as an id that exists
+ * nowhere is. It is also not the file `AGENTS.md` names. A category id sits in a URL and in a drag payload, and a parent id
+ * decides where a row lands, so there are two ways to aim at B: *at* B's row (read, patch, archive,
+ * restore, delete, reorder, move) and *with* B's row as the destination (`parentId` on a create or a
+ * move). Both are run, each refusal is compared with the one an id that exists nowhere produces
+ * (a different `entity` or a `403` would confirm the row exists in somebody else's workspace), and
+ * each shape has a positive control against A's own ids so a refusal is not a typo.
+ *
+ * B's tree has a parent with a child, a loose top-level row and an archived row, so an archive that
+ * cascaded, a restore that landed or a re-parent that took would each change a row the comparison
+ * reads. The fixture is `budget-harness.ts`, as for the budgets above.
+ */
+describe('categories cannot be reached or be aimed across a workspace boundary', () => {
+  /** One workspace's tree: ids are prefixed so a row names the workspace it was seeded for. */
+  interface Tree {
+    readonly parent: string
+    readonly child: string
+    readonly loose: string
+    readonly archived: string
+  }
+  const treeOf = (prefix: 'a' | 'b' | 'nowhere'): Tree => ({
+    parent: `cat-${prefix}-food`,
+    child: `cat-${prefix}-groceries`,
+    loose: `cat-${prefix}-home`,
+    archived: `cat-${prefix}-old`,
+  })
+  const OWN = treeOf('a')
+  const FOREIGN = treeOf('b')
+  const NOWHERE = treeOf('nowhere')
+
+  let world: BudgetWorld
+
+  async function seedTree(tree: Tree, organizationId: 'org-a' | 'org-b') {
+    // The same names in both workspaces: the case a `WHERE name = ?` would get wrong.
+    await seedCategory(world.db, {
+      id: tree.parent,
+      name: 'Food',
+      organizationId,
+    })
+    await seedCategory(world.db, {
+      id: tree.child,
+      name: 'Groceries',
+      parentId: tree.parent,
+      organizationId,
+    })
+    await seedCategory(world.db, {
+      id: tree.loose,
+      name: 'Home',
+      organizationId,
+    })
+    await seedCategory(world.db, {
+      id: tree.archived,
+      name: 'Old',
+      organizationId,
+    })
+    await world.db
+      .update(categories)
+      .set({ archivedAt: NOW })
+      .where(eq(categories.id, tree.archived))
+  }
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    await seedTree(OWN, 'org-a')
+    await seedTree(FOREIGN, 'org-b')
+    await seedTransaction(world.db, {
+      id: 'tx-a',
+      categoryId: OWN.child,
+      refAmountMinor: 100_00,
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-b',
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      categoryId: FOREIGN.child,
+      refAmountMinor: 750_00,
+    })
+  })
+
+  /**
+   * Whole rows, every column, of both workspaces' categories, and of B's transactions: a write that
+   * matched no row but changed one anyway is what a return-value assertion misses. A's are read too,
+   * because a `reorderCategories` that named one foreign id must not move A's own rows either.
+   */
+  async function rowsAtStake() {
+    const categoriesOf = (organizationId: string) =>
+      world.db
+        .select()
+        .from(categories)
+        .where(eq(categories.organizationId, organizationId))
+        .orderBy(categories.id)
+    return {
+      aCategories: await categoriesOf('org-a'),
+      bCategories: await categoriesOf('org-b'),
+      bTransactions: await world.db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.organizationId, 'org-b'))
+        .orderBy(transactions.id),
+    }
+  }
+
+  /**
+   * Every hostile call, run as A and aimed at `target`. Where the call also names a row of A's it
+   * names {@link OWN}, so the same function is the positive control when `target` is {@link OWN}.
+   */
+  const ATTACKS: ReadonlyArray<{
+    readonly label: string
+    readonly run: (target: Tree) => Promise<unknown>
+  }> = [
+    {
+      label: 'reads a category by id',
+      run: (target) => getCategory(world.scope, target.parent),
+    },
+    {
+      label: 'edits a category',
+      run: (target) =>
+        updateCategory(world.scope, target.parent, {
+          name: 'mine now',
+          color: '#625106',
+        }),
+    },
+    {
+      label: 'archives a category with children',
+      run: (target) => archiveCategory(world.scope, target.parent),
+    },
+    {
+      label: 'restores an archived category',
+      run: (target) => restoreCategory(world.scope, target.archived),
+    },
+    {
+      label: 'deletes an unused category',
+      run: (target) => deleteCategory(world.scope, target.loose),
+    },
+    {
+      // The foreign id leads, so a leak would move A's row from 0 to 1.
+      label: 'reorders a run that mixes its own row with one of the target’s',
+      run: (target) =>
+        reorderCategories(world.scope, [target.parent, OWN.loose]),
+    },
+    {
+      label: 'moves a category to the top level',
+      run: (target) =>
+        moveCategory(world.scope, { id: target.child, parentId: null }),
+    },
+    {
+      label: 'moves a category under one of its own',
+      run: (target) =>
+        moveCategory(world.scope, { id: target.loose, parentId: OWN.parent }),
+    },
+    {
+      label: 'moves its own category under the target’s parent',
+      run: (target) =>
+        moveCategory(world.scope, { id: OWN.loose, parentId: target.parent }),
+    },
+    {
+      // Payees call this to vet a default category; a foreign id must not pass as usable.
+      label: 'offers the category as a payee default',
+      run: (target) => assertCategoryUsable(world.scope, target.parent),
+    },
+    {
+      label: 'creates a category under the target’s parent',
+      run: (target) =>
+        createCategory(world.scope, { name: 'Mine', parentId: target.parent }),
+    },
+  ]
+
+  const rejection = (work: Promise<unknown>): Promise<unknown> =>
+    work.then(
+      () => {
+        throw new Error('the call was meant to be refused')
+      },
+      (error: unknown) => error,
+    )
+
+  it('has a real row behind every foreign id, so no refusal below is an empty fixture', async () => {
+    for (const id of Object.values(FOREIGN)) {
+      await expect(getCategory(world.otherScope, id)).resolves.toMatchObject({
+        id,
+        organizationId: 'org-b',
+      })
+    }
+    await expect(
+      getCategory(world.otherScope, FOREIGN.archived),
+    ).resolves.not.toHaveProperty('archivedAt', null)
+  })
+
+  it.each(ATTACKS)(
+    'refuses a call that $label, as it would an id that exists nowhere, and moves no row',
+    async ({ run }) => {
+      const before = await rowsAtStake()
+
+      const foreign = await rejection(run(FOREIGN))
+      const missing = await rejection(run(NOWHERE))
+
+      expect(foreign).toBeInstanceOf(NotFoundError)
+      expect(missing).toBeInstanceOf(NotFoundError)
+      // `entity` and `code` only: `message` and `id` embed the id the caller supplied.
+      const shape = (error: unknown) => ({
+        entity: (error as NotFoundError).entity,
+        code: (error as NotFoundError).code,
+      })
+      expect(shape(foreign)).toEqual(shape(missing))
+      expect(shape(foreign)).toEqual({ entity: 'category', code: 'NOT_FOUND' })
+
+      expect(await rowsAtStake()).toEqual(before)
+    },
+  )
+
+  it.each(ATTACKS)(
+    'lets the same call through against A’s own ids, and leaves B alone: $label',
+    async ({ run }) => {
+      const before = await rowsAtStake()
+
+      // A refusal here would reject, and a rejected promise fails the test.
+      await run(OWN)
+
+      const after = await rowsAtStake()
+      expect(after.bCategories).toEqual(before.bCategories)
+      expect(after.bTransactions).toEqual(before.bTransactions)
+    },
+  )
+
+  it('lists none of B’s categories, archived ones included', async () => {
+    const listed = await listCategories(world.scope, { includeArchived: true })
+
+    expect(listed.map((row) => row.id).sort()).toEqual(
+      Object.values(OWN).sort(),
+    )
+    for (const row of listed) expect(row.organizationId).toBe('org-a')
+    // The control: B's own list is not empty, so A's is not empty by accident.
+    expect(
+      await listCategories(world.otherScope, { includeArchived: true }),
+    ).toHaveLength(Object.values(FOREIGN).length)
+  })
+
+  it('counts none of B’s spending under an identically named category', async () => {
+    const window = { from: '2026-03-01', to: '2026-03-31' }
+
+    // 100,00, not 850,00: the roll-up joins `categories` on the child's parent, and both
+    // workspaces call that parent "Food".
+    const mine = await spendingByCategory(world.scope, window)
+    expect(mine.totalMinor).toBe(100_00)
+    expect(mine.categories).toEqual([
+      expect.objectContaining({ categoryId: OWN.parent, amountMinor: 100_00 }),
+    ])
+
+    const theirs = await spendingByCategory(world.otherScope, window)
+    expect(theirs.totalMinor).toBe(750_00)
+    expect(theirs.categories.map((slice) => slice.categoryId)).toEqual([
+      FOREIGN.parent,
+    ])
   })
 })
 

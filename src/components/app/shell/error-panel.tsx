@@ -34,7 +34,8 @@ import type { ReactNode } from 'react'
  * `role="alert"` by default, because this panel appears in response to something the reader just
  * did. `mode="region"` is for a block that failed to load on arrival (a widget, a tab): an alert
  * on initial render is announced before the person has any context for it, so it is a labelled
- * region instead.
+ * region instead. It is also what a caller uses when it supplies the live region itself, as the
+ * categories screen does for a refused write.
  *
  * ## The opt-in props
  *

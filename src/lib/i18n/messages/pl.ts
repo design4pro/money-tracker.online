@@ -116,6 +116,8 @@ const messages = {
   'action.moveUp': 'Przenieś wyżej',
   'action.moveDown': 'Przenieś niżej',
   'action.moveTo': 'Przenieś do…',
+  'action.moveToTop': 'Przenieś na początek',
+  'action.moveToBottom': 'Przenieś na koniec',
   'action.undo': 'Cofnij',
   'action.done': 'Gotowe',
   'action.skip': 'Pomiń',
@@ -278,6 +280,82 @@ const messages = {
   'accounts.group.title': 'Grupy',
   'accounts.group.create': 'Nowa grupa',
   'accounts.group.ungrouped': 'Poza grupami',
+  'accounts.groups.title': 'Grupy kont',
+  'accounts.groups.description':
+    'Foldery na Twoje konta, np. Wspólne albo Firmowe. Grupa nigdy nie zmienia salda.',
+  'accounts.groups.manage': 'Zarządzaj grupami',
+  'accounts.groups.loading': 'Wczytywanie grup kont',
+  'accounts.groups.empty.title': 'Nie masz jeszcze grup',
+  'accounts.groups.empty.body':
+    'Grupa zbiera konta pod jedną nazwą, np. Wspólne albo Firmowe, żeby lista wyglądała tak, jak o niej myślisz. Konta zachowują własne salda.',
+  'accounts.groups.error.title': 'Nie udało się wczytać grup kont',
+  'accounts.groups.error.body':
+    'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
+  'accounts.groups.tree.label': 'Grupy kont, w kolejności wyświetlania',
+  'accounts.groups.row.group': {
+    one: '{name}, grupa, {count} konto',
+    few: '{name}, grupa, {count} konta',
+    many: '{name}, grupa, {count} kont',
+    other: '{name}, grupa, {count} konta',
+  },
+  'accounts.groups.row.childOf': {
+    one: '{name}, wewnątrz {parent}, {count} konto',
+    few: '{name}, wewnątrz {parent}, {count} konta',
+    many: '{name}, wewnątrz {parent}, {count} kont',
+    other: '{name}, wewnątrz {parent}, {count} konta',
+  },
+  'accounts.groups.row.account': '{account}, w grupie {group}',
+  'accounts.groups.row.accountArchived':
+    '{account}, zarchiwizowane, w grupie {group}',
+  'accounts.groups.drag.label': 'Przeciągnij: {name}',
+  'accounts.groups.drag.labelChild': 'Przeciągnij: {name}, wewnątrz {parent}',
+  'accounts.groups.actions.label': 'Działania dla: {name}',
+  'accounts.groups.actions.labelChild':
+    'Działania dla: {name}, wewnątrz {parent}',
+  'accounts.group.field.name': 'Nazwa grupy',
+  'accounts.group.field.parent': 'Wewnątrz',
+  'accounts.group.field.parent.hasChildren':
+    'Ta grupa ma podgrupy, więc nie może leżeć wewnątrz innej grupy.',
+  'accounts.group.parent.none': 'Bez nadrzędnej',
+  'accounts.group.rename': 'Zmień nazwę',
+  'accounts.group.addChild': 'Dodaj podgrupę',
+  'accounts.group.form.error.title': 'Nie zapisano grupy',
+  'accounts.group.disabled.noGrandchild':
+    'Podgrupa nie może mieć własnych podgrup',
+  'accounts.group.disabled.first': 'Już jest pierwsza',
+  'accounts.group.disabled.last': 'Już jest ostatnia',
+  'accounts.group.disabled.same': 'Już tam jest',
+  'accounts.group.toast.created': 'Utworzono grupę: {name}',
+  'accounts.group.toast.renamed': 'Zmieniono nazwę grupy: {name}',
+  'accounts.group.toast.reparented':
+    'Przeniesiono grupę: {name}, teraz wewnątrz {parent}',
+  'accounts.group.toast.reparentedTop':
+    'Przeniesiono grupę: {name}, teraz na poziomie głównym',
+  'accounts.group.toast.deleted': 'Usunięto grupę: {name}',
+  'accounts.group.announce.position':
+    'Przeniesiono grupę: {name}, pozycja {position} z {total}',
+  'accounts.group.announce.positionChild':
+    'Przeniesiono grupę: {name}, pozycja {position} z {total} wewnątrz {parent}',
+  'accounts.group.refused.title': 'Nie wprowadzono zmiany',
+  'accounts.group.refused.conflict':
+    'To nie pasuje do obecnych grup. Grupa może leżeć wewnątrz jednej innej grupy, nie dwóch poziomów głębiej.',
+  'accounts.group.refused.notFound':
+    'Lista zmieniła się w innym oknie. Wczytaliśmy ją ponownie.',
+  'accounts.group.refused.forbidden':
+    'Grupy we wspólnym obszarze roboczym może zmieniać tylko właściciel albo administrator.',
+  'accounts.group.refused.generic': 'Coś poszło nie tak. Spróbuj ponownie.',
+  'accounts.group.delete.action': 'Usuń grupę',
+  'accounts.group.delete.title': 'Usunąć grupę {name}?',
+  'accounts.group.delete.body': {
+    one: '{count} konto opuszcza tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    few: '{count} konta opuszczą tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    many: '{count} kont opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    other:
+      '{count} konta opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+  },
+  'accounts.group.delete.bodyEmpty': 'Podgrupy trafią na poziom główny.',
+  'accounts.group.delete.rules':
+    'Reguły używające tej grupy zostaną wstrzymane, dopóki nie wybierzesz innej.',
   'accounts.count': {
     one: '{count} konto',
     few: '{count} konta',
@@ -852,11 +930,12 @@ const messages = {
   'categories.kind.income': 'Wpływy',
   'categories.kind.both': 'Wpływy i wydatki',
   'categories.parent.none': 'Poziom główny',
-  'categories.move.top': 'Przenieś na początek',
-  'categories.move.bottom': 'Przenieś na koniec',
   'categories.move.refused': 'Nie udało się przenieść kategorii',
-  'categories.move.refused.body':
-    'Kategorie mają dwa poziomy. Kategorii, która ma już podkategorie, nie można umieścić wewnątrz innej.',
+  'categories.move.refused.nest':
+    'Kategoria „{category}” nie może trafić do kategorii „{parent}”: kategorie mają tylko dwa poziomy.',
+  'categories.refused.forbidden':
+    'Kategorie w tym domu mogą zmieniać tylko właściciele i administratorzy.',
+  'categories.restore.refused': 'Nie przywróciliśmy kategorii',
   'categories.filter.showArchived': 'Pokaż zarchiwizowane kategorie',
   'categories.field.kind': 'Stosowana do',
   'categories.field.kind.help':

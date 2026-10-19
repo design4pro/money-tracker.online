@@ -16,6 +16,7 @@ import {
   Label,
   fieldEndButton,
   fieldRow,
+  resolveInvalid,
 } from './field'
 import { Popover } from './popover'
 import { composeTw, fieldSizes, transitionBase } from './shared'
@@ -131,12 +132,14 @@ export function DatePicker<T extends DateValue>({
   calendarLabel = 'Open calendar',
   className,
   isRequired,
+  isInvalid,
   ...props
 }: DatePickerProps<T>) {
   return (
     <RACDatePicker
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (
@@ -213,6 +216,7 @@ export function DateRangePicker<T extends DateValue>({
   placeholder,
   className,
   isRequired,
+  isInvalid,
   ...props
 }: DateRangePickerProps<T>) {
   const isResting =
@@ -222,6 +226,7 @@ export function DateRangePicker<T extends DateValue>({
     <RACDateRangePicker
       {...props}
       isRequired={isRequired}
+      isInvalid={resolveInvalid(isInvalid, errorMessage)}
       className={composeTw(className, fieldRow)}
     >
       {label === undefined ? null : (

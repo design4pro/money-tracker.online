@@ -694,6 +694,17 @@ label kept in the DOM under the spinner so the button holds its width.
 - **Hover** darkens the rule to `ink-2`; **focus** moves it to `brand` and draws the ring.
 - **Invalid** moves the rule to `negative`; the error renders below, wired by `aria-describedby`,
   with an icon and a message. **Disabled:** `surface-sunken`, `ink-2`, `not-allowed`.
+- **How an error is shown.** A caller passes the sentence as `errorMessage` and nothing else: every
+  field in `components/ui` turns a non-empty `errorMessage` into the invalid state through
+  `resolveInvalid` (`field.tsx`), so the message renders and the control carries `aria-invalid`
+  (WCAG 3.3.1) without a matching `isInvalid` at the call site. `FieldError` renders only on an
+  invalid field, which is why a message with no invalid state is invisible. An explicit `isInvalid`
+  wins either way; the function form of `errorMessage` reads native validation and does not decide
+  validity. Compute the message from state (`hasTriedToSubmit && trimmedName === ''`), so it clears
+  when the value is fixed: a message passed unconditionally is shown unconditionally. A notice that
+  is not an error (a limit reached, a hint) is not an `errorMessage`; where one already is, pass
+  `isInvalid={false}`. A new field component takes the same `errorMessage` and `isInvalid` pair and
+  hands its container `isInvalid={resolveInvalid(isInvalid, errorMessage)}`.
 
 ### Select and ComboBox popover
 
@@ -732,6 +743,57 @@ label kept in the DOM under the spinner so the button holds its width.
 - Keyboard navigation, selection and focus return to the trigger are React Aria's and are
   untouched.
 - **The one thing it is not:** `Menu`, whose popover is not tied to a trigger width at all.
+
+### Menu
+
+- **The shape.** A column of 44px-minimum rows inside the base `Popover`, at least `11rem` wide
+  (`min-w-44`) and not tied to a trigger width.
+- **The height rule.** A menu sets no height cap of its own. The `Popover` is a column flex
+  container and React Aria writes the room left in the viewport onto it as `max-height`, so a menu
+  that fits is never a scroll container, and one that cannot fit (a short landscape phone) shrinks
+  to that room and scrolls. The old fixed `max-h-80` (320px) hid the eighth row of an eight-item
+  menu at 48px a row and made the menu a scrollable region with no focusable content while a
+  submenu held focus, which axe reports as `scrollable-region-focusable` (#728). A new cap on a
+  `Menu` brings both back: change the number of items, not the cap.
+- **Reaching the last row.** Every item is reachable from the keyboard (arrows, `Home`, `End`,
+  type-ahead) and React Aria scrolls the focused row into view, so the scrolling case stays
+  keyboard-complete. `e2e/menu-height.spec.ts` asserts all of it in a browser at 360px and 1280px,
+  with a submenu open, and in a viewport too short for the menu.
+- **Known limit.** The axe guarantee holds while the menu fits. In a viewport too short for it
+  (about 280px, a landscape phone or 400% zoom) with a submenu open, the parent menu scrolls again
+  with every item at `tabindex="-1"`, and axe's `scrollable-region-focusable` can return; the
+  keyboard path stays complete because `Escape` closes the submenu.
+- **A long submenu grows to the viewport.** A submenu with many entries (the category tree's "Move
+  to") is no longer cut at 320px; it takes the room React Aria leaves it, then scrolls.
+- **Every `Popover` is a column flex container.** The rule above lives in the base `Popover`, so
+  `Select`, `ComboBox`, `DatePicker` and `PopoverDialog` share it; their children stretch to the
+  panel width and only a child that already scrolls (`ListBox`, `Menu`) shrinks.
+- **The one thing it is not:** a `ListBox` or a `Select`, which hold values and keep their own
+  `max-h-72` (`ListBox`).
+
+### Toast
+
+- **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
+  button; the copy is the caller's `closeLabel` (`action.close`, EN + PL), never a default string
+  and never an icon-only control without a name.
+- **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
+  §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
+  never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
+  `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
+  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-7` so text never runs
+  under the box.
+- **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
+  so the close button's size, position and transform are `!` utilities. `left` and `right` read the
+  opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
+- **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
+  box-shadow is switched off.
+- **Contrast.** The chip's edge is `border-subtle`, a decorative edge below 3:1 by design; the glyph
+  (`ink-2`, forced with `!` like the rest; measured 8.6:1 in light and 8.1:1 in dark on the chip, #730) carries the 1.4.11 contrast.
+- **A toast action.** No toast has an `action` or `cancel` button today. If one is added it must
+  not sit in the top 44px of the inline-end corner, which the close box owns.
+- **Verified by:** `src/components/ui/__tests__/toast.test.tsx` (name, hidden glyph, classes) and
+  `e2e/toast-close-button.spec.ts` (measured box, axe, EN, PL and RTL, 360px and 1280px, both
+  themes, keyboard).
 
 ### Focus
 
@@ -780,35 +842,78 @@ a sentence that says what to do, not a blank.
 - `src/components/ui/__tests__/empty-state-ownership.test.ts` fails when `variant="dashed"`
   appears outside `src/components/ui`.
 
-### Failure panels
+### Error panel
 
-Two components say "something went wrong", and a screen picks one by what failed: `ErrorPanel` is
-the frame, `FailurePanel` is the one that reads a failure and chooses the sentence.
+What replaces a region, or the page, when something did not work. `ErrorPanel` is the frame and
+`FailurePanel` chooses what goes in it: it reads the failure envelope and offers the recovery its
+failure kind calls for, so a screen never invents its own way out. Both live in
+`src/components/app/shell/`. `RouteError` is the same idea for a whole page.
 
-- **`FailurePanel`** is for a failure that arrived as a thrown value: a refused save in a dialog,
-  a preview that did not load, a move that was rejected. It takes the failure envelope
-  (`failureOf(error)` in the `catch`) and shows the catalogue sentence of its kind, so two failures
-  of one kind read the same on every screen. The kind decides the recovery (`RECOVERY_OF`:
-  `retryable`, `quota`, `feature_locked`, `internal`): a link to billing for a quota or a locked
-  feature, the kind's own sentence otherwise. Retry, a reference and a link home are extras the
-  caller supplies (`onRetry`, `reference`, `homeHref`), so a dialog that passes none shows none.
-- **`ErrorPanel`** is the frame for a route whose loader failed (`errorComponent`) and the shape
-  `FailurePanel` renders into. A route passes it catalogue copy only; there is no `detail` prop
-  and no `<details>`.
-- **Placement.** `after-action` is the result of something the reader just did: `role="alert"`, and
-  focus moves to the heading. `in-place` is a block that failed to load on arrival: a labelled
-  region that never moves focus, because an alert on first render is announced without context.
-  A form clears its failure before it submits again, so a repeat failure remounts the panel and is
-  announced again.
-- **Copy.** `title` and `body` are catalogue copy and are used for the retryable recovery only;
-  the quota, locked and internal recoveries keep their own sentences. A site never renders what the
-  error said - a repository message is written for a developer, English-only, and can carry an id
-  or a count - and `failure-message-guard.test.ts` fails on a file that reads one back in.
-- **Tone.** `negative` (the default) for a fault; `warning` for a quota or a locked feature, which are not
-  faults, and which `FailurePanel` sets by itself.
-  The icon is `aria-hidden` and never carries a word the sentence does not say.
-- **It is not** `EmptyState` (nothing here yet) and not a toast: a toast is for an outcome that needs
-  no decision, a failure that leaves the form open belongs in the panel beside the input.
+- **The shape.** A default card (Cards, above) at `md` padding with a 12px gap, `xl` radius and the
+  one-pixel `--shadow-card` under-edge, its rule repainted from `border-subtle` to the tone at 30%
+  opacity (`border-negative/30`, `border-warning/30`). A 32px round disc in the tone's `-soft` wash
+  holds a 16px triangle glyph in the tone's ink; the disc is round because it is a glyph, and
+  nothing else about the panel is. The heading is `subtitle` at semibold in `ink`, an `h3` unless
+  the caller says `h2` or `h4`; the sentence under it is `body` in `ink-2`. Actions wrap below: Retry
+  and the way back to the dashboard are `secondary`, the link to billing is `primary`. `RouteError`, the page-level
+  failure, is a frame of its own: a centred `rounded-xl` card on `border-subtle`, a 48px disc, an
+  `h1` in `title`, a `primary` Retry, and it keeps the `warning` glyph it shipped with. That is the
+  one fault that is not `negative`, recorded here and not changed.
+- **The tones.** `negative` is a fault: something broke and nobody did anything wrong. `warning`
+  is a limit the reader can act on: the workspace is at a quota or the feature is not in its plan.
+  `negative` is the default. A call site does not pick a tone for a failure: `FailurePanel` derives
+  it from the recovery, so `warning` appears only on the `quota` and `feature_locked` recoveries
+  and every other one is `negative`. A reader asks "did the product fail, or did it decline?"; when
+  it is hard to say, the answer is `negative`. The four recoveries are `retryable` (Retry, beside
+  the form and never instead of it, so input survives), `quota` (a link to billing and the metric
+  that was reached), `feature_locked` (a link to billing and nothing else) and `internal` (the
+  sentence, Retry when the caller has one, a way back to the dashboard where the reader is known to
+  be signed in, and a reference). `not_found` and `forbidden` share the `internal` recovery on
+  purpose, so the screen never offers a different way out (the sentence still differs) for a missing row and a foreign one
+  (`RECOVERY_OF`). The sentence is the envelope's own catalogue key, so two failures of one kind
+  read the same, and no recovery shows a plan name or an amount.
+- **The states.** It has two placements, `after-action` and `in-place` (the alert-versus-region
+  rule below), and Retry has a pending state (the Pending-Not-Disabled Rule). It does not have
+  hover, press, selected, disabled or invalid: a panel is not interactive, only its buttons and
+  links are, and each answers with its own states and the 44px hit area. It has no dismiss and no
+  timer, so it stays until the failure is gone or the reader leaves. The heading takes focus
+  programmatically and is never a tab stop, so like `<main>` it draws no focus ring.
+- **What carries the meaning without colour.** The heading and the sentence. The glyph is
+  `aria-hidden` and the tone is reinforcement, never the signal (Colour Is Never Alone). The title
+  says what did not happen and the body says whether anything was changed, which is the sentence a
+  reader of a finance app needs first. Under forced colours the panel is a bordered card with
+  text, so the text and the rule survive; no forced-colours capture of it has been made.
+- **The one thing it is not.** An `EmptyState` (nothing here yet, which is not a failure) and a
+  toast (transient, and it cannot hold a recovery). A failure that needs a way out stays on the
+  screen and carries its action. A panel is not a place to show what went wrong in a developer's
+  words either.
+
+**The Alert-Versus-Region Rule.** `placement="after-action"` is the result of something the reader
+just did, so it is `role="alert"`. `placement="in-place"`, and `RouteError`, are the content of a
+page or a block that failed to load on arrival, so they are a region labelled by their heading:
+an alert on initial render is announced before the person has any context for it. The heading is the
+first element inside the alert.
+
+**The Focus Rule.** Only an after-action panel moves focus, to its heading, so a keyboard reader
+lands on the explanation and Retry is the next tab stop. An in-place panel never moves focus.
+`RouteError` moves it only when it mounts after the document's first render, because on the first
+render the browser has already placed focus on the document and the skip link must stay the first
+tab stop. A panel that held focus when it goes away, after a successful Retry say, gives it back to
+the enclosing dialog or else to `#main-content`, never to `<body>` (`useFocusHeading`).
+
+**The Tab-Title Rule.** An error surface never writes `document.title`. The router runs `head()` for
+the failed match as well, so the tab already carries the failed route's own title, and an imperative
+write would compete with the rendered `<title>` and outlive a successful Retry.
+
+**The Reference Rule.** No code renders an error's message. `ErrorPanel` and `FailurePanel` have no
+`detail` prop and no `<details>` (#718 removed both), `title` and `body` are catalogue copy, and
+`failure-message-guard.test.ts` fails on a file that reads a thrown error's text back in. The only
+free-form string the panel is given is a `reference`, which is an event id or a request id and
+nothing else: the panel drops anything that is not 8 to 64 letters, digits, `_` or `-`, but the
+shape narrows a string and does not prove it is not an amount, so the producer passes an id and
+never a value of its own.
+
+The guideline states no conformance level and widens none: the claim is `docs/ACCESSIBILITY.md` §1.
 
 ### Badges
 
@@ -874,6 +979,53 @@ band on `surface-sunken` in micro uppercase `ink-2`; cells separated by `border-
 rules and rows by `border-subtle` horizontal ones, cell padding 12 / 10px. Hover paints the `hover`
 wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 (`inset 0 0 0 1px`): a box, not a bar. Amounts are end-aligned and tabular.
+
+### Reorderable tree
+
+A two-level list of rows that a person can put in order, by dragging **and** by keyboard. Two
+screens draw one: the category tree (`CategoryTree`) and the account group tree (`GroupTree`).
+They share the arithmetic in `#/components/app/tree` and nothing else; each builds its own menu,
+because what a row can do differs (a category archives, a group deletes).
+
+- **Shape:** one flat `GridList` in reading order, never nested lists, so arrow keys travel
+  linearly. A child row is indented one step (`ms-6`) and carries a corner arrow; a row an
+  account sits on (group tree only) is indented one more. Row, radius and padding are the
+  `GridListItem`'s. The drag handle and the menu trigger are `ghost` icon buttons on the 44px hit
+  area (`target-min`), also on an indented row at 360px.
+- **Both paths ship together.** Every gesture the pointer can make is a menu item built from the
+  same pure move functions: _Move up_, _Move down_, _Move to top_, _Move to bottom_, _Move to…_
+  (which re-parents). Neither path is the fallback for the other, and a keyboard drag and the
+  matching menu item must produce the same move; a component test holds that.
+- **Names say where a row is.** A child row's accessible name carries its parent ("Trips, inside
+  Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
+  after their row, and their parent for a child.
+- **Disabled, never hidden, and the reason is written.** An item that would change nothing, or
+  that the one-level rule forbids, stays in the menu disabled. The group tree also writes the
+  reason as the item's description ("Already first", "A sub-group cannot have its own
+  sub-groups"), painted under the item at full contrast (only the label dims) and wired as its
+  description, so the reason does not depend on a tooltip. Arrow keys skip a disabled item, so it
+  is reached by a virtual cursor and by sight; the category tree disables the item without a description yet.
+- **Drop and focus rules.** A drop lands _beside_ a row, never on it, and the dropped row takes
+  that row's parent: one rule, no nesting-by-hovering. Rows that are not part of the order
+  (accounts inside a group) are not drop targets - the target is cancelled, so no indicator is
+  drawn and a keyboard drag skips it - and cannot start a drag. The group tree offers each
+  boundary between two rows of a run once, as _before_ the later one (the target is also cancelled
+  for a dragged group that has children when the target is a sub-group, which the one-level rule would
+  refuse); _after_ exists for the last
+  row of a run only, and its indicator is drawn directly under that row. For the last top-level group, which
+  has its accounts beneath it, that reads as "inside" - a known limit of a row-based indicator and
+  the reason the menu is not optional. After a move, a rename or a create, focus stays on (or goes
+  to) the row; after a delete it goes to the next row, then the previous, then the screen's create
+  button.
+- **In the group tree a menu move is said aloud, politely:** "Business moved to position 2 of 3", qualified by the
+  parent for a child. A drag has React Aria's own announcements.
+- **A refusal is a sentence in an always-mounted `role="alert"` region** above the tree, and a
+  toast is for what succeeded. The group tree chooses its sentence from the catalogue by the kind
+  of failure and never prints the server's message.
+- **Non-colour meaning:** the row's kind or count is a word or a number beside the name, never a
+  hue alone.
+- **It is not** a data table (no columns, no sort) and not a `ListBox` (a menu of values to
+  choose from): its rows are things with an order, and the order is the data.
 
 ### Period actions
 

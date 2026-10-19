@@ -117,6 +117,8 @@ const messages = {
   'action.moveUp': 'Move up',
   'action.moveDown': 'Move down',
   'action.moveTo': 'Move to…',
+  'action.moveToTop': 'Move to top',
+  'action.moveToBottom': 'Move to bottom',
   'action.undo': 'Undo',
   'action.done': 'Done',
   'action.skip': 'Skip',
@@ -277,6 +279,71 @@ const messages = {
   'accounts.group.title': 'Groups',
   'accounts.group.create': 'New group',
   'accounts.group.ungrouped': 'Not in a group',
+  'accounts.groups.title': 'Account groups',
+  'accounts.groups.description':
+    'Folders for your accounts, such as Joint or Business. A group never changes a balance.',
+  'accounts.groups.manage': 'Manage groups',
+  'accounts.groups.loading': 'Loading account groups',
+  'accounts.groups.empty.title': 'No groups yet',
+  'accounts.groups.empty.body':
+    'A group collects accounts under one name, such as Joint or Business, so the list reads the way you think about it. Accounts keep their own balances.',
+  'accounts.groups.error.title': 'Could not load your account groups',
+  'accounts.groups.error.body': 'Nothing was changed. Try again in a moment.',
+  'accounts.groups.tree.label': 'Account groups, in display order',
+  'accounts.groups.row.group': {
+    one: '{name}, group, {count} account',
+    other: '{name}, group, {count} accounts',
+  },
+  'accounts.groups.row.childOf': {
+    one: '{name}, inside {parent}, {count} account',
+    other: '{name}, inside {parent}, {count} accounts',
+  },
+  'accounts.groups.row.account': '{account}, in {group}',
+  'accounts.groups.row.accountArchived': '{account}, archived, in {group}',
+  'accounts.groups.drag.label': 'Drag {name}',
+  'accounts.groups.drag.labelChild': 'Drag {name}, inside {parent}',
+  'accounts.groups.actions.label': 'Actions for {name}',
+  'accounts.groups.actions.labelChild': 'Actions for {name}, inside {parent}',
+  'accounts.group.field.name': 'Group name',
+  'accounts.group.field.parent': 'Inside',
+  'accounts.group.field.parent.hasChildren':
+    'This group has sub-groups, so it cannot sit inside another group.',
+  'accounts.group.parent.none': 'No parent',
+  'accounts.group.rename': 'Rename',
+  'accounts.group.addChild': 'Add sub-group',
+  'accounts.group.form.error.title': 'The group was not saved',
+  'accounts.group.disabled.noGrandchild':
+    'A sub-group cannot have its own sub-groups',
+  'accounts.group.disabled.first': 'Already first',
+  'accounts.group.disabled.last': 'Already last',
+  'accounts.group.disabled.same': 'Already there',
+  'accounts.group.toast.created': 'Group created: {name}',
+  'accounts.group.toast.renamed': 'Group renamed: {name}',
+  'accounts.group.toast.reparented': 'Group moved: {name}, now inside {parent}',
+  'accounts.group.toast.reparentedTop': 'Group moved: {name}, now top-level',
+  'accounts.group.toast.deleted': 'Group deleted: {name}',
+  'accounts.group.announce.position':
+    '{name} moved to position {position} of {total}',
+  'accounts.group.announce.positionChild':
+    '{name} moved to position {position} of {total} inside {parent}',
+  'accounts.group.refused.title': 'That change was not made',
+  'accounts.group.refused.conflict':
+    'That does not fit the groups as they are. A group can sit inside one other group, not two deep.',
+  'accounts.group.refused.notFound':
+    'The list changed in another window. It has been reloaded.',
+  'accounts.group.refused.forbidden':
+    'Only an owner or an admin can change groups in a shared workspace.',
+  'accounts.group.refused.generic': 'Something went wrong. Try again.',
+  'accounts.group.delete.action': 'Delete group',
+  'accounts.group.delete.title': 'Delete {name}?',
+  'accounts.group.delete.body': {
+    one: '{count} account leaves this group. None is deleted. Sub-groups become top-level groups.',
+    other:
+      '{count} accounts leave this group. None is deleted. Sub-groups become top-level groups.',
+  },
+  'accounts.group.delete.bodyEmpty': 'Sub-groups become top-level groups.',
+  'accounts.group.delete.rules':
+    'Rules that use this group will be paused until you pick another.',
   'accounts.count': {
     one: '{count} account',
     other: '{count} accounts',
@@ -819,11 +886,12 @@ const messages = {
   'categories.kind.income': 'Money in',
   'categories.kind.both': 'Either way',
   'categories.parent.none': 'Top level',
-  'categories.move.top': 'Move to top',
-  'categories.move.bottom': 'Move to bottom',
   'categories.move.refused': 'That move was not made',
-  'categories.move.refused.body':
-    'Categories go two levels deep. A category that already holds subcategories cannot be filed inside another one.',
+  'categories.move.refused.nest':
+    'The category "{category}" cannot go inside "{parent}": categories nest only two levels.',
+  'categories.refused.forbidden':
+    'Only an owner or an admin can change categories in a shared workspace.',
+  'categories.restore.refused': 'That category was not restored',
   'categories.filter.showArchived': 'Show archived categories',
   'categories.field.kind': 'Used for',
   'categories.field.kind.help':
