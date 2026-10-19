@@ -11,7 +11,7 @@
 -- table-level `CHECK` on `book`: adding one would require the rebuild this file exists to
 -- avoid. Every write parses `z.enum(BOOKS)` in `repos/recurring.ts` instead.
 --
--- Numbered `0008` on purpose: #752 owns `0006` (loans) and #756 owns `0007` (recurring
+-- Numbered `0008` on purpose: #752 owns `0006` (loans) and #759 owns `0007` (recurring
 -- columns). This PR merges later, so both files can land; wrangler applies them by name.
 -- Hand-written against the "drizzle/ is generated" rule — `drizzle/meta` still describes the
 -- schema this file arrives at, so `pnpm db:generate` stays silent and the drift gate still holds.
