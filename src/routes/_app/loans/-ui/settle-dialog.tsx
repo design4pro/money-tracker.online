@@ -57,22 +57,22 @@ export function SettleDialog({
   const [rows, setRows] = useState<ReadonlyArray<Transaction> | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [hasFailed, setHasFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     setRows(null)
     setSelected(null)
-    setFailure(null)
+    setHasFailed(false)
     void loadInstalmentCandidates({
       data: { loanId, sequence: instalment.sequence },
     })
       .then((page) => {
         if (!cancelled) setRows(page)
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (!cancelled) {
-          setFailure(error instanceof Error ? error.message : String(error))
+          setHasFailed(true)
           setRows([])
         }
       })
@@ -84,7 +84,7 @@ export function SettleDialog({
   async function submit() {
     if (selected === null) return
     setIsSaving(true)
-    setFailure(null)
+    setHasFailed(false)
     try {
       await markLoanInstalmentPaid({
         data: {
@@ -95,8 +95,8 @@ export function SettleDialog({
       })
       onSaved()
       onOpenChange(false)
-    } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+    } catch {
+      setHasFailed(true)
     } finally {
       setIsSaving(false)
     }
@@ -125,13 +125,12 @@ export function SettleDialog({
                   : t('loans.markPaid.candidateCount', { count: rows.length })}
               </p>
 
-              {failure === null ? null : (
+              {hasFailed ? (
                 <ErrorPanel
                   title={t('loans.toast.failed')}
-                  body={t('loans.error.body')}
-                  detail={failure}
+                  body={t('loans.markPaid.error.body')}
                 />
-              )}
+              ) : null}
 
               {rows === null ? (
                 <p
@@ -142,7 +141,7 @@ export function SettleDialog({
                   {t('loans.markPaid.loading')}
                 </p>
               ) : rows.length === 0 ? (
-                failure === null ? (
+                hasFailed ? null : (
                   <div className="flex flex-col gap-3">
                     <p className="text-body text-ink-2">
                       {t('loans.markPaid.empty')}
@@ -167,7 +166,7 @@ export function SettleDialog({
                       {t('loans.markPaid.record')}
                     </Button>
                   </div>
-                ) : null
+                )
               ) : (
                 <RadioGroup
                   label={t('loans.markPaid.field')}

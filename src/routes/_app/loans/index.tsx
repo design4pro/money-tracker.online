@@ -48,19 +48,12 @@ export const Route = createFileRoute('/_app/loans/')({
   component: LoansListRoute,
 })
 
-function LoansListError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function LoansListError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('loans.error.title')}
       body={t('loans.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

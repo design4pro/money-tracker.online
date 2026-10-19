@@ -50,6 +50,10 @@ test.describe('write flows', () => {
         .click()
 
       await expect(dialog).toBeHidden()
+      // The saved row lost its button; focus goes back to the page, not to <body> (WCAG 2.4.3).
+      await expect(
+        page.getByRole('heading', { name: fixture.loanName }),
+      ).toBeFocused()
       await expect(page.getByText('Paid').first()).toBeVisible()
       await expect(
         page.getByRole('button', { name: /^Mark paid, instalment due/ }),

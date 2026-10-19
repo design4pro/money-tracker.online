@@ -22,6 +22,7 @@ import { NotFoundError } from '#/server/repos/errors'
 import {
   getLoan as getLoanRow,
   listInstalments as listInstalmentsRow,
+  listSettledTransactionIds,
   markInstalmentPaid as markInstalmentPaidRow,
   markInstalmentPaidSchema,
 } from '#/server/repos/loans'
@@ -107,8 +108,9 @@ const candidatesSchema = z.strictObject({
 })
 
 /**
- * Unlinked transactions on the loan's account (when it has one) within a fortnight of the due
- * date. Offered, never linked automatically.
+ * Expenses in the loan's currency, on the loan's account (when it has one), within a fortnight
+ * of the due date, that do not already settle an instalment. Offered, never linked
+ * automatically.
  */
 export const loadInstalmentCandidates = createServerFn({ method: 'GET' })
   .inputValidator(candidatesSchema)
@@ -140,5 +142,8 @@ export const loadInstalmentCandidates = createServerFn({ method: 'GET' })
       cursor: null,
       limit: 50,
     })
-    return page.rows.filter((row) => row.currencyCode === loan.currencyCode)
+    const linked = await listSettledTransactionIds(scope)
+    return page.rows.filter(
+      (row) => row.currencyCode === loan.currencyCode && !linked.has(row.id),
+    )
   })
