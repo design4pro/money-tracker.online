@@ -74,7 +74,9 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
 - Reading `.dev.vars`, `.env.local` or `.ai/qa/test-env.env`.
 - A blanket "WCAG AAA" claim anywhere: copy, comment, commit message or plan.
 - A PNG or a report left inside the repository; frames go to `.ai/qa/artifacts_*/` or a scratchpad.
-- `gh pr edit` or `gh issue edit` to change a label, an assignee, a title or a body. Use the REST
+- `gh pr edit` or `gh issue edit` to change a label, an assignee, a title or a body: the `gh` on this
+  host predates 2.82.1 (`gh --version`), so both abort on the retired Projects (classic) API before
+  they write anything, and `gh issue view` without `--json` fails the same way. Use the REST
   operations in `.ai/trackers/github.md` (#447, #490).
 
 ## Validation Commands
