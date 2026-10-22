@@ -74,9 +74,7 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
 - Reading `.dev.vars`, `.env.local` or `.ai/qa/test-env.env`.
 - A blanket "WCAG AAA" claim anywhere: copy, comment, commit message or plan.
 - A PNG or a report left inside the repository; frames go to `.ai/qa/artifacts_*/` or a scratchpad.
-- `gh pr edit` or `gh issue edit` to change a label, an assignee, a title or a body: the `gh` on this
-  host predates 2.82.1 (`gh --version`), so both abort on the retired Projects (classic) API before
-  they write anything, and `gh issue view` without `--json` fails the same way. Use the REST
+- `gh pr edit` or `gh issue edit` to change a label, an assignee, a title or a body. Use the REST
   operations in `.ai/trackers/github.md` (#447, #490).
 
 ## Validation Commands
@@ -177,6 +175,7 @@ file is allowed; printing a value is not.
 | The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md`                         | Labels are the state machine; `needs-qa` needs `qa-approved` from a specialist panel                                                                                                                                                                                             |
 | Unattended intake: triage, tickets, lessons    | `SDLC.md` § Readiness, § Unattended decisions; `.ai/skills/afk-*/SKILL.md`; `docs/agents/cezar-automations.json` | No label marks an issue ready or starts a run (ADR 0029): `backlog-status.mjs --plan` names the next ready issue for the Reconciler to start. An independent specialist sub-agent settles an open question (`afk-decide`) into Resolved assumptions. Nothing merges into `main`. |
 | The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                                                       | One cockpit per host; no secrets in the service env                                                                                                                                                                                                                              |
+| The super-board robot                          | `docs/agents/super-board.md`; `/super-board` skills                                                              | Board is design4pro project 20; Conventional Commits win over the emoji format; `gh issue edit` only on gh 2.82.1+                                                                                                                                                               |
 
 ## Process and skills
 
