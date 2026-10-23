@@ -33,10 +33,14 @@ Scanned: project 20 ("Money-tracker board"), the card on it (#747), and `docs/su
 
 - [✓] Ports 3010-3020 are free (`lsof -nP -iTCP:3010-3020 -sTCP:LISTEN` prints nothing). Playwright
   refuses a base URL outside that range; agents in a shared checkout use 3011-3020.
-- [ ] The local D1 database is migrated and the demo workspace is seeded. `.wrangler/state/v3/d1`
-      exists, but whether it is current was not checked. Run `pnpm db:migrate:local` and confirm the
-      seed before a card that runs `pnpm e2e` against the app.
-- [ ] The board lists its cards. `gh project item-list 20 --owner design4pro` returned 0 items on
-      2026-10-22 while #747 reports `projectItems` 1 for project 20 and the item resolves by node ID
-      with status Ready. The wave planner reads that list, so run cannot see the card until the list
-      shows #747. Re-run the command; clear this line when it prints the card.
+- [✓] The local D1 database is migrated and the demo workspace is present. On 2026-10-23
+  `wrangler d1 migrations list money-tracker-db --local` named `0004_saas_billing_events.sql` and
+  `0005_useful_professor_monster.sql` as pending; `pnpm db:migrate:local` applied both and the same
+  command now prints `No migrations to apply!`. The `demo-household` organization holds 624
+  transactions. The seed's own audit (`scripts/seed/verify.mjs`) was not run.
+- [✓] The board lists its cards. On 2026-10-22 `gh project item-list 20 --owner design4pro`
+  returned 0 items while #747 reported `projectItems` 1; on 2026-10-23 it prints `total=1`, `#747`
+  in `Ready`. The earlier 0 was a delay on GitHub's side. Item #747 had an empty Status that day
+  and was set to Ready again. The project's "Auto-add sub-issues to project" workflow is now
+  disabled (no workflow is enabled), so a parent added to the board no longer drags its sub-issues
+  in with an empty Status.
