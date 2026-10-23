@@ -111,15 +111,24 @@ describe.each([
   })
 })
 
+/**
+ * The one job allowed off the pool: `agent attestation` in ci.yml, seconds of API calls with no
+ * artifact, which on the two `ci` slots would queue behind the jobs it exists to skip (ADR 0033).
+ */
+const ATTESTATION_RUNS_ON =
+  /^ {2}attestation:\n(?:(?! {2}\S).*\n)*? {4}runs-on: ubuntu-latest\n/m
+
 describe('.github/workflows', () => {
   it('points every workflow at the VPS pool and nowhere else by default', () => {
     const workflows = readdirSync(join(ROOT, '.github/workflows')).filter((f) =>
       f.endsWith('.yml'),
     )
+    expect(read('.github/workflows/ci.yml')).toMatch(ATTESTATION_RUNS_ON)
     for (const file of workflows) {
-      for (const [line] of read(`.github/workflows/${file}`).matchAll(
-        /^\s*runs-on:[^\n]*/gm,
-      )) {
+      const text = read(`.github/workflows/${file}`)
+      const pooled =
+        file === 'ci.yml' ? text.replace(ATTESTATION_RUNS_ON, '') : text
+      for (const [line] of pooled.matchAll(/^\s*runs-on:[^\n]*/gm)) {
         expect(line, file).toMatch(
           /fromJSON\(vars\.RUNNER_(CI|DEPLOY|AGENT) \|\| '\["self-hosted","linux","X64","(ci|agent)"\]'\)/,
         )
