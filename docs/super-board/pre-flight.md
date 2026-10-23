@@ -10,10 +10,10 @@ Scanned: project 20 ("Money-tracker board"), the card on it (#747), and `docs/su
 
 - [✓] GitHub account `design4pro-agent` is signed in and active (`GH_CONFIG_DIR=$HOME/.config/gh-agent gh auth status`).
   Token scopes: `gist`, `project`, `read:org`, `repo`, `workflow`.
-- [ ] The robot token's expiry date. GitHub returns no `github-authentication-token-expiration`
-      header for it (`gh api -i user`), so the date cannot be read from here. Check it under
-      Settings -> Developer settings -> Tokens (classic) for `design4pro-agent`, renew before it
-      lapses, then mark this line.
+- [✓] The robot token has no expiry date. GitHub returns no `github-authentication-token-expiration`
+  header for it (`gh api -i user`), so the owner read the setting under Settings -> Developer
+  settings -> Tokens (classic) for `design4pro-agent` on 2026-10-23: no expiration. It can still
+  be revoked, so a 401 from the robot account means a revoked token, not a lapsed one.
 - [✓] No login for the end-to-end suite is needed by #747: `e2e/toast-close-button.spec.ts` mounts a
   harness (`./support/mount-harness`) and imports no sign-in helper. A card that does sign in
   needs the role and `passwordEnv` name from `.ai/qa/test-env.json`, which does not exist in this
@@ -33,10 +33,14 @@ Scanned: project 20 ("Money-tracker board"), the card on it (#747), and `docs/su
 
 - [✓] Ports 3010-3020 are free (`lsof -nP -iTCP:3010-3020 -sTCP:LISTEN` prints nothing). Playwright
   refuses a base URL outside that range; agents in a shared checkout use 3011-3020.
-- [ ] The local D1 database is migrated and the demo workspace is seeded. `.wrangler/state/v3/d1`
-      exists, but whether it is current was not checked. Run `pnpm db:migrate:local` and confirm the
-      seed before a card that runs `pnpm e2e` against the app.
-- [ ] The board lists its cards. `gh project item-list 20 --owner design4pro` returned 0 items on
-      2026-10-22 while #747 reports `projectItems` 1 for project 20 and the item resolves by node ID
-      with status Ready. The wave planner reads that list, so run cannot see the card until the list
-      shows #747. Re-run the command; clear this line when it prints the card.
+- [✓] The local D1 database is migrated and the demo workspace is present. On 2026-10-23
+  `wrangler d1 migrations list money-tracker-db --local` named `0004_saas_billing_events.sql` and
+  `0005_useful_professor_monster.sql` as pending; `pnpm db:migrate:local` applied both and the same
+  command now prints `No migrations to apply!`. The `demo-household` organization holds 624
+  transactions. The seed's own audit (`scripts/seed/verify.mjs`) was not run.
+- [✓] The board lists its cards. On 2026-10-22 `gh project item-list 20 --owner design4pro`
+  returned 0 items while #747 reported `projectItems` 1; on 2026-10-23 it prints `total=1`, `#747`
+  in `Ready`. The earlier 0 was a delay on GitHub's side. Item #747 had an empty Status that day
+  and was set to Ready again. The project's "Auto-add sub-issues to project" workflow is now
+  disabled (no workflow is enabled), so a parent added to the board no longer drags its sub-issues
+  in with an empty Status.
