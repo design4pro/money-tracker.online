@@ -291,6 +291,9 @@ describe('GroupTree keyboard drag', () => {
     })
     onMove.mockClear()
 
+    // RAC's keyboard drag overlay can still hold pointer-events:none on the
+    // handles after onReorder; Escape ends that session so the row menu opens.
+    await user.keyboard('{Escape}')
     await user.click(
       screen.getByRole('button', { name: 'Actions for Savings' }),
     )
