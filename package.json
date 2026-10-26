@@ -82,7 +82,7 @@
     "@cloudflare/vite-plugin": "^1.54.4",
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@cloudflare/workers-types": "^5.20260904.1",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.64.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@tanstack/devtools-vite": "^0.8.3",
     "@tanstack/router-cli": "^1.132.0",
@@ -108,7 +108,7 @@
     "typescript": "^7.0.2",
     "vite": "^8.0.0",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.1.11",
+    "vitest": "^5.0.5",
     "wrangler": "^4.131.0"
   }
 }
