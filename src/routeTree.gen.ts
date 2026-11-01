@@ -33,6 +33,7 @@ import { Route as AppImportIndexRouteImport } from './routes/_app/import/index'
 import { Route as AppImportBatchIdRouteImport } from './routes/_app/import/$batchId'
 import { Route as AppLoansIndexRouteImport } from './routes/_app/loans/index'
 import { Route as AppLoansLoanIdRouteImport } from './routes/_app/loans/$loanId'
+import { Route as AppLoansMonthsRouteImport } from './routes/_app/loans/months'
 import { Route as AppPayeesIndexRouteImport } from './routes/_app/payees/index'
 import { Route as AppPayeesPayeeIdRouteImport } from './routes/_app/payees/$payeeId'
 import { Route as AppRecurringIndexRouteImport } from './routes/_app/recurring/index'
@@ -174,6 +175,11 @@ const AppLoansLoanIdRoute = AppLoansLoanIdRouteImport.update({
   path: '/loans/$loanId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLoansMonthsRoute = AppLoansMonthsRouteImport.update({
+  id: '/loans/months',
+  path: '/loans/months',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPayeesIndexRoute = AppPayeesIndexRouteImport.update({
   id: '/payees/',
   path: '/payees/',
@@ -304,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
   '/loans/$loanId': typeof AppLoansLoanIdRoute
+  '/loans/months': typeof AppLoansMonthsRoute
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -350,6 +357,7 @@ export interface FileRoutesByTo {
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
   '/loans/$loanId': typeof AppLoansLoanIdRoute
+  '/loans/months': typeof AppLoansMonthsRoute
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -399,6 +407,7 @@ export interface FileRoutesById {
   '/_app/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/_app/import/$batchId': typeof AppImportBatchIdRoute
   '/_app/loans/$loanId': typeof AppLoansLoanIdRoute
+  '/_app/loans/months': typeof AppLoansMonthsRoute
   '/_app/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/_app/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/_app/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -447,6 +456,7 @@ export interface FileRouteTypes {
     | '/goals/$goalId'
     | '/import/$batchId'
     | '/loans/$loanId'
+    | '/loans/months'
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
@@ -493,6 +503,7 @@ export interface FileRouteTypes {
     | '/goals/$goalId'
     | '/import/$batchId'
     | '/loans/$loanId'
+    | '/loans/months'
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
     | '/_app/goals/$goalId'
     | '/_app/import/$batchId'
     | '/_app/loans/$loanId'
+    | '/_app/loans/months'
     | '/_app/payees/$payeeId'
     | '/_app/recurring/$seriesId'
     | '/_app/recurring/candidates'
@@ -758,6 +770,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLoansLoanIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/loans/months': {
+      id: '/_app/loans/months'
+      path: '/loans/months'
+      fullPath: '/loans/months'
+      preLoaderRoute: typeof AppLoansMonthsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/payees/': {
       id: '/_app/payees/'
       path: '/payees'
@@ -940,6 +959,7 @@ interface AppRouteChildren {
   AppGoalsGoalIdRoute: typeof AppGoalsGoalIdRoute
   AppImportBatchIdRoute: typeof AppImportBatchIdRoute
   AppLoansLoanIdRoute: typeof AppLoansLoanIdRoute
+  AppLoansMonthsRoute: typeof AppLoansMonthsRoute
   AppPayeesPayeeIdRoute: typeof AppPayeesPayeeIdRoute
   AppRecurringSeriesIdRoute: typeof AppRecurringSeriesIdRoute
   AppRecurringCandidatesRoute: typeof AppRecurringCandidatesRoute
@@ -972,6 +992,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppGoalsGoalIdRoute: AppGoalsGoalIdRoute,
   AppImportBatchIdRoute: AppImportBatchIdRoute,
   AppLoansLoanIdRoute: AppLoansLoanIdRoute,
+  AppLoansMonthsRoute: AppLoansMonthsRoute,
   AppPayeesPayeeIdRoute: AppPayeesPayeeIdRoute,
   AppRecurringSeriesIdRoute: AppRecurringSeriesIdRoute,
   AppRecurringCandidatesRoute: AppRecurringCandidatesRoute,

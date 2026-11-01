@@ -160,6 +160,7 @@ import {
   createLoan,
   deleteLoan,
   getLoan,
+  listCalendarInstalments,
   listInstalments,
   listLoans,
   listSettledTransactionIds,
@@ -3541,6 +3542,58 @@ describe('loans cannot be reached across a workspace boundary', () => {
 
     expect(await loanSnapshotOfB()).toEqual(before)
     expect(await listLoans(world.scope, { includeClosed: true })).toEqual([])
+  })
+
+  it('reads calendar schedules only from its workspace, including closed loans and the requested book', async () => {
+    const ownBusiness = await createLoan(world.scope, {
+      name: 'Loan A business',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      book: 'business',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+    const ownPersonal = await createLoan(world.scope, {
+      name: 'Loan A personal',
+      currencyCode: 'PLN',
+      instalmentMinor: 30_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      book: 'personal',
+      instalments: [{ dueOn: '2026-04-10', amountMinor: 30_00 }],
+    })
+    await updateLoan(world.scope, ownPersonal.id, { status: 'closed' })
+
+    const all = await listCalendarInstalments(world.scope, {
+      today: '2026-03-01',
+    })
+    expect(all.map((row) => row.loanId).sort()).toEqual(
+      [ownBusiness.id, ownPersonal.id].sort(),
+    )
+    expect(all.find((row) => row.loanId === ownBusiness.id)).toMatchObject({
+      derivedStatus: 'overdue',
+      refAmountMinor: 50_00,
+    })
+    const personal = await listCalendarInstalments(world.scope, {
+      today: '2026-03-01',
+      book: 'personal',
+    })
+    expect(personal).toHaveLength(1)
+    expect(personal[0]).toMatchObject({
+      loanId: ownPersonal.id,
+      derivedStatus: 'upcoming',
+      refAmountMinor: 30_00,
+    })
+    expect(JSON.stringify(all)).not.toContain(loanBId)
+    const other = await listCalendarInstalments(world.otherScope, {
+      today: '2026-03-01',
+      book: 'business',
+    })
+    expect(other.map((row) => row.loanId)).toEqual([loanBId, loanBId])
+    await expect(
+      listCalendarInstalments(world.scope, { today: 'not-a-date' }),
+    ).rejects.toThrow()
   })
 
   it('refuses to settle its own instalment with another workspace’s transaction', async () => {

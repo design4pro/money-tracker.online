@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { requireOrg } from '#/server/auth/guards'
 import { serverToday } from '#/server/clock'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
+import { obligationCalendarFor } from '#/server/loans/calendar'
 import { summariseLoan, summariseLoans } from '#/server/loans/summary'
 import { NotFoundError } from '#/server/repos/errors'
 import {
@@ -28,8 +29,9 @@ import {
 import { ledgerPageFor } from '#/server/transactions/ledger-page'
 
 import type { Transaction } from '#/server/db/types'
-import type { InstalmentView } from '#/server/repos/loans'
+import type { ObligationCalendar } from '#/server/loans/calendar'
 import type { LoanSummary, LoansOverview } from '#/server/loans/summary'
+import type { InstalmentView } from '#/server/repos/loans'
 
 const loanIdSchema = z.strictObject({
   loanId: z.string().trim().min(1).max(64),
@@ -58,6 +60,19 @@ export const loadLoans = createServerFn({ method: 'GET' })
       book,
       includeClosed: data.includeClosed,
     })
+  })
+
+export const loadObligationCalendar = createServerFn({ method: 'GET' })
+  .inputValidator(
+    z.strictObject({
+      book: z.enum(['business', 'personal', 'all']).optional(),
+    }),
+  )
+  .handler(async ({ data }): Promise<ObligationCalendar> => {
+    const scope = await requireOrg()
+    const book =
+      data.book === 'all' || data.book === undefined ? undefined : data.book
+    return obligationCalendarFor(scope, serverToday(), { book })
   })
 
 export const loadLoanDetail = createServerFn({ method: 'GET' })
