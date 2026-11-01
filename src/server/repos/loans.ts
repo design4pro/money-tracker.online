@@ -102,6 +102,29 @@ export class LoanInstalmentSettledError extends ConflictError {
   }
 }
 
+/**
+ * Thrown when a transaction cannot settle an instalment: it is not an expense in the loan's
+ * currency, or it already settles another instalment. One payment pays one instalment.
+ */
+export class LoanSettlementRefusedError extends ConflictError {
+  readonly reason:
+    | 'not-an-expense'
+    | 'currency-mismatch'
+    | 'already-linked'
+    | 'account-mismatch'
+    | 'not-a-payment'
+
+  constructor(
+    transactionId: string,
+    reason: LoanSettlementRefusedError['reason'],
+  ) {
+    super(
+      `Transaction ${transactionId} cannot settle this instalment: ${reason}.`,
+    )
+    this.reason = reason
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Schemas                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -488,6 +511,23 @@ export async function listInstalments(
   })
 }
 
+/**
+ * The ids of every transaction that already settles an instalment, on any loan of the
+ * workspace. A settle picker leaves these out; {@link markInstalmentPaid} refuses them.
+ */
+export async function listSettledTransactionIds(
+  scope: TenantScope,
+): Promise<ReadonlySet<string>> {
+  const rows = await instalmentAccess.findMany(scope, {
+    where: eq(loanInstalments.status, 'paid'),
+  })
+  const ids = new Set<string>()
+  for (const row of rows) {
+    if (row.settledTransactionId !== null) ids.add(row.settledTransactionId)
+  }
+  return ids
+}
+
 /* -------------------------------------------------------------------------- */
 /* Writes — the loan                                                           */
 /* -------------------------------------------------------------------------- */
@@ -807,8 +847,53 @@ export async function markInstalmentPaid(
   input: MarkInstalmentPaidInput,
 ): Promise<LoanInstalment> {
   const parsed = markInstalmentPaidSchema.parse(input)
-  await getLoan(scope, parsed.loanId)
-  await requireOwnedTransaction(scope, parsed.transactionId)
+  const [loan, transaction, existing, linked] = await Promise.all([
+    getLoan(scope, parsed.loanId),
+    requireOwnedTransaction(scope, parsed.transactionId),
+    instalmentAccess.findOne(
+      scope,
+      and(
+        eq(loanInstalments.loanId, parsed.loanId),
+        eq(loanInstalments.sequence, parsed.sequence),
+      ) as SQL,
+    ),
+    listSettledTransactionIds(scope),
+  ])
+  if (transaction.direction !== 'expense') {
+    throw new LoanSettlementRefusedError(transaction.id, 'not-an-expense')
+  }
+  if (transaction.currencyCode !== loan.currencyCode) {
+    throw new LoanSettlementRefusedError(transaction.id, 'currency-mismatch')
+  }
+  if (loan.accountId !== null && transaction.accountId !== loan.accountId) {
+    throw new LoanSettlementRefusedError(transaction.id, 'account-mismatch')
+  }
+  if (
+    transaction.isPlanned ||
+    transaction.isBalanceAdjustment ||
+    transaction.transferKind !== 'none'
+  ) {
+    throw new LoanSettlementRefusedError(transaction.id, 'not-a-payment')
+  }
+
+  if (existing === null) {
+    throw new NotFoundError(
+      'loan instalment',
+      `${parsed.loanId}:${parsed.sequence}`,
+    )
+  }
+  if (
+    existing.status === 'paid' &&
+    existing.settledTransactionId !== parsed.transactionId
+  ) {
+    throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
+  }
+  if (
+    existing.settledTransactionId !== parsed.transactionId &&
+    linked.has(parsed.transactionId)
+  ) {
+    throw new LoanSettlementRefusedError(transaction.id, 'already-linked')
+  }
 
   const rows = await instalmentAccess.updateWhere(
     scope,
@@ -819,6 +904,24 @@ export async function markInstalmentPaid(
         ne(loanInstalments.status, 'paid'),
         eq(loanInstalments.settledTransactionId, parsed.transactionId),
       ),
+      notExists(
+        scope.db
+          .select({ sequence: loanInstalments.sequence })
+          .from(loanInstalments)
+          .where(
+            tenantFilter(
+              scope,
+              loanInstalments,
+              and(
+                eq(loanInstalments.settledTransactionId, parsed.transactionId),
+                or(
+                  ne(loanInstalments.loanId, parsed.loanId),
+                  ne(loanInstalments.sequence, parsed.sequence),
+                ),
+              ),
+            ),
+          ),
+      ),
     ) as SQL,
     {
       status: 'paid',
@@ -828,14 +931,17 @@ export async function markInstalmentPaid(
   )
   const updated = rows.at(0)
   if (updated === undefined) {
-    const existing = await instalmentAccess.findOne(
+    if ((await listSettledTransactionIds(scope)).has(parsed.transactionId)) {
+      throw new LoanSettlementRefusedError(transaction.id, 'already-linked')
+    }
+    const current = await instalmentAccess.findOne(
       scope,
       and(
         eq(loanInstalments.loanId, parsed.loanId),
         eq(loanInstalments.sequence, parsed.sequence),
       ) as SQL,
     )
-    if (existing !== null) {
+    if (current !== null) {
       throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
     }
     throw new NotFoundError(

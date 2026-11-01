@@ -66,6 +66,7 @@ const messages = {
   'nav.payees': 'Payees',
   'nav.recurring': 'Recurring',
   'nav.goals': 'Savings goals',
+  'nav.loans': 'Liabilities',
   'nav.reports': 'Reports',
   'nav.rules': 'Rules',
   'nav.import': 'Import',
@@ -2368,6 +2369,110 @@ const messages = {
   'goals.toast.recomputed': 'Progress rechecked',
   'goals.toast.reached': '{name} is fully funded',
   'goals.toast.failed': 'That did not go through',
+
+  /* -- Liabilities (loans table) ------------------------------------------ */
+  'loans.title': 'Liabilities',
+  'loans.subtitle':
+    'Borrowings with a payment schedule. Remaining is the unpaid instalments, not a bank balance.',
+  'loans.list.loading': 'Loading your liabilities…',
+  'loans.detail.loading': 'Loading this liability…',
+  'loans.detail.back': 'All liabilities',
+  'loans.detail.error.title': 'This liability could not be loaded',
+  'loans.detail.error.body':
+    'It may have been deleted, or the request did not come back. Nothing has been changed.',
+
+  'loans.filter.book': 'Book',
+  'loans.filter.book.all': 'All',
+  'loans.filter.status': 'Show',
+  'loans.filter.active': 'Active',
+  'loans.filter.all': 'All, including closed',
+
+  'loans.error.title': 'Liabilities could not be loaded',
+  'loans.error.body':
+    'The list did not come back. Nothing has been changed — try again.',
+
+  'loans.empty.title': 'No liabilities yet',
+  'loans.empty.body':
+    'A liability is more than a negative account balance: a lender, a payment day, and a schedule of instalments that can differ from one month to the next. Marking one paid points at a transaction you already recorded.',
+  'loans.empty.filtered.title': 'Nothing here',
+  'loans.empty.filtered.body':
+    'No liability matches this filter. Try a different one.',
+
+  'loans.book.business': 'Business',
+  'loans.book.personal': 'Personal',
+  'loans.kind.credit': 'Credit',
+  'loans.kind.leasing': 'Leasing',
+  'loans.kind.loan': 'Loan',
+  'loans.kind.other': 'Other',
+
+  'loans.status.active': 'Active',
+  'loans.status.overdue': 'Overdue',
+  'loans.status.settled': 'Settled',
+  'loans.status.paid': 'Paid',
+  'loans.status.upcoming': 'Upcoming',
+
+  'loans.overview.remaining': 'Remaining',
+  'loans.overview.overdue': 'Overdue',
+  'loans.overview.thisMonth': 'Due this month',
+  'loans.overview.overdueCount': {
+    one: '{count} overdue instalment',
+    other: '{count} overdue instalments',
+  },
+  'loans.overview.thisMonthCount': {
+    one: '{count} instalment',
+    other: '{count} instalments',
+  },
+
+  'loans.meter.label': 'Repaid towards {name}',
+  'loans.meter.valueText':
+    '{paid} paid, {remaining} remaining, {percent} of the schedule',
+  'loans.meter.unavailable': 'Progress unavailable',
+  'loans.progress.remaining': '{amount} remaining',
+  'loans.progress.complete': 'Schedule paid',
+  'loans.progress.of': '{paid} of {total} paid',
+
+  'loans.next.none': 'No unpaid instalment',
+  'loans.next.due': 'Next {amount} on {date}',
+  'loans.next.overdue': 'Overdue {amount} from {date}',
+  'loans.paymentDay': 'Payment day {day}',
+  'loans.endsOn': 'Ends {date}',
+
+  'loans.schedule.caption':
+    'Each row is one expected payment. Paid means it points at a recorded transaction.',
+  'loans.schedule.missing':
+    'This liability has no schedule. That should not happen; try again or delete it.',
+  'loans.schedule.title': 'Instalment schedule',
+  'loans.schedule.sequence': 'No.',
+  'loans.schedule.due': 'Due',
+  'loans.schedule.amount': 'Amount',
+  'loans.schedule.status': 'Status',
+  'loans.schedule.actions': 'Actions',
+  'loans.schedule.next': 'Next',
+  'loans.schedule.buyout': 'Buyout',
+
+  'loans.markPaid.action': 'Mark paid, instalment due {date}',
+  'loans.markPaid.title': 'Mark this instalment paid',
+  'loans.markPaid.body':
+    'Choose the transaction that settled it. This does not create an entry and does not move a balance.',
+  'loans.markPaid.field': 'Which transaction',
+  'loans.markPaid.loading': 'Looking for matching entries…',
+  'loans.markPaid.candidateCount': {
+    one: '{count} matching entry',
+    other: '{count} matching entries',
+  },
+  'loans.markPaid.empty':
+    'Nothing in this window matches. Record the payment first, then come back and point at it.',
+  'loans.markPaid.record': 'Record the payment',
+  'loans.markPaid.never':
+    'Marking paid never creates a transaction. It only points at one that already exists.',
+  'loans.markPaid.confirm': 'Link this transaction',
+  'loans.markPaid.variance.none': 'Matches the instalment',
+  'loans.markPaid.variance.over': '{amount} more than planned',
+  'loans.markPaid.variance.under': '{amount} less than planned',
+  'loans.toast.failed': 'That did not go through',
+  'loans.markPaid.error.body':
+    'That payment could not be linked. It may already pay another instalment. Nothing has been changed.',
+
   /* -- Rules · the paused banner -------------------------------------------- */
   // A rule pauses when something it names is deleted. The banner has to say *what*
   // broke, so the reason carries the deleted row's name — by the time this is read
