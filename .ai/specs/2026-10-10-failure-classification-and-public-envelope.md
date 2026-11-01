@@ -563,3 +563,25 @@ framework's outer `catch`, a failure before the chain runs) still dehydrates or 
 routes, the queue handlers and the Durable Object keep logging through the raw logger until `05-S3`. The SSR document
 status is the router's (500 for any loader error), not the kind's; only the server-function response carries the kind's
 status.
+
+## Amendment — RPC transport preserves application rejection (#720)
+
+This supersedes the classified HTTP status contract in “What a failing server function does”,
+the kinds/status mapping, the resolved assumptions about response status, and the residual status
+statement above. Those passages remain as the historical design.
+
+The default failure middleware port now sets HTTP 200 exactly when the framework request header
+`x-tsr-serverFn` equals `true`. Start serializes the same rejected operation through the validated
+failure envelope and the client still rejects its promise. A successful transport is not a
+successful application operation: authentication and permission refusals remain refusals.
+The header selects transport behavior only; it grants no permission.
+
+Unmarked server-side calls retain the classified status. The classifier and injected status port
+still use the per-kind status mapping. Redirects, router not-found sentinels, thrown `Response`
+objects and already-built public failures retain their existing pass-through behavior. The router
+continues to determine SSR document status. Envelope version, serialization adapter, logging,
+redaction, authorization and tenant checks are unchanged; API/auth/webhook endpoints and failures
+before the function chain remain outside this middleware.
+
+This change avoids browser resource errors for handled RPC refusals. Consumers and monitoring
+must inspect the failure envelope rather than treating the RPC HTTP status as the operation result.
