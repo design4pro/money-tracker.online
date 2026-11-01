@@ -7,14 +7,21 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
 
-import { accounts, exchangeRates, loanInstalments } from '#/server/db/schema'
+import {
+  accounts,
+  exchangeRates,
+  loanInstalments,
+  transactions,
+} from '#/server/db/schema'
 import { createBudgetWorld, executed, seedTransaction } from './budget-harness'
 
 import { setLimitResolver } from '../base'
 import { ConflictError } from '../errors'
 import {
   LoanInstalmentSettledError,
+  LoanSettlementRefusedError,
   LoanTermsLockedError,
   MAX_INSTALMENTS,
   createLoan,
@@ -23,6 +30,7 @@ import {
   getLoan,
   listInstalments,
   listLoans,
+  listSettledTransactionIds,
   markInstalmentPaid,
   updateLoan,
 } from '../loans'
@@ -290,6 +298,168 @@ describe('paid instalments bind a transaction', () => {
     ).resolves.toMatchObject({
       settledTransactionId: rows[0]?.settledTransactionId,
     })
+  })
+
+  it.each([false, true])(
+    'allows only one instalment to win the same concurrent settlement (different loan: %s)',
+    async (differentLoan) => {
+      const loan = await createLoan(scope, importedInput())
+      const other = differentLoan
+        ? await createLoan(scope, importedInput())
+        : loan
+      await seedTransaction(world.db, {
+        id: 'tx-shared',
+        refAmountMinor: 120_00,
+        bookedOn: '2026-02-20',
+      })
+      const results = await Promise.allSettled(
+        [1, 2].map((sequence) =>
+          markInstalmentPaid(scope, {
+            loanId: sequence === 1 ? loan.id : other.id,
+            sequence,
+            transactionId: 'tx-shared',
+          }),
+        ),
+      )
+      expect(
+        results.filter((result) => result.status === 'fulfilled'),
+      ).toHaveLength(1)
+      expect(
+        results.find((result) => result.status === 'rejected'),
+      ).toMatchObject({
+        reason: expect.any(LoanSettlementRefusedError),
+      })
+      expect(
+        [
+          ...(await listInstalments(scope, { loanId: loan.id })),
+          ...(differentLoan
+            ? await listInstalments(scope, { loanId: other.id })
+            : []),
+        ].filter((row) => row.status === 'paid'),
+      ).toHaveLength(1)
+    },
+  )
+
+  it.each([
+    { isPlanned: true },
+    { isBalanceAdjustment: true },
+    { transferKind: 'external_out' as const },
+  ])('refuses a non-payment settlement: %j', async (flags) => {
+    const loan = await createLoan(scope, importedInput())
+    await seedTransaction(world.db, {
+      id: 'tx-invalid',
+      refAmountMinor: 120_00,
+      ...flags,
+    })
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-invalid',
+      }),
+    ).rejects.toMatchObject({ reason: 'not-a-payment' })
+    expect((await listInstalments(scope, { loanId: loan.id }))[0]?.status).toBe(
+      'upcoming',
+    )
+  })
+
+  it('refuses a payment from a different account', async () => {
+    await world.db.insert(accounts).values({
+      id: 'acc-other',
+      organizationId: 'org-a',
+      name: 'Other',
+      currencyCode: 'PLN',
+      createdAt: new Date('2026-03-15T10:00:00.000Z'),
+      updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+    })
+    const loan = await createLoan(scope, {
+      ...importedInput(),
+      accountId: 'acc-a',
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-other',
+      accountId: 'acc-other',
+      refAmountMinor: 120_00,
+    })
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-other',
+      }),
+    ).rejects.toMatchObject({ reason: 'account-mismatch' })
+  })
+
+  it('refuses a transaction that already settles another instalment', async () => {
+    const loan = await createLoan(scope, importedInput())
+    await seedTransaction(world.db, {
+      id: 'tx-a',
+      refAmountMinor: 120_00,
+      bookedOn: '2026-02-20',
+    })
+    await markInstalmentPaid(scope, {
+      loanId: loan.id,
+      sequence: 1,
+      transactionId: 'tx-a',
+    })
+    expect([...(await listSettledTransactionIds(scope))]).toEqual(['tx-a'])
+
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 2,
+        transactionId: 'tx-a',
+      }),
+    ).rejects.toMatchObject({
+      constructor: LoanSettlementRefusedError,
+      reason: 'already-linked',
+    })
+    // Re-linking the same pair stays idempotent.
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-a',
+      }),
+    ).resolves.toMatchObject({ status: 'paid' })
+  })
+
+  it('refuses an income transaction as the settlement', async () => {
+    const loan = await createLoan(scope, importedInput())
+    await seedTransaction(world.db, {
+      id: 'tx-in',
+      direction: 'income',
+      refAmountMinor: 120_00,
+      bookedOn: '2026-02-20',
+    })
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-in',
+      }),
+    ).rejects.toMatchObject({
+      constructor: LoanSettlementRefusedError,
+      reason: 'not-an-expense',
+    })
+  })
+
+  it('refuses a settlement in another currency without changing the instalment', async () => {
+    const loan = await createLoan(scope, importedInput())
+    await seedTransaction(world.db, { id: 'tx-eur', refAmountMinor: 120_00 })
+    await world.db
+      .update(transactions)
+      .set({ currencyCode: 'EUR' })
+      .where(eq(transactions.id, 'tx-eur'))
+    const before = await listInstalments(scope, { loanId: loan.id })
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-eur',
+      }),
+    ).rejects.toMatchObject({ reason: 'currency-mismatch' })
+    expect(await listInstalments(scope, { loanId: loan.id })).toEqual(before)
   })
 
   it('lets the database refuse a paid row with no transaction id', async () => {

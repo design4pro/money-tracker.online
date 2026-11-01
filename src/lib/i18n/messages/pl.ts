@@ -65,6 +65,7 @@ const messages = {
   'nav.payees': 'Odbiorcy',
   'nav.recurring': 'Cykliczne',
   'nav.goals': 'Cele',
+  'nav.loans': 'Zobowiązania',
   'nav.reports': 'Raporty',
   'nav.rules': 'Zasady',
   'nav.import': 'Import',
@@ -2462,6 +2463,116 @@ const messages = {
   'goals.toast.recomputed': 'Postęp przeliczony',
   'goals.toast.reached': 'Cel {name} jest w pełni sfinansowany',
   'goals.toast.failed': 'Nie udało się',
+
+  /* -- Zobowiązania (tabela loans) ----------------------------------------- */
+  'loans.title': 'Zobowiązania',
+  'loans.subtitle':
+    'Pożyczki i leasingi z harmonogramem spłat. Pozostało to suma niezapłaconych rat, nie saldo banku.',
+  'loans.list.loading': 'Wczytujemy zobowiązania…',
+  'loans.detail.loading': 'Wczytujemy to zobowiązanie…',
+  'loans.detail.back': 'Wszystkie zobowiązania',
+  'loans.detail.error.title': 'Nie udało się wczytać tego zobowiązania',
+  'loans.detail.error.body':
+    'Mogło zostać usunięte albo żądanie nie wróciło. Nic nie zostało zmienione.',
+
+  'loans.filter.book': 'Księga',
+  'loans.filter.book.all': 'Wszystko',
+  'loans.filter.status': 'Pokaż',
+  'loans.filter.active': 'Aktywne',
+  'loans.filter.all': 'Wszystkie, także zamknięte',
+
+  'loans.error.title': 'Nie udało się wczytać zobowiązań',
+  'loans.error.body':
+    'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
+
+  'loans.empty.title': 'Nie ma jeszcze zobowiązań',
+  'loans.empty.body':
+    'Zobowiązanie to więcej niż ujemne saldo konta: kredytodawca, dzień płatności i harmonogram rat, które mogą się różnić z miesiąca na miesiąc. Oznaczenie raty jako zapłaconej wskazuje na transakcję, którą już zapisano.',
+  'loans.empty.filtered.title': 'Nic tu nie ma',
+  'loans.empty.filtered.body':
+    'Żadne zobowiązanie nie pasuje do tego filtra. Spróbuj innego.',
+
+  'loans.book.business': 'Firma',
+  'loans.book.personal': 'Prywatne',
+  'loans.kind.credit': 'Kredyt',
+  'loans.kind.leasing': 'Leasing',
+  'loans.kind.loan': 'Pożyczka',
+  'loans.kind.other': 'Inne',
+
+  'loans.status.active': 'Aktywne',
+  'loans.status.overdue': 'Zaległe',
+  'loans.status.settled': 'Spłacone',
+  'loans.status.paid': 'Zapłacone',
+  'loans.status.upcoming': 'Nadchodzące',
+
+  'loans.overview.remaining': 'Pozostało',
+  'loans.overview.overdue': 'Zaległe',
+  'loans.overview.thisMonth': 'W tym miesiącu',
+  'loans.overview.overdueCount': {
+    one: '{count} zaległa rata',
+    few: '{count} zaległe raty',
+    many: '{count} zaległych rat',
+    other: '{count} zaległej raty',
+  },
+  'loans.overview.thisMonthCount': {
+    one: '{count} rata',
+    few: '{count} raty',
+    many: '{count} rat',
+    other: '{count} raty',
+  },
+
+  'loans.meter.label': 'Spłata zobowiązania {name}',
+  'loans.meter.valueText':
+    'zapłacono {paid}, pozostało {remaining}, {percent} harmonogramu',
+  'loans.meter.unavailable': 'Postęp niedostępny',
+  'loans.progress.remaining': 'Pozostało {amount}',
+  'loans.progress.complete': 'Harmonogram spłacony',
+  'loans.progress.of': 'Zapłacono {paid} z {total}',
+
+  'loans.next.none': 'Brak niezapłaconej raty',
+  'loans.next.due': 'Następna {amount} {date}',
+  'loans.next.overdue': 'Zaległe {amount} z dnia {date}',
+  'loans.paymentDay': 'Dzień płatności {day}',
+  'loans.endsOn': 'Koniec {date}',
+
+  'loans.schedule.caption':
+    'Każdy wiersz to jedna oczekiwana płatność. Zapłacone oznacza wskazanie zapisanej transakcji.',
+  'loans.schedule.missing':
+    'To zobowiązanie nie ma harmonogramu. Tak nie powinno być; spróbuj ponownie albo je usuń.',
+  'loans.schedule.title': 'Harmonogram rat',
+  'loans.schedule.sequence': 'Lp.',
+  'loans.schedule.due': 'Termin',
+  'loans.schedule.amount': 'Kwota',
+  'loans.schedule.status': 'Stan',
+  'loans.schedule.actions': 'Działania',
+  'loans.schedule.next': 'Następna',
+  'loans.schedule.buyout': 'Wykup',
+
+  'loans.markPaid.action': 'Oznacz jako zapłacone, rata na {date}',
+  'loans.markPaid.title': 'Oznacz tę ratę jako zapłaconą',
+  'loans.markPaid.body':
+    'Wskaż transakcję, która ją rozliczyła. To nie tworzy wpisu i nie przesuwa salda.',
+  'loans.markPaid.field': 'Która transakcja',
+  'loans.markPaid.loading': 'Szukamy pasujących wpisów…',
+  'loans.markPaid.candidateCount': {
+    one: '{count} pasujący wpis',
+    few: '{count} pasujące wpisy',
+    many: '{count} pasujących wpisów',
+    other: '{count} pasującego wpisu',
+  },
+  'loans.markPaid.empty':
+    'W tym oknie nic nie pasuje. Najpierw zapisz płatność, potem wróć i wskaż ją.',
+  'loans.markPaid.record': 'Zapisz płatność',
+  'loans.markPaid.never':
+    'Oznaczenie jako zapłacone nigdy nie tworzy transakcji. Tylko wskazuje istniejącą.',
+  'loans.markPaid.confirm': 'Powiąż tę transakcję',
+  'loans.markPaid.variance.none': 'Zgadza się z ratą',
+  'loans.markPaid.variance.over': 'o {amount} więcej niż w planie',
+  'loans.markPaid.variance.under': 'o {amount} mniej niż w planie',
+  'loans.toast.failed': 'Nie udało się',
+  'loans.markPaid.error.body':
+    'Nie udało się powiązać tej płatności. Mogła już opłacać inną ratę. Nic nie zostało zmienione.',
+
   /* -- Zasady · baner wstrzymanej zasady ------------------------------------ */
   'rules.paused.badge': 'Wstrzymana',
   'rules.paused.title': 'Zasada „{name}” jest wstrzymana',
