@@ -98,6 +98,17 @@ describe('SeriesCard', () => {
     expect(screen.getByText('Paused')).toBeTruthy()
   })
 
+  it('names a JDG duty in words, not as a tax', async () => {
+    await renderLinkedRecurring(
+      <SeriesCard
+        row={listRow({ series: series({ dutyCode: 'zus' }) })}
+        today={TODAY}
+      />,
+    )
+    expect(screen.getByText('ZUS contribution')).toBeTruthy()
+    expect(screen.getByText('Duty')).toBeTruthy()
+  })
+
   it('says that a series records itself, rather than leaving it to be discovered', async () => {
     await renderLinkedRecurring(
       <SeriesCard

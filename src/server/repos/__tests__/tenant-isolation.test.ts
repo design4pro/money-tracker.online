@@ -54,9 +54,11 @@ import {
   currencies,
   importBatches,
   payees,
+  recurringLinks,
   rules,
   transactions,
 } from '#/server/db/schema'
+import { forecastSeries } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { sqliteBatchCallback } from './db-harness'
@@ -146,7 +148,13 @@ import {
   toImportBatchDto,
 } from '../imports'
 
-import { createSeries, getUpcoming } from '../recurring'
+import {
+  createSeries,
+  getUpcoming,
+  listPeriods as listSeriesPeriods,
+  listSeriesLinkDetails,
+  markPaid,
+} from '../recurring'
 import {
   createLoan,
   deleteLoan,
@@ -2941,6 +2949,185 @@ describe('an unsubscribe link acts in the workspace it names and nowhere else', 
       },
     )
     expect((await listPrefsFor(world.otherScope, 'user-b')).size).toBe(0)
+  })
+})
+
+/**
+ * The forecast reads a series' linked transactions through `listSeriesLinkDetails`, which joins
+ * `recurring_links` to `transactions`. Both halves are scoped, and a read of the caller's own series
+ * id cannot show it: B's links hang off B's series. So the case plants the leak the join guards
+ * against - a link row in A's workspace that points at B's transaction - and requires that neither
+ * the read nor the sum picks it up, and that B's series is not readable through A's scope.
+ */
+describe('a recurring forecast cannot add another workspace’s linked amounts', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('sums only the caller’s linked transactions for spent this year', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+
+    await seedTransaction(world.db, {
+      id: 'txn-a-forecast',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-forecast',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-forecast',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-forecast',
+    })
+
+    const [periods, links] = await Promise.all([
+      listSeriesPeriods(world.scope, mine.id, today),
+      listSeriesLinkDetails(world.scope, mine.id),
+    ])
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: {
+        frequency: 'monthly',
+        anchorDay: 20,
+        startDate: '2026-01-20',
+      },
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today,
+      links,
+      periods,
+    })
+
+    expect(forecast.spentThisYearMinor).toBe(100_00)
+    expect(links.map((link) => link.transactionId)).toEqual(['txn-a-forecast'])
+  })
+
+  it('does not read a foreign transaction through a link planted in the caller’s workspace', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-forecast',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    // The row a bug elsewhere could leave behind: org A's link, B's transaction.
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: mine.id,
+      transactionId: 'txn-b-forecast',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    const links = await listSeriesLinkDetails(world.scope, mine.id)
+    expect(links).toEqual([])
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: {
+        frequency: 'monthly',
+        anchorDay: 20,
+        startDate: '2026-01-20',
+      },
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today,
+      links,
+      periods: [],
+    })
+    expect(forecast.spentThisYearMinor).toBe(0)
+
+    // The series filter, not only the join: org B's own link under org B's own series, pointing at
+    // an org A transaction (the row a bug elsewhere could leave behind). Org A's scope passes the
+    // join filter on that transaction, so only `tenantFilter` on `recurring_links` keeps the row
+    // out. Removing it makes this read return the link.
+    await seedTransaction(world.db, {
+      id: 'txn-a-crossed',
+      refAmountMinor: 55_00,
+      organizationId: 'org-a',
+      accountId: 'acc-a',
+      bookedOn: '2026-02-20',
+    })
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-b',
+      seriesId: theirs.id,
+      transactionId: 'txn-a-crossed',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await expect(
+      listSeriesLinkDetails(world.scope, theirs.id),
+    ).resolves.toEqual([])
   })
 })
 

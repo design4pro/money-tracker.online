@@ -65,6 +65,8 @@ const PROPER_NOUNS: ReadonlyArray<string> = [
   // only the two bare labels are here.
   'rules.field.tag',
   'rules.action.value.tag',
+  // The return's own name. Polish readers look for the same form as the form they file.
+  'recurring.duty.vat_7',
   // Polish kept the English legal noun for this kind of contract.
   'loans.kind.leasing',
 ]
