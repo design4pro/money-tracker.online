@@ -76,6 +76,20 @@ test('a series row is a link to its own detail screen', async ({ page }) => {
   expect(page.url()).toContain(href ?? '')
 })
 
+test('an empty book filter keeps account currencies available for a new series', async ({
+  page,
+}) => {
+  await useLocale(page.context(), 'en')
+  await gotoApp(page, '/recurring?book=business')
+  await expect(
+    page.getByRole('radio', { name: 'Business', exact: true }),
+  ).toBeChecked()
+  await page.getByRole('button', { name: 'New series', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New recurring series' })
+  await dialog.getByRole('button', { name: /Currency$/ }).click()
+  await expect(page.getByRole('option', { name: /EUR/ })).toBeVisible()
+})
+
 test('what is due is said in words, not carried by a colour', async ({
   page,
 }) => {

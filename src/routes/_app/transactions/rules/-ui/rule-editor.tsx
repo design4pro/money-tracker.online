@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import {
   Button,
   Card,
@@ -33,6 +33,7 @@ import { ActionRow } from './action-row'
 import { ConditionRow } from './condition-row'
 import { RulePreview } from './rule-preview'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { Key } from 'react-aria-components'
 import type { TransactionReference } from '#/components/app/transactions'
 import type { MessageKey } from '#/lib/i18n'
@@ -91,8 +92,8 @@ export interface RuleEditorProps {
   readonly initial: RuleEditorInitialValue
   readonly reference: RuleEditorReference
   readonly isSaving: boolean
-  /** The failure of the last save attempt, as a sentence. `null` when there has not been one. */
-  readonly saveError: string | null
+  /** The failure of the last save attempt. `null` when there has not been one. */
+  readonly saveFailure: FailureEnvelope | null
   readonly onSave: (definition: RuleDefinition) => void
   readonly onCancel: () => void
   /** Absent on the create route: there is nothing to delete yet. */
@@ -126,7 +127,7 @@ export function RuleEditor({
   initial,
   reference,
   isSaving,
-  saveError,
+  saveFailure,
   onSave,
   onCancel,
   onDelete,
@@ -229,11 +230,11 @@ export function RuleEditor({
         </div>
       </header>
 
-      {saveError === null ? null : (
-        <ErrorPanel
+      {saveFailure === null ? null : (
+        <FailurePanel
+          failure={saveFailure}
+          placement="after-action"
           title={t('rules.editor.error.title')}
-          body={t('rules.error.body')}
-          detail={saveError}
         />
       )}
 

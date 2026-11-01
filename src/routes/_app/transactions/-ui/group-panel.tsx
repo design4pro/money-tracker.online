@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import { Button, Card, Select, SelectItem, toast } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import { addToGroup, removeFromGroup } from '#/server/fns/transaction-groups'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
 
 /**
@@ -66,7 +68,7 @@ export function GroupPanel({
 
   const [selected, setSelected] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   const inThisTransaction = new Set(memberOf.map((group) => group.id))
   const available = allGroups.filter(
@@ -92,7 +94,7 @@ export function GroupPanel({
       await work()
       onChanged()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsBusy(false)
     }
@@ -144,10 +146,10 @@ export function GroupPanel({
       </div>
 
       {failure === null ? null : (
-        <ErrorPanel
+        <FailurePanel
+          failure={failure}
+          placement="after-action"
           title={t('groups.panel.error.title')}
-          body={t('empty.error.body')}
-          detail={failure}
         />
       )}
 

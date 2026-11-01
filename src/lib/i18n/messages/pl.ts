@@ -65,6 +65,7 @@ const messages = {
   'nav.payees': 'Odbiorcy',
   'nav.recurring': 'Cykliczne',
   'nav.goals': 'Cele',
+  'nav.loans': 'Zobowiązania',
   'nav.reports': 'Raporty',
   'nav.rules': 'Zasady',
   'nav.import': 'Import',
@@ -305,6 +306,13 @@ const messages = {
     other: '{name}, wewnątrz {parent}, {count} konta',
   },
   'accounts.groups.row.account': '{account}, w grupie {group}',
+  'accounts.groups.member.actions': 'Działania dla: {name}',
+  'accounts.groups.member.destination': '{name}, wewnątrz {parent}',
+  'accounts.groups.member.remove': 'Usuń z tej grupy',
+  'accounts.groups.member.moved':
+    'Konto {account}: przynależność przeniesiona do grupy {group}.',
+  'accounts.groups.member.removed':
+    'Konto {account}: przynależność usunięta z grupy {group}.',
   'accounts.groups.row.accountArchived':
     '{account}, zarchiwizowane, w grupie {group}',
   'accounts.groups.drag.label': 'Przeciągnij: {name}',
@@ -848,6 +856,8 @@ const messages = {
   'refunds.dialog.submit': 'Powiąż zwrot',
   'refunds.dialog.cancel': 'Anuluj',
   'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
+  'refunds.dialog.error.refused':
+    'Nic się nie zmieniło. Tego zwrotu nie da się powiązać w tej postaci. Sprawdź transakcję, jej kwotę, walutę i kierunek, a potem spróbuj ponownie.',
   'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
   'refunds.suggest.empty':
     'Żaden wydatek u tego samego odbiorcy z ostatnich 90 dni nie jest dość duży, aby to był jego zwrot.',
@@ -1027,6 +1037,8 @@ const messages = {
   'payees.aliases.remove': 'Usuń {name}',
   'payees.aliases.empty': 'Na razie pasuje tylko własna nazwa tego odbiorcy.',
   'payees.aliases.failed': 'Nie dodaliśmy tego opisu',
+  'payees.aliases.conflict':
+    'Opis może już należeć do odbiorcy, nie zawierać niczego przydatnego do dopasowania albo przekraczać limit opisów tego odbiorcy. Proszę użyć innego opisu lub usunąć nieużywany wpis z tej listy.',
   'payees.ignored.title': 'Opisy, które nigdy nie są odbiorcą',
   'payees.ignored.body':
     'Nazwy, z których nie da się zrobić odbiorcy: „PŁATNOŚĆ KARTĄ”, „POLECENIE ZAPŁATY” i wszystko inne, co bank dopisuje do każdej pozycji.',
@@ -1718,6 +1730,7 @@ const messages = {
   'billing.usage.metric.goals': 'Cele',
   'billing.usage.metric.rules': 'Reguły opisywania',
   'billing.usage.metric.recurringSeries': 'Rachunki cykliczne',
+  'billing.usage.metric.loans': 'Zobowiązania',
   'billing.usage.metric.transactions': 'Wpisy',
   'billing.usage.metric.importsPerMonth': 'Importy w tym miesiącu',
   'billing.usage.metric.storageBytes': 'Paragony',
@@ -1880,6 +1893,14 @@ const messages = {
   'recurring.filter.label': 'Pokaż',
   'recurring.filter.active': 'Aktywne',
   'recurring.filter.all': 'Wszystkie, łącznie z wstrzymanymi',
+
+  'book.filter.label': 'Wymiar',
+  'book.filter.all': 'Wszystko',
+  'book.business': 'Firma',
+  'book.personal': 'Prywatne',
+  'book.field.label': 'Wymiar',
+  'book.field.description':
+    'Czy ta seria należy do firmy, czy do finansów prywatnych.',
 
   'recurring.error.title': 'Nie udało się wczytać serii cyklicznych',
   'recurring.error.body':
@@ -2190,6 +2211,35 @@ const messages = {
   'recurring.candidate.toast.dismissed': 'Propozycja odrzucona',
   'recurring.candidate.toast.accepted': 'Seria utworzona z propozycji',
 
+  'recurring.forecast.title': 'Ten rok i najbliższe dwanaście miesięcy',
+  'recurring.forecast.caption':
+    'Wydane to to, co już powiązano w tym roku. Reszta roku i najbliższe dwanaście miesięcy to wciąż otwarty plan — kwoty oczekiwane, nie przeliczenie na żywo.',
+  'recurring.forecast.spent': 'Wydane w tym roku',
+  'recurring.forecast.rest': 'Reszta tego roku',
+  'recurring.forecast.next12': 'Najbliższe 12 miesięcy',
+  'recurring.forecast.empty': 'Nie ma jeszcze nic do prognozy.',
+
+  'recurring.form.anchorMonth': 'Miesiąc roku',
+  'recurring.form.anchorMonth.help':
+    'Kalendarzowy miesiąc, w którym przypada seria roczna. Niezależny od pierwszego terminu.',
+  'recurring.form.anchorMonth.auto': 'Ten sam miesiąc co pierwszy termin',
+  'recurring.form.duty.templates': 'Szablony polskich terminów',
+  'recurring.form.duty.help':
+    'Szablon uzupełnia nazwę, rodzaj, częstotliwość i dzień miesiąca. Kwotę wpisujesz samodzielnie. To przypomnienie, nie porada podatkowa.',
+  'recurring.form.duty.apply': 'Użyj: {name}',
+
+  'recurring.duty.zus': 'Składka ZUS',
+  'recurring.duty.pit': 'Zaliczka PIT-36L',
+  'recurring.duty.vat_7': 'VAT-7',
+  'recurring.duty.badge': 'Obowiązek',
+  'recurring.duty.disclaimer':
+    'Termin, plan i to, czy zapłacono — dzień, który wybrano. To nie wyliczony podatek i nie porada.',
+  'recurring.duty.due': 'Termin',
+  'recurring.duty.plan': 'Kwota planu',
+  'recurring.duty.paid': 'Zapłacono',
+  'recurring.periods.duty.caption':
+    'Każdy wiersz to jeden termin: plan, to, co zapłacono, i różnica. Oznaczenie wiersza jako zapłaconego nigdy nie tworzy wpisu.',
+
   /* -- Cele oszczędnościowe ----------------------------------------------- */
   /* -- Lista --------------------------------------------------------------- */
   'goals.title': 'Cele oszczędnościowe',
@@ -2432,6 +2482,143 @@ const messages = {
   'goals.toast.recomputed': 'Postęp przeliczony',
   'goals.toast.reached': 'Cel {name} jest w pełni sfinansowany',
   'goals.toast.failed': 'Nie udało się',
+
+  /* -- Zobowiązania (tabela loans) ----------------------------------------- */
+  'loans.title': 'Zobowiązania',
+  'loans.subtitle':
+    'Pożyczki i leasingi z harmonogramem spłat. Pozostało to suma niezapłaconych rat, nie saldo banku.',
+  'loans.list.loading': 'Wczytujemy zobowiązania…',
+  'loans.detail.loading': 'Wczytujemy to zobowiązanie…',
+  'loans.detail.back': 'Wszystkie zobowiązania',
+  'loans.detail.error.title': 'Nie udało się wczytać tego zobowiązania',
+  'loans.detail.error.body':
+    'Mogło zostać usunięte albo żądanie nie wróciło. Nic nie zostało zmienione.',
+
+  'loans.filter.book': 'Księga',
+  'loans.filter.book.all': 'Wszystko',
+  'loans.filter.status': 'Pokaż',
+  'loans.filter.active': 'Aktywne',
+  'loans.filter.all': 'Wszystkie, także zamknięte',
+
+  'loans.error.title': 'Nie udało się wczytać zobowiązań',
+  'loans.error.body':
+    'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
+
+  'loans.empty.title': 'Nie ma jeszcze zobowiązań',
+  'loans.empty.body':
+    'Zobowiązanie to więcej niż ujemne saldo konta: kredytodawca, dzień płatności i harmonogram rat, które mogą się różnić z miesiąca na miesiąc. Oznaczenie raty jako zapłaconej wskazuje na transakcję, którą już zapisano.',
+  'loans.empty.filtered.title': 'Nic tu nie ma',
+  'loans.empty.filtered.body':
+    'Żadne zobowiązanie nie pasuje do tego filtra. Spróbuj innego.',
+
+  'loans.book.business': 'Firma',
+  'loans.book.personal': 'Prywatne',
+  'loans.kind.credit': 'Kredyt',
+  'loans.kind.leasing': 'Leasing',
+  'loans.kind.loan': 'Pożyczka',
+  'loans.kind.other': 'Inne',
+
+  'loans.status.active': 'Aktywne',
+  'loans.status.overdue': 'Zaległe',
+  'loans.status.settled': 'Spłacone',
+  'loans.status.paid': 'Zapłacone',
+  'loans.status.upcoming': 'Nadchodzące',
+
+  'loans.overview.remaining': 'Pozostało',
+  'loans.overview.overdue': 'Zaległe',
+  'loans.overview.thisMonth': 'W tym miesiącu',
+  'loans.overview.overdueCount': {
+    one: '{count} zaległa rata',
+    few: '{count} zaległe raty',
+    many: '{count} zaległych rat',
+    other: '{count} zaległej raty',
+  },
+  'loans.overview.thisMonthCount': {
+    one: '{count} rata',
+    few: '{count} raty',
+    many: '{count} rat',
+    other: '{count} raty',
+  },
+
+  'loans.meter.label': 'Spłata zobowiązania {name}',
+  'loans.meter.valueText':
+    'zapłacono {paid}, pozostało {remaining}, {percent} harmonogramu',
+  'loans.meter.unavailable': 'Postęp niedostępny',
+  'loans.progress.remaining': 'Pozostało {amount}',
+  'loans.progress.complete': 'Harmonogram spłacony',
+  'loans.progress.of': 'Zapłacono {paid} z {total}',
+
+  'loans.next.none': 'Brak niezapłaconej raty',
+  'loans.next.due': 'Następna {amount} {date}',
+  'loans.next.overdue': 'Zaległe {amount} z dnia {date}',
+  'loans.paymentDay': 'Dzień płatności {day}',
+  'loans.endsOn': 'Koniec {date}',
+
+  'loans.schedule.caption':
+    'Każdy wiersz to jedna oczekiwana płatność. Zapłacone oznacza wskazanie zapisanej transakcji.',
+  'loans.schedule.missing':
+    'To zobowiązanie nie ma harmonogramu. Tak nie powinno być; spróbuj ponownie albo je usuń.',
+  'loans.schedule.title': 'Harmonogram rat',
+  'loans.schedule.sequence': 'Lp.',
+  'loans.schedule.due': 'Termin',
+  'loans.schedule.amount': 'Kwota',
+  'loans.schedule.status': 'Stan',
+  'loans.schedule.actions': 'Działania',
+  'loans.schedule.next': 'Następna',
+  'loans.schedule.buyout': 'Wykup',
+
+  'loans.markPaid.action': 'Oznacz jako zapłacone, rata na {date}',
+  'loans.markPaid.title': 'Oznacz tę ratę jako zapłaconą',
+  'loans.markPaid.body':
+    'Wskaż transakcję, która ją rozliczyła. To nie tworzy wpisu i nie przesuwa salda.',
+  'loans.markPaid.field': 'Która transakcja',
+  'loans.markPaid.loading': 'Szukamy pasujących wpisów…',
+  'loans.markPaid.candidateCount': {
+    one: '{count} pasujący wpis',
+    few: '{count} pasujące wpisy',
+    many: '{count} pasujących wpisów',
+    other: '{count} pasującego wpisu',
+  },
+  'loans.markPaid.empty':
+    'W tym oknie nic nie pasuje. Najpierw zapisz płatność, potem wróć i wskaż ją.',
+  'loans.markPaid.record': 'Zapisz płatność',
+  'loans.markPaid.never':
+    'Oznaczenie jako zapłacone nigdy nie tworzy transakcji. Tylko wskazuje istniejącą.',
+  'loans.markPaid.confirm': 'Powiąż tę transakcję',
+  'loans.markPaid.variance.none': 'Zgadza się z ratą',
+  'loans.markPaid.variance.over': 'o {amount} więcej niż w planie',
+  'loans.markPaid.variance.under': 'o {amount} mniej niż w planie',
+  'loans.toast.failed': 'Nie udało się',
+  'loans.markPaid.error.body':
+    'Nie udało się powiązać tej płatności. Mogła już opłacać inną ratę. Nic nie zostało zmienione.',
+
+  'loans.calendar.title': 'Przegląd miesięcy',
+  'loans.calendar.link': 'Przegląd miesięcy',
+  'loans.calendar.subtitle':
+    'Każda rata w danym miesiącu: zapłacone wobec pozostałego. Lata od 2025. Kwoty to zapisane wartości w walucie bazowej, nie bieżące przeliczenie.',
+  'loans.calendar.loading': 'Wczytujemy przegląd miesięcy…',
+  'loans.calendar.error.title': 'Nie udało się wczytać przeglądu miesięcy',
+  'loans.calendar.error.body':
+    'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
+  'loans.calendar.filter.year': 'Rok',
+  'loans.calendar.caption':
+    'Zapłacone i pozostałe raty według miesiąca i roku, w walucie bazowej tej przestrzeni roboczej.',
+  'loans.calendar.key':
+    'W każdym miesiącu pierwsza kwota jest zapłacona, druga pozostała.',
+  'loans.calendar.year': 'Rok',
+  'loans.calendar.total': 'Suma roku',
+  'loans.calendar.paid': 'Zapłacone',
+  'loans.calendar.remaining': 'Pozostało',
+  'loans.calendar.thisMonth': 'Ten miesiąc',
+  'loans.calendar.cell.empty': 'Brak rat',
+  'loans.calendar.chart.title': 'Obciążenia w {year}',
+  'loans.calendar.chart.category': 'Miesiąc',
+  'loans.calendar.chart.emptyTitle': 'Nic nie zaplanowano w tym roku',
+  'loans.calendar.chart.emptyBody':
+    'Zmień rok albo dodaj zobowiązanie z harmonogramem, który go obejmuje.',
+  'loans.calendar.chart.noData': 'Brak odczytu',
+  'loans.calendar.chart.total': 'Plan',
+
   /* -- Zasady · baner wstrzymanej zasady ------------------------------------ */
   'rules.paused.badge': 'Wstrzymana',
   'rules.paused.title': 'Zasada „{name}” jest wstrzymana',
@@ -2463,10 +2650,7 @@ const messages = {
   'rules.editor.load.error.body':
     'Żadna zasada nie została utworzona ani zmieniona. Spróbuj ponownie za chwilę.',
   'rules.error.title': 'Nie udało się wczytać zasad',
-  'rules.error.body':
-    'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli będzie się powtarzać, prześlij nam szczegóły poniżej.',
-  'rules.error.locked':
-    'Zasady nie wchodzą w skład tego planu, więc nic nie zapisano.',
+  'rules.error.body': 'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
 
   'rules.empty.title': 'Nie ma jeszcze żadnej zasady',
   'rules.empty.body':

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import {
   Badge,
   Button,
@@ -14,12 +14,14 @@ import {
   TableHeader,
   toast,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import { loadRefunds, unlinkRefund } from '#/server/fns/refunds'
 
 import { RefundDialog } from './refund-dialog'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { RefundSummary } from '#/server/repos/refunds'
 
 /**
@@ -86,7 +88,7 @@ export function RefundPanel({
   const [summary, setSummary] = useState<RefundSummary | null>(
     initialSummary ?? null,
   )
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   const [isBusy, setIsBusy] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
@@ -96,7 +98,7 @@ export function RefundPanel({
       setSummary(await loadRefunds({ data: { transactionId } }))
     } catch (error) {
       setSummary(null)
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     }
   }, [transactionId])
 
@@ -128,7 +130,7 @@ export function RefundPanel({
       await reload()
       onChanged()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsBusy(false)
     }
@@ -151,10 +153,10 @@ export function RefundPanel({
       </div>
 
       {failure === null ? null : (
-        <ErrorPanel
+        <FailurePanel
+          failure={failure}
+          placement="after-action"
           title={t('refunds.error.title')}
-          body={t('empty.error.body')}
-          detail={failure}
           onRetry={() => void reload()}
         />
       )}

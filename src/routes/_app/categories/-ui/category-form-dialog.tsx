@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { CATEGORY_HUES, CategoryColourField } from '#/components/app/categories'
-import { ErrorPanel, FormModal, useIsDirty } from '#/components/app/shell'
+import { FailurePanel, FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -13,10 +13,12 @@ import {
   SelectItem,
   TextField,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { CATEGORY_KINDS } from '#/lib/enums'
 import { createCategory, updateCategory } from '#/server/fns/categories'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { Key } from 'react-aria-components'
 import type { MessageKey } from '#/lib/i18n'
 import type { CategoryKind } from '#/server/db/schema'
@@ -113,7 +115,7 @@ export function CategoryFormDialog({
     draftFrom(category, initialParentId),
   )
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   // Validation appears after the first submit. An empty field is not a mistake until it is offered
   // as an answer.
   const [hasTriedToSubmit, setHasTriedToSubmit] = useState(false)
@@ -155,7 +157,7 @@ export function CategoryFormDialog({
       }
       onOpenChange(false)
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -194,10 +196,10 @@ export function CategoryFormDialog({
             >
               <DialogBody className="flex flex-col gap-5">
                 {failure === null ? null : (
-                  <ErrorPanel
+                  <FailurePanel
+                    failure={failure}
+                    placement="after-action"
                     title={t('categories.form.error.title')}
-                    body={t('empty.error.body')}
-                    detail={failure}
                   />
                 )}
 

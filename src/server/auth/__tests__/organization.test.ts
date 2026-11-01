@@ -15,7 +15,11 @@ import {
   DEFAULT_WORKSPACE_CURRENCY_CODES,
 } from '#/server/catalog/data/currencies'
 import { member, organization } from '#/server/db/auth-schema'
-import { currencies, organizationCurrencies } from '#/server/db/schema'
+import {
+  currencies,
+  organizationCurrencies,
+  organizationSettings,
+} from '#/server/db/schema'
 
 import {
   firstOrganizationIdFor,
@@ -410,6 +414,15 @@ describe('provisioned base currency', () => {
     expect(rows.map((row) => row.currencyCode).sort()).toEqual(
       [...DEFAULT_WORKSPACE_CURRENCY_CODES].sort(),
     )
+  })
+
+  it('does not insert organization_settings; timezone defaults at read', async () => {
+    const organizationId = await provisionPersonalWorkspace(db, ANNA)
+    const rows = await db
+      .select()
+      .from(organizationSettings)
+      .where(eq(organizationSettings.organizationId, organizationId))
+    expect(rows).toHaveLength(0)
   })
 })
 

@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { mkdir } from 'node:fs/promises'
 
-import { DELIBERATE_SERVER_FAILURE, expect, test } from './support/console'
+import { DELIBERATE_LOADER_FAILURE, expect, test } from './support/console'
 
 import { gotoApp, useLocale, useTheme } from './support/app'
 import { expectNoWcagViolations } from './support/axe-scan'
@@ -37,8 +37,8 @@ import type { Locator, Page } from '@playwright/test'
  *
  * ## The console
  *
- * The forced failure writes the three messages `DELIBERATE_SERVER_FAILURE` measures and, on the
- * production build CI serves, the error the stub threw (see {@link FORCED_FAILURE_CONSOLE}),
+ * The forced failure writes the messages `DELIBERATE_LOADER_FAILURE` measures, including
+ * the error the stub threw in the production build CI serves,
  * declared per test with `expectConsole`; the 404 writes the browser's own report of the document it was asked
  * for. Nothing else is allowed, and the net is not widened.
  *
@@ -70,21 +70,6 @@ const DOCUMENT_404: readonly ExpectedConsoleMessage[] = [
     why: 'the browser reporting the 404 status of the document the test requested on purpose',
     match:
       /^Failed to load resource: the server responded with a status of 404 \(Not Found\)$/,
-  },
-]
-
-/**
- * What the forced failure writes: the shared measurement of a deliberate server failure, plus the
- * error itself. The router's default boundary hands the loader's error to `console.error` in the
- * production build CI serves (`vite preview`); the dev server the measurement was taken on does
- * not write it. Anchored on the text of the stub's own body (`e2e/support/states.ts`), so an
- * error from any other source still fails the run.
- */
-const FORCED_FAILURE_CONSOLE: readonly ExpectedConsoleMessage[] = [
-  ...DELIBERATE_SERVER_FAILURE,
-  {
-    why: 'the router’s default error boundary logging the error the intercepted loader threw, in the production build',
-    match: /^deliberate failure from e2e\/support\/states\.ts$/,
   },
 ]
 
@@ -187,7 +172,7 @@ for (const theme of THEMES) {
         context,
         expectConsole,
       }) => {
-        expectConsole(FORCED_FAILURE_CONSOLE)
+        expectConsole(DELIBERATE_LOADER_FAILURE)
         await useLocale(context, locale)
         await useTheme(page, theme)
 
@@ -472,7 +457,7 @@ test.describe('evidence frames', () => {
         page,
         expectConsole,
       }) => {
-        expectConsole([...DOCUMENT_404, ...FORCED_FAILURE_CONSOLE])
+        expectConsole([...DOCUMENT_404, ...DELIBERATE_LOADER_FAILURE])
         await mkdir(directory ?? '', { recursive: true })
         await page.setViewportSize({ width, height })
         await useTheme(page, theme)

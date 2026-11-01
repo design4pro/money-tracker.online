@@ -752,7 +752,7 @@ label kept in the DOM under the spinner so the button holds its width.
   container and React Aria writes the room left in the viewport onto it as `max-height`, so a menu
   that fits is never a scroll container, and one that cannot fit (a short landscape phone) shrinks
   to that room and scrolls. The old fixed `max-h-80` (320px) hid the eighth row of an eight-item
-  menu at 48px a row and made the menu a scrollable region with no focusable content while a
+  menu at 44px a row (`--target-min`) and made the menu a scrollable region with no focusable content while a
   submenu held focus, which axe reports as `scrollable-region-focusable` (#728). A new cap on a
   `Menu` brings both back: change the number of items, not the cap.
 - **Reaching the last row.** Every item is reachable from the keyboard (arrows, `Home`, `End`,
@@ -774,19 +774,26 @@ label kept in the DOM under the spinner so the button holds its width.
 ### Toast
 
 - **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
-  button; the copy is the caller's `closeLabel` (`action.close`, EN + PL), never a default string
-  and never an icon-only control without a name.
+  button; the app shell always passes `closeLabel` (`action.close`, EN + PL) and `regionLabel`
+  (`notifications.title`, EN + PL). `ToastHost` retains English defaults for both props. The
+  icon-only close control always has an accessible name.
 - **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
   §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
   never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
-  `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
-  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-7` so text never runs
-  under the box.
+  `aria-hidden` and the button's `aria-label` is its only name. On the #745 base, the reproduced
+  axe defect was `target-size` on the 20px close button; the `role-img-alt` report from #730 did
+  not reproduce on the toast markup. Both rules remain in the browser regression sweep. The
+  toast's content carries `pe-8` so text never runs under the box.
 - **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
-  so the close button's size, position and transform are `!` utilities. `left` and `right` read the
+  so the toast surface, layout and text use local `!` utilities to apply the product tokens:
+  `surface-raised`, `border-subtle`, `rounded-lg`, `p-3.5`, `ink` and `ink-2`. Sonner keeps its
+  positioning and animation rules. The close button's size, position and transform also use `!`
+  utilities. `left` and `right` read the
   opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
 - **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
-  box-shadow is switched off.
+  box-shadow is switched off. This is an exception to the Focus treatment below:
+  `focus-visible:shadow-none!` also removes the `focus-gap` box-shadow band, while retaining the
+  outline and its offset.
 - **Contrast.** The chip's edge is `border-subtle`, a decorative edge below 3:1 by design; the glyph
   (`ink-2`, forced with `!` like the rest; measured 8.6:1 in light and 8.1:1 in dark on the chip, #730) carries the 1.4.11 contrast.
 - **A toast action.** No toast has an `action` or `cancel` button today. If one is added it must
@@ -905,13 +912,13 @@ the enclosing dialog or else to `#main-content`, never to `<body>` (`useFocusHea
 the failed match as well, so the tab already carries the failed route's own title, and an imperative
 write would compete with the rendered `<title>` and outlive a successful Retry.
 
-**The Reference Rule.** New code never renders an error's message. `FailurePanel` has no `detail` prop
-and no `<details>` (`ErrorPanel` still has both until #718), `title` and `body` are catalogue copy, and the only free-form string it is given is
-a `reference`, which is an event id or a request id and nothing else: the panel drops anything that
-is not 8 to 64 letters, digits, `_` or `-`, but the shape narrows a string and does not prove it is
-not an amount, so the producer passes an id and never a value of its own. The existing `ErrorPanel`
-sites that still pass `detail` are the tracked exception, owned by #718 (audit the `detail=` sites
-and remove those that carry the repository's message), after which the prop goes.
+**The Reference Rule.** No code renders an error's message. `ErrorPanel` and `FailurePanel` have no
+`detail` prop and no `<details>` (#718 removed both), `title` and `body` are catalogue copy, and
+`failure-message-guard.test.ts` fails on a file that reads a thrown error's text back in. The only
+free-form string the panel is given is a `reference`, which is an event id or a request id and
+nothing else: the panel drops anything that is not 8 to 64 letters, digits, `_` or `-`, but the
+shape narrows a string and does not prove it is not an amount, so the producer passes an id and
+never a value of its own.
 
 The guideline states no conformance level and widens none: the claim is `docs/ACCESSIBILITY.md` §1.
 
@@ -999,6 +1006,11 @@ because what a row can do differs (a category archives, a group deletes).
 - **Names say where a row is.** A child row's accessible name carries its parent ("Trips, inside
   Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
   after their row, and their parent for a child.
+- **Account membership is menu-only.** An account row in the group tree offers _Move to…_ and
+  _Remove from this group_, acting only on that row's membership. Destinations include their parent
+  and the current group stays disabled. Focus follows the account into the target group, or the
+  next surviving row after removal (previous when last, then the create button). Success is
+  announced politely; account rows never gain a drag handle.
 - **Disabled, never hidden, and the reason is written.** An item that would change nothing, or
   that the one-level rule forbids, stays in the menu disabled. The group tree also writes the
   reason as the item's description ("Already first", "A sub-group cannot have its own
@@ -1026,6 +1038,33 @@ because what a row can do differs (a category archives, a group deletes).
   hue alone.
 - **It is not** a data table (no columns, no sort) and not a `ListBox` (a menu of values to
   choose from): its rows are things with an order, and the order is the data.
+
+### Forecast panel
+
+Spent this year, rest of this year, next twelve months — three amounts for a recurring series, or
+the same three rolled up per currency on `/recurring`. The second call site is the series detail.
+
+- **The shape:** a `Card` (`lg` padding) with a subtitle heading, a caption in `text-caption` /
+  `ink-2`, then a `dl` whose columns follow the card's own width
+  (`grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]`, never a viewport breakpoint: the panel sits
+  in a ~490px column at 1280px and a full-width card at 360px, and three six-digit amounts touched
+  under `sm:grid-cols-3`). Each metric is a `dt` in caption `ink-2` and a `dd` in subtitle,
+  semibold, tabular, `break-words`. One currency per block; a second currency is a second block,
+  never a converted total.
+- **What it counts:** expense series and expense links only. `amount_minor` is never negative, so
+  an income series (or a refund linked by hand) is a direction, not a negative spend; an income
+  series shows no panel. `/recurring` rolls up every series whatever its list filter, because a
+  paused series' spend still counts.
+- **The tones:** none. These are plan figures, not alerts. Overdue copy lives on the series card
+  and _Due soon_, not here.
+- **The states:** resting only. There is no empty colour wash; an empty rollup is a sentence
+  (`recurring.forecast.empty`).
+- **What carries the meaning when the colour does not:** the three labels, and a visually-hidden
+  table of the same three cells so a screen reader gets tabular data rather than three adjacent
+  paragraphs. The clip (`sr-only`) sits on a wrapper `div`, never on the `<table>`: a table lays
+  out by its content and ignores `width: 1px`, so it widens the page at 360px. Amounts are formatted by `formatMoney`; they never become a float in the panel.
+- **It is not** a chart (no SVG, no second encoding) and not _Due soon_ (that list is periods you
+  act on). This panel is a year view of integer sums.
 
 ### Period actions
 
@@ -1074,6 +1113,9 @@ the series detail grid and _Due soon_ on `/recurring`.
   stacks the buttons from `sm` up). Every layout change is scoped below `sm`, so nothing changes
   at `sm` and above. The shared classes and the self-labelling
   cell are `stacked-table.tsx`.
+  The liability schedule (`/loans/$loanId`) is a second call site of both: the same classes, its
+  scroller a focusable named region, and `useRowFocusRecovery` returning focus to the schedule
+  (the heading when the saved row has no button left) after a mark-paid save.
   - _Semantics survive the `display` change:_ the table, both row groups, rows, column headers,
     the due-date row header and cells carry their `role` explicitly, with `<caption>` and `scope`
     kept, because a non-table `display` can drop a native role in some browser and screen reader
@@ -1127,6 +1169,17 @@ and nothing else — no headline is ever a caution tone, the verdict word and th
 `warning` at 7:1, and a caller that wants loud caution TEXT has to re-measure the token at 4.5:1
 first. What the 3:1 floor bought differs by theme and is measured rather than assumed: dark gets
 full chroma at nearly the old weight, light has to lighten to get any (`src/styles/tokens.css`).
+
+### Liability meter
+
+The share of a borrowing's imported schedule that is already linked to a transaction, drawn with
+the `AmountMeter` shell on the list card and again as the detail hero (`md` / `lg`). The
+**headline is remaining**, not paid: that is the number somebody acts on. Paid-of-total sits in the
+caption. Overdue changes four channels before colour: the word _Overdue_, the warning triangle, a
+hatched fill, then `warning-bold`. Settled uses a check and a hatched positive fill. Remaining of zero is
+_Schedule paid_, never `0,00`. `aria-valuetext` names paid, remaining and the percentage, never a
+bare percent. The list and the detail share this component; inventing a second bar on the detail
+would be two opinions about the same money.
 
 ### Charts
 

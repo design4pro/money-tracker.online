@@ -3,6 +3,7 @@ import { ExternalLink, Paperclip, Trash2 } from 'lucide-react'
 
 import { ConfirmDeleteDialog } from '#/components/app/transactions'
 import { Button, Card, EmptyState, Link, toast } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import { deleteAttachment } from '#/server/fns/attachments'
 
@@ -119,7 +120,7 @@ export function AttachmentList({
       setPending(null)
       onDeleted()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error))
+      toast.error(t(failureOf(error).message.key))
     } finally {
       setIsDeleting(false)
     }

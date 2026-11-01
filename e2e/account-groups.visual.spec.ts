@@ -141,6 +141,31 @@ for (const theme of THEMES) {
         page,
         `/accounts/groups (${theme}, ${locale})`,
       )
+      const accountRow = page.locator('[data-key^="member:"]').first()
+      const actions = accountRow.getByRole('button')
+      await page.setViewportSize({ width: 360, height: 800 })
+      const hitArea = await actions.evaluate((element) => {
+        const style = getComputedStyle(element, '::after')
+        return {
+          width: Number.parseFloat(style.width),
+          height: Number.parseFloat(style.height),
+        }
+      })
+      expect(hitArea.width).toBeGreaterThanOrEqual(44)
+      expect(hitArea.height).toBeGreaterThanOrEqual(44)
+      await actions.click()
+      await page
+        .getByRole('menuitem', { name: say(locale, 'action.moveTo') })
+        .click()
+      await expect(page.getByRole('menu').last()).toBeVisible()
+      const box = await page.getByRole('menu').last().boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(360)
+      await expectNoSeriousViolations(
+        page,
+        `/accounts/groups account move menu (${theme}, ${locale})`,
+      )
     })
   }
 }
