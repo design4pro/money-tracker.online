@@ -9,7 +9,7 @@
 
 import { ZERO_MINOR, sumMinor } from '#/lib/money'
 import { CALENDAR_START_YEAR } from '#/lib/obligation-calendar'
-import { listInstalments, listLoans } from '#/server/repos/loans'
+import { listCalendarInstalments } from '#/server/repos/loans'
 import { conversionContextFor } from '#/server/repos/workspace-currencies'
 
 import type { Book } from '#/lib/enums'
@@ -140,20 +140,9 @@ export async function obligationCalendarFor(
   input: { readonly book?: Book } = {},
 ): Promise<ObligationCalendar> {
   const conversion = await conversionContextFor(scope)
-  const loans = await listLoans(scope, {
+  const instalments = await listCalendarInstalments(scope, {
     book: input.book,
-    includeClosed: true,
+    today,
   })
-  const instalments: Array<CalendarInstalment> = []
-  for (const loan of loans) {
-    const rows = await listInstalments(scope, { loanId: loan.id, today })
-    for (const row of rows) {
-      instalments.push({
-        dueOn: row.dueOn,
-        derivedStatus: row.derivedStatus,
-        refAmountMinor: row.refAmountMinor,
-      })
-    }
-  }
   return assembleCalendar(instalments, today, conversion.baseCurrencyCode)
 }

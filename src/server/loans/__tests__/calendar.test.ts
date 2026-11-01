@@ -4,6 +4,7 @@ import { asMinor } from '#/lib/money'
 import { CALENDAR_START_YEAR } from '#/lib/obligation-calendar'
 import {
   createBudgetWorld,
+  executed,
   seedTransaction,
 } from '#/server/repos/__tests__/budget-harness'
 import { setLimitResolver } from '#/server/repos/base'
@@ -88,6 +89,27 @@ afterEach(() => {
 })
 
 describe('obligationCalendarFor', () => {
+  it('reads the complete calendar without a query per loan', async () => {
+    for (const name of ['Loan A', 'Loan B', 'Loan C']) {
+      await createLoan(world.scope, {
+        name,
+        currencyCode: 'PLN',
+        instalmentMinor: 1_000,
+        paymentDay: 20,
+        openedOn: '2026-01-15',
+        instalments: [{ dueOn: '2026-02-20', amountMinor: 1_000 }],
+      })
+    }
+
+    executed.length = 0
+    const calendar = await obligationCalendarFor(world.scope, '2026-03-01')
+
+    expect(calendar.cells.find((cell) => cell.key === '2026-02')).toMatchObject(
+      { remainingRefMinor: 3_000, overdueCount: 3 },
+    )
+    expect(executed).toHaveLength(2)
+  })
+
   it('keeps the book filter on the loan, not on a mixed total', async () => {
     const business = await createLoan(world.scope, {
       name: 'Loan A',
