@@ -322,6 +322,10 @@ describe('TransactionForm booking date', () => {
         dayCell(FUTURE).hasAttribute('data-unavailable') ||
           dayCell(FUTURE).getAttribute('aria-disabled') === 'true',
       ).toBe(false)
+      // Adjacent-month cells are disabled until their month is displayed.
+      if (FUTURE.slice(8) === '01') {
+        await user.click(screen.getByRole('button', { name: 'Previous month' }))
+      }
       const before = dayCell(dayBefore(FUTURE))
       expect(
         before.hasAttribute('data-unavailable') ||
@@ -346,6 +350,10 @@ describe('TransactionForm booking date', () => {
 
       await user.click(screen.getByRole('button', { name: /Open calendar/ }))
 
+      // Adjacent-month cells are disabled until their month is displayed.
+      if (FUTURE.slice(8) === '01') {
+        await user.click(screen.getByRole('button', { name: 'Previous month' }))
+      }
       const before = dayCell(dayBefore(FUTURE))
       expect(before.hasAttribute('data-unavailable')).toBe(false)
       expect(before.getAttribute('aria-disabled')).not.toBe('true')
