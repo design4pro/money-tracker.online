@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DELIBERATE_LOADER_FAILURE,
   DELIBERATE_SERVER_FAILURE,
   TOLERATED_CONSOLE_WARNINGS,
   classifyConsoleMessage,
@@ -26,6 +27,25 @@ const CHROMIUM_TAIL =
 const WEBKIT_TAIL = " Please make sure it wasn't preloaded for nothing."
 
 describe('classifyConsoleMessage', () => {
+  it('expects only the explicitly injected loader error, only when declared', () => {
+    const message = {
+      type: 'error',
+      text: 'deliberate failure from e2e/support/states.ts',
+    }
+    expect(classifyConsoleMessage(message)).toBe('fatal')
+    expect(classifyConsoleMessage(message, DELIBERATE_SERVER_FAILURE)).toBe(
+      'fatal',
+    )
+    expect(classifyConsoleMessage(message, DELIBERATE_LOADER_FAILURE)).toBe(
+      'tolerated',
+    )
+    expect(
+      classifyConsoleMessage(
+        { ...message, text: 'real server failure' },
+        DELIBERATE_LOADER_FAILURE,
+      ),
+    ).toBe('fatal')
+  })
   it('fails the run on an error, whoever wrote it', () => {
     expect(classifyConsoleMessage({ type: 'error', text: 'anything' })).toBe(
       'fatal',

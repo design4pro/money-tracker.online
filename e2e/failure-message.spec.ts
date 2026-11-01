@@ -1,7 +1,12 @@
 import path from 'node:path'
 import { mkdir } from 'node:fs/promises'
 
-import { DELIBERATE_SERVER_FAILURE, expect, test } from './support/console'
+import {
+  DELIBERATE_LOADER_FAILURE,
+  DELIBERATE_SERVER_FAILURE,
+  expect,
+  test,
+} from './support/console'
 
 import { LABELS, gotoApp, useLocale, useTheme } from './support/app'
 import { expectNoWcagViolations } from './support/axe-scan'
@@ -54,7 +59,7 @@ test.describe('a refused save', () => {
     context,
     expectConsole,
   }) => {
-    expectConsole(DELIBERATE_SERVER_FAILURE)
+    expectConsole(DELIBERATE_LOADER_FAILURE)
     await useLocale(context, 'en')
     await gotoApp(page, '/dashboard')
     const failing = await failServerFns(page)
