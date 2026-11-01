@@ -3574,6 +3574,31 @@ describe('loans cannot be reached across a workspace boundary', () => {
     return { loan, instalments }
   }
 
+  it('hides a foreign paid-instalment transaction from deletion and a foreign loan from amount edits', async () => {
+    await markInstalmentPaid(world.otherScope, {
+      loanId: loanBId,
+      sequence: 1,
+      transactionId: 'tx-b-loan',
+    })
+    const before = await loanSnapshotOfB()
+    await expect(
+      deleteTransaction({
+        scope: world.scope,
+        policies: {
+          planned: 'include',
+          adjustments: 'include',
+          transfers: 'include',
+          completeness: 'any',
+        },
+        id: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      updateLoan(world.scope, loanBId, { instalmentMinor: 1 }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(await loanSnapshotOfB()).toEqual(before)
+  })
+
   it('refuses every loan read and write aimed at another workspace’s id, and leaves the row alone', async () => {
     const before = await loanSnapshotOfB()
 
