@@ -908,13 +908,13 @@ the enclosing dialog or else to `#main-content`, never to `<body>` (`useFocusHea
 the failed match as well, so the tab already carries the failed route's own title, and an imperative
 write would compete with the rendered `<title>` and outlive a successful Retry.
 
-**The Reference Rule.** New code never renders an error's message. `FailurePanel` has no `detail` prop
-and no `<details>` (`ErrorPanel` still has both until #718), `title` and `body` are catalogue copy, and the only free-form string it is given is
-a `reference`, which is an event id or a request id and nothing else: the panel drops anything that
-is not 8 to 64 letters, digits, `_` or `-`, but the shape narrows a string and does not prove it is
-not an amount, so the producer passes an id and never a value of its own. The existing `ErrorPanel`
-sites that still pass `detail` are the tracked exception, owned by #718 (audit the `detail=` sites
-and remove those that carry the repository's message), after which the prop goes.
+**The Reference Rule.** No code renders an error's message. `ErrorPanel` and `FailurePanel` have no
+`detail` prop and no `<details>` (#718 removed both), `title` and `body` are catalogue copy, and
+`failure-message-guard.test.ts` fails on a file that reads a thrown error's text back in. The only
+free-form string the panel is given is a `reference`, which is an event id or a request id and
+nothing else: the panel drops anything that is not 8 to 64 letters, digits, `_` or `-`, but the
+shape narrows a string and does not prove it is not an amount, so the producer passes an id and
+never a value of its own.
 
 The guideline states no conformance level and widens none: the claim is `docs/ACCESSIBILITY.md` §1.
 

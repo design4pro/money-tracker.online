@@ -6,7 +6,7 @@ import {
   accountCategoryFacts,
   isAccountCategory,
 } from '#/components/app/accounts'
-import { ErrorPanel, FormModal, useIsDirty } from '#/components/app/shell'
+import { FailurePanel, FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   DatePicker,
@@ -22,10 +22,12 @@ import {
   TextAreaField,
   TextField,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { ZERO_MINOR, currencyName } from '#/lib/money'
 import { createAccount, updateAccount } from '#/server/fns/accounts'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { CalendarDate } from '@internationalized/date'
 import type { Key } from 'react-aria-components'
 import type { Minor } from '#/lib/money'
@@ -136,7 +138,7 @@ export function AccountFormDialog({
     draftFrom(account, initialCategory, baseCurrencyCode),
   )
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   // Validation messages appear after the first submit, never while somebody is still filling the
   // form in. An empty field is not a mistake until it is offered as an answer.
   const [hasTriedToSubmit, setHasTriedToSubmit] = useState(false)
@@ -190,7 +192,7 @@ export function AccountFormDialog({
       }
       onOpenChange(false)
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -229,10 +231,10 @@ export function AccountFormDialog({
             >
               <DialogBody className="flex flex-col gap-5">
                 {failure === null ? null : (
-                  <ErrorPanel
+                  <FailurePanel
+                    failure={failure}
+                    placement="after-action"
                     title={t('accounts.form.error.title')}
-                    body={t('empty.error.body')}
-                    detail={failure}
                   />
                 )}
 

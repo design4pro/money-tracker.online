@@ -166,13 +166,12 @@ function DashboardSkeleton() {
   )
 }
 
-function DashboardError({ error, reset }: { error: Error; reset: () => void }) {
+function DashboardError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('empty.error.title')}
       body={t('empty.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

@@ -1,11 +1,13 @@
 import { useId, useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import { Button, toast } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import { applyTemplate } from '#/server/fns/transaction-groups'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type {
   TransactionDraft,
   TransactionTemplateSummary,
@@ -64,7 +66,7 @@ export function TemplatePicker({
   const labelId = useId()
 
   const [pending, setPending] = useState<string | null>(null)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   if (templates.length === 0) return null
 
@@ -77,7 +79,7 @@ export function TemplatePicker({
       // The sentence a person needs after pressing this: the form moved, the ledger did not.
       toast.success(t('templates.applied', { name: template.name }))
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setPending(null)
     }
@@ -137,10 +139,10 @@ export function TemplatePicker({
       </div>
 
       {failure === null ? null : (
-        <ErrorPanel
+        <FailurePanel
+          failure={failure}
+          placement="after-action"
           title={t('templates.picker.error.title')}
-          body={t('empty.error.body')}
-          detail={failure}
         />
       )}
     </section>

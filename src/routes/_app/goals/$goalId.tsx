@@ -84,19 +84,12 @@ export const Route = createFileRoute('/_app/goals/$goalId')({
   component: GoalDetailRoute,
 })
 
-function GoalDetailError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function GoalDetailError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('goals.detail.error.title')}
       body={t('goals.detail.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

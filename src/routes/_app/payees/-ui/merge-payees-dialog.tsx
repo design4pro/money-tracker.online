@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -12,9 +12,11 @@ import {
   Select,
   SelectItem,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { mergePayees } from '#/server/fns/payees'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { Key } from 'react-aria-components'
 
 /**
@@ -54,7 +56,7 @@ export function MergePayeesDialog({
     candidates.length === 0 ? null : candidates[0].id,
   )
   const [isWorking, setIsWorking] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   const target = candidates.find((candidate) => candidate.id === into) ?? null
 
@@ -67,7 +69,7 @@ export function MergePayeesDialog({
       onMerged(target.name, from.name)
       close()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsWorking(false)
     }
@@ -121,10 +123,10 @@ export function MergePayeesDialog({
                   </>
                 )}
                 {failure === null ? null : (
-                  <ErrorPanel
+                  <FailurePanel
+                    failure={failure}
+                    placement="after-action"
                     title={t('payees.merge.failed')}
-                    body={t('empty.error.body')}
-                    detail={failure}
                   />
                 )}
               </DialogBody>
