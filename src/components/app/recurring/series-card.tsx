@@ -6,9 +6,9 @@ import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 
 import type { ReactNode } from 'react'
-import type { RecurringDutyCode } from '#/lib/enums'
 import type {
   Book,
+  RecurringDutyCode,
   RecurringFrequency,
   RecurringKind,
   TransactionDirection,

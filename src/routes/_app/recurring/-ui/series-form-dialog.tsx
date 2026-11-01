@@ -30,14 +30,13 @@ import { occurrences } from '#/server/recurring/schedule'
 import type { CalendarDate } from '@internationalized/date'
 import type { Key } from 'react-aria-components'
 import type { Minor } from '#/lib/money'
-import type { RecurringDutyCode } from '#/lib/enums'
+import type { Book, RecurringDutyCode } from '#/lib/enums'
 import type {
   CategoryRow,
   RecurringFrequency,
   RecurringKind,
   TransactionDirection,
 } from '#/server/db/schema'
-import type { Book } from '#/lib/enums'
 import type {
   CreateSeriesInput,
   RemindBeforeOffset,
