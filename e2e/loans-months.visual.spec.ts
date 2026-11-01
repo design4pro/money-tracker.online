@@ -64,3 +64,24 @@ test('Wszystko / Firma / Prywatne is a book filter, not a second register', asyn
   await expect(page.getByRole('radio', { name: 'Business' })).toBeChecked()
   await expect(page.getByRole('table').first()).toBeVisible()
 })
+
+test('keeps horizontal scrolling inside the keyboard-accessible month grid', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await gotoApp(page, '/loans/months')
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth))
+  const scroller = page.getByRole('region', {
+    name: 'Month overview',
+    exact: true,
+  })
+  await scroller.focus()
+  await expect(scroller).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect
+    .poll(() => scroller.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0)
+})

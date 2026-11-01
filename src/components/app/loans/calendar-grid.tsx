@@ -88,7 +88,7 @@ export function CalendarGrid({ calendar }: CalendarGridProps) {
         aria-label={t('loans.calendar.title')}
         tabIndex={0}
         className={cn(
-          'overflow-x-auto rounded-md outline-focus focus-safe',
+          'relative overflow-x-auto rounded-md outline-focus focus-safe',
           'focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2',
         )}
       >
