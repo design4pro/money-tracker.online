@@ -99,6 +99,12 @@ already caused, or would obviously cause, two people to mean two things by one w
   both; the filter is All / Business / Personal (PL: Wszystko / Firma / Prywatne). It is not a
   second tenant and not an account type. _Avoid_: "book" for the booked date; two workspaces as a
   substitute for the filter.
+- **Recurring forecast** — expense-series totals for spending this calendar year, unpaid
+  occurrences due this year, and unpaid occurrences due in the next twelve months. Each currency
+  stays separate; a paused or finished series retains its spending history and plans nothing ahead.
+- **JDG duty template** — a Polish sole trader's recurring-series due-date shape, identified by
+  a duty code. The person supplies the amount; the template neither calculates tax nor files a return.
+  _Avoid_: "tax engine" or "tax liability" for a duty template.
 - **Subscription** — the workspace's paid plan with the billing provider. One per workspace.
   _Avoid_: using it for a recurring series, a streaming service the user pays for, or a plan tier.
 - **Rule** — an ordered automation: conditions over a transaction, actions applied when they match,

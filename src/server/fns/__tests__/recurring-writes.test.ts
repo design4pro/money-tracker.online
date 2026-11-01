@@ -26,10 +26,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { recurringSeries } from '#/server/db/schema'
 import {
   createSeries as createSeriesRow,
+  markPaid,
   createSeriesSchema,
   updateSeriesSchema,
 } from '#/server/repos/recurring'
-import { createBudgetWorld } from '#/server/repos/__tests__/budget-harness'
+import {
+  createBudgetWorld,
+  seedTransaction,
+} from '#/server/repos/__tests__/budget-harness'
+import { materializeSeries } from '#/server/recurring/materialize'
 import { SERIES_AHEAD } from '#/server/recurring/series-write'
 
 import {
@@ -37,6 +42,7 @@ import {
   completeSeries,
   createSeries,
   deleteSeries,
+  loadRecurring,
   pauseSeries,
   resumeSeries,
   updateSeries,
@@ -44,6 +50,7 @@ import {
 
 import type * as SeriesWriteModule from '#/server/recurring/series-write'
 import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
+import type { RecurringOverview } from '../recurring'
 
 const TODAY = '2026-03-15'
 
@@ -110,6 +117,68 @@ beforeEach(async () => {
   requireOrg.mockImplementation(async () => world.scope)
   writeSeries.mockReset()
   writeSeries.mockImplementation(async () => ({ seriesId: 'series-1' }))
+})
+
+describe('the recurring overview filters', () => {
+  it('filters forecasts by book while retaining paused spending regardless of the activity filter', async () => {
+    const business = await createSeriesRow(world.scope, {
+      ...SERIES,
+      name: 'Business',
+      book: 'business',
+    })
+    const personal = await createSeriesRow(world.scope, {
+      ...SERIES,
+      name: 'Personal',
+      book: 'personal',
+    })
+    const paused = await createSeriesRow(world.scope, {
+      ...SERIES,
+      name: 'Paused business',
+      book: 'business',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: paused.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const transactionId = await seedTransaction(world.db, {
+      id: 'paused-business-payment',
+      refAmountMinor: 10_000,
+      bookedOn: '2026-01-31',
+    })
+    await markPaid(world.scope, {
+      seriesId: paused.id,
+      periodStart: '2026-01-01',
+      transactionId,
+    })
+    await call(pauseSeries, { seriesId: paused.id })
+
+    const all = (await call(loadRecurring, {
+      includeInactive: true,
+    })) as RecurringOverview
+    const filtered = (await call(loadRecurring, {
+      book: 'business',
+    })) as RecurringOverview
+    const includingPaused = (await call(loadRecurring, {
+      book: 'business',
+      includeInactive: true,
+    })) as RecurringOverview
+
+    expect(all.rows.map((row) => row.series.id)).toEqual(
+      expect.arrayContaining([business.id, personal.id, paused.id]),
+    )
+    expect(filtered.rows.map((row) => row.series.id)).toEqual([business.id])
+    expect(includingPaused.rows.map((row) => row.series.id)).toEqual(
+      expect.arrayContaining([business.id, paused.id]),
+    )
+    expect(includingPaused.rows).toHaveLength(2)
+    expect(all.forecast[0]?.next12MonthsMinor).toBeGreaterThan(0)
+    expect(all.forecast[0]?.next12MonthsMinor).toBeGreaterThan(
+      filtered.forecast[0]?.next12MonthsMinor ?? 0,
+    )
+    expect(filtered.forecast[0]?.spentThisYearMinor).toBe(10_000)
+    expect(includingPaused.forecast).toEqual(filtered.forecast)
+  })
 })
 
 describe('each series-writing handler delegates to writeSeries', () => {

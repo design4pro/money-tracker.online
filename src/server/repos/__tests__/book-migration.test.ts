@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 
 const migrations = new URL('../../../../drizzle/', import.meta.url)
-const migration = '0007_freezing_falcon.sql'
+const migration = '0008_wild_lenny_balinger.sql'
 
 describe('the recurring book migration', () => {
   it('preserves existing periods with foreign keys on, including a transaction rollback', () => {

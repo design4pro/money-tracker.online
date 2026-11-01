@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "93ca5ace-88c2-4b2c-bda7-24c886710277",
+  "id": "5da03591-dca2-4604-b81e-98ccdf3051d8",
   "prevId": "2cceead3-ed68-4f6f-8d1a-8726842f07e7",
   "tables": {
     "account": {
@@ -4542,64 +4542,6 @@
         }
       }
     },
-    "organization_settings": {
-      "name": "organization_settings",
-      "columns": {
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text(64)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'Europe/Warsaw'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "organization_settings_organization_id_organization_id_fk": {
-          "name": "organization_settings_organization_id_organization_id_fk",
-          "tableFrom": "organization_settings",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "organization_settings_timezone_length_check": {
-          "name": "organization_settings_timezone_length_check",
-          "value": "length(\"organization_settings\".\"timezone\") <= 64"
-        }
-      }
-    },
     "payee_aliases": {
       "name": "payee_aliases",
       "columns": {
@@ -5523,6 +5465,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "anchor_month": {
+          "name": "anchor_month",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "duty_code": {
+          "name": "duty_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "start_date": {
           "name": "start_date",
           "type": "text(10)",
@@ -5603,14 +5559,6 @@
           "autoincrement": false,
           "default": true
         },
-        "book": {
-          "name": "book",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'personal'"
-        },
         "is_active": {
           "name": "is_active",
           "type": "integer",
@@ -5684,14 +5632,6 @@
           "columns": [
             "organization_id",
             "payee_id"
-          ],
-          "isUnique": false
-        },
-        "recurring_series_organization_id_book_idx": {
-          "name": "recurring_series_organization_id_book_idx",
-          "columns": [
-            "organization_id",
-            "book"
           ],
           "isUnique": false
         }
