@@ -838,6 +838,9 @@ export interface SeriesLink {
   readonly currencyCode: string
   /** `amount_minor` is never negative: which way the money moved is this column (MONEY.md §1). */
   readonly direction: TransactionDirection
+  readonly isPlanned: boolean
+  readonly isBalanceAdjustment: boolean
+  readonly transferKind: string
   readonly note: string | null
 }
 
@@ -863,6 +866,9 @@ export async function listSeriesLinkDetails(
       amountMinor: transactions.amountMinor,
       currencyCode: transactions.currencyCode,
       direction: transactions.direction,
+      isPlanned: transactions.isPlanned,
+      isBalanceAdjustment: transactions.isBalanceAdjustment,
+      transferKind: transactions.transferKind,
       note: transactions.note,
     })
     .from(recurringLinks)
@@ -885,6 +891,9 @@ export async function listSeriesLinkDetails(
     amountMinor: asMinor(row.amountMinor),
     currencyCode: row.currencyCode,
     direction: row.direction as TransactionDirection,
+    isPlanned: row.isPlanned,
+    isBalanceAdjustment: row.isBalanceAdjustment,
+    transferKind: row.transferKind,
     note: row.note,
   }))
 }

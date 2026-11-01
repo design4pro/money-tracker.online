@@ -1718,6 +1718,7 @@ const messages = {
   'billing.usage.metric.goals': 'Cele',
   'billing.usage.metric.rules': 'Reguły opisywania',
   'billing.usage.metric.recurringSeries': 'Rachunki cykliczne',
+  'billing.usage.metric.loans': 'Zobowiązania',
   'billing.usage.metric.transactions': 'Wpisy',
   'billing.usage.metric.importsPerMonth': 'Importy w tym miesiącu',
   'billing.usage.metric.storageBytes': 'Paragony',

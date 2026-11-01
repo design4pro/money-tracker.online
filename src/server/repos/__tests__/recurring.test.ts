@@ -36,6 +36,7 @@ import {
 } from '#/server/db/schema'
 import { occurrences } from '#/server/recurring/schedule'
 import { materializeSeries } from '#/server/recurring/materialize'
+import { forecastSeries } from '#/server/recurring/forecast'
 
 import { NotFoundError } from '../errors'
 import {
@@ -47,6 +48,7 @@ import {
   getUpcoming,
   listPeriods,
   listSeries,
+  listSeriesLinkDetails,
   markPaid,
   markSkipped,
   pauseSeries,
@@ -81,6 +83,54 @@ let world: BudgetWorld
 
 beforeEach(async () => {
   world = await createBudgetWorld()
+})
+
+describe('forecast spending policy', () => {
+  it.each([
+    { isPlanned: true },
+    { isBalanceAdjustment: true },
+    { transferKind: 'external_out' },
+  ])(
+    'excludes a linked payment after its policy changes: %j',
+    async (patch) => {
+      const series = await createSeries(world.scope, seriesInput())
+      await materializeSeries(world.scope, {
+        seriesId: series.id,
+        today: TODAY,
+        ahead: 0,
+      })
+      const transactionId = await seedTransaction(world.db, {
+        id: 'forecast-payment',
+        refAmountMinor: 10_000,
+        bookedOn: '2026-01-31',
+      })
+      await markPaid(world.scope, {
+        seriesId: series.id,
+        periodStart: '2026-01-01',
+        transactionId,
+      })
+      const forecast = async () =>
+        forecastSeries({
+          schedule: { ...series, frequency: 'monthly' },
+          expectedAmountMinor: series.expectedAmountMinor,
+          expectedCurrencyCode: series.expectedCurrencyCode,
+          direction: 'expense',
+          isActive: true,
+          today: TODAY,
+          links: await listSeriesLinkDetails(world.scope, series.id),
+          periods: await listPeriods(world.scope, series.id, TODAY),
+        })
+      expect((await forecast()).spentThisYearMinor).toBe(10_000)
+      await world.db
+        .update(transactions)
+        .set(patch)
+        .where(eq(transactions.id, transactionId))
+      expect(await listSeriesLinkDetails(world.scope, series.id)).toHaveLength(
+        1,
+      )
+      expect((await forecast()).spentThisYearMinor).toBe(0)
+    },
+  )
 })
 
 describe('materialisation', () => {

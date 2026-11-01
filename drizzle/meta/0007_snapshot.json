@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7778dd76-1136-496b-9b10-af82046899b1",
-  "prevId": "498b6c67-98c6-4ead-b4ba-65fe5e8ac457",
+  "id": "5da03591-dca2-4604-b81e-98ccdf3051d8",
+  "prevId": "2cceead3-ed68-4f6f-8d1a-8726842f07e7",
   "tables": {
     "account": {
       "name": "account",
@@ -3356,6 +3356,710 @@
         "import_row_errors_row_index_check": {
           "name": "import_row_errors_row_index_check",
           "value": "\"import_row_errors\".\"row_index\" >= 0"
+        }
+      }
+    },
+    "loan_extra_repayments": {
+      "name": "loan_extra_repayments",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "loan_id": {
+          "name": "loan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transaction_id": {
+          "name": "transaction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "loan_extra_repayments_organization_id_transaction_id_idx": {
+          "name": "loan_extra_repayments_organization_id_transaction_id_idx",
+          "columns": [
+            "organization_id",
+            "transaction_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "loan_extra_repayments_organization_id_organization_id_fk": {
+          "name": "loan_extra_repayments_organization_id_organization_id_fk",
+          "tableFrom": "loan_extra_repayments",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "loan_extra_repayments_loan_id_loans_id_fk": {
+          "name": "loan_extra_repayments_loan_id_loans_id_fk",
+          "tableFrom": "loan_extra_repayments",
+          "tableTo": "loans",
+          "columnsFrom": [
+            "loan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "loan_extra_repayments_transaction_id_transactions_id_fk": {
+          "name": "loan_extra_repayments_transaction_id_transactions_id_fk",
+          "tableFrom": "loan_extra_repayments",
+          "tableTo": "transactions",
+          "columnsFrom": [
+            "transaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "loan_extra_repayments_pk": {
+          "columns": [
+            "loan_id",
+            "transaction_id"
+          ],
+          "name": "loan_extra_repayments_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "loan_instalments": {
+      "name": "loan_instalments",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "loan_id": {
+          "name": "loan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "due_on": {
+          "name": "due_on",
+          "type": "text(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "currency_code": {
+          "name": "currency_code",
+          "type": "text(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ref_amount_minor": {
+          "name": "ref_amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rate_e10": {
+          "name": "rate_e10",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "principal_minor": {
+          "name": "principal_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "interest_minor": {
+          "name": "interest_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "closing_balance_minor": {
+          "name": "closing_balance_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_buyout": {
+          "name": "is_buyout",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'upcoming'"
+        },
+        "settled_transaction_id": {
+          "name": "settled_transaction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "loan_instalments_organization_id_due_on_status_idx": {
+          "name": "loan_instalments_organization_id_due_on_status_idx",
+          "columns": [
+            "organization_id",
+            "due_on",
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "loan_instalments_organization_id_organization_id_fk": {
+          "name": "loan_instalments_organization_id_organization_id_fk",
+          "tableFrom": "loan_instalments",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "loan_instalments_loan_id_loans_id_fk": {
+          "name": "loan_instalments_loan_id_loans_id_fk",
+          "tableFrom": "loan_instalments",
+          "tableTo": "loans",
+          "columnsFrom": [
+            "loan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "loan_instalments_currency_code_currencies_code_fk": {
+          "name": "loan_instalments_currency_code_currencies_code_fk",
+          "tableFrom": "loan_instalments",
+          "tableTo": "currencies",
+          "columnsFrom": [
+            "currency_code"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "loan_instalments_settled_transaction_id_transactions_id_fk": {
+          "name": "loan_instalments_settled_transaction_id_transactions_id_fk",
+          "tableFrom": "loan_instalments",
+          "tableTo": "transactions",
+          "columnsFrom": [
+            "settled_transaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "loan_instalments_pk": {
+          "columns": [
+            "loan_id",
+            "sequence"
+          ],
+          "name": "loan_instalments_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "loan_instalments_status_check": {
+          "name": "loan_instalments_status_check",
+          "value": "\"loan_instalments\".\"status\" in ('upcoming', 'paid')"
+        },
+        "loan_instalments_sequence_check": {
+          "name": "loan_instalments_sequence_check",
+          "value": "\"loan_instalments\".\"sequence\" >= 1"
+        },
+        "loan_instalments_amount_minor_check": {
+          "name": "loan_instalments_amount_minor_check",
+          "value": "\"loan_instalments\".\"amount_minor\" > 0"
+        },
+        "loan_instalments_ref_amount_minor_check": {
+          "name": "loan_instalments_ref_amount_minor_check",
+          "value": "\"loan_instalments\".\"ref_amount_minor\" > 0"
+        },
+        "loan_instalments_rate_e10_check": {
+          "name": "loan_instalments_rate_e10_check",
+          "value": "\"loan_instalments\".\"rate_e10\" > 0"
+        },
+        "loan_instalments_principal_minor_check": {
+          "name": "loan_instalments_principal_minor_check",
+          "value": "\"loan_instalments\".\"principal_minor\" is null or \"loan_instalments\".\"principal_minor\" >= 0"
+        },
+        "loan_instalments_interest_minor_check": {
+          "name": "loan_instalments_interest_minor_check",
+          "value": "\"loan_instalments\".\"interest_minor\" is null or \"loan_instalments\".\"interest_minor\" >= 0"
+        },
+        "loan_instalments_closing_balance_minor_check": {
+          "name": "loan_instalments_closing_balance_minor_check",
+          "value": "\"loan_instalments\".\"closing_balance_minor\" is null or \"loan_instalments\".\"closing_balance_minor\" >= 0"
+        },
+        "loan_instalments_paid_requires_transaction_check": {
+          "name": "loan_instalments_paid_requires_transaction_check",
+          "value": "\"loan_instalments\".\"status\" <> 'paid' or \"loan_instalments\".\"settled_transaction_id\" is not null"
+        },
+        "loan_instalments_due_on_check": {
+          "name": "loan_instalments_due_on_check",
+          "value": "length(\"loan_instalments\".\"due_on\") = 10"
+        },
+        "loan_instalments_note_check": {
+          "name": "loan_instalments_note_check",
+          "value": "length(\"loan_instalments\".\"note\") <= 500"
+        }
+      }
+    },
+    "loans": {
+      "name": "loans",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'credit'"
+        },
+        "book": {
+          "name": "book",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'personal'"
+        },
+        "lender": {
+          "name": "lender",
+          "type": "text(200)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "currency_code": {
+          "name": "currency_code",
+          "type": "text(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "principal_minor": {
+          "name": "principal_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ref_principal_minor": {
+          "name": "ref_principal_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "instalment_minor": {
+          "name": "instalment_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ref_instalment_minor": {
+          "name": "ref_instalment_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "outstanding_minor": {
+          "name": "outstanding_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ref_outstanding_minor": {
+          "name": "ref_outstanding_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rate_e10": {
+          "name": "rate_e10",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "annual_rate_e10": {
+          "name": "annual_rate_e10",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "repayment_shape": {
+          "name": "repayment_shape",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'imported'"
+        },
+        "payment_frequency": {
+          "name": "payment_frequency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'monthly'"
+        },
+        "term_periods": {
+          "name": "term_periods",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payment_day": {
+          "name": "payment_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "opened_on": {
+          "name": "opened_on",
+          "type": "text(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_payment_on": {
+          "name": "first_payment_on",
+          "type": "text(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "text(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "note": {
+          "name": "note",
+          "type": "text(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "loans_organization_id_status_idx": {
+          "name": "loans_organization_id_status_idx",
+          "columns": [
+            "organization_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "loans_organization_id_account_id_idx": {
+          "name": "loans_organization_id_account_id_idx",
+          "columns": [
+            "organization_id",
+            "account_id"
+          ],
+          "isUnique": false
+        },
+        "loans_organization_id_book_idx": {
+          "name": "loans_organization_id_book_idx",
+          "columns": [
+            "organization_id",
+            "book"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "loans_organization_id_organization_id_fk": {
+          "name": "loans_organization_id_organization_id_fk",
+          "tableFrom": "loans",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "loans_account_id_accounts_id_fk": {
+          "name": "loans_account_id_accounts_id_fk",
+          "tableFrom": "loans",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "loans_currency_code_currencies_code_fk": {
+          "name": "loans_currency_code_currencies_code_fk",
+          "tableFrom": "loans",
+          "tableTo": "currencies",
+          "columnsFrom": [
+            "currency_code"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "loans_kind_check": {
+          "name": "loans_kind_check",
+          "value": "\"loans\".\"kind\" in ('credit', 'leasing', 'loan', 'other')"
+        },
+        "loans_book_check": {
+          "name": "loans_book_check",
+          "value": "\"loans\".\"book\" in ('business', 'personal')"
+        },
+        "loans_status_check": {
+          "name": "loans_status_check",
+          "value": "\"loans\".\"status\" in ('active', 'settled', 'closed', 'needs_review')"
+        },
+        "loans_repayment_shape_check": {
+          "name": "loans_repayment_shape_check",
+          "value": "\"loans\".\"repayment_shape\" in ('imported', 'annuity', 'linear_principal')"
+        },
+        "loans_payment_frequency_check": {
+          "name": "loans_payment_frequency_check",
+          "value": "\"loans\".\"payment_frequency\" in ('monthly', 'quarterly', 'semi_annual', 'annual')"
+        },
+        "loans_principal_minor_check": {
+          "name": "loans_principal_minor_check",
+          "value": "\"loans\".\"principal_minor\" is null or \"loans\".\"principal_minor\" > 0"
+        },
+        "loans_principal_pair_check": {
+          "name": "loans_principal_pair_check",
+          "value": "(\"loans\".\"principal_minor\" is null) = (\"loans\".\"ref_principal_minor\" is null)"
+        },
+        "loans_instalment_minor_check": {
+          "name": "loans_instalment_minor_check",
+          "value": "\"loans\".\"instalment_minor\" > 0"
+        },
+        "loans_ref_instalment_minor_check": {
+          "name": "loans_ref_instalment_minor_check",
+          "value": "\"loans\".\"ref_instalment_minor\" > 0"
+        },
+        "loans_outstanding_minor_check": {
+          "name": "loans_outstanding_minor_check",
+          "value": "\"loans\".\"outstanding_minor\" is null or \"loans\".\"outstanding_minor\" >= 0"
+        },
+        "loans_outstanding_pair_check": {
+          "name": "loans_outstanding_pair_check",
+          "value": "(\"loans\".\"outstanding_minor\" is null) = (\"loans\".\"ref_outstanding_minor\" is null)"
+        },
+        "loans_rate_e10_check": {
+          "name": "loans_rate_e10_check",
+          "value": "\"loans\".\"rate_e10\" > 0"
+        },
+        "loans_annual_rate_e10_check": {
+          "name": "loans_annual_rate_e10_check",
+          "value": "\"loans\".\"annual_rate_e10\" is null or \"loans\".\"annual_rate_e10\" >= 0"
+        },
+        "loans_term_periods_check": {
+          "name": "loans_term_periods_check",
+          "value": "\"loans\".\"term_periods\" is null or (\"loans\".\"term_periods\" >= 1 and \"loans\".\"term_periods\" <= 600)"
+        },
+        "loans_payment_day_check": {
+          "name": "loans_payment_day_check",
+          "value": "\"loans\".\"payment_day\" >= 1 and \"loans\".\"payment_day\" <= 31"
+        },
+        "loans_first_payment_on_check": {
+          "name": "loans_first_payment_on_check",
+          "value": "\"loans\".\"first_payment_on\" is null or \"loans\".\"first_payment_on\" >= \"loans\".\"opened_on\""
+        },
+        "loans_ends_on_check": {
+          "name": "loans_ends_on_check",
+          "value": "\"loans\".\"ends_on\" is null or \"loans\".\"ends_on\" >= \"loans\".\"opened_on\""
+        },
+        "loans_name_check": {
+          "name": "loans_name_check",
+          "value": "length(\"loans\".\"name\") <= 100"
+        },
+        "loans_lender_check": {
+          "name": "loans_lender_check",
+          "value": "length(\"loans\".\"lender\") <= 200"
+        },
+        "loans_note_check": {
+          "name": "loans_note_check",
+          "value": "length(\"loans\".\"note\") <= 500"
+        },
+        "loans_opened_on_check": {
+          "name": "loans_opened_on_check",
+          "value": "length(\"loans\".\"opened_on\") = 10"
+        },
+        "loans_first_payment_on_length_check": {
+          "name": "loans_first_payment_on_length_check",
+          "value": "length(\"loans\".\"first_payment_on\") = 10"
+        },
+        "loans_ends_on_length_check": {
+          "name": "loans_ends_on_length_check",
+          "value": "length(\"loans\".\"ends_on\") = 10"
         }
       }
     },

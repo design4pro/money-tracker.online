@@ -1685,6 +1685,7 @@ const messages = {
   'billing.usage.metric.goals': 'Goals',
   'billing.usage.metric.rules': 'Filing rules',
   'billing.usage.metric.recurringSeries': 'Recurring bills',
+  'billing.usage.metric.loans': 'Loans',
   'billing.usage.metric.transactions': 'Entries',
   'billing.usage.metric.importsPerMonth': 'Imports this month',
   'billing.usage.metric.storageBytes': 'Receipts',

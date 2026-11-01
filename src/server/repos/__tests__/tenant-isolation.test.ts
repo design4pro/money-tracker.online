@@ -155,6 +155,15 @@ import {
   listSeriesLinkDetails,
   markPaid,
 } from '../recurring'
+import {
+  createLoan,
+  deleteLoan,
+  getLoan,
+  listInstalments,
+  listLoans,
+  markInstalmentPaid,
+  updateLoan,
+} from '../loans'
 import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -3402,5 +3411,160 @@ describe('the upcoming read cannot leak another workspace’s series ids', () =>
       expect(page.total).toBe(2)
       expect(JSON.stringify(page)).not.toContain('plan-b')
     })
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Loans                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The loan register, attacked through every export. A's scope names B's ids; B's rows must be
+ * byte-identical afterwards. Creating a loan parented onto B's `account_id` is the extra case
+ * `28-loans.md` names: a foreign parent must be indistinguishable from a missing one.
+ */
+describe('loans cannot be reached across a workspace boundary', () => {
+  let world: BudgetWorld
+  let loanBId: string
+
+  const schedule = [
+    { dueOn: '2026-02-20', amountMinor: 100_00 },
+    { dueOn: '2026-03-20', amountMinor: 80_00 },
+  ] as const
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    const loanB = await createLoan(world.otherScope, {
+      name: 'Loan B',
+      lender: 'Lender B',
+      accountId: 'acc-b',
+      currencyCode: 'PLN',
+      instalmentMinor: 100_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      book: 'business',
+      instalments: [...schedule],
+    })
+    loanBId = loanB.id
+    await seedTransaction(world.db, {
+      id: 'tx-b-loan',
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-02-20',
+    })
+  })
+
+  async function loanSnapshotOfB() {
+    const loan = await getLoan(world.otherScope, loanBId)
+    const instalments = await listInstalments(world.otherScope, {
+      loanId: loanBId,
+    })
+    return { loan, instalments }
+  }
+
+  it('refuses every loan read and write aimed at another workspace’s id, and leaves the row alone', async () => {
+    const before = await loanSnapshotOfB()
+
+    await expect(getLoan(world.scope, loanBId)).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(
+      listInstalments(world.scope, { loanId: loanBId }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      updateLoan(world.scope, loanBId, { name: 'Hijacked' }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(deleteLoan(world.scope, loanBId)).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(
+      markInstalmentPaid(world.scope, {
+        loanId: loanBId,
+        sequence: 1,
+        transactionId: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(await listLoans(world.scope, { includeClosed: true })).toEqual([])
+    expect(await loanSnapshotOfB()).toEqual(before)
+  })
+
+  it('refuses a create parented onto another workspace’s account_id', async () => {
+    const before = await loanSnapshotOfB()
+
+    await expect(
+      createLoan(world.scope, {
+        name: 'Loan A',
+        accountId: 'acc-b',
+        currencyCode: 'PLN',
+        instalmentMinor: 50_00,
+        paymentDay: 10,
+        openedOn: '2026-01-01',
+        instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(await loanSnapshotOfB()).toEqual(before)
+    expect(await listLoans(world.scope, { includeClosed: true })).toEqual([])
+  })
+
+  it('refuses to settle its own instalment with another workspace’s transaction', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    await expect(
+      markInstalmentPaid(world.scope, {
+        loanId: own.id,
+        sequence: 1,
+        transactionId: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const [instalment] = await listInstalments(world.scope, { loanId: own.id })
+    expect(instalment).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+    })
+  })
+
+  it('refuses to re-parent its own loan onto another workspace’s account_id', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    await expect(
+      updateLoan(world.scope, own.id, { accountId: 'acc-b' }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect((await getLoan(world.scope, own.id)).accountId).toBeNull()
+  })
+
+  it('never lists another workspace’s loan, even under an identical name', async () => {
+    await createLoan(world.scope, {
+      name: 'Loan B',
+      lender: 'Lender B',
+      currencyCode: 'PLN',
+      instalmentMinor: 100_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      book: 'business',
+      instalments: [...schedule],
+    })
+
+    const mine = await listLoans(world.scope)
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.id).not.toBe(loanBId)
+    expect(JSON.stringify(mine)).not.toContain(loanBId)
   })
 })

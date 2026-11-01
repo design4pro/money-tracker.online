@@ -42,6 +42,9 @@ export interface ForecastLink {
   readonly amountMinor: number
   readonly currencyCode: string
   readonly direction: TransactionDirection
+  readonly isPlanned?: boolean
+  readonly isBalanceAdjustment?: boolean
+  readonly transferKind?: string
   /** `unlinked` rows are history of a pointer, not spending. */
   readonly status: string
 }
@@ -103,6 +106,9 @@ export function forecastSeries(input: SeriesForecastInput): SeriesForecast {
   let spent = 0
   for (const link of input.links) {
     if (link.status === 'unlinked') continue
+    if (link.isPlanned || link.isBalanceAdjustment) continue
+    if (link.transferKind !== undefined && link.transferKind !== 'none')
+      continue
     if (link.direction !== 'expense' || input.direction !== 'expense') continue
     if (link.currencyCode !== input.expectedCurrencyCode) continue
     if (link.bookedOn < year.start || link.bookedOn > year.end) continue

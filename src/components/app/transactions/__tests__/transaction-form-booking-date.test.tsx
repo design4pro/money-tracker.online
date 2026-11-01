@@ -346,7 +346,11 @@ describe('TransactionForm booking date', () => {
 
       await user.click(screen.getByRole('button', { name: /Open calendar/ }))
 
-      const before = dayCell(dayBefore(FUTURE))
+      const previousDay = dayBefore(FUTURE)
+      if (previousDay.slice(0, 7) !== FUTURE.slice(0, 7)) {
+        await user.click(screen.getByRole('button', { name: 'Previous month' }))
+      }
+      const before = dayCell(previousDay)
       expect(before.hasAttribute('data-unavailable')).toBe(false)
       expect(before.getAttribute('aria-disabled')).not.toBe('true')
     })
