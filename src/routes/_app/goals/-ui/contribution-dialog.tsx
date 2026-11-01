@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { ErrorPanel, FormModal } from '#/components/app/shell'
+import { FailurePanel, FormModal } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -12,6 +12,7 @@ import {
   SelectItem,
   Spinner,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import {
@@ -19,6 +20,7 @@ import {
   loadContributionCandidates,
 } from '#/server/fns/goals'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { Key } from 'react-aria-components'
 import type { Transaction } from '#/server/db/types'
 import type { GoalSummary } from '#/server/goals/summary'
@@ -69,7 +71,7 @@ export function ContributionDialog({
     useState<ReadonlyArray<Transaction> | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   // Validation appears after the first submit, never while somebody is still choosing. The submit
   // button stays enabled for the same reason it does everywhere else in this product: a disabled
   // control gives no reason, and a keyboard user pressing it learns nothing.
@@ -89,7 +91,7 @@ export function ContributionDialog({
       .catch((error: unknown) => {
         if (cancelled) return
         setCandidates([])
-        setFailure(error instanceof Error ? error.message : String(error))
+        setFailure(failureOf(error))
       })
     return () => {
       cancelled = true
@@ -106,7 +108,7 @@ export function ContributionDialog({
       onAdded(result.becameReached)
       onOpenChange(false)
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -139,10 +141,10 @@ export function ContributionDialog({
             >
               <DialogBody className="flex flex-col gap-5">
                 {failure === null ? null : (
-                  <ErrorPanel
+                  <FailurePanel
+                    failure={failure}
+                    placement="after-action"
                     title={t('goals.contribute.error')}
-                    body={t('empty.error.body')}
-                    detail={failure}
                   />
                 )}
 

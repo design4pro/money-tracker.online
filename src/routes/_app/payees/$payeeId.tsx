@@ -3,7 +3,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft, Pencil, X } from 'lucide-react'
 
 import { PayeeAvatar, PayeeDetailSkeleton } from '#/components/app/payees'
-import { ErrorPanel } from '#/components/app/shell'
+import { ErrorPanel, FailurePanel } from '#/components/app/shell'
 import {
   Badge,
   Button,
@@ -15,6 +15,7 @@ import {
   TextField,
   toast,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { listCategories } from '#/server/fns/categories'
 import { addAlias, getPayee, removeAlias } from '#/server/fns/payees'
@@ -22,6 +23,7 @@ import { addAlias, getPayee, removeAlias } from '#/server/fns/payees'
 import { useDataRefresh } from '../-lib/refresh'
 import { PayeeFormDialog } from './-ui/payee-form-dialog'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { MessageKey } from '#/lib/i18n'
 import { pageHead } from '#/routes/-lib/page-title'
 
@@ -64,10 +66,10 @@ export const Route = createFileRoute('/_app/payees/$payeeId')({
  *
  * A payee id that names no row in this workspace no longer arrives here: `getPayee` classifies it
  * as the router's not-found sentinel, so it renders the root's `notFoundComponent` under a 404.
- * What is left is a request that did not come back, which is why the copy says so and offers the
- * disclosure rather than telling the reader the payee is gone.
+ * What is left is a request that did not come back, which is why the copy says so rather than
+ * telling the reader the payee is gone.
  */
-function PayeeDetailError({ error }: { error: Error }) {
+function PayeeDetailError() {
   const t = useTranslate()
   return (
     <div className="flex flex-col gap-4">
@@ -75,7 +77,6 @@ function PayeeDetailError({ error }: { error: Error }) {
       <ErrorPanel
         title={t('payees.detail.error.title')}
         body={t('payees.detail.error.body')}
-        detail={error.message}
       />
     </div>
   )
@@ -106,7 +107,7 @@ function PayeeDetailRoute() {
 
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState('')
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
   const { payee, aliases } = detail
@@ -117,7 +118,7 @@ function PayeeDetailRoute() {
         null)
 
   function report(error: unknown) {
-    setFailure(error instanceof Error ? error.message : String(error))
+    setFailure(failureOf(error))
   }
 
   return (
@@ -205,10 +206,10 @@ function PayeeDetailRoute() {
           </Form>
 
           {failure === null ? null : (
-            <ErrorPanel
+            <FailurePanel
+              failure={failure}
+              placement="after-action"
               title={t('payees.aliases.failed')}
-              body={t('empty.error.body')}
-              detail={failure}
             />
           )}
 

@@ -813,6 +813,8 @@ const messages = {
   'refunds.dialog.submit': 'Link the refund',
   'refunds.dialog.cancel': 'Cancel',
   'refunds.dialog.error.title': 'The refund was not linked',
+  'refunds.dialog.error.refused':
+    'Nothing was changed. This refund cannot be linked as it is. Check the transaction, its amount, its currency and its direction, then try again.',
   'refunds.suggest.loading': 'Looking for what this refunds…',
   'refunds.suggest.empty':
     'Nothing with the same payee in the last 90 days is large enough to be what this refunds.',
@@ -2409,10 +2411,7 @@ const messages = {
   'rules.editor.load.error.body':
     'No rule was created or changed. Try again in a moment.',
   'rules.error.title': 'The rules could not be loaded',
-  'rules.error.body':
-    'Nothing was changed. Try again, and if it keeps happening the detail below is what to send us.',
-  'rules.error.locked':
-    'Rules are not part of this plan, so nothing was saved.',
+  'rules.error.body': 'Nothing was changed. Try again in a moment.',
 
   'rules.empty.title': 'No rules yet',
   'rules.empty.body':

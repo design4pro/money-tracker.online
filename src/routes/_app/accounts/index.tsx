@@ -85,19 +85,12 @@ export const Route = createFileRoute('/_app/accounts/')({
   component: AccountsListRoute,
 })
 
-function AccountsListError({
-  error,
-  reset,
-}: {
-  error: Error
-  reset: () => void
-}) {
+function AccountsListError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('accounts.error.title')}
       body={t('accounts.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

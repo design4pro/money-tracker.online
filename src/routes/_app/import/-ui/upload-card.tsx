@@ -6,6 +6,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Upload } from 'lucide-react'
 
 import { Button, Select, SelectItem } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import { uploadImport } from '#/server/fns/imports'
 
@@ -148,7 +149,7 @@ export function UploadCard({ accounts, options, maxBytes }: UploadCardProps) {
       setPhase('idle')
       setError(
         t('import.upload.error.failed', {
-          reason: cause instanceof Error ? cause.message : file.name,
+          reason: t(failureOf(cause).message.key),
         }),
       )
     }

@@ -78,13 +78,12 @@ function BillingSkeleton() {
   )
 }
 
-function BillingError({ error, reset }: { error: Error; reset: () => void }) {
+function BillingError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('billing.error.title')}
       body={t('empty.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

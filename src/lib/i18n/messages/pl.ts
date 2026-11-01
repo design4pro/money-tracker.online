@@ -848,6 +848,8 @@ const messages = {
   'refunds.dialog.submit': 'Powiąż zwrot',
   'refunds.dialog.cancel': 'Anuluj',
   'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
+  'refunds.dialog.error.refused':
+    'Nic się nie zmieniło. Tego zwrotu nie da się powiązać w tej postaci. Sprawdź transakcję, jej kwotę, walutę i kierunek, a potem spróbuj ponownie.',
   'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
   'refunds.suggest.empty':
     'Żaden wydatek u tego samego odbiorcy z ostatnich 90 dni nie jest dość duży, aby to był jego zwrot.',
@@ -2463,10 +2465,7 @@ const messages = {
   'rules.editor.load.error.body':
     'Żadna zasada nie została utworzona ani zmieniona. Spróbuj ponownie za chwilę.',
   'rules.error.title': 'Nie udało się wczytać zasad',
-  'rules.error.body':
-    'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli będzie się powtarzać, prześlij nam szczegóły poniżej.',
-  'rules.error.locked':
-    'Zasady nie wchodzą w skład tego planu, więc nic nie zapisano.',
+  'rules.error.body': 'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
 
   'rules.empty.title': 'Nie ma jeszcze żadnej zasady',
   'rules.empty.body':
