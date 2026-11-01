@@ -25,7 +25,8 @@
  * 3. `log`, then `report`, receive **only** those redacted fields and the kind. Neither is ever
  *    handed the raw error, because `logger.error(msg, error)` would write `errorMessage` and
  *    `errorStack`. A port that throws is swallowed: it must not change what is thrown.
- * 4. `setStatus` sets the response status of the kind.
+ * 4. `setStatus` receives the status of the kind. The default port uses 200 for a framework RPC
+ *    request; an unmarked server-side call keeps the classified status.
  * 5. A {@link PublicFailureError} is thrown.
  *
  * It sits outside `runWithLedgerBatch` by construction: the batch is opened inside handler bodies,
@@ -174,8 +175,12 @@ const defaultPorts: FailurePorts = {
   },
   report: () => undefined,
   setStatus: async (status) => {
-    const { setResponseStatus } = await import('@tanstack/react-start/server')
-    setResponseStatus(status)
+    const { getRequestHeader, setResponseStatus } =
+      await import('@tanstack/react-start/server')
+    // RPC transports the rejected operation in its validated failure envelope.
+    setResponseStatus(
+      getRequestHeader('x-tsr-serverFn') === 'true' ? 200 : status,
+    )
   },
 }
 
