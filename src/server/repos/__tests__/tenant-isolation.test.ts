@@ -92,6 +92,7 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   spendingByCategory,
   updateCategory,
 } from '../categories'
@@ -1949,6 +1950,28 @@ describe('categories cannot be reached or be aimed across a workspace boundary',
         .orderBy(transactions.id),
     }
   }
+
+  it('seeds only A, ignoring B’s occupied standard slug and leaving B byte-identical', async () => {
+    await world.db
+      .update(categories)
+      .set({ slug: 'food' })
+      .where(eq(categories.id, FOREIGN.parent))
+    const before = await rowsAtStake()
+
+    await expect(
+      seedStandardCategories(world.scope, { locale: 'pl' }),
+    ).resolves.toEqual({ created: 36, skipped: 0 })
+
+    const after = await rowsAtStake()
+    expect(after.bCategories).toEqual(before.bCategories)
+    expect(after.bTransactions).toEqual(before.bTransactions)
+    const food = after.aCategories.find((row) => row.slug === 'food')!
+    expect(food).toMatchObject({ organizationId: 'org-a', name: 'Jedzenie' })
+    expect(food.id).not.toBe(FOREIGN.parent)
+    expect(
+      after.aCategories.find((row) => row.slug === 'groceries'),
+    ).toMatchObject({ organizationId: 'org-a', parentId: food.id })
+  })
 
   /**
    * Every hostile call, run as A and aimed at `target`. Where the call also names a row of A's it

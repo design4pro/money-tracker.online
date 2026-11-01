@@ -1,5 +1,5 @@
 /**
- * The nine category server functions, run: the guard, the scope, the strict input and the absence of
+ * The category server functions, run: the guard, the scope, the strict input and the absence of
  * a ledger batch.
  *
  * Nothing else runs these handlers. The repository tests call `createCategory` directly, where no
@@ -38,6 +38,7 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   updateCategory,
 } from '../categories'
 
@@ -174,13 +175,17 @@ const HANDLERS: ReadonlyArray<{
     name: 'moveCategory',
     run: () => call(moveCategory, { id: TREE.child, parentId: TREE.loose }),
   },
+  {
+    name: 'seedStandardCategories',
+    run: () => call(seedStandardCategories, { locale: 'pl' }),
+  },
 ]
 
 describe('the guard and the scope', () => {
   it('has a case for every export of the handler file', async () => {
     const exported = Object.keys(await import('../categories')).sort()
     expect(HANDLERS.map(({ name }) => name).sort()).toEqual(exported)
-    expect(exported).toHaveLength(9)
+    expect(exported).toHaveLength(10)
   })
 
   it.each(HANDLERS)(
@@ -199,12 +204,17 @@ describe('the guard and the scope', () => {
     const before = await allCategories()
 
     for (const { name, run } of HANDLERS) {
-      if (name === 'listCategories' || name === 'createCategory') continue
+      if (
+        ['listCategories', 'createCategory', 'seedStandardCategories'].includes(
+          name,
+        )
+      )
+        continue
       await expect(run(), name).rejects.toBeInstanceOf(NotFoundError)
     }
 
     expect(await allCategories()).toEqual(before)
-    // The two handlers with no id to refuse act inside B's workspace.
+    // Handlers with no id to refuse act inside B's workspace.
     const listed = (await call(listCategories, {})) as ReadonlyArray<{
       organizationId: string
     }>
@@ -212,6 +222,20 @@ describe('the guard and the scope', () => {
     await expect(call(createCategory, { name: 'Pets' })).resolves.toMatchObject(
       { organizationId: 'org-b' },
     )
+    await expect(
+      call(seedStandardCategories, { locale: 'pl' }),
+    ).resolves.toEqual({ created: 35, skipped: 1 })
+    const seeded = await world.db
+      .select()
+      .from(categories)
+      .orderBy(categories.id)
+    expect(seeded.filter((row) => row.organizationId === 'org-a')).toEqual(
+      before.filter((row) => row.organizationId === 'org-a'),
+    )
+    expect(seeded.find((row) => row.slug === 'housing')).toMatchObject({
+      organizationId: 'org-b',
+      name: 'Mieszkanie',
+    })
   })
 
   it.each(HANDLERS)(
@@ -250,6 +274,16 @@ describe('the strict input is refused at the door', () => {
     readonly handler: unknown
     readonly data: unknown
   }> = [
+    {
+      label: 'an unsupported seed locale',
+      handler: seedStandardCategories,
+      data: { locale: 'de' },
+    },
+    {
+      label: 'an extra seed field',
+      handler: seedStandardCategories,
+      data: { locale: 'pl', organizationId: 'org-b' },
+    },
     {
       label: 'an unknown field on create',
       handler: createCategory,
@@ -394,6 +428,22 @@ describe('another workspace’s id is refused as not found', () => {
 })
 
 describe('the write gate reaches the handlers', () => {
+  it('refuses seeding for a plain member in a shared workspace and writes nothing', async () => {
+    await addSecondMember(world.db)
+    requireOrg.mockResolvedValue(
+      createScope(world.db, {
+        userId: 'user-b',
+        organizationId: 'org-a',
+        role: 'member',
+      }),
+    )
+    const before = await allCategories()
+    await expect(
+      call(seedStandardCategories, { locale: 'pl' }),
+    ).rejects.toBeInstanceOf(ForbiddenError)
+    expect(await allCategories()).toEqual(before)
+  })
+
   it('refuses a plain member in a shared workspace through the create handler and writes nothing', async () => {
     await addSecondMember(world.db)
     requireOrg.mockResolvedValue(

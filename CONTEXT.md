@@ -67,6 +67,9 @@ already caused, or would obviously cause, two people to mean two things by one w
 - **Category** — a classification of what a transaction was for, at most two levels deep, with a
   colour and an icon, scoped to `expense`, `income` or both. _Avoid_: "category" for a tag, for an
   account category, or for a budget.
+- **Standard set** — the ready-made bilingual collection of categories a person can add to a
+  workspace. Its categories are ordinary, editable categories; applying it again leaves existing
+  categories, including archived ones, untouched. _Avoid_: "system categories" for the standard set.
 - **Account category** — the kind of thing an account is (`cash`, `current`, `credit_card`,
   `savings`, `investment`, `loan`, `general`, `other`). Distinct from a transaction category and
   never mixed with it. _Avoid_: "account type".

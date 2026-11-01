@@ -9,8 +9,8 @@
  *    rule (`categories_parent_self_check`); the set-level half — "a parent may not itself have a
  *    parent" — is a product decision, so it lives in this file where changing it costs a test
  *    rather than a migration. {@link createCategory} and {@link moveCategory} both go through
- *    {@link assertMayParent}, and so does every other caller, because there is no write path here
- *    that sets `parent_id` without it.
+ *    {@link assertMayParent}; {@link seedStandardCategories} uses the same `canTakeChildren`
+ *    predicate against its scoped rows, inserting parents before their children.
  *
  * 2. **A colour is inherited until it is overridden, and inheritance is resolved by this module.**
  *    `categories.color` is `NOT NULL`, so "no override" is not a value the column can hold; what
@@ -33,7 +33,7 @@
  *    is exactly the one this rule forbids.
  *
  * **Writes are gated, reads are not.** Every write — create, edit, archive, restore, delete,
- * reorder and move — needs `owner | admin` once the workspace has a second member
+ * reorder, move and seed — needs `owner | admin` once the workspace has a second member
  * ({@link assertMayAdminister}), because a rename, an archive or a re-parent regroups what every
  * other member files transactions under. {@link listCategories}, {@link getCategory},
  * {@link spendingByCategory} and {@link assertCategoryUsable} stay open to every member.
@@ -57,7 +57,9 @@ import {
 } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { isSupportedLocale } from '#/lib/i18n'
 import { ZERO_MINOR, asMinor } from '#/lib/money'
+import { STANDARD_CATEGORIES } from '#/server/categories/standard-set'
 import { member } from '#/server/db/auth-schema'
 import {
   CATEGORY_KINDS,
@@ -76,9 +78,10 @@ import { scopedTransactionFilter } from './transactions'
 import { CATEGORY_ICON_NAMES } from '#/components/app/categories/icon-names'
 
 import type { SQL } from 'drizzle-orm'
+import type { Locale } from '#/lib/i18n'
 import type { Minor } from '#/lib/money'
 import type { CategoryRow } from '#/server/db/schema'
-import type { TenantScope } from './base'
+import type { TenantInsert, TenantScope } from './base'
 import type { TransactionPolicies } from './transactions'
 
 /* -------------------------------------------------------------------------- */
@@ -236,6 +239,15 @@ export const createCategorySchema = z.strictObject({
   icon: iconSchema.nullable().default(null),
 })
 export type CreateCategoryInput = z.input<typeof createCategorySchema>
+
+export const seedStandardCategoriesSchema = z.strictObject({
+  locale: z.custom<Locale>(isSupportedLocale, 'An unsupported locale.'),
+})
+
+export interface StandardSetResult {
+  readonly created: number
+  readonly skipped: number
+}
 
 export const updateCategorySchema = z
   .strictObject({
@@ -579,6 +591,91 @@ export async function createCategory(
     createdAt: now,
     updatedAt: now,
   })
+}
+
+// Measured by the proxy-driver test: a populated category insert binds 12 parameters per row.
+const CATEGORY_INSERT_PARAMETERS = 12
+const CATEGORY_INSERT_CHUNK = Math.floor(100 / CATEGORY_INSERT_PARAMETERS)
+
+/** Plans parents first; a child can reference only a row already read or successfully inserted. */
+function standardCategoryChunk(
+  rows: ReadonlyArray<Category>,
+  locale: Locale,
+): Array<TenantInsert<typeof categories>> {
+  const bySlug = new Map(rows.map((row) => [row.slug, row]))
+  const positions = new Map<string | null, number>()
+  for (const row of rows) {
+    positions.set(
+      row.parentId,
+      Math.max(positions.get(row.parentId) ?? 0, row.position + 1),
+    )
+  }
+  const missing = STANDARD_CATEGORIES.filter((row) => !bySlug.has(row.slug))
+  const parents = missing.filter((row) => row.parentSlug === null)
+  const chunk: Array<TenantInsert<typeof categories>> = []
+  const now = new Date()
+  for (const entry of parents.length > 0 ? parents : missing) {
+    const parent =
+      entry.parentSlug === null ? undefined : bySlug.get(entry.parentSlug)
+    if (
+      entry.parentSlug !== null &&
+      (parent === undefined ||
+        !canTakeChildren(parent) ||
+        parent.archivedAt !== null ||
+        (parent.kind !== entry.kind && parent.kind !== 'both'))
+    )
+      continue
+    const parentId = parent?.id ?? null
+    const position = positions.get(parentId) ?? 0
+    chunk.push({
+      id: newId(),
+      slug: entry.slug,
+      name: nameSchema.parse(entry.names[locale]),
+      kind: entry.kind,
+      parentId,
+      color: colorSchema.parse(parent?.color ?? entry.hue),
+      icon: entry.icon,
+      isSystem: false,
+      position,
+      createdAt: now,
+      updatedAt: now,
+    })
+    positions.set(parentId, position + 1)
+    if (chunk.length === CATEGORY_INSERT_CHUNK) break
+  }
+  return chunk
+}
+
+/** Applies missing standard slugs without changing existing rows, including archived ones. */
+export async function seedStandardCategories(
+  scope: TenantScope,
+  input: z.input<typeof seedStandardCategoriesSchema>,
+): Promise<StandardSetResult> {
+  const { locale } = seedStandardCategoriesSchema.parse(input)
+  await assertMayAdminister(scope, 'add the standard categories')
+  // shortcut: parent moves/archives can race this read; add atomic checks if category writes become transactional.
+  let rows = await categoryRepo.findMany(scope)
+  let created = 0
+  for (;;) {
+    let chunk = standardCategoryChunk(rows, locale)
+    if (chunk.length === 0) break
+    let inserted: Array<Category>
+    try {
+      inserted = await categoryRepo.insertMany(scope, chunk)
+    } catch (error) {
+      const fresh = await categoryRepo.findMany(scope)
+      const slugs = new Set(fresh.map((row) => row.slug))
+      if (!chunk.some((row) => slugs.has(row.slug))) throw error
+      rows = fresh
+      chunk = standardCategoryChunk(rows, locale)
+      if (chunk.length === 0) break
+      // One recovery per failed chunk; a retry failure must keep its own identity.
+      inserted = await categoryRepo.insertMany(scope, chunk)
+    }
+    created += inserted.length
+    rows.push(...inserted)
+  }
+  return { created, skipped: STANDARD_CATEGORIES.length - created }
 }
 
 /**
