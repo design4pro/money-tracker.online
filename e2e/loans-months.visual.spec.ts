@@ -56,7 +56,11 @@ test('Wszystko / Firma / Prywatne is a book filter, not a second register', asyn
   page,
 }) => {
   await gotoApp(page, '/loans/months')
-  await page.getByRole('radio', { name: 'Business' }).click()
+  await page
+    .getByRole('radiogroup', { name: 'Book' })
+    .getByText('Business', { exact: true })
+    .click()
   await expect(page).toHaveURL(/book=business/)
+  await expect(page.getByRole('radio', { name: 'Business' })).toBeChecked()
   await expect(page.getByRole('table').first()).toBeVisible()
 })
