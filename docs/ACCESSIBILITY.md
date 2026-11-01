@@ -185,6 +185,9 @@ is under 44 CSS px on its smaller edge, honouring the in-sentence exception and
 `data-a11y-target-exempt`. That scan measures what is on the page when the route loads, so the rows
 of a closed menu or select are outside it; those are covered by the primitive above, and
 `src/components/ui/__tests__/menu.test.tsx` pins the class that provides the height.
+Toasts shown after load are outside that scan too. `e2e/toast-close-button.spec.ts` measures a
+visible toast's close button and checks axe at narrow and wide viewports, in both themes,
+including EN, PL and RTL; it also verifies Tab reachability, the focus outline and Enter dismissal.
 
 ### 3.5 — 3.3.9 Accessible Authentication (Enhanced)
 

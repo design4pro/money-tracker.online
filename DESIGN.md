@@ -774,14 +774,16 @@ label kept in the DOM under the spinner so the button holds its width.
 ### Toast
 
 - **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
-  button; the copy is the caller's `closeLabel` (`action.close`, EN + PL), never a default string
-  and never an icon-only control without a name.
+  button; the app shell always passes `closeLabel` (`action.close`, EN + PL) and `regionLabel`
+  (`notifications.title`, EN + PL). `ToastHost` retains English defaults for both props. The
+  icon-only close control always has an accessible name.
 - **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
   §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
   never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
-  `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
-  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-8` so text never runs
-  under the box.
+  `aria-hidden` and the button's `aria-label` is its only name. On the #745 base, the reproduced
+  axe defect was `target-size` on the 20px close button; the `role-img-alt` report from #730 did
+  not reproduce on the toast markup. Both rules remain in the browser regression sweep. The
+  toast's content carries `pe-8` so text never runs under the box.
 - **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
   so the toast surface, layout and text use local `!` utilities to apply the product tokens:
   `surface-raised`, `border-subtle`, `rounded-lg`, `p-3.5`, `ink` and `ink-2`. Sonner keeps its
@@ -789,7 +791,9 @@ label kept in the DOM under the spinner so the button holds its width.
   utilities. `left` and `right` read the
   opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
 - **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
-  box-shadow is switched off.
+  box-shadow is switched off. This is an exception to the Focus treatment below:
+  `focus-visible:shadow-none!` also removes the `focus-gap` box-shadow band, while retaining the
+  outline and its offset.
 - **Contrast.** The chip's edge is `border-subtle`, a decorative edge below 3:1 by design; the glyph
   (`ink-2`, forced with `!` like the rest; measured 8.6:1 in light and 8.1:1 in dark on the chip, #730) carries the 1.4.11 contrast.
 - **A toast action.** No toast has an `action` or `cancel` button today. If one is added it must
