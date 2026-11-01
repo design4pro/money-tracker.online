@@ -983,6 +983,8 @@ const messages = {
   'payees.aliases.remove': 'Remove {name}',
   'payees.aliases.empty': 'Nothing but the payee’s own name matches it yet.',
   'payees.aliases.failed': 'That text was not added',
+  'payees.aliases.conflict':
+    'The text may already belong to a payee, contain nothing usable for matching, or exceed this payee’s statement-text limit. Try different text or remove an unused entry from this list.',
   'payees.ignored.title': 'Text that is never a payee',
   'payees.ignored.body':
     'Strings that must never become a payee: "CARD PAYMENT", "SEPA DD" and anything else your bank writes on every line.',

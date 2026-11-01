@@ -210,6 +210,11 @@ function PayeeDetailRoute() {
               failure={failure}
               placement="after-action"
               title={t('payees.aliases.failed')}
+              body={
+                failure.kind === 'conflict'
+                  ? t('payees.aliases.conflict')
+                  : undefined
+              }
             />
           )}
 

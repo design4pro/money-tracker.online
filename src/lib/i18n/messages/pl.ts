@@ -1029,6 +1029,8 @@ const messages = {
   'payees.aliases.remove': 'Usuń {name}',
   'payees.aliases.empty': 'Na razie pasuje tylko własna nazwa tego odbiorcy.',
   'payees.aliases.failed': 'Nie dodaliśmy tego opisu',
+  'payees.aliases.conflict':
+    'Opis może już należeć do odbiorcy, nie zawierać niczego przydatnego do dopasowania albo przekraczać limit opisów tego odbiorcy. Proszę użyć innego opisu lub usunąć nieużywany wpis z tej listy.',
   'payees.ignored.title': 'Opisy, które nigdy nie są odbiorcą',
   'payees.ignored.body':
     'Nazwy, z których nie da się zrobić odbiorcy: „PŁATNOŚĆ KARTĄ”, „POLECENIE ZAPŁATY” i wszystko inne, co bank dopisuje do każdej pozycji.',
