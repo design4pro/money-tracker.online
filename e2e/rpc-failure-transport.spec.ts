@@ -78,6 +78,7 @@ for (const locale of ['en', 'pl'] as const) {
           const headers = {
             'content-type': request.headers()['content-type']!,
             'x-tsr-serverFn': 'true',
+            origin: new URL(request.url()).origin,
           }
           const body = request.postData()!
           expect(body).toContain(id)
