@@ -277,7 +277,10 @@ async function measurePanel(page: Page, kind: PopoverKind) {
   return popover.evaluate((element) => {
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
     return {
-      width: element.getBoundingClientRect().width,
+      // The laid-out width, not `getBoundingClientRect()`: the panel enters with `pop-in`
+      // (`scale(0.96)`), and the bounding box shrinks with the transform for the length of the
+      // animation, so a poll that lands on its tail reads a panel a few pixels under the trigger.
+      width: parseFloat(getComputedStyle(element).width),
       // React Aria publishes the trigger's width on the popover element itself.
       triggerWidth: parseFloat(
         getComputedStyle(element).getPropertyValue('--trigger-width'),
