@@ -122,6 +122,24 @@ test.describe('toast close button', () => {
     }
   }
 
+  test('the toast card retains its visible keyboard focus cue', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await mountHarness(page, 'toast-harness.tsx', { title: 'Toast harness' })
+
+    const card = page.locator('[data-sonner-toast]')
+    await expect(card).toBeVisible()
+    const restingShadow = await card.evaluate(
+      (node) => getComputedStyle(node).boxShadow,
+    )
+    await card.focus()
+    await expect(card).toBeFocused()
+    await expect
+      .poll(() => card.evaluate((node) => getComputedStyle(node).boxShadow))
+      .not.toBe(restingShadow)
+  })
+
   test('a keyboard user reaches the close button, sees a focus ring and dismisses with Enter', async ({
     page,
   }) => {

@@ -95,7 +95,7 @@ export function ToastHost({
         // near-black panel with a mid-grey body line.
         classNames: {
           toast:
-            'group flex w-full items-start! gap-3! rounded-lg! border! border-border-subtle! bg-surface-raised! p-3.5! text-ink! shadow-popover!',
+            'group flex w-full items-start! gap-3! rounded-lg! border! border-border-subtle! bg-surface-raised! p-3.5! text-ink! shadow-popover',
           title: 'text-label! font-semibold! text-ink!',
           description: 'text-caption! text-ink-2!',
           actionButton:
