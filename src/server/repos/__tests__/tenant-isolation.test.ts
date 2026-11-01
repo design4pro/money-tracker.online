@@ -123,6 +123,7 @@ import {
   deleteAccountGroup,
   getAccountBalanceOn,
   listAccountGroups,
+  moveAccountToGroup,
   reorderAccountGroups,
   setAccountGroupMembers,
   updateAccountGroup,
@@ -571,6 +572,38 @@ describe('account groups cannot be reached or aimed across a workspace boundary'
       [B_GROUP, B_CHILD],
     )
   })
+
+  it.each([
+    [B_ACCOUNTS[0], A_GROUP, null],
+    [A_ACCOUNTS[0], B_GROUP, A_GROUP],
+    [A_ACCOUNTS[0], A_GROUP, B_GROUP],
+    [A_ACCOUNTS[0], null, B_GROUP],
+    [A_ACCOUNTS[0], B_GROUP, B_GROUP],
+    [B_ACCOUNTS[0], null, null],
+  ])(
+    'moveAccountToGroup hides foreign ids even for no-ops (%s, %s, %s)',
+    async (accountId, fromGroupId, toGroupId) => {
+      const before = await bState()
+      const error = await moveAccountToGroup(a, {
+        accountId: accountId!,
+        fromGroupId,
+        toGroupId,
+      }).catch((thrown: unknown) => thrown)
+      expect(error).toBeInstanceOf(NotFoundError)
+      const missingId =
+        accountId === B_ACCOUNTS[0] ? 'missing-account' : 'missing-group'
+      const missing = await moveAccountToGroup(a, {
+        accountId: accountId === B_ACCOUNTS[0] ? missingId : accountId!,
+        fromGroupId: fromGroupId === B_GROUP ? missingId : fromGroupId,
+        toGroupId: toGroupId === B_GROUP ? missingId : toGroupId,
+      }).catch((thrown: unknown) => thrown)
+      expect(missing).toBeInstanceOf(NotFoundError)
+      expect(buildEnvelope(error, classifyFailure(error))).toEqual(
+        buildEnvelope(missing, classifyFailure(missing)),
+      )
+      expect(await bState()).toEqual(before)
+    },
+  )
 
   it('createAccountGroup refuses B’s group as the parent', async () => {
     await expectRefused(

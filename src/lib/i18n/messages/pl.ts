@@ -306,6 +306,13 @@ const messages = {
     other: '{name}, wewnątrz {parent}, {count} konta',
   },
   'accounts.groups.row.account': '{account}, w grupie {group}',
+  'accounts.groups.member.actions': 'Działania dla: {name}',
+  'accounts.groups.member.destination': '{name}, wewnątrz {parent}',
+  'accounts.groups.member.remove': 'Usuń z tej grupy',
+  'accounts.groups.member.moved':
+    'Konto {account}: przynależność przeniesiona do grupy {group}.',
+  'accounts.groups.member.removed':
+    'Konto {account}: przynależność usunięta z grupy {group}.',
   'accounts.groups.row.accountArchived':
     '{account}, zarchiwizowane, w grupie {group}',
   'accounts.groups.drag.label': 'Przeciągnij: {name}',

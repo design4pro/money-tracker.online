@@ -300,6 +300,13 @@ const messages = {
     other: '{name}, inside {parent}, {count} accounts',
   },
   'accounts.groups.row.account': '{account}, in {group}',
+  'accounts.groups.member.actions': 'Actions for {name}',
+  'accounts.groups.member.destination': '{name}, inside {parent}',
+  'accounts.groups.member.remove': 'Remove from this group',
+  'accounts.groups.member.moved':
+    'Account {account}: membership moved to {group}.',
+  'accounts.groups.member.removed':
+    'Account {account}: membership removed from {group}.',
   'accounts.groups.row.accountArchived': '{account}, archived, in {group}',
   'accounts.groups.drag.label': 'Drag {name}',
   'accounts.groups.drag.labelChild': 'Drag {name}, inside {parent}',
