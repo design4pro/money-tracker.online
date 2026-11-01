@@ -111,7 +111,13 @@ test('retries the failed calendar read after the service recovers', async ({
   expectConsole,
 }) => {
   await gotoApp(page, '/loans/months')
-  expectConsole(DELIBERATE_SERVER_FAILURE)
+  expectConsole([
+    ...DELIBERATE_SERVER_FAILURE,
+    {
+      why: 'the production router logs the exact failure this test injects',
+      match: /^deliberate failure from e2e\/support\/states\.ts$/,
+    },
+  ])
   const failing = await failServerFns(page)
   try {
     await page
