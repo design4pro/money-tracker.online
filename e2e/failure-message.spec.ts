@@ -49,6 +49,38 @@ function evidenceDirectory(): string | undefined {
 test.describe('a refused save', () => {
   test.use({ storageState: storageStateFor('demo') })
 
+  test('Accounts Retry reruns the failed loader without a page reload', async ({
+    page,
+    context,
+    expectConsole,
+  }) => {
+    expectConsole(DELIBERATE_SERVER_FAILURE)
+    await useLocale(context, 'en')
+    await gotoApp(page, '/dashboard')
+    const failing = await failServerFns(page)
+    try {
+      await page
+        .getByRole('link', { name: 'Accounts', exact: true })
+        .first()
+        .click()
+      const retry = page.getByRole('button', { name: en['action.retry'] })
+      await expect(retry).toBeVisible()
+      await failing.release()
+      const request = page.waitForRequest((request) =>
+        request.url().includes('/_serverFn/'),
+      )
+      await retry.click()
+      await request
+      await expect(retry).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: LABELS.en.newAccount }),
+      ).toBeVisible()
+      await expect(page).toHaveURL(/\/accounts\?status=active$/)
+    } finally {
+      await failing.release()
+    }
+  })
+
   for (const theme of THEMES) {
     for (const locale of LOCALES) {
       test(`shows the sentence of its kind and never the error text - ${theme}, ${locale}`, async ({
