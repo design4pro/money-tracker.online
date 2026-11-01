@@ -57,6 +57,13 @@
       "when": 1793504535616,
       "tag": "0007_recurring_anchor_month_duty",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793509066074,
+      "tag": "0008_wild_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

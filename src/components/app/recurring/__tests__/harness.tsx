@@ -116,6 +116,7 @@ export function series(over: Partial<RecurringSeries> = {}): RecurringSeries {
     remindBefore: '[]',
     notifyEmail: false,
     showInWidget: true,
+    book: 'personal',
     isActive: true,
     completedAt: null,
     logoDomain: null,
