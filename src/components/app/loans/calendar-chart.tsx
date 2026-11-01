@@ -1,5 +1,5 @@
 import { BarChart } from '#/components/charts'
-import { asCurrencyCode } from '#/lib/money'
+import { asCurrencyCode, isZeroMinor } from '#/lib/money'
 import { useLocale, useTranslate } from '#/lib/i18n'
 
 import { monthHeadings } from './month-headings'
@@ -24,6 +24,10 @@ export function CalendarChart({ calendar, year }: CalendarChartProps) {
   const locale = useLocale()
   const headings = monthHeadings(locale)
   const row = calendar.cells.filter((cell) => cell.year === year)
+  const hasObligations = row.some(
+    (cell) =>
+      !isZeroMinor(cell.paidRefMinor) || !isZeroMinor(cell.remainingRefMinor),
+  )
   const emphasis = row.map((cell) => cell.key === calendar.todayMonth)
 
   const series: ReadonlyArray<ChartSeries> = [
@@ -51,7 +55,7 @@ export function CalendarChart({ calendar, year }: CalendarChartProps) {
     <BarChart
       locale={locale}
       currencyCode={asCurrencyCode(calendar.baseCurrencyCode)}
-      series={series}
+      series={hasObligations ? series : []}
       copy={{
         title: t('loans.calendar.chart.title', { year }),
         categoryHeader: t('loans.calendar.chart.category'),

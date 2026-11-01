@@ -10,7 +10,7 @@ import { CalendarGrid } from '../calendar-grid'
 
 import type { Catalogue } from '#/lib/i18n'
 
-function renderCalendar() {
+function renderCalendar(year = 2026) {
   const calendar = assembleCalendar(
     [
       {
@@ -31,7 +31,7 @@ function renderCalendar() {
     calendar,
     ...render(
       <I18nProvider locale="en" messages={en as Catalogue}>
-        <CalendarChart calendar={calendar} year={2026} />
+        <CalendarChart calendar={calendar} year={year} />
         <CalendarGrid calendar={calendar} />
       </I18nProvider>,
     ),
@@ -67,6 +67,22 @@ describe('CalendarGrid scroller', () => {
 })
 
 describe('CalendarChart', () => {
+  it('explains a year without instalments while preserving the full grid', () => {
+    renderCalendar(2025)
+
+    expect(screen.getByText('Nothing planned this year')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Switch year, or add a liability with a schedule that covers it.',
+      ),
+    ).toBeTruthy()
+    const grid = screen.getByRole('table', {
+      name: /Paid and remaining instalments by month and year/i,
+    })
+    expect(within(grid).getByRole('rowheader', { name: '2026' })).toBeTruthy()
+    expect(within(grid).getByText('Overdue')).toBeTruthy()
+  })
+
   it('ships a visually hidden table of the same paid and remaining integers', () => {
     renderCalendar()
     const chart = screen.getByRole('table', {
