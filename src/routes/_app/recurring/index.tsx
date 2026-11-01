@@ -93,19 +93,12 @@ export const Route = createFileRoute('/_app/recurring/')({
   component: RecurringListRoute,
 })
 
-function RecurringListError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function RecurringListError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('recurring.error.title')}
       body={t('recurring.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

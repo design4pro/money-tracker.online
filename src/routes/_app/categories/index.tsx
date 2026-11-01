@@ -78,20 +78,13 @@ export const Route = createFileRoute('/_app/categories/')({
   component: CategoriesRoute,
 })
 
-function CategoriesError({
-  error,
-  reset,
-}: {
-  error: Error
-  reset: () => void
-}) {
+function CategoriesError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       className="max-w-list"
       title={t('categories.error.title')}
       body={t('empty.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import { Button, Card, toast } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { asMinor, formatMoney, makeMoney } from '#/lib/money'
 import { clearSplits, setSplits } from '#/server/fns/splits'
 
 import { SplitRow } from './split-row'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { CategoryOption } from '#/components/app/transactions'
 import type { Minor } from '#/lib/money'
 import type { TransactionSplit } from '#/server/db/types'
@@ -114,7 +116,7 @@ export function SplitEditor({
   )
   const [activeIndex, setActiveIndex] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   const money = (value: number) =>
     formatMoney(locale, makeMoney(asMinor(value), currencyCode))
@@ -176,7 +178,7 @@ export function SplitEditor({
       toast.success(t('splits.saved'))
       onSaved()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -190,7 +192,7 @@ export function SplitEditor({
       toast.success(t('splits.cleared'))
       onSaved()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -224,10 +226,10 @@ export function SplitEditor({
       </div>
 
       {failure === null ? null : (
-        <ErrorPanel
+        <FailurePanel
+          failure={failure}
+          placement="after-action"
           title={t('splits.error.title')}
-          body={t('empty.error.body')}
-          detail={failure}
         />
       )}
 

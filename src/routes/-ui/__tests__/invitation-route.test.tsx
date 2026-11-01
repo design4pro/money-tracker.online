@@ -134,25 +134,24 @@ describe('/invite/$invitationId, accepting', () => {
   })
 
   it.each(['forbidden', 'conflict', 'internal'] as const)(
-    'keeps the toast for a %s envelope',
+    'toasts the sentence of a %s envelope, never its message',
     async (kind) => {
       await accept(envelopeError(kind))
 
       await waitFor(() =>
-        expect(toast.error).toHaveBeenCalledWith(
-          'This could not be completed.',
-        ),
+        expect(toast.error).toHaveBeenCalledWith(en[`failure.${kind}`]),
       )
       expect(router.navigate).not.toHaveBeenCalled()
     },
   )
 
-  it('keeps the toast for a plain error', async () => {
+  it('toasts the internal sentence for a plain error, never its message', async () => {
     await accept(new Error('Network down'))
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('Network down'),
+      expect(toast.error).toHaveBeenCalledWith(en['failure.internal']),
     )
+    expect(toast.error).not.toHaveBeenCalledWith('Network down')
     expect(router.navigate).not.toHaveBeenCalled()
   })
 })

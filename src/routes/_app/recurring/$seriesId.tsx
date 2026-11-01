@@ -90,19 +90,12 @@ export const Route = createFileRoute('/_app/recurring/$seriesId')({
   component: SeriesDetailRoute,
 })
 
-function SeriesDetailError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function SeriesDetailError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('recurring.detail.error.title')}
       body={t('recurring.detail.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

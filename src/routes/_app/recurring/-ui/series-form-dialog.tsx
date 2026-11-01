@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { parseDate, today as todayIn } from '@internationalized/date'
 
-import { ErrorPanel, FormModal, useIsDirty } from '#/components/app/shell'
+import { FailurePanel, FormModal, useIsDirty } from '#/components/app/shell'
 import {
   Button,
   Checkbox,
@@ -21,11 +21,13 @@ import {
   Switch,
   TextField,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { currencyName } from '#/lib/money'
 import { createSeries, updateSeries } from '#/server/fns/recurring'
 import { occurrences } from '#/server/recurring/schedule'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { CalendarDate } from '@internationalized/date'
 import type { Key } from 'react-aria-components'
 import type { Minor } from '#/lib/money'
@@ -269,7 +271,7 @@ export function SeriesFormDialog({
     ...initial,
   }))
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   // Validation appears after the first submit, never while somebody is still filling the form in.
   const [hasTriedToSubmit, setHasTriedToSubmit] = useState(false)
 
@@ -348,7 +350,7 @@ export function SeriesFormDialog({
       }
       onOpenChange(false)
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -385,10 +387,10 @@ export function SeriesFormDialog({
             >
               <DialogBody className="flex flex-col gap-5">
                 {failure === null ? null : (
-                  <ErrorPanel
+                  <FailurePanel
+                    failure={failure}
+                    placement="after-action"
                     title={t('recurring.form.error')}
-                    body={t('empty.error.body')}
-                    detail={failure}
                   />
                 )}
 
