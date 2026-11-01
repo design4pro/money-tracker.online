@@ -85,6 +85,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
 
   useEffect(() => {
     if (focusRequest === undefined || pending.kind !== 'none') return
+    if (focusRequest.key === null && groups.length !== 0) return
     // Let the collection finish restoring focus after removing the old row first.
     const frame = requestAnimationFrame(() => {
       const target =
