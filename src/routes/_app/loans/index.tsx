@@ -85,58 +85,54 @@ function LoansListRoute() {
         </Link>
       </header>
 
+      <div className="flex flex-wrap gap-4">
+        <SegmentedFilter
+          label={t('loans.filter.book')}
+          value={book}
+          onChange={(next: BookFilter) =>
+            void navigate({ search: { book: next, status } })
+          }
+          options={[
+            { id: 'all', label: t('loans.filter.book.all') },
+            { id: 'business', label: t('loans.book.business') },
+            { id: 'personal', label: t('loans.book.personal') },
+          ]}
+        />
+        <SegmentedFilter
+          label={t('loans.filter.status')}
+          value={status}
+          onChange={(next: StatusFilter) =>
+            void navigate({ search: { book, status: next } })
+          }
+          options={[
+            { id: 'active', label: t('loans.filter.active') },
+            { id: 'all', label: t('loans.filter.all') },
+          ]}
+        />
+      </div>
+
       {overview.rows.length === 0 && book === 'all' && status === 'active' ? (
         <LoanEmptyState />
+      ) : overview.rows.length === 0 ? (
+        <Card padding="lg" className="text-center">
+          <h2 className="text-subtitle font-semibold text-ink">
+            {t('loans.empty.filtered.title')}
+          </h2>
+          <p className="mt-1 text-body text-ink-2">
+            {t('loans.empty.filtered.body')}
+          </p>
+        </Card>
       ) : (
         <>
-          <div className="flex flex-wrap gap-4">
-            <SegmentedFilter
-              label={t('loans.filter.book')}
-              value={book}
-              onChange={(next: BookFilter) =>
-                void navigate({ search: { book: next, status } })
-              }
-              options={[
-                { id: 'all', label: t('loans.filter.book.all') },
-                { id: 'business', label: t('loans.book.business') },
-                { id: 'personal', label: t('loans.book.personal') },
-              ]}
-            />
-            <SegmentedFilter
-              label={t('loans.filter.status')}
-              value={status}
-              onChange={(next: StatusFilter) =>
-                void navigate({ search: { book, status: next } })
-              }
-              options={[
-                { id: 'active', label: t('loans.filter.active') },
-                { id: 'all', label: t('loans.filter.all') },
-              ]}
-            />
-          </div>
-
-          {overview.rows.length === 0 ? (
-            <Card padding="lg" className="text-center">
-              <h2 className="text-subtitle font-semibold text-ink">
-                {t('loans.empty.filtered.title')}
-              </h2>
-              <p className="mt-1 text-body text-ink-2">
-                {t('loans.empty.filtered.body')}
-              </p>
-            </Card>
-          ) : (
-            <>
-              <OverviewFigures
-                overview={overview}
-                baseCurrencyCode={baseCurrencyCode}
-              />
-              <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
-                {overview.rows.map((summary) => (
-                  <LoanCard key={summary.loan.id} summary={summary} />
-                ))}
-              </ul>
-            </>
-          )}
+          <OverviewFigures
+            overview={overview}
+            baseCurrencyCode={baseCurrencyCode}
+          />
+          <ul className="rounded-xl border border-border-subtle bg-surface shadow-card">
+            {overview.rows.map((summary) => (
+              <LoanCard key={summary.loan.id} summary={summary} />
+            ))}
+          </ul>
         </>
       )}
     </div>

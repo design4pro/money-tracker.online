@@ -105,7 +105,13 @@ export const markLoanInstalmentPaid = createServerFn({ method: 'POST' })
 const candidatesSchema = z.strictObject({
   loanId: z.string().trim().min(1).max(64),
   sequence: z.number().int().min(1),
+  cursor: z.string().max(4096).nullable().default(null),
 })
+
+export interface InstalmentCandidates {
+  readonly rows: ReadonlyArray<Transaction>
+  readonly nextCursor: string | null
+}
 
 /**
  * Expenses in the loan's currency, on the loan's account (when it has one), within a fortnight
@@ -114,7 +120,7 @@ const candidatesSchema = z.strictObject({
  */
 export const loadInstalmentCandidates = createServerFn({ method: 'GET' })
   .inputValidator(candidatesSchema)
-  .handler(async ({ data }): Promise<ReadonlyArray<Transaction>> => {
+  .handler(async ({ data }): Promise<InstalmentCandidates> => {
     const scope = await requireOrg()
     const loan = await getLoanRow(scope, data.loanId).catch(rethrowAsNotFound)
     const instalments = await listInstalmentsRow(scope, { loanId: loan.id })
@@ -139,11 +145,14 @@ export const loadInstalmentCandidates = createServerFn({ method: 'GET' })
         direction: 'expense',
       },
       sort: { field: 'bookedOn', direction: 'desc' },
-      cursor: null,
+      cursor: data.cursor,
       limit: 50,
     })
     const linked = await listSettledTransactionIds(scope)
-    return page.rows.filter(
-      (row) => row.currencyCode === loan.currencyCode && !linked.has(row.id),
-    )
+    return {
+      rows: page.rows.filter(
+        (row) => row.currencyCode === loan.currencyCode && !linked.has(row.id),
+      ),
+      nextCursor: page.nextCursor,
+    }
   })

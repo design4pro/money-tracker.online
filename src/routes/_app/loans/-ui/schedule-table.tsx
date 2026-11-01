@@ -189,6 +189,7 @@ export function ScheduleTable({
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-auto whitespace-normal"
                       onPress={() => onMarkPaid(row)}
                     >
                       {t('loans.markPaid.action', {

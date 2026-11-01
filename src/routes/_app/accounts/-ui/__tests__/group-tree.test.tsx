@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { I18nProvider } from '#/lib/i18n'
@@ -275,11 +281,24 @@ describe('GroupTree keyboard drag', () => {
     // Savings sits after Business; dragging it up one slot must give the same move as the menu.
     const { onMove } = renderTree()
     const user = userEvent.setup()
-    const handle = screen.getByRole('button', { name: 'Drag Savings' })
-    handle.focus()
+    // Reach the handle the way a keyboard user does: Tab lands on the first row, six rows down is
+    // Savings, ArrowRight enters it. A bare `handle.focus()` depends on the focus modality an
+    // earlier test left behind: with none, the list sends focus back to its first row.
+    await user.tab()
+    await user.keyboard('{ArrowDown>6/}{ArrowRight}')
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(
+      'Drag Savings',
+    )
     await user.keyboard('{Enter}')
-    // The drag starts on "before Joint". Account rows and the second name of a boundary are
-    // skipped: Trips, Bills, after Bills, then Business.
+    // React Aria starts listening for the drag keys on the next animation frame; a key sent before
+    // that moves row focus instead. The session is live once focus is on a drop target.
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute('aria-label')).toMatch(
+        /^Insert /,
+      ),
+    )
+    // The drag starts after Savings, the last top-level group. Account rows are skipped, so four
+    // steps down are: before Joint (wrapping), before Trips, before Bills, before Business.
     await user.keyboard('{ArrowDown>4/}')
     await user.keyboard('{Enter}')
 
@@ -291,6 +310,13 @@ describe('GroupTree keyboard drag', () => {
     })
     onMove.mockClear()
 
+    // React Aria hands focus back to the dragged row 50 ms after a drop; a click on the menu
+    // trigger before that leaves no menu open.
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute('aria-label')).toBe(
+        'Savings, group, 2 accounts',
+      ),
+    )
     await user.click(
       screen.getByRole('button', { name: 'Actions for Savings' }),
     )

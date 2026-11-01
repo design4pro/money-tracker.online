@@ -13,11 +13,6 @@ import { TENANT_A, storageStateFor } from './support/session'
 test.describe('write flows', () => {
   test.use({ storageState: storageStateFor('tenant-a') })
 
-  test.skip(
-    ({ browserName, isMobile }) => browserName !== 'chromium' || isMobile,
-    'two projects would settle the same fixture workspace at once',
-  )
-
   test('mark paid binds a transaction id and never a naked checkbox', async ({
     page,
   }) => {
@@ -44,7 +39,10 @@ test.describe('write flows', () => {
       ).toBeVisible()
       await expectNoSeriousViolations(page, 'settle dialog')
 
-      await dialog.getByRole('radio').first().click()
+      const candidate = dialog.getByRole('radio').first()
+      await candidate.focus()
+      await candidate.press('Space')
+      await expect(candidate).toBeChecked()
       await dialog
         .getByRole('button', { name: 'Link this transaction' })
         .click()

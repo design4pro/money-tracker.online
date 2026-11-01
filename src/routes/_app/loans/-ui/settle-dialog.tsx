@@ -58,17 +58,23 @@ export function SettleDialog({
   const [selected, setSelected] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [hasFailed, setHasFailed] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     setRows(null)
     setSelected(null)
     setHasFailed(false)
+    setNextCursor(null)
     void loadInstalmentCandidates({
       data: { loanId, sequence: instalment.sequence },
     })
       .then((page) => {
-        if (!cancelled) setRows(page)
+        if (!cancelled) {
+          setRows(page.rows)
+          setNextCursor(page.nextCursor)
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -80,6 +86,23 @@ export function SettleDialog({
       cancelled = true
     }
   }, [loanId, instalment.sequence])
+
+  async function loadMore() {
+    if (nextCursor === null || isLoadingMore) return
+    setIsLoadingMore(true)
+    setHasFailed(false)
+    try {
+      const page = await loadInstalmentCandidates({
+        data: { loanId, sequence: instalment.sequence, cursor: nextCursor },
+      })
+      setRows((previous) => [...(previous ?? []), ...page.rows])
+      setNextCursor(page.nextCursor)
+    } catch {
+      setHasFailed(true)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
 
   async function submit() {
     if (selected === null) return
@@ -120,9 +143,13 @@ export function SettleDialog({
             />
             <DialogBody className="flex flex-col gap-4">
               <p role="status" className="sr-only">
-                {rows === null
-                  ? t('loans.markPaid.loading')
-                  : t('loans.markPaid.candidateCount', { count: rows.length })}
+                {hasFailed
+                  ? ''
+                  : rows === null
+                    ? t('loans.markPaid.loading')
+                    : t('loans.markPaid.candidateCount', {
+                        count: rows.length,
+                      })}
               </p>
 
               {hasFailed ? (
@@ -141,7 +168,7 @@ export function SettleDialog({
                   {t('loans.markPaid.loading')}
                 </p>
               ) : rows.length === 0 ? (
-                hasFailed ? null : (
+                hasFailed || nextCursor !== null ? null : (
                   <div className="flex flex-col gap-3">
                     <p className="text-body text-ink-2">
                       {t('loans.markPaid.empty')}
@@ -198,7 +225,9 @@ export function SettleDialog({
                       <Radio
                         key={row.id}
                         value={row.id}
-                        description={`${planned} · ${varianceLabel}`}
+                        description={[row.note, `${planned} · ${varianceLabel}`]
+                          .filter(Boolean)
+                          .join(' · ')}
                       >
                         {`${formatCalendarDate(locale, row.bookedOn, 'medium')} · ${formatMoney(
                           locale,
@@ -210,6 +239,15 @@ export function SettleDialog({
                 </RadioGroup>
               )}
 
+              {nextCursor === null ? null : (
+                <Button
+                  variant="secondary"
+                  isPending={isLoadingMore}
+                  onPress={() => void loadMore()}
+                >
+                  {t('action.showMore')}
+                </Button>
+              )}
               <p className="text-caption text-ink-2">
                 {t('loans.markPaid.never')}
               </p>
