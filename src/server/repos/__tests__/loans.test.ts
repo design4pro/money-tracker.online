@@ -226,6 +226,72 @@ describe('paid instalments bind a transaction', () => {
     ).rejects.toBeInstanceOf(LoanInstalmentSettledError)
   })
 
+  it('refuses term edits when an instalment is settled during the edit', async () => {
+    const loan = await createLoan(scope, importedInput())
+    await seedTransaction(world.db, {
+      id: 'tx-a',
+      refAmountMinor: 120_00,
+      bookedOn: '2026-02-20',
+    })
+
+    const [settlement, edit] = await Promise.allSettled([
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-a',
+      }),
+      updateLoan(scope, loan.id, { principalMinor: 400_00 }),
+    ])
+    expect(settlement).toMatchObject({ status: 'fulfilled' })
+    expect(edit).toMatchObject({
+      status: 'rejected',
+      reason: expect.any(LoanTermsLockedError),
+    })
+    expect((await getLoan(scope, loan.id)).principalMinor).toBe(500_00)
+  })
+
+  it('allows only one transaction to win concurrent settlements', async () => {
+    const loan = await createLoan(scope, importedInput())
+    for (const id of ['tx-a', 'tx-a2']) {
+      await seedTransaction(world.db, {
+        id,
+        refAmountMinor: 120_00,
+        bookedOn: '2026-02-20',
+      })
+    }
+
+    const results = await Promise.allSettled(
+      ['tx-a', 'tx-a2'].map((transactionId) =>
+        markInstalmentPaid(scope, {
+          loanId: loan.id,
+          sequence: 1,
+          transactionId,
+        }),
+      ),
+    )
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1)
+    const rejected = results.find((result) => result.status === 'rejected')
+    expect(rejected).toMatchObject({
+      reason: expect.any(LoanInstalmentSettledError),
+    })
+    const winner = results.find((result) => result.status === 'fulfilled')
+    const rows = await listInstalments(scope, { loanId: loan.id })
+    expect(rows[0]?.settledTransactionId).toBe(
+      winner?.value.settledTransactionId,
+    )
+    await expect(
+      markInstalmentPaid(scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: rows[0]?.settledTransactionId ?? '',
+      }),
+    ).resolves.toMatchObject({
+      settledTransactionId: rows[0]?.settledTransactionId,
+    })
+  })
+
   it('lets the database refuse a paid row with no transaction id', async () => {
     const loan = await createLoan(scope, importedInput())
     await expect(

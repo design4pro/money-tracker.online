@@ -30,7 +30,7 @@
  * repository those stages call.
  */
 
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, eq, ne, notExists, or, sql } from 'drizzle-orm'
 
 import type { SQL } from 'drizzle-orm'
 import { z } from 'zod'
@@ -117,9 +117,8 @@ const currencySchema = z
   .regex(/^[A-Z]{3}$/u, { error: 'An ISO 4217 alphabetic code.' })
 
 /**
- * The most instalments one loan carries. Equal to the longest `termPeriods`, so a schedule is never
- * longer than the term it claims, and bounded so one request cannot store (or price) an unbounded
- * number of rows: instalments are not metered.
+ * The most instalments one loan carries, matching the maximum allowed `termPeriods`.
+ * Bounded so one request cannot store or price unbounded rows: instalments are not metered.
  */
 export const MAX_INSTALMENTS = 600
 
@@ -658,7 +657,8 @@ export async function updateLoan(
     }
   }
 
-  if (patchTouchesTerms(parsed)) {
+  const touchesTerms = patchTouchesTerms(parsed)
+  if (touchesTerms) {
     const paid = await firstPaidSequence(scope, parsedId)
     if (paid !== null) throw new LoanTermsLockedError(parsedId, paid)
   }
@@ -703,7 +703,27 @@ export async function updateLoan(
         ? null
         : await refTriple(nextOutstanding, currencyCode, openedOn, conversion)
 
-  await loanRepo.requireUpdate(scope, parsedId, {
+  const where = and(
+    eq(loans.id, parsedId),
+    touchesTerms
+      ? notExists(
+          scope.db
+            .select({ sequence: loanInstalments.sequence })
+            .from(loanInstalments)
+            .where(
+              tenantFilter(
+                scope,
+                loanInstalments,
+                and(
+                  eq(loanInstalments.loanId, parsedId),
+                  eq(loanInstalments.status, 'paid'),
+                ),
+              ),
+            ),
+        )
+      : undefined,
+  ) as SQL
+  const rows = await loanRepo.updateWhere(scope, where, {
     ...(parsed.name === undefined ? {} : { name: parsed.name }),
     ...(parsed.kind === undefined ? {} : { kind: parsed.kind }),
     ...(parsed.book === undefined ? {} : { book: parsed.book }),
@@ -757,6 +777,11 @@ export async function updateLoan(
     ...(parsed.note === undefined ? {} : { note: parsed.note }),
     updatedAt: new Date(),
   })
+  if (rows.length === 0) {
+    const paid = touchesTerms ? await firstPaidSequence(scope, parsedId) : null
+    if (paid !== null) throw new LoanTermsLockedError(parsedId, paid)
+    throw new NotFoundError('loan', parsedId)
+  }
   return getLoan(scope, parsedId)
 }
 
@@ -785,31 +810,15 @@ export async function markInstalmentPaid(
   await getLoan(scope, parsed.loanId)
   await requireOwnedTransaction(scope, parsed.transactionId)
 
-  const existing = await instalmentAccess.findOne(
-    scope,
-    and(
-      eq(loanInstalments.loanId, parsed.loanId),
-      eq(loanInstalments.sequence, parsed.sequence),
-    ) as SQL,
-  )
-  if (existing === null) {
-    throw new NotFoundError(
-      'loan instalment',
-      `${parsed.loanId}:${parsed.sequence}`,
-    )
-  }
-  if (
-    existing.status === 'paid' &&
-    existing.settledTransactionId !== parsed.transactionId
-  ) {
-    throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
-  }
-
   const rows = await instalmentAccess.updateWhere(
     scope,
     and(
       eq(loanInstalments.loanId, parsed.loanId),
       eq(loanInstalments.sequence, parsed.sequence),
+      or(
+        ne(loanInstalments.status, 'paid'),
+        eq(loanInstalments.settledTransactionId, parsed.transactionId),
+      ),
     ) as SQL,
     {
       status: 'paid',
@@ -819,6 +828,16 @@ export async function markInstalmentPaid(
   )
   const updated = rows.at(0)
   if (updated === undefined) {
+    const existing = await instalmentAccess.findOne(
+      scope,
+      and(
+        eq(loanInstalments.loanId, parsed.loanId),
+        eq(loanInstalments.sequence, parsed.sequence),
+      ) as SQL,
+    )
+    if (existing !== null) {
+      throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
+    }
     throw new NotFoundError(
       'loan instalment',
       `${parsed.loanId}:${parsed.sequence}`,
