@@ -54,6 +54,8 @@ import {
   budgetCategories,
   currencies,
   exchangeRates,
+  loanInstalments,
+  organizationCurrencies,
   transactionSplits,
   transactions,
 } from '#/server/db/schema'
@@ -130,6 +132,7 @@ import {
   getTransaction,
   updateTransaction,
 } from '../transactions'
+import { createLoan, listInstalments, markInstalmentPaid } from '../loans'
 
 import type { RateE10 } from '#/lib/money'
 import type { MatchSubject } from '#/server/recurring/match'
@@ -2595,5 +2598,155 @@ describe('22 — a category write never touches an amount', () => {
       'cat-home',
     )
     await expect(getCategory(world.scope, 'cat-unused')).rejects.toThrow()
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* 23 — imported loan schedules                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The loan register's money contract (`00-S17` extended for imported amounts).
+ *
+ * The amortisation engine is a later stage. What this stage must not get wrong: every amount is
+ * an integer minor unit, `ref_*` is historical, a paid instalment requires a transaction id, and
+ * the imported schedule sums to exactly the amounts that were written.
+ */
+describe('23 — an imported loan schedule is integer amounts with paid-requires-a-transaction', () => {
+  it('writes ref amounts once at identity for the workspace base and never invents a float', async () => {
+    const world = await createBudgetWorld()
+    const loan = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      principalMinor: 1_000_00,
+      instalmentMinor: 120_00,
+      outstandingMinor: 1_000_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      instalments: [
+        { dueOn: '2026-02-20', amountMinor: 120_00 },
+        { dueOn: '2026-03-20', amountMinor: 110_00 },
+        { dueOn: '2026-04-20', amountMinor: 90_00, isBuyout: true },
+      ],
+    })
+
+    expect(loan.principalMinor).toBe(1_000_00)
+    expect(loan.refPrincipalMinor).toBe(1_000_00)
+    expect(loan.instalmentMinor).toBe(120_00)
+    expect(loan.refInstalmentMinor).toBe(120_00)
+    expect(loan.outstandingMinor).toBe(1_000_00)
+    expect(loan.refOutstandingMinor).toBe(1_000_00)
+    expect(loan.rateE10).toBe(10_000_000_000)
+    expect(Number.isInteger(loan.instalmentMinor)).toBe(true)
+
+    const rows = await listInstalments(world.scope, { loanId: loan.id })
+    const written = [120_00, 110_00, 90_00]
+    expect(rows.map((row) => row.amountMinor)).toEqual(written)
+    expect(rows.map((row) => row.refAmountMinor)).toEqual(written)
+    expect(rows.reduce((sum, row) => sum + row.amountMinor, 0)).toBe(
+      120_00 + 110_00 + 90_00,
+    )
+    expect(rows.some((row) => row.isBuyout)).toBe(true)
+    expect(rows.every((row) => Number.isSafeInteger(row.amountMinor))).toBe(
+      true,
+    )
+  })
+
+  it('refuses to store paid without a transaction, and accepts paid only by pointing at one', async () => {
+    const world = await createBudgetWorld()
+    const loan = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      instalments: [{ dueOn: '2026-02-20', amountMinor: 50_00 }],
+    })
+    await seedTransaction(world.db, {
+      id: 'tx-loan-a',
+      refAmountMinor: 50_00,
+      bookedOn: '2026-02-20',
+    })
+
+    await expect(
+      world.db.insert(loanInstalments).values({
+        organizationId: 'org-a',
+        loanId: loan.id,
+        sequence: 99,
+        dueOn: '2026-12-20',
+        amountMinor: 10_00,
+        currencyCode: 'PLN',
+        refAmountMinor: 10_00,
+        rateE10: 10_000_000_000,
+        status: 'paid',
+        settledTransactionId: null,
+        createdAt: new Date('2026-03-15T10:00:00.000Z'),
+        updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+      }),
+    ).rejects.toThrow()
+
+    const paid = await markInstalmentPaid(world.scope, {
+      loanId: loan.id,
+      sequence: 1,
+      transactionId: 'tx-loan-a',
+    })
+    expect(paid.status).toBe('paid')
+    expect(paid.settledTransactionId).toBe('tx-loan-a')
+    expect(paid.amountMinor).toBe(50_00)
+  })
+
+  it('keeps the digits of the currency: a yen loan is not scaled by 100', async () => {
+    const world = await createBudgetWorld()
+    await world.db.insert(organizationCurrencies).values({
+      organizationId: 'org-a',
+      currencyCode: 'JPY',
+      isBase: false,
+      addedAt: new Date('2026-03-15T10:00:00.000Z'),
+    })
+    await world.db.insert(exchangeRates).values({
+      baseCode: 'JPY',
+      quoteCode: 'PLN',
+      date: '2026-01-15',
+      rateE10: 2_500_000_000,
+      source: 'manual',
+      fetchedAt: new Date('2026-01-15T00:00:00.000Z'),
+    })
+    await world.db.insert(accounts).values({
+      id: 'acc-a-jpy',
+      organizationId: 'org-a',
+      name: 'Yen',
+      currencyCode: 'JPY',
+      createdAt: new Date('2026-03-15T10:00:00.000Z'),
+      updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+    })
+
+    const loan = await createLoan(world.scope, {
+      name: 'Loan JPY',
+      accountId: 'acc-a-jpy',
+      currencyCode: 'JPY',
+      principalMinor: 10_000,
+      instalmentMinor: 1_000,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      instalments: [
+        { dueOn: '2026-01-15', amountMinor: 1_000 },
+        { dueOn: '2026-01-20', amountMinor: 1_000 },
+      ],
+    })
+
+    expect(loan.principalMinor).toBe(10_000)
+    expect(loan.instalmentMinor).toBe(1_000)
+    const rows = await listInstalments(world.scope, { loanId: loan.id })
+    expect(rows.map((row) => row.amountMinor)).toEqual([1_000, 1_000])
+    expect(rows.every((row) => Number.isInteger(row.refAmountMinor))).toBe(true)
+  })
+
+  it('contains no float arithmetic on an amount in the loans repository', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../loans.ts', import.meta.url)),
+      'utf8',
+    )
+    expect(source).not.toMatch(/\bMath\.(pow|floor|ceil|round)\b/)
+    expect(source).not.toMatch(/\/\s*\d*(?:00|100)\b/)
   })
 })
