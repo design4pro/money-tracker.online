@@ -17,6 +17,7 @@ import type { ReactNode } from 'react'
 import type { Catalogue } from '#/lib/i18n'
 import type { RecurringCandidate, RecurringSeries } from '#/server/db/types'
 import type { CandidateRow, SeriesListRow } from '#/server/fns/recurring'
+import type { SeriesForecast } from '#/server/recurring/forecast'
 import type { PeriodView } from '#/server/repos/recurring'
 
 /**
@@ -102,6 +103,8 @@ export function series(over: Partial<RecurringSeries> = {}): RecurringSeries {
     expectedCurrencyCode: 'PLN',
     frequency: 'monthly',
     anchorDay: null,
+    anchorMonth: null,
+    dutyCode: null,
     startDate: '2026-01-01',
     endDate: null,
     maxOccurrences: null,
@@ -113,6 +116,7 @@ export function series(over: Partial<RecurringSeries> = {}): RecurringSeries {
     remindBefore: '[]',
     notifyEmail: false,
     showInWidget: true,
+    book: 'personal',
     isActive: true,
     completedAt: null,
     logoDomain: null,
@@ -142,12 +146,23 @@ export function period(over: Partial<PeriodView> = {}): PeriodView {
   }
 }
 
+export function forecast(over: Partial<SeriesForecast> = {}): SeriesForecast {
+  return {
+    currencyCode: 'PLN',
+    spentThisYearMinor: asMinor(0),
+    restOfYearMinor: asMinor(0),
+    next12MonthsMinor: asMinor(0),
+    ...over,
+  }
+}
+
 /** A list row: the series, where its next period stands, and how much it has missed. */
 export function listRow(over: Partial<SeriesListRow> = {}): SeriesListRow {
   return {
     series: series(),
     next: period(),
     overdueCount: 0,
+    forecast: forecast(),
     ...over,
   }
 }

@@ -42,6 +42,7 @@ import type { ComponentType, DragEvent } from 'react'
 import type { Key } from 'react-aria-components'
 import type { MessageKey, Translate } from '#/lib/i18n'
 import type { MoveStep, TreeMove } from '#/components/app/tree'
+import type { MoveAccountToGroupInput } from '#/server/repos/accounts'
 
 import type { GroupEntry, GroupItem, MemberEntry } from './group-rows'
 
@@ -51,10 +52,8 @@ import type { GroupEntry, GroupItem, MemberEntry } from './group-rows'
  * It follows the category tree's contract (`DESIGN.md` -> Reorderable tree) and differs from it in
  * three places, all because a group row is not the only kind of row in the list:
  *
- * - **Account rows are read-only.** Each group lists the accounts it holds, so a person can see
- *   what a rename or a delete touches. They carry no drag handle and no menu, and a pointer drag
- *   that starts on one is stopped before React Aria sees it ({@link blockMemberDrag}). Moving an
- *   account is another screen's gesture.
+ * - **Account rows move through their menu only.** A pointer drag that starts on one is stopped
+ *   before React Aria sees it ({@link blockMemberDrag}). Each menu acts on its row's membership.
  * - **Only a group row is a drop target, and only beside it.** Every other target is cancelled, which
  *   skips it for the pointer and the keyboard alike and draws no indicator ({@link acceptsDrop}).
  * - **The move arithmetic never sees an account row.** `#/components/app/tree` reads *groups*;
@@ -78,6 +77,7 @@ export interface GroupTreeProps {
    * was applied, so a menu move is announced only when it happened.
    */
   readonly onMove: (move: TreeMove) => Promise<boolean>
+  readonly onMoveAccount: (move: MoveAccountToGroupInput) => Promise<boolean>
 }
 
 export function GroupTree({
@@ -86,6 +86,7 @@ export function GroupTree({
   onAddChild,
   onDelete,
   onMove,
+  onMoveAccount,
 }: GroupTreeProps) {
   const t = useTranslate()
   const entries = useMemo(() => buildEntries(groups), [groups])
@@ -154,7 +155,11 @@ export function GroupTree({
               onMove={applyFromMenu}
             />
           ) : (
-            <MemberRow entry={entry} />
+            <MemberRow
+              entry={entry}
+              groups={groups}
+              onMoveAccount={onMoveAccount}
+            />
           )
         }
       </GridList>
@@ -288,15 +293,32 @@ function GroupRow({
   )
 }
 
-/**
- * An account inside a group: a name, and nothing to do with it here.
- *
- * It is a row of the list - arrow keys reach it and a screen reader reads where it is - but it is
- * not an actor: no drag handle, no menu, no action. Indented one level more under a sub-group.
- */
-function MemberRow({ entry }: { readonly entry: MemberEntry }) {
+/** An account's menu changes only the membership named by this row. */
+function MemberRow({
+  entry,
+  groups,
+  onMoveAccount,
+}: {
+  readonly entry: MemberEntry
+  readonly groups: ReadonlyArray<GroupItem>
+  readonly onMoveAccount: GroupTreeProps['onMoveAccount']
+}) {
   const t = useTranslate()
   const { member, group, depth } = entry
+  const isNarrow = useIsNarrow()
+  const name = t(
+    member.isArchived
+      ? 'accounts.groups.row.accountArchived'
+      : 'accounts.groups.row.account',
+    { account: member.name, group: group.name },
+  )
+  const move = (toGroupId: string | null) => {
+    void onMoveAccount({
+      accountId: member.id,
+      fromGroupId: group.id,
+      toGroupId,
+    })
+  }
   return (
     <GridListItem
       id={entry.key}
@@ -307,6 +329,70 @@ function MemberRow({ entry }: { readonly entry: MemberEntry }) {
         { account: member.name, group: group.name },
       )}
       className={depth === 1 ? 'ms-6' : 'ms-12'}
+      actions={
+        <MenuTrigger>
+          <Button
+            variant="ghost"
+            shape="icon"
+            size="sm"
+            label={t('accounts.groups.member.actions', { name })}
+            icon={<MoreHorizontal aria-hidden="true" />}
+          />
+          <Popover placement="bottom end">
+            <Menu>
+              <SubmenuTrigger>
+                <MenuItem
+                  hasSubmenu
+                  icon={<FolderInput aria-hidden="true" />}
+                  textValue={t('action.moveTo')}
+                >
+                  {t('action.moveTo')}
+                </MenuItem>
+                <Popover
+                  placement={isNarrow ? 'bottom end' : 'end top'}
+                  className="max-w-[calc(100vw-1rem)]"
+                >
+                  <Menu onAction={(key) => move(String(key))}>
+                    {groups.map((destination) => {
+                      const parent = groups.find(
+                        (candidate) => candidate.id === destination.parentId,
+                      )
+                      const label =
+                        parent === undefined
+                          ? destination.name
+                          : t('accounts.groups.member.destination', {
+                              name: destination.name,
+                              parent: parent.name,
+                            })
+                      return (
+                        <MenuItem
+                          key={destination.id}
+                          id={destination.id}
+                          isDisabled={destination.id === group.id}
+                          description={
+                            destination.id === group.id
+                              ? t('accounts.group.disabled.same')
+                              : undefined
+                          }
+                          textValue={label}
+                        >
+                          {label}
+                        </MenuItem>
+                      )
+                    })}
+                  </Menu>
+                </Popover>
+              </SubmenuTrigger>
+              <MenuItem
+                onAction={() => move(null)}
+                textValue={t('accounts.groups.member.remove')}
+              >
+                {t('accounts.groups.member.remove')}
+              </MenuItem>
+            </Menu>
+          </Popover>
+        </MenuTrigger>
+      }
     >
       <div className="flex min-w-0 items-center gap-2.5">
         {/*

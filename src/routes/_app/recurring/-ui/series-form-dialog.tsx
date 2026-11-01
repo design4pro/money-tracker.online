@@ -24,6 +24,7 @@ import {
 import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { currencyName } from '#/lib/money'
+import { JDG_DUTY_TEMPLATES } from '#/lib/recurring/jdg-duties'
 import { createSeries, updateSeries } from '#/server/fns/recurring'
 import { occurrences } from '#/server/recurring/schedule'
 
@@ -31,6 +32,7 @@ import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { CalendarDate } from '@internationalized/date'
 import type { Key } from 'react-aria-components'
 import type { Minor } from '#/lib/money'
+import type { Book, RecurringDutyCode } from '#/lib/enums'
 import type {
   CategoryRow,
   RecurringFrequency,
@@ -149,14 +151,19 @@ const MONTH_SHAPED: ReadonlySet<string> = new Set([
 type Automation = 'none' | 'auto' | 'match'
 type TerminationKind = 'open' | 'endDate' | 'maxOccurrences'
 
+const BOOKS: ReadonlyArray<Book> = ['business', 'personal']
+
 export interface Draft {
   name: string
   kind: RecurringKind
+  book: Book
   direction: TransactionDirection
   expectedAmountMinor: Minor | null
   currencyCode: string
   frequency: RecurringFrequency
   anchorDay: number | null
+  anchorMonth: number | null
+  dutyCode: RecurringDutyCode | null
   startDate: CalendarDate
   terminationKind: TerminationKind
   endDate: CalendarDate | null
@@ -181,11 +188,14 @@ function draftFrom(
   const base: Draft = {
     name: '',
     kind: 'subscription',
+    book: 'personal',
     direction: 'expense',
     expectedAmountMinor: null,
     currencyCode: baseCurrencyCode,
     frequency: 'monthly',
     anchorDay: null,
+    anchorMonth: null,
+    dutyCode: null,
     startDate: todayIn('UTC'),
     terminationKind: 'open',
     endDate: null,
@@ -208,11 +218,14 @@ function draftFrom(
     ...base,
     name: series.name,
     kind: series.kind as RecurringKind,
+    book: series.book as Book,
     direction: series.direction as TransactionDirection,
     expectedAmountMinor: series.expectedAmountMinor,
     currencyCode: series.expectedCurrencyCode,
     frequency: series.frequency as RecurringFrequency,
     anchorDay: series.anchorDay,
+    anchorMonth: series.anchorMonth,
+    dutyCode: (series.dutyCode as RecurringDutyCode | null) ?? null,
     startDate: parseDate(series.startDate),
     terminationKind:
       series.endDate !== null
@@ -318,9 +331,12 @@ export function SeriesFormDialog({
       const shared = {
         name: trimmedName,
         kind: draft.kind,
+        book: draft.book,
         expectedAmountMinor: draft.expectedAmountMinor ?? 0,
         frequency: draft.frequency,
         anchorDay: MONTH_SHAPED.has(draft.frequency) ? draft.anchorDay : null,
+        anchorMonth: draft.frequency === 'annual' ? draft.anchorMonth : null,
+        dutyCode: draft.dutyCode,
         termination,
         accountId: draft.accountId,
         categoryId: draft.categoryId,
@@ -410,12 +426,31 @@ export function SeriesFormDialog({
                   }
                 />
 
+                <RadioGroup
+                  label={t('book.field.label')}
+                  description={t('book.field.description')}
+                  value={draft.book}
+                  onChange={(book) => patch({ book: book as Book })}
+                >
+                  {BOOKS.map((book) => (
+                    <Radio key={book} value={book}>
+                      {t(`book.${book}`)}
+                    </Radio>
+                  ))}
+                </RadioGroup>
+
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Select
                     label={t('recurring.kind.label')}
                     selectedKey={draft.kind}
                     onSelectionChange={(key: Key | null) => {
-                      if (key !== null) patch({ kind: key as RecurringKind })
+                      if (key !== null) {
+                        patch({
+                          kind: key as RecurringKind,
+                          // A duty template is a bill; any other kind leaves the template.
+                          ...(key === 'bill' ? {} : { dutyCode: null }),
+                        })
+                      }
                     }}
                   >
                     {KINDS.map((kind) => (
@@ -430,7 +465,13 @@ export function SeriesFormDialog({
                     selectedKey={draft.frequency}
                     onSelectionChange={(key: Key | null) => {
                       if (key !== null) {
-                        patch({ frequency: key as RecurringFrequency })
+                        // `anchorMonth` stays in the draft: the submit and the preview only use it
+                        // for an annual series, so Monthly and back to Yearly keeps the month.
+                        // A duty template is monthly; any other frequency leaves the template.
+                        patch({
+                          frequency: key as RecurringFrequency,
+                          ...(key === 'monthly' ? {} : { dutyCode: null }),
+                        })
                       }
                     }}
                   >
@@ -441,6 +482,56 @@ export function SeriesFormDialog({
                     ))}
                   </Select>
                 </div>
+
+                {isEdit ? null : (
+                  <fieldset className="flex flex-col gap-2">
+                    <legend className="text-label font-medium text-ink">
+                      {t('recurring.form.duty.templates')}
+                    </legend>
+                    <p className="text-caption text-ink-2">
+                      {t('recurring.form.duty.help')}
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {JDG_DUTY_TEMPLATES.map((template) => (
+                        <Button
+                          key={template.code}
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => {
+                            const name = t(`recurring.duty.${template.code}`)
+                            patch({
+                              dutyCode: template.code,
+                              kind: template.kind,
+                              frequency: template.frequency,
+                              anchorDay: template.anchorDay,
+                              anchorMonth: null,
+                              direction: 'expense',
+                              name:
+                                trimmedName === '' ||
+                                JDG_DUTY_TEMPLATES.some(
+                                  (row) =>
+                                    t(`recurring.duty.${row.code}`) ===
+                                    trimmedName,
+                                )
+                                  ? name
+                                  : draft.name,
+                            })
+                          }}
+                        >
+                          {t('recurring.form.duty.apply', {
+                            name: t(`recurring.duty.${template.code}`),
+                          })}
+                        </Button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+
+                {draft.dutyCode === null ? null : (
+                  <p className="text-caption text-ink-2">
+                    {t('recurring.duty.disclaimer')}
+                  </p>
+                )}
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <MoneyField
@@ -536,6 +627,46 @@ export function SeriesFormDialog({
                             {String(index + 1)}
                           </SelectItem>
                         )),
+                      ]}
+                    </Select>
+                  ) : null}
+
+                  {draft.frequency === 'annual' ? (
+                    <Select
+                      label={t('recurring.form.anchorMonth')}
+                      description={t('recurring.form.anchorMonth.help')}
+                      selectedKey={
+                        draft.anchorMonth === null
+                          ? 'auto'
+                          : String(draft.anchorMonth)
+                      }
+                      onSelectionChange={(key: Key | null) => {
+                        if (key === null) return
+                        patch({
+                          anchorMonth: key === 'auto' ? null : Number(key),
+                        })
+                      }}
+                    >
+                      {[
+                        <SelectItem key="auto" id="auto">
+                          {t('recurring.form.anchorMonth.auto')}
+                        </SelectItem>,
+                        ...Array.from({ length: 12 }, (_, index) => {
+                          const month = index + 1
+                          const label = new Intl.DateTimeFormat(locale, {
+                            month: 'long',
+                            timeZone: 'UTC',
+                          }).format(
+                            new Date(
+                              `2026-${String(month).padStart(2, '0')}-01T00:00:00Z`,
+                            ),
+                          )
+                          return (
+                            <SelectItem key={String(month)} id={String(month)}>
+                              {label}
+                            </SelectItem>
+                          )
+                        }),
                       ]}
                     </Select>
                   ) : null}
@@ -802,6 +933,7 @@ function SchedulePreview({ draft }: { readonly draft: Draft }) {
     {
       frequency: draft.frequency,
       anchorDay: MONTH_SHAPED.has(draft.frequency) ? draft.anchorDay : null,
+      anchorMonth: draft.frequency === 'annual' ? draft.anchorMonth : null,
       startDate: draft.startDate.toString(),
       endDate:
         draft.terminationKind === 'endDate'

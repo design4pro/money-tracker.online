@@ -42,7 +42,7 @@
  *   `assertWithinLimit`, called inside this repository before the insert.
  */
 
-import { and, asc, count, eq, inArray, lte, sql } from 'drizzle-orm'
+import { and, asc, count, eq, exists, inArray, lte, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -317,6 +317,13 @@ export const setGroupMembersSchema = z.strictObject({
   /** The complete membership, in display order. An empty list empties the group. */
   accountIds: z.array(idSchema).max(200),
 })
+
+export const moveAccountToGroupSchema = z.strictObject({
+  accountId: idSchema,
+  fromGroupId: idSchema.nullable(),
+  toGroupId: idSchema.nullable(),
+})
+export type MoveAccountToGroupInput = z.input<typeof moveAccountToGroupSchema>
 
 export const reorderAccountGroupsSchema = z.strictObject({
   ids: z.array(idSchema).min(1).max(200),
@@ -1103,6 +1110,80 @@ export async function setAccountGroupMembers(
       position: index,
     })),
   )
+}
+
+/** Changes only the source membership, atomically, without touching any balance. */
+export async function moveAccountToGroup(
+  scope: TenantScope,
+  input: MoveAccountToGroupInput,
+): Promise<void> {
+  const { accountId, fromGroupId, toGroupId } =
+    moveAccountToGroupSchema.parse(input)
+  await assertMayAdminister(scope, 'move an account between groups')
+  await accountRepo.requireById(scope, accountId)
+  await requireAllOwned(
+    scope,
+    accountGroups,
+    [fromGroupId, toGroupId].filter((id) => id !== null),
+    'account group',
+  )
+  if (fromGroupId === toGroupId) return
+
+  const targetRows =
+    toGroupId === null
+      ? []
+      : await membershipRepo.findMany(scope, {
+          where: eq(accountGroupMembers.groupId, toGroupId),
+        })
+  const position =
+    targetRows.reduce((last, row) => Math.max(last, row.position), -1) + 1
+  if (fromGroupId === null) {
+    // Both-null was handled above, so this is a pure, idempotent add.
+    if (toGroupId !== null)
+      await membershipRepo.insertOnConflictDoNothing(
+        scope,
+        { groupId: toGroupId, accountId, position },
+        [accountGroupMembers.groupId, accountGroupMembers.accountId],
+      )
+    return
+  }
+
+  const source = and(
+    eq(accountGroupMembers.groupId, fromGroupId),
+    eq(accountGroupMembers.accountId, accountId),
+  )!
+  let changed: number
+  if (toGroupId === null) {
+    changed = await membershipRepo.removeWhere(scope, source)
+  } else if (targetRows.some((row) => row.accountId === accountId)) {
+    // Recheck in the delete itself: a concurrent target removal must leave the source intact.
+    const target = scope.db
+      .select({ accountId: accountGroupMembers.accountId })
+      .from(accountGroupMembers)
+      .where(
+        tenantFilter(
+          scope,
+          accountGroupMembers,
+          and(
+            eq(accountGroupMembers.groupId, toGroupId),
+            eq(accountGroupMembers.accountId, accountId),
+          ),
+        ),
+      )
+    changed = await membershipRepo.removeWhere(
+      scope,
+      and(source, exists(target))!,
+    )
+  } else {
+    changed = (
+      await membershipRepo.updateWhere(scope, source, {
+        groupId: toGroupId,
+        position,
+      })
+    ).length
+  }
+  if (changed === 0)
+    throw new NotFoundError('account group membership', accountId)
 }
 
 /** The group order, in one statement, for the same reasons as {@link reorderAccounts}. */

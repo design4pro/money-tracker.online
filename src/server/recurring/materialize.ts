@@ -76,6 +76,7 @@ export async function materializeSeries(
   const schedule = {
     frequency: series.frequency as RecurringFrequency,
     anchorDay: series.anchorDay,
+    anchorMonth: series.anchorMonth,
     startDate: series.startDate,
     endDate: series.endDate,
     maxOccurrences: series.maxOccurrences,

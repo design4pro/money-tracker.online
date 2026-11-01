@@ -66,6 +66,7 @@ const messages = {
   'nav.payees': 'Payees',
   'nav.recurring': 'Recurring',
   'nav.goals': 'Savings goals',
+  'nav.loans': 'Liabilities',
   'nav.reports': 'Reports',
   'nav.rules': 'Rules',
   'nav.import': 'Import',
@@ -299,6 +300,13 @@ const messages = {
     other: '{name}, inside {parent}, {count} accounts',
   },
   'accounts.groups.row.account': '{account}, in {group}',
+  'accounts.groups.member.actions': 'Actions for {name}',
+  'accounts.groups.member.destination': '{name}, inside {parent}',
+  'accounts.groups.member.remove': 'Remove from this group',
+  'accounts.groups.member.moved':
+    'Account {account}: membership moved to {group}.',
+  'accounts.groups.member.removed':
+    'Account {account}: membership removed from {group}.',
   'accounts.groups.row.accountArchived': '{account}, archived, in {group}',
   'accounts.groups.drag.label': 'Drag {name}',
   'accounts.groups.drag.labelChild': 'Drag {name}, inside {parent}',
@@ -1689,6 +1697,7 @@ const messages = {
   'billing.usage.metric.goals': 'Goals',
   'billing.usage.metric.rules': 'Filing rules',
   'billing.usage.metric.recurringSeries': 'Recurring bills',
+  'billing.usage.metric.loans': 'Loans',
   'billing.usage.metric.transactions': 'Entries',
   'billing.usage.metric.importsPerMonth': 'Imports this month',
   'billing.usage.metric.storageBytes': 'Receipts',
@@ -1849,6 +1858,14 @@ const messages = {
   'recurring.filter.label': 'Show',
   'recurring.filter.active': 'Active',
   'recurring.filter.all': 'All, including paused',
+
+  'book.filter.label': 'Book',
+  'book.filter.all': 'All',
+  'book.business': 'Business',
+  'book.personal': 'Personal',
+  'book.field.label': 'Book',
+  'book.field.description':
+    'Whether this series belongs to the business or to personal finances.',
 
   'recurring.error.title': 'Recurring series could not be loaded',
   'recurring.error.body':
@@ -2140,6 +2157,35 @@ const messages = {
   'recurring.candidate.toast.dismissed': 'Suggestion dismissed',
   'recurring.candidate.toast.accepted': 'Series created from the suggestion',
 
+  'recurring.forecast.title': 'This year and the next twelve months',
+  'recurring.forecast.caption':
+    'Spent is what you already linked this year. The rest of the year and the next twelve months are the plan that is still open — expected amounts, not a live conversion.',
+  'recurring.forecast.spent': 'Spent this year',
+  'recurring.forecast.rest': 'Rest of this year',
+  'recurring.forecast.next12': 'Next 12 months',
+  'recurring.forecast.empty': 'Nothing to forecast yet.',
+
+  'recurring.form.anchorMonth': 'Month of the year',
+  'recurring.form.anchorMonth.help':
+    'The calendar month a yearly series falls in. Independent of the first due date.',
+  'recurring.form.anchorMonth.auto': 'Same month as the first due date',
+  'recurring.form.duty.templates': 'Polish due-date templates',
+  'recurring.form.duty.help':
+    'A template fills in the name, kind, frequency and day of the month. You type the amount. This is a reminder, not tax advice.',
+  'recurring.form.duty.apply': 'Use {name}',
+
+  'recurring.duty.zus': 'ZUS contribution',
+  'recurring.duty.pit': 'PIT-36L advance',
+  'recurring.duty.vat_7': 'VAT-7',
+  'recurring.duty.badge': 'Duty',
+  'recurring.duty.disclaimer':
+    'A due date you chose — a deadline, a plan, and whether it is paid. Not a calculated tax and not advice.',
+  'recurring.duty.due': 'Due date',
+  'recurring.duty.plan': 'Plan',
+  'recurring.duty.paid': 'Paid',
+  'recurring.periods.duty.caption':
+    'Each row is one due date: the plan, what was paid, and the difference. Marking a row paid never creates an entry.',
+
   /* -- Savings goals ------------------------------------------------------ */
   /* -- The list ----------------------------------------------------------- */
   'goals.title': 'Savings goals',
@@ -2371,6 +2417,137 @@ const messages = {
   'goals.toast.recomputed': 'Progress rechecked',
   'goals.toast.reached': '{name} is fully funded',
   'goals.toast.failed': 'That did not go through',
+
+  /* -- Liabilities (loans table) ------------------------------------------ */
+  'loans.title': 'Liabilities',
+  'loans.subtitle':
+    'Borrowings with a payment schedule. Remaining is the unpaid instalments, not a bank balance.',
+  'loans.list.loading': 'Loading your liabilities…',
+  'loans.detail.loading': 'Loading this liability…',
+  'loans.detail.back': 'All liabilities',
+  'loans.detail.error.title': 'This liability could not be loaded',
+  'loans.detail.error.body':
+    'It may have been deleted, or the request did not come back. Nothing has been changed.',
+
+  'loans.filter.book': 'Book',
+  'loans.filter.book.all': 'All',
+  'loans.filter.status': 'Show',
+  'loans.filter.active': 'Active',
+  'loans.filter.all': 'All, including closed',
+
+  'loans.error.title': 'Liabilities could not be loaded',
+  'loans.error.body':
+    'The list did not come back. Nothing has been changed — try again.',
+
+  'loans.empty.title': 'No liabilities yet',
+  'loans.empty.body':
+    'A liability is more than a negative account balance: a lender, a payment day, and a schedule of instalments that can differ from one month to the next. Marking one paid points at a transaction you already recorded.',
+  'loans.empty.filtered.title': 'Nothing here',
+  'loans.empty.filtered.body':
+    'No liability matches this filter. Try a different one.',
+
+  'loans.book.business': 'Business',
+  'loans.book.personal': 'Personal',
+  'loans.kind.credit': 'Credit',
+  'loans.kind.leasing': 'Leasing',
+  'loans.kind.loan': 'Loan',
+  'loans.kind.other': 'Other',
+
+  'loans.status.active': 'Active',
+  'loans.status.overdue': 'Overdue',
+  'loans.status.settled': 'Settled',
+  'loans.status.paid': 'Paid',
+  'loans.status.upcoming': 'Upcoming',
+
+  'loans.overview.remaining': 'Remaining',
+  'loans.overview.overdue': 'Overdue',
+  'loans.overview.thisMonth': 'Due this month',
+  'loans.overview.overdueCount': {
+    one: '{count} overdue instalment',
+    other: '{count} overdue instalments',
+  },
+  'loans.overview.thisMonthCount': {
+    one: '{count} instalment',
+    other: '{count} instalments',
+  },
+
+  'loans.meter.label': 'Repaid towards {name}',
+  'loans.meter.valueText':
+    '{paid} paid, {remaining} remaining, {percent} of the schedule',
+  'loans.meter.unavailable': 'Progress unavailable',
+  'loans.progress.remaining': '{amount} remaining',
+  'loans.progress.complete': 'Schedule paid',
+  'loans.progress.of': '{paid} of {total} paid',
+
+  'loans.next.none': 'No unpaid instalment',
+  'loans.next.due': 'Next {amount} on {date}',
+  'loans.next.overdue': 'Overdue {amount} from {date}',
+  'loans.paymentDay': 'Payment day {day}',
+  'loans.endsOn': 'Ends {date}',
+
+  'loans.schedule.caption':
+    'Each row is one expected payment. Paid means it points at a recorded transaction.',
+  'loans.schedule.missing':
+    'This liability has no schedule. That should not happen; try again or delete it.',
+  'loans.schedule.title': 'Instalment schedule',
+  'loans.schedule.sequence': 'No.',
+  'loans.schedule.due': 'Due',
+  'loans.schedule.amount': 'Amount',
+  'loans.schedule.status': 'Status',
+  'loans.schedule.actions': 'Actions',
+  'loans.schedule.next': 'Next',
+  'loans.schedule.buyout': 'Buyout',
+
+  'loans.markPaid.action': 'Mark paid, instalment due {date}',
+  'loans.markPaid.title': 'Mark this instalment paid',
+  'loans.markPaid.body':
+    'Choose the transaction that settled it. This does not create an entry and does not move a balance.',
+  'loans.markPaid.field': 'Which transaction',
+  'loans.markPaid.loading': 'Looking for matching entries…',
+  'loans.markPaid.candidateCount': {
+    one: '{count} matching entry',
+    other: '{count} matching entries',
+  },
+  'loans.markPaid.empty':
+    'Nothing in this window matches. Record the payment first, then come back and point at it.',
+  'loans.markPaid.record': 'Record the payment',
+  'loans.markPaid.never':
+    'Marking paid never creates a transaction. It only points at one that already exists.',
+  'loans.markPaid.confirm': 'Link this transaction',
+  'loans.markPaid.variance.none': 'Matches the instalment',
+  'loans.markPaid.variance.over': '{amount} more than planned',
+  'loans.markPaid.variance.under': '{amount} less than planned',
+  'loans.toast.failed': 'That did not go through',
+  'loans.markPaid.error.body':
+    'That payment could not be linked. It may already pay another instalment. Nothing has been changed.',
+
+  'loans.calendar.title': 'Month overview',
+  'loans.calendar.link': 'Month overview',
+  'loans.calendar.subtitle':
+    'Every instalment due in a month, paid against remaining. Years start at 2025. Amounts are the stored base-currency figures, not a live conversion.',
+  'loans.calendar.loading': 'Loading the month overview…',
+  'loans.calendar.error.title': 'The month overview could not be loaded',
+  'loans.calendar.error.body':
+    'Nothing has been changed. Try again in a moment.',
+  'loans.calendar.filter.year': 'Year',
+  'loans.calendar.caption':
+    'Paid and remaining instalments by month and year, in the workspace base currency.',
+  'loans.calendar.key':
+    'In each month the first figure is paid, the second is remaining.',
+  'loans.calendar.year': 'Year',
+  'loans.calendar.total': 'Year total',
+  'loans.calendar.paid': 'Paid',
+  'loans.calendar.remaining': 'Remaining',
+  'loans.calendar.thisMonth': 'This month',
+  'loans.calendar.cell.empty': 'No instalments',
+  'loans.calendar.chart.title': 'Obligations in {year}',
+  'loans.calendar.chart.category': 'Month',
+  'loans.calendar.chart.emptyTitle': 'Nothing planned this year',
+  'loans.calendar.chart.emptyBody':
+    'Switch year, or add a liability with a schedule that covers it.',
+  'loans.calendar.chart.noData': 'No reading',
+  'loans.calendar.chart.total': 'Planned',
+
   /* -- Rules · the paused banner -------------------------------------------- */
   // A rule pauses when something it names is deleted. The banner has to say *what*
   // broke, so the reason carries the deleted row's name — by the time this is read
