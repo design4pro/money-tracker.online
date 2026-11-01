@@ -195,6 +195,71 @@ describe('the loans quota', () => {
 
 describe('paid instalments bind a transaction', () => {
   it.each([false, true])(
+    'keeps the complete paid row unchanged on replay (settled during update: %s)',
+    async (duringUpdate) => {
+      const loan = await createLoan(scope, importedInput())
+      await seedTransaction(world.db, {
+        id: 'tx-replay',
+        refAmountMinor: 120_00,
+      })
+      const [before] = await world.db
+        .select()
+        .from(loanInstalments)
+        .where(
+          and(
+            eq(loanInstalments.loanId, loan.id),
+            eq(loanInstalments.sequence, 1),
+          ),
+        )
+      const paid = {
+        ...before,
+        status: 'paid' as const,
+        settledTransactionId: 'tx-replay',
+        updatedAt: new Date('2026-02-20T12:00:00.000Z'),
+      }
+      const settle = () =>
+        world.db
+          .update(loanInstalments)
+          .set({
+            status: paid.status,
+            settledTransactionId: paid.settledTransactionId,
+            updatedAt: paid.updatedAt,
+          })
+          .where(
+            and(
+              eq(loanInstalments.loanId, loan.id),
+              eq(loanInstalments.sequence, 1),
+            ),
+          )
+          .run()
+      let competingWrite: Promise<unknown> | undefined
+      if (duringUpdate) {
+        fault.when = (query) => {
+          if (query.startsWith('update "loan_instalments"')) {
+            fault.when = null
+            competingWrite = settle()
+          }
+          return false
+        }
+      } else {
+        await settle()
+      }
+      expect(
+        await markInstalmentPaid(scope, {
+          loanId: loan.id,
+          sequence: 1,
+          transactionId: 'tx-replay',
+        }),
+      ).toEqual(paid)
+      await competingWrite
+      expect((await listInstalments(scope, { loanId: loan.id }))[0]).toEqual({
+        ...paid,
+        derivedStatus: 'paid',
+      })
+    },
+  )
+
+  it.each([false, true])(
     'refuses deletion of a settling transaction (settled during delete: %s)',
     async (duringDelete) => {
       const loan = await createLoan(scope, importedInput())

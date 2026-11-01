@@ -844,12 +844,13 @@ export interface DeleteTransactionArgs extends TransactionScopeArgs {
 }
 
 /**
- * Deletes one transaction, refusing the two cases where a single-row delete is the wrong operation.
+ * Deletes one transaction, refusing cases where its links must be cleared first.
  *
  * A refund-linked row would leave a `refunds` row pointing at nothing, and a leg of an `internal`
  * transfer would leave the other leg as half a movement — a transfer's delete is paired, and it is
  * plan `10`'s. Both refuse with a {@link ConflictError} naming what to do first, rather than
  * cascading a deletion the person did not ask for.
+ * A paid loan instalment must likewise be reverted before its settling transaction is deleted.
  */
 export async function deleteTransaction(
   args: DeleteTransactionArgs,

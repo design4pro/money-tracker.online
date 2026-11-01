@@ -2795,6 +2795,7 @@ describe('23 — an imported loan schedule is integer amounts with paid-requires
       sequence: 1,
       transactionId: 'tx-loan-a',
     })
+    expect(repeated).toEqual(paid)
     expect(repeated).toMatchObject({
       amountMinor: paid.amountMinor,
       refAmountMinor: paid.refAmountMinor,

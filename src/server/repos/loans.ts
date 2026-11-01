@@ -936,10 +936,7 @@ export async function markInstalmentPaid(
     and(
       eq(loanInstalments.loanId, parsed.loanId),
       eq(loanInstalments.sequence, parsed.sequence),
-      or(
-        ne(loanInstalments.status, 'paid'),
-        eq(loanInstalments.settledTransactionId, parsed.transactionId),
-      ),
+      ne(loanInstalments.status, 'paid'),
       notExists(
         scope.db
           .select({ sequence: loanInstalments.sequence })
@@ -967,9 +964,6 @@ export async function markInstalmentPaid(
   )
   const updated = rows.at(0)
   if (updated === undefined) {
-    if ((await listSettledTransactionIds(scope)).has(parsed.transactionId)) {
-      throw new LoanSettlementRefusedError(parsed, 'already-linked')
-    }
     const current = await instalmentAccess.findOne(
       scope,
       and(
@@ -977,6 +971,15 @@ export async function markInstalmentPaid(
         eq(loanInstalments.sequence, parsed.sequence),
       ) as SQL,
     )
+    if (
+      current?.status === 'paid' &&
+      current.settledTransactionId === parsed.transactionId
+    ) {
+      return toInstalment(current)
+    }
+    if ((await listSettledTransactionIds(scope)).has(parsed.transactionId)) {
+      throw new LoanSettlementRefusedError(parsed, 'already-linked')
+    }
     if (current !== null) {
       throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
     }
