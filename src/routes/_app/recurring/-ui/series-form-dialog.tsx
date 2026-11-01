@@ -470,7 +470,7 @@ export function SeriesFormDialog({
                     <p className="text-caption text-ink-2">
                       {t('recurring.form.duty.help')}
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3">
                       {JDG_DUTY_TEMPLATES.map((template) => (
                         <Button
                           key={template.code}
