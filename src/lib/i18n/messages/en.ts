@@ -2502,6 +2502,33 @@ const messages = {
   'loans.markPaid.error.body':
     'That payment could not be linked. It may already pay another instalment. Nothing has been changed.',
 
+  'loans.calendar.title': 'Month overview',
+  'loans.calendar.link': 'Month overview',
+  'loans.calendar.subtitle':
+    'Every instalment due in a month, paid against remaining. Years start at 2025. Amounts are the stored base-currency figures, not a live conversion.',
+  'loans.calendar.loading': 'Loading the month overview…',
+  'loans.calendar.error.title': 'The month overview could not be loaded',
+  'loans.calendar.error.body':
+    'Nothing has been changed. Try again in a moment.',
+  'loans.calendar.filter.year': 'Year',
+  'loans.calendar.caption':
+    'Paid and remaining instalments by month and year, in the workspace base currency.',
+  'loans.calendar.key':
+    'In each month the first figure is paid, the second is remaining.',
+  'loans.calendar.year': 'Year',
+  'loans.calendar.total': 'Year total',
+  'loans.calendar.paid': 'Paid',
+  'loans.calendar.remaining': 'Remaining',
+  'loans.calendar.thisMonth': 'This month',
+  'loans.calendar.cell.empty': 'No instalments',
+  'loans.calendar.chart.title': 'Obligations in {year}',
+  'loans.calendar.chart.category': 'Month',
+  'loans.calendar.chart.emptyTitle': 'Nothing planned this year',
+  'loans.calendar.chart.emptyBody':
+    'Switch year, or add a liability with a schedule that covers it.',
+  'loans.calendar.chart.noData': 'No reading',
+  'loans.calendar.chart.total': 'Planned',
+
   /* -- Rules · the paused banner -------------------------------------------- */
   // A rule pauses when something it names is deleted. The banner has to say *what*
   // broke, so the reason carries the deleted row's name — by the time this is read

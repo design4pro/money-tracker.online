@@ -30,7 +30,7 @@
  * repository those stages call.
  */
 
-import { and, eq, ne, notExists, or, sql } from 'drizzle-orm'
+import { and, eq, exists, ne, notExists, or, sql } from 'drizzle-orm'
 
 import type { SQL } from 'drizzle-orm'
 import { z } from 'zod'
@@ -292,6 +292,11 @@ export const listInstalmentsSchema = z.strictObject({
 })
 export type ListInstalmentsInput = z.input<typeof listInstalmentsSchema>
 
+const calendarInstalmentsSchema = z.strictObject({
+  book: z.enum(BOOKS).optional(),
+  today: z.iso.date(),
+})
+
 /* -------------------------------------------------------------------------- */
 /* Returned shapes                                                            */
 /* -------------------------------------------------------------------------- */
@@ -496,19 +501,47 @@ export async function listInstalments(
     where: eq(loanInstalments.loanId, parsed.loanId),
     orderBy: [loanInstalments.sequence],
   })
-  const today = parsed.today
-  return rows.map((row) => {
-    const instalment = toInstalment(row)
-    const stored: LoanInstalmentStatus =
-      row.status === 'paid' ? 'paid' : 'upcoming'
-    return {
-      ...instalment,
-      derivedStatus:
-        today === undefined
-          ? stored
-          : derivedInstalmentStatus(stored, row.dueOn, today),
-    }
+  return rows.map((row) => toInstalmentView(row, parsed.today))
+}
+
+function toInstalmentView(
+  row: LoanInstalmentRow,
+  today: string | undefined,
+): InstalmentView {
+  const stored: LoanInstalmentStatus =
+    row.status === 'paid' ? 'paid' : 'upcoming'
+  return {
+    ...toInstalment(row),
+    derivedStatus:
+      today === undefined
+        ? stored
+        : derivedInstalmentStatus(stored, row.dueOn, today),
+  }
+}
+
+/** All schedules, including closed loans, without a round trip for each parent. */
+export async function listCalendarInstalments(
+  scope: TenantScope,
+  input: z.input<typeof calendarInstalmentsSchema>,
+): Promise<ReadonlyArray<InstalmentView>> {
+  const parsed = calendarInstalmentsSchema.parse(input)
+  const parent = scope.db
+    .select({ id: loans.id })
+    .from(loans)
+    .where(
+      tenantFilter(
+        scope,
+        loans,
+        and(
+          eq(loans.id, loanInstalments.loanId),
+          parsed.book === undefined ? undefined : eq(loans.book, parsed.book),
+        ),
+      ),
+    )
+  const rows = await instalmentAccess.findMany(scope, {
+    where: exists(parent),
   })
+  return rows.map((row) => toInstalmentView(row, parsed.today))
 }
 
 /**

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import {
@@ -11,8 +11,8 @@ import { SegmentedFilter } from '#/components/app/nav'
 import { ErrorPanel } from '#/components/app/shell'
 import { Card } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
-import { loadLoans } from '#/server/fns/loans'
 import { pageHead } from '#/routes/-lib/page-title'
+import { loadLoans } from '#/server/fns/loans'
 
 /**
  * `/loans` — the liability register.
@@ -76,6 +76,13 @@ function LoansListRoute() {
             {t('loans.subtitle')}
           </p>
         </div>
+        <Link
+          to="/loans/months"
+          search={{ book }}
+          className="target-min-h inline-flex items-center text-label font-semibold text-brand underline decoration-brand/40 underline-offset-4"
+        >
+          {t('loans.calendar.link')}
+        </Link>
       </header>
 
       <div className="flex flex-wrap gap-4">
