@@ -135,14 +135,13 @@ for (const locale of ['en', 'pl'] as const) {
         name: messages['payees.actions.label'].replace('{name}', name),
         exact: true,
       })
-      await actions.focus()
-      await page.keyboard.press('Enter')
+      await actions.click()
       await expect(page.getByRole('menu')).toBeVisible()
       await page
         .getByRole('menuitem', { name: messages['action.delete'], exact: true })
         .click()
       await page
-        .getByRole('dialog')
+        .getByRole('alertdialog')
         .getByRole('button', { name: messages['action.delete'], exact: true })
         .click()
       await expect(page.getByRole('button', { name, exact: true })).toHaveCount(
