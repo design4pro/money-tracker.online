@@ -10,8 +10,10 @@
  *    defence; {@link markInstalmentPaid} is the only writer that sets `paid`.
  *
  * 2. **Amounts are integer minor units.** The scale is `currencies.digits`, never a hard-coded 2.
- *    `ref_*` figures are written once at the relevant calendar date's rate (`opened_on` on the
- *    loan, `due_on` on each instalment) and never recomputed (`docs/MONEY.md` §3.1).
+ *    `ref_*` figures are written once, at the rate of the loan's `opened_on`, and never
+ *    recomputed (`docs/MONEY.md` §3.1). The instalments are priced at `opened_on` too, not at their
+ *    own `due_on`: a due date in the future has no rate yet (rate resolution looks back, never
+ *    forward), so pricing it there would refuse every foreign-currency schedule.
  *
  * 3. **The schedule is the plan, not a second ledger.** Instalment `amount_minor` is an
  *    expectation. What actually moved is the linked transaction. Extra repayments (the link
@@ -28,7 +30,7 @@
  * repository those stages call.
  */
 
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, eq, ne, notExists, or, sql } from 'drizzle-orm'
 
 import type { SQL } from 'drizzle-orm'
 import { z } from 'zod'
@@ -65,7 +67,7 @@ import type {
   LoanInstalmentRow,
 } from '#/server/db/schema'
 import type { Loan, LoanInstalment, Transaction } from '#/server/db/types'
-import type { ConversionContext } from './transactions'
+import type { ConversionContext, RateResolver } from './transactions'
 import type { TenantScope } from './base'
 
 /* -------------------------------------------------------------------------- */
@@ -105,11 +107,16 @@ export class LoanInstalmentSettledError extends ConflictError {
  * currency, or it already settles another instalment. One payment pays one instalment.
  */
 export class LoanSettlementRefusedError extends ConflictError {
-  readonly reason: 'not-an-expense' | 'currency-mismatch' | 'already-linked'
+  readonly reason:
+    | 'not-an-expense'
+    | 'currency-mismatch'
+    | 'already-linked'
+    | 'account-mismatch'
+    | 'not-a-payment'
 
   constructor(
     transactionId: string,
-    reason: 'not-an-expense' | 'currency-mismatch' | 'already-linked',
+    reason: LoanSettlementRefusedError['reason'],
   ) {
     super(
       `Transaction ${transactionId} cannot settle this instalment: ${reason}.`,
@@ -133,9 +140,8 @@ const currencySchema = z
   .regex(/^[A-Z]{3}$/u, { error: 'An ISO 4217 alphabetic code.' })
 
 /**
- * The most instalments one loan carries. Equal to the longest `termPeriods`, so a schedule is never
- * longer than the term it claims, and bounded so one request cannot store (or price) an unbounded
- * number of rows: instalments are not metered.
+ * The most instalments one loan carries, matching the maximum allowed `termPeriods`.
+ * Bounded so one request cannot store or price unbounded rows: instalments are not metered.
  */
 export const MAX_INSTALMENTS = 600
 
@@ -237,14 +243,14 @@ const TERM_FIELDS = [
   'repaymentShape',
   'paymentFrequency',
   'termPeriods',
-  'openedOn',
   'firstPaymentOn',
 ] as const
 
 /**
- * The patch. `currencyCode` is absent on purpose: the instalment rows carry the loan's currency,
- * so changing it would leave a schedule in one currency under a loan in another. A loan in the
- * wrong currency is deleted and created again.
+ * The patch. `currencyCode` and `openedOn` are absent on purpose: every instalment carries the
+ * loan's currency and was priced at its `opened_on`, so changing either would leave a schedule
+ * that disagrees with its loan. A loan with the wrong currency or opening date is deleted and
+ * created again.
  */
 export const updateLoanSchema = z
   .strictObject({
@@ -261,7 +267,6 @@ export const updateLoanSchema = z
     paymentFrequency: z.enum(LOAN_PAYMENT_FREQUENCIES),
     termPeriods: z.number().int().min(1).max(600).nullable(),
     paymentDay: z.number().int().min(1).max(31),
-    openedOn: z.iso.date(),
     firstPaymentOn: z.iso.date().nullable(),
     endsOn: z.iso.date().nullable(),
     status: z.enum(LOAN_STATUSES),
@@ -431,6 +436,26 @@ async function refTriple(
   return { refAmountMinor: ref.refAmountMinor, rateE10: ref.rateE10 }
 }
 
+/**
+ * A conversion context that asks each rate question once. A schedule prices hundreds of rows at
+ * the one rate of `opened_on`, and each unmemoised lookup is one to three D1 queries.
+ */
+function memoisedConversion(conversion: ConversionContext): ConversionContext {
+  const answers = new Map<string, ReturnType<RateResolver>>()
+  return {
+    baseCurrencyCode: conversion.baseCurrencyCode,
+    resolveRate: (query) => {
+      const key = `${query.base}/${query.quote}/${query.date}`
+      let answer = answers.get(key)
+      if (answer === undefined) {
+        answer = conversion.resolveRate(query)
+        answers.set(key, answer)
+      }
+      return answer
+    },
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Reads                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -493,15 +518,12 @@ export async function listInstalments(
 export async function listSettledTransactionIds(
   scope: TenantScope,
 ): Promise<ReadonlySet<string>> {
-  const rows = await scope.db
-    .select({ transactionId: loanInstalments.settledTransactionId })
-    .from(loanInstalments)
-    .where(
-      tenantFilter(scope, loanInstalments, eq(loanInstalments.status, 'paid')),
-    )
+  const rows = await instalmentAccess.findMany(scope, {
+    where: eq(loanInstalments.status, 'paid'),
+  })
   const ids = new Set<string>()
   for (const row of rows) {
-    if (row.transactionId !== null) ids.add(row.transactionId)
+    if (row.settledTransactionId !== null) ids.add(row.settledTransactionId)
   }
   return ids
 }
@@ -532,7 +554,7 @@ export async function createLoan(
   const held = await loanRepo.count(scope)
   await assertWithinLimit(scope, LOAN_QUOTA_METRIC, held + 1)
 
-  const conversion = await conversionContextFor(scope)
+  const conversion = memoisedConversion(await conversionContextFor(scope))
   const opened = await refTriple(
     parsed.instalmentMinor,
     parsed.currencyCode,
@@ -568,10 +590,11 @@ export async function createLoan(
   for (let index = 0; index < sorted.length; index += 1) {
     const row = sorted[index]
     if (row === undefined) continue
+    // Priced at `opened_on`, not `due_on`: see rule 2 at the top of this file.
     const converted = await refTriple(
       row.amountMinor,
       parsed.currencyCode,
-      row.dueOn,
+      parsed.openedOn,
       conversion,
     )
     instalmentRows.push({
@@ -674,32 +697,37 @@ export async function updateLoan(
     }
   }
 
-  if (patchTouchesTerms(parsed)) {
+  const touchesTerms = patchTouchesTerms(parsed)
+  if (touchesTerms) {
     const paid = await firstPaidSequence(scope, parsedId)
     if (paid !== null) throw new LoanTermsLockedError(parsedId, paid)
   }
 
   const conversion = await conversionContextFor(scope)
-  const { currencyCode } = existing
-  const openedOn = parsed.openedOn ?? existing.openedOn
+  const { currencyCode, openedOn } = existing
 
-  // Every `ref_*` on the loan is priced at `opened_on`, so moving the date re-prices all three,
-  // whether or not the caller sent that amount.
-  const repriced = parsed.openedOn !== undefined
+  if (parsed.firstPaymentOn != null && parsed.firstPaymentOn < openedOn) {
+    throw new ConflictError(
+      `firstPaymentOn ${parsed.firstPaymentOn} falls before the loan's openedOn ${openedOn}.`,
+    )
+  }
+  if (parsed.endsOn != null && parsed.endsOn < openedOn) {
+    throw new ConflictError(
+      `endsOn ${parsed.endsOn} falls before the loan's openedOn ${openedOn}.`,
+    )
+  }
+
   const instalmentRef =
-    parsed.instalmentMinor === undefined && !repriced
+    parsed.instalmentMinor === undefined
       ? null
       : await refTriple(
-          parsed.instalmentMinor ?? existing.instalmentMinor,
+          parsed.instalmentMinor,
           currencyCode,
           openedOn,
           conversion,
         )
 
-  const nextPrincipal =
-    parsed.principalMinor === undefined && repriced
-      ? existing.principalMinor
-      : parsed.principalMinor
+  const nextPrincipal = parsed.principalMinor
   const principalRef =
     nextPrincipal === undefined
       ? undefined
@@ -707,10 +735,7 @@ export async function updateLoan(
         ? null
         : await refTriple(nextPrincipal, currencyCode, openedOn, conversion)
 
-  const nextOutstanding =
-    parsed.outstandingMinor === undefined && repriced
-      ? existing.outstandingMinor
-      : parsed.outstandingMinor
+  const nextOutstanding = parsed.outstandingMinor
   const outstandingRef =
     nextOutstanding === undefined
       ? undefined
@@ -718,7 +743,27 @@ export async function updateLoan(
         ? null
         : await refTriple(nextOutstanding, currencyCode, openedOn, conversion)
 
-  await loanRepo.requireUpdate(scope, parsedId, {
+  const where = and(
+    eq(loans.id, parsedId),
+    touchesTerms
+      ? notExists(
+          scope.db
+            .select({ sequence: loanInstalments.sequence })
+            .from(loanInstalments)
+            .where(
+              tenantFilter(
+                scope,
+                loanInstalments,
+                and(
+                  eq(loanInstalments.loanId, parsedId),
+                  eq(loanInstalments.status, 'paid'),
+                ),
+              ),
+            ),
+        )
+      : undefined,
+  ) as SQL
+  const rows = await loanRepo.updateWhere(scope, where, {
     ...(parsed.name === undefined ? {} : { name: parsed.name }),
     ...(parsed.kind === undefined ? {} : { kind: parsed.kind }),
     ...(parsed.book === undefined ? {} : { book: parsed.book }),
@@ -764,7 +809,6 @@ export async function updateLoan(
     ...(parsed.paymentDay === undefined
       ? {}
       : { paymentDay: parsed.paymentDay }),
-    ...(parsed.openedOn === undefined ? {} : { openedOn: parsed.openedOn }),
     ...(parsed.firstPaymentOn === undefined
       ? {}
       : { firstPaymentOn: parsed.firstPaymentOn }),
@@ -773,6 +817,11 @@ export async function updateLoan(
     ...(parsed.note === undefined ? {} : { note: parsed.note }),
     updatedAt: new Date(),
   })
+  if (rows.length === 0) {
+    const paid = touchesTerms ? await firstPaidSequence(scope, parsedId) : null
+    if (paid !== null) throw new LoanTermsLockedError(parsedId, paid)
+    throw new NotFoundError('loan', parsedId)
+  }
   return getLoan(scope, parsedId)
 }
 
@@ -798,22 +847,35 @@ export async function markInstalmentPaid(
   input: MarkInstalmentPaidInput,
 ): Promise<LoanInstalment> {
   const parsed = markInstalmentPaidSchema.parse(input)
-  const loan = await getLoan(scope, parsed.loanId)
-  const transaction = await requireOwnedTransaction(scope, parsed.transactionId)
+  const [loan, transaction, existing, linked] = await Promise.all([
+    getLoan(scope, parsed.loanId),
+    requireOwnedTransaction(scope, parsed.transactionId),
+    instalmentAccess.findOne(
+      scope,
+      and(
+        eq(loanInstalments.loanId, parsed.loanId),
+        eq(loanInstalments.sequence, parsed.sequence),
+      ) as SQL,
+    ),
+    listSettledTransactionIds(scope),
+  ])
   if (transaction.direction !== 'expense') {
     throw new LoanSettlementRefusedError(transaction.id, 'not-an-expense')
   }
   if (transaction.currencyCode !== loan.currencyCode) {
     throw new LoanSettlementRefusedError(transaction.id, 'currency-mismatch')
   }
+  if (loan.accountId !== null && transaction.accountId !== loan.accountId) {
+    throw new LoanSettlementRefusedError(transaction.id, 'account-mismatch')
+  }
+  if (
+    transaction.isPlanned ||
+    transaction.isBalanceAdjustment ||
+    transaction.transferKind !== 'none'
+  ) {
+    throw new LoanSettlementRefusedError(transaction.id, 'not-a-payment')
+  }
 
-  const existing = await instalmentAccess.findOne(
-    scope,
-    and(
-      eq(loanInstalments.loanId, parsed.loanId),
-      eq(loanInstalments.sequence, parsed.sequence),
-    ) as SQL,
-  )
   if (existing === null) {
     throw new NotFoundError(
       'loan instalment',
@@ -826,11 +888,11 @@ export async function markInstalmentPaid(
   ) {
     throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
   }
-  if (existing.settledTransactionId !== parsed.transactionId) {
-    const linked = await listSettledTransactionIds(scope)
-    if (linked.has(parsed.transactionId)) {
-      throw new LoanSettlementRefusedError(transaction.id, 'already-linked')
-    }
+  if (
+    existing.settledTransactionId !== parsed.transactionId &&
+    linked.has(parsed.transactionId)
+  ) {
+    throw new LoanSettlementRefusedError(transaction.id, 'already-linked')
   }
 
   const rows = await instalmentAccess.updateWhere(
@@ -838,6 +900,28 @@ export async function markInstalmentPaid(
     and(
       eq(loanInstalments.loanId, parsed.loanId),
       eq(loanInstalments.sequence, parsed.sequence),
+      or(
+        ne(loanInstalments.status, 'paid'),
+        eq(loanInstalments.settledTransactionId, parsed.transactionId),
+      ),
+      notExists(
+        scope.db
+          .select({ sequence: loanInstalments.sequence })
+          .from(loanInstalments)
+          .where(
+            tenantFilter(
+              scope,
+              loanInstalments,
+              and(
+                eq(loanInstalments.settledTransactionId, parsed.transactionId),
+                or(
+                  ne(loanInstalments.loanId, parsed.loanId),
+                  ne(loanInstalments.sequence, parsed.sequence),
+                ),
+              ),
+            ),
+          ),
+      ),
     ) as SQL,
     {
       status: 'paid',
@@ -847,6 +931,19 @@ export async function markInstalmentPaid(
   )
   const updated = rows.at(0)
   if (updated === undefined) {
+    if ((await listSettledTransactionIds(scope)).has(parsed.transactionId)) {
+      throw new LoanSettlementRefusedError(transaction.id, 'already-linked')
+    }
+    const current = await instalmentAccess.findOne(
+      scope,
+      and(
+        eq(loanInstalments.loanId, parsed.loanId),
+        eq(loanInstalments.sequence, parsed.sequence),
+      ) as SQL,
+    )
+    if (current !== null) {
+      throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
+    }
     throw new NotFoundError(
       'loan instalment',
       `${parsed.loanId}:${parsed.sequence}`,
