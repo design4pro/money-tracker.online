@@ -1,8 +1,9 @@
-import { expect, test } from './support/console'
+import { DELIBERATE_SERVER_FAILURE, expect, test } from './support/console'
 
 import { gotoApp, useLocale, useTheme } from './support/app'
 import { expectNoSeriousViolations } from './support/budgets'
 import { storageStateFor } from './support/session'
+import { failServerFns, holdEveryServerFn } from './support/states'
 
 import type { AppLocale, AppTheme } from './support/app'
 
@@ -84,4 +85,50 @@ test('keeps horizontal scrolling inside the keyboard-accessible month grid', asy
   await expect
     .poll(() => scroller.evaluate((element) => element.scrollLeft))
     .toBeGreaterThan(0)
+})
+
+test('keeps the loading view within the mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await gotoApp(page, '/loans')
+  const held = await holdEveryServerFn(page)
+  try {
+    await page
+      .getByRole('link', { name: 'Month overview', exact: true })
+      .click()
+    await expect(
+      page.getByText('Loading the month overview…', { exact: true }),
+    ).toBeAttached()
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth))
+  } finally {
+    await held.release()
+  }
+})
+
+test('retries the failed calendar read after the service recovers', async ({
+  page,
+  expectConsole,
+}) => {
+  await gotoApp(page, '/loans/months')
+  expectConsole(DELIBERATE_SERVER_FAILURE)
+  const failing = await failServerFns(page)
+  try {
+    await page
+      .getByRole('radiogroup', { name: 'Book' })
+      .getByText('Business', { exact: true })
+      .click()
+    await expect(
+      page.getByRole('heading', {
+        name: 'The month overview could not be loaded',
+      }),
+    ).toBeVisible()
+  } finally {
+    await failing.release()
+  }
+  await page.getByRole('button', { name: 'Try again', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: 'Month overview', exact: true }),
+  ).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Business' })).toBeChecked()
 })

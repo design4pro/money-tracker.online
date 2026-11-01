@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
 
@@ -60,12 +60,13 @@ function CalendarError({
   readonly reset: () => void
 }) {
   const t = useTranslate()
+  const router = useRouter()
   return (
     <ErrorPanel
       title={t('loans.calendar.error.title')}
       body={t('loans.calendar.error.body')}
       detail={error.message}
-      onRetry={reset}
+      onRetry={() => void router.invalidate().then(reset)}
     />
   )
 }

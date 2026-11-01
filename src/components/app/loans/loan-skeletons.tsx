@@ -50,7 +50,7 @@ export function LoanCalendarSkeleton() {
     <div className="flex flex-col gap-6">
       <LoadingAnnouncement message={t('loans.calendar.loading')} />
       <Skeleton shape="text" className="h-8 w-64" />
-      <Skeleton shape="text" className="h-4 w-96" />
+      <Skeleton shape="text" className="h-4 w-96 max-w-full" />
       <div className="flex gap-4">
         <Skeleton shape="block" className="h-11 w-64" />
         <Skeleton shape="block" className="h-11 w-64" />
