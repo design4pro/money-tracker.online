@@ -1,0 +1,164 @@
+version: 2
+name: maintain-to-intent
+description: 'Maintain stage of the AI-native SDLC: one production signal (error report, regression, failing scan) -> read-only diagnosis -> independent adversarial confidence gate -> intent-format GitHub issue (filed as a follow-up, never fixed here) or a reasoned dismissal -> incident record. Ambiguous or risk-high findings wait for a human. The produced issue enters issue-to-merge later, once it is ready per SDLC.md.'
+nodes:
+  - id: start
+    type: start
+
+  # ---------- DIAGNOSE ----------
+  - id: diagnose
+    name: 'Diagnose signal'
+    type: agent
+    skill: om-root-cause
+    prompt: |-
+      Production signal: {{task}}
+      Read-only. Do not edit files and do not fix anything.
+      1. Establish the facts: what was observed, when it first appeared, how often, and which
+         users or data it touches. Quote the signal; do not paraphrase away details.
+      2. Find the specification (.ai/specs/, index in .ai/specs/README.md) or the docs/plans/
+         stage that owns the affected behavior and the code that implements it. Name the file and
+         the violated requirement; when no spec covers it, say so.
+      3. Give the root cause with file and line evidence, the minimal change surface, and a
+         reproduction (steps, failing test idea or log excerpt). Mark every claim you could not
+         verify as an assumption.
+      4. Name the missing safety net: which eval or test class (unit, integration, Playwright,
+         contract, monitoring alert) would have caught this before production.
+      5. Note whether the area is risk-high per SDLC.md ("This repository": auth, tenant scoping,
+         money, the ledger, billing, migrations, protected decision documents, merge-policy surfaces).
+
+  # ---------- CONFIDENCE GATE ----------
+  # A fresh-context agent that did not write the diagnosis tries to refute it. The producer
+  # never grades its own finding (AI-native SDLC: independent confidence gate between stages).
+  - id: confirm
+    name: 'Confidence gate (adversarial)'
+    type: agent
+    verdicts: [real, notreal, unclear, riskhigh]
+    prompt: |-
+      Production signal: {{task}}
+      Diagnosis you must challenge: {{nodes.diagnose.summary}}
+      You did not write this diagnosis. Try to refute it from the repository and the signal
+      itself: re-read the cited code and spec, check that the evidence supports the stated root
+      cause, look for an alternative explanation, a duplicate (gh issue list --search, open PRs),
+      or a fix already on the base branch. Do not edit files and do not create anything.
+      Verdicts:
+      - real: reproducible or well-evidenced defect, root cause holds, not a duplicate, not risk-high.
+      - notreal: false positive, expected behavior, duplicate, already fixed or not reproducible.
+        State the reasons with evidence.
+      - unclear: evidence is too thin or contradictory to decide either way. State what is missing.
+      - riskhigh: the finding looks real but touches auth, tenant scoping, money, the ledger,
+        billing, migrations, protected decision documents or merge-policy surfaces, so a human
+        must decide before an issue is filed.
+      End with exactly one line: CEZ:VERDICT real | notreal | unclear | riskhigh
+
+  # Ambiguous and risk-high findings are never filed or dismissed autonomously.
+  - id: humanreview
+    name: 'Human decision (unclear or risk-high)'
+    type: gate.human
+    message: |-
+      The confidence gate did not settle this production signal on its own.
+      Signal: {{task}}
+      Diagnosis: {{nodes.diagnose.summary}}
+      Gate verdict and reasons: {{nodes.confirm.summary}}
+      Approve to file the intent issue (nothing is fixed in this workflow). Reject to dismiss
+      the signal with the gate's reasons; put your own reasons in the comment.
+    timeoutMs: 259200000
+
+  # ---------- INTENT ----------
+  - id: fileissue
+    name: 'File intent issue'
+    type: agent
+    skill: om-prepare-issue
+    prompt: |-
+      Production signal: {{task}}
+      Confirmed diagnosis: {{nodes.diagnose.summary}}
+      Gate: {{nodes.confirm.summary}}
+      Human note (empty when the gate decided alone): {{nodes.humanreview.comment}}
+      File exactly ONE GitHub issue in intent format. Do not implement or fix anything.
+      Sections: What (the defect, observable), Why (impact and the signal, linked or quoted),
+      Constraints (spec requirements that must hold, risk-high evidence rules from SDLC.md
+      when applicable, no scope beyond the defect), Acceptance (verifiable criteria, including
+      the regression test or eval named by the diagnosis).
+      Link the owning specification or docs/plans/ stage when one exists. Do NOT invent a backlog
+      ID: file it as a follow-up and link the source signal instead. Include an `## Agent Brief`
+      section so the issue meets the Definition of Ready. Use only labels that exist in
+      .ai/agentic.config.json (one category, one priority, one risk; needs-qa for user-facing
+      defects under src/routes/**, src/components/**, src/styles/** or src/lib/i18n/messages/*). Dedupe against existing issues first; if a duplicate exists, comment on it with
+      the new evidence instead of filing. End by stating the issue number and URL.
+
+  # ---------- INCIDENT RECORD ----------
+  - id: incident
+    name: 'Incident record'
+    type: agent
+    prompt: |-
+      Issue filed from the signal: {{nodes.fileissue.summary}}
+      Signal: {{task}}
+      Diagnosis: {{nodes.diagnose.summary}}
+      Post ONE comment on that issue (gh issue comment) with the heading "Incident record" and
+      three short parts: Timeline (first seen, detected, diagnosed, filed - state unknown times
+      as unknown), Root cause (one paragraph with file and line evidence), Missing safety net
+      (the eval or test class that would have caught it and where it belongs in the test pyramid).
+      Do not change code and do not edit labels.
+
+  # ---------- DISMISS ----------
+  - id: dismiss
+    name: 'Dismiss signal'
+    type: agent
+    prompt: |-
+      Production signal: {{task}}
+      Gate reasons: {{nodes.confirm.summary}}
+      Human note (empty when the gate decided alone): {{nodes.humanreview.comment}}
+      Post ONE dismissal comment with the reasons, each backed by evidence (duplicate link, fixing
+      commit, expected-behavior spec reference, or why it could not be reproduced). If the signal
+      is a GitHub issue, comment on it (gh issue comment); otherwise state the dismissal in your
+      summary. Say what new evidence would reopen it. Do not close or label anything, do not
+      change code.
+
+  # ---------- ESCALATION + ENDS ----------
+  - id: escalate
+    name: 'Escalate to human'
+    type: agent
+    prompt: |-
+      The Maintain run stopped. Signal: {{task}}
+      diagnose: {{nodes.diagnose.summary}}
+      gate: {{nodes.confirm.summary}}
+      filed issue: {{nodes.fileissue.summary}}
+      Say where it stopped, why, and the next human action. If the signal is a GitHub issue,
+      post ONE concise comment on it. Do not change code and do not file new issues.
+
+  - id: filed
+    name: 'Intent issue filed'
+    type: end
+    status: success
+  - id: dismissed
+    name: 'Signal dismissed'
+    type: end
+    status: success
+  - id: needshuman
+    name: 'Needs human'
+    type: end
+    status: failed
+
+edges:
+  - { from: start.next, to: diagnose }
+  - { from: diagnose.done, to: confirm }
+  - { from: diagnose.failed, to: escalate }
+
+  - { from: confirm.real, to: fileissue }
+  - { from: confirm.notreal, to: dismiss }
+  - { from: confirm.unclear, to: humanreview }
+  - { from: confirm.riskhigh, to: humanreview }
+  - { from: confirm.failed, to: escalate }
+
+  - { from: humanreview.approve, to: fileissue }
+  - { from: humanreview.reject, to: dismiss }
+  - { from: humanreview.timeout, to: escalate }
+
+  - { from: fileissue.done, to: incident }
+  - { from: fileissue.failed, to: escalate }
+  - { from: incident.done, to: filed }
+  - { from: incident.failed, to: escalate }
+  - { from: dismiss.done, to: dismissed }
+  - { from: dismiss.failed, to: escalate }
+
+  - { from: escalate.done, to: needshuman }
+  - { from: escalate.failed, to: needshuman }

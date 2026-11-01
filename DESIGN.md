@@ -771,6 +771,30 @@ label kept in the DOM under the spinner so the button holds its width.
 - **The one thing it is not:** a `ListBox` or a `Select`, which hold values and keep their own
   `max-h-72` (`ListBox`).
 
+### Toast
+
+- **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
+  button; the copy is the caller's `closeLabel` (`action.close`, EN + PL), never a default string
+  and never an icon-only control without a name.
+- **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
+  §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
+  never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
+  `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
+  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-7` so text never runs
+  under the box.
+- **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
+  so the close button's size, position and transform are `!` utilities. `left` and `right` read the
+  opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
+- **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
+  box-shadow is switched off.
+- **Contrast.** The chip's edge is `border-subtle`, a decorative edge below 3:1 by design; the glyph
+  (`ink-2`, forced with `!` like the rest; measured 8.6:1 in light and 8.1:1 in dark on the chip, #730) carries the 1.4.11 contrast.
+- **A toast action.** No toast has an `action` or `cancel` button today. If one is added it must
+  not sit in the top 44px of the inline-end corner, which the close box owns.
+- **Verified by:** `src/components/ui/__tests__/toast.test.tsx` (name, hidden glyph, classes) and
+  `e2e/toast-close-button.spec.ts` (measured box, axe, EN, PL and RTL, 360px and 1280px, both
+  themes, keyboard).
+
 ### Focus
 
 One treatment product-wide, drawn outside the control: a 2px `focus-gap` band (a `box-shadow`)
@@ -817,6 +841,79 @@ a sentence that says what to do, not a blank.
   filter's own copy.
 - `src/components/ui/__tests__/empty-state-ownership.test.ts` fails when `variant="dashed"`
   appears outside `src/components/ui`.
+
+### Error panel
+
+What replaces a region, or the page, when something did not work. `ErrorPanel` is the frame and
+`FailurePanel` chooses what goes in it: it reads the failure envelope and offers the recovery its
+failure kind calls for, so a screen never invents its own way out. Both live in
+`src/components/app/shell/`. `RouteError` is the same idea for a whole page.
+
+- **The shape.** A default card (Cards, above) at `md` padding with a 12px gap, `xl` radius and the
+  one-pixel `--shadow-card` under-edge, its rule repainted from `border-subtle` to the tone at 30%
+  opacity (`border-negative/30`, `border-warning/30`). A 32px round disc in the tone's `-soft` wash
+  holds a 16px triangle glyph in the tone's ink; the disc is round because it is a glyph, and
+  nothing else about the panel is. The heading is `subtitle` at semibold in `ink`, an `h3` unless
+  the caller says `h2` or `h4`; the sentence under it is `body` in `ink-2`. Actions wrap below: Retry
+  and the way back to the dashboard are `secondary`, the link to billing is `primary`. `RouteError`, the page-level
+  failure, is a frame of its own: a centred `rounded-xl` card on `border-subtle`, a 48px disc, an
+  `h1` in `title`, a `primary` Retry, and it keeps the `warning` glyph it shipped with. That is the
+  one fault that is not `negative`, recorded here and not changed.
+- **The tones.** `negative` is a fault: something broke and nobody did anything wrong. `warning`
+  is a limit the reader can act on: the workspace is at a quota or the feature is not in its plan.
+  `negative` is the default. A call site does not pick a tone for a failure: `FailurePanel` derives
+  it from the recovery, so `warning` appears only on the `quota` and `feature_locked` recoveries
+  and every other one is `negative`. A reader asks "did the product fail, or did it decline?"; when
+  it is hard to say, the answer is `negative`. The four recoveries are `retryable` (Retry, beside
+  the form and never instead of it, so input survives), `quota` (a link to billing and the metric
+  that was reached), `feature_locked` (a link to billing and nothing else) and `internal` (the
+  sentence, Retry when the caller has one, a way back to the dashboard where the reader is known to
+  be signed in, and a reference). `not_found` and `forbidden` share the `internal` recovery on
+  purpose, so the screen never offers a different way out (the sentence still differs) for a missing row and a foreign one
+  (`RECOVERY_OF`). The sentence is the envelope's own catalogue key, so two failures of one kind
+  read the same, and no recovery shows a plan name or an amount.
+- **The states.** It has two placements, `after-action` and `in-place` (the alert-versus-region
+  rule below), and Retry has a pending state (the Pending-Not-Disabled Rule). It does not have
+  hover, press, selected, disabled or invalid: a panel is not interactive, only its buttons and
+  links are, and each answers with its own states and the 44px hit area. It has no dismiss and no
+  timer, so it stays until the failure is gone or the reader leaves. The heading takes focus
+  programmatically and is never a tab stop, so like `<main>` it draws no focus ring.
+- **What carries the meaning without colour.** The heading and the sentence. The glyph is
+  `aria-hidden` and the tone is reinforcement, never the signal (Colour Is Never Alone). The title
+  says what did not happen and the body says whether anything was changed, which is the sentence a
+  reader of a finance app needs first. Under forced colours the panel is a bordered card with
+  text, so the text and the rule survive; no forced-colours capture of it has been made.
+- **The one thing it is not.** An `EmptyState` (nothing here yet, which is not a failure) and a
+  toast (transient, and it cannot hold a recovery). A failure that needs a way out stays on the
+  screen and carries its action. A panel is not a place to show what went wrong in a developer's
+  words either.
+
+**The Alert-Versus-Region Rule.** `placement="after-action"` is the result of something the reader
+just did, so it is `role="alert"`. `placement="in-place"`, and `RouteError`, are the content of a
+page or a block that failed to load on arrival, so they are a region labelled by their heading:
+an alert on initial render is announced before the person has any context for it. The heading is the
+first element inside the alert.
+
+**The Focus Rule.** Only an after-action panel moves focus, to its heading, so a keyboard reader
+lands on the explanation and Retry is the next tab stop. An in-place panel never moves focus.
+`RouteError` moves it only when it mounts after the document's first render, because on the first
+render the browser has already placed focus on the document and the skip link must stay the first
+tab stop. A panel that held focus when it goes away, after a successful Retry say, gives it back to
+the enclosing dialog or else to `#main-content`, never to `<body>` (`useFocusHeading`).
+
+**The Tab-Title Rule.** An error surface never writes `document.title`. The router runs `head()` for
+the failed match as well, so the tab already carries the failed route's own title, and an imperative
+write would compete with the rendered `<title>` and outlive a successful Retry.
+
+**The Reference Rule.** New code never renders an error's message. `FailurePanel` has no `detail` prop
+and no `<details>` (`ErrorPanel` still has both until #718), `title` and `body` are catalogue copy, and the only free-form string it is given is
+a `reference`, which is an event id or a request id and nothing else: the panel drops anything that
+is not 8 to 64 letters, digits, `_` or `-`, but the shape narrows a string and does not prove it is
+not an amount, so the producer passes an id and never a value of its own. The existing `ErrorPanel`
+sites that still pass `detail` are the tracked exception, owned by #718 (audit the `detail=` sites
+and remove those that carry the repository's message), after which the prop goes.
+
+The guideline states no conformance level and widens none: the claim is `docs/ACCESSIBILITY.md` §1.
 
 ### Badges
 
@@ -883,6 +980,80 @@ rules and rows by `border-subtle` horizontal ones, cell padding 12 / 10px. Hover
 wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
 (`inset 0 0 0 1px`): a box, not a bar. Amounts are end-aligned and tabular.
 
+### Reorderable tree
+
+A two-level list of rows that a person can put in order, by dragging **and** by keyboard. Two
+screens draw one: the category tree (`CategoryTree`) and the account group tree (`GroupTree`).
+They share the arithmetic in `#/components/app/tree` and nothing else; each builds its own menu,
+because what a row can do differs (a category archives, a group deletes).
+
+- **Shape:** one flat `GridList` in reading order, never nested lists, so arrow keys travel
+  linearly. A child row is indented one step (`ms-6`) and carries a corner arrow; a row an
+  account sits on (group tree only) is indented one more. Row, radius and padding are the
+  `GridListItem`'s. The drag handle and the menu trigger are `ghost` icon buttons on the 44px hit
+  area (`target-min`), also on an indented row at 360px.
+- **Both paths ship together.** Every gesture the pointer can make is a menu item built from the
+  same pure move functions: _Move up_, _Move down_, _Move to top_, _Move to bottom_, _Move to…_
+  (which re-parents). Neither path is the fallback for the other, and a keyboard drag and the
+  matching menu item must produce the same move; a component test holds that.
+- **Names say where a row is.** A child row's accessible name carries its parent ("Trips, inside
+  Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
+  after their row, and their parent for a child.
+- **Disabled, never hidden, and the reason is written.** An item that would change nothing, or
+  that the one-level rule forbids, stays in the menu disabled. The group tree also writes the
+  reason as the item's description ("Already first", "A sub-group cannot have its own
+  sub-groups"), painted under the item at full contrast (only the label dims) and wired as its
+  description, so the reason does not depend on a tooltip. Arrow keys skip a disabled item, so it
+  is reached by a virtual cursor and by sight; the category tree disables the item without a description yet.
+- **Drop and focus rules.** A drop lands _beside_ a row, never on it, and the dropped row takes
+  that row's parent: one rule, no nesting-by-hovering. Rows that are not part of the order
+  (accounts inside a group) are not drop targets - the target is cancelled, so no indicator is
+  drawn and a keyboard drag skips it - and cannot start a drag. The group tree offers each
+  boundary between two rows of a run once, as _before_ the later one (the target is also cancelled
+  for a dragged group that has children when the target is a sub-group, which the one-level rule would
+  refuse); _after_ exists for the last
+  row of a run only, and its indicator is drawn directly under that row. For the last top-level group, which
+  has its accounts beneath it, that reads as "inside" - a known limit of a row-based indicator and
+  the reason the menu is not optional. After a move, a rename or a create, focus stays on (or goes
+  to) the row; after a delete it goes to the next row, then the previous, then the screen's create
+  button.
+- **In the group tree a menu move is said aloud, politely:** "Business moved to position 2 of 3", qualified by the
+  parent for a child. A drag has React Aria's own announcements.
+- **A refusal is a sentence in an always-mounted `role="alert"` region** above the tree, and a
+  toast is for what succeeded. The group tree chooses its sentence from the catalogue by the kind
+  of failure and never prints the server's message.
+- **Non-colour meaning:** the row's kind or count is a word or a number beside the name, never a
+  hue alone.
+- **It is not** a data table (no columns, no sort) and not a `ListBox` (a menu of values to
+  choose from): its rows are things with an order, and the order is the data.
+
+### Forecast panel
+
+Spent this year, rest of this year, next twelve months — three amounts for a recurring series, or
+the same three rolled up per currency on `/recurring`. The second call site is the series detail.
+
+- **The shape:** a `Card` (`lg` padding) with a subtitle heading, a caption in `text-caption` /
+  `ink-2`, then a `dl` whose columns follow the card's own width
+  (`grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]`, never a viewport breakpoint: the panel sits
+  in a ~490px column at 1280px and a full-width card at 360px, and three six-digit amounts touched
+  under `sm:grid-cols-3`). Each metric is a `dt` in caption `ink-2` and a `dd` in subtitle,
+  semibold, tabular, `break-words`. One currency per block; a second currency is a second block,
+  never a converted total.
+- **What it counts:** expense series and expense links only. `amount_minor` is never negative, so
+  an income series (or a refund linked by hand) is a direction, not a negative spend; an income
+  series shows no panel. `/recurring` rolls up every series whatever its list filter, because a
+  paused series' spend still counts.
+- **The tones:** none. These are plan figures, not alerts. Overdue copy lives on the series card
+  and _Due soon_, not here.
+- **The states:** resting only. There is no empty colour wash; an empty rollup is a sentence
+  (`recurring.forecast.empty`).
+- **What carries the meaning when the colour does not:** the three labels, and a visually-hidden
+  table of the same three cells so a screen reader gets tabular data rather than three adjacent
+  paragraphs. The clip (`sr-only`) sits on a wrapper `div`, never on the `<table>`: a table lays
+  out by its content and ignores `width: 1px`, so it widens the page at 360px. Amounts are formatted by `formatMoney`; they never become a float in the panel.
+- **It is not** a chart (no SVG, no second encoding) and not _Due soon_ (that list is periods you
+  act on). This panel is a year view of integer sums.
+
 ### Period actions
 
 The buttons on one row of a recurring period, drawn by one component wherever a period is listed:
@@ -930,6 +1101,9 @@ the series detail grid and _Due soon_ on `/recurring`.
   stacks the buttons from `sm` up). Every layout change is scoped below `sm`, so nothing changes
   at `sm` and above. The shared classes and the self-labelling
   cell are `stacked-table.tsx`.
+  The liability schedule (`/loans/$loanId`) is a second call site of both: the same classes, its
+  scroller a focusable named region, and `useRowFocusRecovery` returning focus to the schedule
+  (the heading when the saved row has no button left) after a mark-paid save.
   - _Semantics survive the `display` change:_ the table, both row groups, rows, column headers,
     the due-date row header and cells carry their `role` explicitly, with `<caption>` and `scope`
     kept, because a non-table `display` can drop a native role in some browser and screen reader
@@ -983,6 +1157,17 @@ and nothing else — no headline is ever a caution tone, the verdict word and th
 `warning` at 7:1, and a caller that wants loud caution TEXT has to re-measure the token at 4.5:1
 first. What the 3:1 floor bought differs by theme and is measured rather than assumed: dark gets
 full chroma at nearly the old weight, light has to lighten to get any (`src/styles/tokens.css`).
+
+### Liability meter
+
+The share of a borrowing's imported schedule that is already linked to a transaction, drawn with
+the `AmountMeter` shell on the list card and again as the detail hero (`md` / `lg`). The
+**headline is remaining**, not paid: that is the number somebody acts on. Paid-of-total sits in the
+caption. Overdue changes four channels before colour: the word _Overdue_, the warning triangle, a
+hatched fill, then `warning-bold`. Settled uses a check and a hatched positive fill. Remaining of zero is
+_Schedule paid_, never `0,00`. `aria-valuetext` names paid, remaining and the percentage, never a
+bare percent. The list and the detail share this component; inventing a second bar on the detail
+would be two opinions about the same money.
 
 ### Charts
 

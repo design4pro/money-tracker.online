@@ -65,6 +65,7 @@ const messages = {
   'nav.payees': 'Odbiorcy',
   'nav.recurring': 'Cykliczne',
   'nav.goals': 'Cele',
+  'nav.loans': 'Zobowiązania',
   'nav.reports': 'Raporty',
   'nav.rules': 'Zasady',
   'nav.import': 'Import',
@@ -116,6 +117,8 @@ const messages = {
   'action.moveUp': 'Przenieś wyżej',
   'action.moveDown': 'Przenieś niżej',
   'action.moveTo': 'Przenieś do…',
+  'action.moveToTop': 'Przenieś na początek',
+  'action.moveToBottom': 'Przenieś na koniec',
   'action.undo': 'Cofnij',
   'action.done': 'Gotowe',
   'action.skip': 'Pomiń',
@@ -278,6 +281,82 @@ const messages = {
   'accounts.group.title': 'Grupy',
   'accounts.group.create': 'Nowa grupa',
   'accounts.group.ungrouped': 'Poza grupami',
+  'accounts.groups.title': 'Grupy kont',
+  'accounts.groups.description':
+    'Foldery na Twoje konta, np. Wspólne albo Firmowe. Grupa nigdy nie zmienia salda.',
+  'accounts.groups.manage': 'Zarządzaj grupami',
+  'accounts.groups.loading': 'Wczytywanie grup kont',
+  'accounts.groups.empty.title': 'Nie masz jeszcze grup',
+  'accounts.groups.empty.body':
+    'Grupa zbiera konta pod jedną nazwą, np. Wspólne albo Firmowe, żeby lista wyglądała tak, jak o niej myślisz. Konta zachowują własne salda.',
+  'accounts.groups.error.title': 'Nie udało się wczytać grup kont',
+  'accounts.groups.error.body':
+    'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
+  'accounts.groups.tree.label': 'Grupy kont, w kolejności wyświetlania',
+  'accounts.groups.row.group': {
+    one: '{name}, grupa, {count} konto',
+    few: '{name}, grupa, {count} konta',
+    many: '{name}, grupa, {count} kont',
+    other: '{name}, grupa, {count} konta',
+  },
+  'accounts.groups.row.childOf': {
+    one: '{name}, wewnątrz {parent}, {count} konto',
+    few: '{name}, wewnątrz {parent}, {count} konta',
+    many: '{name}, wewnątrz {parent}, {count} kont',
+    other: '{name}, wewnątrz {parent}, {count} konta',
+  },
+  'accounts.groups.row.account': '{account}, w grupie {group}',
+  'accounts.groups.row.accountArchived':
+    '{account}, zarchiwizowane, w grupie {group}',
+  'accounts.groups.drag.label': 'Przeciągnij: {name}',
+  'accounts.groups.drag.labelChild': 'Przeciągnij: {name}, wewnątrz {parent}',
+  'accounts.groups.actions.label': 'Działania dla: {name}',
+  'accounts.groups.actions.labelChild':
+    'Działania dla: {name}, wewnątrz {parent}',
+  'accounts.group.field.name': 'Nazwa grupy',
+  'accounts.group.field.parent': 'Wewnątrz',
+  'accounts.group.field.parent.hasChildren':
+    'Ta grupa ma podgrupy, więc nie może leżeć wewnątrz innej grupy.',
+  'accounts.group.parent.none': 'Bez nadrzędnej',
+  'accounts.group.rename': 'Zmień nazwę',
+  'accounts.group.addChild': 'Dodaj podgrupę',
+  'accounts.group.form.error.title': 'Nie zapisano grupy',
+  'accounts.group.disabled.noGrandchild':
+    'Podgrupa nie może mieć własnych podgrup',
+  'accounts.group.disabled.first': 'Już jest pierwsza',
+  'accounts.group.disabled.last': 'Już jest ostatnia',
+  'accounts.group.disabled.same': 'Już tam jest',
+  'accounts.group.toast.created': 'Utworzono grupę: {name}',
+  'accounts.group.toast.renamed': 'Zmieniono nazwę grupy: {name}',
+  'accounts.group.toast.reparented':
+    'Przeniesiono grupę: {name}, teraz wewnątrz {parent}',
+  'accounts.group.toast.reparentedTop':
+    'Przeniesiono grupę: {name}, teraz na poziomie głównym',
+  'accounts.group.toast.deleted': 'Usunięto grupę: {name}',
+  'accounts.group.announce.position':
+    'Przeniesiono grupę: {name}, pozycja {position} z {total}',
+  'accounts.group.announce.positionChild':
+    'Przeniesiono grupę: {name}, pozycja {position} z {total} wewnątrz {parent}',
+  'accounts.group.refused.title': 'Nie wprowadzono zmiany',
+  'accounts.group.refused.conflict':
+    'To nie pasuje do obecnych grup. Grupa może leżeć wewnątrz jednej innej grupy, nie dwóch poziomów głębiej.',
+  'accounts.group.refused.notFound':
+    'Lista zmieniła się w innym oknie. Wczytaliśmy ją ponownie.',
+  'accounts.group.refused.forbidden':
+    'Grupy we wspólnym obszarze roboczym może zmieniać tylko właściciel albo administrator.',
+  'accounts.group.refused.generic': 'Coś poszło nie tak. Spróbuj ponownie.',
+  'accounts.group.delete.action': 'Usuń grupę',
+  'accounts.group.delete.title': 'Usunąć grupę {name}?',
+  'accounts.group.delete.body': {
+    one: '{count} konto opuszcza tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    few: '{count} konta opuszczą tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    many: '{count} kont opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    other:
+      '{count} konta opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+  },
+  'accounts.group.delete.bodyEmpty': 'Podgrupy trafią na poziom główny.',
+  'accounts.group.delete.rules':
+    'Reguły używające tej grupy zostaną wstrzymane, dopóki nie wybierzesz innej.',
   'accounts.count': {
     one: '{count} konto',
     few: '{count} konta',
@@ -850,11 +929,12 @@ const messages = {
   'categories.kind.income': 'Wpływy',
   'categories.kind.both': 'Wpływy i wydatki',
   'categories.parent.none': 'Poziom główny',
-  'categories.move.top': 'Przenieś na początek',
-  'categories.move.bottom': 'Przenieś na koniec',
   'categories.move.refused': 'Nie udało się przenieść kategorii',
-  'categories.move.refused.body':
-    'Kategorie mają dwa poziomy. Kategorii, która ma już podkategorie, nie można umieścić wewnątrz innej.',
+  'categories.move.refused.nest':
+    'Kategoria „{category}” nie może trafić do kategorii „{parent}”: kategorie mają tylko dwa poziomy.',
+  'categories.refused.forbidden':
+    'Kategorie w tym domu mogą zmieniać tylko właściciele i administratorzy.',
+  'categories.restore.refused': 'Nie przywróciliśmy kategorii',
   'categories.filter.showArchived': 'Pokaż zarchiwizowane kategorie',
   'categories.field.kind': 'Stosowana do',
   'categories.field.kind.help':
@@ -1639,6 +1719,7 @@ const messages = {
   'billing.usage.metric.goals': 'Cele',
   'billing.usage.metric.rules': 'Reguły opisywania',
   'billing.usage.metric.recurringSeries': 'Rachunki cykliczne',
+  'billing.usage.metric.loans': 'Zobowiązania',
   'billing.usage.metric.transactions': 'Wpisy',
   'billing.usage.metric.importsPerMonth': 'Importy w tym miesiącu',
   'billing.usage.metric.storageBytes': 'Paragony',
@@ -2111,6 +2192,35 @@ const messages = {
   'recurring.candidate.toast.dismissed': 'Propozycja odrzucona',
   'recurring.candidate.toast.accepted': 'Seria utworzona z propozycji',
 
+  'recurring.forecast.title': 'Ten rok i najbliższe dwanaście miesięcy',
+  'recurring.forecast.caption':
+    'Wydane to to, co już powiązano w tym roku. Reszta roku i najbliższe dwanaście miesięcy to wciąż otwarty plan — kwoty oczekiwane, nie przeliczenie na żywo.',
+  'recurring.forecast.spent': 'Wydane w tym roku',
+  'recurring.forecast.rest': 'Reszta tego roku',
+  'recurring.forecast.next12': 'Najbliższe 12 miesięcy',
+  'recurring.forecast.empty': 'Nie ma jeszcze nic do prognozy.',
+
+  'recurring.form.anchorMonth': 'Miesiąc roku',
+  'recurring.form.anchorMonth.help':
+    'Kalendarzowy miesiąc, w którym przypada seria roczna. Niezależny od pierwszego terminu.',
+  'recurring.form.anchorMonth.auto': 'Ten sam miesiąc co pierwszy termin',
+  'recurring.form.duty.templates': 'Szablony polskich terminów',
+  'recurring.form.duty.help':
+    'Szablon uzupełnia nazwę, rodzaj, częstotliwość i dzień miesiąca. Kwotę wpisujesz samodzielnie. To przypomnienie, nie porada podatkowa.',
+  'recurring.form.duty.apply': 'Użyj: {name}',
+
+  'recurring.duty.zus': 'Składka ZUS',
+  'recurring.duty.pit': 'Zaliczka PIT-36L',
+  'recurring.duty.vat_7': 'VAT-7',
+  'recurring.duty.badge': 'Obowiązek',
+  'recurring.duty.disclaimer':
+    'Termin, plan i to, czy zapłacono — dzień, który wybrano. To nie wyliczony podatek i nie porada.',
+  'recurring.duty.due': 'Termin',
+  'recurring.duty.plan': 'Kwota planu',
+  'recurring.duty.paid': 'Zapłacono',
+  'recurring.periods.duty.caption':
+    'Każdy wiersz to jeden termin: plan, to, co zapłacono, i różnica. Oznaczenie wiersza jako zapłaconego nigdy nie tworzy wpisu.',
+
   /* -- Cele oszczędnościowe ----------------------------------------------- */
   /* -- Lista --------------------------------------------------------------- */
   'goals.title': 'Cele oszczędnościowe',
@@ -2353,6 +2463,116 @@ const messages = {
   'goals.toast.recomputed': 'Postęp przeliczony',
   'goals.toast.reached': 'Cel {name} jest w pełni sfinansowany',
   'goals.toast.failed': 'Nie udało się',
+
+  /* -- Zobowiązania (tabela loans) ----------------------------------------- */
+  'loans.title': 'Zobowiązania',
+  'loans.subtitle':
+    'Pożyczki i leasingi z harmonogramem spłat. Pozostało to suma niezapłaconych rat, nie saldo banku.',
+  'loans.list.loading': 'Wczytujemy zobowiązania…',
+  'loans.detail.loading': 'Wczytujemy to zobowiązanie…',
+  'loans.detail.back': 'Wszystkie zobowiązania',
+  'loans.detail.error.title': 'Nie udało się wczytać tego zobowiązania',
+  'loans.detail.error.body':
+    'Mogło zostać usunięte albo żądanie nie wróciło. Nic nie zostało zmienione.',
+
+  'loans.filter.book': 'Księga',
+  'loans.filter.book.all': 'Wszystko',
+  'loans.filter.status': 'Pokaż',
+  'loans.filter.active': 'Aktywne',
+  'loans.filter.all': 'Wszystkie, także zamknięte',
+
+  'loans.error.title': 'Nie udało się wczytać zobowiązań',
+  'loans.error.body':
+    'Lista nie wróciła. Nic nie zostało zmienione — spróbuj ponownie.',
+
+  'loans.empty.title': 'Nie ma jeszcze zobowiązań',
+  'loans.empty.body':
+    'Zobowiązanie to więcej niż ujemne saldo konta: kredytodawca, dzień płatności i harmonogram rat, które mogą się różnić z miesiąca na miesiąc. Oznaczenie raty jako zapłaconej wskazuje na transakcję, którą już zapisano.',
+  'loans.empty.filtered.title': 'Nic tu nie ma',
+  'loans.empty.filtered.body':
+    'Żadne zobowiązanie nie pasuje do tego filtra. Spróbuj innego.',
+
+  'loans.book.business': 'Firma',
+  'loans.book.personal': 'Prywatne',
+  'loans.kind.credit': 'Kredyt',
+  'loans.kind.leasing': 'Leasing',
+  'loans.kind.loan': 'Pożyczka',
+  'loans.kind.other': 'Inne',
+
+  'loans.status.active': 'Aktywne',
+  'loans.status.overdue': 'Zaległe',
+  'loans.status.settled': 'Spłacone',
+  'loans.status.paid': 'Zapłacone',
+  'loans.status.upcoming': 'Nadchodzące',
+
+  'loans.overview.remaining': 'Pozostało',
+  'loans.overview.overdue': 'Zaległe',
+  'loans.overview.thisMonth': 'W tym miesiącu',
+  'loans.overview.overdueCount': {
+    one: '{count} zaległa rata',
+    few: '{count} zaległe raty',
+    many: '{count} zaległych rat',
+    other: '{count} zaległej raty',
+  },
+  'loans.overview.thisMonthCount': {
+    one: '{count} rata',
+    few: '{count} raty',
+    many: '{count} rat',
+    other: '{count} raty',
+  },
+
+  'loans.meter.label': 'Spłata zobowiązania {name}',
+  'loans.meter.valueText':
+    'zapłacono {paid}, pozostało {remaining}, {percent} harmonogramu',
+  'loans.meter.unavailable': 'Postęp niedostępny',
+  'loans.progress.remaining': 'Pozostało {amount}',
+  'loans.progress.complete': 'Harmonogram spłacony',
+  'loans.progress.of': 'Zapłacono {paid} z {total}',
+
+  'loans.next.none': 'Brak niezapłaconej raty',
+  'loans.next.due': 'Następna {amount} {date}',
+  'loans.next.overdue': 'Zaległe {amount} z dnia {date}',
+  'loans.paymentDay': 'Dzień płatności {day}',
+  'loans.endsOn': 'Koniec {date}',
+
+  'loans.schedule.caption':
+    'Każdy wiersz to jedna oczekiwana płatność. Zapłacone oznacza wskazanie zapisanej transakcji.',
+  'loans.schedule.missing':
+    'To zobowiązanie nie ma harmonogramu. Tak nie powinno być; spróbuj ponownie albo je usuń.',
+  'loans.schedule.title': 'Harmonogram rat',
+  'loans.schedule.sequence': 'Lp.',
+  'loans.schedule.due': 'Termin',
+  'loans.schedule.amount': 'Kwota',
+  'loans.schedule.status': 'Stan',
+  'loans.schedule.actions': 'Działania',
+  'loans.schedule.next': 'Następna',
+  'loans.schedule.buyout': 'Wykup',
+
+  'loans.markPaid.action': 'Oznacz jako zapłacone, rata na {date}',
+  'loans.markPaid.title': 'Oznacz tę ratę jako zapłaconą',
+  'loans.markPaid.body':
+    'Wskaż transakcję, która ją rozliczyła. To nie tworzy wpisu i nie przesuwa salda.',
+  'loans.markPaid.field': 'Która transakcja',
+  'loans.markPaid.loading': 'Szukamy pasujących wpisów…',
+  'loans.markPaid.candidateCount': {
+    one: '{count} pasujący wpis',
+    few: '{count} pasujące wpisy',
+    many: '{count} pasujących wpisów',
+    other: '{count} pasującego wpisu',
+  },
+  'loans.markPaid.empty':
+    'W tym oknie nic nie pasuje. Najpierw zapisz płatność, potem wróć i wskaż ją.',
+  'loans.markPaid.record': 'Zapisz płatność',
+  'loans.markPaid.never':
+    'Oznaczenie jako zapłacone nigdy nie tworzy transakcji. Tylko wskazuje istniejącą.',
+  'loans.markPaid.confirm': 'Powiąż tę transakcję',
+  'loans.markPaid.variance.none': 'Zgadza się z ratą',
+  'loans.markPaid.variance.over': 'o {amount} więcej niż w planie',
+  'loans.markPaid.variance.under': 'o {amount} mniej niż w planie',
+  'loans.toast.failed': 'Nie udało się',
+  'loans.markPaid.error.body':
+    'Nie udało się powiązać tej płatności. Mogła już opłacać inną ratę. Nic nie zostało zmienione.',
+
   /* -- Zasady · baner wstrzymanej zasady ------------------------------------ */
   'rules.paused.badge': 'Wstrzymana',
   'rules.paused.title': 'Zasada „{name}” jest wstrzymana',

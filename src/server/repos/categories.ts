@@ -95,23 +95,33 @@ export class CategoryDepthError extends ConflictError {
   readonly categoryId: string
   readonly parentId: string
 
-  constructor(categoryId: string, parentId: string, parentName: string) {
+  constructor(
+    categoryId: string,
+    parentId: string,
+    categoryName: string,
+    parentName: string,
+  ) {
     super(
-      `Categories nest two levels; ${categoryId} cannot sit inside ${parentId} ("${parentName}"), which is already inside another category.`,
+      `Categories nest two levels: "${categoryName}" cannot sit inside "${parentName}", which is already inside another category.`,
     )
     this.categoryId = categoryId
     this.parentId = parentId
   }
 }
 
-/** Thrown when a category that already has children is asked to become a child itself. */
+/**
+ * Thrown when a category that already has children is asked to become a child itself.
+ *
+ * The count follows the name in parentheses instead of agreeing with a noun: a plural built by
+ * hand in an English sentence is wrong in the language it was not written for.
+ */
 export class CategoryHasChildrenError extends ConflictError {
   readonly categoryId: string
   readonly childCount: number
 
-  constructor(categoryId: string, childCount: number) {
+  constructor(categoryId: string, categoryName: string, childCount: number) {
     super(
-      `Category ${categoryId} holds ${childCount} subcategor(y|ies); move them out before moving it inside another category.`,
+      `Category "${categoryName}" has subcategories (${childCount}); move them out before filing it inside another category.`,
     )
     this.categoryId = categoryId
     this.childCount = childCount
@@ -343,6 +353,11 @@ async function assertMayAdminister(
   }
 }
 
+/** Whether `parent` may hold children: the tree is two levels, so only a top-level row can. */
+function canTakeChildren(parent: Pick<CategoryRow, 'parentId'>): boolean {
+  return parent.parentId === null
+}
+
 /**
  * The depth cap, asserted on every write that sets `parent_id`.
  *
@@ -350,10 +365,13 @@ async function assertMayAdminister(
  * {@link NotFoundError} (never a `ForbiddenError` — see `./errors`), a parent that is itself a
  * child is a {@link CategoryDepthError} naming both rows, and a category that already holds
  * children cannot become a child, because that would put its children on the third level.
+ * `categoryName` is the name of the category being filed (`parsed.name` for a create), for the
+ * sentence of the first and the third.
  */
 async function assertMayParent(
   scope: TenantScope,
   categoryId: string | null,
+  categoryName: string,
   parentId: string | null,
 ): Promise<void> {
   if (parentId === null) return
@@ -362,8 +380,13 @@ async function assertMayParent(
   }
 
   const parent = await categoryRepo.requireById(scope, parentId)
-  if (parent.parentId !== null) {
-    throw new CategoryDepthError(categoryId ?? '(new)', parentId, parent.name)
+  if (!canTakeChildren(parent)) {
+    throw new CategoryDepthError(
+      categoryId ?? '(new)',
+      parentId,
+      categoryName,
+      parent.name,
+    )
   }
 
   if (categoryId === null) return
@@ -372,7 +395,7 @@ async function assertMayParent(
     eq(categories.parentId, categoryId),
   )
   if (childCount > 0) {
-    throw new CategoryHasChildrenError(categoryId, childCount)
+    throw new CategoryHasChildrenError(categoryId, categoryName, childCount)
   }
 }
 
@@ -530,7 +553,7 @@ export async function createCategory(
 ): Promise<Category> {
   const parsed = createCategorySchema.parse(input)
   await assertMayAdminister(scope, 'create a category')
-  await assertMayParent(scope, null, parsed.parentId)
+  await assertMayParent(scope, null, parsed.name, parsed.parentId)
 
   const parent =
     parsed.parentId === null
@@ -763,7 +786,7 @@ export async function moveCategory(
   const parsed = moveCategorySchema.parse(input)
   await assertMayAdminister(scope, 'move a category')
   const before = await categoryRepo.requireById(scope, parsed.id)
-  await assertMayParent(scope, parsed.id, parsed.parentId)
+  await assertMayParent(scope, parsed.id, before.name, parsed.parentId)
 
   const previousParent =
     before.parentId === null

@@ -24,7 +24,7 @@ This file extends the shared `om-prepare-test-env` skill installed at
   outside 3010-3020.
 - Host `127.0.0.1`, never `localhost`: the server binds v4 only, and Node's fetch in the seed
   resolves `localhost` differently from curl.
-- `.dev.vars`: the script writes a throwaway file (`BETTER_AUTH_SECRET`, `APP_URL`) whose first
+- `.dev.vars`: the script writes a throwaway file (`BETTER_AUTH_SECRET`, `APP_URL`, and the fixed `UNSUBSCRIBE_TOKEN_SECRET` that `e2e/unsubscribe.spec.ts` signs with) whose first
   line is a marker. A `.dev.vars` without the marker was written by a person and is never
   overwritten: the script keeps it and warns when its `APP_URL` does not match the chosen port.
   Billing QA needs Polar **sandbox** credentials in that human-written file, all seven or none

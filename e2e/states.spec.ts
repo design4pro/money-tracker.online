@@ -243,7 +243,11 @@ test.describe('a read that has not come back yet', () => {
       // A card link, because the account detail is not a rail destination: `account-card.tsx` uses
       // TanStack's `Link`, so this is a client-side navigation and its loader asks the browser for
       // the data.
-      await page.locator('main a[href^="/accounts/"]').first().click()
+      // Not `/accounts/groups`: the "Manage groups" link sits above the cards and is not a detail.
+      await page
+        .locator('main a[href^="/accounts/"]:not([href="/accounts/groups"])')
+        .first()
+        .click()
 
       // What issue #21 says nobody could show: a designed loading state, on purpose, on demand.
       const loading = page.locator('main [role="status"]')
@@ -285,7 +289,11 @@ test.describe('a read that has not come back yet', () => {
 
     const held = await holdEveryServerFn(page)
     try {
-      await page.locator('main a[href^="/accounts/"]').first().click()
+      // Not `/accounts/groups`: the "Manage groups" link sits above the cards and is not a detail.
+      await page
+        .locator('main a[href^="/accounts/"]:not([href="/accounts/groups"])')
+        .first()
+        .click()
 
       const loading = page.locator('main [role="status"]')
       await expect(loading).toHaveCount(1)

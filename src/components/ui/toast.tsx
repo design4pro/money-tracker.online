@@ -7,6 +7,20 @@ import type { ToasterProps as SonnerToasterProps } from 'sonner'
 
 export { toast }
 
+/**
+ * The close button is a real 44x44 box (WCAG 2.2 §2.5.5) pinned inside the toast's inline-end
+ * corner, with the 20px chip drawn by `::before`. Sonner's own rule floats a 20px circle over the
+ * corner; its stylesheet is unlayered, so every override here is important to win over it
+ * (#730). `left`/`right` read the opposite direction variable, which puts the box at the
+ * inline-end edge in both LTR and RTL.
+ */
+const CLOSE_BUTTON_CLASSES = [
+  'size-11! left-(--toast-close-button-end)! right-(--toast-close-button-start)! transform-none!',
+  'rounded-md! border-0! bg-transparent! text-ink-2! focus-ring focus-visible:shadow-none!',
+  "before:absolute before:-z-10 before:size-5 before:rounded-full before:border before:border-border-subtle before:bg-surface before:content-['']",
+  'hover:bg-transparent! hover:before:bg-hover',
+].join(' ')
+
 export interface ToastHostProps extends Omit<
   SonnerToasterProps,
   'theme' | 'toastOptions'
@@ -88,8 +102,8 @@ export function ToastHost({
             'rounded-md bg-accent px-2.5 py-1 text-caption font-semibold text-on-accent',
           cancelButton:
             'rounded-md bg-surface-sunken px-2.5 py-1 text-caption font-semibold text-ink',
-          closeButton:
-            'rounded-md border border-border-subtle bg-surface text-ink-2',
+          closeButton: CLOSE_BUTTON_CLASSES,
+          content: 'pe-7',
           icon: 'shrink-0',
         },
       }}

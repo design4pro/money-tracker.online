@@ -4,6 +4,7 @@ import { Plus, Search } from 'lucide-react'
 import { z } from 'zod'
 
 import {
+  ForecastPanel,
   RECURRING_PANES,
   RecurringEmptyState,
   RecurringListSkeleton,
@@ -239,6 +240,10 @@ function RecurringListRoute() {
         */
         <div className={RECURRING_PANES}>
           <div className="flex min-w-0 flex-col gap-6">
+            {overview.rows.length === 0 ? null : (
+              <ForecastPanel forecasts={overview.forecast} />
+            )}
+
             <SegmentedFilter
               label={t('recurring.filter.label')}
               value={status}
