@@ -274,10 +274,10 @@ function CategoryRowMenu({
   }> = [
     { step: 'up', label: t('action.moveUp'), icon: ChevronUp },
     { step: 'down', label: t('action.moveDown'), icon: ChevronDown },
-    { step: 'top', label: t('categories.move.top'), icon: ArrowUpToLine },
+    { step: 'top', label: t('action.moveToTop'), icon: ArrowUpToLine },
     {
       step: 'bottom',
-      label: t('categories.move.bottom'),
+      label: t('action.moveToBottom'),
       icon: ArrowDownToLine,
     },
   ]

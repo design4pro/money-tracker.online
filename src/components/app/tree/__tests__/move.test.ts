@@ -109,6 +109,12 @@ describe('dropMove', () => {
   it('asks for nothing when the target is not in the tree', () => {
     expect(dropMove(tree, 'food', 'missing', 'before')).toBeNull()
   })
+
+  it('asks for nothing when a parent is dropped beside its own child', () => {
+    // The dropped row would take the target's parent, which is the dropped row itself.
+    expect(dropMove(tree, 'food', 'groceries', 'before')).toBeNull()
+    expect(dropMove(tree, 'food', 'dining', 'after')).toBeNull()
+  })
 })
 
 describe('stepMove', () => {

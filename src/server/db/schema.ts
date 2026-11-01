@@ -123,6 +123,12 @@ import {
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
   NOTIFICATION_KIND_IDS,
+  BOOKS,
+  LOAN_KINDS,
+  LOAN_STATUSES,
+  LOAN_REPAYMENT_SHAPES,
+  LOAN_PAYMENT_FREQUENCIES,
+  LOAN_INSTALMENT_STATUSES,
 } from '#/lib/enums'
 
 /**
@@ -145,6 +151,7 @@ export {
   RECURRING_KINDS,
   TRANSACTION_DIRECTIONS,
   RECURRING_FREQUENCIES,
+  RECURRING_DUTY_CODES,
   SAVINGS_GOAL_STATUSES,
   IMPORT_SOURCES,
   IMPORT_STATUSES,
@@ -164,6 +171,12 @@ export {
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
   NOTIFICATION_KIND_IDS,
+  BOOKS,
+  LOAN_KINDS,
+  LOAN_STATUSES,
+  LOAN_REPAYMENT_SHAPES,
+  LOAN_PAYMENT_FREQUENCIES,
+  LOAN_INSTALMENT_STATUSES,
 } from '#/lib/enums'
 export type {
   PlanId,
@@ -181,6 +194,7 @@ export type {
   RecurringKind,
   TransactionDirection,
   RecurringFrequency,
+  RecurringDutyCode,
   SavingsGoalStatus,
   ImportSource,
   ImportStatus,
@@ -200,6 +214,12 @@ export type {
   ExportStatus,
   SuggestionKind,
   NotificationKind,
+  Book,
+  LoanKind,
+  LoanStatus,
+  LoanRepaymentShape,
+  LoanPaymentFrequency,
+  LoanInstalmentStatus,
 } from '#/lib/enums'
 
 /* -------------------------------------------------------------------------- */
@@ -1281,6 +1301,16 @@ export const recurringSeries = sqliteTable(
     frequency: text('frequency').notNull(),
     /** Day of month (1–31) or day of week (1–7), read according to `frequency`. */
     anchorDay: integer('anchor_day'),
+    /**
+     * Calendar month (1–12) an annual series falls in. Null for every other frequency and for
+     * annual series that keep their start date's month. Additive: existing rows stay null.
+     */
+    anchorMonth: integer('anchor_month'),
+    /**
+     * A JDG due-date shape (`zus` / `pit` / `vat_7`), or null. Presentation and templates only —
+     * the engine never computes a tax. Additive: existing rows stay null.
+     */
+    dutyCode: text('duty_code'),
     startDate: calendarDate('start_date').notNull(),
     endDate: calendarDate('end_date'),
     maxOccurrences: integer('max_occurrences'),
@@ -1445,6 +1475,157 @@ export const savingsGoals = sqliteTable(
 )
 
 export type SavingsGoalRow = typeof savingsGoals.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Loans — the register. Schedule rows live after `transactions`.             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One borrowing in the workspace register (UI copy later: zobowiązania).
+ *
+ * The table is `loans` because `28-loans.md` / `00-S17` named it; kinds cover credit, leasing,
+ * a personal loan and other. It is **not** the `loan` account category — that account still holds
+ * the balance when one is linked. An imported spreadsheet row often has no such account yet, so
+ * `account_id` is optional.
+ *
+ * Two amount stories sit on the same row:
+ * - **Own currency** — `principal_minor`, `instalment_minor` (the current payment), optional
+ *   `outstanding_minor`. Integers, scale from `currencies.digits`.
+ * - **Workspace base** — the matching `ref_*` columns, written once at `opened_on`'s rate
+ *   (`docs/MONEY.md` §3.1) together with `rate_e10`. They are never recomputed.
+ *
+ * Principal, interest rate, outstanding balance and term are optional: the owner's schedule is
+ * often a list of amounts without a contract rate. `repayment_shape = imported` is the mode this
+ * migration exists to store. `annuity` / `linear_principal` are stored for the later engine.
+ *
+ * `book` is Firma/Prywatne on **this** table only. Recurring series keep their own PR.
+ */
+export const loans = sqliteTable(
+  'loans',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    name: text('name', { length: 100 }).notNull(),
+    kind: text('kind').notNull().default('credit'),
+    book: text('book').notNull().default('personal'),
+    lender: text('lender', { length: 200 }),
+    accountId: text('account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+
+    principalMinor: integer('principal_minor'),
+    refPrincipalMinor: integer('ref_principal_minor'),
+    instalmentMinor: integer('instalment_minor').notNull(),
+    refInstalmentMinor: integer('ref_instalment_minor').notNull(),
+    outstandingMinor: integer('outstanding_minor'),
+    refOutstandingMinor: integer('ref_outstanding_minor'),
+    /** FX rate used for the `ref_*` pair at `opened_on`. Not the interest rate. */
+    rateE10: integer('rate_e10').notNull(),
+    /**
+     * Nominal annual interest, integer × 10^10. Optional on an imported schedule.
+     * Shares the scaling of an exchange rate and never resolves through the rate tables.
+     */
+    annualRateE10: integer('annual_rate_e10'),
+
+    repaymentShape: text('repayment_shape').notNull().default('imported'),
+    paymentFrequency: text('payment_frequency').notNull().default('monthly'),
+    termPeriods: integer('term_periods'),
+    /** Day of month the payment is expected, 1–31. Month-end anchoring is a later engine. */
+    paymentDay: integer('payment_day').notNull(),
+    openedOn: calendarDate('opened_on').notNull(),
+    firstPaymentOn: calendarDate('first_payment_on'),
+    endsOn: calendarDate('ends_on'),
+    status: text('status').notNull().default('active'),
+    note: text('note', { length: 500 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('loans_organization_id_status_idx').on(
+      table.organizationId,
+      table.status,
+    ),
+    index('loans_organization_id_account_id_idx').on(
+      table.organizationId,
+      table.accountId,
+    ),
+    index('loans_organization_id_book_idx').on(
+      table.organizationId,
+      table.book,
+    ),
+    enumCheck('loans_kind_check', table.kind, LOAN_KINDS),
+    enumCheck('loans_book_check', table.book, BOOKS),
+    enumCheck('loans_status_check', table.status, LOAN_STATUSES),
+    enumCheck(
+      'loans_repayment_shape_check',
+      table.repaymentShape,
+      LOAN_REPAYMENT_SHAPES,
+    ),
+    enumCheck(
+      'loans_payment_frequency_check',
+      table.paymentFrequency,
+      LOAN_PAYMENT_FREQUENCIES,
+    ),
+    check(
+      'loans_principal_minor_check',
+      sql`${table.principalMinor} is null or ${table.principalMinor} > 0`,
+    ),
+    check(
+      'loans_principal_pair_check',
+      sql`(${table.principalMinor} is null) = (${table.refPrincipalMinor} is null)`,
+    ),
+    positiveMinorCheck('loans_instalment_minor_check', table.instalmentMinor),
+    positiveMinorCheck(
+      'loans_ref_instalment_minor_check',
+      table.refInstalmentMinor,
+    ),
+    check(
+      'loans_outstanding_minor_check',
+      sql`${table.outstandingMinor} is null or ${table.outstandingMinor} >= 0`,
+    ),
+    check(
+      'loans_outstanding_pair_check',
+      sql`(${table.outstandingMinor} is null) = (${table.refOutstandingMinor} is null)`,
+    ),
+    check('loans_rate_e10_check', sql`${table.rateE10} > 0`),
+    check(
+      'loans_annual_rate_e10_check',
+      sql`${table.annualRateE10} is null or ${table.annualRateE10} >= 0`,
+    ),
+    check(
+      'loans_term_periods_check',
+      sql`${table.termPeriods} is null or (${table.termPeriods} >= 1 and ${table.termPeriods} <= 600)`,
+    ),
+    check(
+      'loans_payment_day_check',
+      sql`${table.paymentDay} >= 1 and ${table.paymentDay} <= 31`,
+    ),
+    check(
+      'loans_first_payment_on_check',
+      sql`${table.firstPaymentOn} is null or ${table.firstPaymentOn} >= ${table.openedOn}`,
+    ),
+    check(
+      'loans_ends_on_check',
+      sql`${table.endsOn} is null or ${table.endsOn} >= ${table.openedOn}`,
+    ),
+    maxLengthCheck('loans_name_check', table.name, 100),
+    maxLengthCheck('loans_lender_check', table.lender, 200),
+    maxLengthCheck('loans_note_check', table.note, 500),
+    fixedLengthCheck('loans_opened_on_check', table.openedOn, 10),
+    fixedLengthCheck(
+      'loans_first_payment_on_length_check',
+      table.firstPaymentOn,
+      10,
+    ),
+    fixedLengthCheck('loans_ends_on_length_check', table.endsOn, 10),
+  ],
+)
+
+export type LoanRow = typeof loans.$inferSelect
+export type LoanInsert = typeof loans.$inferInsert
 
 /* -------------------------------------------------------------------------- */
 /* Import — the batch. Presets, row errors and export jobs are below.         */
@@ -2493,6 +2674,129 @@ export const savingsGoalContributions = sqliteTable(
 
 export type SavingsGoalContributionRow =
   typeof savingsGoalContributions.$inferSelect
+
+/* -------------------------------------------------------------------------- */
+/* Loan schedule — one expected payment, settled only by a real transaction   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One row of a loan's plan.
+ *
+ * `amount_minor` is the **total** payment for that date — imported and variable amounts included,
+ * not only an annuity split. Principal / interest / closing balance are optional extras the
+ * contract engine fills; the spreadsheet mode leaves them null.
+ *
+ * A buyout (wykup) is a flagged row, not a column on `loans`. Paid means
+ * `settled_transaction_id` points at a transaction; the evidence `CHECK` is the same shape as
+ * `recurring_periods`. Overdue is not a stored status.
+ */
+export const loanInstalments = sqliteTable(
+  'loan_instalments',
+  {
+    organizationId: organizationId(),
+    loanId: text('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+    dueOn: calendarDate('due_on').notNull(),
+    amountMinor: integer('amount_minor').notNull(),
+    currencyCode: currencyCode('currency_code')
+      .notNull()
+      .references(() => currencies.code),
+    refAmountMinor: integer('ref_amount_minor').notNull(),
+    rateE10: integer('rate_e10').notNull(),
+    principalMinor: integer('principal_minor'),
+    interestMinor: integer('interest_minor'),
+    closingBalanceMinor: integer('closing_balance_minor'),
+    isBuyout: integer('is_buyout', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    status: text('status').notNull().default('upcoming'),
+    settledTransactionId: text('settled_transaction_id').references(
+      () => transactions.id,
+      { onDelete: 'set null' },
+    ),
+    note: text('note', { length: 500 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'loan_instalments_pk',
+      columns: [table.loanId, table.sequence],
+    }),
+    index('loan_instalments_organization_id_due_on_status_idx').on(
+      table.organizationId,
+      table.dueOn,
+      table.status,
+    ),
+    enumCheck(
+      'loan_instalments_status_check',
+      table.status,
+      LOAN_INSTALMENT_STATUSES,
+    ),
+    check('loan_instalments_sequence_check', sql`${table.sequence} >= 1`),
+    positiveMinorCheck(
+      'loan_instalments_amount_minor_check',
+      table.amountMinor,
+    ),
+    positiveMinorCheck(
+      'loan_instalments_ref_amount_minor_check',
+      table.refAmountMinor,
+    ),
+    check('loan_instalments_rate_e10_check', sql`${table.rateE10} > 0`),
+    check(
+      'loan_instalments_principal_minor_check',
+      sql`${table.principalMinor} is null or ${table.principalMinor} >= 0`,
+    ),
+    check(
+      'loan_instalments_interest_minor_check',
+      sql`${table.interestMinor} is null or ${table.interestMinor} >= 0`,
+    ),
+    check(
+      'loan_instalments_closing_balance_minor_check',
+      sql`${table.closingBalanceMinor} is null or ${table.closingBalanceMinor} >= 0`,
+    ),
+    check(
+      'loan_instalments_paid_requires_transaction_check',
+      sql`${table.status} <> 'paid' or ${table.settledTransactionId} is not null`,
+    ),
+    fixedLengthCheck('loan_instalments_due_on_check', table.dueOn, 10),
+    maxLengthCheck('loan_instalments_note_check', table.note, 500),
+  ],
+)
+
+export type LoanInstalmentRow = typeof loanInstalments.$inferSelect
+
+/**
+ * An extra repayment outside the schedule. The amount lives on the transaction; this table is
+ * a link and a timestamp, never a second ledger (`28-loans.md` / `00-S17`).
+ */
+export const loanExtraRepayments = sqliteTable(
+  'loan_extra_repayments',
+  {
+    organizationId: organizationId(),
+    loanId: text('loan_id')
+      .notNull()
+      .references(() => loans.id, { onDelete: 'cascade' }),
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'loan_extra_repayments_pk',
+      columns: [table.loanId, table.transactionId],
+    }),
+    index('loan_extra_repayments_organization_id_transaction_id_idx').on(
+      table.organizationId,
+      table.transactionId,
+    ),
+  ],
+)
+
+export type LoanExtraRepaymentRow = typeof loanExtraRepayments.$inferSelect
 
 /* -------------------------------------------------------------------------- */
 /* Rules — the automation engine                                              */

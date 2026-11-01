@@ -71,6 +71,11 @@ export interface PeriodGridProps {
   readonly onRevert: (period: PeriodView) => void
   /** A paused or finished series shows its history without offering to change it. */
   readonly isReadOnly?: boolean
+  /**
+   * A JDG duty series uses "due date / plan / paid" instead of the ordinary period words,
+   * so the screen never says "tax due".
+   */
+  readonly copy?: 'series' | 'duty'
   readonly className?: string
 }
 
@@ -98,10 +103,20 @@ export function PeriodGrid({
   onSkip,
   onRevert,
   isReadOnly = false,
+  copy = 'series',
   className,
 }: PeriodGridProps) {
   const t = useTranslate()
   const locale = useLocale()
+  const dueLabel = t(
+    copy === 'duty' ? 'recurring.duty.due' : 'recurring.periods.col.due',
+  )
+  const planLabel = t(
+    copy === 'duty' ? 'recurring.duty.plan' : 'recurring.periods.col.expected',
+  )
+  const paidLabel = t(
+    copy === 'duty' ? 'recurring.duty.paid' : 'recurring.periods.col.settled',
+  )
   const rootRef = useRef<HTMLDivElement>(null)
   const { remember } = useRowFocusRecovery({
     rows: periods,
@@ -149,7 +164,11 @@ export function PeriodGrid({
             STACKED_BLOCK,
           )}
         >
-          {t('recurring.periods.caption')}
+          {t(
+            copy === 'duty'
+              ? 'recurring.periods.duty.caption'
+              : 'recurring.periods.caption',
+          )}
         </caption>
         <thead role="rowgroup" className={STACKED_HEAD}>
           <tr
@@ -164,7 +183,7 @@ export function PeriodGrid({
                 STACKED_BLOCK,
               )}
             >
-              {t('recurring.periods.col.due')}
+              {dueLabel}
             </th>
             <th
               role="columnheader"
@@ -174,7 +193,7 @@ export function PeriodGrid({
                 STACKED_BLOCK,
               )}
             >
-              {t('recurring.periods.col.expected')}
+              {planLabel}
             </th>
             <th
               role="columnheader"
@@ -184,7 +203,7 @@ export function PeriodGrid({
                 STACKED_BLOCK,
               )}
             >
-              {t('recurring.periods.col.settled')}
+              {paidLabel}
             </th>
             <th
               role="columnheader"
@@ -246,7 +265,7 @@ export function PeriodGrid({
                   {due}
                 </th>
                 <StackedCell
-                  label={t('recurring.periods.col.expected')}
+                  label={planLabel}
                   className="whitespace-nowrap px-3 py-2 text-end tabular text-ink"
                 >
                   {formatMoney(
@@ -258,7 +277,7 @@ export function PeriodGrid({
                   )}
                 </StackedCell>
                 <StackedCell
-                  label={t('recurring.periods.col.settled')}
+                  label={paidLabel}
                   className="whitespace-nowrap px-3 py-2 text-end tabular text-ink"
                 >
                   {period.settledAmountMinor === null ||

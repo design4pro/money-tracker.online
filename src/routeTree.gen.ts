@@ -22,6 +22,7 @@ import { Route as ApiUnsubscribeRouteImport } from './routes/api/unsubscribe'
 import { Route as InviteInvitationIdRouteImport } from './routes/invite.$invitationId'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
 import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
+import { Route as AppAccountsGroupsRouteImport } from './routes/_app/accounts/groups'
 import { Route as AppBudgetsIndexRouteImport } from './routes/_app/budgets/index'
 import { Route as AppBudgetsBudgetIdRouteImport } from './routes/_app/budgets/$budgetId'
 import { Route as AppCategoriesIndexRouteImport } from './routes/_app/categories/index'
@@ -30,6 +31,8 @@ import { Route as AppGoalsIndexRouteImport } from './routes/_app/goals/index'
 import { Route as AppGoalsGoalIdRouteImport } from './routes/_app/goals/$goalId'
 import { Route as AppImportIndexRouteImport } from './routes/_app/import/index'
 import { Route as AppImportBatchIdRouteImport } from './routes/_app/import/$batchId'
+import { Route as AppLoansIndexRouteImport } from './routes/_app/loans/index'
+import { Route as AppLoansLoanIdRouteImport } from './routes/_app/loans/$loanId'
 import { Route as AppPayeesIndexRouteImport } from './routes/_app/payees/index'
 import { Route as AppPayeesPayeeIdRouteImport } from './routes/_app/payees/$payeeId'
 import { Route as AppRecurringIndexRouteImport } from './routes/_app/recurring/index'
@@ -116,6 +119,11 @@ const AppAccountsAccountIdRoute = AppAccountsAccountIdRouteImport.update({
   path: '/accounts/$accountId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAccountsGroupsRoute = AppAccountsGroupsRouteImport.update({
+  id: '/accounts/groups',
+  path: '/accounts/groups',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBudgetsIndexRoute = AppBudgetsIndexRouteImport.update({
   id: '/budgets/',
   path: '/budgets/',
@@ -154,6 +162,16 @@ const AppImportIndexRoute = AppImportIndexRouteImport.update({
 const AppImportBatchIdRoute = AppImportBatchIdRouteImport.update({
   id: '/import/$batchId',
   path: '/import/$batchId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLoansIndexRoute = AppLoansIndexRouteImport.update({
+  id: '/loans/',
+  path: '/loans/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLoansLoanIdRoute = AppLoansLoanIdRouteImport.update({
+  id: '/loans/$loanId',
+  path: '/loans/$loanId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPayeesIndexRoute = AppPayeesIndexRouteImport.update({
@@ -281,9 +299,11 @@ export interface FileRoutesByFullPath {
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/accounts/groups': typeof AppAccountsGroupsRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
+  '/loans/$loanId': typeof AppLoansLoanIdRoute
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -305,6 +325,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AppDashboardIndexRoute
   '/goals/': typeof AppGoalsIndexRoute
   '/import/': typeof AppImportIndexRoute
+  '/loans/': typeof AppLoansIndexRoute
   '/payees/': typeof AppPayeesIndexRoute
   '/recurring/': typeof AppRecurringIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -324,9 +345,11 @@ export interface FileRoutesByTo {
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/accounts/groups': typeof AppAccountsGroupsRoute
   '/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
+  '/loans/$loanId': typeof AppLoansLoanIdRoute
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -348,6 +371,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardIndexRoute
   '/goals': typeof AppGoalsIndexRoute
   '/import': typeof AppImportIndexRoute
+  '/loans': typeof AppLoansIndexRoute
   '/payees': typeof AppPayeesIndexRoute
   '/recurring': typeof AppRecurringIndexRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -370,9 +394,11 @@ export interface FileRoutesById {
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
   '/invite/$invitationId': typeof InviteInvitationIdRoute
   '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
+  '/_app/accounts/groups': typeof AppAccountsGroupsRoute
   '/_app/budgets/$budgetId': typeof AppBudgetsBudgetIdRoute
   '/_app/goals/$goalId': typeof AppGoalsGoalIdRoute
   '/_app/import/$batchId': typeof AppImportBatchIdRoute
+  '/_app/loans/$loanId': typeof AppLoansLoanIdRoute
   '/_app/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/_app/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/_app/recurring/candidates': typeof AppRecurringCandidatesRoute
@@ -394,6 +420,7 @@ export interface FileRoutesById {
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_app/goals/': typeof AppGoalsIndexRoute
   '/_app/import/': typeof AppImportIndexRoute
+  '/_app/loans/': typeof AppLoansIndexRoute
   '/_app/payees/': typeof AppPayeesIndexRoute
   '/_app/recurring/': typeof AppRecurringIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -415,9 +442,11 @@ export interface FileRouteTypes {
     | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/accounts/$accountId'
+    | '/accounts/groups'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
     | '/import/$batchId'
+    | '/loans/$loanId'
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
@@ -439,6 +468,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/goals/'
     | '/import/'
+    | '/loans/'
     | '/payees/'
     | '/recurring/'
     | '/settings/'
@@ -458,9 +488,11 @@ export interface FileRouteTypes {
     | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/accounts/$accountId'
+    | '/accounts/groups'
     | '/budgets/$budgetId'
     | '/goals/$goalId'
     | '/import/$batchId'
+    | '/loans/$loanId'
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
@@ -482,6 +514,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/goals'
     | '/import'
+    | '/loans'
     | '/payees'
     | '/recurring'
     | '/settings'
@@ -503,9 +536,11 @@ export interface FileRouteTypes {
     | '/api/unsubscribe'
     | '/invite/$invitationId'
     | '/_app/accounts/$accountId'
+    | '/_app/accounts/groups'
     | '/_app/budgets/$budgetId'
     | '/_app/goals/$goalId'
     | '/_app/import/$batchId'
+    | '/_app/loans/$loanId'
     | '/_app/payees/$payeeId'
     | '/_app/recurring/$seriesId'
     | '/_app/recurring/candidates'
@@ -527,6 +562,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/'
     | '/_app/goals/'
     | '/_app/import/'
+    | '/_app/loans/'
     | '/_app/payees/'
     | '/_app/recurring/'
     | '/_app/settings/'
@@ -645,6 +681,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsAccountIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/accounts/groups': {
+      id: '/_app/accounts/groups'
+      path: '/accounts/groups'
+      fullPath: '/accounts/groups'
+      preLoaderRoute: typeof AppAccountsGroupsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/budgets/': {
       id: '/_app/budgets/'
       path: '/budgets'
@@ -699,6 +742,20 @@ declare module '@tanstack/react-router' {
       path: '/import/$batchId'
       fullPath: '/import/$batchId'
       preLoaderRoute: typeof AppImportBatchIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/loans/': {
+      id: '/_app/loans/'
+      path: '/loans'
+      fullPath: '/loans/'
+      preLoaderRoute: typeof AppLoansIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/loans/$loanId': {
+      id: '/_app/loans/$loanId'
+      path: '/loans/$loanId'
+      fullPath: '/loans/$loanId'
+      preLoaderRoute: typeof AppLoansLoanIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/payees/': {
@@ -878,9 +935,11 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
+  AppAccountsGroupsRoute: typeof AppAccountsGroupsRoute
   AppBudgetsBudgetIdRoute: typeof AppBudgetsBudgetIdRoute
   AppGoalsGoalIdRoute: typeof AppGoalsGoalIdRoute
   AppImportBatchIdRoute: typeof AppImportBatchIdRoute
+  AppLoansLoanIdRoute: typeof AppLoansLoanIdRoute
   AppPayeesPayeeIdRoute: typeof AppPayeesPayeeIdRoute
   AppRecurringSeriesIdRoute: typeof AppRecurringSeriesIdRoute
   AppRecurringCandidatesRoute: typeof AppRecurringCandidatesRoute
@@ -896,6 +955,7 @@ interface AppRouteChildren {
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
   AppGoalsIndexRoute: typeof AppGoalsIndexRoute
   AppImportIndexRoute: typeof AppImportIndexRoute
+  AppLoansIndexRoute: typeof AppLoansIndexRoute
   AppPayeesIndexRoute: typeof AppPayeesIndexRoute
   AppRecurringIndexRoute: typeof AppRecurringIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
@@ -907,9 +967,11 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,
+  AppAccountsGroupsRoute: AppAccountsGroupsRoute,
   AppBudgetsBudgetIdRoute: AppBudgetsBudgetIdRoute,
   AppGoalsGoalIdRoute: AppGoalsGoalIdRoute,
   AppImportBatchIdRoute: AppImportBatchIdRoute,
+  AppLoansLoanIdRoute: AppLoansLoanIdRoute,
   AppPayeesPayeeIdRoute: AppPayeesPayeeIdRoute,
   AppRecurringSeriesIdRoute: AppRecurringSeriesIdRoute,
   AppRecurringCandidatesRoute: AppRecurringCandidatesRoute,
@@ -925,6 +987,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardIndexRoute: AppDashboardIndexRoute,
   AppGoalsIndexRoute: AppGoalsIndexRoute,
   AppImportIndexRoute: AppImportIndexRoute,
+  AppLoansIndexRoute: AppLoansIndexRoute,
   AppPayeesIndexRoute: AppPayeesIndexRoute,
   AppRecurringIndexRoute: AppRecurringIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,

@@ -62,7 +62,9 @@ function placeAt(
  * that means two different things depending on a few pixels is a gesture people perform by
  * accident.
  *
- * `null` when the gesture asks for nothing — a row dropped onto itself.
+ * `null` when the gesture asks for nothing — a row dropped onto itself, or a parent dropped beside
+ * its own child, where the row would be asked to become its own parent. That is the same no-op
+ * extended to its children, not a second depth rule: the repository still decides the depth.
  */
 export function dropMove(
   rows: ReadonlyArray<TreeRow>,
@@ -72,7 +74,7 @@ export function dropMove(
 ): TreeMove | null {
   if (id === targetId) return null
   const target = rows.find((row) => row.id === targetId)
-  if (target === undefined) return null
+  if (target === undefined || target.parentId === id) return null
 
   const parentId = target.parentId
   const run = siblingsOf(rows, parentId)

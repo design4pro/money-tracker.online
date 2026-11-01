@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
 
 import {
+  ForecastPanel,
   PeriodGrid,
   SeriesDetailSkeleton,
   useRecurringAction,
@@ -147,7 +148,7 @@ function SeriesDetailRoute() {
     }
   }
 
-  const { series, periods, links } = detail
+  const { series, periods, links, forecast } = detail
   const accountRefs = accounts.accounts.map((account) => ({
     id: account.id,
     name: account.name,
@@ -226,7 +227,16 @@ function SeriesDetailRoute() {
           )}
         </p>
 
+        {series.dutyCode === null ? null : (
+          <p className="text-caption text-ink-2">
+            {t('recurring.duty.disclaimer')}
+          </p>
+        )}
+
         <p className="flex flex-wrap items-center gap-2">
+          {series.dutyCode === null ? null : (
+            <Badge tone="neutral">{t('recurring.duty.badge')}</Badge>
+          )}
           {series.autoRecord ? (
             <Badge tone="info">{t('recurring.automation.badge.auto')}</Badge>
           ) : series.matchingRules === null ? null : (
@@ -234,6 +244,10 @@ function SeriesDetailRoute() {
           )}
         </p>
       </Card>
+
+      {series.direction === 'expense' ? (
+        <ForecastPanel forecasts={[forecast]} />
+      ) : null}
 
       <Card className="flex flex-col gap-3">
         <h2 className="text-subtitle font-semibold text-ink">
@@ -244,6 +258,7 @@ function SeriesDetailRoute() {
         </p>
         <PeriodGrid
           periods={periods}
+          copy={series.dutyCode === null ? 'series' : 'duty'}
           isReadOnly={!series.isActive}
           openPeriodStart={
             pending.kind === 'markPaid' ? pending.period.periodStart : null

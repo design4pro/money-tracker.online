@@ -48,6 +48,9 @@ export {
   SeriesDetailSkeleton,
 } from './recurring-skeletons'
 
+export { ForecastPanel } from './forecast-panel'
+export type { ForecastPanelProps } from './forecast-panel'
+
 export { SeriesCard } from './series-card'
 export type { SeriesCardProps } from './series-card'
 

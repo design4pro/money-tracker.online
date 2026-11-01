@@ -36,6 +36,7 @@ import {
 } from '#/server/db/schema'
 import { occurrences } from '#/server/recurring/schedule'
 import { materializeSeries } from '#/server/recurring/materialize'
+import { forecastSeries } from '#/server/recurring/forecast'
 
 import { NotFoundError } from '../errors'
 import {
@@ -47,6 +48,7 @@ import {
   getUpcoming,
   listPeriods,
   listSeries,
+  listSeriesLinkDetails,
   markPaid,
   markSkipped,
   pauseSeries,
@@ -81,6 +83,54 @@ let world: BudgetWorld
 
 beforeEach(async () => {
   world = await createBudgetWorld()
+})
+
+describe('forecast spending policy', () => {
+  it.each([
+    { isPlanned: true },
+    { isBalanceAdjustment: true },
+    { transferKind: 'external_out' },
+  ])(
+    'excludes a linked payment after its policy changes: %j',
+    async (patch) => {
+      const series = await createSeries(world.scope, seriesInput())
+      await materializeSeries(world.scope, {
+        seriesId: series.id,
+        today: TODAY,
+        ahead: 0,
+      })
+      const transactionId = await seedTransaction(world.db, {
+        id: 'forecast-payment',
+        refAmountMinor: 10_000,
+        bookedOn: '2026-01-31',
+      })
+      await markPaid(world.scope, {
+        seriesId: series.id,
+        periodStart: '2026-01-01',
+        transactionId,
+      })
+      const forecast = async () =>
+        forecastSeries({
+          schedule: { ...series, frequency: 'monthly' },
+          expectedAmountMinor: series.expectedAmountMinor,
+          expectedCurrencyCode: series.expectedCurrencyCode,
+          direction: 'expense',
+          isActive: true,
+          today: TODAY,
+          links: await listSeriesLinkDetails(world.scope, series.id),
+          periods: await listPeriods(world.scope, series.id, TODAY),
+        })
+      expect((await forecast()).spentThisYearMinor).toBe(10_000)
+      await world.db
+        .update(transactions)
+        .set(patch)
+        .where(eq(transactions.id, transactionId))
+      expect(await listSeriesLinkDetails(world.scope, series.id)).toHaveLength(
+        1,
+      )
+      expect((await forecast()).spentThisYearMinor).toBe(0)
+    },
+  )
 })
 
 describe('materialisation', () => {
@@ -191,6 +241,123 @@ describe('overdue is derived, never stored', () => {
     expect(periods.every((period) => period.derivedStatus === 'upcoming')).toBe(
       true,
     )
+  })
+})
+
+describe('yearly month and JDG duty shape', () => {
+  it('stores an annual month and materialises that month, not the start date’s', async () => {
+    const series = await createSeries(
+      world.scope,
+      seriesInput({
+        frequency: 'annual',
+        anchorDay: 10,
+        anchorMonth: 11,
+        startDate: '2026-03-15',
+      }),
+    )
+    expect(series.anchorMonth).toBe(11)
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: '2026-06-15',
+      ahead: 1,
+    })
+    const periods = await listPeriods(world.scope, series.id, '2026-06-15')
+    expect(periods.map((period) => period.dueOn)).toEqual(['2026-11-10'])
+  })
+
+  it('drops a leftover yearly month when the series is not annual', async () => {
+    const series = await createSeries(
+      world.scope,
+      seriesInput({
+        frequency: 'monthly',
+        anchorDay: 20,
+        anchorMonth: 11,
+        startDate: '2026-03-15',
+      }),
+    )
+    expect(series.anchorMonth).toBeNull()
+  })
+
+  it('stores a JDG duty code without inventing an amount', async () => {
+    const series = await createSeries(
+      world.scope,
+      seriesInput({
+        name: 'ZUS',
+        kind: 'bill',
+        dutyCode: 'zus',
+        frequency: 'monthly',
+        anchorDay: 20,
+        expectedAmountMinor: 1_234_00,
+        startDate: '2026-01-20',
+      }),
+    )
+    expect(series.dutyCode).toBe('zus')
+    expect(series.anchorDay).toBe(20)
+    expect(series.expectedAmountMinor).toBe(1_234_00)
+  })
+
+  describe('an update', () => {
+    it('clears the yearly month when the series stops being annual', async () => {
+      const series = await createSeries(
+        world.scope,
+        seriesInput({
+          frequency: 'annual',
+          anchorDay: 10,
+          anchorMonth: 11,
+          startDate: '2026-03-15',
+        }),
+      )
+      const updated = await updateSeries(world.scope, series.id, {
+        frequency: 'monthly',
+      })
+      expect(updated.anchorMonth).toBeNull()
+    })
+
+    it('keeps the yearly month when only another field changes on an annual series', async () => {
+      const series = await createSeries(
+        world.scope,
+        seriesInput({
+          frequency: 'annual',
+          anchorDay: 10,
+          anchorMonth: 11,
+          startDate: '2026-03-15',
+        }),
+      )
+      const updated = await updateSeries(world.scope, series.id, {
+        frequency: 'annual',
+        name: 'Renamed',
+      })
+      expect(updated.anchorMonth).toBe(11)
+    })
+
+    it('ignores a yearly month sent for a series that is not annual', async () => {
+      const series = await createSeries(
+        world.scope,
+        seriesInput({ frequency: 'monthly', anchorDay: 20 }),
+      )
+      const updated = await updateSeries(world.scope, series.id, {
+        anchorMonth: 5,
+      })
+      expect(updated.anchorMonth).toBeNull()
+    })
+
+    it('sets and clears a duty code, and refuses an unknown one', async () => {
+      const series = await createSeries(world.scope, seriesInput({}))
+      const withDuty = await updateSeries(world.scope, series.id, {
+        dutyCode: 'vat_7',
+      })
+      expect(withDuty.dutyCode).toBe('vat_7')
+      const cleared = await updateSeries(world.scope, series.id, {
+        dutyCode: null,
+      })
+      expect(cleared.dutyCode).toBeNull()
+      await expect(
+        updateSeries(world.scope, series.id, {
+          // The point of the case: a code outside the enum, past the type.
+          dutyCode: 'pit_28' as 'zus',
+        }),
+      ).rejects.toThrow()
+    })
   })
 })
 

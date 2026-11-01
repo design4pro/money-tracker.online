@@ -38,10 +38,18 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   `SDLC.md` -> Stacked pull requests).
 - Every number you write down came from a command whose output you read (`docs/SPEC.md` §7.7). So
   does every claim about what a tool, a library or the suite does: probe it once instead of copying
-  a sentence from a comment, an ADR or a brief (#472, #531, #574).
+  a sentence from a comment, an ADR or a brief (#472, #531, #574). A spec or a brief describes the
+  tree at its base revision: re-read what it names (a stage that has shipped since, a line or case
+  number, a wire shape) at the current base before building on it (#562, #635, #740, #744).
 - In a worktree every `Write` and `Edit` path starts at the worktree root (`$PWD`). The worktree is
   nested inside the main checkout, so a path that stops short of its own directory lands in the
-  main checkout and leaves a stray file there (runs ae3e4860 for #588, b778b4dc for #624).
+  main checkout and leaves a stray file there (runs ae3e4860 for #588, b778b4dc for #624). A `cd`
+  in one Bash call persists into the next: run elsewhere in a subshell, `(cd <dir> && ...)`, or
+  with absolute paths (#673, #701).
+- Change code with an exact `Edit`, not a scripted `str.replace` or `sed` over a token: it rewrites
+  occurrences you did not mean (#577 dropped a class from every table row with the tests green,
+  #725 broke the block patterns after it) and ignores syntax (#669). A rename that must be scripted
+  runs after the block edits, and its `git diff` is read before anything else runs.
 - Verify before claiming: skill `verifying-changes` is the ladder; `docs/SPEC.md` §7 is done.
 
 ## Ask First
@@ -169,6 +177,7 @@ file is allowed; printing a value is not.
 | The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md`                         | Labels are the state machine; `needs-qa` needs `qa-approved` from a specialist panel                                                                                                                                                                                             |
 | Unattended intake: triage, tickets, lessons    | `SDLC.md` § Readiness, § Unattended decisions; `.ai/skills/afk-*/SKILL.md`; `docs/agents/cezar-automations.json` | No label marks an issue ready or starts a run (ADR 0029): `backlog-status.mjs --plan` names the next ready issue for the Reconciler to start. An independent specialist sub-agent settles an open question (`afk-decide`) into Resolved assumptions. Nothing merges into `main`. |
 | The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                                                       | One cockpit per host; no secrets in the service env                                                                                                                                                                                                                              |
+| The super-board robot                          | `docs/agents/super-board.md`; `/super-board` skills                                                              | Board is design4pro project 20; Conventional Commits win over the emoji format; `gh issue edit` only on gh 2.82.1+                                                                                                                                                               |
 
 ## Process and skills
 
