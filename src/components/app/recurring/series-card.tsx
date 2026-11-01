@@ -6,12 +6,13 @@ import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 
 import type { ReactNode } from 'react'
-import type { RecurringDutyCode } from '#/lib/enums'
 import type {
+  Book,
+  RecurringDutyCode,
   RecurringFrequency,
   RecurringKind,
   TransactionDirection,
-} from '#/server/db/schema'
+} from '#/lib/enums'
 import type { SeriesListRow } from '#/server/fns/recurring'
 
 /**
@@ -124,6 +125,8 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
                 `recurring.direction.${series.direction as TransactionDirection}`,
               )}
             </span>
+            <span aria-hidden="true">·</span>
+            <span>{t(`book.${series.book as Book}`)}</span>
           </p>
         </div>
 

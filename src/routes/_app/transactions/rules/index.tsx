@@ -105,19 +105,12 @@ export const Route = createFileRoute('/_app/transactions/rules/')({
   component: RulesListRoute,
 })
 
-function RulesListError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function RulesListError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('rules.error.title')}
       body={t('rules.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

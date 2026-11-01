@@ -774,19 +774,26 @@ label kept in the DOM under the spinner so the button holds its width.
 ### Toast
 
 - **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
-  button; the copy is the caller's `closeLabel` (`action.close`, EN + PL), never a default string
-  and never an icon-only control without a name.
+  button; the app shell always passes `closeLabel` (`action.close`, EN + PL) and `regionLabel`
+  (`notifications.title`, EN + PL). `ToastHost` retains English defaults for both props. The
+  icon-only close control always has an accessible name.
 - **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
   §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
   never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
-  `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
-  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-7` so text never runs
-  under the box.
+  `aria-hidden` and the button's `aria-label` is its only name. On the #745 base, the reproduced
+  axe defect was `target-size` on the 20px close button; the `role-img-alt` report from #730 did
+  not reproduce on the toast markup. Both rules remain in the browser regression sweep. The
+  toast's content carries `pe-8` so text never runs under the box.
 - **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
-  so the close button's size, position and transform are `!` utilities. `left` and `right` read the
+  so the toast surface, layout and text use local `!` utilities to apply the product tokens:
+  `surface-raised`, `border-subtle`, `rounded-lg`, `p-3.5`, `ink` and `ink-2`. Sonner keeps its
+  positioning and animation rules. The close button's size, position and transform also use `!`
+  utilities. `left` and `right` read the
   opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
 - **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
-  box-shadow is switched off.
+  box-shadow is switched off. This is an exception to the Focus treatment below:
+  `focus-visible:shadow-none!` also removes the `focus-gap` box-shadow band, while retaining the
+  outline and its offset.
 - **Contrast.** The chip's edge is `border-subtle`, a decorative edge below 3:1 by design; the glyph
   (`ink-2`, forced with `!` like the rest; measured 8.6:1 in light and 8.1:1 in dark on the chip, #730) carries the 1.4.11 contrast.
 - **A toast action.** No toast has an `action` or `cancel` button today. If one is added it must
@@ -905,13 +912,13 @@ the enclosing dialog or else to `#main-content`, never to `<body>` (`useFocusHea
 the failed match as well, so the tab already carries the failed route's own title, and an imperative
 write would compete with the rendered `<title>` and outlive a successful Retry.
 
-**The Reference Rule.** New code never renders an error's message. `FailurePanel` has no `detail` prop
-and no `<details>` (`ErrorPanel` still has both until #718), `title` and `body` are catalogue copy, and the only free-form string it is given is
-a `reference`, which is an event id or a request id and nothing else: the panel drops anything that
-is not 8 to 64 letters, digits, `_` or `-`, but the shape narrows a string and does not prove it is
-not an amount, so the producer passes an id and never a value of its own. The existing `ErrorPanel`
-sites that still pass `detail` are the tracked exception, owned by #718 (audit the `detail=` sites
-and remove those that carry the repository's message), after which the prop goes.
+**The Reference Rule.** No code renders an error's message. `ErrorPanel` and `FailurePanel` have no
+`detail` prop and no `<details>` (#718 removed both), `title` and `body` are catalogue copy, and
+`failure-message-guard.test.ts` fails on a file that reads a thrown error's text back in. The only
+free-form string the panel is given is a `reference`, which is an event id or a request id and
+nothing else: the panel drops anything that is not 8 to 64 letters, digits, `_` or `-`, but the
+shape narrows a string and does not prove it is not an amount, so the producer passes an id and
+never a value of its own.
 
 The guideline states no conformance level and widens none: the claim is `docs/ACCESSIBILITY.md` §1.
 

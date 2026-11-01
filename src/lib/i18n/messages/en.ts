@@ -821,6 +821,8 @@ const messages = {
   'refunds.dialog.submit': 'Link the refund',
   'refunds.dialog.cancel': 'Cancel',
   'refunds.dialog.error.title': 'The refund was not linked',
+  'refunds.dialog.error.refused':
+    'Nothing was changed. This refund cannot be linked as it is. Check the transaction, its amount, its currency and its direction, then try again.',
   'refunds.suggest.loading': 'Looking for what this refunds…',
   'refunds.suggest.empty':
     'Nothing with the same payee in the last 90 days is large enough to be what this refunds.',
@@ -989,6 +991,8 @@ const messages = {
   'payees.aliases.remove': 'Remove {name}',
   'payees.aliases.empty': 'Nothing but the payee’s own name matches it yet.',
   'payees.aliases.failed': 'That text was not added',
+  'payees.aliases.conflict':
+    'The text may already belong to a payee, contain nothing usable for matching, or exceed this payee’s statement-text limit. Try different text or remove an unused entry from this list.',
   'payees.ignored.title': 'Text that is never a payee',
   'payees.ignored.body':
     'Strings that must never become a payee: "CARD PAYMENT", "SEPA DD" and anything else your bank writes on every line.',
@@ -1855,6 +1859,14 @@ const messages = {
   'recurring.filter.active': 'Active',
   'recurring.filter.all': 'All, including paused',
 
+  'book.filter.label': 'Book',
+  'book.filter.all': 'All',
+  'book.business': 'Business',
+  'book.personal': 'Personal',
+  'book.field.label': 'Book',
+  'book.field.description':
+    'Whether this series belongs to the business or to personal finances.',
+
   'recurring.error.title': 'Recurring series could not be loaded',
   'recurring.error.body':
     'The list did not come back. Nothing has been changed — try again.',
@@ -2578,10 +2590,7 @@ const messages = {
   'rules.editor.load.error.body':
     'No rule was created or changed. Try again in a moment.',
   'rules.error.title': 'The rules could not be loaded',
-  'rules.error.body':
-    'Nothing was changed. Try again, and if it keeps happening the detail below is what to send us.',
-  'rules.error.locked':
-    'Rules are not part of this plan, so nothing was saved.',
+  'rules.error.body': 'Nothing was changed. Try again in a moment.',
 
   'rules.empty.title': 'No rules yet',
   'rules.empty.body':

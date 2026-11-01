@@ -149,11 +149,6 @@ function TransactionDetailRoute() {
           <ErrorPanel
             title={t('transactions.detail.error.title')}
             body={t('transactions.detail.error.body')}
-            detail={
-              detailQuery.error instanceof Error
-                ? detailQuery.error.message
-                : null
-            }
             onRetry={() => void detailQuery.refetch()}
             isRetrying={detailQuery.isFetching}
           />
@@ -313,7 +308,7 @@ function TransactionDetailScreen({
       setMode(undefined)
     },
     onError: (error: unknown, input) => {
-      setFailure(saveFailureOf(error, input.entry, t('empty.error.body')))
+      setFailure(saveFailureOf(error, input.entry, t))
     },
   })
 

@@ -98,6 +98,10 @@ already caused, or would obviously cause, two people to mean two things by one w
   generates **recurring periods**, each of which is upcoming, paid, overdue or skipped. _Avoid_:
   "subscription" for a recurring series — in this repository "subscription" means the workspace's
   billing plan and nothing else.
+- **Book** — a workspace-local dimension on a row: `business` or `personal`. One workspace holds
+  both; the filter is All / Business / Personal (PL: Wszystko / Firma / Prywatne). It is not a
+  second tenant and not an account type. _Avoid_: "book" for the booked date; two workspaces as a
+  substitute for the filter.
 - **Recurring forecast** — expense-series totals for spending this calendar year, unpaid
   occurrences due this year, and unpaid occurrences due in the next twelve months. Each currency
   stays separate; a paused or finished series retains its spending history and plans nothing ahead.

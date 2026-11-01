@@ -53,6 +53,7 @@ import {
   categories,
   currencies,
   importBatches,
+  organizationSettings,
   payees,
   recurringLinks,
   rules,
@@ -105,6 +106,7 @@ import {
   addSecondMember,
   createBudgetWorld,
   executed as harnessExecuted,
+  NOW as budgetWorldNow,
   seedBudget,
   seedCategory,
   seedPeriod,
@@ -156,6 +158,10 @@ import {
   listSeriesLinkDetails,
   markPaid,
 } from '../recurring'
+import {
+  getWorkspaceTimezone,
+  setWorkspaceTimezone,
+} from '../workspace-settings'
 import {
   createLoan,
   deleteLoan,
@@ -2675,6 +2681,76 @@ describe('an attachment row cannot be used to reach another workspace’s object
   })
 })
 
+describe('workspace timezone cannot be aimed across a workspace boundary', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('lets A UPDATE Honolulu and leaves B on its seeded timezone', async () => {
+    await world.db.insert(organizationSettings).values([
+      {
+        organizationId: 'org-a',
+        timezone: 'Europe/Warsaw',
+        createdAt: budgetWorldNow,
+        updatedAt: budgetWorldNow,
+      },
+      {
+        organizationId: 'org-b',
+        timezone: 'Pacific/Auckland',
+        createdAt: budgetWorldNow,
+        updatedAt: budgetWorldNow,
+      },
+    ])
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Europe/Warsaw')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe(
+      'Pacific/Auckland',
+    )
+
+    harnessExecuted.length = 0
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    const updates = harnessExecuted.filter((query) =>
+      /update\s+"organization_settings"/i.test(query),
+    )
+    expect(updates).not.toHaveLength(0)
+    for (const statement of updates) {
+      expect(statement).toContain('organization_id')
+    }
+    expect(
+      harnessExecuted.filter((query) =>
+        /insert\s+into\s+"organization_settings"/i.test(query),
+      ),
+    ).toHaveLength(0)
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe(
+      'Pacific/Auckland',
+    )
+  })
+
+  it('updates only A’s existing row when both workspaces already have one', async () => {
+    await setWorkspaceTimezone(world.scope, { timezone: 'Europe/London' })
+    await setWorkspaceTimezone(world.otherScope, { timezone: 'Asia/Tokyo' })
+
+    // Both rows exist now, so this takes the update branch: an update that lost its tenant
+    // predicate would rewrite B's row as well.
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Asia/Tokyo')
+  })
+
+  it('refuses a timezone that is not an IANA name, without writing B', async () => {
+    await expect(
+      setWorkspaceTimezone(world.scope, { timezone: 'Not/AZone' }),
+    ).rejects.toThrow()
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+  })
+})
+
 describe('notifications cannot be read, counted or marked across a workspace boundary', () => {
   const AT = new Date('2026-03-15T10:00:00.000Z')
   const KIND = 'budget.threshold_crossed' as const
@@ -3497,6 +3573,31 @@ describe('loans cannot be reached across a workspace boundary', () => {
     })
     return { loan, instalments }
   }
+
+  it('hides a foreign paid-instalment transaction from deletion and a foreign loan from amount edits', async () => {
+    await markInstalmentPaid(world.otherScope, {
+      loanId: loanBId,
+      sequence: 1,
+      transactionId: 'tx-b-loan',
+    })
+    const before = await loanSnapshotOfB()
+    await expect(
+      deleteTransaction({
+        scope: world.scope,
+        policies: {
+          planned: 'include',
+          adjustments: 'include',
+          transfers: 'include',
+          completeness: 'any',
+        },
+        id: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      updateLoan(world.scope, loanBId, { instalmentMinor: 1 }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(await loanSnapshotOfB()).toEqual(before)
+  })
 
   it('refuses every loan read and write aimed at another workspace’s id, and leaves the row alone', async () => {
     const before = await loanSnapshotOfB()

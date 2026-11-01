@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { readFailure } from '../failure'
+import { failureOf, readFailure } from '../failure'
 
 import type { FailureEnvelope } from '../failure-envelope'
 
@@ -53,6 +53,17 @@ describe('readFailure', () => {
     expect(readFailure(new Error('x'))).toBeNull()
   })
 
+  it('returns null for a value whose envelope cannot be read, without throwing', () => {
+    const hostile = new Proxy(new Error('x'), {
+      get() {
+        throw new Error('boom')
+      },
+    })
+
+    expect(readFailure(hostile)).toBeNull()
+    expect(failureOf(hostile).kind).toBe('internal')
+  })
+
   it('returns null for an envelope of an unknown version', () => {
     expect(readFailure(wireError({ ...LOCKED, v: 2 }))).toBeNull()
   })
@@ -80,5 +91,34 @@ describe('readFailure', () => {
 
   it('reads an envelope off a non-Error object, as a flattened client may deliver it', () => {
     expect(readFailure({ envelope: LOCKED })).toEqual(LOCKED)
+  })
+})
+
+describe('failureOf', () => {
+  it('returns the envelope of an envelope-shaped error', () => {
+    expect(failureOf(wireError(LOCKED))).toEqual(LOCKED)
+  })
+
+  it.each([
+    ['a plain error', new Error('Account 01k still has 412 transaction(s)')],
+    ['a string', 'Account 01k still has 412 transaction(s)'],
+    ['null', null],
+    ['an envelope of an unknown version', wireError({ ...LOCKED, v: 2 })],
+  ])(
+    'reads %s as the internal failure and never keeps its text',
+    (_, error) => {
+      const failure = failureOf(error)
+
+      expect(failure).toEqual({
+        v: 1,
+        kind: 'internal',
+        message: { key: 'failure.internal' },
+      })
+      expect(JSON.stringify(failure)).not.toContain('412')
+    },
+  )
+
+  it('hands out a fresh object each time', () => {
+    expect(failureOf(null)).not.toBe(failureOf(null))
   })
 })

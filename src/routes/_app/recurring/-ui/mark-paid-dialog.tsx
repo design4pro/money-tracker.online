@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { parseDate } from '@internationalized/date'
 
 import { MarkPaidEmpty, MarkPaidStatus } from '#/components/app/recurring'
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -15,6 +15,7 @@ import {
   RadioGroup,
   Spinner,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import { markPeriodPaid } from '#/server/fns/recurring'
@@ -22,6 +23,7 @@ import { loadTransactions } from '#/server/fns/transactions'
 
 import { recordPaymentSearch } from '../-lib/record-payment'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { RecordPaymentOrigin } from '../-lib/record-payment'
 import type { PeriodView } from '#/server/repos/recurring'
 import type { RecurringSeries, Transaction } from '#/server/db/types'
@@ -100,7 +102,7 @@ export function MarkPaidDialog({
   const [rows, setRows] = useState<ReadonlyArray<Transaction> | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -129,7 +131,7 @@ export function MarkPaidDialog({
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setFailure(error instanceof Error ? error.message : String(error))
+          setFailure(failureOf(error))
           setRows([])
         }
       })
@@ -154,7 +156,7 @@ export function MarkPaidDialog({
       onSaved()
       onOpenChange(false)
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -179,10 +181,11 @@ export function MarkPaidDialog({
               />
 
               {failure === null ? null : (
-                <ErrorPanel
+                <FailurePanel
+                  failure={failure}
+                  placement="after-action"
                   title={t('recurring.toast.failed')}
                   body={t('recurring.error.body')}
-                  detail={failure}
                 />
               )}
 
