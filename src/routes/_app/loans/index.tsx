@@ -79,7 +79,7 @@ function LoansListRoute() {
         <Link
           to="/loans/months"
           search={{ book }}
-          className="text-label font-semibold text-brand underline decoration-brand/40 underline-offset-4"
+          className="target-min-h inline-flex items-center text-label font-semibold text-brand underline decoration-brand/40 underline-offset-4"
         >
           {t('loans.calendar.link')}
         </Link>

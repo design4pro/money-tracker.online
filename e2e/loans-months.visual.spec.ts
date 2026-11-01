@@ -132,3 +132,26 @@ test('retries the failed calendar read after the service recovers', async ({
   ).toBeVisible()
   await expect(page.getByRole('radio', { name: 'Business' })).toBeChecked()
 })
+
+test('gives both calendar navigation links a full touch target', async ({
+  page,
+}) => {
+  await gotoApp(page, '/loans')
+  const overview = page.getByRole('link', {
+    name: 'Month overview',
+    exact: true,
+  })
+  expect(
+    await overview.evaluate(
+      (element) => element.getBoundingClientRect().height,
+    ),
+  ).toBeGreaterThanOrEqual(44)
+  await overview.click()
+  const back = page.getByRole('link', { name: 'All liabilities', exact: true })
+  await expect(back).toBeVisible()
+  expect(
+    await back.evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeGreaterThanOrEqual(44)
+  await back.click()
+  await expect(page).toHaveURL(/\/loans(?:\?|$)/)
+})

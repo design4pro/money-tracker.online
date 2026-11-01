@@ -83,7 +83,7 @@ function CalendarRoute() {
         <Link
           to="/loans"
           search={{ book }}
-          className="inline-flex items-center gap-2 text-label font-semibold text-brand"
+          className="target-min-h inline-flex items-center gap-2 text-label font-semibold text-brand"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           {t('loans.detail.back')}
