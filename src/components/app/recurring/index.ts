@@ -35,6 +35,8 @@ export {
   useRowFocusRecovery,
 } from './use-row-focus-recovery'
 
+export { useRecurringAction } from './use-recurring-action'
+
 export { RecurringEmptyState } from './recurring-empty-state'
 export type { RecurringEmptyStateProps } from './recurring-empty-state'
 

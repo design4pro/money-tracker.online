@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { Plus, Search } from 'lucide-react'
 import { z } from 'zod'
 
@@ -10,6 +10,7 @@ import {
   RecurringListSkeleton,
   SeriesCard,
   UpcomingPanel,
+  useRecurringAction,
 } from '#/components/app/recurring'
 import { SegmentedFilter } from '#/components/app/nav'
 import { ErrorPanel } from '#/components/app/shell'
@@ -143,8 +144,8 @@ function RecurringListRoute() {
   const { overview, accounts, categories, payees } = Route.useLoaderData()
   const { status, book, markPaid, series: markPaidSeries } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const router = useRouter()
   const refreshCaches = useDataRefresh()
+  const runAction = useRecurringAction(refreshCaches)
 
   const [pending, setPending] = useState<Pending>(() => {
     const reopened = overview.upcoming.find(
@@ -162,7 +163,6 @@ function RecurringListRoute() {
       void navigate({ search: { status, book }, replace: true })
     }
   }
-  const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
   const baseCurrencyCode = accounts.overview.baseCurrencyCode
   const currencyOptions = [
@@ -299,12 +299,13 @@ function RecurringListRoute() {
                           setPending({ kind: 'pause', series: row.series })
                         }
                         onResume={() => {
-                          void resumeSeries({
-                            data: { seriesId: row.series.id },
-                          }).then(() => {
-                            toast.success(t('recurring.toast.resumed'))
-                            refresh()
-                          })
+                          void runAction(
+                            () =>
+                              resumeSeries({
+                                data: { seriesId: row.series.id },
+                              }),
+                            t('recurring.toast.resumed'),
+                          )
                         }}
                         onComplete={() =>
                           setPending({ kind: 'complete', series: row.series })
@@ -324,19 +325,16 @@ function RecurringListRoute() {
               setPending(markPaidPending(overview.rows, period))
             }
             onSkip={(period) => {
-              void skipPeriod({
-                data: {
-                  seriesId: period.seriesId,
-                  periodStart: period.periodStart,
-                },
-              })
-                .then(() => {
-                  toast.success(t('recurring.toast.periodSkipped'))
-                  refresh()
-                })
-                .catch(() => {
-                  toast.error(t('recurring.toast.failed'))
-                })
+              void runAction(
+                () =>
+                  skipPeriod({
+                    data: {
+                      seriesId: period.seriesId,
+                      periodStart: period.periodStart,
+                    },
+                  }),
+                t('recurring.toast.periodSkipped'),
+              )
             }}
           />
         </div>
@@ -364,7 +362,7 @@ function RecurringListRoute() {
               ),
             )
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
@@ -382,7 +380,7 @@ function RecurringListRoute() {
           onSaved={() => {
             toast.success(t('recurring.toast.periodPaid'))
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
@@ -402,7 +400,7 @@ function RecurringListRoute() {
             await pauseSeries({ data: { seriesId: pending.series.id } })
             toast.success(t('recurring.toast.paused'))
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
@@ -422,7 +420,7 @@ function RecurringListRoute() {
             await completeSeries({ data: { seriesId: pending.series.id } })
             toast.success(t('recurring.toast.completed'))
             close()
-            refresh()
+            void refreshCaches()
           }}
         />
       ) : null}
