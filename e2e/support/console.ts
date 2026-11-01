@@ -144,6 +144,7 @@ export const test = base.extend<{
 
 export { expect }
 export {
+  DELIBERATE_LOADER_FAILURE,
   DELIBERATE_SERVER_FAILURE,
   TOLERATED_CONSOLE_WARNINGS,
 } from './console-policy'

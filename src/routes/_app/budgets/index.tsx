@@ -70,19 +70,12 @@ export const Route = createFileRoute('/_app/budgets/')({
   component: BudgetsListRoute,
 })
 
-function BudgetsListError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function BudgetsListError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('budgets.error.title')}
       body={t('budgets.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

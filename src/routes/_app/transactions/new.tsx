@@ -358,7 +358,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
       setResetToken((token) => token + 1)
     },
     onError: (error: unknown, input) => {
-      setFailure(saveFailureOf(error, input.entry, t('empty.error.body')))
+      setFailure(saveFailureOf(error, input.entry, t))
     },
   })
 

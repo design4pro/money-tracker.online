@@ -64,19 +64,12 @@ export const Route = createFileRoute('/_app/import/')({
  * disturbed by the failure. Saying so is the first thing somebody standing over a bank statement
  * needs to know, before the retry is worth offering.
  */
-function ImportPageError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function ImportPageError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('import.load.error.title')}
       body={t('import.load.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
