@@ -151,6 +151,7 @@ export {
   RECURRING_KINDS,
   TRANSACTION_DIRECTIONS,
   RECURRING_FREQUENCIES,
+  RECURRING_DUTY_CODES,
   SAVINGS_GOAL_STATUSES,
   IMPORT_SOURCES,
   IMPORT_STATUSES,
@@ -193,6 +194,7 @@ export type {
   RecurringKind,
   TransactionDirection,
   RecurringFrequency,
+  RecurringDutyCode,
   SavingsGoalStatus,
   ImportSource,
   ImportStatus,
@@ -1299,6 +1301,16 @@ export const recurringSeries = sqliteTable(
     frequency: text('frequency').notNull(),
     /** Day of month (1–31) or day of week (1–7), read according to `frequency`. */
     anchorDay: integer('anchor_day'),
+    /**
+     * Calendar month (1–12) an annual series falls in. Null for every other frequency and for
+     * annual series that keep their start date's month. Additive: existing rows stay null.
+     */
+    anchorMonth: integer('anchor_month'),
+    /**
+     * A JDG due-date shape (`zus` / `pit` / `vat_7`), or null. Presentation and templates only —
+     * the engine never computes a tax. Additive: existing rows stay null.
+     */
+    dutyCode: text('duty_code'),
     startDate: calendarDate('start_date').notNull(),
     endDate: calendarDate('end_date'),
     maxOccurrences: integer('max_occurrences'),

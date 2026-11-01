@@ -35,6 +35,7 @@ import { requireOrg } from '#/server/auth/guards'
 import { serverToday } from '#/server/clock'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { confidenceBand, detectCandidates } from '#/server/recurring/detect'
+import { forecastSeries, rollupForecasts } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { SERIES_AHEAD, writeSeries } from '#/server/recurring/series-write'
 import {
@@ -68,6 +69,11 @@ import type {
   UpcomingPeriod,
 } from '#/server/repos/recurring'
 import type { RecurringCandidate, RecurringSeries } from '#/server/db/types'
+import type {
+  RecurringFrequency,
+  TransactionDirection,
+} from '#/server/db/schema'
+import type { SeriesForecast } from '#/server/recurring/forecast'
 import type { WeakestSignal } from '#/server/recurring/detect'
 
 const seriesIdSchema = z.strictObject({
@@ -85,6 +91,17 @@ const DETECTION_MONTHS = 18
 /* Reads                                                                       */
 /* -------------------------------------------------------------------------- */
 
+function scheduleOf(series: RecurringSeries) {
+  return {
+    frequency: series.frequency as RecurringFrequency,
+    anchorDay: series.anchorDay,
+    anchorMonth: series.anchorMonth,
+    startDate: series.startDate,
+    endDate: series.endDate,
+    maxOccurrences: series.maxOccurrences,
+  }
+}
+
 /** One row of the series list: the series, plus the one period the card is actually about. */
 export interface SeriesListRow {
   readonly series: RecurringSeries
@@ -92,6 +109,7 @@ export interface SeriesListRow {
   readonly next: PeriodView | null
   /** How many unsettled periods are already past their due date. Drives the "overdue" wording. */
   readonly overdueCount: number
+  readonly forecast: SeriesForecast
 }
 
 export interface RecurringOverview {
@@ -101,6 +119,8 @@ export interface RecurringOverview {
   readonly pendingCandidates: number
   /** The day the derivation was made on, so the screen labels "overdue" against the same date. */
   readonly today: string
+  /** Spent / rest of year / next 12 months, one row per currency, integer minor units. */
+  readonly forecast: ReadonlyArray<SeriesForecast>
 }
 
 /**
@@ -117,9 +137,9 @@ export const loadRecurring = createServerFn({ method: 'GET' })
     const scope = await requireOrg()
     const today = serverToday()
 
-    const series = await listSeriesRow(scope, {
-      includeInactive: data.includeInactive,
-    })
+    // Every series is read, whatever the filter: what a paused or finished series already spent
+    // still counts in "spent this year", so the rollup must not change with the list's filter.
+    const series = await listSeriesRow(scope, { includeInactive: true })
     for (const one of series) {
       if (one.isActive) {
         await materializeSeries(scope, {
@@ -137,7 +157,10 @@ export const loadRecurring = createServerFn({ method: 'GET' })
 
     const rows = await Promise.all(
       series.map(async (one): Promise<SeriesListRow> => {
-        const periods = await listPeriodsRow(scope, one.id, today)
+        const [periods, links] = await Promise.all([
+          listPeriodsRow(scope, one.id, today),
+          listSeriesLinkDetails(scope, one.id),
+        ])
         const open = periods.filter(
           (period) =>
             period.derivedStatus === 'upcoming' ||
@@ -149,15 +172,33 @@ export const loadRecurring = createServerFn({ method: 'GET' })
           overdueCount: open.filter(
             (period) => period.derivedStatus === 'overdue',
           ).length,
+          forecast: forecastSeries({
+            schedule: scheduleOf(one),
+            expectedAmountMinor: one.expectedAmountMinor,
+            expectedCurrencyCode: one.expectedCurrencyCode,
+            direction: one.direction as TransactionDirection,
+            isActive: one.isActive,
+            today,
+            links,
+            periods,
+          }),
         }
       }),
     )
 
     return {
-      rows,
+      rows: data.includeInactive
+        ? rows
+        : rows.filter((row) => row.series.isActive),
       upcoming,
       pendingCandidates: candidates.length,
       today,
+      // An income series forecasts nothing, and a zero block for it would only add a row.
+      forecast: rollupForecasts(
+        rows
+          .filter((row) => row.series.direction === 'expense')
+          .map((row) => row.forecast),
+      ),
     }
   })
 
@@ -167,6 +208,7 @@ export interface SeriesDetail {
   readonly periods: ReadonlyArray<PeriodView>
   readonly links: ReadonlyArray<SeriesLink>
   readonly today: string
+  readonly forecast: SeriesForecast
 }
 
 export const loadSeriesDetail = createServerFn({ method: 'GET' })
@@ -188,7 +230,22 @@ export const loadSeriesDetail = createServerFn({ method: 'GET' })
       listPeriodsRow(scope, series.id, today),
       listSeriesLinkDetails(scope, series.id),
     ])
-    return { series, periods, links, today }
+    return {
+      series,
+      periods,
+      links,
+      today,
+      forecast: forecastSeries({
+        schedule: scheduleOf(series),
+        expectedAmountMinor: series.expectedAmountMinor,
+        expectedCurrencyCode: series.expectedCurrencyCode,
+        direction: series.direction as TransactionDirection,
+        isActive: series.isActive,
+        today,
+        links,
+        periods,
+      }),
+    }
   })
 
 /**

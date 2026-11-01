@@ -45,6 +45,7 @@ import { projectCompletion } from '#/server/goals/project'
 import { runAutoRecord } from '#/server/recurring/auto-record'
 import { medianOf } from '#/server/recurring/detect'
 import { autoRecordMarkerKey } from '#/server/recurring/markers'
+import { forecastSeries } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { matchesPeriod } from '#/server/recurring/match'
 import { organization, user } from '#/server/db/auth-schema'
@@ -917,6 +918,58 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
         settledOn: null,
       }),
     ).toBeNull()
+  })
+
+  it('forecasts spent, rest of year and next twelve months as integer minor units', () => {
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: {
+        frequency: 'monthly',
+        anchorDay: 20,
+        startDate: '2026-01-20',
+      },
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today: '2026-06-15',
+      links: [
+        {
+          direction: 'expense',
+          bookedOn: '2026-01-20',
+          amountMinor: 100_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+        {
+          direction: 'expense',
+          bookedOn: '2026-02-20',
+          amountMinor: 40_00,
+          currencyCode: 'EUR',
+          status: 'active',
+        },
+        {
+          // Money in is never "spent": `amount_minor` is non-negative, the direction column decides.
+          direction: 'income',
+          bookedOn: '2026-03-20',
+          amountMinor: 25_00,
+          currencyCode: 'PLN',
+          status: 'active',
+        },
+      ],
+      periods: [
+        { periodStart: '2026-01-01', derivedStatus: 'paid' },
+        { periodStart: '2026-02-01', derivedStatus: 'paid' },
+        { periodStart: '2026-03-01', derivedStatus: 'paid' },
+        { periodStart: '2026-04-01', derivedStatus: 'paid' },
+        { periodStart: '2026-05-01', derivedStatus: 'paid' },
+      ],
+    })
+    expect(forecast.spentThisYearMinor).toBe(100_00)
+    expect(forecast.restOfYearMinor).toBe(700_00)
+    expect(forecast.next12MonthsMinor).toBe(1_200_00)
+    expect(Number.isInteger(forecast.spentThisYearMinor)).toBe(true)
+    expect(Number.isInteger(forecast.restOfYearMinor)).toBe(true)
+    expect(Number.isInteger(forecast.next12MonthsMinor)).toBe(true)
   })
 
   it('makes the match tolerance an integer window in minor units, inclusive at its edge', () => {
