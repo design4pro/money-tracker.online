@@ -780,10 +780,13 @@ label kept in the DOM under the spinner so the button holds its width.
   §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
   never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
   `aria-hidden` and the button's `aria-label` is its only name, which is what keeps axe
-  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-7` so text never runs
+  `role-img-alt` and `target-size` quiet. The toast's content carries `pe-8` so text never runs
   under the box.
 - **Why the classes are important.** Sonner's stylesheet is unlayered and beats Tailwind utilities,
-  so the close button's size, position and transform are `!` utilities. `left` and `right` read the
+  so the toast surface, layout and text use local `!` utilities to apply the product tokens:
+  `surface-raised`, `border-subtle`, `rounded-lg`, `p-3.5`, `ink` and `ink-2`. Sonner keeps its
+  positioning and animation rules. The close button's size, position and transform also use `!`
+  utilities. `left` and `right` read the
   opposite direction variable, which puts the box at the inline-end edge in LTR and RTL alike.
 - **Focus.** The product's `focus-ring` outline is drawn around the whole 44px box; sonner's faint
   box-shadow is switched off.

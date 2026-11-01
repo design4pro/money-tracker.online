@@ -52,6 +52,37 @@ test.describe('toast close button', () => {
           await expect(close).toBeVisible()
 
           const toast = page.locator('[data-sonner-toast]')
+          const surface = await toast.evaluate((node) => {
+            const probe = document.createElement('div')
+            probe.style.cssText =
+              'background:var(--color-surface-raised);border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);padding:calc(var(--spacing) * 3.5);color:var(--color-ink)'
+            document.body.appendChild(probe)
+            const actual = getComputedStyle(node)
+            const expected = getComputedStyle(probe)
+            const properties = [
+              'background-color',
+              'border-top-color',
+              'border-top-width',
+              'border-top-style',
+              'border-top-left-radius',
+              'padding-top',
+            ]
+            const measured = {
+              actual: properties.map((property) =>
+                actual.getPropertyValue(property),
+              ),
+              expected: properties.map((property) =>
+                expected.getPropertyValue(property),
+              ),
+              title: getComputedStyle(node.querySelector('[data-title]')!)
+                .color,
+              ink: expected.color,
+            }
+            probe.remove()
+            return measured
+          })
+          expect(surface.actual).toEqual(surface.expected)
+          expect(surface.title).toBe(surface.ink)
           const [box, toastBox] = await Promise.all([
             close.boundingBox(),
             toast.boundingBox(),
