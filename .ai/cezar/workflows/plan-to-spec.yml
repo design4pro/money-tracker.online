@@ -6,8 +6,7 @@
 # independent specialist (.ai/skills/afk-decide/SKILL.md), writes a `ready` spec under .ai/specs/ and
 # has a specialist panel review it. The PR and the merge are the same chain implement-ticket ends
 # with: the spec PR is design-only (`skip-qa`) and ready for review, the develop ruleset requires no approving review, and
-# om-pr-autopilot --allow-merge merges it into develop once the agent-posted full gate is green
-# (ADR 0027, ADR 0030, ADR 0033). The
+# om-pr-autopilot --allow-merge merges it into develop once CI is green (ADR 0027, ADR 0030). The
 # next tick then slices the merged spec (spec-to-tickets).
 # A stage the code already delivers gets no spec: the skill marks it, and every other uncovered stage
 # of the plan the code delivers, with a `Delivered:` line in the plan, and the run opens a docs-only

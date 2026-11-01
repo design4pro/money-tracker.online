@@ -7,10 +7,12 @@ import { formatMoney, makeMoney } from '#/lib/money'
 
 import type { ReactNode } from 'react'
 import type {
+  Book,
+  RecurringDutyCode,
   RecurringFrequency,
   RecurringKind,
   TransactionDirection,
-} from '#/server/db/schema'
+} from '#/lib/enums'
 import type { SeriesListRow } from '#/server/fns/recurring'
 
 /**
@@ -106,7 +108,11 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
               rowWashSecondary,
             )}
           >
-            <span>{t(`recurring.kind.${series.kind as RecurringKind}`)}</span>
+            <span>
+              {series.dutyCode === null
+                ? t(`recurring.kind.${series.kind as RecurringKind}`)
+                : t(`recurring.duty.${series.dutyCode as RecurringDutyCode}`)}
+            </span>
             <span aria-hidden="true">·</span>
             <span>
               {t(
@@ -119,6 +125,8 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
                 `recurring.direction.${series.direction as TransactionDirection}`,
               )}
             </span>
+            <span aria-hidden="true">·</span>
+            <span>{t(`book.${series.book as Book}`)}</span>
           </p>
         </div>
 
@@ -126,6 +134,9 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
           {isPaused ? (
             <Badge tone="neutral">{t('recurring.series.paused')}</Badge>
           ) : null}
+          {series.dutyCode === null ? null : (
+            <Badge tone="neutral">{t('recurring.duty.badge')}</Badge>
+          )}
           {series.autoRecord ? (
             <Badge tone="info">{t('recurring.automation.badge.auto')}</Badge>
           ) : null}

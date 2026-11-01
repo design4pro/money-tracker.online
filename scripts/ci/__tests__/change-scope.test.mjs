@@ -41,6 +41,7 @@ describe('reachesBrowser', () => {
     '.github/a11y/routes.json',
     'scripts/seed/seed.mjs',
     // A change to the gate is tested by the gate.
+    '.github/workflows/ci.yml',
     '.github/workflows/a11y.yml',
     // A Markdown file is only safe at the root or under an excluded directory.
     'src/content/terms.md',

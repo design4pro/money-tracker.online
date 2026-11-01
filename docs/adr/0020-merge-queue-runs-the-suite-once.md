@@ -239,10 +239,3 @@ report whose legs did not run for any reason but this classification still runs 
   it.
 - **The job runs on the `gate` pool** (ADR 0022). The e2e legs wait for it, and on the `ci` pool it
   would queue behind `verify` and `test`.
-
-## Amendment 2026-10-18 (no Actions suite on the PR)
-
-Amended by ADR 0033. There is no GitHub merge queue rule and no `ci.yml`. Browser and unit
-verification run on the Cursor agent VM; Actions only deploys. The `change scope` classifier
-remains in the tree for an on-demand axe dispatch. A pair of green PRs can still break `develop`;
-the repair is a fix or revert PR (ADR 0032 as amended).

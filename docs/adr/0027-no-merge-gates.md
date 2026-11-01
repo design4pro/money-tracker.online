@@ -91,10 +91,3 @@ changes how this decision tells pull requests apart, not what it decides:
   promotion.
 - QA below `risk-high` is signed off by the run on a QA specialist's verdict (`SDLC.md`, QA gate);
   `risk-high` QA stays with the owner.
-
-## Amendment 2026-10-18 (agent gate, not Actions required checks)
-
-Amended by ADR 0033. Merging into `develop` still does not wait on a person (ADR 0031). It waits
-on the agent-posted full gate comment, not on `generated · typecheck · lint · build` /
-`unit tests · coverage` / `e2e · merged report`. The owner removes those required contexts from
-the rulesets; agents do not. Label rules remain a convention with no Actions enforcement.

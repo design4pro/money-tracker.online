@@ -260,10 +260,3 @@ already ran, so production ships the tree staging shipped without a second full 
 
 Anything with no verdict — a direct push, an admin bypass merge, a hotfix on `main` whose tree
 matches no parent — runs the suite and waits for it, exactly as the amendment above describes.
-
-## Amendment 2026-10-18 (deploys on push; PR gate is the agent)
-
-Amended by ADR 0033. `deploy-staging.yml` and `deploy-production.yml` are `on: push` again
-(`develop` and `main`) plus `workflow_dispatch`. They are no longer called from `ci.yml`
-(removed). A merge into `develop` deploys staging and smoke-checks `/api/health`; a merge into
-`main` deploys production. The PR suite lives on the Cursor agent VM. `main` remains owner-only.

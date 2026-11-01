@@ -5,9 +5,7 @@
  *
  *   GH_REPO=owner/name HEAD_SHA=$GITHUB_SHA RUN_ID=$GITHUB_RUN_ID node scripts/ci/verified-tree.mjs
  *
- * It writes `verified=true|false` and `verified-run=<id>` to `$GITHUB_OUTPUT`. Unused by live
- * workflows after ADR 0033 (PR verification left Actions); kept as the lookup the push-once
- * gate used. Previously `ci.yml` skipped the
+ * It writes `verified=true|false` and `verified-run=<id>` to `$GITHUB_OUTPUT`; `ci.yml` skips the
  * suite when the answer is true and deploys on the earlier verdict instead of producing a second
  * one. Merging through a merge queue is what makes that safe: the queue runs the required checks on
  * the commit it built and then moves `develop` to that same commit, so the push that follows has a

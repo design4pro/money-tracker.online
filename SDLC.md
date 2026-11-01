@@ -166,11 +166,7 @@ The wait for that outcome is bounded by `ci.maxWaitMinutes` (default 40). When i
 
 A red signal does not short-circuit the review either. A failing required check or a conflicted head is collected as a **blocker finding** and reported together with the full code review, never instead of it: one review cycle gives the author the failing check, the conflict, and every code finding at once, rather than the cheapest red flag first and another cycle to discover the rest. Such a verdict is still `changes-requested` — completeness changed, the gate did not.
 
-None of this touches the merge rules. Reporting early is safe; merging early is not — the
-agent-posted full gate (ADR 0033) still gates every merge into `develop`, and the merge tooling
-refuses until that comment is gate-green on the current head (`Status: green`, or no new
-failures vs `origin/develop`). Remaining GitHub required checks, until
-the owner removes them, still block the merge button.
+None of this touches the merge rules. Reporting early is safe; merging early is not — required checks still gate every merge, and the merge tooling refuses until they are genuinely green.
 
 ## The automation contract
 
@@ -196,6 +192,8 @@ A state an unattended pipeline can enter needs an exit that does not require a h
 Every PR passes the full validation gate before review sign-off. **The command list lives in exactly one place: `.ai/agentic.config.json` → `validation.commands`, in order.** This section deliberately does not repeat it, and neither should `AGENTS.md`, `CONTRIBUTING.md`, a skill, or a workflow file — a gate written down twice is a gate that disagrees with itself, and the copy an agent happens to read is the one that wins.
 
 Any non-zero exit fails the gate and blocks the PR. The implementing skills run the configured gate before opening a PR, and `om-check-and-commit` runs it before pushing a hand-worked branch. Changing the gate means editing that one key; anything that needs the list at runtime reads it from there.
+
+**Agent attestation (ADR 0033).** `node scripts/ci/attestation.mjs run` runs that gate on the committed head, one gate per host at a time, and keeps the record; `attest --pr <n>` posts it as a `<!-- agent-attestation -->` comment after the last push. On a pull request whose head tree it matches, and whose diff stays out of the gate's own files and the `risk-high` paths, CI skips `verify` and `unit tests · coverage`; the e2e legs always run. The push to `develop` still runs everything before a deploy. `implement-ticket` runs `run` as its gate step and `attest` before the merge.
 
 ## Repo automations
 
@@ -236,19 +234,12 @@ Three amendment rules are specific to this document's shape:
 
 ## This repository
 
-- **The base branch is `develop`.** Eligible PRs merge into `develop` by squash via
-  `om-pr-autopilot --allow-merge` once the **agent full gate** is gate-green on that head
-  (ADR 0033): every command in `.ai/agentic.config.json` → `validation.commands`, then e2e
-  (`chromium` and `mobile-chromium`), then axe (`.github/a11y/axe-scan.mjs`), posted as
-  `<!-- agent-gate-report -->` for the current SHA, and drizzle is additive
-  (`node scripts/ci/assert-additive-migrations.mjs`; rebase then `pnpm db:generate` so snapshot
-  `prevId` chains). Gate-green is `Status: green`, or `New-failures: none` against a
-  `Baseline-develop` SHA of `origin/develop` this run gated (same failing tests allowed). GitHub
-  Actions does not run that suite on pull requests. A merge into `develop` does not close an issue natively, so the merger
-  then runs `om-close-fixed-issues` and honours the PR's `Closes #n`. The `develop` → `main`
-  promotion is a separate PR, **owner-only**, merged with **a merge commit** (ADR 0003). If
-  `develop` (staging) is red after a merge, open a fix or revert PR — never commit straight to
-  `develop`.
+- **The base branch is `develop`.** Eligible PRs enter `develop`'s **merge
+  queue** (ADR 0020), which runs the suite on the commit it builds and merges it minutes later. A
+  merge into `develop` does not close an issue natively, so the merger then runs
+  `om-close-fixed-issues` — once the merge has landed, not while the PR is still queued — and it
+  honours the PR's `Closes #n`. The `develop` → `main` promotion is a separate PR, merged directly
+  with **a merge commit** and no queue (ADR 0003).
 - **Who starts a run.** No label does (ADR 0029). An issue a maintainer opens is groomed and
   triaged on the event (`issue-groom`: `om-auto-manage-issues`, then `afk-triage`); a ready issue
   is implemented by the two-hour schedule, which asks `backlog-status.mjs --next` for it, or by the
@@ -292,14 +283,25 @@ target `develop` until its base merges, which is expected, not a finding.
   `gh api -X PATCH repos/{owner}/{repo}/pulls/{prNumber} -f base=develop`. Retarget **before**
   anyone deletes the base branch: GitHub closes a PR whose base branch disappears under it (its
   documented behaviour; not exercised in this repository).
-- **The agent gate runs on the PR that targets `develop`.** A stacked PR whose base is another
-  feature branch is not mergeable into `develop` until it is retargeted. After the base PR merges,
-  retarget, merge `develop` into the branch, push, and re-run the full gate on that head (rebase
-  then `pnpm db:generate` when the stack added migrations, so snapshot `prevId` is the base's
-  latest). Post a new `<!-- agent-gate-report -->` for the new SHA. Autopilot must not merge on
-  evidence for an older head. No force-push, no `--no-verify`.
-- **GitHub Actions is not the PR gate (#546 is retired with it).** Workflows no longer listen to
-  `pull_request` except cancelling leftover runs on close. Retargeting does not start a VPS job.
+- **CI does not run on the way.** `.github/workflows/ci.yml` triggers on `pull_request` against
+  `main` or `develop` only, so a PR whose base is another feature branch gets no CI run, and
+  merging into that branch passes through no required check: it is not a quality gate. A retarget
+  alone starts none either, because it fires `edited`, which the workflow does not listen to
+  (#175 merged 88 seconds after #172 with none of the required checks ever reported on it). After the retarget the
+  author merges `develop` into the branch and pushes, which fires `synchronize` against `develop`
+  and starts CI. The PR does not merge until the required checks are green on that run. A local
+  validation-gate pass is review evidence, never a substitute for them. No force-push, no
+  `--no-verify`.
+- **CI does not start on a retarget, by design (#546).** Listening to `edited` would make every
+  title or body edit a CI trigger, and two things make that unsafe. A run for `edited` joins the
+  `ci-<ref>` concurrency group, which cancels in-flight pull request runs, so an edit could cancel
+  a real run on the same ref. A job guarded to skip unless the base changed would report as skipped
+  under the required check names, and GitHub counts a skipped required check as passing, so a
+  failing or cancelled result could be masked. The ruleset already keeps a PR whose required checks
+  never reported from merging, so the cost of the gap is the remedy above: one merge commit and one
+  push per stacked PR. A merge without the required checks is an admin bypass, and it is reported as
+  one. Revisit only after a second stacked-PR incident: then a trigger on `edited` with a per-event
+  concurrency key and no cancellation on `edited`.
 
 ### The Reconciler
 
@@ -377,12 +379,10 @@ the script refuses to delete an enabled stray.
   `implement-ticket` and of `plan-to-spec` (a spec PR the specialist panel approved, or the docs-only PR that marks delivered plan stages, ADR 0030), a PR a maintainer opened, and an agent PR reviewed into `merge-queue`
   (ADR 0027, amended 2026-10-01). A spec PR `implement-ticket` writes for a spec task is not among them: it is spec-only with an `Issue` row and no `Plan` row, so a person merges it. It never merges into `main`: the `develop` -> `main` promotion
   carries `do-not-merge` (ADR 0029) and is the owner's. A person merges everything else, with `gh pr merge`, or with `gh pr merge --auto` to
-  land it. After ADR 0033 the rulesets should require **no** GitHub Actions status checks
-  (`docs/agents/cezar.md`); the merge skill still refuses until the agent-posted full gate is
-  green on the current head. Every label rule in this document is a convention that
-  `om-merge-buddy` and `om-approve-merge-pr` read and honour, and nothing in Actions enforces it
-  (ADR 0027). The process label `merge-queue` is not a GitHub merge queue entry. The owner applies
-  the ruleset change after reviewing this policy; the agent does not edit org/repo settings.
+  land it once the required checks pass. The rulesets require only the three CI checks (`docs/agents/cezar.md`);
+  every label rule in this document is a convention that `om-merge-buddy` and
+  `om-approve-merge-pr` read and the person merging honours, and nothing in CI enforces it
+  (ADR 0027). The process label `merge-queue` is not a GitHub merge queue entry.
 - A `risk-high` or `security` PR gets a deeper review: the security and tenancy reviewer sits on
   its QA panel and judges its diff before it merges (ADR 0031). A `needs-qa` PR waits for
   `qa-approved` from the unattended sign-off or a QA reviewer. Promotion from `develop` to `main` merges after the

@@ -1,8 +1,7 @@
 # A human opened a pull request, or an agent pull request reached `merge-queue` (the "Autopilot new
 # pull requests" and "Merge reviewed agent pull requests" automations filter on authors and labels).
 # om-pr-autopilot diagnoses it and runs the right chain: continue, fix, review, QA, and with
-# `--allow-merge` the final om-approve-merge-pr merge, which still refuses on a failed QA gate,
-# a missing green `<!-- agent-gate-report -->` on the current head (ADR 0033), or
+# `--allow-merge` the final om-approve-merge-pr merge, which still refuses on a failed QA gate or
 # `qa-failed` / `do-not-merge` / `blocked` (ADR 0027). The develop-to-main promotion PR never
 # reaches this workflow: it carries `do-not-merge`, which every PR automation excludes (ADR 0029),
 # and om-approve-merge-pr merges unattended only into `develop`.

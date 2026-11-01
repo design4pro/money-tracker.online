@@ -90,11 +90,10 @@ gate in CI on a command it never ran.
 node -e "require('./.ai/agentic.config.json').validation.commands.forEach(c=>console.log(c))"
 ```
 
-`pnpm e2e` and the axe scan are not in `validation.commands` because they need a running app:
-Cursor cloud agents run them on the PR VM as part of the **full gate** (`prVerification` in the
-same config) and post the evidence comment autopilot requires before merging to `develop`
-(ADR 0033). `om-auto-qa-pr` still drives the app for UI evidence. `pnpm check` (prettier over the
-whole repo) is not a gate either; keep what you touch prettier-clean.
+`pnpm e2e` is not in the gate because it needs a running environment: CI runs it on every pull
+request that can change what the browser sees (`scripts/ci/change-scope.mjs`) and on every push to
+`develop`, and `om-auto-qa-pr` drives the app for UI evidence. `pnpm check` (prettier over the whole
+repo) is not a gate either; keep what you touch prettier-clean.
 
 `pnpm test` takes 160-200 s (#472, #525, #588), longer than the Bash tool's 120 s default: pass
 `timeout: 600000` and write the output to a file (#525 saw a call over the default moved to the
@@ -178,6 +177,7 @@ file is allowed; printing a value is not.
 | The delivery process, labels, QA gate          | `SDLC.md`; `CODE_REVIEW.md`; `BACKWARD_COMPATIBILITY.md`; `docs/agents/issue-tracker.md`                         | Labels are the state machine; `needs-qa` needs `qa-approved` from a specialist panel                                                                                                                                                                                             |
 | Unattended intake: triage, tickets, lessons    | `SDLC.md` § Readiness, § Unattended decisions; `.ai/skills/afk-*/SKILL.md`; `docs/agents/cezar-automations.json` | No label marks an issue ready or starts a run (ADR 0029): `backlog-status.mjs --plan` names the next ready issue for the Reconciler to start. An independent specialist sub-agent settles an open question (`afk-decide`) into Resolved assumptions. Nothing merges into `main`. |
 | The orchestrator                               | `docs/agents/cezar.md`; ADR 0013, ADR 0017                                                                       | One cockpit per host; no secrets in the service env                                                                                                                                                                                                                              |
+| The super-board robot                          | `docs/agents/super-board.md`; `/super-board` skills                                                              | Board is design4pro project 20; Conventional Commits win over the emoji format; `gh issue edit` only on gh 2.82.1+                                                                                                                                                               |
 
 ## Process and skills
 

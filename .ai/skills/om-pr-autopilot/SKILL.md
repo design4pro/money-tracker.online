@@ -121,30 +121,8 @@ These hold for every skill this run chains, whether or not its own override was 
   `"$TEST_OWNER_PASSWORD"` in the command (AGENTS.md).
 - **The dev server URL is `baseUrl` in `.ai/qa/test-env.json`** (`om-prepare-test-env` writes it).
   Never derive it from `.dev.vars`, which the agent never reads.
-- **Do not wait on GitHub Actions PR checks.** After ADR 0033, `ci.yml` is gone and no workflow
-  queues `vps-ci-*` on every pull request. A PR whose Actions tab shows queued `generated ·
-typecheck · lint · build` / `unit tests · coverage` / `e2e · merged report` is waiting on a
-  ruleset the owner has not yet updated — do not burn `ci.maxWaitMinutes` on an empty pool
-  (#596, #598, #604, #608, #609, #610). Merge evidence is the agent-posted full gate, not those
-  jobs.
-- **Merge into `develop` only with a gate-green agent full gate on this head.** Require a
-  conversation comment matching `scripts/ci/agent-gate-report.template.md`: the newest one carrying
-  `.ai/agentic.config.json` → `prVerification.evidenceMarker` (`<!-- agent-gate-report -->`),
-  posted by one of `prVerification.evidenceAuthors`, with `Head: <the PR's full current head
-SHA>`, and `Migrations: additive` or `Migrations: none` after `prVerification.migrationCheck`.
-  Gate-green means `Status: green` (every `validation.commands` rung plus `prVerification.buildCheck`
-  and `prVerification.browserCommands` pass; `skipped (change-scope)` only when `change-scope.mjs`
-  prints `browser=false` for the head) **or**, when `prVerification.mergeWhenNoNewFailures` is
-  true, `New-failures: none` against `Baseline-develop:` the full SHA of `origin/develop` this run
-  gated. Same failing tests as that baseline are allowed; a new failing test is not. Evidence for
-  an older SHA does not count: re-run the gate after a push. When the comment is missing or stale,
-  this run is the agent that runs the full gate in its worktree (and the same commands on
-  `origin/develop` when the PR is red) and posts the template comment; it never merges on a
-  comment it did not read. `--allow-merge` still means `develop` only; `main` is the owner's.
-- **Drizzle must stay a chain.** After merging or rebasing `develop`, run `pnpm db:generate
-< /dev/null` and commit what it writes. Snapshot N's `prevId` is snapshot N-1's `id`; journal
-  `idx` values are unique and equal to `0..n-1`. No `DROP TABLE` / `DROP COLUMN` in SQL this
-  branch added. `node scripts/ci/assert-additive-migrations.mjs` is the check.
-- **If `develop` is red, open a PR.** A failed staging deploy, a red smoke check, or a broken
-  `develop` tip is a fix PR or a revert PR targeting `develop`. Never `git push` a commit straight
-  onto `develop`. Never merge into `main`.
+- **Required checks stuck at `queued`: read the runner pool before waiting.** When
+  `gh api repos/<owner>/<repo>/actions/runners --jq .total_count` is 0, nothing can pick the jobs up
+  and the wait budget is wasted: apply the `ci.maxWaitMinutes` expiry procedure at once, and do not
+  push again, because `ci.yml` cancels the queued run of the previous head on every push. #596,
+  #598, #604, #608, #609 and #610 waited on an empty or idle self-hosted pool.

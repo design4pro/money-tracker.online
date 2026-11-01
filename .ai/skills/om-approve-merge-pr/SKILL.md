@@ -31,48 +31,12 @@ Read the base and the head off the pull request rather than off its title. The p
 by `.github/workflows/promote-develop.yml` under a fixed title, but a person can open the same pull
 request by hand under any title at all.
 
-## The agent full gate is the merge evidence (ADR 0033)
-
-Step 1 of the installed skill treats GitHub **required checks** as the CI gate. After the owner
-clears those contexts from the rulesets they will be empty; until then they may still block the
-GitHub merge button. Either way this overlay **refuses** `om-approve-merge-pr` into `develop`
-unless all of the following hold on the current head:
-
-1. The **newest** conversation comment that contains `<!-- agent-gate-report -->`
-   (`.ai/agentic.config.json` → `prVerification.evidenceMarker`) was posted by one of
-   `prVerification.evidenceAuthors`, and says `Head: <the full 40-character head SHA>`. An older
-   comment does not outlive a newer one, and a comment from anyone else is not evidence. Read the
-   head with **get-pr** (`headRefOid`) immediately before the merge and merge with
-   `gh pr merge --squash --match-head-commit <that SHA>`, so a push after the read makes the merge
-   fail instead of landing ungated code.
-2. That comment is **gate-green for merge-to-develop** when either:
-   - `Status: green` and every `validation.commands` rung, `prVerification.buildCheck` and
-     `prVerification.browserCommands` (`pnpm e2e --project=chromium --project=mobile-chromium` and
-     `pnpm exec tsx .github/a11y/axe-scan.mjs`) is pass (browser rungs may read
-     `skipped (change-scope)` only when `node scripts/ci/change-scope.mjs` prints `browser=false`
-     for this head: run it yourself and compare); or
-   - `prVerification.mergeWhenNoNewFailures` is true, `New-failures: none`, and
-     `Baseline-develop:` is the full SHA of `origin/develop` (`prVerification.baselineRef`) this
-     run actually gated. Same failing tests as that baseline are allowed. A new failing test, a
-     skipped rung that is not change-scope, or a missing baseline SHA is not merge-green. The
-     raw `Status` stays `red` when anything failed; do not rewrite it to green.
-3. `Migrations: additive` or `Migrations: none`, matching
-   `node scripts/ci/assert-additive-migrations.mjs` (unique journal `idx`, snapshot `prevId`
-   chain, no `DROP TABLE` / `DROP COLUMN` in SQL this branch added). Rebase onto `develop` and run
-   `pnpm db:generate` when two PRs added migrations from the same parent.
-4. Any GitHub required status checks that still remain in the ruleset are genuinely green — never
-   bypass them. Do not wait on `vps-ci-*` jobs whose workflows this repository no longer runs.
-
-A local `validation.commands` pass without the posted comment is this run's own notes, not merge
-evidence. If staging/`develop` is red, open a fix or revert PR; never push a commit onto
-`develop` outside a pull request.
-
 ## Rules
 
 - Merging into `develop` is `pr-autopilot`'s job (`om-pr-autopilot --allow-merge`, ADR 0027); a
   person merges the rest. The label rules in `SDLC.md` (`do-not-merge`, `blocked`, `qa-failed`,
   `in-progress`, and `needs-qa` without `qa-approved`) are a convention this skill reads and
-  honours; no GitHub Actions check enforces them (ADR 0027). The agent full gate above does.
+  honours; no CI check enforces them (ADR 0027).
 - The `develop` to `main` promotion requires a person's release decision. An unattended run
   (`CEZ_TASK_ID` is set, or no person is in the session) merges only a PR whose `baseRefName` is
   `develop`; any other base, or a PR carrying `do-not-merge` (the promotion carries it), is

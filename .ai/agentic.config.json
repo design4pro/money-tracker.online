@@ -16,19 +16,6 @@
       "pnpm build"
     ]
   },
-  "prVerification": {
-    "provider": "cursor-cloud-agent",
-    "evidenceMarker": "<!-- agent-gate-report -->",
-    "browserCommands": [
-      "pnpm e2e --project=chromium --project=mobile-chromium",
-      "pnpm exec tsx .github/a11y/axe-scan.mjs"
-    ],
-    "buildCheck": "node scripts/ci/assert-build-output.mjs",
-    "migrationCheck": "node scripts/ci/assert-additive-migrations.mjs",
-    "evidenceAuthors": ["cursor[bot]", "rafalwolak"],
-    "baselineRef": "origin/develop",
-    "mergeWhenNoNewFailures": true
-  },
   "labels": {
     "enabled": true,
     "pipeline": [

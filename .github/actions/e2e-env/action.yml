@@ -5,9 +5,9 @@ description: >
   build served by `vite preview` on port 3010, and the seeded demo workspace
   behind it.
 
-  Used by the dispatched `a11y.yml` scan. Cursor agents prepare the same stack
-  through `om-prepare-test-env` / `.ai/scripts/test-env-up.sh` on their VM
-  (ADR 0033).
+  Two workflows need this identical preparation - the e2e gate in ci.yml and the
+  accessibility gate in a11y.yml - and a drift between them would show up as a
+  suite that only fails in one of the two. So it lives here once.
 
   Installs the browsers rather than assuming them. The assumption held while
   these jobs ran in `mcr.microsoft.com/playwright:v<version>-noble`, and then
@@ -151,28 +151,36 @@ runs:
     # this action's call. Pure bash over /proc, so it needs no tool the image may lack: `--host`
     # binds v4 and v6, so both /proc/net/tcp and /proc/net/tcp6 are read, and a socket is the
     # holder's only when its state is LISTEN (0A). An unprivileged runner sees only its own
-    # processes, hence the explicit "not visible" branch rather than a silent pass.
+    # processes, hence the explicit "not visible" branch rather than a silent pass. Where there is
+    # no /proc (macOS, running the guard's test locally) it asks `lsof` instead.
     - name: Check the preview port is free
       shell: bash
       env:
         PORT: ${{ inputs.port }}
       run: |
         set -euo pipefail
-        hex=$(printf '%04X' "$PORT")
-        inodes=$(awk -v hex="$hex" '$4 == "0A" && $2 ~ (":" hex "$") { print $10 }' /proc/net/tcp /proc/net/tcp6 2>/dev/null | sort -u || true)
-        [ -n "$inodes" ] || exit 0
-
         holder='a process that is not visible to the runner user'
-        for inode in $inodes; do
-          fd=$(find /proc/[0-9]*/fd -maxdepth 1 -lname "socket:\\[$inode\\]" -print -quit 2>/dev/null || true)
-          if [ -n "$fd" ]; then
-            pid=${fd#/proc/}
-            pid=${pid%%/*}
-            cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | cut -c1-200 || true)
-            holder="PID $pid ($cmd)"
-            break
-          fi
-        done
+        if [ -r /proc/net/tcp ]; then
+          hex=$(printf '%04X' "$PORT")
+          inodes=$(awk -v hex="$hex" '$4 == "0A" && $2 ~ (":" hex "$") { print $10 }' /proc/net/tcp /proc/net/tcp6 2>/dev/null | sort -u || true)
+          [ -n "$inodes" ] || exit 0
+
+          for inode in $inodes; do
+            fd=$(find /proc/[0-9]*/fd -maxdepth 1 -lname "socket:\\[$inode\\]" -print -quit 2>/dev/null || true)
+            if [ -n "$fd" ]; then
+              pid=${fd#/proc/}
+              pid=${pid%%/*}
+              cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | cut -c1-200 || true)
+              holder="PID $pid ($cmd)"
+              break
+            fi
+          done
+        else
+          pid=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true)
+          [ -n "$pid" ] || exit 0
+          cmd=$(ps -o command= -p "$pid" 2>/dev/null | cut -c1-200 || true)
+          holder="PID $pid ($cmd)"
+        fi
         echo "::error title=Preview port::Port $PORT is already held by $holder - probably a preview server left over from an earlier run on this runner. Nothing was killed; stop it before re-running."
         exit 1
 

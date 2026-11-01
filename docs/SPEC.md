@@ -301,7 +301,7 @@ e2e/                 <module>.visual.spec.ts, one per module
   on `TASKS`, never run inline.
 - Named exports only, route modules excepted.
 - **Generated files are never hand-edited**: `src/routeTree.gen.ts` (`pnpm generate-routes`),
-  `drizzle/` (`pnpm db:generate`). The agent gate diffs both (`validation.commands`).
+  `drizzle/` (`pnpm db:generate`). CI diffs both.
 - Migrations are **additive**; the running Worker must survive the migrate-then-deploy window. No
   column is dropped, renamed or narrowed in the same change that stops writing it.
 

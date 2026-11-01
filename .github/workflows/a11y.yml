@@ -1,8 +1,21 @@
 name: Accessibility
 
-# On-demand axe scan. Pull-request verification no longer runs here (ADR 0033): Cursor cloud
-# agents run `pnpm exec tsx .github/a11y/axe-scan.mjs` on their VM and post the result on the PR.
-# Dispatch this workflow when a person wants the same scan on the VPS pool without opening a PR.
+# The accessibility gate, and the one place the product's two different promises are kept
+# apart:
+#
+#   * WCAG 2.2 level A and AA are a HARD gate. Any axe violation on any scanned route, in either
+#     colour scheme, fails this workflow and therefore the merge.
+#
+#   * A named list of AAA criteria - 2.5.5 target size (44px), 2.4.11/2.4.12 focus not obscured,
+#     1.4.8 visual presentation, 2.2.6 timeouts, 3.3.9 accessible authentication, plus axe's own
+#     AAA rules including 1.4.6 enhanced contrast at 7:1 - is measured and reported, and does not
+#     fail the build.
+#
+# That second bucket is a commitment, not a certification. Nothing here licenses a blanket
+# "WCAG 2.2 AAA compliant" claim in user-facing or marketing copy, and the report says so.
+#
+# The scanner and its route list live in .github/a11y/. The route list is meant to track the
+# browser specs under e2e/: a route worth a journey is a route worth scanning.
 #
 # ── GitHub configuration this workflow needs ──────────────────────────────────────────────────
 # secrets    E2E_USER_PASSWORD  optional; only if the seed's demo password is not the default
@@ -10,6 +23,12 @@ name: Accessibility
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 
 on:
+  pull_request:
+    branches: [main, develop]
+    # No `labeled`: ADR 0016 retired `needs-e2e`, and no label changes what this workflow does.
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, develop]
   workflow_dispatch:
 
 concurrency:
@@ -20,10 +39,44 @@ permissions:
   contents: read
 
 jobs:
+  # The same question, and the same script, as the `changes` job in ci.yml: a pull request that
+  # cannot change what the browser renders skips the scan (#455). Skipped on a push, where the empty
+  # output means "run", and the push to `develop` after the merge scans every route regardless.
+  changes:
+    name: change scope
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
+    timeout-minutes: 5
+    outputs:
+      browser: ${{ steps.scope.outputs.browser }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          sparse-checkout: scripts/ci
+
+      - name: Classify the changed files
+        id: scope
+        run: BASE_SHA=$(git rev-parse HEAD^1) HEAD_SHA=$(git rev-parse HEAD) node scripts/ci/change-scope.mjs
+
   axe:
     name: axe · WCAG 2.2 AA gate
+    needs: changes
+    # A develop→main pull request duplicates the push-triggered run on the same commits; the push
+    # run is canonical for the shared branches. `!cancelled()` rather than the implicit `success()`,
+    # which would read the skipped `changes` on a push as a reason to skip the scan too.
+    if: ${{ !cancelled() && !github.event.pull_request.draft && needs.changes.outputs.browser != 'false' && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 30
+    # The same runners as the e2e gate, and no `container:` on either: `./.github/actions/e2e-env`
+    # installs the browsers per job, so neither gate needs a machine that carries them.
+    #
+    # What that leaves this scan reading is whatever font stack the VPS pool's image plus
+    # `playwright install` ends up with, rather than the hosted runners'. Font rasterisation is what axe's contrast rule samples
+    # on text over a background it cannot compute, so a new borderline violation here is worth
+    # reading as an environment finding before it is read as a product regression.
 
     env:
       CI: 'true'
@@ -35,14 +88,27 @@ jobs:
       - name: Prepare the browser-test environment
         uses: ./.github/actions/e2e-env
 
+      # Two passes over every route in .github/a11y/routes.json: the A/AA gate at desktop width
+      # in both colour schemes, then the AAA advisory pass at mobile width. Exit 1 means an A/AA
+      # violation, exit 2 means the scan could not run at all - a lost session, a route that
+      # answered 500 - which is a failure of the gate, not a pass.
       - name: Run the accessibility scan
         env:
           A11Y_BASE_URL: http://localhost:3010
           A11Y_OUT_DIR: a11y-report
+          # Both are optional. Unset, the scanner uses the demo account the seed writes; they
+          # exist so a checkout whose seed uses different credentials does not have to fork the
+          # scanner to say so.
           A11Y_USER_EMAIL: ${{ vars.E2E_USER_EMAIL }}
           A11Y_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
         run: pnpm exec tsx .github/a11y/axe-scan.mjs
 
+      # `always()`: the JSON is at its most useful on the run that failed. `continue-on-error`
+      # because the verdict is the scan above, not this upload - on 2026-09-21 the scan passed on
+      # the pool and the job went red anyway, on `Artifact storage quota has been hit`
+      # (run 35659108917, #417). On the VPS the upload stays on the runner host and costs no GitHub
+      # storage (design4pro/.github `artifact-upload`); seven days applies only when it falls back
+      # to GitHub, whose 2 GB allowance it would share.
       - name: Upload the axe results
         if: always()
         continue-on-error: true

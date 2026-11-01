@@ -1,15 +1,16 @@
 name: Deploy production
 
-# Git Flow's release leg: a push to `main` — the owner-merged promotion pull request — migrates
-# and deploys the production Worker. Pull-request verification does not run on GitHub Actions
-# (ADR 0033). A commit on `main` normally sat on `develop` and was gated there by the agent
-# evidence comment; a hotfix cut straight from `main` was not, so the owner is its only gate.
-# `workflow_dispatch` waits on nothing: it is for redeploying a commit by hand.
+# Git Flow's release leg: a push to `main` - the merged promotion pull request - migrates and
+# deploys the production Worker once CI has passed on that commit. ci.yml calls this workflow as its
+# last job, `deploy · production`, behind `verify`, the unit suite and every e2e leg, so a red
+# commit never reaches production (ADR 0003, amendment 2026-09-15). `workflow_dispatch` waits on
+# nothing: it is for redeploying a commit by hand, or for shipping while CI itself is down.
 #
 # The approval is the promotion itself, as in planned.travel: a human merges the `develop` → `main`
-# pull request. `main` stays owner-only. The `production` environment has no required reviewers on
-# purpose: a second approval after that merge would only park a commit already reviewed. The
-# environment is here to record where each deploy went (ADR 0003, amendment 2026-09-15).
+# pull request, and the `main` ruleset refuses that merge until the required checks are green. The
+# `production` environment has no required reviewers on purpose: a second approval after that merge
+# would only park a commit already reviewed and tested, and the environment is here to record where
+# each deploy went (ADR 0003, amendment 2026-09-15).
 #
 # ── GitHub configuration this workflow needs ──────────────────────────────────────────────────
 # secrets    CLOUDFLARE_API_TOKEN   Workers Scripts:Edit + D1:Edit on account 6cfdf3b5143cddc631383a4c14736c3a
@@ -27,8 +28,7 @@ name: Deploy production
 # ──────────────────────────────────────────────────────────────────────────────────────────────
 
 on:
-  push:
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -36,16 +36,18 @@ permissions:
 
 # `runs-on` below reads through `vars.RUNNER_DEPLOY`, a repository variable that is deliberately
 # unset: the fallback array selects the `ci` pool on the OVH VPS - x64 containers in the `vps`
-# runner group, one job per container, shared with design4pro/planned.travel (ADR 0022). Deploys
-# keep that pool so the Cloudflare credential stays on machines the organisation runs. PR
-# verification no longer queues here (ADR 0033).
+# runner group, one job per container, shared with design4pro/planned.travel - where the gate
+# runs too. Since 2026-09-24 that VPS is the only place this repository's jobs run (ADR 0022).
 #
-# A deploy queues behind whatever the pool is already running, and a VPS outage stops shipping.
-# Recovery is a variable, not a pull request:
+# A deploy queues behind whatever the pool is already running, and a VPS outage stops shipping
+# as well as the gate. Recovery is a variable, not a pull request, because the required checks
+# need the runners that are missing:
 #
 #   gh variable set RUNNER_DEPLOY '["ubuntu-latest"]'
 #
 # moves shipping onto GitHub-hosted machines; deleting the variable brings it back to the VPS.
+# `RUNNER_CI` and `RUNNER_AGENT` are the same lever for the gate and for the agent jobs. The
+# Cloudflare credential this workflow carries stays on machines the organisation runs.
 # See design4pro/cezar, `docs/host/README.md`, "Linux host".
 
 jobs:
@@ -55,12 +57,13 @@ jobs:
     timeout-minutes: 25
     # Never run two deploys at once, and never cancel one half-way: an interrupted
     # `d1 migrations apply` would leave the schema between two versions. On the job, so it holds
-    # the same way whether a push started this or a human dispatched it.
+    # the same way whether ci.yml calls this or a human dispatches it.
     concurrency:
       group: deploy-production
       cancel-in-progress: false
-    # No reviewers on this environment: the approval is the owner merging the promotion. A
-    # `workflow_dispatch` is itself the human decision.
+    # No reviewers on this environment: the approval is the promotion merge, behind the `main`
+    # ruleset's required checks, and ci.yml runs this job only at the end of that green run. A
+    # `workflow_dispatch` skips both, so starting one is itself the human decision.
     environment:
       name: production
       url: https://money-tracker.online
@@ -135,9 +138,8 @@ jobs:
       # the code - is serving live traffic against the NEW schema. Every migration must therefore
       # be additive (add tables, add nullable columns, add indexes) and never remove or narrow
       # anything the deployed code still reads. A destructive change is a two-release dance:
-      # release one stops using the column, release two drops it. The agent gate's db-drift
-      # rung proves a migration exists; review plus `scripts/ci/assert-additive-migrations.mjs`
-      # prove it is additive.
+      # release one stops using the column, release two drops it. CI's db-drift rung proves a
+      # migration exists; only review proves it is additive.
       - name: Apply D1 migrations
         if: steps.gate.outputs.configured == 'true'
         uses: cloudflare/wrangler-action@v4

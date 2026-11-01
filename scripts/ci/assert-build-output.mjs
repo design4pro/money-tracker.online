@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Checks the two things `pnpm build` must leave true, which `ci.yml` asserted after its build
- * step and the agent gate (ADR 0033) now asserts here. Run it straight after `pnpm build`:
+ * Checks the two build invariants also enforced by `ci.yml` after its build step.
+ * Run it straight after `pnpm build` for the same checks locally:
  *
  *   node scripts/ci/assert-build-output.mjs
  *

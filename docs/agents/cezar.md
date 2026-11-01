@@ -176,21 +176,25 @@ drift rows. Re-date the column when someone reads that page, not when a run read
   they require the same three contexts, with `strict_required_status_checks_policy: false`
   (ADR 0027):
 
-  | Required context                                                  | Published by |
-  | ----------------------------------------------------------------- | ------------ |
-  | _(none — owner clears the three Actions contexts after ADR 0033)_ | —            |
+  | Required context                       | Published by               |
+  | -------------------------------------- | -------------------------- |
+  | `generated · typecheck · lint · build` | `.github/workflows/ci.yml` |
+  | `unit tests · coverage`                | `.github/workflows/ci.yml` |
+  | `e2e · merged report`                  | `.github/workflows/ci.yml` |
 
-  Until the owner applies that ruleset change, `develop` (ruleset 22037820) and `main` (22037770)
-  still list `generated · typecheck · lint · build`, `unit tests · coverage` and
-  `e2e · merged report` (`integration_id` 15368). Those jobs are not in the tree any more
-  (`ci.yml` is gone), so they never report. **Do not wait on them.** Merge evidence is the
-  `<!-- agent-gate-report -->` comment on the current head (ADR 0033), gate-green when `Status:
-green` or when it records `New-failures: none` vs `origin/develop`. **get-pr-checks** still
-  reads whatever the ruleset names; an empty required set after the owner update means the
-  GitHub button is not the gate.
+  The required contexts name the GitHub Actions integration (`integration_id` 15368).
+  **get-pr-checks** must read the current head's required check runs rather than treating a
+  skipped or missing result as a passing test.
 
-  Read the table above as "what GitHub's merge button waits for". The pipeline's merge wait is
-  the agent full gate in `.ai/skills/om-approve-merge-pr/SKILL.md`.
+  `ci.yml` now runs the browser legs on every pull request that can change what the browser sees.
+  The required `e2e · merged report` fails when those legs fail or are skipped, except when the
+  `change scope` job classified the diff as unable to reach the browser: then the report skips too
+  (#455, ADR 0020's 2026-09-24 amendment). Artifact storage is advisory, but browser results
+  are not. ADR 0020's 2026-09-23 amendment explains why deferring E2E to `merge_group` was
+  unsafe without a live GitHub merge queue rule.
+
+  Read the table above as "what a merge waits for", not as "what runs". Adding a required context
+  means editing this table in the same change.
 
   The pipeline still holds a merge as well — the labels, the review verdict and the
   QA gate in `SDLC.md`, read by the merge skills as a convention and enforced by no check
@@ -365,7 +369,7 @@ All five now carry a bootstrap step and an explicit grant: `triage` and `archite
 read-only (`[Read, Grep, Glob, Bash, Skill, TodoWrite]`), `spec-to-tickets` the same plus `Write`
 for its ticket drafts and no `Edit` (run b4bde0ac, 2026-09-25, failed on eleven denied `Write`
 calls without it), `lessons` and `implement-ticket` with `Edit` and `Write` because they write. The
-gate step runs `node scripts/ci/run-validation.mjs`, which reads `validation.commands` — so the
+gate step runs `node scripts/ci/attestation.mjs run`, which reads `validation.commands` — so the
 list lives in one file again, and `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails if any
 workflow copies a command out of it. The same test fails a workflow that prompts without a grant,
 or one that neither bootstraps nor says in a comment why it does not.
