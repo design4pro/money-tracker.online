@@ -350,11 +350,11 @@ describe('TransactionForm booking date', () => {
 
       await user.click(screen.getByRole('button', { name: /Open calendar/ }))
 
-      // Adjacent-month cells are disabled until their month is displayed.
-      if (FUTURE.slice(8) === '01') {
+      const previousDay = dayBefore(FUTURE)
+      if (previousDay.slice(0, 7) !== FUTURE.slice(0, 7)) {
         await user.click(screen.getByRole('button', { name: 'Previous month' }))
       }
-      const before = dayCell(dayBefore(FUTURE))
+      const before = dayCell(previousDay)
       expect(before.hasAttribute('data-unavailable')).toBe(false)
       expect(before.getAttribute('aria-disabled')).not.toBe('true')
     })
