@@ -84,7 +84,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   const createSlotRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (focusRequest === undefined) return
+    if (focusRequest === undefined || pending.kind !== 'none') return
     // Let the collection finish restoring focus after removing the old row first.
     const frame = requestAnimationFrame(() => {
       const target =
@@ -99,7 +99,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
       }
     })
     return () => cancelAnimationFrame(frame)
-  }, [focusRequest, groups])
+  }, [focusRequest, groups, pending.kind])
 
   const close = () => setPending({ kind: 'none' })
   const byId = new Map(groups.map((group) => [group.id, group]))
