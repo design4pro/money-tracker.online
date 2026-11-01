@@ -7,7 +7,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
+import { ZodError } from 'zod'
 
 import {
   accounts,
@@ -15,10 +16,16 @@ import {
   loanInstalments,
   transactions,
 } from '#/server/db/schema'
-import { createBudgetWorld, executed, seedTransaction } from './budget-harness'
+import {
+  createBudgetWorld,
+  executed,
+  fault,
+  seedTransaction,
+} from './budget-harness'
 
 import { setLimitResolver } from '../base'
-import { ConflictError } from '../errors'
+import { ConflictError, RateUnavailableError } from '../errors'
+import { deleteTransaction, getTransaction } from '../transactions'
 import {
   LoanInstalmentSettledError,
   LoanSettlementRefusedError,
@@ -187,6 +194,71 @@ describe('the loans quota', () => {
 })
 
 describe('paid instalments bind a transaction', () => {
+  it.each([false, true])(
+    'refuses deletion of a settling transaction (settled during delete: %s)',
+    async (duringDelete) => {
+      const loan = await createLoan(scope, importedInput())
+      await seedTransaction(world.db, {
+        id: 'tx-delete',
+        refAmountMinor: 120_00,
+      })
+      const settle = () =>
+        world.db
+          .update(loanInstalments)
+          .set({
+            status: 'paid',
+            settledTransactionId: 'tx-delete',
+          })
+          .where(
+            and(
+              eq(loanInstalments.loanId, loan.id),
+              eq(loanInstalments.sequence, 1),
+            ),
+          )
+          .run()
+      let competingWrite: Promise<unknown> | undefined
+      if (duringDelete) {
+        fault.when = (query) => {
+          if (query.startsWith('delete from "transactions"')) {
+            fault.when = null
+            competingWrite = settle()
+          }
+          return false
+        }
+      } else {
+        await markInstalmentPaid(scope, {
+          loanId: loan.id,
+          sequence: 1,
+          transactionId: 'tx-delete',
+        })
+      }
+      const policies = {
+        planned: 'include',
+        adjustments: 'include',
+        transfers: 'include',
+        completeness: 'any',
+      } as const
+      await expect(
+        deleteTransaction({ scope, policies, id: 'tx-delete' }),
+      ).rejects.toMatchObject({
+        constructor: ConflictError,
+        message: expect.stringMatching(/revert.*instalment/i),
+      })
+      await competingWrite
+      expect(
+        (await getTransaction({ scope, policies, id: 'tx-delete' })).id,
+      ).toBe('tx-delete')
+      expect(
+        (await listInstalments(scope, { loanId: loan.id }))[0],
+      ).toMatchObject({
+        status: 'paid',
+        settledTransactionId: 'tx-delete',
+        amountMinor: 120_00,
+        refAmountMinor: 120_00,
+      })
+    },
+  )
+
   it('locks term edits once any instalment is paid', async () => {
     const loan = await createLoan(scope, importedInput())
     await seedTransaction(world.db, {
@@ -458,7 +530,12 @@ describe('paid instalments bind a transaction', () => {
         sequence: 1,
         transactionId: 'tx-eur',
       }),
-    ).rejects.toMatchObject({ reason: 'currency-mismatch' })
+    ).rejects.toMatchObject({
+      reason: 'currency-mismatch',
+      message: expect.stringContaining(
+        `Transaction tx-eur cannot settle instalment 1 of loan ${loan.id}`,
+      ),
+    })
     expect(await listInstalments(scope, { loanId: loan.id })).toEqual(before)
   })
 
@@ -541,7 +618,7 @@ describe('updateLoan keeps the loan, its account and its schedule in one currenc
 
     await expect(
       updateLoan(scope, loan.id, { openedOn: '2026-02-15' } as UpdateLoanInput),
-    ).rejects.toThrow()
+    ).rejects.toBeInstanceOf(ZodError)
     expect((await getLoan(scope, loan.id)).openedOn).toBe('2026-01-15')
   })
 
@@ -554,10 +631,58 @@ describe('updateLoan keeps the loan, its account and its schedule in one currenc
     await expect(
       updateLoan(scope, loan.id, { endsOn: '2026-01-01' }),
     ).rejects.toBeInstanceOf(ConflictError)
+    await expect(
+      updateLoan(scope, loan.id, {
+        firstPaymentOn: '2026-01-20',
+        endsOn: '2026-05-20',
+      }),
+    ).resolves.toMatchObject({
+      firstPaymentOn: '2026-01-20',
+      endsOn: '2026-05-20',
+    })
   })
 })
 
 describe('a foreign-currency schedule is priced at openedOn', () => {
+  it.each([
+    { instalmentMinor: 20_00 },
+    { principalMinor: 200_00 },
+    { outstandingMinor: 200_00 },
+  ])(
+    'uses the stored opening rate for an amount edit after rates are backfilled: %j',
+    async (patch) => {
+      await seedEurRates()
+      const loan = await createLoan(scope, {
+        ...importedInput(),
+        currencyCode: 'EUR',
+        outstandingMinor: 300_00,
+      })
+      const schedule = await listInstalments(scope, { loanId: loan.id })
+      await world.db
+        .update(exchangeRates)
+        .set({ rateE10: 60_000_000_000 })
+        .where(eq(exchangeRates.date, loan.openedOn))
+      const updated = await updateLoan(scope, loan.id, patch)
+      expect(updated).toMatchObject({
+        rateE10: 40_000_000_000,
+        principalMinor: patch.principalMinor ?? loan.principalMinor,
+        refPrincipalMinor:
+          patch.principalMinor === undefined ? loan.refPrincipalMinor : 800_00,
+        instalmentMinor: patch.instalmentMinor ?? loan.instalmentMinor,
+        refInstalmentMinor:
+          patch.instalmentMinor === undefined ? loan.refInstalmentMinor : 80_00,
+        outstandingMinor: patch.outstandingMinor ?? loan.outstandingMinor,
+        refOutstandingMinor:
+          patch.outstandingMinor === undefined
+            ? loan.refOutstandingMinor
+            : 800_00,
+      })
+      expect(await listInstalments(scope, { loanId: loan.id })).toEqual(
+        schedule,
+      )
+    },
+  )
+
   it('accepts instalments dated beyond the newest rate and prices them all at the opening rate', async () => {
     await seedEurRates()
     const loan = await createLoan(scope, {
@@ -581,11 +706,13 @@ describe('a foreign-currency schedule is priced at openedOn', () => {
   it('looks the opening rate up once for the whole schedule', async () => {
     await seedEurRates()
     executed.length = 0
-    await createLoan(scope, {
+    const loan = await createLoan(scope, {
       ...importedInput(),
       currencyCode: 'EUR',
-      instalments: Array.from({ length: 12 }, (_, index) => ({
-        dueOn: new Date(Date.UTC(2027, index, 20)).toISOString().slice(0, 10),
+      instalments: Array.from({ length: MAX_INSTALMENTS }, (_, index) => ({
+        dueOn: new Date(Date.UTC(2027, 0, 1 + (index % 2)))
+          .toISOString()
+          .slice(0, 10),
         amountMinor: 10_00,
       })),
     })
@@ -594,6 +721,24 @@ describe('a foreign-currency schedule is priced at openedOn', () => {
       query.startsWith('select "rate_e10" from "exchange_rates"'),
     )
     expect(rateReads.length).toBeLessThanOrEqual(4)
+    const rows = await listInstalments(scope, { loanId: loan.id })
+    expect(rows.map((row) => row.refAmountMinor)).toEqual(
+      Array(MAX_INSTALMENTS).fill(40_00),
+    )
+    expect(rows.every((row) => row.rateE10 === 40_000_000_000)).toBe(true)
+  })
+
+  it('refuses a future opening date beyond the rate look-back with a typed error', async () => {
+    await seedEurRates()
+    await expect(
+      createLoan(scope, {
+        ...importedInput(),
+        currencyCode: 'EUR',
+        openedOn: '2027-01-15',
+        endsOn: null,
+      }),
+    ).rejects.toBeInstanceOf(RateUnavailableError)
+    expect(await listLoans(scope)).toEqual([])
   })
 
   it('accepts a schedule of exactly MAX_INSTALMENTS rows', async () => {

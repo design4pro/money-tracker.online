@@ -29,7 +29,17 @@
  * leg of an `internal` transfer so a paired delete cannot be bypassed before plan `10` exists.
  */
 
-import { count, eq, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
+import {
+  count,
+  eq,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -47,6 +57,7 @@ import {
   TRANSACTION_DIRECTIONS,
   accounts,
   categories,
+  loanInstalments,
   payees,
   transactions,
 } from '#/server/db/schema'
@@ -857,9 +868,24 @@ export async function deleteTransaction(
     )
   }
 
+  const paidInstalments = scope.db
+    .select({
+      loanId: loanInstalments.loanId,
+      sequence: loanInstalments.sequence,
+    })
+    .from(loanInstalments)
+    .where(
+      tenantFilter(
+        scope,
+        loanInstalments,
+        eq(loanInstalments.settledTransactionId, id),
+        eq(loanInstalments.status, 'paid'),
+      ),
+    )
   const predicates: Array<SQL> = [
     eq(transactions.id, id),
     ...applyPolicies(policies),
+    notExists(paidInstalments),
   ]
   assertScopedWrite(predicates)
 
@@ -870,6 +896,12 @@ export async function deleteTransaction(
 
   const deleted = rows.at(0)
   if (deleted === undefined) {
+    const [bound] = await paidInstalments.limit(1)
+    if (bound !== undefined) {
+      throw new ConflictError(
+        `Transaction ${id} settles instalment ${bound.sequence} of loan ${bound.loanId}; revert the instalment before deleting the transaction.`,
+      )
+    }
     throw new NotFoundError('transaction', id)
   }
   touchLedgerAccount(deleted.accountId)

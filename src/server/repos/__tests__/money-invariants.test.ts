@@ -133,7 +133,12 @@ import {
   getTransaction,
   updateTransaction,
 } from '../transactions'
-import { createLoan, listInstalments, markInstalmentPaid } from '../loans'
+import {
+  createLoan,
+  listInstalments,
+  markInstalmentPaid,
+  updateLoan,
+} from '../loans'
 
 import type { RateE10 } from '#/lib/money'
 import type { MatchSubject } from '#/server/recurring/match'
@@ -2666,6 +2671,45 @@ describe('22 — a category write never touches an amount', () => {
  * the imported schedule sums to exactly the amounts that were written.
  */
 describe('23 — an imported loan schedule is integer amounts with paid-requires-a-transaction', () => {
+  it('keeps the historical loan rate and other ref amounts when one amount changes after a backfill', async () => {
+    const world = await createBudgetWorld()
+    await world.db.insert(exchangeRates).values({
+      baseCode: 'EUR',
+      quoteCode: 'PLN',
+      date: '2026-01-15',
+      rateE10: 40_000_000_000,
+      source: 'manual',
+      fetchedAt: new Date('2026-01-15T00:00:00.000Z'),
+    })
+    const loan = await createLoan(world.scope, {
+      name: 'Loan EUR',
+      currencyCode: 'EUR',
+      principalMinor: 1_000_00,
+      instalmentMinor: 100_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      instalments: [{ dueOn: '2026-02-20', amountMinor: 100_00 }],
+    })
+    const before = await listInstalments(world.scope, { loanId: loan.id })
+    await world.db
+      .update(exchangeRates)
+      .set({ rateE10: 50_000_000_000 })
+      .where(eq(exchangeRates.date, loan.openedOn))
+    const updated = await updateLoan(world.scope, loan.id, {
+      instalmentMinor: 90_00,
+    })
+    expect(updated).toMatchObject({
+      principalMinor: 1_000_00,
+      refPrincipalMinor: 4_000_00,
+      instalmentMinor: 90_00,
+      refInstalmentMinor: 360_00,
+      rateE10: 40_000_000_000,
+    })
+    expect(await listInstalments(world.scope, { loanId: loan.id })).toEqual(
+      before,
+    )
+  })
+
   it('writes ref amounts once at identity for the workspace base and never invents a float', async () => {
     const world = await createBudgetWorld()
     const loan = await createLoan(world.scope, {
@@ -2746,6 +2790,39 @@ describe('23 — an imported loan schedule is integer amounts with paid-requires
     expect(paid.status).toBe('paid')
     expect(paid.settledTransactionId).toBe('tx-loan-a')
     expect(paid.amountMinor).toBe(50_00)
+    const repeated = await markInstalmentPaid(world.scope, {
+      loanId: loan.id,
+      sequence: 1,
+      transactionId: 'tx-loan-a',
+    })
+    expect(repeated).toMatchObject({
+      amountMinor: paid.amountMinor,
+      refAmountMinor: paid.refAmountMinor,
+      principalMinor: paid.principalMinor,
+      interestMinor: paid.interestMinor,
+      closingBalanceMinor: paid.closingBalanceMinor,
+      rateE10: paid.rateE10,
+      settledTransactionId: paid.settledTransactionId,
+    })
+    const before = await listInstalments(world.scope, { loanId: loan.id })
+    await seedTransaction(world.db, {
+      id: 'tx-loan-eur',
+      refAmountMinor: 50_00,
+    })
+    await world.db
+      .update(transactions)
+      .set({ currencyCode: 'EUR' })
+      .where(eq(transactions.id, 'tx-loan-eur'))
+    await expect(
+      markInstalmentPaid(world.scope, {
+        loanId: loan.id,
+        sequence: 1,
+        transactionId: 'tx-loan-eur',
+      }),
+    ).rejects.toMatchObject({ reason: 'currency-mismatch' })
+    expect(await listInstalments(world.scope, { loanId: loan.id })).toEqual(
+      before,
+    )
   })
 
   it('keeps the digits of the currency: a yen loan is not scaled by 100', async () => {
