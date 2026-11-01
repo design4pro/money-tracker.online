@@ -50,6 +50,11 @@
 
 import { getRequestHeader } from '@tanstack/react-start/server'
 
+import {
+  DEFAULT_WORKSPACE_TIMEZONE,
+  civilDayInTimeZone,
+} from '#/server/calendar-day'
+
 /** The header a development request may pin the day with. Mirrored in `playwright.config.ts`. */
 const SERVER_TODAY_HEADER = 'x-mt-server-today'
 
@@ -84,6 +89,24 @@ export function serverToday(): string {
     if (pinned !== null) return pinned
   }
   return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * Today in a workspace timezone, still honouring the development and e2e pins.
+ *
+ * Recurring due/overdue reads this. Report month buckets keep {@link serverToday} (UTC), so a
+ * timezone change cannot move a booked row between months (`docs/MONEY.md` §6.2, §6.4).
+ */
+export function workspaceCivilDay(
+  timeZone: string = DEFAULT_WORKSPACE_TIMEZONE,
+  now: Date = new Date(),
+): string {
+  if (typeof __E2E_SERVER_TODAY__ === 'string') return __E2E_SERVER_TODAY__
+  if (import.meta.env.DEV) {
+    const pinned = pinnedDay()
+    if (pinned !== null) return pinned
+  }
+  return civilDayInTimeZone(now, timeZone)
 }
 
 /**

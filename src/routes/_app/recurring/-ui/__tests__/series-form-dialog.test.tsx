@@ -85,3 +85,60 @@ describe('SeriesFormDialog reminders', () => {
     expect(group.hasAttribute('data-invalid')).toBe(false)
   })
 })
+
+/**
+ * A JDG duty template fills the form and marks the series as a duty. The mark must not outlive the
+ * template: a weekly or income "ZUS" is not the 20th-of-the-month shape the badge promises. The
+ * yearly month, on the other hand, belongs to the person's choice and survives a round trip
+ * through another frequency.
+ */
+describe('SeriesFormDialog duty template', () => {
+  async function pick(label: string, option: string) {
+    await user.click(screen.getByRole('button', { name: new RegExp(label) }))
+    await user.click(await screen.findByRole('option', { name: option }))
+  }
+
+  it('shows the duty disclaimer after a template and drops it when the kind leaves Bill', async () => {
+    renderDialog()
+    expect(screen.queryByText(en['recurring.duty.disclaimer'])).toBeNull()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Use ZUS contribution' }),
+    )
+    expect(screen.getByText(en['recurring.duty.disclaimer'])).toBeTruthy()
+    expect(
+      (screen.getByRole('textbox', { name: 'Name' }) as HTMLInputElement).value,
+    ).toBe('ZUS contribution')
+
+    await pick('Kind', 'Income')
+    expect(screen.queryByText(en['recurring.duty.disclaimer'])).toBeNull()
+  })
+
+  it('drops the duty disclaimer when the frequency leaves Monthly', async () => {
+    renderDialog()
+    await user.click(screen.getByRole('button', { name: 'Use VAT-7' }))
+    expect(screen.getByText(en['recurring.duty.disclaimer'])).toBeTruthy()
+
+    await pick('How often', 'Weekly')
+    expect(screen.queryByText(en['recurring.duty.disclaimer'])).toBeNull()
+  })
+
+  it('keeps the chosen yearly month across a frequency round trip', async () => {
+    renderDialog()
+    await pick('How often', 'Yearly')
+    await pick('Month of the year', 'November')
+    expect(
+      screen.getByRole('button', { name: /Month of the year/ }).textContent,
+    ).toContain('November')
+
+    await pick('How often', 'Monthly')
+    expect(
+      screen.queryByRole('button', { name: /Month of the year/ }),
+    ).toBeNull()
+
+    await pick('How often', 'Yearly')
+    expect(
+      screen.getByRole('button', { name: /Month of the year/ }).textContent,
+    ).toContain('November')
+  })
+})
