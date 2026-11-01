@@ -13,7 +13,7 @@ import { Popover } from '#/components/ui/popover'
 
 /**
  * An eight-item row menu with a submenu, the shape of the groups screen's (#701): one more item
- * than a 320px cap fits at the 48px row height, and the destructive one is last.
+ * than a 320px cap fits at the 44px row height, and the destructive one is last.
  */
 function Harness() {
   return (
