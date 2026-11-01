@@ -1074,6 +1074,9 @@ the series detail grid and _Due soon_ on `/recurring`.
   stacks the buttons from `sm` up). Every layout change is scoped below `sm`, so nothing changes
   at `sm` and above. The shared classes and the self-labelling
   cell are `stacked-table.tsx`.
+  The liability schedule (`/loans/$loanId`) is a second call site of both: the same classes, its
+  scroller a focusable named region, and `useRowFocusRecovery` returning focus to the schedule
+  (the heading when the saved row has no button left) after a mark-paid save.
   - _Semantics survive the `display` change:_ the table, both row groups, rows, column headers,
     the due-date row header and cells carry their `role` explicitly, with `<caption>` and `scope`
     kept, because a non-table `display` can drop a native role in some browser and screen reader
@@ -1127,6 +1130,17 @@ and nothing else — no headline is ever a caution tone, the verdict word and th
 `warning` at 7:1, and a caller that wants loud caution TEXT has to re-measure the token at 4.5:1
 first. What the 3:1 floor bought differs by theme and is measured rather than assumed: dark gets
 full chroma at nearly the old weight, light has to lighten to get any (`src/styles/tokens.css`).
+
+### Liability meter
+
+The share of a borrowing's imported schedule that is already linked to a transaction, drawn with
+the `AmountMeter` shell on the list card and again as the detail hero (`md` / `lg`). The
+**headline is remaining**, not paid: that is the number somebody acts on. Paid-of-total sits in the
+caption. Overdue changes four channels before colour: the word _Overdue_, the warning triangle, a
+hatched fill, then `warning-bold`. Settled uses a check and a hatched positive fill. Remaining of zero is
+_Schedule paid_, never `0,00`. `aria-valuetext` names paid, remaining and the percentage, never a
+bare percent. The list and the detail share this component; inventing a second bar on the detail
+would be two opinions about the same money.
 
 ### Charts
 

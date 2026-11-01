@@ -25,6 +25,7 @@ import { createLogger } from '#/server/observability/logger'
 import { rebuildAccountBalance } from '#/server/repos/account-balances'
 import { createSeries, listCronScopes } from '#/server/repos/recurring'
 import { createScope } from '#/server/repos/scope'
+import { setWorkspaceTimezone } from '#/server/repos/workspace-settings'
 import { NOW, createBudgetWorld } from '#/server/repos/__tests__/budget-harness'
 
 import {
@@ -111,6 +112,32 @@ describe('cronToday', () => {
 })
 
 describe('the hourly branch', () => {
+  it('posts only the workspace whose civil day has reached the due date', async () => {
+    await setWorkspaceTimezone(world.scope, { timezone: 'Europe/Warsaw' })
+    await setWorkspaceTimezone(world.otherScope, {
+      timezone: 'America/New_York',
+    })
+    await createSeries(world.scope, rentInput({ startDate: TODAY }))
+    await createSeries(
+      world.otherScope,
+      rentInput({ startDate: TODAY, accountId: 'acc-b' }),
+    )
+
+    const report = await runRecurringHourly({
+      scopes: await listCronScopes(world.db),
+      markers,
+      logger: logger(),
+      now: new Date('2026-03-14T23:30:00.000Z'),
+    })
+
+    expect(report.failures).toBe(0)
+    expect(report.transactionsPosted).toBe(1)
+    const rows = await world.db.select().from(transactions)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.organizationId).toBe('org-a')
+    expect(rows[0]?.bookedOn).toBe(TODAY)
+  })
+
   it('materialises every workspace’s series and posts only the auto-recorded ones', async () => {
     await createSeries(world.scope, rentInput())
     // B's series is active and due, and is not `auto_record`. It must be materialised and left
@@ -218,6 +245,21 @@ describe('the reminder branch', () => {
     // flips. What this case checks is that the gap is *reported* rather than hidden, so a
     // production log says plainly when reminders are computed and not delivered.
     expect(report.dispatcherInstalled).toBe(false)
+  })
+
+  it('uses the workspace timezone when the reminder sweep has no pinned day', async () => {
+    await seriesDueInThreeDays()
+    await setWorkspaceTimezone(world.scope, { timezone: 'America/New_York' })
+    const input = {
+      scopes: [world.scope],
+      markers,
+      logger: logger(),
+      now: new Date('2026-03-14T23:30:00.000Z'),
+    }
+    expect((await runRecurringReminderSweep(input)).dispatched).toBe(0)
+    await setWorkspaceTimezone(world.scope, { timezone: 'Europe/Warsaw' })
+    expect((await runRecurringReminderSweep(input)).dispatched).toBe(1)
+    expect((await runRecurringReminderSweep(input)).dispatched).toBe(0)
   })
 
   it('sends nothing on the next tick a quarter of an hour later', async () => {

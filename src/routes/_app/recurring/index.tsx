@@ -170,11 +170,11 @@ function RecurringListRoute() {
   }
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
-  const baseCurrencyCode =
-    overview.rows.at(0)?.series.expectedCurrencyCode ?? 'PLN'
+  const baseCurrencyCode = accounts.overview.baseCurrencyCode
   const currencyOptions = [
     ...new Set([
       baseCurrencyCode,
+      ...accounts.accounts.map((account) => account.currencyCode),
       ...overview.rows.map((row) => row.series.expectedCurrencyCode),
     ]),
   ]
