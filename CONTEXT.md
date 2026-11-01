@@ -21,6 +21,9 @@ already caused, or would obviously cause, two people to mean two things by one w
   balance, and a running current balance. Every account in this product is manual; there is no
   connected account and no account type that behaves differently because of where its rows came
   from. _Avoid_: "account" for a login or a workspace; "wallet"; "bank account".
+- **Account group** — a workspace's collection of accounts, optionally inside another top-level
+  group. An account can belong to several groups; moving it changes only the source membership,
+  and removing it from a group neither deletes the account nor removes its other memberships.
 - **Transaction** — one movement of money against one account, in one direction, on one calendar
   date. It is `income` or `expense`; there is no third direction. It is written in its account's
   currency, and the repository refuses a write in any other. Everything else the product shows

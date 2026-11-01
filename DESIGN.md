@@ -999,6 +999,11 @@ because what a row can do differs (a category archives, a group deletes).
 - **Names say where a row is.** A child row's accessible name carries its parent ("Trips, inside
   Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
   after their row, and their parent for a child.
+- **Account membership is menu-only.** An account row in the group tree offers _Move to…_ and
+  _Remove from this group_, acting only on that row's membership. Destinations include their parent
+  and the current group stays disabled. Focus follows the account into the target group, or the
+  next surviving row after removal (previous when last, then the create button). Success is
+  announced politely; account rows never gain a drag handle.
 - **Disabled, never hidden, and the reason is written.** An item that would change nothing, or
   that the one-level rule forbids, stays in the menu disabled. The group tree also writes the
   reason as the item's description ("Already first", "A sub-group cannot have its own

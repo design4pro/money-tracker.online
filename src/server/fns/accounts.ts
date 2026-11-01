@@ -45,6 +45,8 @@ import {
   listAccountGroups as listAccountGroupsRow,
   listAccounts as listAccountsRow,
   listAccountsSchema,
+  moveAccountToGroup as moveAccountToGroupRow,
+  moveAccountToGroupSchema,
   reorderAccountGroups as reorderAccountGroupsRow,
   reorderAccountGroupsSchema,
   reorderAccounts as reorderAccountsRow,
@@ -257,6 +259,14 @@ export const setAccountGroupMembers = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await setAccountGroupMembersRow(scope, data.groupId, data.accountIds)
+  })
+
+/** Changes membership only; no ledger batch or quota applies. */
+export const moveAccountToGroup = createServerFn({ method: 'POST' })
+  .inputValidator(moveAccountToGroupSchema)
+  .handler(async ({ data }): Promise<void> => {
+    const scope = await requireOrg()
+    await moveAccountToGroupRow(scope, data)
   })
 
 /** Rewrites the group order. */

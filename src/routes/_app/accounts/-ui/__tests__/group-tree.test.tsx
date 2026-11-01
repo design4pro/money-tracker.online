@@ -21,7 +21,7 @@ import type { GroupItem } from '../group-rows'
  *
  * What has to be proved here is the contract a screen reader and a keyboard user rely on: names
  * that say where a row is, a menu path that reaches every move a drag can, reasons beside every
- * item the menu disables, and account rows that are in the list but cannot act. The drag half
+ * item the menu disables, and account rows that act through menus only. The drag half
  * (pointer physics, drop indicators) is React Aria's own.
  */
 
@@ -62,6 +62,7 @@ function renderTree(overrides: Partial<Parameters<typeof GroupTree>[0]> = {}) {
         onAddChild={noop}
         onDelete={noop}
         onMove={onMove}
+        onMoveAccount={vi.fn().mockResolvedValue(true)}
         {...overrides}
       />
     </I18nProvider>,
@@ -97,10 +98,35 @@ describe('GroupTree rows', () => {
     ])
   })
 
-  it('gives an account row no drag handle and no menu', () => {
+  it('gives an account row a menu but no drag handle', () => {
     renderTree()
     const account = screen.getByRole('row', { name: 'Cash, in Joint' })
-    expect(within(account).queryAllByRole('button')).toEqual([])
+    expect(within(account).getAllByRole('button')).toHaveLength(1)
+    expect(
+      within(account).getByRole('button', {
+        name: 'Actions for Cash, in Joint',
+      }),
+    ).not.toBeNull()
+    expect(within(account).queryByRole('button', { name: /Drag/ })).toBeNull()
+  })
+
+  it('distinguishes memberships of the same account and names archived account actions', () => {
+    renderTree({
+      groups: [
+        group('joint', 'Joint', null, ['Cash', 'Old card']),
+        group('business', 'Business', null, ['Cash']),
+      ],
+    })
+    expect(screen.getByRole('row', { name: 'Cash, in Joint' })).not.toBeNull()
+    expect(
+      screen.getByRole('row', { name: 'Cash, in Business' }),
+    ).not.toBeNull()
+    expect(
+      screen.getByRole('button', {
+        name: 'Actions for Old card, archived, in Joint',
+      }),
+    ).not.toBeNull()
+    expect(screen.getByText('Archived')).not.toBeNull()
   })
 
   it('names the drag handle and the menu trigger of a sub-group by its parent', () => {
@@ -124,6 +150,33 @@ describe('GroupTree rows', () => {
 })
 
 describe('GroupTree menu', () => {
+  it('moves only the row membership through parent-qualified destinations and disables its own group', async () => {
+    const onMoveAccount = vi.fn().mockResolvedValue(true)
+    renderTree({ onMoveAccount })
+    const user = userEvent.setup()
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for Cash, in Joint' }),
+    )
+    expect(
+      screen.getByRole('menuitem', { name: 'Remove from this group' }),
+    ).not.toBeNull()
+    await user.click(screen.getByRole('menuitem', { name: 'Move to…' }))
+    const submenu = (await screen.findAllByRole('menu')).at(-1)!
+    expect(
+      within(submenu)
+        .getByRole('menuitem', { name: 'Joint' })
+        .getAttribute('aria-disabled'),
+    ).toBe('true')
+    await user.click(
+      within(submenu).getByRole('menuitem', { name: 'Trips, inside Joint' }),
+    )
+    expect(onMoveAccount).toHaveBeenCalledWith({
+      accountId: 'Cash',
+      fromGroupId: 'joint',
+      toGroupId: 'trips',
+    })
+  })
+
   it('offers every ordering gesture as a menu item, not only as a drag', async () => {
     const { menu } = await openMenu('Business')
     for (const label of [
