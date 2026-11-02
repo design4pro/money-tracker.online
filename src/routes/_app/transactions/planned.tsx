@@ -3,6 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { CalendarClock } from 'lucide-react'
 import { z } from 'zod'
 
+import { useRecurringAction } from '#/components/app/recurring'
 import {
   KeyboardShortcuts,
   TransactionsModeSwitch,
@@ -77,6 +78,7 @@ function PlannedTransactionsRoute() {
   const { markPaid, series, ...search } = Route.useSearch()
   const navigate = Route.useNavigate()
   const refresh = useDataRefresh()
+  const runAction = useRecurringAction(refresh)
 
   const [pending, setPending] = useState<ExpectationRow | null>(null)
   const close = () => {
@@ -87,13 +89,13 @@ function PlannedTransactionsRoute() {
   }
 
   const skip = (row: ExpectationRow) => {
-    void skipPeriod({
-      data: { seriesId: row.seriesId, periodStart: row.periodStart },
-    })
-      .then(() => toast.success(t('recurring.toast.periodSkipped')))
-      .catch(() => toast.error(t('recurring.toast.failed')))
-      // A failure may mean it settled in another tab: either way the list is read again.
-      .finally(() => void refresh())
+    void runAction(
+      () =>
+        skipPeriod({
+          data: { seriesId: row.seriesId, periodStart: row.periodStart },
+        }),
+      t('recurring.toast.periodSkipped'),
+    )
   }
 
   return (
