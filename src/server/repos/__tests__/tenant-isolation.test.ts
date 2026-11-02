@@ -53,10 +53,13 @@ import {
   categories,
   currencies,
   importBatches,
+  organizationSettings,
   payees,
+  recurringLinks,
   rules,
   transactions,
 } from '#/server/db/schema'
+import { forecastSeries } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { sqliteBatchCallback } from './db-harness'
@@ -103,6 +106,7 @@ import {
   addSecondMember,
   createBudgetWorld,
   executed as harnessExecuted,
+  NOW as budgetWorldNow,
   seedBudget,
   seedCategory,
   seedPeriod,
@@ -121,6 +125,7 @@ import {
   deleteAccountGroup,
   getAccountBalanceOn,
   listAccountGroups,
+  moveAccountToGroup,
   reorderAccountGroups,
   setAccountGroupMembers,
   updateAccountGroup,
@@ -146,7 +151,28 @@ import {
   toImportBatchDto,
 } from '../imports'
 
-import { createSeries, getUpcoming } from '../recurring'
+import {
+  createSeries,
+  getUpcoming,
+  listPeriods as listSeriesPeriods,
+  listSeriesLinkDetails,
+  markPaid,
+} from '../recurring'
+import {
+  getWorkspaceTimezone,
+  setWorkspaceTimezone,
+} from '../workspace-settings'
+import {
+  createLoan,
+  deleteLoan,
+  getLoan,
+  listCalendarInstalments,
+  listInstalments,
+  listLoans,
+  listSettledTransactionIds,
+  markInstalmentPaid,
+  updateLoan,
+} from '../loans'
 import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -552,6 +578,38 @@ describe('account groups cannot be reached or aimed across a workspace boundary'
       [B_GROUP, B_CHILD],
     )
   })
+
+  it.each([
+    [B_ACCOUNTS[0], A_GROUP, null],
+    [A_ACCOUNTS[0], B_GROUP, A_GROUP],
+    [A_ACCOUNTS[0], A_GROUP, B_GROUP],
+    [A_ACCOUNTS[0], null, B_GROUP],
+    [A_ACCOUNTS[0], B_GROUP, B_GROUP],
+    [B_ACCOUNTS[0], null, null],
+  ])(
+    'moveAccountToGroup hides foreign ids even for no-ops (%s, %s, %s)',
+    async (accountId, fromGroupId, toGroupId) => {
+      const before = await bState()
+      const error = await moveAccountToGroup(a, {
+        accountId: accountId!,
+        fromGroupId,
+        toGroupId,
+      }).catch((thrown: unknown) => thrown)
+      expect(error).toBeInstanceOf(NotFoundError)
+      const missingId =
+        accountId === B_ACCOUNTS[0] ? 'missing-account' : 'missing-group'
+      const missing = await moveAccountToGroup(a, {
+        accountId: accountId === B_ACCOUNTS[0] ? missingId : accountId!,
+        fromGroupId: fromGroupId === B_GROUP ? missingId : fromGroupId,
+        toGroupId: toGroupId === B_GROUP ? missingId : toGroupId,
+      }).catch((thrown: unknown) => thrown)
+      expect(missing).toBeInstanceOf(NotFoundError)
+      expect(buildEnvelope(error, classifyFailure(error))).toEqual(
+        buildEnvelope(missing, classifyFailure(missing)),
+      )
+      expect(await bState()).toEqual(before)
+    },
+  )
 
   it('createAccountGroup refuses B’s group as the parent', async () => {
     await expectRefused(
@@ -2623,6 +2681,76 @@ describe('an attachment row cannot be used to reach another workspace’s object
   })
 })
 
+describe('workspace timezone cannot be aimed across a workspace boundary', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('lets A UPDATE Honolulu and leaves B on its seeded timezone', async () => {
+    await world.db.insert(organizationSettings).values([
+      {
+        organizationId: 'org-a',
+        timezone: 'Europe/Warsaw',
+        createdAt: budgetWorldNow,
+        updatedAt: budgetWorldNow,
+      },
+      {
+        organizationId: 'org-b',
+        timezone: 'Pacific/Auckland',
+        createdAt: budgetWorldNow,
+        updatedAt: budgetWorldNow,
+      },
+    ])
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Europe/Warsaw')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe(
+      'Pacific/Auckland',
+    )
+
+    harnessExecuted.length = 0
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    const updates = harnessExecuted.filter((query) =>
+      /update\s+"organization_settings"/i.test(query),
+    )
+    expect(updates).not.toHaveLength(0)
+    for (const statement of updates) {
+      expect(statement).toContain('organization_id')
+    }
+    expect(
+      harnessExecuted.filter((query) =>
+        /insert\s+into\s+"organization_settings"/i.test(query),
+      ),
+    ).toHaveLength(0)
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe(
+      'Pacific/Auckland',
+    )
+  })
+
+  it('updates only A’s existing row when both workspaces already have one', async () => {
+    await setWorkspaceTimezone(world.scope, { timezone: 'Europe/London' })
+    await setWorkspaceTimezone(world.otherScope, { timezone: 'Asia/Tokyo' })
+
+    // Both rows exist now, so this takes the update branch: an update that lost its tenant
+    // predicate would rewrite B's row as well.
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Asia/Tokyo')
+  })
+
+  it('refuses a timezone that is not an IANA name, without writing B', async () => {
+    await expect(
+      setWorkspaceTimezone(world.scope, { timezone: 'Not/AZone' }),
+    ).rejects.toThrow()
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+  })
+})
+
 describe('notifications cannot be read, counted or marked across a workspace boundary', () => {
   const AT = new Date('2026-03-15T10:00:00.000Z')
   const KIND = 'budget.threshold_crossed' as const
@@ -2934,6 +3062,185 @@ describe('an unsubscribe link acts in the workspace it names and nowhere else', 
 })
 
 /**
+ * The forecast reads a series' linked transactions through `listSeriesLinkDetails`, which joins
+ * `recurring_links` to `transactions`. Both halves are scoped, and a read of the caller's own series
+ * id cannot show it: B's links hang off B's series. So the case plants the leak the join guards
+ * against - a link row in A's workspace that points at B's transaction - and requires that neither
+ * the read nor the sum picks it up, and that B's series is not readable through A's scope.
+ */
+describe('a recurring forecast cannot add another workspace’s linked amounts', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('sums only the caller’s linked transactions for spent this year', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+
+    await seedTransaction(world.db, {
+      id: 'txn-a-forecast',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-forecast',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-forecast',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-forecast',
+    })
+
+    const [periods, links] = await Promise.all([
+      listSeriesPeriods(world.scope, mine.id, today),
+      listSeriesLinkDetails(world.scope, mine.id),
+    ])
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: {
+        frequency: 'monthly',
+        anchorDay: 20,
+        startDate: '2026-01-20',
+      },
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today,
+      links,
+      periods,
+    })
+
+    expect(forecast.spentThisYearMinor).toBe(100_00)
+    expect(links.map((link) => link.transactionId)).toEqual(['txn-a-forecast'])
+  })
+
+  it('does not read a foreign transaction through a link planted in the caller’s workspace', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-forecast',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    // The row a bug elsewhere could leave behind: org A's link, B's transaction.
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: mine.id,
+      transactionId: 'txn-b-forecast',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    const links = await listSeriesLinkDetails(world.scope, mine.id)
+    expect(links).toEqual([])
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: {
+        frequency: 'monthly',
+        anchorDay: 20,
+        startDate: '2026-01-20',
+      },
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today,
+      links,
+      periods: [],
+    })
+    expect(forecast.spentThisYearMinor).toBe(0)
+
+    // The series filter, not only the join: org B's own link under org B's own series, pointing at
+    // an org A transaction (the row a bug elsewhere could leave behind). Org A's scope passes the
+    // join filter on that transaction, so only `tenantFilter` on `recurring_links` keeps the row
+    // out. Removing it makes this read return the link.
+    await seedTransaction(world.db, {
+      id: 'txn-a-crossed',
+      refAmountMinor: 55_00,
+      organizationId: 'org-a',
+      accountId: 'acc-a',
+      bookedOn: '2026-02-20',
+    })
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-b',
+      seriesId: theirs.id,
+      transactionId: 'txn-a-crossed',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    await expect(
+      listSeriesLinkDetails(world.scope, theirs.id),
+    ).resolves.toEqual([])
+  })
+})
+
+/**
  * The upcoming read, which the planned screen widens by three ids of the series it joins.
  *
  * `getUpcoming` already scopes both halves of its join. What this case adds is the claim about the
@@ -3215,5 +3522,250 @@ describe('the upcoming read cannot leak another workspace’s series ids', () =>
       expect(page.total).toBe(2)
       expect(JSON.stringify(page)).not.toContain('plan-b')
     })
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Loans                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The loan register, attacked through every export. A's scope names B's ids; B's rows must be
+ * byte-identical afterwards. Creating a loan parented onto B's `account_id` is the extra case
+ * `28-loans.md` names: a foreign parent must be indistinguishable from a missing one.
+ */
+describe('loans cannot be reached across a workspace boundary', () => {
+  let world: BudgetWorld
+  let loanBId: string
+
+  const schedule = [
+    { dueOn: '2026-02-20', amountMinor: 100_00 },
+    { dueOn: '2026-03-20', amountMinor: 80_00 },
+  ] as const
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+    const loanB = await createLoan(world.otherScope, {
+      name: 'Loan B',
+      lender: 'Lender B',
+      accountId: 'acc-b',
+      currencyCode: 'PLN',
+      instalmentMinor: 100_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      book: 'business',
+      instalments: [...schedule],
+    })
+    loanBId = loanB.id
+    await seedTransaction(world.db, {
+      id: 'tx-b-loan',
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-02-20',
+    })
+  })
+
+  async function loanSnapshotOfB() {
+    const loan = await getLoan(world.otherScope, loanBId)
+    const instalments = await listInstalments(world.otherScope, {
+      loanId: loanBId,
+    })
+    return { loan, instalments }
+  }
+
+  it('hides a foreign paid-instalment transaction from deletion and a foreign loan from amount edits', async () => {
+    await markInstalmentPaid(world.otherScope, {
+      loanId: loanBId,
+      sequence: 1,
+      transactionId: 'tx-b-loan',
+    })
+    const before = await loanSnapshotOfB()
+    await expect(
+      deleteTransaction({
+        scope: world.scope,
+        policies: {
+          planned: 'include',
+          adjustments: 'include',
+          transfers: 'include',
+          completeness: 'any',
+        },
+        id: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      updateLoan(world.scope, loanBId, { instalmentMinor: 1 }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(await loanSnapshotOfB()).toEqual(before)
+  })
+
+  it('refuses every loan read and write aimed at another workspace’s id, and leaves the row alone', async () => {
+    const before = await loanSnapshotOfB()
+
+    await expect(getLoan(world.scope, loanBId)).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(
+      listInstalments(world.scope, { loanId: loanBId }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(
+      updateLoan(world.scope, loanBId, { name: 'Hijacked' }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    await expect(deleteLoan(world.scope, loanBId)).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    await expect(
+      markInstalmentPaid(world.scope, {
+        loanId: loanBId,
+        sequence: 1,
+        transactionId: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(await listLoans(world.scope, { includeClosed: true })).toEqual([])
+    expect(await loanSnapshotOfB()).toEqual(before)
+  })
+
+  it('refuses a create parented onto another workspace’s account_id', async () => {
+    const before = await loanSnapshotOfB()
+
+    await expect(
+      createLoan(world.scope, {
+        name: 'Loan A',
+        accountId: 'acc-b',
+        currencyCode: 'PLN',
+        instalmentMinor: 50_00,
+        paymentDay: 10,
+        openedOn: '2026-01-01',
+        instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(await loanSnapshotOfB()).toEqual(before)
+    expect(await listLoans(world.scope, { includeClosed: true })).toEqual([])
+  })
+
+  it('reads calendar schedules only from its workspace, including closed loans and the requested book', async () => {
+    const ownBusiness = await createLoan(world.scope, {
+      name: 'Loan A business',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      book: 'business',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+    const ownPersonal = await createLoan(world.scope, {
+      name: 'Loan A personal',
+      currencyCode: 'PLN',
+      instalmentMinor: 30_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      book: 'personal',
+      instalments: [{ dueOn: '2026-04-10', amountMinor: 30_00 }],
+    })
+    await updateLoan(world.scope, ownPersonal.id, { status: 'closed' })
+
+    const all = await listCalendarInstalments(world.scope, {
+      today: '2026-03-01',
+    })
+    expect(all.map((row) => row.loanId).sort()).toEqual(
+      [ownBusiness.id, ownPersonal.id].sort(),
+    )
+    expect(all.find((row) => row.loanId === ownBusiness.id)).toMatchObject({
+      derivedStatus: 'overdue',
+      refAmountMinor: 50_00,
+    })
+    const personal = await listCalendarInstalments(world.scope, {
+      today: '2026-03-01',
+      book: 'personal',
+    })
+    expect(personal).toHaveLength(1)
+    expect(personal[0]).toMatchObject({
+      loanId: ownPersonal.id,
+      derivedStatus: 'upcoming',
+      refAmountMinor: 30_00,
+    })
+    expect(JSON.stringify(all)).not.toContain(loanBId)
+    const other = await listCalendarInstalments(world.otherScope, {
+      today: '2026-03-01',
+      book: 'business',
+    })
+    expect(other.map((row) => row.loanId)).toEqual([loanBId, loanBId])
+    await expect(
+      listCalendarInstalments(world.scope, { today: 'not-a-date' }),
+    ).rejects.toThrow()
+  })
+
+  it('refuses to settle its own instalment with another workspace’s transaction', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    await expect(
+      markInstalmentPaid(world.scope, {
+        loanId: own.id,
+        sequence: 1,
+        transactionId: 'tx-b-loan',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const [instalment] = await listInstalments(world.scope, { loanId: own.id })
+    expect(instalment).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+    })
+  })
+
+  it('lists only its own settled transaction ids', async () => {
+    await markInstalmentPaid(world.otherScope, {
+      loanId: loanBId,
+      sequence: 1,
+      transactionId: 'tx-b-loan',
+    })
+
+    expect([...(await listSettledTransactionIds(world.scope))]).toEqual([])
+    expect([...(await listSettledTransactionIds(world.otherScope))]).toEqual([
+      'tx-b-loan',
+    ])
+  })
+
+  it('refuses to re-parent its own loan onto another workspace’s account_id', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    await expect(
+      updateLoan(world.scope, own.id, { accountId: 'acc-b' }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect((await getLoan(world.scope, own.id)).accountId).toBeNull()
+  })
+
+  it('never lists another workspace’s loan, even under an identical name', async () => {
+    await createLoan(world.scope, {
+      name: 'Loan B',
+      lender: 'Lender B',
+      currencyCode: 'PLN',
+      instalmentMinor: 100_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      book: 'business',
+      instalments: [...schedule],
+    })
+
+    const mine = await listLoans(world.scope)
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.id).not.toBe(loanBId)
+    expect(JSON.stringify(mine)).not.toContain(loanBId)
   })
 })

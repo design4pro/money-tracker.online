@@ -215,6 +215,56 @@ describe('the first occurrence never precedes the start date', () => {
   })
 })
 
+describe('an annual series can be anchored on a month other than the start date’s', () => {
+  it('falls in the named month of the starting year when that date has not gone by', () => {
+    expect(
+      nextDueDates({
+        frequency: 'annual',
+        anchorDay: 10,
+        anchorMonth: 11,
+        startDate: '2026-03-15',
+        count: 3,
+      }),
+    ).toEqual(['2026-11-10', '2027-11-10', '2028-11-10'])
+  })
+
+  it('steps a year when the named month-and-day has already gone by', () => {
+    expect(
+      nextDueDates({
+        frequency: 'annual',
+        anchorDay: 10,
+        anchorMonth: 11,
+        startDate: '2026-11-20',
+        count: 2,
+      }),
+    ).toEqual(['2027-11-10', '2028-11-10'])
+  })
+
+  it('keeps the start date’s month when no yearly month is set', () => {
+    expect(
+      nextDueDates({
+        frequency: 'annual',
+        anchorDay: 10,
+        anchorMonth: null,
+        startDate: '2026-03-15',
+        count: 2,
+      }),
+    ).toEqual(['2027-03-10', '2028-03-10'])
+  })
+
+  it('is ignored on a monthly series, even if a leftover month is present', () => {
+    expect(
+      nextDueDates({
+        frequency: 'monthly',
+        anchorDay: 20,
+        anchorMonth: 11,
+        startDate: '2026-03-15',
+        count: 3,
+      }),
+    ).toEqual(['2026-03-20', '2026-04-20', '2026-05-20'])
+  })
+})
+
 describe('quarterly, semi-annual and annual step by their own number of months', () => {
   it.each([
     ['quarterly' as const, ['2026-02-10', '2026-05-10', '2026-08-10']],

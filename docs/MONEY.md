@@ -198,6 +198,12 @@ report change every morning.
 Reports sum `ref_amount_minor`. A report that recomputes a conversion is a defect, and a code review
 that lets one through is the review's failure.
 
+Loan reference amounts, including imported instalments, are anchored to the loan's `opened_on`,
+not the instalments' future `due_on`. The opening rate follows §2.3, including its look-back limit;
+a future opening date without an available rate is refused. `opened_on` is immutable. Editing a
+loan amount uses its stored `rate_e10` (§3.2), leaving other reference amounts and the schedule
+unchanged even when catalogue rates have since been back-filled.
+
 The two legitimate ways `ref_amount_minor` changes:
 
 - The transaction itself is edited (its amount, its currency or its `booked_on`), in which case the
@@ -473,16 +479,20 @@ transactions are converted to UTC".
 3. **The `date` column of every snapshot, period and aggregate** — a calendar date, never an
    instant, never an ISO string with a `T` in it.
 
-### 6.4 The person's timezone is applied at render, and only there
+### 6.4 Timezone shapes the civil clock, not the date grid
 
-`organization_settings.timezone` and the person's own preference affect:
+`organization_settings.timezone` (default `Europe/Warsaw` when the row is missing) and the person's
+own preference affect:
 
 - The **default** `booked_on` on a new transaction form.
 - The rendering of _instants_ (`created_at`, audit trail entries, "2 hours ago").
-- The moment a cron-driven reminder is considered due.
+- Cron "today" for due and overdue (`cronToday`): the workspace civil day in that timezone. It is
+  not a report bucket and it is not `toISOString().slice(0, 10)` in UTC — around midnight a Warsaw
+  household would otherwise see the previous UTC date.
 
 They affect **nothing** about how a stored calendar date is bucketed, summed or charted. A workspace
-that changes its timezone sees no report change, and that is correct.
+that changes its timezone sees no report change, and that is correct. `booked_on` stays a
+timezone-free calendar date (§6.1).
 
 ### 6.5 `booked_at` orders, it does not date
 

@@ -5,6 +5,7 @@ import { isFileDropItem } from 'react-aria-components/useDragAndDrop'
 import { Paperclip } from 'lucide-react'
 
 import { Button, ProgressBar } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { uploadAttachment } from '#/server/fns/attachments'
 
@@ -151,10 +152,7 @@ export function AttachmentDropzone({
         key,
         name: file.name,
         status: 'error',
-        message:
-          error instanceof Error
-            ? error.message
-            : t('attachments.error.failed'),
+        message: t(failureOf(error).message.key),
       })
     }
   }

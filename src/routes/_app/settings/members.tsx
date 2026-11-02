@@ -24,6 +24,7 @@ import {
   TableHeader,
   toast,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { UNLIMITED } from '#/lib/plans'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatCalendarDate, formatNumber } from '#/lib/i18n/format'
@@ -85,13 +86,12 @@ function MembersSkeleton() {
   )
 }
 
-function MembersError({ error, reset }: { error: Error; reset: () => void }) {
+function MembersError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('members.error.title')}
       body={t('empty.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -121,6 +121,8 @@ function MembersRoute() {
   const seatsLeft = members.seatLimit - members.seatsUsed
   const close = () => setPending({ kind: 'none' })
   const refresh = () => void router.invalidate()
+  const reportFailure = (error: unknown) =>
+    toast.error(t(failureOf(error).message.key))
 
   const day = (value: Date) => formatCalendarDate(locale, utcDay(value))
   const seatLimitLabel =
@@ -225,9 +227,7 @@ function MembersRoute() {
                         onChangeRole={(role) => {
                           void changeMemberRole({
                             data: { memberId: person.memberId, role },
-                          }).then(refresh, (error: Error) => {
-                            toast.error(error.message)
-                          })
+                          }).then(refresh, reportFailure)
                         }}
                         onRemove={() =>
                           setPending({ kind: 'remove', member: person })
@@ -360,10 +360,6 @@ function MembersRoute() {
       />
     </div>
   )
-}
-
-function reportFailure(error: unknown): void {
-  toast.error(error instanceof Error ? error.message : String(error))
 }
 
 /**

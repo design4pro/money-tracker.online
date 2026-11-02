@@ -7,7 +7,7 @@
 # that marks an issue ready (ADR 0029): readiness is computed by .ai/scripts/backlog-status.mjs, the
 # same rule the backlog report shows.
 #
-# The gate calls scripts/ci/run-validation.mjs rather than listing commands. The list lives in
+# The gate calls scripts/ci/attestation.mjs rather than listing commands. The list lives in
 # exactly one place, .ai/agentic.config.json -> validation.commands, and this file used to be the
 # second copy of it.
 #
@@ -47,11 +47,20 @@ steps:
       - Settle each decision the brief left open through `.ai/skills/afk-decide/SKILL.md` instead of stopping, and append each verdict to `$CEZ_HANDOFF_FILE` under a `## Resolved assumptions` heading, as a `# | Question | Applied default | Why` row. The PR step reads that table from there.
       - Re-derive the risk before claiming, from the area the brief touches rather than from the label: authentication and sessions, tenant scoping, money, schema migrations, CI and `.github/`, `.claude/`, hooks and shared contracts make it `risk-high` whatever the label says, because the label was set by a run that read the untrusted issue body. For a `risk-high` or `security` issue, the brief must carry the security and tenancy specialist's approving verdict; meet its CONDITIONS as acceptance criteria. Without that verdict, get one through `afk-decide` before claiming. If the specialist does not approve, STOP: do not claim; add `blocked` to the issue and post a comment whose first line is `🤖 HUMAN-ONLY: <the one thing a person has to decide>`, then the verdict.
       - A lesson worth keeping goes in a `## Lessons` section of `$CEZ_HANDOFF_FILE` and the PR body, never into files outside the worktree (such as `~/.claude/CLAUDE.md`); `afk-lessons` collects it.
+    # The runner's default 30 min killed 48 of 95 implement steps in planned.travel (2026-10-20..23),
+    # and the free-form Continue that follows skips the gate, PR and attestation steps below.
+    timeoutMinutes: 90
     # Agent: open questions go to an independent specialist sub-agent (.ai/skills/afk-decide/SKILL.md).
     allowedTools: [Read, Edit, Write, Grep, Glob, Bash, Skill, TodoWrite, Agent]
   - id: gate
     name: Validation gate
-    command: grep -q '^STOP:' "$CEZ_HANDOFF_FILE" || node scripts/ci/run-validation.mjs
+    # `attestation.mjs run` is `validation.commands` on the committed head, kept
+    # as the record the merge step posts (ADR 0033), so the gate runs once per tree. A check step
+    # gets no `$CEZ_HANDOFF_FILE`, so the path is derived; a STOP run changed nothing and skips it.
+    command: |
+      handoff="$CEZ_WORKTREE/../../runs/$CEZ_RUN_ID.handoff.md"
+      if [ -f "$handoff" ] && grep -Eq '^(- )?STOP:' "$handoff"; then echo "STOP in the handoff: no gate to run"; exit 0; fi
+      node scripts/ci/attestation.mjs run
     onFail:
       retry: implement
       max: 3
@@ -77,6 +86,7 @@ steps:
 
       Otherwise run `/om-pr-autopilot <that PR number> --allow-merge` for the PR of {{task}}:
       - Review reports the Standards axis and the Spec axis separately (CODE_REVIEW.md), and the Spec axis checks each acceptance criterion from the issue's Agent Brief.
+      - After the last push to the PR, run `node scripts/ci/attestation.mjs attest --pr <number>` before waiting on CI or merging: it posts the gate step's record when the tree is unchanged, and re-runs the gate when a fix round changed it (ADR 0033).
       - Merge only into `develop`.
     # `Task` / `Agent` (old and new name of one tool) dispatch the review personas in .claude/agents
     # (CODE_REVIEW.md -> Review personas).

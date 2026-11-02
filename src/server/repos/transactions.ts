@@ -29,7 +29,17 @@
  * leg of an `internal` transfer so a paired delete cannot be bypassed before plan `10` exists.
  */
 
-import { count, eq, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
+import {
+  count,
+  eq,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -47,6 +57,7 @@ import {
   TRANSACTION_DIRECTIONS,
   accounts,
   categories,
+  loanInstalments,
   payees,
   transactions,
 } from '#/server/db/schema'
@@ -833,12 +844,13 @@ export interface DeleteTransactionArgs extends TransactionScopeArgs {
 }
 
 /**
- * Deletes one transaction, refusing the two cases where a single-row delete is the wrong operation.
+ * Deletes one transaction, refusing cases where its links must be cleared first.
  *
  * A refund-linked row would leave a `refunds` row pointing at nothing, and a leg of an `internal`
  * transfer would leave the other leg as half a movement — a transfer's delete is paired, and it is
  * plan `10`'s. Both refuse with a {@link ConflictError} naming what to do first, rather than
  * cascading a deletion the person did not ask for.
+ * A paid loan instalment must likewise be reverted before its settling transaction is deleted.
  */
 export async function deleteTransaction(
   args: DeleteTransactionArgs,
@@ -857,9 +869,24 @@ export async function deleteTransaction(
     )
   }
 
+  const paidInstalments = scope.db
+    .select({
+      loanId: loanInstalments.loanId,
+      sequence: loanInstalments.sequence,
+    })
+    .from(loanInstalments)
+    .where(
+      tenantFilter(
+        scope,
+        loanInstalments,
+        eq(loanInstalments.settledTransactionId, id),
+        eq(loanInstalments.status, 'paid'),
+      ),
+    )
   const predicates: Array<SQL> = [
     eq(transactions.id, id),
     ...applyPolicies(policies),
+    notExists(paidInstalments),
   ]
   assertScopedWrite(predicates)
 
@@ -870,6 +897,12 @@ export async function deleteTransaction(
 
   const deleted = rows.at(0)
   if (deleted === undefined) {
+    const [bound] = await paidInstalments.limit(1)
+    if (bound !== undefined) {
+      throw new ConflictError(
+        `Transaction ${id} settles instalment ${bound.sequence} of loan ${bound.loanId}; revert the instalment before deleting the transaction.`,
+      )
+    }
     throw new NotFoundError('transaction', id)
   }
   touchLedgerAccount(deleted.accountId)

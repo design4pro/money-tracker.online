@@ -8,6 +8,7 @@ import { useTranslate } from '#/lib/i18n'
 import {
   createAccountGroup,
   deleteAccountGroup,
+  moveAccountToGroup,
   reorderAccountGroups,
   updateAccountGroup,
 } from '#/server/fns/accounts'
@@ -15,12 +16,18 @@ import {
 import { GroupDeleteDialog } from './group-delete-dialog'
 import { GroupFormDialog } from './group-form-dialog'
 import { refusalFor } from './group-refusal'
-import { buildEntries, focusKeyAfterDelete, groupKey } from './group-rows'
+import {
+  buildEntries,
+  focusKeyAfterDelete,
+  groupKey,
+  memberKey,
+} from './group-rows'
 import { GroupEmptyState } from './group-states'
 import { GroupTree } from './group-tree'
 
 import type { MessageKey } from '#/lib/i18n'
 import type { TreeMove } from '#/components/app/tree'
+import type { MoveAccountToGroupInput } from '#/server/repos/accounts'
 
 import type { GroupFormValues } from './group-form-dialog'
 import type { GroupItem } from './group-rows'
@@ -67,6 +74,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
 
   const [pending, setPending] = useState<Pending>({ kind: 'none' })
   const [refusal, setRefusal] = useState<MessageKey | null>(null)
+  const [accountAnnouncement, setAccountAnnouncement] = useState('')
   // The row (or `null`: the "New group" button) to focus once the loader has caught up.
   const [focusRequest, setFocusRequest] = useState<
     { readonly key: string | null } | undefined
@@ -76,18 +84,23 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   const createSlotRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (focusRequest === undefined) return
-    const target =
-      focusRequest.key === null
-        ? createSlotRef.current?.querySelector('button')
-        : treeRef.current?.querySelector<HTMLElement>(
-            `[data-key="${focusRequest.key}"]`,
-          )
-    if (target) {
-      target.focus()
-      setFocusRequest(undefined)
-    }
-  }, [focusRequest, groups])
+    if (focusRequest === undefined || pending.kind !== 'none') return
+    if (focusRequest.key === null && groups.length !== 0) return
+    // Let the collection finish restoring focus after removing the old row first.
+    const frame = requestAnimationFrame(() => {
+      const target =
+        focusRequest.key === null
+          ? createSlotRef.current?.querySelector('button')
+          : treeRef.current?.querySelector<HTMLElement>(
+              `[data-key="${focusRequest.key}"]`,
+            )
+      if (target) {
+        target.focus()
+        setFocusRequest(undefined)
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [focusRequest, groups, pending.kind])
 
   const close = () => setPending({ kind: 'none' })
   const byId = new Map(groups.map((group) => [group.id, group]))
@@ -144,6 +157,51 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
     setFocusRequest({ key: groupKey(move.id) })
     await refresh()
     if (isReparented) announceReparent(current.name, move.parentId)
+    return true
+  }
+
+  async function applyAccountMove(
+    move: MoveAccountToGroupInput,
+  ): Promise<boolean> {
+    const source = groups.find((group) => group.id === move.fromGroupId)
+    const account = source?.accounts.find(
+      (member) => member.id === move.accountId,
+    )
+    if (source === undefined || account === undefined) return false
+    const entries = buildEntries(groups)
+    const key = memberKey(source.id, account.id)
+    const index = entries.findIndex((entry) => entry.key === key)
+    const nextKey =
+      move.toGroupId === null
+        ? ((entries[index + 1] ?? entries[index - 1])?.key ?? null)
+        : memberKey(move.toGroupId, account.id)
+    try {
+      await moveAccountToGroup({ data: move })
+    } catch (error) {
+      refuse(error)
+      return false
+    }
+    setRefusal(null)
+    await refresh()
+    setFocusRequest({ key: nextKey })
+    const target = groups.find((group) => group.id === move.toGroupId)
+    const destination = target ?? source
+    const parent = groups.find((group) => group.id === destination.parentId)
+    const groupName =
+      parent === undefined
+        ? destination.name
+        : t('accounts.groups.member.destination', {
+            name: destination.name,
+            parent: parent.name,
+          })
+    setAccountAnnouncement(
+      t(
+        target === undefined
+          ? 'accounts.groups.member.removed'
+          : 'accounts.groups.member.moved',
+        { account: account.name, group: groupName },
+      ),
+    )
     return true
   }
 
@@ -244,6 +302,9 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
           />
         )}
       </div>
+      <div role="status" aria-live="polite" className="sr-only">
+        {accountAnnouncement}
+      </div>
 
       {groups.length === 0 ? (
         <GroupEmptyState
@@ -265,6 +326,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
               if (group !== undefined) setPending({ kind: 'delete', group })
             }}
             onMove={applyMove}
+            onMoveAccount={applyAccountMove}
           />
         </div>
       )}

@@ -41,6 +41,6 @@ describe('ToastHost', () => {
     // has to be important to apply at all. jsdom lays nothing out; the measured
     // box is asserted in `e2e/toast-close-button.spec.ts`.
     expect(close.classList.contains('size-11!')).toBe(true)
-    expect(title.parentElement?.classList.contains('pe-7')).toBe(true)
+    expect(title.parentElement?.classList.contains('pe-8')).toBe(true)
   })
 })

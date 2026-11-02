@@ -81,6 +81,40 @@ env:
   VITE_ENVIRONMENT: ci
 
 jobs:
+  # Whether an agent already ran the validation gate on exactly this tree, so that `verify` and
+  # `test` below can be skipped on a pull request (ADR 0033); the e2e legs always run. Pull requests
+  # only; a push to `develop` or `main` runs everything, and the deploys wait on it. `valid` is
+  # `true` only for a record scripts/ci/attestation.mjs accepts; anything else -
+  # no comment, another tree, a diff that touches the gate itself, an error here - leaves the jobs to
+  # run as before. GitHub-hosted, the one exception to ADR 0022: seconds of API calls, no artifact,
+  # and on the two `ci` slots it would queue behind the jobs it exists to skip.
+  attestation:
+    name: agent attestation
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      valid: ${{ steps.judge.outputs.valid }}
+    steps:
+      # The pull request's own head, not the merge commit: the attestation is of the tree the
+      # agent ran the gate on.
+      - name: Check out the head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Judge the attestation
+        id: judge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: node scripts/ci/attestation.mjs verify
+
   # Has this tree already passed? Only a push can have an earlier verdict, and after a queue merge
   # it always does: the queue ran these same checks on the commit it then moved `develop` to, so the
   # suite below would be judging a commit it has already judged. A promotion into `main` carries the
@@ -147,7 +181,7 @@ jobs:
 
   # Rungs 1-5 plus the build, in ladder order.
   verify:
-    needs: verdict
+    needs: [verdict, attestation]
     name: generated · typecheck · lint · build
     # A develop→main (or main→develop) pull request duplicates the push-triggered
     # run on the same commits; the push run is canonical for the shared branches.
@@ -155,8 +189,9 @@ jobs:
     # `verdict` is skipped on every event but a push, and a skipped job's output is empty, so the
     # first clause only ever stands down when a real earlier run said this tree passed. `!cancelled()`
     # rather than the implicit `success()`, which would read the skipped `verdict` as a reason to skip
-    # this too (design4pro/planned.travel#531).
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && !github.event.pull_request.draft && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
+    # this too (design4pro/planned.travel#531). The same holds for `attestation`, skipped on a push:
+    # a valid one skips this job on a pull request (ADR 0033).
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && needs.attestation.outputs.valid != 'true' && !github.event.pull_request.draft && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 20
 
@@ -269,10 +304,10 @@ jobs:
   # suite is CPU-bound and independent of the build, so running the two in
   # parallel is the whole gate's critical path minus whichever is shorter.
   test:
-    needs: verdict
+    needs: [verdict, attestation]
     name: unit tests · coverage
-    # Same two clauses as `verify` above, for the same two reasons.
-    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && !github.event.pull_request.draft && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
+    # Same clauses as `verify` above, for the same reasons.
+    if: ${{ !cancelled() && needs.verdict.outputs.verified != 'true' && needs.attestation.outputs.valid != 'true' && !github.event.pull_request.draft && (github.event_name != 'pull_request' || !contains(fromJSON('["develop","main"]'), github.event.pull_request.head.ref)) }}
     runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 20
 

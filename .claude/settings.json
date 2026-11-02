@@ -6,7 +6,45 @@
       "Bash(gh pr review:*)",
       "Bash(gh pr comment:*)",
       "Bash(gh run view:*)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue edit:*)",
+      "Bash(gh issue comment:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr ready:*)",
+      "Bash(gh project item-edit:*)",
+      "Bash(gh project item-list:*)",
+      "Bash(gh api:*)",
+      "Bash(git worktree:*)",
+      "Bash(.claude/bin/super-board-card.sh:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(git blame:*)",
+      "Bash(mkdir:*)",
+      "Bash(pgrep:*)",
+      "Bash(node --check:*)",
+      "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
+      "Bash(bash .claude/bin/super-board-preflight.sh:*)",
+      "Bash(bash .claude/bin/super-board-usage.sh:*)",
+      "Bash(bash .claude/bin/super-board-throttle.sh:*)",
+      "Bash(bash .claude/bin/super-board-codex-lane.sh:*)",
+      "Bash(bash .claude/bin/super-board-codex-wave.sh:*)",
+      "Bash(bash .claude/bin/super-board-host.sh:*)",
+      "Bash(bash .claude/bin/super-board-pr-body.sh:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(pnpm db:migrate:local)",
+      "Bash(bash .claude/bin/super-board-env-check.sh:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm e2e:*)"
     ],
     "ask": [
       "Edit(/worker-configuration.d.ts)",
@@ -62,6 +100,41 @@
             "statusMessage": "Checking UI changes"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-worktree-path.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-delete-outside.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-protected-push.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-secrets.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-key-literals.py"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -71,6 +144,15 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-file.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-key-literals.py"
           }
         ]
       }
@@ -83,6 +165,16 @@
             "command": "[ ! -f \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs\" ] || node \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs\"",
             "timeout": 30,
             "statusMessage": "Design deep pass"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 .claude/hooks/cleanup-wt.py --auto --fetch 2>/dev/null || true"
           }
         ]
       }

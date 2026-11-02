@@ -47,8 +47,10 @@ import { z } from 'zod'
 
 import { parseDate } from '@internationalized/date'
 
+import { BOOKS } from '#/lib/enums'
 import { asMinor } from '#/lib/money'
 import {
+  RECURRING_DUTY_CODES,
   RECURRING_FREQUENCIES,
   RECURRING_KINDS,
   RECURRING_MATCH_SOURCES,
@@ -67,6 +69,7 @@ import { newId } from '#/server/db/ids'
 import { member } from '#/server/db/auth-schema'
 
 import {
+  allOf,
   assertWithinLimit,
   createScope,
   createTenantRepository,
@@ -215,6 +218,8 @@ export type Termination = z.infer<typeof terminationSchema>
 export const listSeriesSchema = z.strictObject({
   /** Paused and completed series still hold history, so a screen asks for them explicitly. */
   includeInactive: z.boolean().default(false),
+  /** Omit to include both books. */
+  book: z.enum(BOOKS).optional(),
 })
 export type ListSeriesInput = z.input<typeof listSeriesSchema>
 
@@ -227,6 +232,8 @@ export const createSeriesSchema = z.strictObject({
   expectedCurrencyCode: currencySchema,
   frequency: z.enum(RECURRING_FREQUENCIES).default('monthly'),
   anchorDay: z.number().int().min(1).max(31).nullable().default(null),
+  anchorMonth: z.number().int().min(1).max(12).nullable().default(null),
+  dutyCode: z.enum(RECURRING_DUTY_CODES).nullable().default(null),
   startDate: z.iso.date(),
   termination: terminationSchema,
   accountId: idSchema.nullable().default(null),
@@ -237,6 +244,7 @@ export const createSeriesSchema = z.strictObject({
   remindBefore: remindBeforeSchema.default([]),
   notifyEmail: z.boolean().default(false),
   showInWidget: z.boolean().default(true),
+  book: z.enum(BOOKS).default('personal'),
 })
 export type CreateSeriesInput = z.input<typeof createSeriesSchema>
 
@@ -255,6 +263,8 @@ export const updateSeriesSchema = z
     expectedAmountMinor: z.number().int().positive(),
     frequency: z.enum(RECURRING_FREQUENCIES),
     anchorDay: z.number().int().min(1).max(31).nullable(),
+    anchorMonth: z.number().int().min(1).max(12).nullable(),
+    dutyCode: z.enum(RECURRING_DUTY_CODES).nullable(),
     termination: terminationSchema,
     accountId: idSchema.nullable(),
     categoryId: idSchema.nullable(),
@@ -264,6 +274,7 @@ export const updateSeriesSchema = z
     remindBefore: remindBeforeSchema,
     notifyEmail: z.boolean(),
     showInWidget: z.boolean(),
+    book: z.enum(BOOKS),
   })
   .partial()
 export type UpdateSeriesInput = z.input<typeof updateSeriesSchema>
@@ -289,6 +300,7 @@ export const upcomingSchema = z.strictObject({
   /** How many days forward to look. Overdue periods are always included, however old. */
   within: z.number().int().min(0).max(365).default(30),
   limit: z.number().int().positive().max(200).default(50),
+  book: z.enum(BOOKS).optional(),
 })
 export type UpcomingInput = z.input<typeof upcomingSchema>
 
@@ -590,10 +602,22 @@ export async function listSeries(
   input: ListSeriesInput = {},
 ): Promise<ReadonlyArray<RecurringSeries>> {
   const parsed = listSeriesSchema.parse(input)
+  const whereParts: Array<ReturnType<typeof eq>> = []
+  if (!parsed.includeInactive) {
+    whereParts.push(eq(recurringSeries.isActive, true))
+  }
+  if (parsed.book !== undefined) {
+    whereParts.push(eq(recurringSeries.book, parsed.book))
+  }
   const rows = await seriesRepo.findMany(scope, {
-    ...(parsed.includeInactive
+    ...(whereParts.length === 0
       ? {}
-      : { where: eq(recurringSeries.isActive, true) }),
+      : {
+          where:
+            whereParts.length === 1
+              ? whereParts[0]
+              : allOf(whereParts[0]!, ...whereParts.slice(1)),
+        }),
     // Live series first, then by name — `collate nocase` so "Netflix" and "netflix" sort
     // together rather than in two blocks.
     orderBy: [
@@ -753,6 +777,9 @@ export async function getUpcoming(
         recurringSeries,
         eq(recurringSeries.id, recurringPeriods.seriesId),
         eq(recurringSeries.isActive, true),
+        parsed.book === undefined
+          ? undefined
+          : eq(recurringSeries.book, parsed.book),
       ),
     )
     .where(
@@ -831,6 +858,11 @@ export interface SeriesLink {
   readonly bookedOn: string
   readonly amountMinor: Minor
   readonly currencyCode: string
+  /** `amount_minor` is never negative: which way the money moved is this column (MONEY.md §1). */
+  readonly direction: TransactionDirection
+  readonly isPlanned: boolean
+  readonly isBalanceAdjustment: boolean
+  readonly transferKind: string
   readonly note: string | null
 }
 
@@ -855,6 +887,10 @@ export async function listSeriesLinkDetails(
       bookedOn: transactions.bookedOn,
       amountMinor: transactions.amountMinor,
       currencyCode: transactions.currencyCode,
+      direction: transactions.direction,
+      isPlanned: transactions.isPlanned,
+      isBalanceAdjustment: transactions.isBalanceAdjustment,
+      transferKind: transactions.transferKind,
       note: transactions.note,
     })
     .from(recurringLinks)
@@ -876,6 +912,10 @@ export async function listSeriesLinkDetails(
     bookedOn: row.bookedOn,
     amountMinor: asMinor(row.amountMinor),
     currencyCode: row.currencyCode,
+    direction: row.direction as TransactionDirection,
+    isPlanned: row.isPlanned,
+    isBalanceAdjustment: row.isBalanceAdjustment,
+    transferKind: row.transferKind,
     note: row.note,
   }))
 }
@@ -915,6 +955,8 @@ export async function createSeries(
     expectedCurrencyCode: parsed.expectedCurrencyCode,
     frequency: parsed.frequency,
     anchorDay: parsed.anchorDay,
+    anchorMonth: parsed.frequency === 'annual' ? parsed.anchorMonth : null,
+    dutyCode: parsed.dutyCode,
     startDate: parsed.startDate,
     ...terminationColumns(parsed.termination),
     accountId: parsed.accountId,
@@ -928,6 +970,7 @@ export async function createSeries(
     remindBefore: JSON.stringify(parsed.remindBefore),
     notifyEmail: parsed.notifyEmail,
     showInWidget: parsed.showInWidget,
+    book: parsed.book,
     isActive: true,
     createdAt: now,
     updatedAt: now,
@@ -979,6 +1022,17 @@ export async function updateSeries(
       ...(parsed.anchorDay === undefined
         ? {}
         : { anchorDay: parsed.anchorDay }),
+      ...(parsed.anchorMonth === undefined && parsed.frequency === undefined
+        ? {}
+        : {
+            anchorMonth:
+              (parsed.frequency ?? existing.frequency) === 'annual'
+                ? parsed.anchorMonth === undefined
+                  ? existing.anchorMonth
+                  : parsed.anchorMonth
+                : null,
+          }),
+      ...(parsed.dutyCode === undefined ? {} : { dutyCode: parsed.dutyCode }),
       ...(parsed.termination === undefined
         ? {}
         : terminationColumns(parsed.termination)),
@@ -1009,6 +1063,7 @@ export async function updateSeries(
       ...(parsed.showInWidget === undefined
         ? {}
         : { showInWidget: parsed.showInWidget }),
+      ...(parsed.book === undefined ? {} : { book: parsed.book }),
       updatedAt: new Date(),
     }),
   )

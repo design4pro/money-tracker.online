@@ -36,7 +36,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }))
 vi.mock('../rule-editor', () => ({
   ruleEditorReference: () => ({ categories: [], payees: [], tags: [] }),
-  RuleEditor: ({ saveError, onSave }: RuleEditorProps) => (
+  RuleEditor: ({ saveFailure, onSave }: RuleEditorProps) => (
     <div>
       <button
         type="button"
@@ -52,7 +52,9 @@ vi.mock('../rule-editor', () => ({
       >
         save
       </button>
-      {saveError === null ? null : <p data-testid="save-error">{saveError}</p>}
+      {saveFailure === null ? null : (
+        <p data-testid="save-error">{saveFailure.kind}</p>
+      )}
     </div>
   ),
 }))
@@ -104,7 +106,7 @@ describe('/transactions/rules/new, a refused save', () => {
       await saveWith(envelopeError(kind))
 
       const line = await screen.findByTestId('save-error')
-      expect(line.textContent).toBe('This could not be completed.')
+      expect(line.textContent).toBe(kind)
       expect(
         screen.queryByRole('heading', { name: en['rules.empty.locked.title'] }),
       ).toBeNull()

@@ -4,6 +4,7 @@ import { Plus, Search } from 'lucide-react'
 import { z } from 'zod'
 
 import {
+  ForecastPanel,
   RECURRING_PANES,
   RecurringEmptyState,
   RecurringListSkeleton,
@@ -30,6 +31,8 @@ import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 import { MarkPaidDialog } from './-ui/mark-paid-dialog'
 import { SeriesActionsMenu } from './-ui/series-actions-menu'
 import { SeriesFormDialog } from './-ui/series-form-dialog'
+
+import { BOOKS } from '#/lib/enums'
 
 import type { RecurringSeries } from '#/server/db/types'
 import type { SeriesListRow } from '#/server/fns/recurring'
@@ -69,18 +72,25 @@ import { pageHead } from '#/routes/-lib/page-title'
 
 const searchSchema = z.object({
   status: z.enum(['active', 'all']).default('active'),
+  book: z.enum(['all', ...BOOKS]).default('all'),
   markPaid: z.iso.date().optional().catch(undefined),
   series: z.string().trim().min(1).max(64).optional().catch(undefined),
 })
 
 type StatusFilter = z.infer<typeof searchSchema>['status']
+type BookFilter = z.infer<typeof searchSchema>['book']
 
 export const Route = createFileRoute('/_app/recurring/')({
   validateSearch: searchSchema,
-  loaderDeps: ({ search }) => ({ status: search.status }),
+  loaderDeps: ({ search }) => ({ status: search.status, book: search.book }),
   loader: async ({ deps }) => {
     const [overview, accounts, categories, payees] = await Promise.all([
-      loadRecurring({ data: { includeInactive: deps.status === 'all' } }),
+      loadRecurring({
+        data: {
+          includeInactive: deps.status === 'all',
+          ...(deps.book === 'all' ? {} : { book: deps.book }),
+        },
+      }),
       listAccounts({ data: {} }),
       listCategories({ data: {} }),
       listPayees({ data: {} }),
@@ -93,19 +103,12 @@ export const Route = createFileRoute('/_app/recurring/')({
   component: RecurringListRoute,
 })
 
-function RecurringListError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function RecurringListError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('recurring.error.title')}
       body={t('recurring.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -138,7 +141,7 @@ function markPaidPending(
 function RecurringListRoute() {
   const t = useTranslate()
   const { overview, accounts, categories, payees } = Route.useLoaderData()
-  const { status, markPaid, series: markPaidSeries } = Route.useSearch()
+  const { status, book, markPaid, series: markPaidSeries } = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()
   const refreshCaches = useDataRefresh()
@@ -156,16 +159,16 @@ function RecurringListRoute() {
   const close = () => {
     setPending({ kind: 'none' })
     if (markPaid !== undefined || markPaidSeries !== undefined) {
-      void navigate({ search: { status }, replace: true })
+      void navigate({ search: { status, book }, replace: true })
     }
   }
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
-  const baseCurrencyCode =
-    overview.rows.at(0)?.series.expectedCurrencyCode ?? 'PLN'
+  const baseCurrencyCode = accounts.overview.baseCurrencyCode
   const currencyOptions = [
     ...new Set([
       baseCurrencyCode,
+      ...accounts.accounts.map((account) => account.currencyCode),
       ...overview.rows.map((row) => row.series.expectedCurrencyCode),
     ]),
   ]
@@ -221,7 +224,7 @@ function RecurringListRoute() {
         </div>
       </header>
 
-      {overview.rows.length === 0 && status === 'active' ? (
+      {overview.rows.length === 0 && status === 'active' && book === 'all' ? (
         <RecurringEmptyState
           onCreate={() => setPending({ kind: 'form', series: null })}
           onDetect={() => void navigate({ to: '/recurring/candidates' })}
@@ -239,6 +242,10 @@ function RecurringListRoute() {
         */
         <div className={RECURRING_PANES}>
           <div className="flex min-w-0 flex-col gap-6">
+            {overview.rows.length === 0 ? null : (
+              <ForecastPanel forecasts={overview.forecast} />
+            )}
+
             <SegmentedFilter
               label={t('recurring.filter.label')}
               value={status}
@@ -247,7 +254,19 @@ function RecurringListRoute() {
                 { id: 'all', label: t('recurring.filter.all') },
               ]}
               onChange={(next: StatusFilter) => {
-                void navigate({ search: { status: next } })
+                void navigate({ search: { status: next, book } })
+              }}
+            />
+            <SegmentedFilter
+              label={t('book.filter.label')}
+              value={book}
+              options={[
+                { id: 'all', label: t('book.filter.all') },
+                { id: 'business', label: t('book.business') },
+                { id: 'personal', label: t('book.personal') },
+              ]}
+              onChange={(next: BookFilter) => {
+                void navigate({ search: { status, book: next } })
               }}
             />
 

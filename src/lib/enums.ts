@@ -148,6 +148,17 @@ export const RECURRING_FREQUENCIES = [
 ] as const
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number]
 
+/**
+ * A Polish JDG due-date shape on a series, not a tax engine.
+ *
+ * The column is nullable: ordinary subscriptions carry none. The three codes name **when** the
+ * person chose to be reminded (the 20th / 20th / 25th), never an amount the product computed.
+ * Amounts stay human-entered. _Avoid_: treating this as a filing status or a liability to the
+ * tax office.
+ */
+export const RECURRING_DUTY_CODES = ['zus', 'pit', 'vat_7'] as const
+export type RecurringDutyCode = (typeof RECURRING_DUTY_CODES)[number]
+
 /** A goal is being saved for, has been reached, or has been put away. */
 export const SAVINGS_GOAL_STATUSES = ['active', 'reached', 'archived'] as const
 export type SavingsGoalStatus = (typeof SAVINGS_GOAL_STATUSES)[number]
@@ -339,3 +350,71 @@ export const NOTIFICATION_KIND_IDS = [
   'goal.reached',
 ] as const
 export type NotificationKind = (typeof NOTIFICATION_KIND_IDS)[number]
+
+/**
+ * Firma / Prywatne — which book a row belongs to inside one workspace.
+ *
+ * One workspace holds both, so a dashboard filter of "everything / business / personal" is a
+ * column, not a second tenant. The parallel recurring/cron PR imports this tuple from `#/lib/book`
+ * (a re-export) so neither change has to rewrite the other.
+ */
+export const BOOKS = ['business', 'personal'] as const
+export type Book = (typeof BOOKS)[number]
+
+/**
+ * What kind of borrowing a loan row is. Presentation and grouping, not a second engine.
+ *
+ * Polish product copy later says kredyt / leasing / pożyczka / inne; these are the stored values.
+ * `loan` here is the kind "pożyczka", not the table — the table is `loans` for every kind.
+ */
+export const LOAN_KINDS = ['credit', 'leasing', 'loan', 'other'] as const
+export type LoanKind = (typeof LOAN_KINDS)[number]
+
+/**
+ * Lifecycle of a borrowing in the register.
+ *
+ * `needs_review` is the spreadsheet's "do weryfikacji": the row is tracked, the terms are not
+ * trusted yet. `settled` is repaid; `closed` was written off or abandoned without a full payoff.
+ */
+export const LOAN_STATUSES = [
+  'active',
+  'settled',
+  'closed',
+  'needs_review',
+] as const
+export type LoanStatus = (typeof LOAN_STATUSES)[number]
+
+/**
+ * How the schedule's amounts were produced.
+ *
+ * `imported` is first-class: each instalment carries its own total, which is how a spreadsheet of
+ * declining or one-off amounts lands. `annuity` and `linear_principal` are the contract engine in
+ * `28-loans.md`; this schema stores the shape so that engine can write the same tables later.
+ */
+export const LOAN_REPAYMENT_SHAPES = [
+  'imported',
+  'annuity',
+  'linear_principal',
+] as const
+export type LoanRepaymentShape = (typeof LOAN_REPAYMENT_SHAPES)[number]
+
+/**
+ * Payment frequencies that divide a year into a whole number of periods.
+ *
+ * A narrowing of {@link RECURRING_FREQUENCIES}: a per-period nominal rate is the annual rate
+ * divided by the number of periods in a year, and a year does not contain a whole number of weeks.
+ */
+export const LOAN_PAYMENT_FREQUENCIES = [
+  'monthly',
+  'quarterly',
+  'semi_annual',
+  'annual',
+] as const satisfies ReadonlyArray<(typeof RECURRING_FREQUENCIES)[number]>
+export type LoanPaymentFrequency = (typeof LOAN_PAYMENT_FREQUENCIES)[number]
+
+/**
+ * Stored instalment lifecycle. Overdue is derived from `due_on` versus the day the question is
+ * asked, never stored — a stored overdue would freeze a calendar fact that moves every midnight.
+ */
+export const LOAN_INSTALMENT_STATUSES = ['upcoming', 'paid'] as const
+export type LoanInstalmentStatus = (typeof LOAN_INSTALMENT_STATUSES)[number]

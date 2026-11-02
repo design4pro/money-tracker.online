@@ -14,8 +14,8 @@
  *
  * - `members` — accepted memberships **plus pending invitations**. Counting only accepted members
  *   lets a five-seat workspace hold twenty outstanding invites and fill them all at once.
- * - `accounts`, `budgets`, `goals`, `rules`, `recurringSeries` — every row, archived and paused
- *   included: a ceiling that archiving resets is not a ceiling.
+ * - `accounts`, `budgets`, `goals`, `rules`, `recurringSeries`, `loans` — every row, archived,
+ *   paused, settled and closed included: a ceiling that archiving resets is not a ceiling.
  * - `currencies` — the workspace's held currencies, the base one among them.
  * - `transactions` — every row, planned included.
  * - `importsPerMonth` — batches created since the first of the current UTC month, which is the
@@ -29,6 +29,7 @@ import { invitation, member } from '#/server/db/auth-schema'
 import {
   accounts,
   budgets,
+  loans,
   organizationCurrencies,
   recurringSeries,
   rules,
@@ -61,6 +62,7 @@ const seriesAccess = createTenantTableAccess(
   recurringSeries,
   'recurring series',
 )
+const loanAccess = createTenantTableAccess(loans, 'loan')
 const transactionAccess = createTenantTableAccess(transactions, 'transaction')
 
 /**
@@ -97,6 +99,8 @@ export async function countMetric(
       return ruleAccess.count(scope)
     case 'recurringSeries':
       return seriesAccess.count(scope)
+    case 'loans':
+      return loanAccess.count(scope)
     case 'transactions':
       return transactionAccess.count(scope)
     case 'importsPerMonth':

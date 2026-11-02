@@ -172,7 +172,10 @@ if [ -f .dev.vars ] && ! head -1 .dev.vars | grep -qF "$DEV_VARS_MARKER"; then
     echo "test-env-up: WARNING its APP_URL is not $BASE_URL; auth may reject this origin" >&2
   fi
 else
-  printf '%s\nBETTER_AUTH_SECRET=%s\nAPP_URL=%s\n' "$DEV_VARS_MARKER" "$(openssl rand -base64 32)" "$BASE_URL" > .dev.vars
+  # UNSUBSCRIBE_TOKEN_SECRET is fixed, not random: e2e/unsubscribe.spec.ts mints
+  # tokens with the same key (and .github/actions/e2e-env writes it). A missing
+  # line makes every unsubscribe URL invalid by design.
+  printf '%s\nBETTER_AUTH_SECRET=%s\nAPP_URL=%s\nUNSUBSCRIBE_TOKEN_SECRET=e2e-unsubscribe-token-secret\n' "$DEV_VARS_MARKER" "$(openssl rand -base64 32)" "$BASE_URL" > .dev.vars
 fi
 
 # --- credentials file: references for consumers, demo-grade values only ----------

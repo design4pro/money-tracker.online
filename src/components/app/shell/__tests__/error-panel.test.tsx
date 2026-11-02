@@ -1,7 +1,7 @@
 /**
  * What `ErrorPanel` renders by default, and what each opt-in prop changes.
  *
- * Forty-one modules render the panel with no more than a title, a body, `detail` and `onRetry`, so
+ * Forty-one modules render the panel with no more than a title, a body and `onRetry`, so
  * the first block pins that render: the five opt-in props exist for `FailurePanel` and must change
  * nothing for anyone who does not pass them.
  */
@@ -78,15 +78,11 @@ describe('ErrorPanel default render', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('keeps the raw detail behind a disclosure that starts closed', () => {
-    const { container } = renderPanel(
-      <ErrorPanel title="Title" body="Body" detail="D1_ERROR: boom" />,
-    )
+  it('has no disclosure, so no thrown text has a place to appear', () => {
+    const { container } = renderPanel(<ErrorPanel title="Title" body="Body" />)
 
-    const details = container.querySelector('details')
-    expect(details).not.toBeNull()
-    expect(details?.open).toBe(false)
-    expect(details?.textContent).toContain('D1_ERROR: boom')
+    expect(container.querySelector('details')).toBeNull()
+    expect(screen.getByRole('alert').textContent).toBe('TitleBody')
   })
 
   it('leaves a sibling input untouched when Retry is pressed', async () => {

@@ -253,21 +253,32 @@ None.
 
 `06-S3` · Wave 2 · effort **M**.
 
+Delivered: 2026-11-01 - account groups (#640) in [PR #701](https://github.com/design4pro/money-tracker.online/pull/701),
+account membership moves (#641) in [PR #778](https://github.com/design4pro/money-tracker.online/pull/778),
+and the exact balance-adjustment preview (#642) in [PR #651](https://github.com/design4pro/money-tracker.online/pull/651);
+all merged into `develop`.
+
 ### Reference rows
 
-`ACCT-07 missing → done` — the balance adjustment as a real transaction.
-`ACCT-08 missing → done` — account groups, the tree, and membership.
+`ACCT-07 done` — the balance adjustment as a real transaction, with an exact preview for the booking date.
+`ACCT-08 done` — account groups, the tree, and membership; account ordering is not included.
 
 ### Owned paths
 
-- `src/server/repos/account-groups.ts` — new
-- `src/server/fns/account-groups.ts` — new
-- `src/server/accounts/adjust-balance.ts` — new
-- `src/routes/_app/accounts/groups.tsx` — new
-- `src/routes/_app/accounts/-ui/group-tree.tsx` — new
-- `src/routes/_app/accounts/-ui/adjust-balance-dialog.tsx` — new
-- `src/server/repos/__tests__/account-groups.test.ts` — new
-- `e2e/account-groups.visual.spec.ts` — new
+- `src/server/repos/accounts.ts` — groups, membership moves, balance read and adjustment
+- `src/server/fns/accounts.ts` — the corresponding server functions
+- `src/components/app/tree/` — shared group/category move calculations
+- `src/routes/_app/accounts/groups.tsx` — groups route
+- `src/routes/_app/accounts/-ui/groups-screen.tsx` — screen orchestration and focus
+- `src/routes/_app/accounts/-ui/group-tree.tsx` and `group-rows.ts` — group and membership rows
+- `src/routes/_app/accounts/-ui/group-form-dialog.tsx` and `group-delete-dialog.tsx` — group dialogs
+- `src/routes/_app/accounts/-ui/group-states.tsx` and `group-refusal.ts` — states and refusal copy selection
+- `src/routes/_app/accounts/-ui/adjust-balance-dialog.tsx` — balance-adjustment preview and recording
+- `src/routes/_app/accounts/-ui/__tests__/` — tree, screen, row, refusal and adjustment tests
+- `src/components/app/tree/__tests__/move.test.ts` — shared move calculations
+- `src/server/repos/__tests__/accounts.test.ts`, `tenant-isolation.test.ts`,
+  `money-invariants.test.ts` and `account-groups.workerd.test.ts` — repository coverage
+- `e2e/account-groups.visual.spec.ts` and `e2e/balance-adjustment.visual.spec.ts` — browser coverage
 
 ### Data and migration
 
@@ -279,37 +290,48 @@ product decision that could change without a migration.
 
 ### Server (repo, server function, Zod)
 
-- **Repository.** `account-groups.ts`: `listGroups`, `createGroup`, `updateGroup`, `deleteGroup`,
-  `setGroupMembers`, `reorderGroups`. `deleteGroup` **moves its accounts to ungrouped** rather than
-  refusing or cascading — an account is not owned by a group.
-- `src/server/accounts/adjust-balance.ts` exports `adjustBalance({ accountId, targetMinor,
-bookedOn, note })`. It computes the delta against the account's balance **on that date** and writes
+- **Repository.** `src/server/repos/accounts.ts`: `listAccountGroups`, `createAccountGroup`,
+  `updateAccountGroup`, `deleteAccountGroup`, `setAccountGroupMembers`, `reorderAccountGroups`
+  and `moveAccountToGroup`. Deleting a group removes its memberships, promotes its child groups
+  and pauses rules referencing it; accounts and their other memberships survive. A move changes
+  only the source row's membership, preserving any membership in another group.
+- The same module exports `adjustAccountBalance(scope, { accountId, targetMinor, bookedOn, note },
+conversion)`. It computes the delta against the account's balance **on that date** and writes
   a **real transaction** with `is_balance_adjustment = true`, `direction` derived from the delta's
   sign, and the account's own currency. There is no code path that writes
   `accounts.current_balance_minor` directly.
-- **Server function.** `listGroups`, `createGroup`, `updateGroup`, `deleteGroup`, `setGroupMembers`,
-  `reorderGroups`, `adjustBalance`.
-- **Zod.** `adjustBalance` takes `{ accountId, targetMinor: z.number().int(), bookedOn: z.iso.date(),
-note: z.string().max(500).optional() }`. `targetMinor` is an **integer** at the schema, so a client
-  that sends `1234.5` is rejected before any arithmetic happens.
-- **Authorisation.** `requireOrg()`; group writes require `owner | admin` in a multi-member workspace.
-- **Ledger batching.** `adjustBalance` runs inside `runWithLedgerBatch` — it writes a transaction, so
+- `getAccountBalanceOn(scope, { accountId, on })` returns `{ balanceMinor }` through the same private
+  `balanceOn` helper the adjustment uses, never the cached balance.
+- **Server functions.** `src/server/fns/accounts.ts` exposes `listAccountGroups` and
+  `getAccountBalanceOn` as GETs; the group writes, `moveAccountToGroup` and `adjustAccountBalance`
+  are POSTs.
+- **Zod.** Strict schemas are validated at the server-function boundary and parsed again in the
+  repository. `adjustBalanceSchema` uses `minorSchema` for `targetMinor` and `bookableDaySchema`
+  for `bookedOn`; `getAccountBalanceOnSchema` uses the same date schema for `on`.
+  `moveAccountToGroupSchema` requires both nullable group ids, with no omitted-key default.
+- **Authorisation.** `requireOrg()`; group and membership writes require `owner | admin` in a shared
+  workspace, before id lookups. Any member may read the balance or record an adjustment.
+- **Ledger batching.** `adjustAccountBalance` runs inside `runWithLedgerBatch` — it writes a transaction, so
   the account's history rebuilds exactly as it would for any other write.
 
 ### UI (route, components)
 
 - **Route.** `/accounts/groups`, SSR default. The adjustment dialog is opened from
   `/accounts/$accountId` and lives in this stage because the write does.
-- **Components.** Reuses `GridList`, `Dialog`, `MoneyField`, `DatePicker`, `TextArea`, `Menu` and
-  `reorder-menu`. New: `group-tree.tsx`, `adjust-balance-dialog.tsx`.
+- **Components.** Follows the category-tree pattern: a flat React Aria `GridList` in reading order,
+  shared move calculations in `src/components/app/tree/`, and a menu built per tree. See
+  `DESIGN.md` → Reorderable tree. The group screen composes the tree, forms, delete dialog and states;
+  the adjustment dialog reuses the money and date controls.
 - **States.** Empty: _"No groups yet"_ explaining what a group is for, with one action. Skeleton:
   three tree rows. Error: `ErrorPanel` retryable.
 - **Tokens.** None new.
-- **Accessibility.** `group-tree.tsx` is a RAC `GridList` with real tree semantics and full keyboard
-  operation; moving an account between groups is available from `reorder-menu`'s _Move to…_ item as
-  well as by drag. The adjustment dialog shows the **computed delta as text** before confirming —
-  "This will record an expense of 120,00 zł on 2026-08-20" — because the person is choosing a target
-  and the system is writing a delta, and hiding that is how corrections get double-applied.
+- **Accessibility.** Only group rows drag and accept drops; their menus provide the same moves.
+  Child groups are named with their parent. Account rows are menu-only: _Move to…_ and
+  _Remove from this group_ act on the row's membership, with focus restoration and polite success
+  announcements. Refusals use catalogue text in an always-mounted alert region.
+  The adjustment dialog shows the **computed delta as text** for every valid booking date in an
+  always-mounted status region; recording stays disabled until that date's balance has loaded.
+  Failed reads offer a retry, and late responses cannot replace the selected date's preview.
 
 ### Quota
 
@@ -318,17 +340,17 @@ later stage does not add one silently.
 
 ### Tenant isolation test
 
-Added to `tenant-isolation.test.ts`: A, in A's scope, attempts `updateGroup`, `deleteGroup`,
-`setGroupMembers` (with B's account ids **and** with A's accounts onto B's group) and `adjustBalance`
-against B's account. Every one is a `NotFoundError`; B's groups, memberships and balances are
-unchanged. Functions covered: all six group exports plus `adjustBalance`.
+`src/server/repos/__tests__/tenant-isolation.test.ts` covers group reads and writes with foreign
+group, parent and account ids, `moveAccountToGroup` with foreign ids even on no-ops, and
+`getAccountBalanceOn` with a foreign account. Foreign references return `NotFoundError` and the
+other workspace's data stays unchanged. `accounts.test.ts` also covers adjustment isolation.
 
 ### Money invariant
 
 **This stage's whole reason to exist is one invariant: a correction is a transaction, never a silent
 overwrite.** Cases in `money-invariants.test.ts`:
 
-- _`adjustBalance` writes exactly one transaction row with `is_balance_adjustment = true`_ and writes
+- _`adjustAccountBalance` writes exactly one transaction row with `is_balance_adjustment = true`_ and writes
   no `accounts.current_balance_minor` value directly.
 - _the delta is computed against the balance on `bookedOn`, not today_ — adjusting a past date on an
   account with later transactions produces the delta for that date, and the later transactions still
@@ -340,14 +362,22 @@ overwrite.** Cases in `money-invariants.test.ts`:
 
 ### Verification
 
-- Command gate.
-- `account-groups.test.ts`: one-level nesting enforced; delete moves accounts to ungrouped; the four
-  money cases above.
-- Browser evidence: `/accounts/groups` with a two-level tree, both themes, at 360 / 1280 / 2560 px,
-  plus the **adjustment dialog showing the computed delta** and the _Move to…_ menu open.
-- `e2e/account-groups.visual.spec.ts` runs axe on `/accounts/groups` and on the open dialog: zero
-  `serious`, zero `critical`.
-- Console silent.
+- Command gate: `validation.commands` in `.ai/agentic.config.json`.
+- `src/server/repos/__tests__/accounts.test.ts`: nesting, group lifecycle, membership moves,
+  stale sources and races, and balance reads agreeing with the adjustment's booking-date base.
+- `src/server/repos/__tests__/account-groups.workerd.test.ts`: child promotion on group deletion in D1.
+- `src/server/repos/__tests__/money-invariants.test.ts`: the four correction cases above.
+- `src/components/app/tree/__tests__/move.test.ts`: shared move calculations.
+- `src/routes/_app/accounts/-ui/__tests__/group-tree.test.tsx`, `groups-screen.test.tsx`,
+  `group-rows.test.ts` and `group-refusal.test.ts`: menus, keyboard drag, row memberships,
+  focus, announcements, dialogs and refusal mapping.
+- `src/routes/_app/accounts/-ui/__tests__/adjust-balance-dialog.test.tsx`: exact delta, stale
+  responses, blocked submission, retry and focus handoff.
+- `e2e/account-groups.visual.spec.ts`: groups screen and open account menu axe checks in both
+  themes and locales, group lifecycle, stale data and mobile targets, with console monitoring.
+- `e2e/balance-adjustment.visual.spec.ts`: open-dialog axe checks in both themes and exact
+  booking-date previews. Visual evidence covers the tree, open menu and past-date adjustment
+  in light and dark at 360 / 1280 px.
 
 ### Definition of done
 
@@ -355,4 +385,11 @@ All seven §7 items and all ten §2 clauses.
 
 ### Blockers
 
-None.
+No delivery blocker remains for this stage. The following product questions remain outside it:
+
+- **`OPEN-2`** — account reordering: should a drag change global `accounts.position` or per-group
+  `account_group_members.position`? Decide before adding any account drag. Ordering in this stage
+  means group ordering.
+- **`OPEN-3`** — adding an account to a second group. Many-to-many membership is retained and
+  existing multi-group rows survive; the screen offers move and remove, not an additional membership.
+- **`OPEN-4`** — exposing the group's `logo_domain`, `logo_initials` and `logo_color` in the group form.

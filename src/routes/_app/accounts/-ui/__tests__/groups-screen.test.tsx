@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { I18nProvider } from '#/lib/i18n'
@@ -27,6 +27,7 @@ const server = vi.hoisted(() => ({
   updateAccountGroup: vi.fn(),
   deleteAccountGroup: vi.fn(),
   reorderAccountGroups: vi.fn(),
+  moveAccountToGroup: vi.fn(),
 }))
 
 vi.mock('#/server/fns/accounts', () => server)
@@ -74,6 +75,100 @@ const GROUPS: ReadonlyArray<GroupItem> = [
   group('business', 'Business'),
   group('empty', 'Empty'),
 ]
+
+describe('account membership menus', () => {
+  it('moves through the keyboard, refreshes, focuses the new row and announces its destination', async () => {
+    const { user, reload, onRefresh } = renderScreen()
+    await user.tab()
+    await user.tab()
+    await user.keyboard('{ArrowDown>2/}{ArrowRight}')
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Actions for Cash, in Joint' }),
+    )
+    await user.keyboard('{Enter}')
+    const move = await screen.findByRole('menuitem', { name: 'Move to…' })
+    act(() => move.focus())
+    await user.keyboard('{ArrowRight}')
+    const target = await screen.findByRole('menuitem', {
+      name: 'Trips, inside Joint',
+    })
+    act(() => target.focus())
+    await user.keyboard('{Enter}')
+    expect(server.moveAccountToGroup).toHaveBeenCalledWith({
+      data: { accountId: 'Cash', fromGroupId: 'joint', toGroupId: 'trips' },
+    })
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    reload([
+      group('joint', 'Joint', null, ['Card']),
+      group('trips', 'Trips', 'joint', ['Cash']),
+      group('business', 'Business'),
+    ])
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('row', { name: 'Cash, in Trips' }),
+      ),
+    )
+    expect(
+      screen
+        .getByText('Account Cash: membership moved to Trips, inside Joint.')
+        .getAttribute('role'),
+    ).toBe('status')
+  })
+
+  it.each([
+    ['Cash', ['Card'], 'Card, in Joint'],
+    ['Card', ['Cash'], 'Cash, in Joint'],
+  ])(
+    'removes %s and focuses a surviving row',
+    async (account, remaining, nextName) => {
+      const rows = [group('joint', 'Joint', null, ['Cash', 'Card'])]
+      const { user, reload, onRefresh } = renderScreen(rows)
+      await user.click(
+        screen.getByRole('button', {
+          name: `Actions for ${account}, in Joint`,
+        }),
+      )
+      await user.click(
+        screen.getByRole('menuitem', { name: 'Remove from this group' }),
+      )
+      await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+      reload([group('joint', 'Joint', null, remaining)])
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          screen.getByRole('row', { name: nextName }),
+        ),
+      )
+      expect(
+        screen.getByText(`Account ${account}: membership removed from Joint.`),
+      ).not.toBeNull()
+    },
+  )
+
+  it.each([
+    () => refused('forbidden'),
+    () => refused('not_found'),
+    refusedPlain,
+  ])(
+    'shows a catalogue refusal, hides the server message and refreshes',
+    async (make) => {
+      server.moveAccountToGroup.mockRejectedValue(make())
+      const { user, onRefresh } = renderScreen()
+      await user.click(
+        screen.getByRole('button', { name: 'Actions for Cash, in Joint' }),
+      )
+      await user.click(
+        screen.getByRole('menuitem', { name: 'Remove from this group' }),
+      )
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('alert')).getByRole('heading'),
+        ).not.toBeNull(),
+      )
+      expect(screen.queryByText(RAW)).toBeNull()
+      expect(onRefresh).toHaveBeenCalled()
+    },
+  )
+})
 
 function renderScreen(groups: ReadonlyArray<GroupItem> = GROUPS) {
   const onRefresh = vi.fn().mockResolvedValue(undefined)

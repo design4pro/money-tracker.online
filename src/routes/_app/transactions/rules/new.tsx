@@ -4,7 +4,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ErrorPanel } from '#/components/app/shell'
 import { RuleEditorSkeleton } from '#/components/app/transactions'
 import { Button, Card, toast } from '#/components/ui'
-import { readFailure } from '#/lib/failure'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { createRule } from '#/server/fns/rules'
 
@@ -12,6 +12,7 @@ import { useDataRefresh } from '../../-lib/refresh'
 import { loadTransactionReference } from '../-server/list'
 import { RuleEditor, ruleEditorReference } from './-ui/rule-editor'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { RuleDefinition } from '#/server/rules/schema'
 import { pageHead } from '#/routes/-lib/page-title'
 
@@ -48,19 +49,12 @@ export const Route = createFileRoute('/_app/transactions/rules/new')({
  * here: there was no rule yet. `rules.editor.load.error.*` says the editor could not be loaded and
  * that nothing was created, which is the pair of facts somebody about to try again needs.
  */
-function NewRuleError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function NewRuleError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('rules.editor.load.error.title')}
       body={t('rules.editor.load.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -74,7 +68,7 @@ function NewRuleRoute() {
   const refreshCaches = useDataRefresh()
 
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   const [isLocked, setIsLocked] = useState(false)
 
   async function save(definition: RuleDefinition) {
@@ -87,12 +81,9 @@ function NewRuleRoute() {
       await Promise.all([router.invalidate(), refreshCaches()])
       await navigate({ to: '/transactions/rules' })
     } catch (error) {
-      if (readFailure(error)?.kind === 'feature_locked') {
-        setIsLocked(true)
-        setFailure(t('rules.error.locked'))
-      } else {
-        setFailure(error instanceof Error ? error.message : String(error))
-      }
+      const refusal = failureOf(error)
+      setIsLocked(refusal.kind === 'feature_locked')
+      setFailure(refusal)
     } finally {
       setIsSaving(false)
     }
@@ -128,7 +119,7 @@ function NewRuleRoute() {
         }}
         reference={ruleEditorReference(reference)}
         isSaving={isSaving}
-        saveError={isLocked ? null : failure}
+        saveFailure={isLocked ? null : failure}
         onSave={save}
         onCancel={() => void navigate({ to: '/transactions/rules' })}
       />

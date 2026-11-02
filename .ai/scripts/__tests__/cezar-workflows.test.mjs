@@ -161,7 +161,7 @@ describe('cezar workflows', () => {
   it('leaves the validation gate in the one place that owns it', () => {
     // SDLC.md § Validation gate and AGENTS.md both say the list lives only in the config, because
     // a gate written down twice is a gate that disagrees with itself. implement-ticket.yml used to
-    // hold the second copy; the gate step now calls scripts/ci/run-validation.mjs instead.
+    // hold the second copy; the gate step now calls scripts/ci/attestation.mjs instead.
     const { commands } = JSON.parse(
       readFileSync(CONFIG_PATH, 'utf8'),
     ).validation

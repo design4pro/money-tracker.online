@@ -4,6 +4,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { ErrorPanel } from '#/components/app/shell'
 import { RuleEditorSkeleton } from '#/components/app/transactions'
 import { toast } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { deleteRule, loadRule, updateRule } from '#/server/fns/rules'
 
@@ -12,6 +13,7 @@ import { ConfirmDialog } from '../../accounts/-ui/confirm-dialog'
 import { loadTransactionReference } from '../-server/list'
 import { RuleEditor, ruleEditorReference } from './-ui/rule-editor'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { RuleDefinition } from '#/server/rules/schema'
 import { pageHead } from '#/routes/-lib/page-title'
 
@@ -56,19 +58,12 @@ export const Route = createFileRoute('/_app/transactions/rules/$ruleId')({
   component: RuleDetailRoute,
 })
 
-function RuleDetailError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function RuleDetailError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('rules.error.title')}
       body={t('rules.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -82,7 +77,7 @@ function RuleDetailRoute() {
   const refreshCaches = useDataRefresh()
 
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
 
   async function save(definition: RuleDefinition) {
@@ -94,7 +89,7 @@ function RuleDetailRoute() {
       await Promise.all([router.invalidate(), refreshCaches()])
       await navigate({ to: '/transactions/rules' })
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -123,7 +118,7 @@ function RuleDetailRoute() {
         }}
         reference={ruleEditorReference(reference)}
         isSaving={isSaving}
-        saveError={failure}
+        saveFailure={failure}
         onSave={save}
         onCancel={() => void navigate({ to: '/transactions/rules' })}
         onDelete={() => setIsConfirmingDelete(true)}

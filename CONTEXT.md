@@ -21,6 +21,9 @@ already caused, or would obviously cause, two people to mean two things by one w
   balance, and a running current balance. Every account in this product is manual; there is no
   connected account and no account type that behaves differently because of where its rows came
   from. _Avoid_: "account" for a login or a workspace; "wallet"; "bank account".
+- **Account group** — a workspace's collection of accounts, optionally inside another top-level
+  group. An account can belong to several groups; moving it changes only the source membership,
+  and removing it from a group neither deletes the account nor removes its other memberships.
 - **Transaction** — one movement of money against one account, in one direction, on one calendar
   date. It is `income` or `expense`; there is no third direction. It is written in its account's
   currency, and the repository refuses a write in any other. Everything else the product shows
@@ -95,6 +98,16 @@ already caused, or would obviously cause, two people to mean two things by one w
   generates **recurring periods**, each of which is upcoming, paid, overdue or skipped. _Avoid_:
   "subscription" for a recurring series — in this repository "subscription" means the workspace's
   billing plan and nothing else.
+- **Book** — a workspace-local dimension on a row: `business` or `personal`. One workspace holds
+  both; the filter is All / Business / Personal (PL: Wszystko / Firma / Prywatne). It is not a
+  second tenant and not an account type. _Avoid_: "book" for the booked date; two workspaces as a
+  substitute for the filter.
+- **Recurring forecast** — expense-series totals for spending this calendar year, unpaid
+  occurrences due this year, and unpaid occurrences due in the next twelve months. Each currency
+  stays separate; a paused or finished series retains its spending history and plans nothing ahead.
+- **JDG duty template** — a Polish sole trader's recurring-series due-date shape, identified by
+  a duty code. The person supplies the amount; the template neither calculates tax nor files a return.
+  _Avoid_: "tax engine" or "tax liability" for a duty template.
 - **Subscription** — the workspace's paid plan with the billing provider. One per workspace.
   _Avoid_: using it for a recurring series, a streaming service the user pays for, or a plan tier.
 - **Rule** — an ordered automation: conditions over a transaction, actions applied when they match,

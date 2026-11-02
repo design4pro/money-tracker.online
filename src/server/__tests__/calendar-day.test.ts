@@ -5,7 +5,12 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { latestCalendarDayOnEarth } from '../calendar-day'
+import {
+  DEFAULT_WORKSPACE_TIMEZONE,
+  civilDayInTimeZone,
+  isIanaTimeZone,
+  latestCalendarDayOnEarth,
+} from '../calendar-day'
 
 describe('latestCalendarDayOnEarth', () => {
   it('is still day D one second before 10:00 UTC, when UTC+14 reaches midnight', () => {
@@ -36,5 +41,42 @@ describe('latestCalendarDayOnEarth', () => {
     const expected = (ms: number) =>
       new Date(ms + 14 * 3_600_000).toISOString().slice(0, 10)
     expect([expected(before), expected(after)]).toContain(day)
+  })
+})
+
+describe('civilDayInTimeZone', () => {
+  it('is the Warsaw civil day, not the UTC date, around midnight in summer', () => {
+    // 22:30 UTC on 15 July is 00:30 CEST on the 16th.
+    expect(
+      civilDayInTimeZone(new Date('2026-07-15T22:30:00.000Z'), 'Europe/Warsaw'),
+    ).toBe('2026-07-16')
+    expect(
+      civilDayInTimeZone(new Date('2026-07-15T21:30:00.000Z'), 'Europe/Warsaw'),
+    ).toBe('2026-07-15')
+  })
+
+  it('is the Warsaw civil day around midnight in winter', () => {
+    // 23:30 UTC on 15 January is 00:30 CET on the 16th.
+    expect(
+      civilDayInTimeZone(new Date('2026-01-15T23:30:00.000Z'), 'Europe/Warsaw'),
+    ).toBe('2026-01-16')
+    expect(
+      civilDayInTimeZone(new Date('2026-01-15T22:30:00.000Z'), 'Europe/Warsaw'),
+    ).toBe('2026-01-15')
+  })
+
+  it('falls back to Warsaw when the zone is not a real IANA name', () => {
+    expect(
+      civilDayInTimeZone(new Date('2026-07-15T22:30:00.000Z'), 'Not/AZone'),
+    ).toBe('2026-07-16')
+  })
+})
+
+describe('isIanaTimeZone', () => {
+  it('accepts Warsaw and rejects garbage', () => {
+    expect(isIanaTimeZone(DEFAULT_WORKSPACE_TIMEZONE)).toBe(true)
+    expect(isIanaTimeZone('UTC')).toBe(true)
+    expect(isIanaTimeZone('Not/AZone')).toBe(false)
+    expect(isIanaTimeZone('')).toBe(false)
   })
 })

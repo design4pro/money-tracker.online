@@ -10,7 +10,7 @@ import type { TreeRow } from '#/components/app/tree'
  * computes.
  */
 
-/** One account as the tree draws it. Read-only here: moving an account is another screen's gesture. */
+/** One account as the tree draws it; its menu acts on the row's group only. */
 export interface GroupMember {
   readonly id: string
   readonly name: string

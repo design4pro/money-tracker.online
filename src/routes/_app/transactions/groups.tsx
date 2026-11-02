@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { ErrorPanel, FailurePanel } from '#/components/app/shell'
 import {
   Button,
   Card,
@@ -28,6 +28,7 @@ import {
   TextField,
   toast,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatMoney, makeMoney } from '#/lib/money'
 import {
@@ -40,6 +41,7 @@ import {
 import { useDataRefresh } from '../-lib/refresh'
 import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { TransactionGroupSummary } from '#/server/repos/transaction-groups'
 import { pageHead } from '#/routes/-lib/page-title'
 
@@ -102,13 +104,12 @@ function GroupsSkeleton() {
   )
 }
 
-function GroupsError({ error, reset }: { error: Error; reset: () => void }) {
+function GroupsError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('groups.error.title')}
       body={t('empty.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -345,7 +346,7 @@ function GroupFormDialog({
   const [name, setName] = useState(group?.name ?? '')
   const [note, setNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   async function save() {
     setIsSaving(true)
@@ -363,7 +364,7 @@ function GroupFormDialog({
       }
       onSaved(name.trim())
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
       setIsSaving(false)
     }
   }
@@ -396,10 +397,10 @@ function GroupFormDialog({
             />
             <DialogBody className="flex flex-col gap-4">
               {failure === null ? null : (
-                <ErrorPanel
+                <FailurePanel
+                  failure={failure}
+                  placement="after-action"
                   title={t('groups.error.title')}
-                  body={t('empty.error.body')}
-                  detail={failure}
                 />
               )}
               <TextField

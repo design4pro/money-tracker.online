@@ -40,6 +40,14 @@ export interface RecurringSchedule {
   readonly frequency: RecurringFrequency
   /** Day of the month (1–31) for a month-based frequency, ISO day of the week (1–7) for `weekly`. */
   readonly anchorDay: number | null
+  /**
+   * Calendar month (1–12) an `annual` series falls in.
+   *
+   * Independent of {@link startDate}: a yearly charge that starts in March and is due every
+   * November is November, not March. Ignored for every other frequency. `null` means the start
+   * date's own month, which is how annual series behaved before this column existed.
+   */
+  readonly anchorMonth?: number | null
   /** `recurring_series.start_date`. The anchor every occurrence is measured from. */
   readonly startDate: string
   /** Inclusive last day, or `null`. Never set together with {@link maxOccurrences}. */
@@ -124,17 +132,37 @@ function dayOrigin(
  * The month-based origin: the first month whose anchored day is on or after `start_date`.
  *
  * A series that starts on the 20th and is anchored on the 5th has its first occurrence on the 5th
- * of the **next** month, not on a 5th that has already gone by.
+ * of the **next** month, not on a 5th that has already gone by. An annual series with
+ * {@link RecurringSchedule.anchorMonth} uses that month of the starting year, then steps a year
+ * if that date has already gone by.
  */
 function monthOrigin(
   schedule: RecurringSchedule,
   start: CalendarDate,
 ): CalendarDate {
   const months = stepMonths(schedule.frequency) ?? 1
-  const first = clampToMonth(start, anchorDayOf(schedule, start))
+  const cursor = originMonth(schedule, start)
+  const first = clampToMonth(cursor, anchorDayOf(schedule, start))
   if (first.compare(start) >= 0) return first
-  const next = start.add({ months })
-  return clampToMonth(next, anchorDayOf(schedule, start))
+  return clampToMonth(cursor.add({ months }), anchorDayOf(schedule, start))
+}
+
+/**
+ * The calendar month the first occurrence is measured from.
+ *
+ * For `annual` with an explicit month, that month of `start_date`'s year. Everything else keeps
+ * `start_date`'s own month, so a monthly bill is unchanged by a leftover `anchor_month`.
+ */
+function originMonth(
+  schedule: RecurringSchedule,
+  start: CalendarDate,
+): CalendarDate {
+  if (schedule.frequency !== 'annual') return start
+  const month = schedule.anchorMonth
+  if (month === undefined || month === null || month < 1 || month > 12) {
+    return start
+  }
+  return start.set({ month, day: 1 })
 }
 
 /** The day of the month a month-based series is anchored on: its column, or `start_date`'s day. */

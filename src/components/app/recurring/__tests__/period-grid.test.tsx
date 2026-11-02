@@ -40,6 +40,13 @@ describe('PeriodGrid', () => {
     expect(screen.getByRole('columnheader', { name: 'Status' })).toBeTruthy()
   })
 
+  it('uses due date / plan / paid for a JDG duty series', () => {
+    grid([period()], { copy: 'duty' })
+    expect(screen.getByRole('columnheader', { name: 'Due date' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Plan' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Paid' })).toBeTruthy()
+  })
+
   it('keeps every table role explicit, so the stacked layout below sm cannot drop them', () => {
     // `display: block` on a table element can strip its native role in some browser and screen
     // reader pairs; the attributes are what hold the structure in both layouts.

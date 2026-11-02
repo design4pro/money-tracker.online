@@ -179,13 +179,84 @@ export async function installRecurringFixture(
   return { seriesId, seriesName }
 }
 
+export const LOAN_FIXTURE_AMOUNT_MINOR = 1500
+
+export interface LoanFixture {
+  readonly loanId: string
+  readonly loanName: string
+  readonly transactionId: string
+  readonly dueOn: string
+}
+
 /**
- * Removes the series, its periods and links (they cascade), and the payments the test recorded.
+ * One imported-schedule liability plus a candidate expense on the yen account, for mark-paid.
  *
- * The payments are found by account and date rather than by id, because the one a test saves
- * through the entry form is created by the product and the test may have failed before reading its
- * id. A failure is reported rather than raised, so cleanup never fails a test whose body passed.
+ * Written to D1 because this PR has no create form. Amounts are yen (zero decimal). `ref_*` uses
+ * the workspace yen rate so the money columns stay internally consistent.
  */
+export async function installLoanFixture(
+  organizationId: string,
+  token: string,
+  dueOn: string,
+): Promise<LoanFixture> {
+  const org = sqlText(organizationId)
+  const loanId = `e2e-loan-${token}`
+  const loanName = `E2E lease ${token}`
+  const transactionId = `e2e-loan-tx-${token}`
+  const now = Date.now()
+  const amount = LOAN_FIXTURE_AMOUNT_MINOR
+  const refMinor = 4065
+  const rate = YEN_RATE_E10
+
+  await d1Exec([
+    `delete from transactions where id = ${sqlText(transactionId)}`,
+    `delete from loan_instalments where loan_id = ${sqlText(loanId)}`,
+    `delete from loans where id = ${sqlText(loanId)}`,
+    `insert into loans (` +
+      `id, organization_id, name, kind, book, lender, account_id, currency_code, ` +
+      `principal_minor, ref_principal_minor, instalment_minor, ref_instalment_minor, ` +
+      `outstanding_minor, ref_outstanding_minor, rate_e10, annual_rate_e10, ` +
+      `repayment_shape, payment_frequency, term_periods, payment_day, opened_on, ` +
+      `first_payment_on, ends_on, status, note, created_at, updated_at` +
+      `) values (` +
+      `${sqlText(loanId)}, ${org}, ${sqlText(loanName)}, 'leasing', 'business', ` +
+      `'Northshore Leasing Co', ${sqlText(YEN_ACCOUNT_ID)}, 'JPY', null, null, ` +
+      `${amount}, ${refMinor}, null, null, ${rate}, null, 'imported', 'monthly', 1, ` +
+      `20, ${sqlText(dueOn)}, ${sqlText(dueOn)}, ${sqlText(dueOn)}, 'active', null, ` +
+      `${now}, ${now})`,
+    `insert into loan_instalments (` +
+      `organization_id, loan_id, sequence, due_on, amount_minor, currency_code, ` +
+      `ref_amount_minor, rate_e10, principal_minor, interest_minor, closing_balance_minor, ` +
+      `is_buyout, status, settled_transaction_id, note, created_at, updated_at` +
+      `) values (` +
+      `${org}, ${sqlText(loanId)}, 1, ${sqlText(dueOn)}, ${amount}, 'JPY', ${refMinor}, ` +
+      `${rate}, null, null, null, 0, 'upcoming', null, null, ${now}, ${now})`,
+    `insert into transactions (` +
+      `id, organization_id, account_id, direction, amount_minor, currency_code, ` +
+      `ref_amount_minor, ref_currency_code, rate_e10, booked_on, booked_at, ` +
+      `payee_locked, transfer_kind, is_planned, is_balance_adjustment, refund_linked, ` +
+      `exclude_from_stats, created_at, updated_at` +
+      `) values (` +
+      `${sqlText(transactionId)}, ${org}, ${sqlText(YEN_ACCOUNT_ID)}, 'expense', ` +
+      `${amount}, 'JPY', ${refMinor}, 'PLN', ${rate}, ${sqlText(dueOn)}, ${now}, ` +
+      `0, 'none', 0, 0, 0, 0, ${now}, ${now})`,
+  ])
+
+  return { loanId, loanName, transactionId, dueOn }
+}
+
+export async function deleteLoanFixture(fixture: LoanFixture): Promise<void> {
+  try {
+    await d1Exec([
+      `delete from loan_instalments where loan_id = ${sqlText(fixture.loanId)}`,
+      `delete from loans where id = ${sqlText(fixture.loanId)}`,
+      `delete from transactions where id = ${sqlText(fixture.transactionId)}`,
+    ])
+  } catch (error) {
+    console.warn(`loan fixture ${fixture.loanId} was not cleaned up`, error)
+  }
+}
+
 export async function deleteRecurringFixture(
   fixture: RecurringFixture,
   periodStarts: ReadonlyArray<string>,

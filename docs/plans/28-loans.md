@@ -65,40 +65,50 @@ the day they land.
 
 ### Data and migration
 
-Three new tables, none of which exists in `src/server/db/schema.ts`. The schema edit and the
-migration belong to `00-S17`; this section is the requirement it is built from.
+The tables below exist in `src/server/db/schema.ts`, delivered by `00-S17`. This section records
+the stored imported-schedule shape; the amortisation engine remains a later consumer.
 
-- **`loans`** — `id` from `newId()`, `organization_id` leading, `account_id` (`references accounts`,
-  `on delete cascade`, `not null`: a loan whose account is gone is not a loan), `name` `text(100)`,
-  `principal_minor` and `ref_principal_minor` `integer not null`, `currency_code` `text(3)`
-  referencing the catalogue, `annual_rate_e10` `integer not null` (the same integer-scaled-by-10^10
-  convention as an exchange rate, and the reason no second scaling convention is invented here),
-  `repayment_shape` and `payment_frequency` `text not null` with a `CHECK` per enum, `term_periods`
-  `integer not null`, `opened_on` and `first_payment_on` calendar dates, `status` `text not null
-default 'active'`, `note` `text(500)`, `created_at`, `updated_at`.
+- **`loans`** — `id` from `newId()`, `organization_id` leading, `name` `text(100) not null`,
+  `kind` (`credit | leasing | loan | other`, default `credit`), `book` (`business | personal`,
+  default `personal`), nullable `lender` `text(200)`, nullable `account_id` (`references accounts`,
+  `on delete set null`), `currency_code` `text(3) not null` referencing the catalogue.
+  Nullable integer pairs `principal_minor` / `ref_principal_minor` and `outstanding_minor` /
+  `ref_outstanding_minor` have matching nullability; principal is positive when present,
+  outstanding non-negative. `instalment_minor` and `ref_instalment_minor` are positive integers,
+  not null. `rate_e10` is the positive FX rate used for the reference amounts at `opened_on`;
+  nullable non-negative `annual_rate_e10` is the nominal interest rate, not FX.
+  `repayment_shape` defaults to `imported`, `payment_frequency` to `monthly`; both are not null
+  with enum CHECKs. Nullable `term_periods` is bounded from 1 to 600. `payment_day` is not null,
+  from 1 to 31. `opened_on` is not null; `first_payment_on` and `ends_on` are nullable calendar
+  dates constrained to be on or after it. `status` is not null, default `active`; nullable
+  `note` `text(500)`, `created_at`, `updated_at` complete the row.
 - **`loan_instalments`** — `organization_id` leading, `loan_id` (`cascade`), `sequence` `integer`,
-  primary key `(loan_id, sequence)`, `due_on` calendar date, `principal_minor`, `interest_minor` and
-  `closing_balance_minor` `integer not null` with non-negative `CHECK`s, `status` `text not null
-default 'upcoming'`, `settled_transaction_id` (`references transactions`, `on delete set null`),
-  `created_at`, `updated_at`. A `CHECK` that `status <> 'paid' or settled_transaction_id is not
-null`, for the reason `recurring_periods` carries the same one: paid with nothing to point at is a
-  claim with no evidence.
+  primary key `(loan_id, sequence)`, positive sequence, `due_on` calendar date not null.
+  `amount_minor` and `ref_amount_minor` are positive integers not null, `currency_code` references
+  the catalogue, `rate_e10` is positive and not null. Instalment reference amounts use the loan's
+  `opened_on`, not future `due_on` (MONEY §3.1). Nullable `principal_minor`, `interest_minor` and
+  `closing_balance_minor` have non-negative CHECKs. `is_buyout` is not null, default false;
+  `status` is `upcoming | paid`, not null, default `upcoming`; nullable `settled_transaction_id`
+  (`references transactions`, `on delete set null`), nullable `note` `text(500)`, `created_at`,
+  `updated_at`. The CHECK `status <> 'paid' or settled_transaction_id is not null` requires
+  evidence for paid rows. Overdue is derived, never stored.
 - **`loan_extra_repayments`** — `organization_id` leading, `loan_id` (`cascade`), `transaction_id`
   (`cascade`), `created_at`, primary key `(loan_id, transaction_id)`. A link table and nothing else;
   the amount is read from the transaction, never copied here.
 
 Indexes, `organization_id` first in every one: `loans (organization_id, status)`, `loans
-(organization_id, account_id)`, `loan_instalments (organization_id, due_on, status)`,
+(organization_id, account_id)`, `loans (organization_id, book)`, `loan_instalments (organization_id, due_on, status)`,
 `loan_extra_repayments (organization_id, transaction_id)`.
 
-Enums: `LOAN_STATUSES` = `active | settled | closed`; `LOAN_REPAYMENT_SHAPES` = `annuity |
+Enums: `LOAN_STATUSES` = `active | settled | closed | needs_review`; `LOAN_REPAYMENT_SHAPES` = `imported | annuity |
 linear_principal`; the payment frequency reuses `RECURRING_FREQUENCIES` **narrowed** to `monthly |
 quarterly | semi_annual | annual`. The narrowing is the point: a per-period nominal rate is the
 annual rate divided by the number of periods in a year, and a year does not contain a whole number
 of weeks. A weekly loan would need a day-count convention this product does not have, so it is
 refused at the Zod boundary with a message that says why rather than silently modelled as `1/52`.
 
-Migration `drizzle/0006_loans.sql`, additive, backfilling nothing.
+Migration `drizzle/0006_dazzling_blade.sql`, additive, backfilling nothing. No new migration is
+needed for the repository hardening.
 
 ### Server (repo, server function, Zod)
 
@@ -158,7 +168,7 @@ than minting near-duplicates.
 the insert**. `loans` is a new metric: it does not exist in `resolveLimits()`
 (`src/server/billing/limits.ts`) or in the catalogue (`src/lib/plans.ts`), so both are a
 requirement on `00-S15`'s successor and the case is added to
-`src/server/billing/__tests__/limits.test.ts` in the same change. Instalments are **not** metered —
+`src/server/billing/__tests__/resolve-limits.test.ts` in the same change. Instalments are **not** metered —
 they are a consequence of the term, and a person who cannot see the second half of their own
 schedule has been sold a broken feature. Settled and closed loans count; the copy says so.
 
@@ -359,11 +369,12 @@ None. `settled_transaction_id` and its `CHECK` landed in `00-S17`.
 
 - **`settle.ts`** exports `settleInstalment({ loanId, sequence, transactionId })`,
   `unsettleInstalment({ loanId, sequence })` and `repaymentToDate(loanId)`.
-- **What a settlement refuses**, each with an error that names both sides: a transaction on a
-  different account from the loan's; a transaction in a different currency; an `income` transaction
-  against a repayment; a transaction already linked to another instalment or to an extra repayment;
-  an instalment already paid. Every one of these is a way a person's schedule and ledger quietly
-  stop describing the same money.
+- **What a settlement refuses** lives in the repository's `markInstalmentPaid`; `settle.ts` only
+  maps those refusals. Errors identify both sides: a transaction on a different account when the
+  loan has an account; a different currency; income; a planned transaction, balance adjustment
+  or transfer leg; a transaction already settling another instalment; an instalment already paid
+  with a different transaction. Re-marking the same pair is idempotent. The extra-repayment link
+  refusal belongs to `28-S4`.
 - **What a settlement does not do is rewrite the schedule.** A payment larger or smaller than the
   instalment is linked as it is, and the difference is reported as a variance on the row. The
   schedule is what was agreed; the ledger is what happened; a product that edits the first to match
@@ -497,6 +508,8 @@ None. `loan_extra_repayments` landed in `00-S17` and is written for the first ti
 - **`replan.ts`** exports `addExtraRepayment({ loanId, transactionId, effect })` and
   `removeExtraRepayment`. `effect` is `shorten_term | reduce_instalment` — the two things an
   overpayment can buy, and the person chooses, because the answer is a preference and not a fact.
+- **One transaction has one repayment role.** Refuse settlement with a transaction already linked
+  to an extra repayment, and refuse an extra repayment linked to an instalment.
 - **A re-plan never touches a paid instalment.** It rewrites only the unpaid tail, from the extra
   repayment's date forward, and the invariant it must hold is that the principal already attributed
   to paid instalments plus the principal of the new tail still equals the original principal. Paid

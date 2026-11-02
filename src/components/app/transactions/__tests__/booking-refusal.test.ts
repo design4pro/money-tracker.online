@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 
 import {
   isBookedOnRefusal,
@@ -7,67 +6,96 @@ import {
   withoutRefusal,
 } from '../booking-refusal'
 
-const REFUSAL_ISSUE = {
-  code: 'custom' as const,
-  path: ['bookedOn'],
-  message:
-    'A settled row cannot be dated after the latest calendar day on Earth.',
+import type { FailureEnvelope } from '#/lib/failure-envelope'
+import type { Translate } from '#/lib/i18n'
+
+/** The sentence a catalogue key reads as in these tests, so the key itself is what is asserted. */
+const t = ((key: string) => `[${key}]`) as unknown as Translate
+
+/** What the client holds after the wire: an `Error` with a fixed message and the envelope on it. */
+function wire(
+  envelope: Partial<FailureEnvelope> & Pick<FailureEnvelope, 'kind'>,
+  message = 'This could not be completed.',
+): Error {
+  return Object.assign(new Error(message), {
+    envelope: {
+      v: 1,
+      message: { key: `failure.${envelope.kind}` },
+      ...envelope,
+    },
+  })
 }
 
-/** What the client holds after the wire: a plain `Error` whose message is the issue list. */
-function wire(issues: ReadonlyArray<object>): Error {
-  return new Error(JSON.stringify(issues))
-}
+const REFUSAL = wire({
+  kind: 'validation',
+  fields: [{ path: 'bookedOn', key: 'failure.field.invalid' }],
+})
 
 describe('isBookedOnRefusal', () => {
-  it('recognises the plain Error a server function delivers', () => {
-    expect(isBookedOnRefusal(wire([REFUSAL_ISSUE]))).toBe(true)
+  it('recognises the validation failure the server sends for the booking date', () => {
+    expect(isBookedOnRefusal(REFUSAL)).toBe(true)
   })
 
-  it('recognises the server-side ZodError and ZodRealError', () => {
-    expect(isBookedOnRefusal(new z.ZodError([{ ...REFUSAL_ISSUE }]))).toBe(true)
-    expect(isBookedOnRefusal(new z.ZodRealError([{ ...REFUSAL_ISSUE }]))).toBe(
-      true,
-    )
-  })
-
-  it('finds the issue among others', () => {
-    const other = { code: 'too_small', path: ['amountMinor'], message: 'x' }
-
-    expect(isBookedOnRefusal(wire([other, REFUSAL_ISSUE]))).toBe(true)
-  })
-
-  it('refuses a malformed-date issue at the same path', () => {
+  it('finds the field among others', () => {
     expect(
       isBookedOnRefusal(
-        wire([{ code: 'invalid_format', path: ['bookedOn'], message: 'x' }]),
+        wire({
+          kind: 'validation',
+          fields: [
+            { path: 'amountMinor', key: 'failure.field.tooShort' },
+            { path: 'bookedOn', key: 'failure.field.invalid' },
+          ],
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it('refuses a validation failure at another path or a nested one', () => {
+    expect(
+      isBookedOnRefusal(
+        wire({
+          kind: 'validation',
+          fields: [{ path: 'note', key: 'failure.field.invalid' }],
+        }),
+      ),
+    ).toBe(false)
+    expect(
+      isBookedOnRefusal(
+        wire({
+          kind: 'validation',
+          fields: [{ path: 'patch.bookedOn', key: 'failure.field.invalid' }],
+        }),
       ),
     ).toBe(false)
   })
 
-  it('refuses a custom issue at another path or a nested one', () => {
-    expect(
-      isBookedOnRefusal(wire([{ ...REFUSAL_ISSUE, path: ['note'] }])),
-    ).toBe(false)
+  it('refuses a failure of another kind, even one that names the path', () => {
     expect(
       isBookedOnRefusal(
-        wire([{ ...REFUSAL_ISSUE, path: ['patch', 'bookedOn'] }]),
+        wire({
+          kind: 'conflict',
+          fields: [{ path: 'bookedOn', key: 'failure.field.invalid' }],
+        }),
       ),
     ).toBe(false)
   })
 
-  it('refuses anything that is not an issue list, without throwing', () => {
+  it('refuses a validation failure with no fields', () => {
+    expect(isBookedOnRefusal(wire({ kind: 'validation' }))).toBe(false)
+  })
+
+  it('does not read the issue list out of a message', () => {
+    const issues = JSON.stringify([{ code: 'custom', path: ['bookedOn'] }])
+
+    expect(isBookedOnRefusal(new Error(issues))).toBe(false)
+    expect(isBookedOnRefusal(wire({ kind: 'validation' }, issues))).toBe(false)
+  })
+
+  it('refuses anything that is not an envelope, without throwing', () => {
     expect(isBookedOnRefusal(new Error('Network down'))).toBe(false)
-    expect(isBookedOnRefusal(new Error('{"path":["bookedOn"]}'))).toBe(false)
-    expect(
-      isBookedOnRefusal(new TypeError(JSON.stringify([REFUSAL_ISSUE]))),
-    ).toBe(false)
     expect(isBookedOnRefusal('bookedOn')).toBe(false)
     expect(isBookedOnRefusal(null)).toBe(false)
     expect(isBookedOnRefusal(undefined)).toBe(false)
-    expect(
-      isBookedOnRefusal({ message: JSON.stringify([REFUSAL_ISSUE]) }),
-    ).toBe(false)
     expect(
       isBookedOnRefusal(
         new Proxy(new Error('x'), {
@@ -84,22 +112,25 @@ describe('saveFailureOf', () => {
   const entry = { bookedOn: '2026-03-15', isPlanned: false }
 
   it('keeps a booking-date refusal out of the banner and remembers the pair it was about', () => {
-    expect(saveFailureOf(wire([REFUSAL_ISSUE]), entry, 'Fallback')).toEqual({
-      refusedBooking: entry,
+    expect(saveFailureOf(REFUSAL, entry, t)).toEqual({ refusedBooking: entry })
+  })
+
+  it('shows the sentence of the failure kind and never the error message', () => {
+    expect(
+      saveFailureOf(
+        wire({ kind: 'conflict' }, 'Account 01k still has 412 transaction(s)'),
+        entry,
+        t,
+      ),
+    ).toEqual({ serverError: '[failure.conflict]' })
+  })
+
+  it('shows the internal sentence for a value that is not an envelope', () => {
+    expect(saveFailureOf(new Error('Network down'), entry, t)).toEqual({
+      serverError: '[failure.internal]',
     })
-  })
-
-  it('shows any other Error exactly as its message', () => {
-    expect(saveFailureOf(new Error('Network down'), entry, 'Fallback')).toEqual(
-      {
-        serverError: 'Network down',
-      },
-    )
-  })
-
-  it('shows the fallback for a value that is not an Error', () => {
-    expect(saveFailureOf('nope', entry, 'Fallback')).toEqual({
-      serverError: 'Fallback',
+    expect(saveFailureOf('nope', entry, t)).toEqual({
+      serverError: '[failure.internal]',
     })
   })
 })

@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "description": "money-tracker.online build board",
+  "project": {
+    "owner": "design4pro",
+    "title": "Money-tracker board",
+    "number": 20
+  },
+  "worker_backend": "workflow",
+  "model_tier": "medium",
+  "target": {
+    "type": "repo",
+    "url": null
+  },
+  "repo": {
+    "path": ".",
+    "remote": "https://github.com/design4pro/money-tracker.online"
+  },
+  "base_branch": "develop",
+  "timezone": "Europe/Warsaw",
+  "columns": [
+    "Backlog",
+    "Ready",
+    "Building",
+    "QA",
+    "Review",
+    "Blocked",
+    "Done"
+  ],
+  "labels": [
+    "qa",
+    "bug",
+    "feature"
+  ],
+  "paths": {
+    "project_md": "docs/super-board/PROJECT.md",
+    "pre_flight_md": "docs/super-board/pre-flight.md",
+    "runs_dir": "docs/super-board/runs"
+  },
+  "human_approves_merge": false,
+  "merge_policy": {
+    "default": "auto",
+    "auto_max_lines": 400,
+    "always_human": {
+      "money": {
+        "labels": [
+          "money",
+          "payments",
+          "billing",
+          "pricing"
+        ],
+        "paths": [
+          "**/billing/**",
+          "**/payments/**",
+          "**/stripe/**",
+          "**/checkout/**"
+        ],
+        "keywords": [
+          "stripe.",
+          "payment_intent",
+          "price_id",
+          "invoice.create"
+        ]
+      },
+      "auth": {
+        "labels": [
+          "auth",
+          "security"
+        ],
+        "paths": [
+          "**/auth/**",
+          "**/authz/**",
+          "**/permissions/**"
+        ],
+        "keywords": [
+          "jwt.sign",
+          "bcrypt",
+          "password_hash",
+          "service_role"
+        ]
+      },
+      "schema": {
+        "labels": [
+          "schema",
+          "destructive"
+        ],
+        "paths": [],
+        "keywords": [
+          "drop table",
+          "drop column",
+          "truncate table",
+          "rename column",
+          "drop schema"
+        ]
+      },
+      "ledger_tenancy": {
+        "labels": [
+          "ledger",
+          "tenancy"
+        ],
+        "paths": [
+          "**/ledger/**",
+          "**/repos/scope.ts",
+          "**/lib/plans.ts"
+        ],
+        "keywords": []
+      }
+    },
+    "allow_auto_on_production": false
+  },
+  "migrations": {
+    "globs": [
+      "drizzle/**"
+    ],
+    "allowed_envs": [
+      "test",
+      "staging",
+      "live"
+    ],
+    "target_env": "staging",
+    "commands": {
+      "test": "pnpm db:migrate:local",
+      "staging": "-",
+      "live": "-"
+    },
+    "checks": {},
+    "human_steps": []
+  },
+  "no_progress_cycles": 6,
+  "max_dispatches": 0,
+  "truth_gate": "non-trivial",
+  "truth_threshold": 70,
+  "usage_pause_pct": 95,
+  "usage_fallback": "none",
+  "verify_commands": [
+    "pnpm install --frozen-lockfile && git add -A && node -e \"const {validation:{commands:c}}=require('./.ai/agentic.config.json');process.exit(require('child_process').spawnSync(c.join(' && '),{shell:true,stdio:'inherit'}).status??1)\""
+  ],
+  "max_workers": 0,
+  "rebuild_cap": 2,
+  "block_rate_alert_pct": 30,
+  "collect": {
+    "sources": [
+      "sentry",
+      "github",
+      "prs",
+      "architecture"
+    ],
+    "window_days": 14,
+    "sentry": {
+      "org": "design4pro",
+      "project": "money-tracker-online",
+      "host": "https://us.sentry.io",
+      "environment": "production",
+      "min_events": 1,
+      "min_users": 1
+    },
+    "prs": {
+      "max_prs": 200
+    },
+    "architecture": {
+      "max_findings": 5
+    },
+    "custom": []
+  },
+  "notifications": {
+    "channel": "session",
+    "chat_id": null,
+    "bot_identity": "design4pro-agent"
+  }
+}

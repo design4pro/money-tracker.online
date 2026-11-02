@@ -18,11 +18,9 @@
  * somebody added it defensively; both are worth catching in review.
  *
  * **`today` enters here, once per call, from `#/server/clock`.** Every module below takes the day
- * as a parameter and reads no clock, which is what makes a due date, an overdue derivation and a
- * reminder testable at a pinned date. `serverToday()` owns what the day *is* - the UTC calendar
- * day, matching `booked_on`'s definition in `docs/MONEY.md` §6.1 - and is pinnable by header under
- * `pnpm dev`, which is the only reason an "overdue" badge can be photographed twice and match. The
- * reader's timezone is applied at render and only there.
+ * as a parameter and reads no clock. Recurring due/overdue uses the workspace civil day
+ * (`workspaceCivilDay`, default `Europe/Warsaw`, `docs/MONEY.md` §6.4). Development and e2e pins
+ * still win, which is why an "overdue" badge can be photographed twice and match.
  *
  * Reads are `GET` so the router can cache and prefetch them; every write is `POST`.
  */
@@ -32,11 +30,14 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
-import { serverToday } from '#/server/clock'
+import { workspaceCivilDay } from '#/server/clock'
+import { getWorkspaceTimezone } from '#/server/repos/workspace-settings'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { confidenceBand, detectCandidates } from '#/server/recurring/detect'
+import { forecastSeries, rollupForecasts } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { SERIES_AHEAD, writeSeries } from '#/server/recurring/series-write'
+import { BOOKS } from '#/lib/enums'
 import {
   candidateSchema,
   createSeriesSchema,
@@ -68,6 +69,11 @@ import type {
   UpcomingPeriod,
 } from '#/server/repos/recurring'
 import type { RecurringCandidate, RecurringSeries } from '#/server/db/types'
+import type {
+  RecurringFrequency,
+  TransactionDirection,
+} from '#/server/db/schema'
+import type { SeriesForecast } from '#/server/recurring/forecast'
 import type { WeakestSignal } from '#/server/recurring/detect'
 
 const seriesIdSchema = z.strictObject({
@@ -76,7 +82,12 @@ const seriesIdSchema = z.strictObject({
 
 const listInputSchema = z.strictObject({
   includeInactive: z.boolean().default(false),
+  book: z.enum(BOOKS).optional(),
 })
+
+async function todayFor(scope: Awaited<ReturnType<typeof requireOrg>>) {
+  return workspaceCivilDay(await getWorkspaceTimezone(scope))
+}
 
 /** How far back the detector reads. Eighteen months is enough for an annual series to show thrice. */
 const DETECTION_MONTHS = 18
@@ -85,6 +96,17 @@ const DETECTION_MONTHS = 18
 /* Reads                                                                       */
 /* -------------------------------------------------------------------------- */
 
+function scheduleOf(series: RecurringSeries) {
+  return {
+    frequency: series.frequency as RecurringFrequency,
+    anchorDay: series.anchorDay,
+    anchorMonth: series.anchorMonth,
+    startDate: series.startDate,
+    endDate: series.endDate,
+    maxOccurrences: series.maxOccurrences,
+  }
+}
+
 /** One row of the series list: the series, plus the one period the card is actually about. */
 export interface SeriesListRow {
   readonly series: RecurringSeries
@@ -92,6 +114,7 @@ export interface SeriesListRow {
   readonly next: PeriodView | null
   /** How many unsettled periods are already past their due date. Drives the "overdue" wording. */
   readonly overdueCount: number
+  readonly forecast: SeriesForecast
 }
 
 export interface RecurringOverview {
@@ -101,6 +124,8 @@ export interface RecurringOverview {
   readonly pendingCandidates: number
   /** The day the derivation was made on, so the screen labels "overdue" against the same date. */
   readonly today: string
+  /** Spent / rest of year / next 12 months, one row per currency, integer minor units. */
+  readonly forecast: ReadonlyArray<SeriesForecast>
 }
 
 /**
@@ -115,10 +140,12 @@ export const loadRecurring = createServerFn({ method: 'GET' })
   .inputValidator(listInputSchema)
   .handler(async ({ data }): Promise<RecurringOverview> => {
     const scope = await requireOrg()
-    const today = serverToday()
+    const today = await todayFor(scope)
 
+    // Include paused spending within the selected book; activity filters only the cards.
     const series = await listSeriesRow(scope, {
-      includeInactive: data.includeInactive,
+      includeInactive: true,
+      ...(data.book === undefined ? {} : { book: data.book }),
     })
     for (const one of series) {
       if (one.isActive) {
@@ -131,13 +158,21 @@ export const loadRecurring = createServerFn({ method: 'GET' })
     }
 
     const [upcoming, candidates] = await Promise.all([
-      getUpcomingRow(scope, { today, within: 30, limit: 50 }),
+      getUpcomingRow(scope, {
+        today,
+        within: 30,
+        limit: 50,
+        ...(data.book === undefined ? {} : { book: data.book }),
+      }),
       listCandidatesRow(scope, 'pending'),
     ])
 
     const rows = await Promise.all(
       series.map(async (one): Promise<SeriesListRow> => {
-        const periods = await listPeriodsRow(scope, one.id, today)
+        const [periods, links] = await Promise.all([
+          listPeriodsRow(scope, one.id, today),
+          listSeriesLinkDetails(scope, one.id),
+        ])
         const open = periods.filter(
           (period) =>
             period.derivedStatus === 'upcoming' ||
@@ -149,15 +184,35 @@ export const loadRecurring = createServerFn({ method: 'GET' })
           overdueCount: open.filter(
             (period) => period.derivedStatus === 'overdue',
           ).length,
+          forecast: forecastSeries({
+            schedule: scheduleOf(one),
+            expectedAmountMinor: one.expectedAmountMinor,
+            expectedCurrencyCode: one.expectedCurrencyCode,
+            direction: one.direction as TransactionDirection,
+            isActive: one.isActive,
+            today,
+            links,
+            periods,
+          }),
         }
       }),
     )
 
     return {
-      rows,
+      rows: rows.filter(
+        (row) =>
+          (data.includeInactive || row.series.isActive) &&
+          (data.book === undefined || row.series.book === data.book),
+      ),
       upcoming,
       pendingCandidates: candidates.length,
       today,
+      // An income series forecasts nothing, and a zero block for it would only add a row.
+      forecast: rollupForecasts(
+        rows
+          .filter((row) => row.series.direction === 'expense')
+          .map((row) => row.forecast),
+      ),
     }
   })
 
@@ -167,13 +222,14 @@ export interface SeriesDetail {
   readonly periods: ReadonlyArray<PeriodView>
   readonly links: ReadonlyArray<SeriesLink>
   readonly today: string
+  readonly forecast: SeriesForecast
 }
 
 export const loadSeriesDetail = createServerFn({ method: 'GET' })
   .inputValidator(seriesIdSchema)
   .handler(async ({ data }): Promise<SeriesDetail> => {
     const scope = await requireOrg()
-    const today = serverToday()
+    const today = await todayFor(scope)
     const series = await getSeriesRow(scope, data.seriesId).catch(
       rethrowAsNotFound,
     )
@@ -188,7 +244,22 @@ export const loadSeriesDetail = createServerFn({ method: 'GET' })
       listPeriodsRow(scope, series.id, today),
       listSeriesLinkDetails(scope, series.id),
     ])
-    return { series, periods, links, today }
+    return {
+      series,
+      periods,
+      links,
+      today,
+      forecast: forecastSeries({
+        schedule: scheduleOf(series),
+        expectedAmountMinor: series.expectedAmountMinor,
+        expectedCurrencyCode: series.expectedCurrencyCode,
+        direction: series.direction as TransactionDirection,
+        isActive: series.isActive,
+        today,
+        links,
+        periods,
+      }),
+    }
   })
 
 /**
@@ -238,7 +309,7 @@ export const createSeries = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ readonly seriesId: string }> => {
     const scope = await requireOrg()
     return writeSeries(scope, {
-      today: serverToday(),
+      today: await todayFor(scope),
       ahead: SERIES_AHEAD,
       change: { kind: 'create', input: data },
     })
@@ -263,7 +334,7 @@ export const updateSeries = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await writeSeries(scope, {
-      today: serverToday(),
+      today: await todayFor(scope),
       ahead: SERIES_AHEAD,
       change: { kind: 'update', seriesId: data.seriesId, patch: data.patch },
     })
@@ -283,7 +354,7 @@ export const resumeSeries = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await writeSeries(scope, {
-      today: serverToday(),
+      today: await todayFor(scope),
       ahead: SERIES_AHEAD,
       change: { kind: 'resume', seriesId: data.seriesId },
     })
@@ -375,7 +446,7 @@ export const detectRecurring = createServerFn({ method: 'POST' })
   .inputValidator(z.strictObject({}))
   .handler(async (): Promise<DetectionReport> => {
     const scope = await requireOrg()
-    const today = serverToday()
+    const today = await todayFor(scope)
     const from = monthsBefore(today, DETECTION_MONTHS)
 
     const [rows, series, dismissed] = await Promise.all([
@@ -452,7 +523,7 @@ export const acceptCandidate = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ readonly seriesId: string }> => {
     const scope = await requireOrg()
     return writeSeries(scope, {
-      today: serverToday(),
+      today: await todayFor(scope),
       ahead: SERIES_AHEAD,
       change: {
         kind: 'accept',

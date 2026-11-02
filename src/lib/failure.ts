@@ -13,13 +13,30 @@
  */
 
 import { failureEnvelopeSchema } from '#/lib/failure-envelope'
+import { internalEnvelope } from '#/lib/public-failure'
 
 import type { FailureEnvelope } from '#/lib/failure-envelope'
 
 export function readFailure(error: unknown): FailureEnvelope | null {
   if (typeof error !== 'object' || error === null) return null
-  const parsed = failureEnvelopeSchema.safeParse(
-    (error as { readonly envelope?: unknown }).envelope,
-  )
-  return parsed.success ? parsed.data : null
+  try {
+    const parsed = failureEnvelopeSchema.safeParse(
+      (error as { readonly envelope?: unknown }).envelope,
+    )
+    return parsed.success ? parsed.data : null
+  } catch {
+    // A throwing getter or a revoked proxy: this runs inside a `catch`, so it must not throw again.
+    return null
+  }
+}
+
+/**
+ * What a `catch` block keeps: the envelope the server sent, or the `internal` failure for any value
+ * that is not one (a dropped connection, a plain `Error`, a shape from before the middleware).
+ *
+ * Never falls back to the thrown value's `message` or `String(error)`: a screen that renders what
+ * it holds renders a catalogue sentence of the kind and nothing the error said.
+ */
+export function failureOf(error: unknown): FailureEnvelope {
+  return readFailure(error) ?? internalEnvelope()
 }

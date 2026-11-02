@@ -369,7 +369,7 @@ All five now carry a bootstrap step and an explicit grant: `triage` and `archite
 read-only (`[Read, Grep, Glob, Bash, Skill, TodoWrite]`), `spec-to-tickets` the same plus `Write`
 for its ticket drafts and no `Edit` (run b4bde0ac, 2026-09-25, failed on eleven denied `Write`
 calls without it), `lessons` and `implement-ticket` with `Edit` and `Write` because they write. The
-gate step runs `node scripts/ci/run-validation.mjs`, which reads `validation.commands` — so the
+gate step runs `node scripts/ci/attestation.mjs run`, which reads `validation.commands` — so the
 list lives in one file again, and `.ai/scripts/__tests__/cezar-workflows.test.mjs` fails if any
 workflow copies a command out of it. The same test fails a workflow that prompts without a grant,
 or one that neither bootstraps nor says in a comment why it does not.

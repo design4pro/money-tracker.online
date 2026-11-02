@@ -581,7 +581,7 @@ describe('the envelope across the wire', () => {
 })
 
 describe('registration', () => {
-  it('start.ts registers the middleware as global function middleware and the adapter that carries its envelope, and nothing else', async () => {
+  it('start.ts registers the global failure middleware and the adapter that carries its envelope', async () => {
     const options = await startInstance.getOptions()
     expect(options.functionMiddleware).toEqual([failureRedactionMiddleware])
     expect(options.serializationAdapters).toEqual([publicFailureAdapter])

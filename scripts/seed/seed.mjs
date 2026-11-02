@@ -830,6 +830,121 @@ const RECURRING = [
 ]
 
 /**
+ * Three synthetic liabilities so `/loans` is a populated screen: one overdue leasing (business),
+ * one healthy personal credit, one settled loan. Names and amounts are fixtures, never owner data.
+ *
+ * Baseline e2e day is 2026-08-20, so a July unpaid row is overdue and a September row is upcoming.
+ */
+const LOAN_IDENTITY_RATE = 10_000_000_000
+const LOANS = [
+  {
+    id: 'demo-loan-1',
+    name: 'Studio lease',
+    kind: 'leasing',
+    book: 'business',
+    lender: 'Northshore Leasing Co',
+    instalmentMinor: 850_00,
+    paymentDay: 20,
+    openedOn: '2026-01-20',
+    endsOn: '2026-12-20',
+    status: 'active',
+    instalments: [
+      {
+        dueOn: '2026-06-20',
+        amountMinor: 850_00,
+        status: 'paid',
+        transactionId: 'demo-loan-tx-1',
+        isBuyout: false,
+      },
+      {
+        dueOn: '2026-07-20',
+        amountMinor: 820_00,
+        status: 'upcoming',
+        transactionId: null,
+        isBuyout: false,
+      },
+      {
+        dueOn: '2026-09-20',
+        amountMinor: 790_00,
+        status: 'upcoming',
+        transactionId: null,
+        isBuyout: false,
+      },
+      {
+        dueOn: '2026-12-20',
+        amountMinor: 4_500_00,
+        status: 'upcoming',
+        transactionId: null,
+        isBuyout: true,
+      },
+    ],
+  },
+  {
+    id: 'demo-loan-2',
+    name: 'Equipment credit',
+    kind: 'credit',
+    book: 'personal',
+    lender: 'Harbour Bank',
+    instalmentMinor: 320_00,
+    paymentDay: 15,
+    openedOn: '2026-06-15',
+    endsOn: '2026-11-15',
+    status: 'active',
+    instalments: [
+      {
+        dueOn: '2026-09-15',
+        amountMinor: 320_00,
+        status: 'upcoming',
+        transactionId: null,
+        isBuyout: false,
+      },
+      {
+        dueOn: '2026-10-15',
+        amountMinor: 310_00,
+        status: 'upcoming',
+        transactionId: null,
+        isBuyout: false,
+      },
+    ],
+  },
+  {
+    id: 'demo-loan-3',
+    name: 'Workshop loan',
+    kind: 'loan',
+    book: 'business',
+    lender: 'Harbour Bank',
+    instalmentMinor: 400_00,
+    paymentDay: 15,
+    openedOn: '2025-12-15',
+    endsOn: '2026-05-15',
+    status: 'settled',
+    instalments: [
+      {
+        dueOn: '2025-12-15',
+        amountMinor: 400_00,
+        status: 'paid',
+        transactionId: 'demo-loan-tx-4',
+        isBuyout: false,
+      },
+      {
+        dueOn: '2026-04-15',
+        amountMinor: 400_00,
+        status: 'paid',
+        transactionId: 'demo-loan-tx-2',
+        isBuyout: false,
+      },
+      {
+        dueOn: '2026-05-15',
+        amountMinor: 400_00,
+        status: 'paid',
+        transactionId: 'demo-loan-tx-3',
+        isBuyout: false,
+      },
+    ],
+  },
+]
+
+/**
  * Two automations.
  *
  * **The JSON shapes here are provisional.** `conditions` and `actions` are Zod-defined by
@@ -1216,6 +1331,25 @@ function buildLedger(organizationId, userId) {
         transactionId,
         matchSource: series.autoRecord ? 'auto' : 'rule',
       })
+    }
+  }
+
+  for (const loan of LOANS) {
+    for (const row of loan.instalments) {
+      if (row.transactionId === null) continue
+      settled.push(
+        makeTx({
+          id: row.transactionId,
+          accountId: 'demo-acc-1',
+          direction: 'expense',
+          amountMinor: row.amountMinor,
+          currency: BASE,
+          bookedOn: row.dueOn,
+          categoryId: 'demo-cat-utilities',
+          note: loan.name,
+          paymentMethod: 'transfer',
+        }),
+      )
     }
   }
 
@@ -2123,6 +2257,9 @@ function buildSql(organizationId, userId) {
   // Children before parents in both passes, so the order is right even where the deferred-foreign-
   // key pragma is not honoured.
   const TENANT_SCOPED = [
+    'loan_extra_repayments',
+    'loan_instalments',
+    'loans',
     'savings_goal_contributions',
     'recurring_links',
     'recurring_periods',
@@ -2156,6 +2293,8 @@ function buildSql(organizationId, userId) {
 
   // The child tables have no `id` of their own, so they are reached through the parent's.
   out.push(
+    "delete from `loan_instalments` where `loan_id` like 'demo-%';",
+    "delete from `loan_extra_repayments` where `loan_id` like 'demo-%';",
     "delete from `savings_goal_contributions` where `goal_id` like 'demo-%';",
     "delete from `recurring_links` where `series_id` like 'demo-%';",
     "delete from `recurring_periods` where `series_id` like 'demo-%';",
@@ -2173,6 +2312,7 @@ function buildSql(organizationId, userId) {
     'budgets',
     'transactions',
     'savings_goals',
+    'loans',
     'recurring_series',
     'import_batches',
     'rules',
@@ -2549,6 +2689,116 @@ function buildSql(organizationId, userId) {
       TRANSACTION_COLUMNS,
       [...ledger.settled, ...ledger.planned].map((tx) =>
         transactionRow(tx, org, userId),
+      ),
+    ),
+  )
+
+  out.push(
+    insert(
+      'loans',
+      [
+        'id',
+        'organization_id',
+        'name',
+        'kind',
+        'book',
+        'lender',
+        'account_id',
+        'currency_code',
+        'principal_minor',
+        'ref_principal_minor',
+        'instalment_minor',
+        'ref_instalment_minor',
+        'outstanding_minor',
+        'ref_outstanding_minor',
+        'rate_e10',
+        'annual_rate_e10',
+        'repayment_shape',
+        'payment_frequency',
+        'term_periods',
+        'payment_day',
+        'opened_on',
+        'first_payment_on',
+        'ends_on',
+        'status',
+        'note',
+        'created_at',
+        'updated_at',
+      ],
+      LOANS.map((loan) => [
+        loan.id,
+        org,
+        loan.name,
+        loan.kind,
+        loan.book,
+        loan.lender,
+        'demo-acc-1',
+        BASE,
+        null,
+        null,
+        loan.instalmentMinor,
+        loan.instalmentMinor,
+        null,
+        null,
+        LOAN_IDENTITY_RATE,
+        null,
+        'imported',
+        'monthly',
+        loan.instalments.length,
+        loan.paymentDay,
+        loan.openedOn,
+        loan.instalments[0]?.dueOn ?? loan.openedOn,
+        loan.endsOn,
+        loan.status,
+        null,
+        CREATED_AT,
+        CREATED_AT,
+      ]),
+    ),
+  )
+
+  out.push(
+    insert(
+      'loan_instalments',
+      [
+        'organization_id',
+        'loan_id',
+        'sequence',
+        'due_on',
+        'amount_minor',
+        'currency_code',
+        'ref_amount_minor',
+        'rate_e10',
+        'principal_minor',
+        'interest_minor',
+        'closing_balance_minor',
+        'is_buyout',
+        'status',
+        'settled_transaction_id',
+        'note',
+        'created_at',
+        'updated_at',
+      ],
+      LOANS.flatMap((loan) =>
+        loan.instalments.map((row, index) => [
+          org,
+          loan.id,
+          index + 1,
+          row.dueOn,
+          row.amountMinor,
+          BASE,
+          row.amountMinor,
+          LOAN_IDENTITY_RATE,
+          null,
+          null,
+          null,
+          row.isBuyout,
+          row.status,
+          row.transactionId,
+          null,
+          CREATED_AT,
+          CREATED_AT,
+        ]),
       ),
     ),
   )

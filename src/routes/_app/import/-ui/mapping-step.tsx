@@ -10,6 +10,7 @@ import {
   Switch,
   TextField,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { listAccounts } from '#/server/fns/accounts'
 import {
@@ -674,8 +675,7 @@ export function MappingStep({
       {confirm.isError ? (
         <Notice tone="problem">
           {t('import.mapping.failed', {
-            reason:
-              confirm.error instanceof Error ? confirm.error.message : batchId,
+            reason: t(failureOf(confirm.error).message.key),
           })}
         </Notice>
       ) : null}

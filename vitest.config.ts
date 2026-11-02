@@ -198,6 +198,10 @@ export default defineConfig({
             'e2e/support/__tests__/*.test.ts',
           ],
           testTimeout: 30_000,
+          // beforeEach git-init cases are hooks, so they use hookTimeout (default 10000), not
+          // testTimeout. Under the related-test pre-commit fan-out they starved at 10 s and
+          // passed with this budget (same contention as the 30 s testTimeout above).
+          hookTimeout: 30_000,
           restoreMocks: true,
         },
       },

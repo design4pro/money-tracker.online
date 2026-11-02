@@ -16,9 +16,19 @@ import { describe, expect, it } from 'vitest'
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' })
 
 /**
+ * Vendored skills, never edited here: `om-*` is refreshed from its lock by `pnpm install-skills`,
+ * `super-*` and `ui-refine-loop` by re-running the super-board installer. Their examples name
+ * paths of whatever project they run in.
+ */
+const VENDORED_SKILLS = [
+  '.claude/skills/om-',
+  '.claude/skills/super-',
+  '.claude/skills/ui-refine-loop/',
+]
+
+/**
  * The documents an agent reads as instructions: the router, what it routes to, the review and
- * process rules, the skills and the subagents. The vendored `om-*` skills are left out: they are
- * refreshed from their lock by `pnpm install-skills`, never edited here.
+ * process rules, the skills and the subagents. The vendored skills above are left out.
  */
 const DOCUMENTS = git(
   'ls-files',
@@ -38,7 +48,11 @@ const DOCUMENTS = git(
   'docs/agents/*.md',
 )
   .split('\n')
-  .filter((document) => document && !document.startsWith('.claude/skills/om-'))
+  .filter(
+    (document) =>
+      document &&
+      !VENDORED_SKILLS.some((prefix) => document.startsWith(prefix)),
+  )
 
 /** A token is checked when it starts at one of the repository's own top-level directories. */
 const REPO_PATH = /^(\.ai|\.claude|\.github|src|docs|scripts|e2e|drizzle)\//

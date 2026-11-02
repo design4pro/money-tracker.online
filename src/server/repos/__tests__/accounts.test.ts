@@ -57,6 +57,8 @@ import {
   getAccountBalanceOnSchema,
   listAccountGroups,
   listAccounts,
+  moveAccountToGroup,
+  moveAccountToGroupSchema,
   reorderAccountGroups,
   reorderAccounts,
   restoreAccount,
@@ -1391,6 +1393,241 @@ describe('the accounts repository source', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('account groups', () => {
+  async function moveFixture() {
+    const account = await createAccount(scope, EVERYDAY, conversion)
+    const source = await createAccountGroup(scope, { name: 'Source' })
+    const target = await createAccountGroup(scope, { name: 'Target' })
+    await setAccountGroupMembers(scope, source.id, [account.id])
+    return {
+      account,
+      source,
+      target,
+      input: {
+        accountId: account.id,
+        fromGroupId: source.id,
+        toGroupId: target.id,
+      },
+    }
+  }
+
+  it('adds idempotently, removes, and validates both required nullable keys', async () => {
+    const { account, source, target } = await moveFixture()
+    const add = {
+      accountId: account.id,
+      fromGroupId: null,
+      toGroupId: target.id,
+    }
+    await moveAccountToGroup(scope, add)
+    await moveAccountToGroup(scope, add)
+    expect(
+      (await listAccountGroups(scope)).find(
+        ({ group }) => group.id === target.id,
+      )?.accountIds,
+    ).toEqual([account.id])
+    await moveAccountToGroup(scope, {
+      ...add,
+      fromGroupId: source.id,
+      toGroupId: null,
+    })
+    expect(
+      (await listAccountGroups(scope)).find(
+        ({ group }) => group.id === source.id,
+      )?.accountIds,
+    ).toEqual([])
+    await expect(
+      moveAccountToGroup(scope, {
+        ...add,
+        fromGroupId: source.id,
+        toGroupId: null,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    for (const input of [
+      { accountId: account.id, fromGroupId: null },
+      { accountId: account.id, toGroupId: null },
+      { ...add, extra: true },
+    ]) {
+      expect(moveAccountToGroupSchema.safeParse(input).success).toBe(false)
+      await expect(
+        moveAccountToGroup(scope, input as typeof add),
+      ).rejects.toHaveProperty('name', 'ZodError')
+    }
+  })
+
+  it('keeps an existing target in place and deletes only the source', async () => {
+    const { account, source, target, input } = await moveFixture()
+    const second = await createAccount(
+      scope,
+      { ...EVERYDAY, name: 'Second' },
+      conversion,
+    )
+    await setAccountGroupMembers(scope, target.id, [account.id, second.id])
+    executed.length = 0
+    await moveAccountToGroup(scope, input)
+    expect(
+      executed.filter((query) => /^(insert|update|delete)/.test(query)),
+    ).toHaveLength(1)
+    const groups = await listAccountGroups(scope)
+    expect(
+      groups.find(({ group }) => group.id === source.id)?.accountIds,
+    ).toEqual([])
+    expect(
+      groups.find(({ group }) => group.id === target.id)?.accountIds,
+    ).toEqual([account.id, second.id])
+  })
+
+  it('appends after the target group’s highest position', async () => {
+    const { account, target, input } = await moveFixture()
+    const second = await createAccount(
+      scope,
+      { ...EVERYDAY, name: 'Second' },
+      conversion,
+    )
+    await setAccountGroupMembers(scope, target.id, [second.id])
+    await db
+      .update(accountGroupMembers)
+      .set({ position: 17 })
+      .where(eq(accountGroupMembers.groupId, target.id))
+    await moveAccountToGroup(scope, input)
+    expect(
+      (await listAccountGroups(scope)).find(
+        ({ group }) => group.id === target.id,
+      )?.accountIds,
+    ).toEqual([second.id, account.id])
+    const rows = await db
+      .select()
+      .from(accountGroupMembers)
+      .where(eq(accountGroupMembers.groupId, target.id))
+    expect(rows.find((row) => row.accountId === account.id)?.position).toBe(18)
+  })
+
+  it('writes nothing for same-group and both-null calls, after validating ids', async () => {
+    const { input } = await moveFixture()
+    executed.length = 0
+    await moveAccountToGroup(scope, { ...input, toGroupId: input.fromGroupId })
+    await moveAccountToGroup(scope, {
+      ...input,
+      fromGroupId: null,
+      toGroupId: null,
+    })
+    expect(
+      executed.filter((query) => /^(insert|update|delete)/.test(query)),
+    ).toEqual([])
+    await expect(
+      moveAccountToGroup(scope, {
+        ...input,
+        accountId: 'missing',
+        fromGroupId: null,
+        toGroupId: null,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+  })
+
+  it.each([false, true])(
+    'refuses a stale source without adding, target present: %s',
+    async (present) => {
+      const { account, source, target, input } = await moveFixture()
+      await setAccountGroupMembers(scope, source.id, [])
+      if (present) await setAccountGroupMembers(scope, target.id, [account.id])
+      const before = await listAccountGroups(scope)
+      await expect(moveAccountToGroup(scope, input)).rejects.toEqual(
+        new NotFoundError('account group membership', account.id),
+      )
+      expect(await listAccountGroups(scope)).toEqual(before)
+    },
+  )
+
+  it('refuses a shared-workspace member before looking up any supplied ids', async () => {
+    await addSecondMember()
+    const memberScope = createScope(scope.db, { ...scope.ctx, role: 'member' })
+    executed.length = 0
+    await expect(
+      moveAccountToGroup(memberScope, {
+        accountId: 'missing',
+        fromGroupId: 'missing',
+        toGroupId: null,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError)
+    expect(
+      executed.some((query) => /from "(accounts|account_groups)"/.test(query)),
+    ).toBe(false)
+  })
+
+  it('keeps the source when a target membership appears between the read and update', async () => {
+    const { account, target, input } = await moveFixture()
+    const update = scope.db.update.bind(scope.db)
+    vi.spyOn(scope.db, 'update').mockImplementationOnce((table) => {
+      // The proxy callback executes before SQLite awaits its result, so this inserts at the write boundary.
+      void db
+        .insert(accountGroupMembers)
+        .values({
+          organizationId: scope.ctx.organizationId,
+          groupId: target.id,
+          accountId: account.id,
+          position: 7,
+        })
+        .run()
+      return update(table)
+    })
+    await expect(moveAccountToGroup(scope, input)).rejects.toThrow()
+    const groups = await listAccountGroups(scope)
+    expect(
+      groups.find(({ group }) => group.id === input.fromGroupId)?.accountIds,
+    ).toEqual([account.id])
+    expect(
+      groups.find(({ group }) => group.id === target.id)?.accountIds,
+    ).toEqual([account.id])
+  })
+
+  it('keeps the source when the target disappears before the conditional delete', async () => {
+    const { account, target, input } = await moveFixture()
+    await setAccountGroupMembers(scope, target.id, [account.id])
+    const remove = scope.db.delete.bind(scope.db)
+    vi.spyOn(scope.db, 'delete').mockImplementationOnce((table) => {
+      void remove(accountGroupMembers)
+        .where(eq(accountGroupMembers.groupId, target.id))
+        .run()
+      return remove(table)
+    })
+    await expect(moveAccountToGroup(scope, input)).rejects.toBeInstanceOf(
+      NotFoundError,
+    )
+    const groups = await listAccountGroups(scope)
+    expect(
+      groups.find(({ group }) => group.id === input.fromGroupId)?.accountIds,
+    ).toEqual([account.id])
+    expect(
+      groups.find(({ group }) => group.id === target.id)?.accountIds,
+    ).toEqual([])
+  })
+
+  it('moves a membership to the end of its target without touching another group', async () => {
+    const { id: accountId } = await createAccount(scope, EVERYDAY, conversion)
+    const source = await createAccountGroup(scope, { name: 'Source' })
+    const target = await createAccountGroup(scope, { name: 'Target' })
+    const third = await createAccountGroup(scope, { name: 'Third' })
+    await setAccountGroupMembers(scope, source.id, [accountId])
+    await setAccountGroupMembers(scope, third.id, [accountId])
+    executed.length = 0
+    await moveAccountToGroup(scope, {
+      accountId,
+      fromGroupId: source.id,
+      toGroupId: target.id,
+    })
+    expect(
+      executed.filter((query) => /^(insert|update|delete)/.test(query)),
+    ).toHaveLength(1)
+    const groups = await listAccountGroups(scope)
+    expect(
+      groups.find(({ group }) => group.id === source.id)?.accountIds,
+    ).toEqual([])
+    expect(
+      groups.find(({ group }) => group.id === target.id)?.accountIds,
+    ).toEqual([accountId])
+    expect(
+      groups.find(({ group }) => group.id === third.id)?.accountIds,
+    ).toEqual([accountId])
+  })
+
   it('creates, lists and orders groups', async () => {
     const first = await createAccountGroup(scope, { name: 'Joint' })
     const second = await createAccountGroup(scope, { name: 'Business' })

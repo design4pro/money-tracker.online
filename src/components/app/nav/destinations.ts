@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Landmark,
   LayoutDashboard,
   PiggyBank,
   RefreshCw,
@@ -87,6 +88,13 @@ const GOALS: Destination = {
   Icon: Target,
 }
 
+const LOANS: Destination = {
+  id: 'loans',
+  href: '/loans',
+  label: 'nav.loans',
+  Icon: Landmark,
+}
+
 export const SETTINGS: Destination = {
   id: 'settings',
   href: '/settings',
@@ -109,6 +117,7 @@ export const PRIMARY_DESTINATIONS: ReadonlyArray<Destination> = [
   BUDGETS,
   RECURRING,
   GOALS,
+  LOANS,
 ]
 
 /** Every destination, in the order both navigations draw them. */

@@ -193,6 +193,8 @@ Every PR passes the full validation gate before review sign-off. **The command l
 
 Any non-zero exit fails the gate and blocks the PR. The implementing skills run the configured gate before opening a PR, and `om-check-and-commit` runs it before pushing a hand-worked branch. Changing the gate means editing that one key; anything that needs the list at runtime reads it from there.
 
+**Agent attestation (ADR 0033).** `node scripts/ci/attestation.mjs run` runs that gate on the committed head, one gate per host at a time, and keeps the record; `attest --pr <n>` posts it as a `<!-- agent-attestation -->` comment after the last push. On a pull request whose head tree it matches, and whose diff stays out of the gate's own files and the `risk-high` paths, CI skips `verify` and `unit tests · coverage`; the e2e legs always run. The push to `develop` still runs everything before a deploy. `implement-ticket` runs `run` as its gate step and `attest` before the merge.
+
 ## Repo automations
 
 The cezar cockpit runs this process unattended: an automation watches GitHub for one event, and launches one workflow from `.ai/cezar/workflows/` when a record matches its filters. The automations this repository runs are tabulated in `## This repository`; the definitions are committed, and the cockpit's copy under `.ai/cezar/` is runtime state that is rebuilt from them.

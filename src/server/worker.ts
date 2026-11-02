@@ -36,11 +36,7 @@ import './notify/install'
 
 import { runBudgetPeriodSweep } from './cron/budget-periods'
 import { runBudgetThresholdSweep } from './cron/budget-thresholds'
-import {
-  cronToday,
-  runRecurringHourly,
-  runRecurringReminderSweep,
-} from './cron/recurring'
+import { runRecurringHourly, runRecurringReminderSweep } from './cron/recurring'
 import { dbFromEnv } from './db/from-env'
 import { handleTaskBatch } from './queue/dispatch'
 import { taskHandlers } from './queue/handlers'
@@ -137,32 +133,35 @@ export default {
     // owed and still warn, so "the nightly FX refresh has never run" stays visible in Workers
     // Observability rather than being hidden by a slot that succeeds for a different reason.
     if (controller.cron === RECURRING_CRON) {
-      // One set of arguments for both halves of the slot, for the reason the reminder branch
-      // gives below: the day is read once and both sweeps see the same workspaces on it.
-      const args = await recurringCronArgs(env, logger)
+      const now = new Date()
+      const args = await recurringCronArgs(env, logger, now)
 
       const recurring = await runRecurringHourly(args)
       logger.info('recurring hourly sweep finished', { ...recurring })
 
-      // Budget periods are materialised here because `12-S2` puts them on this branch, and
-      // because the alternative — materialising only when somebody edits a budget — leaves an
-      // untouched budget with no period covering today the moment its current one ends.
-      const periods = await runBudgetPeriodSweep(args)
+      // Budget periods stay on the UTC calendar day (`docs/MONEY.md` §6.2). Recurring due/overdue
+      // uses each workspace's civil day inside `runRecurringHourly`.
+      const periods = await runBudgetPeriodSweep({
+        ...args,
+        today: now.toISOString().slice(0, 10),
+      })
       logger.info('budget period sweep finished', { ...periods })
       return
     }
 
     if (controller.cron === REMINDER_CRON) {
-      // One set of arguments for both halves of the slot: the day is read once, the scope list is
-      // queried once, and the two sweeps see exactly the same workspaces on the same date.
-      const args = await recurringCronArgs(env, logger)
+      const now = new Date()
+      const args = await recurringCronArgs(env, logger, now)
 
       const reminders = await runRecurringReminderSweep(args)
       logger.info('recurring reminder sweep finished', { ...reminders })
 
       // `MarkerStore` and `ThresholdMarkerStore` are the same two methods declared in two domains
       // that deliberately do not depend on each other, so the KV store satisfies both structurally.
-      const thresholds = await runBudgetThresholdSweep(args)
+      const thresholds = await runBudgetThresholdSweep({
+        ...args,
+        today: now.toISOString().slice(0, 10),
+      })
       logger.info('budget threshold sweep finished', { ...thresholds })
 
       // Returned, not fallen through: this slot now has handlers, and reaching the warning below
@@ -191,17 +190,18 @@ export default {
  * either branch touches goes through the same tenant predicate a request would. There is no cron
  * super-user that can see across workspaces.
  *
- * The day is read **once**, here, and passed down; nothing below reads a clock. That is what makes
- * the whole path testable at a pinned date.
+ * The civil day is computed per workspace inside the cron (workspace timezone, default
+ * Warsaw). Tests pin `today` on the args object so they never read a clock.
  */
 async function recurringCronArgs(
   env: Cloudflare.Env,
   logger: Logger,
+  now: Date,
 ): Promise<RecurringCronArgs> {
   return {
     scopes: await listCronScopes(dbFromEnv(env)),
     markers: createKvMarkerStore(env.KV),
-    today: cronToday(),
+    now,
     logger,
   }
 }
