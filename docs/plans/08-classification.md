@@ -18,6 +18,17 @@ children unless overridden.
 
 ## Stage 08-S1 — Categories
 
+Delivered: 2026-11-02 - the owned paths listed below exist as built, merged in #740 (tenant
+isolation, money case, handler pins), #741 (write gate), #744 (named refusal), #795 (standard-set
+seed), #796 (empty state) and #798 (browser spec); `pnpm vitest run` on
+`src/server/repos/__tests__/categories.test.ts`,
+`src/server/repos/__tests__/tenant-isolation.test.ts`,
+`src/server/repos/__tests__/money-invariants.test.ts`,
+`src/server/fns/__tests__/categories.test.ts`, `src/components/app/categories`,
+`src/components/app/tree` and `src/routes/_app/categories` passes 491 tests in 12 files (113, 155,
+90, 53, 21, 22 and 37), 26 of them the categories section of `tenant-isolation.test.ts` and 1 of
+them money case 22; `e2e/categories.visual.spec.ts` is run by CI, not by the gate.
+
 ### Stage id
 
 `08-S1` · Wave 2 · effort **L**.
@@ -43,7 +54,7 @@ children unless overridden.
 - `src/server/repos/__tests__/tenant-isolation.test.ts` — edit (categories section)
 - `src/server/repos/__tests__/money-invariants.test.ts` — edit (case 22)
 - `src/server/fns/__tests__/categories.test.ts` — new
-- `e2e/categories.visual.spec.ts` — new (Phase 3 refused-drag case; Phase 5 still open as #737)
+- `e2e/categories.visual.spec.ts` — new (refused drag, axe at rest and on refusal, keyboard menu, empty state)
 
 The plan once named `src/routes/_app/settings/categories.tsx`,
 `src/routes/_app/settings/-ui/category-tree.tsx`, `src/routes/_app/settings/-ui/category-form.tsx`
@@ -152,10 +163,10 @@ descendants" implementation is exactly how a category edit would start rewriting
   restore does not; the write gate; the standard-set seed.
 - `src/server/fns/__tests__/categories.test.ts`: every handler calls `requireOrg()`, none opens a
   ledger batch, the strict schemas refuse unknown fields.
-- Browser evidence: `/categories` with the refused drag in `e2e/categories.visual.spec.ts` (Phase 3,
-  #734). Axe, the keyboard _Move to…_ menu and the empty-state pair are Phase 5 (#737, PR #798,
-  still open). Frames are 360 / 1280 / 2560 px, both themes. The refusal is the point of `CLS-01`
-  and a resting tree is not evidence about it.
+- Browser evidence: `/categories` in `e2e/categories.visual.spec.ts` (#744 the refused drag, #798
+  axe at rest and on the refusal, the keyboard _Move to…_ menu, the empty-state pair). Frames are
+  360 / 1280 / 2560 px, both themes. The refusal is the point of `CLS-01` and a resting tree is not
+  evidence about it.
 - Console silent through a refused re-parent.
 
 ### Definition of done
