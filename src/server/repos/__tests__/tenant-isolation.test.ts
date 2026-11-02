@@ -40,7 +40,7 @@ import { isNotFound } from '@tanstack/react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { asCurrencyCode } from '#/lib/money'
-import { organization, user } from '#/server/db/auth-schema'
+import { member, organization, user } from '#/server/db/auth-schema'
 import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
@@ -177,6 +177,7 @@ import {
   markInstalmentPaid,
   updateLoan,
 } from '../loans'
+import { assertMayAdminister } from '../administer'
 import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -1215,6 +1216,7 @@ describe('no repository forks the tenant predicate', () => {
   it('covers every repository in the directory, so the check cannot lose its subject', () => {
     const names = repositorySources().map((file) => file.name)
     expect(names).toContain('accounts.ts')
+    expect(names).toContain('administer.ts')
     expect(names).toContain('transactions.ts')
     expect(names).toContain('transaction-queries.ts')
     expect(names).toContain('workspace-currencies.ts')
@@ -1260,6 +1262,45 @@ describe('no repository forks the tenant predicate', () => {
     // tenant column by design — it also composes `tenantFilter` for everything that does, so it
     // is not an exemption here, it simply passes.
     expect(offenders.map((file) => file.name)).toEqual([])
+  })
+})
+
+describe('the shared administer gate counts only this workspace’s members', () => {
+  it('lets a member through a solo workspace even when another workspace is shared', async () => {
+    const world = await createBudgetWorld()
+    await world.db.insert(user).values({
+      id: 'user-c',
+      name: 'C',
+      email: 'c@example.com',
+      emailVerified: true,
+      createdAt: budgetWorldNow,
+      updatedAt: budgetWorldNow,
+    })
+    await world.db.insert(member).values({
+      id: 'mem-b2',
+      organizationId: 'org-b',
+      userId: 'user-c',
+      role: 'member',
+      createdAt: budgetWorldNow,
+    })
+
+    const soloMember = createScope(world.db, {
+      userId: 'user-a',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+    harnessExecuted.length = 0
+    await expect(
+      assertMayAdminister(soloMember, 'edit an account'),
+    ).resolves.toBeUndefined()
+
+    const memberCounts = harnessExecuted.filter((statement) =>
+      statement.includes('from "member"'),
+    )
+    expect(memberCounts.length).toBeGreaterThan(0)
+    for (const statement of memberCounts) {
+      expect(statement).toContain('organization_id')
+    }
   })
 })
 

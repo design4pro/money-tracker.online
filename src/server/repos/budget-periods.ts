@@ -47,9 +47,10 @@ import {
 } from '#/server/budgets/period'
 import { rolloverOf } from '#/server/budgets/rollover'
 
+import { assertMayAdminister } from './administer'
 import { createTenantTableAccess } from './base'
 import { ConflictError, NotFoundError } from './errors'
-import { assertMayAdministerBudgets, budgetSpend, getBudget } from './budgets'
+import { budgetSpend, getBudget } from './budgets'
 
 import type { SQL } from 'drizzle-orm'
 import type { Minor } from '#/lib/money'
@@ -335,7 +336,7 @@ export async function closePeriod(
 ): Promise<MaterialisedPeriod> {
   const parsed = periodKeySchema.parse(input)
   const budget = await getBudget(scope, parsed.budgetId)
-  await assertMayAdministerBudgets(scope, 'close a budget period')
+  await assertMayAdminister(scope, 'close a budget period')
 
   const found = await periodAccess.findOne(
     scope,
@@ -373,7 +374,7 @@ export async function reopenPeriod(
 ): Promise<MaterialisedPeriod> {
   const parsed = periodKeySchema.parse(input)
   const budget = await getBudget(scope, parsed.budgetId)
-  await assertMayAdministerBudgets(scope, 'reopen a budget period')
+  await assertMayAdminister(scope, 'reopen a budget period')
 
   const rows = await periodAccess.updateWhere(
     scope,
