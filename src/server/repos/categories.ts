@@ -34,9 +34,10 @@
  *
  * **Writes are gated, reads are not.** Every write — create, edit, archive, restore, delete,
  * reorder, move and the standard-set seed — needs `owner | admin` once the workspace has a second
- * member ({@link assertMayAdminister}), because a rename, an archive or a re-parent regroups what
- * every other member files transactions under. {@link listCategories}, {@link getCategory},
- * {@link spendingByCategory} and {@link assertCategoryUsable} stay open to every member.
+ * member ({@link import('./administer').assertMayAdminister}), because a rename, an archive or a
+ * re-parent regroups what every other member files transactions under. {@link listCategories},
+ * {@link getCategory}, {@link spendingByCategory} and {@link assertCategoryUsable} stay open to
+ * every member.
  *
  * {@link spendingByCategory} is the read the dashboard donut is drawn from. It rolls a child's
  * spending up into its parent, sums the **stored** `ref_amount_minor` with SQL's integer `SUM`, and
@@ -60,7 +61,6 @@ import { z } from 'zod'
 import { isSupportedLocale } from '#/lib/i18n'
 import { ZERO_MINOR, asMinor } from '#/lib/money'
 import { STANDARD_CATEGORIES } from '#/server/categories/standard-set'
-import { member } from '#/server/db/auth-schema'
 import {
   CATEGORY_KINDS,
   accounts,
@@ -71,8 +71,9 @@ import {
 import { newId } from '#/server/db/ids'
 import { pauseRulesReferencing } from '#/server/rules/integrity'
 
+import { assertMayAdminister } from './administer'
 import { assertScopedWrite, createTenantRepository, tenantFilter } from './base'
-import { ConflictError, ForbiddenError, NotFoundError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 import { scopedTransactionFilter } from './transactions'
 
 import { CATEGORY_ICON_NAMES } from '#/components/app/categories/icon-names'
@@ -354,32 +355,12 @@ const CATEGORY_ROWS_PER_INSERT = Math.floor(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Every category write needs `owner | admin` — but only in a shared workspace.
- *
- * The same rule, and the same reasoning, as `repos/accounts`: a solo workspace has one member who
- * is its owner, so a role gate there can only ever produce a bug report. The member count is read
- * live rather than taken from the session, because a claim minted before somebody was invited is a
- * claim about a workspace that no longer exists.
- *
- * Each write calls it right after its input is parsed and before it reads or writes anything:
- * validation stays shape and this stays permission, and a refused member learns nothing about
- * which ids exist (the per-id tenant refusal runs only once the gate is passed). The reads and
- * {@link assertCategoryUsable} are deliberately not gated — every member files transactions under
- * these categories and has to pick one.
+ * Each write calls {@link import('./administer').assertMayAdminister} right after its input is
+ * parsed and before it reads or writes anything: validation stays shape and this stays permission,
+ * and a refused member learns nothing about which ids exist (the per-id tenant refusal runs only
+ * once the gate is passed). The reads and {@link assertCategoryUsable} are deliberately not gated
+ * — every member files transactions under these categories and has to pick one.
  */
-async function assertMayAdminister(
-  scope: TenantScope,
-  action: string,
-): Promise<void> {
-  if (scope.ctx.role === 'owner' || scope.ctx.role === 'admin') return
-  const rows = await scope.db
-    .select({ value: count() })
-    .from(member)
-    .where(tenantFilter(scope, member))
-  if ((rows.at(0)?.value ?? 0) > 1) {
-    throw new ForbiddenError(action, ['owner', 'admin'])
-  }
-}
 
 /** Whether `parent` may hold children: the tree is two levels, so only a top-level row can. */
 function canTakeChildren(parent: Pick<CategoryRow, 'parentId'>): boolean {

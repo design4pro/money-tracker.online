@@ -58,6 +58,7 @@ import {
   exchangeRates,
   loanInstalments,
   organizationCurrencies,
+  recurringLinks,
   transactionSplits,
   transactions,
 } from '#/server/db/schema'
@@ -104,6 +105,7 @@ import {
   listPeriods as listSeriesPeriods,
   markPaid,
   periodVarianceMinor,
+  sumSeriesSpendThisYear,
 } from '../recurring'
 import {
   listPeriods,
@@ -984,6 +986,66 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
     expect(Number.isInteger(forecast.spentThisYearMinor)).toBe(true)
     expect(Number.isInteger(forecast.restOfYearMinor)).toBe(true)
     expect(Number.isInteger(forecast.next12MonthsMinor)).toBe(true)
+  })
+
+  it('sums overview spent this year as a bounded integer aggregate, not a conversion', async () => {
+    const world = await createBudgetWorld()
+    const series = await createSeries(world.scope, {
+      name: 'Rent',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    await seedTransaction(world.db, {
+      id: 'overview-spend-this-year',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'overview-spend-last-year',
+      refAmountMinor: 100_00,
+      bookedOn: '2025-12-31',
+    })
+    await world.db.insert(recurringLinks).values([
+      {
+        organizationId: 'org-a',
+        seriesId: series.id,
+        transactionId: 'overview-spend-this-year',
+        createdAt: new Date('2026-03-15T10:00:00.000Z'),
+        updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+      },
+      {
+        organizationId: 'org-a',
+        seriesId: series.id,
+        transactionId: 'overview-spend-last-year',
+        createdAt: new Date('2026-03-15T10:00:00.000Z'),
+        updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+      },
+    ])
+
+    budgetExecuted.length = 0
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today: '2026-06-15',
+      seriesIds: [series.id],
+    })
+    expect(rows).toEqual([
+      {
+        seriesId: series.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 100_00,
+      },
+    ])
+    expect(Number.isInteger(rows[0]?.spentThisYearMinor)).toBe(true)
+    expect(
+      budgetExecuted.some(
+        (query) =>
+          query.includes('sum(') &&
+          query.includes('booked_on') &&
+          !query.includes('exchange_rates'),
+      ),
+    ).toBe(true)
   })
 
   it('makes the match tolerance an integer window in minor units, inclusive at its edge', () => {

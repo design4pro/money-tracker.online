@@ -57,7 +57,6 @@ import {
 import { z } from 'zod'
 
 import { ZERO_MINOR, asCurrencyCode, asMinor } from '#/lib/money'
-import { member } from '#/server/db/auth-schema'
 import {
   BUDGET_KINDS,
   BUDGET_PERIODS,
@@ -75,13 +74,14 @@ import {
 } from '#/server/db/schema'
 import { newId } from '#/server/db/ids'
 
+import { assertMayAdminister } from './administer'
 import {
   assertWithinLimit,
   createTenantRepository,
   createTenantTableAccess,
   tenantFilter,
 } from './base'
-import { ConflictError, ForbiddenError, NotFoundError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 import { scopedTransactionFilter } from './transactions'
 import { computeRefAmount } from '#/server/transactions/ref-amount'
 import { toTransaction } from '#/server/transactions/row'
@@ -318,28 +318,6 @@ export const BUDGET_QUOTA_METRIC = 'budgets'
 /* -------------------------------------------------------------------------- */
 /* Guards                                                                     */
 /* -------------------------------------------------------------------------- */
-
-/**
- * The destructive writes need `owner | admin` — but only in a shared workspace.
- *
- * The same rule, and the same reasoning, as `repos/categories`: a solo workspace has one member
- * who is its owner, so a role gate there can only ever produce a bug report. The member count is
- * read live rather than taken from the session, because a claim minted before somebody was invited
- * is a claim about a workspace that no longer exists.
- */
-export async function assertMayAdministerBudgets(
-  scope: TenantScope,
-  action: string,
-): Promise<void> {
-  if (scope.ctx.role === 'owner' || scope.ctx.role === 'admin') return
-  const rows = await scope.db
-    .select({ value: count() })
-    .from(member)
-    .where(tenantFilter(scope, member))
-  if ((rows.at(0)?.value ?? 0) > 1) {
-    throw new ForbiddenError(action, ['owner', 'admin'])
-  }
-}
 
 /** Every id belongs to this workspace, or the call is a {@link NotFoundError}. */
 async function requireOwnedCategories(
@@ -985,7 +963,7 @@ export async function archiveBudget(
   budgetId: string,
 ): Promise<Budget> {
   const id = idSchema.parse(budgetId)
-  await assertMayAdministerBudgets(scope, 'archive a budget')
+  await assertMayAdminister(scope, 'archive a budget')
   return toBudget(
     await budgetRepo.requireUpdate(scope, id, {
       status: 'archived',
@@ -1000,7 +978,7 @@ export async function restoreBudget(
   budgetId: string,
 ): Promise<Budget> {
   const id = idSchema.parse(budgetId)
-  await assertMayAdministerBudgets(scope, 'restore a budget')
+  await assertMayAdminister(scope, 'restore a budget')
   return toBudget(
     await budgetRepo.requireUpdate(scope, id, {
       status: 'active',
@@ -1021,7 +999,7 @@ export async function deleteBudget(
   budgetId: string,
 ): Promise<void> {
   const id = idSchema.parse(budgetId)
-  await assertMayAdministerBudgets(scope, 'delete a budget')
+  await assertMayAdminister(scope, 'delete a budget')
   await budgetRepo.requireById(scope, id)
 
   const closed = await countClosedPeriods(scope, id)

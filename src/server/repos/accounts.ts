@@ -61,7 +61,6 @@ import {
 import { isLiabilityCategory } from '#/server/catalog/account-types'
 import { latestCalendarDayOnEarth } from '#/server/calendar-day'
 import { serverToday } from '#/server/clock'
-import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
 import {
   pauseRulesReferencing,
@@ -76,6 +75,7 @@ import {
   transactions,
 } from '#/server/db/schema'
 
+import { assertMayAdminister } from './administer'
 import {
   assertScopedWrite,
   assertWithinLimit,
@@ -85,7 +85,7 @@ import {
   tenantFilter,
   touchLedgerAccount,
 } from './base'
-import { ConflictError, ForbiddenError, NotFoundError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 // The base currency is read in one place in this codebase. This module and `./workspace-currencies`
 // were written in parallel against the same `is_base` row, and two readers of it is two chances to
 // answer a different currency after a base change.
@@ -457,36 +457,6 @@ function toAccount(row: typeof accounts.$inferSelect): Account {
  */
 function openingDayOf(row: typeof accounts.$inferSelect): string {
   return row.createdAt.toISOString().slice(0, 10)
-}
-
-/* -------------------------------------------------------------------------- */
-/* Authorisation                                                              */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The destructive writes need `owner | admin` — **but only in a shared workspace**.
- *
- * A solo workspace has one member and that member is its owner, so a role gate there can only ever
- * produce a bug report. The member count is read live rather than taken from the session, for the
- * same reason `requireOrg()` re-reads the role: a claim minted before somebody was invited is a
- * claim about a workspace that no longer exists.
- */
-async function assertMayAdminister(
-  scope: TenantScope,
-  action: string,
-): Promise<void> {
-  if (scope.ctx.role === 'owner' || scope.ctx.role === 'admin') {
-    return
-  }
-  // `member` is an auth table rather than a finance one, but it carries the same discriminator and
-  // the same rule applies to it: the predicate is composed by the base, not spelled out here.
-  const rows = await scope.db
-    .select({ value: count() })
-    .from(member)
-    .where(tenantFilter(scope, member))
-  if ((rows.at(0)?.value ?? 0) > 1) {
-    throw new ForbiddenError(action, ['owner', 'admin'])
-  }
 }
 
 /* -------------------------------------------------------------------------- */

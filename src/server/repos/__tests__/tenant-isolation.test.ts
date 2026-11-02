@@ -40,7 +40,7 @@ import { isNotFound } from '@tanstack/react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { asCurrencyCode } from '#/lib/money'
-import { organization, user } from '#/server/db/auth-schema'
+import { member, organization, user } from '#/server/db/auth-schema'
 import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
@@ -160,6 +160,7 @@ import {
   listSeriesLinkDetails,
   markPaid,
   removeUnpaidOpenPeriods,
+  sumSeriesSpendThisYear,
 } from '../recurring'
 import {
   getWorkspaceTimezone,
@@ -177,6 +178,7 @@ import {
   markInstalmentPaid,
   updateLoan,
 } from '../loans'
+import { assertMayAdminister } from '../administer'
 import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -1216,6 +1218,7 @@ describe('no repository forks the tenant predicate', () => {
   it('covers every repository in the directory, so the check cannot lose its subject', () => {
     const names = repositorySources().map((file) => file.name)
     expect(names).toContain('accounts.ts')
+    expect(names).toContain('administer.ts')
     expect(names).toContain('transactions.ts')
     expect(names).toContain('transaction-queries.ts')
     expect(names).toContain('workspace-currencies.ts')
@@ -1261,6 +1264,45 @@ describe('no repository forks the tenant predicate', () => {
     // tenant column by design — it also composes `tenantFilter` for everything that does, so it
     // is not an exemption here, it simply passes.
     expect(offenders.map((file) => file.name)).toEqual([])
+  })
+})
+
+describe('the shared administer gate counts only this workspace’s members', () => {
+  it('lets a member through a solo workspace even when another workspace is shared', async () => {
+    const world = await createBudgetWorld()
+    await world.db.insert(user).values({
+      id: 'user-c',
+      name: 'C',
+      email: 'c@example.com',
+      emailVerified: true,
+      createdAt: budgetWorldNow,
+      updatedAt: budgetWorldNow,
+    })
+    await world.db.insert(member).values({
+      id: 'mem-b2',
+      organizationId: 'org-b',
+      userId: 'user-c',
+      role: 'member',
+      createdAt: budgetWorldNow,
+    })
+
+    const soloMember = createScope(world.db, {
+      userId: 'user-a',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+    harnessExecuted.length = 0
+    await expect(
+      assertMayAdminister(soloMember, 'edit an account'),
+    ).resolves.toBeUndefined()
+
+    const memberCounts = harnessExecuted.filter((statement) =>
+      statement.includes('from "member"'),
+    )
+    expect(memberCounts.length).toBeGreaterThan(0)
+    for (const statement of memberCounts) {
+      expect(statement).toContain('organization_id')
+    }
   })
 })
 
@@ -3292,6 +3334,100 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     await expect(
       listSeriesLinkDetails(world.scope, theirs.id),
     ).resolves.toEqual([])
+  })
+
+  it('does not add another workspace’s year spend through the overview aggregate', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-a-overview-spend',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-overview-spend',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-overview-spend',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-overview-spend',
+    })
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: mine.id,
+      transactionId: 'txn-b-overview-spend',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today,
+      seriesIds: [mine.id, theirs.id],
+    })
+    expect(rows).toEqual([
+      {
+        seriesId: mine.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 100_00,
+      },
+    ])
+    await expect(
+      sumSeriesSpendThisYear(world.otherScope, {
+        today,
+        seriesIds: [theirs.id],
+      }),
+    ).resolves.toEqual([
+      {
+        seriesId: theirs.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 777_00,
+      },
+    ])
   })
 })
 

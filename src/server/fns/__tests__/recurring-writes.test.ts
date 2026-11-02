@@ -290,6 +290,18 @@ describe('the handler file, by reading its own source', () => {
   it('still reads the repository, so the check above is looking at the right import', () => {
     expect(repositoryImports).toContain('pauseSeries')
     expect(repositoryImports).toContain('listSeries')
+    expect(repositoryImports).toContain('sumSeriesSpendThisYear')
+  })
+
+  it('keeps overview spend on the bounded yearly aggregate and detail history on the join', () => {
+    const overview = source.slice(
+      source.indexOf('export const loadRecurring'),
+      source.indexOf('export const loadSeriesDetail'),
+    )
+    const detail = source.slice(source.indexOf('export const loadSeriesDetail'))
+    expect(overview).toContain('sumSeriesSpendThisYear')
+    expect(overview).not.toContain('listSeriesLinkDetails')
+    expect(detail).toContain('listSeriesLinkDetails')
   })
 
   it('keeps no horizon of its own', () => {

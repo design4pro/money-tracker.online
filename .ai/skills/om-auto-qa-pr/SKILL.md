@@ -53,9 +53,12 @@ stored minor-unit value.
 
   Sign off only when every member approves, and quote each verdict in the evidence comment. When
   one does not, post its findings in a 🤖 comment as the fix list, apply `qa-failed` (the
-  `--apply-failure` path) and return: `om-pr-autopilot` routes the PR to `om-auto-fix-pr` with that
-  list, and QA runs again on the new head (the repo override of `om-pr-autopilot` says how many
-  times).
+  `--apply-failure` path) and then post a conversation comment whose first line is exactly
+  `🤖 QA-PANEL-FAILED head:<headSha>` — `qaPanelFailedMarker` from `.ai/scripts/qa-panel-failed.mjs`,
+  with `<headSha>` the PR head this run judged. The installed skill's failure path is vendored and
+  does not post that marker, so this override is the place that does. Return: `om-pr-autopilot`
+  routes the PR to `om-auto-fix-pr` with that list, and QA runs again on the new head (the repo
+  override of `om-pr-autopilot` says how many times).
 
 - Frames go to `.ai/qa/artifacts_<runId>/` (gitignored). A PNG anywhere else in the repository is a
   defect.
