@@ -19,6 +19,23 @@ import pl from '../messages/pl'
 
 const t = createTranslator('pl', pl)
 
+describe('categories.toast.seeded in Polish', () => {
+  it('takes the branch each of the four CLDR categories selects', () => {
+    expect(t('categories.toast.seeded', { count: 1 })).toBe(
+      'Dodaliśmy 1 kategorię.',
+    )
+    expect(t('categories.toast.seeded', { count: 2 })).toBe(
+      'Dodaliśmy 2 kategorie.',
+    )
+    expect(t('categories.toast.seeded', { count: 5 })).toBe(
+      'Dodaliśmy 5 kategorii.',
+    )
+    expect(t('categories.toast.seeded', { count: 22 })).toBe(
+      'Dodaliśmy 22 kategorie.',
+    )
+  })
+})
+
 describe('accounts.filter.count in Polish', () => {
   it('takes the branch each of the four CLDR categories selects', () => {
     const shown = formatNumber('pl', 1)

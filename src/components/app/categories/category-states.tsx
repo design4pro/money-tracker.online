@@ -6,11 +6,22 @@ import { useTranslate } from '#/lib/i18n'
 /**
  * The category list before anything is in it.
  *
- * A workspace with no categories is a workspace that cannot answer "where did the money go", so
- * this is the first screen of real work rather than a notice about absence. The sentence names
- * what a category is for and the one button starts the only path out.
+ * A workspace with no live categories is a workspace that cannot answer "where did the money go".
+ * The primary action lays down a ready-made set; the secondary opens a blank row. While the seed
+ * runs, the primary stays focusable (`isPending`) and the secondary is disabled, so a second
+ * press cannot start a second write.
  */
-export function CategoryEmptyState({ onCreate }: { onCreate: () => void }) {
+export interface CategoryEmptyStateProps {
+  readonly onSeed: () => void
+  readonly onCreate: () => void
+  readonly isSeeding?: boolean
+}
+
+export function CategoryEmptyState({
+  onSeed,
+  onCreate,
+  isSeeding = false,
+}: CategoryEmptyStateProps) {
   const t = useTranslate()
   return (
     <EmptyState
@@ -20,7 +31,12 @@ export function CategoryEmptyState({ onCreate }: { onCreate: () => void }) {
       description={t('categories.empty.body')}
       headingLevel={2}
       action={
-        <Button variant="primary" onPress={onCreate}>
+        <Button variant="primary" isPending={isSeeding} onPress={onSeed}>
+          {t('categories.seed.action')}
+        </Button>
+      }
+      secondaryAction={
+        <Button variant="secondary" isDisabled={isSeeding} onPress={onCreate}>
           {t('categories.create')}
         </Button>
       }

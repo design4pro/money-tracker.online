@@ -85,6 +85,11 @@ export interface CategoryTreeProps {
   readonly onDelete: (id: string) => void
   /** Applied by the route, which owns the server calls a move costs. */
   readonly onMove: (move: CategoryMove) => void
+  /**
+   * Passed to the `GridList` on mount. React Aria reads `autoFocus` once; turning it on after
+   * the tree has already mounted does nothing.
+   */
+  readonly autoFocus?: 'first'
 }
 
 export function CategoryTree({
@@ -95,6 +100,7 @@ export function CategoryTree({
   onRestore,
   onDelete,
   onMove,
+  autoFocus,
 }: CategoryTreeProps) {
   const t = useTranslate()
 
@@ -131,6 +137,7 @@ export function CategoryTree({
       items={categories}
       dragAndDropHooks={dragAndDropHooks}
       dependencies={[categories]}
+      autoFocus={autoFocus}
     >
       {(row) => (
         <GridListItem

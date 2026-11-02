@@ -920,7 +920,15 @@ const messages = {
   'categories.error.title': 'Could not load your categories',
   'categories.empty.title': 'No categories yet',
   'categories.empty.body':
-    'A category answers "what was this for". Add the first one and the reports have something to group by.',
+    'A category answers "what was this for". Start from a ready-made set you can rename, recolour or archive, or add your own.',
+  'categories.seed.action': 'Add the standard set',
+  'categories.seed.failed': 'The standard set could not be added',
+  'categories.toast.seeded': {
+    one: 'Added {count} category.',
+    other: 'Added {count} categories.',
+  },
+  'categories.toast.seeded.none':
+    'Nothing new was added. The standard set already exists here; archived categories are under "Show archived categories".',
   'categories.archive.title': 'Archive {name}?',
   'categories.archive.body':
     'It stops being offered on new entries, and anything already filed under it keeps its label. Subcategories are archived with it. You can restore it at any time.',
