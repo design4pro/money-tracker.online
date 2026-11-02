@@ -1005,7 +1005,8 @@ because what a row can do differs (a category archives, a group deletes).
   matching menu item must produce the same move; a component test holds that.
 - **Names say where a row is.** A child row's accessible name carries its parent ("Trips, inside
   Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
-  after their row, and their parent for a child.
+  after their row, and their parent for a child. Below `sm` the group tree stacks the account-count
+  badge under the name so a long name wraps at word boundaries instead of against the badge.
 - **Account membership is menu-only.** An account row in the group tree offers _Move to…_ and
   _Remove from this group_, acting only on that row's membership. Destinations include their parent
   and the current group stays disabled. Focus follows the account into the target group, or the

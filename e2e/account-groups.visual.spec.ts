@@ -217,6 +217,82 @@ test('create, nest, move out and delete leave the console silent and the workspa
   }
 })
 
+test('the Move to… submenu on a sub-group stays inside the viewport at 641, 700 and 768 px', async ({
+  page,
+}) => {
+  const parent = uniqueToken('Joint')
+  const child = uniqueToken('Trips')
+  await gotoApp(page, '/accounts/groups')
+
+  try {
+    await createGroup(page, parent)
+    await createSubGroup(page, parent, child)
+
+    for (const width of [641, 700, 768]) {
+      await page.setViewportSize({ width, height: 800 })
+      await openActions(page, child)
+      await page
+        .getByRole('menuitem', {
+          name: new RegExp(`^${say('en', 'action.moveTo')}`),
+        })
+        .click()
+      const submenu = page.getByRole('menu').last()
+      await expect(
+        submenu.getByRole('menuitem', {
+          name: say('en', 'accounts.group.parent.none'),
+        }),
+      ).toBeVisible()
+      const menuBox = await submenu.boundingBox()
+      expect(menuBox).not.toBeNull()
+      expect(menuBox!.x).toBeGreaterThanOrEqual(0)
+      expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(width)
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('menu')).toHaveCount(0)
+    }
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await removeIfPresent(page, child)
+    await removeIfPresent(page, parent)
+  }
+})
+
+test('at 360 px in Polish a long child name wraps and the count badge sits under it', async ({
+  page,
+  context,
+}) => {
+  const parent = uniqueToken('Wspolne')
+  const child = `${uniqueToken('Wycieczki')} ${'szeroka '.repeat(8)}`.trim()
+  await gotoApp(page, '/accounts/groups')
+
+  try {
+    await createGroup(page, parent)
+    await createSubGroup(page, parent, child)
+    await useLocale(context, 'pl')
+    await gotoApp(page, '/accounts/groups')
+    await page.setViewportSize({ width: 360, height: 800 })
+
+    const row = page.getByRole('row', {
+      name: new RegExp(`^${escape(child)}, `),
+    })
+    const name = row.getByText(child, { exact: true })
+    const badge = row.getByText(/kont/)
+    await expect(name).toBeVisible()
+    await expect(badge).toBeVisible()
+    const nameBox = await name.boundingBox()
+    const badgeBox = await badge.boundingBox()
+    expect(nameBox).not.toBeNull()
+    expect(badgeBox).not.toBeNull()
+    expect(badgeBox!.y).toBeGreaterThan(nameBox!.y)
+    expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(360)
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await useLocale(context, 'en')
+    await removeIfPresent(page, child)
+    await removeIfPresent(page, parent)
+  }
+})
+
 test('the controls on an indented sub-group are a 44 px target at 360 px, and nothing scrolls sideways', async ({
   page,
 }) => {

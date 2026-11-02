@@ -345,11 +345,10 @@ const messages = {
   'accounts.group.delete.action': 'Delete group',
   'accounts.group.delete.title': 'Delete {name}?',
   'accounts.group.delete.body': {
-    one: '{count} account leaves this group. None is deleted. Sub-groups become top-level groups.',
-    other:
-      '{count} accounts leave this group. None is deleted. Sub-groups become top-level groups.',
+    one: '{count} account leaves this group. None is deleted.',
+    other: '{count} accounts leave this group. None is deleted.',
   },
-  'accounts.group.delete.bodyEmpty': 'Sub-groups become top-level groups.',
+  'accounts.group.delete.subgroups': 'Sub-groups become top-level groups.',
   'accounts.group.delete.rules':
     'Rules that use this group will be paused until you pick another.',
   'accounts.count': {
