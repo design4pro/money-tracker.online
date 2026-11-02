@@ -1,10 +1,7 @@
-import { Link } from '@tanstack/react-router'
-
-import { buttonVariants } from '#/components/ui'
-import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 import { QUOTA_METRIC_LABEL_KEYS } from '#/lib/plans'
 
+import { ButtonLink } from './button-link'
 import { DashboardLink } from './dashboard-link'
 import { ErrorPanel } from './error-panel'
 import { FailureReference, hasOpaqueIdShape } from './failure-reference'
@@ -41,12 +38,6 @@ export const RECOVERY_OF: Readonly<Record<FailureKind, Recovery>> = {
   not_found: 'internal',
   internal: 'internal',
 }
-
-/** The billing link is painted as a button for the same reasons as `DashboardLink`. */
-const PRIMARY_LINK = cn(
-  buttonVariants({ variant: 'primary' }),
-  'no-underline hover:bg-accent-hover hover:shadow-elevated active:translate-y-px',
-)
 
 export interface FailurePanelProps {
   /** What `readFailure(error)` returned. Only `kind` and `message` are read. */
@@ -188,8 +179,8 @@ export function FailurePanel({
 function BillingLink() {
   const t = useTranslate()
   return (
-    <Link to="/settings/billing" className={PRIMARY_LINK}>
+    <ButtonLink to="/settings/billing" variant="primary">
       {t('billing.title')}
-    </Link>
+    </ButtonLink>
   )
 }

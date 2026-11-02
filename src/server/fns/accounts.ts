@@ -45,6 +45,8 @@ import {
   listAccountGroups as listAccountGroupsRow,
   listAccounts as listAccountsRow,
   listAccountsSchema,
+  moveAccountGroup as moveAccountGroupRow,
+  moveAccountGroupSchema,
   moveAccountToGroup as moveAccountToGroupRow,
   moveAccountToGroupSchema,
   reorderAccountGroups as reorderAccountGroupsRow,
@@ -268,6 +270,14 @@ export const moveAccountToGroup = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await moveAccountToGroupRow(scope, data)
+  })
+
+/** Re-parents a group and rewrites the run it lands in, as one repository write. */
+export const moveAccountGroup = createServerFn({ method: 'POST' })
+  .inputValidator(moveAccountGroupSchema)
+  .handler(async ({ data }): Promise<void> => {
+    const scope = await requireOrg()
+    await moveAccountGroupRow(scope, data)
   })
 
 /** Rewrites the group order. */

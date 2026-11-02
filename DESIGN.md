@@ -687,6 +687,30 @@ Stamps. Square-cornered, typed, pressed one pixel into the page.
 **The Pending-Not-Disabled Rule.** A submit in flight uses `isPending`: focusable, `aria-disabled`,
 label kept in the DOM under the spinner so the button holds its width.
 
+### Button links
+
+A router `<a>` wearing the stamp. Navigation is an href, so this is never `Button` with an
+`onPress` that routes: a screen reader’s link list, a status-bar preview and “open in a new tab”
+all require a real anchor. `buttonVariants` still paints React Aria’s `data-[hovered]` and
+`data-[pressed]`, which a TanStack `Link` never receives, so `ButtonLink`
+(`src/components/app/shell/button-link.tsx`) restates those states as `:hover` / `:active` and
+keeps `target-min`. The caller states the variant and size (and `block` when the stamp is full
+width).
+
+- **Shape and sizes:** the same stamps as Buttons — `sm` 32px / `md` 40px / `lg` 48px, `md`
+  radius (2px), bold. No extra variants or colours.
+- **Tones:** the same meanings as Buttons. A filled stamp (`primary`, `secondary`, and the unused
+  `ghost` / `subtle` / `brand` / `danger` maps) drops the underline. The `link` tone keeps the
+  `brand` underline at 40% opacity, reaching full on hover.
+- **States:** hover and press via CSS pseudo-classes; focus via the shared ring. There is no
+  disabled or pending form: a way out that cannot be taken is omitted, not greyed.
+- **When colour is gone:** the filled stamp still has a border or a fill step; the `link` tone
+  still has an underline.
+- **What it is not:** `Button` (an in-place `onPress`, including the budget empty-state tiles);
+  `Link` in `components/ui` (a text link, which needs React Aria’s router). Do not import
+  `ButtonLink` from `__root.tsx` or `router.tsx` — `not-found` and `default-error` load it lazily
+  so the marketing entry chunk stays free of the button primitive.
+
 ### Fields
 
 - **Style:** `surface` ground, `border-strong` rule, `md` radius (2px), 40px at the default size,

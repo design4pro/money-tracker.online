@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { CircleCheck, Link2Off } from 'lucide-react'
 
-import { Button, Form, buttonVariants, linkVariants } from '#/components/ui'
+import { ButtonLink } from '#/components/app/shell/button-link'
 import { RouteError } from '#/components/app/shell/route-error'
-import { cn } from '#/lib/cn'
+import { Button, Form, linkVariants } from '#/components/ui'
 import { resetPassword, toAuthFailure } from '#/lib/auth-client'
 import { useTranslate } from '#/lib/i18n'
 import { pageHead } from '#/routes/-lib/page-title'
@@ -51,20 +51,6 @@ interface ResetSearch {
   /** Set by Better Auth when it rejected the token before we ever saw it. */
   readonly error?: string
 }
-
-/**
- * A link wearing the primary button's clothes.
- *
- * Two of this screen's three states offer navigation as their main action, and navigation is an
- * `<a>` — a `Button` with an `onPress` that navigates has no href to open in a new tab, no status
- * bar preview and no meaning to a screen reader's link list. `buttonVariants` paints React Aria's
- * `data-[hovered]` and `data-[pressed]` states, which a plain anchor never receives, so the two
- * interaction states are restated here as CSS pseudo-classes.
- */
-const ACTION_LINK = cn(
-  buttonVariants({ variant: 'primary', size: 'lg', block: true }),
-  'no-underline hover:bg-accent-hover hover:shadow-elevated active:translate-y-px',
-)
 
 export const Route = createFileRoute('/(auth)/reset-password')({
   validateSearch: (search: Record<string, unknown>): ResetSearch => ({
@@ -148,9 +134,9 @@ function ResetPasswordScreen() {
           confirmation before the page moves; an automatic bounce three seconds later is a
           confirmation nobody using a screen reader ever finishes hearing.
         */}
-        <Link to="/login" className={ACTION_LINK}>
+        <ButtonLink to="/login" variant="primary" size="lg" block>
           {t('auth.reset.continue')}
-        </Link>
+        </ButtonLink>
       </AuthCard>
     )
   }
@@ -182,9 +168,9 @@ function ResetPasswordScreen() {
           </p>
         </div>
 
-        <Link to="/forgot-password" className={ACTION_LINK}>
+        <ButtonLink to="/forgot-password" variant="primary" size="lg" block>
           {t('auth.reset.requestNew')}
-        </Link>
+        </ButtonLink>
       </AuthCard>
     )
   }

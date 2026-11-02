@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { organization } from '../../db/auth-schema'
 import { dbFromEnv } from '../../db/from-env'
-import { payees } from '../../db/schema'
+import { accountGroups, payees } from '../../db/schema'
 import { createScope, createTenantRepository, runTenantBatch } from '../base'
 
 /**
@@ -69,5 +69,51 @@ describe('a tenant batch in workerd', () => {
     expect(inserted).toHaveLength(1)
     const afterSuccess = await repo.findMany(scope)
     expect(afterSuccess.map((row) => row.id)).toEqual(['payee-2'])
+  })
+
+  it('accepts a 200-statement tenant batch on D1', async () => {
+    const db = dbFromEnv(env)
+    await db.insert(organization).values({
+      id: 'org-batch-200',
+      name: 'Batch 200',
+      slug: 'batch-200',
+      createdAt: now,
+    })
+    const scope = createScope(db, {
+      userId: 'user-batch-200',
+      organizationId: 'org-batch-200',
+      role: 'owner',
+    })
+    const groups = createTenantRepository(accountGroups, 'account group')
+    const ids = Array.from({ length: 200 }, (_, index) => `grp-${index}`)
+    for (let offset = 0; offset < ids.length; offset += 10) {
+      const chunk = ids.slice(offset, offset + 10)
+      await groups.insertMany(
+        scope,
+        chunk.map((id, index) => ({
+          id,
+          name: id,
+          position: offset + index,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      )
+    }
+
+    const [first, ...rest] = ids.map((id, index) =>
+      groups.updateWhereStatement(scope, eq(accountGroups.id, id), {
+        position: 199 - index,
+        updatedAt: now,
+      }),
+    )
+    if (first === undefined) {
+      throw new Error('expected a non-empty batch')
+    }
+    await runTenantBatch(scope, [first, ...rest])
+
+    const listed = await groups.findMany(scope)
+    expect(listed).toHaveLength(200)
+    expect(listed.find((row) => row.id === 'grp-0')?.position).toBe(199)
+    expect(listed.find((row) => row.id === 'grp-199')?.position).toBe(0)
   })
 })

@@ -4,12 +4,14 @@
  * *"After any change to a series, write the periods it should have"* used to be four hand-written
  * `materializeSeries` calls in the server-function file, and a fifth series-writing handler that
  * forgot the call passed every test. The server functions now hand the change to {@link writeSeries}
- * and keep what is theirs: the guard, the input validation and the day. The structural guard in
+ * and keep what is theirs: the guard, the input validation and the day. Read-time catch-up and the
+ * hourly sweep hand the same job to {@link catchUpSeries}. The structural guard in
  * `fns/__tests__/recurring-writes.test.ts` keeps the repository's four series writers out of that
  * file, so a new one can only reach them through here.
  *
  * **It lives in `recurring/`, not in a repository,** because {@link materializeSeries} imports the
- * repositories. A repository that called it would be a cycle.
+ * repositories. A repository that called it would be a cycle. Production callers of
+ * `materializeSeries` live only in this file.
  *
  * **It derives nothing.** The scope arrives already built (a tenant is authorised by the caller, not
  * decided here) and `today` arrives as a parameter, so a test pins the day and the module reads no
@@ -17,8 +19,8 @@
  *
  * **Write, then materialise: two sequential calls, not one transaction.** A write that succeeds
  * and a materialisation that throws leaves the series written and its periods missing, and the next
- * read or the hourly sweep fills them in - `insertMissingPeriods` is idempotent. An error from
- * either call reaches the caller unchanged.
+ * {@link catchUpSeries} from a read or the hourly sweep fills them in - `insertMissingPeriods` is
+ * idempotent. An error from either call reaches the caller unchanged.
  *
  * **Pause, complete and delete are not here, and that is a statement:** none of them adds a period.
  * Nor are the period writes, which settle a row that exists. Update and resume materialise whatever
@@ -37,6 +39,7 @@ import {
 
 import { materializeSeries } from './materialize'
 
+import type { MaterializeResult } from './materialize'
 import type { TenantScope } from '#/server/repos/base'
 import type {
   CreateSeriesInput,
@@ -45,6 +48,28 @@ import type {
 
 /** How far ahead the list and the detail screen materialise. Three periods is one screen's worth. */
 export const SERIES_AHEAD = 3
+
+export interface CatchUpSeriesInput {
+  readonly seriesId: string
+  /** The day the catch-up is happening on. A parameter, never a clock read inside this module. */
+  readonly today: string
+  /** How many occurrences past today to write; {@link SERIES_AHEAD} when omitted. */
+  readonly ahead?: number
+}
+
+/**
+ * Brings one series' periods up to date without changing the series.
+ *
+ * The list, the detail screen and the hourly sweep all ask this; they decide *which* series and
+ * *whether* it is active. Paused and completed series are materialised too when asked for
+ * directly, the same as {@link materializeSeries}.
+ */
+export async function catchUpSeries(
+  scope: TenantScope,
+  { seriesId, today, ahead = SERIES_AHEAD }: CatchUpSeriesInput,
+): Promise<MaterializeResult> {
+  return materializeSeries(scope, { seriesId, today, ahead })
+}
 
 /** The four edits to a series that must leave its periods written. */
 export type SeriesChange =

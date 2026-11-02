@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -9,7 +8,7 @@ import {
 } from 'lucide-react'
 
 import { Amount } from '#/components/app/accounts'
-import { buttonVariants } from '#/components/ui'
+import { ButtonLink } from '#/components/app/shell/button-link'
 import {
   formatCalendarDateRange,
   formatPercent,
@@ -114,13 +113,10 @@ export function DashboardHeader({
         </div>
         <div className="flex flex-wrap items-end gap-3">
           {action}
-          <Link
-            to="/transactions/new"
-            className={buttonVariants({ variant: 'primary' })}
-          >
+          <ButtonLink to="/transactions/new" variant="primary">
             <Plus aria-hidden="true" className="size-4" />
             {t('transactions.create')}
-          </Link>
+          </ButtonLink>
         </div>
       </div>
 

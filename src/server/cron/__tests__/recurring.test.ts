@@ -15,6 +15,9 @@
  * The clock is a parameter throughout, so nothing here mocks `Date`.
  */
 
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
@@ -287,5 +290,17 @@ describe('the reminder branch', () => {
     })
 
     expect((await runRecurringReminderSweep(await args())).dispatched).toBe(0)
+  })
+})
+
+describe('the hourly file, by reading its own source', () => {
+  const source = readFileSync(
+    path.join(import.meta.dirname, '..', 'recurring.ts'),
+    'utf8',
+  )
+
+  it('imports no materializeSeries: the sweep catch-up goes through the series-change module', () => {
+    expect(source).not.toMatch(/materializeSeries/)
+    expect(source).toMatch(/catchUpSeries/)
   })
 })

@@ -354,6 +354,18 @@ export const reorderAccountGroupsSchema = z.strictObject({
   ids: z.array(idSchema).min(1).max(200),
 })
 
+export const moveAccountGroupSchema = z
+  .strictObject({
+    id: idSchema,
+    parentId: idSchema.nullable(),
+    orderedIds: z.array(idSchema).min(1).max(200),
+  })
+  .refine((value) => value.orderedIds.includes(value.id), {
+    path: ['orderedIds'],
+    message: 'orderedIds must contain id',
+  })
+export type MoveAccountGroupInput = z.input<typeof moveAccountGroupSchema>
+
 /* -------------------------------------------------------------------------- */
 /* Returned shapes                                                            */
 /* -------------------------------------------------------------------------- */
@@ -1045,18 +1057,8 @@ export async function updateAccountGroup(
   await assertMayAdminister(scope, 'edit an account group')
   await groupRepo.requireById(scope, id)
 
-  if (parsed.parentId !== undefined && parsed.parentId !== null) {
-    if (parsed.parentId === id) {
-      throw new GroupDepthError(id)
-    }
-    await assertParentIsTopLevel(scope, parsed.parentId)
-    const children = await groupRepo.count(
-      scope,
-      eq(accountGroups.parentId, id),
-    )
-    if (children > 0) {
-      throw new GroupDepthError(id)
-    }
+  if (parsed.parentId !== undefined) {
+    await assertMayNest(scope, id, parsed.parentId)
   }
 
   const changes: TenantPatch<typeof accountGroups> = { updatedAt: new Date() }
@@ -1232,6 +1234,55 @@ export async function moveAccountToGroup(
     throw new NotFoundError('account group membership', accountId)
 }
 
+/**
+ * Moves a group to a parent and a position in one tenant batch.
+ *
+ * Re-parenting without rewriting the run it lands in is how two groups share a position and the
+ * list starts reordering itself on reload. The route used to sequence {@link updateAccountGroup}
+ * then {@link reorderAccountGroups}; a failure of the second left the group under its new parent
+ * at a stale index. This function is that pair as one `runTenantBatch`: the parent on the moved
+ * row and the position of every id in the new order, or nothing. {@link TenantPatch} types
+ * `position` as a number, so each id is its own statement rather than a `CASE` expression.
+ *
+ * A move inside one run still goes through {@link reorderAccountGroups}; that path does not
+ * change a parent.
+ */
+export async function moveAccountGroup(
+  scope: TenantScope,
+  input: MoveAccountGroupInput,
+): Promise<void> {
+  const parsed = moveAccountGroupSchema.parse(input)
+  await assertMayAdminister(scope, 'move an account group')
+  await groupRepo.requireById(scope, parsed.id)
+  await assertMayNest(scope, parsed.id, parsed.parentId)
+  await requireAllOwned(
+    scope,
+    accountGroups,
+    parsed.orderedIds,
+    'account group',
+  )
+
+  const now = new Date()
+  const [first, ...rest] = parsed.orderedIds.map((rowId, index) => {
+    const patch: TenantPatch<typeof accountGroups> = {
+      position: index,
+      updatedAt: now,
+    }
+    if (rowId === parsed.id) {
+      patch.parentId = parsed.parentId
+    }
+    return groupRepo.updateWhereStatement(
+      scope,
+      eq(accountGroups.id, rowId),
+      patch,
+    )
+  })
+  if (first === undefined) {
+    throw new ConflictError('A batch needs at least one statement.')
+  }
+  await runTenantBatch(scope, [first, ...rest])
+}
+
 /** The group order, in one statement, for the same reasons as {@link reorderAccounts}. */
 export async function reorderAccountGroups(
   scope: TenantScope,
@@ -1359,5 +1410,32 @@ async function assertParentIsTopLevel(
   const parent = await groupRepo.requireById(scope, parentId)
   if (parent.parentId !== null) {
     throw new GroupDepthError(parentId)
+  }
+}
+
+/**
+ * The one-level rule from both directions: a parent must be top-level, and a group that already
+ * has children may not itself become a child. {@link updateAccountGroup} and
+ * {@link moveAccountGroup} both ask here; {@link createAccountGroup} keeps
+ * {@link assertParentIsTopLevel} because a new group has no children yet.
+ */
+async function assertMayNest(
+  scope: TenantScope,
+  groupId: string,
+  parentId: string | null,
+): Promise<void> {
+  if (parentId === null) {
+    return
+  }
+  if (parentId === groupId) {
+    throw new GroupDepthError(groupId)
+  }
+  await assertParentIsTopLevel(scope, parentId)
+  const children = await groupRepo.count(
+    scope,
+    eq(accountGroups.parentId, groupId),
+  )
+  if (children > 0) {
+    throw new GroupDepthError(groupId)
   }
 }

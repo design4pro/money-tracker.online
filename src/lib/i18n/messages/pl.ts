@@ -2570,7 +2570,7 @@ const messages = {
   'loans.schedule.caption':
     'Każdy wiersz to jedna oczekiwana płatność. Zapłacone oznacza wskazanie zapisanej transakcji.',
   'loans.schedule.missing':
-    'To zobowiązanie nie ma harmonogramu. Tak nie powinno być; spróbuj ponownie albo je usuń.',
+    'To zobowiązanie nie ma harmonogramu. Spróbuj ponownie albo wróć do wszystkich zobowiązań.',
   'loans.schedule.title': 'Harmonogram rat',
   'loans.schedule.sequence': 'Lp.',
   'loans.schedule.due': 'Termin',

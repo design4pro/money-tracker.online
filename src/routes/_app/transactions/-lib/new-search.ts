@@ -24,10 +24,10 @@
  *
  * ## The way back is a closed shape
  *
- * `return*` names one of three screens of this app, a series and a period start. It is never a URL:
- * {@link returnTargetOf} yields a value the caller turns into a typed router target, so
- * `https://evil.example`, `//evil.example` and `/accounts` all fail the enum and the save falls back
- * to where it always went.
+ * `return*` names a screen of this app: a recurring series, the recurring list, the planned list,
+ * or a liability schedule. It is never a URL: {@link returnTargetOf} yields a value the caller
+ * turns into a typed router target, so `https://evil.example`, `//evil.example` and `/accounts`
+ * all fail the enum and the save falls back to where it always went.
  */
 
 import { z } from 'zod'
@@ -80,25 +80,57 @@ export const newTransactionSearchSchema = z.object({
   account: idParam,
   category: idParam,
   payee: idParam,
-  returnTo: z.enum(['series', 'list', 'planned']).optional().catch(undefined),
+  returnTo: z
+    .enum(['series', 'list', 'planned', 'loan'])
+    .optional()
+    .catch(undefined),
   returnSeries: idParam,
   returnPeriod: dateParam,
+  returnLoan: idParam,
+  returnSequence: z
+    .union([
+      z.number(),
+      z
+        .string()
+        .regex(/^\d{1,15}$/)
+        .transform(Number),
+    ])
+    .pipe(z.number().int().min(1))
+    .optional()
+    .catch(undefined),
 })
 
 export type NewTransactionSearch = z.infer<typeof newTransactionSearchSchema>
 
-/** The screen a saved entry sends the person back to, and the period it was recorded for. */
-export interface ReturnTarget {
+/** A recurring screen a saved entry sends the person back to, and the period it was recorded for. */
+export interface RecurringReturnTarget {
   readonly to: 'series' | 'list' | 'planned'
   readonly seriesId: string
   readonly periodStart: string
 }
 
+/** A liability schedule a saved entry sends the person back to, and the instalment to reopen. */
+export interface LoanReturnTarget {
+  readonly to: 'loan'
+  readonly loanId: string
+  readonly sequence: number
+}
+
+/** The screen a saved entry sends the person back to. */
+export type ReturnTarget = RecurringReturnTarget | LoanReturnTarget
+
 /** The way back, or `undefined` unless the address carries every part of one. */
 export function returnTargetOf(
   search: NewTransactionSearch,
 ): ReturnTarget | undefined {
-  const { returnTo, returnSeries, returnPeriod } = search
+  const { returnTo, returnSeries, returnPeriod, returnLoan, returnSequence } =
+    search
+  if (returnTo === 'loan') {
+    if (returnLoan === undefined || returnSequence === undefined) {
+      return undefined
+    }
+    return { to: 'loan', loanId: returnLoan, sequence: returnSequence }
+  }
   if (
     returnTo === undefined ||
     returnSeries === undefined ||
