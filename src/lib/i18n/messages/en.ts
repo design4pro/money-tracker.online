@@ -446,7 +446,7 @@ const messages = {
   'accounts.form.create.body':
     'A name and a currency are all that is required. The rest can wait.',
   'accounts.form.edit.body':
-    'Changing the currency or the opening balance re-values this account’s whole history.',
+    'The currency can change only while this account has no entries. Booked amounts stay in the currency they were recorded in.',
   'accounts.form.error.title': 'The account was not saved',
   'accounts.field.openedOn': 'Opening date',
   'accounts.field.openedOn.help':
@@ -455,6 +455,10 @@ const messages = {
     'A positive figure. Leave it empty when there is no limit.',
   'accounts.field.currency.help':
     'Only the currencies your household holds are offered.',
+  'accounts.field.currency.locked':
+    'This account already has entries, so its currency cannot change.',
+  'accounts.currency.locked':
+    'This account already has entries, so its currency cannot change. Those entries stay in the currency they were recorded in.',
   /* -- Accounts: correcting a balance ------------------------------------- */
   'accounts.adjust.body':
     'State what the balance should be. The difference is written as an entry you can find, edit and export.',
