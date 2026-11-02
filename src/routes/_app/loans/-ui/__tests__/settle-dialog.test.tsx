@@ -94,6 +94,28 @@ describe('settlement candidate pages', () => {
     ).not.toBeNull()
   })
 
+  it('opens the entry form with a way back to this instalment', async () => {
+    mocks.candidates.mockResolvedValueOnce({ rows: [], nextCursor: null })
+    const user = userEvent.setup()
+    openDialog()
+    await user.click(
+      await screen.findByRole('button', { name: 'Record the payment' }),
+    )
+    expect(mocks.navigate).toHaveBeenCalledWith({
+      to: '/transactions/new',
+      search: {
+        direction: 'expense',
+        amount: 1500,
+        currency: 'JPY',
+        date: '2026-08-20',
+        account: 'acc-a',
+        returnTo: 'loan',
+        returnLoan: 'loan-a',
+        returnSequence: 1,
+      },
+    })
+  })
+
   it('allows retrying a failed later page without claiming that no payment exists', async () => {
     mocks.candidates
       .mockResolvedValueOnce({ rows: [], nextCursor: 'next-page' })

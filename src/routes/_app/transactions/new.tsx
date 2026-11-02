@@ -262,7 +262,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
    *
    * Typed router targets only, built from the closed shape `returnTargetOf` yields: there is no
    * href to assemble and no URL to follow, so the address cannot send anybody anywhere but the
-   * recurring screens and the planned list.
+   * recurring screens, the planned list, and a liability schedule.
    */
   const goBack = useCallback(
     (target: ReturnTarget) => {
@@ -286,6 +286,12 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
               markPaid: target.periodStart,
               series: target.seriesId,
             },
+          })
+        case 'loan':
+          return void navigate({
+            to: '/loans/$loanId',
+            params: { loanId: target.loanId },
+            search: { markPaid: target.sequence },
           })
       }
     },

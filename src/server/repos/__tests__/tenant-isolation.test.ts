@@ -170,6 +170,7 @@ import {
   getLoan,
   listCalendarInstalments,
   listInstalments,
+  listInstalmentsForLoans,
   listLoans,
   listSettledTransactionIds,
   markInstalmentPaid,
@@ -3760,6 +3761,35 @@ describe('loans cannot be reached across a workspace boundary', () => {
     await expect(
       listCalendarInstalments(world.scope, { today: 'not-a-date' }),
     ).rejects.toThrow()
+  })
+
+  it('batches instalments for its own loans only, even when a foreign id is named', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    const mixed = await listInstalmentsForLoans(world.scope, {
+      loanIds: [own.id, loanBId],
+      today: '2026-03-01',
+    })
+    expect(mixed.map((row) => row.loanId)).toEqual([own.id])
+    expect(JSON.stringify(mixed)).not.toContain(loanBId)
+
+    const foreignOnly = await listInstalmentsForLoans(world.scope, {
+      loanIds: [loanBId],
+    })
+    expect(foreignOnly).toEqual([])
+
+    const other = await listInstalmentsForLoans(world.otherScope, {
+      loanIds: [loanBId, own.id],
+    })
+    expect(other.map((row) => row.loanId)).toEqual([loanBId, loanBId])
+    expect(JSON.stringify(other)).not.toContain(own.id)
   })
 
   it('refuses to settle its own instalment with another workspace’s transaction', async () => {

@@ -30,7 +30,7 @@
  * repository those stages call.
  */
 
-import { and, eq, exists, ne, notExists, or, sql } from 'drizzle-orm'
+import { and, eq, exists, inArray, ne, notExists, or, sql } from 'drizzle-orm'
 
 import type { SQL } from 'drizzle-orm'
 import { z } from 'zod'
@@ -292,6 +292,18 @@ export const listInstalmentsSchema = z.strictObject({
 })
 export type ListInstalmentsInput = z.input<typeof listInstalmentsSchema>
 
+export const listInstalmentsForLoansSchema = z.strictObject({
+  loanIds: z.array(idSchema).max(10_000),
+  /**
+   * The day the question is asked. When set, {@link derivedInstalmentStatus} is attached so a
+   * screen can show overdue without storing it.
+   */
+  today: z.iso.date().optional(),
+})
+export type ListInstalmentsForLoansInput = z.input<
+  typeof listInstalmentsForLoansSchema
+>
+
 const calendarInstalmentsSchema = z.strictObject({
   book: z.enum(BOOKS).optional(),
   today: z.iso.date(),
@@ -500,6 +512,29 @@ export async function listInstalments(
   const rows = await instalmentAccess.findMany(scope, {
     where: eq(loanInstalments.loanId, parsed.loanId),
     orderBy: [loanInstalments.sequence],
+  })
+  return rows.map((row) => toInstalmentView(row, parsed.today))
+}
+
+/**
+ * Every instalment of the given loans, in one tenant-scoped read.
+ *
+ * The register used to call {@link listInstalments} per card, and that function starts with
+ * {@link getLoan}. At the free ceiling that is two parent round-trips the list already paid for;
+ * this keeps the schedule load a single `IN` regardless of how many cards the page holds.
+ * Unknown or foreign ids are absent from the result, never a 404: the caller already has the
+ * parents from {@link listLoans}.
+ */
+export async function listInstalmentsForLoans(
+  scope: TenantScope,
+  input: ListInstalmentsForLoansInput,
+): Promise<ReadonlyArray<InstalmentView>> {
+  const parsed = listInstalmentsForLoansSchema.parse(input)
+  const loanIds = [...new Set(parsed.loanIds)]
+  if (loanIds.length === 0) return []
+  const rows = await instalmentAccess.findMany(scope, {
+    where: inArray(loanInstalments.loanId, loanIds),
+    orderBy: [loanInstalments.loanId, loanInstalments.sequence],
   })
   return rows.map((row) => toInstalmentView(row, parsed.today))
 }

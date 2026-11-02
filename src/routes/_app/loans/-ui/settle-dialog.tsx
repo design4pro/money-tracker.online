@@ -20,6 +20,8 @@ import {
   markLoanInstalmentPaid,
 } from '#/server/fns/loans'
 
+import { recordLoanPaymentSearch } from '../-lib/record-payment'
+
 import type { Transaction } from '#/server/db/types'
 import type { InstalmentView } from '#/server/repos/loans'
 
@@ -178,15 +180,10 @@ export function SettleDialog({
                       onPress={() =>
                         void navigate({
                           to: '/transactions/new',
-                          search: {
-                            direction: 'expense',
-                            amount: instalment.amountMinor,
-                            currency: instalment.currencyCode,
-                            date: instalment.dueOn,
-                            ...(accountId === null
-                              ? {}
-                              : { account: accountId }),
-                          },
+                          search: recordLoanPaymentSearch(
+                            { id: loanId, accountId },
+                            instalment,
+                          ),
                         })
                       }
                     >

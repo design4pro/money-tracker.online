@@ -198,6 +198,33 @@ describe('returnTargetOf', () => {
     expect(
       returnTargetOf(parse({ returnTo: 'series', returnPeriod: '2026-03-01' })),
     ).toBeUndefined()
+    expect(
+      returnTargetOf(parse({ returnTo: 'loan', returnLoan: 'loan-a' })),
+    ).toBeUndefined()
+    expect(
+      returnTargetOf(parse({ returnTo: 'loan', returnSequence: 1 })),
+    ).toBeUndefined()
+  })
+
+  it('names a liability schedule and the instalment it came from', () => {
+    expect(
+      returnTargetOf(
+        parse({
+          returnTo: 'loan',
+          returnLoan: 'loan-a',
+          returnSequence: 3,
+        }),
+      ),
+    ).toEqual({ to: 'loan', loanId: 'loan-a', sequence: 3 })
+    expect(
+      returnTargetOf(
+        parse({
+          returnTo: 'loan',
+          returnLoan: 'loan-a',
+          returnSequence: '3',
+        }),
+      ),
+    ).toEqual({ to: 'loan', loanId: 'loan-a', sequence: 3 })
   })
 
   it.each([
@@ -212,6 +239,15 @@ describe('returnTargetOf', () => {
           returnTo: value,
           returnSeries: 'ser-1',
           returnPeriod: '2026-03-01',
+        }),
+      ),
+    ).toBeUndefined()
+    expect(
+      returnTargetOf(
+        parse({
+          returnTo: value,
+          returnLoan: 'loan-a',
+          returnSequence: 1,
         }),
       ),
     ).toBeUndefined()
