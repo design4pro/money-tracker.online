@@ -468,7 +468,7 @@ const messages = {
   'accounts.form.create.body':
     'Wymagana jest tylko nazwa i waluta. Resztę możesz uzupełnić później.',
   'accounts.form.edit.body':
-    'Zmiana waluty albo stanu początkowego przelicza całą historię tego konta.',
+    'Walutę można zmienić tylko wtedy, gdy na koncie nie ma jeszcze wpisów. Zaksięgowane kwoty zostają w walucie, w której je zapisano.',
   'accounts.form.error.title': 'Nie udało się zapisać konta',
   'accounts.field.openedOn': 'Data otwarcia',
   'accounts.field.openedOn.help':
@@ -477,6 +477,10 @@ const messages = {
     'Kwota dodatnia. Zostaw puste, jeśli konto nie ma limitu.',
   'accounts.field.currency.help':
     'Proponujemy tylko waluty, które ma Twój dom.',
+  'accounts.field.currency.locked':
+    'Na tym koncie są już wpisy, więc jego waluty nie można zmienić.',
+  'accounts.currency.locked':
+    'Na tym koncie są już wpisy, więc jego waluty nie można zmienić. Te wpisy zostają w walucie, w której je zapisano.',
   /* -- Accounts: correcting a balance ------------------------------------- */
   'accounts.adjust.body':
     'Podaj, ile powinno być na koncie. Różnicę zapiszemy jako zwykły wpis, który znajdziesz, poprawisz i pobierzesz razem z resztą.',

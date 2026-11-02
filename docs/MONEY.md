@@ -213,6 +213,11 @@ The two legitimate ways `ref_amount_minor` changes:
   against the new base, in one queue job, with a before/after net-worth figure shown to the person
   who asked for it. It is not a background side effect of a settings toggle.
 
+Changing an **account's** currency is not one of those ways. Once the account has transactions, the
+change is refused; booked rows stay in the currency they were written in. An empty account may still
+change currency, and that re-derives only the account row's opening `ref_` columns. Detecting rows
+that already disagree with their account (#695) reports them; it does not rewrite them.
+
 ### 3.2 `rate_e10` on the row is not redundant
 
 Storing the rate beside the amount duplicates catalogue data on purpose:

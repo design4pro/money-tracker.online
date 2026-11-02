@@ -42,6 +42,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../errors'
 import { createScope } from '../scope'
 import { sqliteBatchCallback } from './db-harness'
 import {
+  AccountCurrencyLockedError,
   AccountHasTransactionsError,
   CurrencyNotHeldError,
   GroupDepthError,
@@ -652,7 +653,88 @@ describe('updateAccount', () => {
     expect(touchLedgerAccount).toHaveBeenCalledWith(created.id)
   })
 
-  it('re-values the row when the currency changes, and asks for a rebuild', async () => {
+  // Deliberately rewritten for #706: this case used to assert that changing the currency
+  // re-valued the account row (and, with history, would have mixed booked currencies). It now
+  // asserts the lock. Empty-account re-valuation is the next case.
+  it('refuses a currency change once the account has transactions, and leaves the booked row alone', async () => {
+    const created = await createAccount(
+      scope,
+      { ...EVERYDAY, initialBalanceMinor: 100_00 },
+      conversion,
+    )
+    await seedTransaction({
+      accountId: created.id,
+      direction: 'expense',
+      amountMinor: 12_34,
+      bookedOn: '2026-03-10',
+    })
+    vi.mocked(touchLedgerAccount).mockClear()
+
+    const error = await updateAccount(
+      scope,
+      created.id,
+      { currencyCode: 'EUR', openedOn: '2026-03-15' },
+      conversion,
+    ).catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(AccountCurrencyLockedError)
+    expect((error as AccountCurrencyLockedError).transactionCount).toBe(1)
+    expect((await accountRow(created.id))?.currencyCode).toBe('PLN')
+    expect(touchLedgerAccount).not.toHaveBeenCalled()
+
+    const booked = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.accountId, created.id))
+    expect(booked).toHaveLength(1)
+    expect(booked[0]).toMatchObject({
+      amountMinor: 12_34,
+      currencyCode: 'PLN',
+      refAmountMinor: 12_34,
+    })
+  })
+
+  it('still accepts a same-currency patch when the account has transactions', async () => {
+    const created = await createAccount(scope, EVERYDAY, conversion)
+    await seedTransaction({
+      accountId: created.id,
+      direction: 'expense',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-10',
+    })
+    const updated = await updateAccount(
+      scope,
+      created.id,
+      { name: 'Household', currencyCode: 'PLN' },
+      NO_RATES,
+    )
+    expect(updated.name).toBe('Household')
+    expect(updated.currencyCode).toBe('PLN')
+  })
+
+  it('does not treat another workspace’s transactions as history for a currency change', async () => {
+    const created = await createAccount(
+      scope,
+      { ...EVERYDAY, initialBalanceMinor: 100_00 },
+      conversion,
+    )
+    await seedTransaction({
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      direction: 'expense',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-10',
+    })
+    const updated = await updateAccount(
+      scope,
+      created.id,
+      { currencyCode: 'EUR', openedOn: '2026-03-15' },
+      conversion,
+    )
+    expect(updated.currencyCode).toBe('EUR')
+  })
+
+  it('re-values an empty account’s opening row when the currency changes, and asks for a rebuild', async () => {
     const created = await createAccount(
       scope,
       { ...EVERYDAY, initialBalanceMinor: 100_00 },
