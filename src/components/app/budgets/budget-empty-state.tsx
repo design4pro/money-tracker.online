@@ -1,8 +1,6 @@
 import { FolderTree, Hand, Plus, Wallet } from 'lucide-react'
-import { Button as RACButton } from 'react-aria-components/Button'
 
-import { Button, EmptyState, buttonVariants } from '#/components/ui'
-import { cn } from '#/lib/cn'
+import { Button, EmptyState, KindTile } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 
 /**
@@ -72,41 +70,20 @@ export function BudgetEmptyState({
             ] as const
           ).map(({ kind, Icon }) => (
             <li key={kind} className="flex">
-              {/*
-                Not the shared `Button`: it wraps its children in an inline row of its own, so a
-                `flex-col` passed to it never reaches the icon, the title and the help text. The
-                tile takes the button's paint instead and is the interactive element itself, so
-                the three are its direct children and stack. `h-auto` in a flex `li` lets the grid
-                cell stretch it, and `auto-rows-fr` on the list gives the rows one height even
-                where it is a single column and the tiles sit in different rows (#536).
-              */}
-              <RACButton
-                className={cn(
-                  buttonVariants({
-                    variant: 'secondary',
-                    size: 'lg',
-                    block: true,
-                  }),
-                  'h-auto flex-col items-start justify-start gap-1.5 whitespace-normal py-4 text-start',
+              <KindTile
+                icon={<Icon />}
+                title={t(
+                  kind === 'category'
+                    ? 'budgets.kind.category'
+                    : 'budgets.kind.manual',
+                )}
+                help={t(
+                  kind === 'category'
+                    ? 'budgets.kind.category.help'
+                    : 'budgets.kind.manual.help',
                 )}
                 onPress={() => onCreate(kind)}
-              >
-                <Icon aria-hidden="true" className="size-5 text-ink-2" />
-                <span className="text-label font-semibold text-ink">
-                  {t(
-                    kind === 'category'
-                      ? 'budgets.kind.category'
-                      : 'budgets.kind.manual',
-                  )}
-                </span>
-                <span className="text-caption font-normal text-ink-2">
-                  {t(
-                    kind === 'category'
-                      ? 'budgets.kind.category.help'
-                      : 'budgets.kind.manual.help',
-                  )}
-                </span>
-              </RACButton>
+              />
             </li>
           ))}
         </ul>

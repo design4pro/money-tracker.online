@@ -91,9 +91,10 @@ sees for a week, in exchange for a checklist that is never wrong.
 - **`presets.ts`** declares two or three named presets (`household`, `personal`, and `minimal`), each
   a typed structure of categories (respecting the depth cap of 2 from `08-S1`) and an optional budget
   skeleton with **no amounts** — a preset that guesses someone's grocery budget is worse than one that
-  leaves it blank, because a wrong anchor is stickier than an empty field. Presets are
-  **localised**: the `pl` preset is a real Polish category set, not a machine translation of the
-  English one.
+  leaves it blank, because a wrong anchor is stickier than an empty field. The category structures
+  build on the standard set `src/server/categories/standard-set.ts` of `08-S1` and never redefine it.
+  Presets are **localised**: the `pl` preset is a real Polish category set, not a machine translation
+  of the English one.
 - **`progress.ts`** returns `{ hasAccount, hasTransaction, hasCategory, hasBudget, hasRecurring,
 hasImported, percentComplete }` from scoped counts in a single batched query.
 
