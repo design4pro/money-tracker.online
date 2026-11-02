@@ -76,7 +76,11 @@ import { pageForReader } from '#/server/repos/notifications'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 
-import { adjustAccountBalance, updateAccount } from '../accounts'
+import {
+  AccountCurrencyLockedError,
+  adjustAccountBalance,
+  updateAccount,
+} from '../accounts'
 import { touchLedgerAccount } from '../base'
 import { budgetSpend, getBudget } from '../budgets'
 import {
@@ -2369,13 +2373,13 @@ describe('19 — a transaction is in its account’s currency', () => {
   })
 })
 
-describe('20 — changing an account’s currency leaves rows the detection can see', () => {
-  it('reports a row booked in the old currency after updateAccount changes the account’s currency', async () => {
+describe('20 — changing an account’s currency is refused once it has history', () => {
+  it('does not rewrite a booked row, and detection stays empty because the account currency did not move', async () => {
     const world = await createBudgetWorld()
     const conversion = conversionOf('PLN', [
       [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
     ])
-    await createTransaction({
+    const booked = await createTransaction({
       scope: world.scope,
       policies: EVERYTHING,
       conversion,
@@ -2385,16 +2389,27 @@ describe('20 — changing an account’s currency leaves rows the detection can 
       findAccountCurrencyMismatches(world.scope),
     ).resolves.toMatchObject({ count: 0 })
 
-    await updateAccount(
-      world.scope,
-      'acc-a',
-      { currencyCode: 'EUR' },
-      conversion,
-    )
+    await expect(
+      updateAccount(world.scope, 'acc-a', { currencyCode: 'EUR' }, conversion),
+    ).rejects.toBeInstanceOf(AccountCurrencyLockedError)
 
-    const report = await findAccountCurrencyMismatches(world.scope)
-    expect(report.count).toBe(1)
-    expect(report.sample.at(0)?.accountId).toBe('acc-a')
+    const [account] = await world.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, 'acc-a'))
+    const [row] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, booked.id))
+    expect(account?.currencyCode).toBe('PLN')
+    expect(row).toMatchObject({
+      amountMinor: booked.amountMinor,
+      currencyCode: booked.currencyCode,
+      refAmountMinor: booked.refAmountMinor,
+    })
+    await expect(
+      findAccountCurrencyMismatches(world.scope),
+    ).resolves.toMatchObject({ count: 0 })
   })
 })
 

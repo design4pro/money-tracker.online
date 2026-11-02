@@ -73,9 +73,14 @@ includeExcluded })`, `getAccount(id)`, `createAccount(input)`, `updateAccount(id
 - **Authorisation.** `requireOrg()` in every server function. `updateAccount` and `deleteAccount`
   additionally require `owner | admin` when the workspace has more than one member.
 - **Ledger batching.** `createAccount` (with a non-zero `initial_balance_minor`), `updateAccount`
-  (when `currency_code` or `initial_balance_minor` changes) and `restoreAccount` all run inside
-  `runWithLedgerBatch`, which enqueues one rebuild for the touched account after the write settles.
-  Changing an account's currency changes every `ref_` value in its history.
+  (when `currency_code` or `initial_balance_minor` changes on a path that is allowed) and
+  `restoreAccount` all run inside `runWithLedgerBatch`, which enqueues one rebuild for the touched
+  account after the write settles.
+- **Currency lock.** `updateAccount` refuses a `currency_code` change once the account has any
+  transactions. Booked rows keep `amount_minor`, `currency_code` and `ref_amount_minor`
+  (`docs/MONEY.md` §3.1). Empty accounts may still change currency; that re-derives only the
+  account row's opening `ref_` columns. It is not a workspace-base re-denomination. Already
+  mismatched rows are reported by `findAccountCurrencyMismatches` (#695) and are not rewritten.
 
 ### UI (route, components)
 
@@ -125,7 +130,8 @@ Cases in `money-invariants.test.ts`:
 ### Verification
 
 - Command gate: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
-- `accounts.test.ts`: delete-refuses-with-history; the currency must be held by the workspace;
+- `accounts.test.ts`: delete-refuses-with-history; currency change refused once there are
+  transactions, allowed on an empty account; the currency must be held by the workspace;
   reorder is a single batched write; the quota call site fires before the insert.
 - Browser evidence: `/accounts` with the seeded five-account workspace, both themes, at **360 / 1280 /
   2560 px** — six frames — plus the **empty state** and the **reorder menu open**, which are the two

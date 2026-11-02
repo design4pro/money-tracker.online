@@ -132,8 +132,9 @@ const updateAccountInputSchema = z.strictObject({
 })
 
 /**
- * Edits an account. Batched, because changing the currency or the opening balance re-values every
- * day of its history — the repository decides whether this particular patch did either.
+ * Edits an account. Batched, because a currency change on an empty account or an opening-balance
+ * change asks the ledger to rebuild. A currency change on an account that already has transactions
+ * is refused in the repository (`docs/MONEY.md` §3.1).
  */
 export const updateAccount = createServerFn({ method: 'POST' })
   .inputValidator(updateAccountInputSchema)
