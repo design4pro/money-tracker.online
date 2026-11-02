@@ -154,9 +154,10 @@ export class CategoryInUseError extends ConflictError {
 /**
  * Thrown when a system category is asked to be deleted.
  *
- * A system row may be renamed and recoloured — it is the person's vocabulary too — but the import
- * mappers and the rule engine address it by `slug`, and a missing slug is a silently
- * mis-categorised import rather than a visible failure.
+ * A system row may be renamed and recoloured — it is the person's vocabulary too — but it is
+ * reserved for a row the product itself must find by slug. None exists today. The standard set
+ * is not system: those rows are ordinary and deletable. Import mappers and the rule engine
+ * address categories by free text and by id, not by this flag.
  */
 export class SystemCategoryError extends ConflictError {
   readonly categoryId: string
