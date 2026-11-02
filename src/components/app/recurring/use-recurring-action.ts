@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 
 import { toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
@@ -13,6 +13,10 @@ import { useTranslate } from '#/lib/i18n'
  * it was is the one thing that must not happen. `run` never rejects: the call sites fire it with
  * `void`, and a rejection there has no toast and no refresh.
  *
+ * A second press while the first call has not settled is ignored. The button is still on screen
+ * until the refresh removes the row, and without the guard that second press would hit the server
+ * again, toast success, then toast "That did not work" when the server refuses the duplicate.
+ *
  * ## What it does not know
  *
  * The server function, its arguments and the success message arrive as arguments - this directory
@@ -24,17 +28,24 @@ export function useRecurringAction(
   refresh: () => Promise<void>,
 ): (call: () => Promise<unknown>, successMessage: string) => Promise<void> {
   const t = useTranslate()
+  const inFlight = useRef(false)
 
   return useCallback(
     async (call, successMessage) => {
+      if (inFlight.current) return
+      inFlight.current = true
       try {
-        await call()
-        toast.success(successMessage)
-      } catch {
-        toast.error(t('recurring.toast.failed'))
+        try {
+          await call()
+          toast.success(successMessage)
+        } catch {
+          toast.error(t('recurring.toast.failed'))
+        }
+        // The outcome is already on screen; a failed re-read must not escape as an unhandled rejection.
+        await refresh().catch(() => undefined)
+      } finally {
+        inFlight.current = false
       }
-      // The outcome is already on screen; a failed re-read must not escape as an unhandled rejection.
-      await refresh().catch(() => undefined)
     },
     [refresh, t],
   )

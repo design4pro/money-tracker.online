@@ -1,9 +1,11 @@
-import { useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { CalendarClock } from 'lucide-react'
 import { z } from 'zod'
 
-import { useRecurringAction } from '#/components/app/recurring'
+import {
+  useMarkPaidReopen,
+  useRecurringAction,
+} from '#/components/app/recurring'
 import {
   KeyboardShortcuts,
   TransactionsModeSwitch,
@@ -79,13 +81,15 @@ function PlannedTransactionsRoute() {
   const navigate = Route.useNavigate()
   const refresh = useDataRefresh()
   const runAction = useRecurringAction(refresh)
-
-  const [pending, setPending] = useState<ExpectationRow | null>(null)
-  const close = () => {
-    setPending(null)
-    if (markPaid !== undefined || series !== undefined) {
+  const markPaidDialog = useMarkPaidReopen<ExpectationRow>({
+    search: { markPaid, series },
+    initial: null,
+    onClearSearch: () => {
       void navigate({ search, replace: true })
-    }
+    },
+  })
+  const close = () => {
+    markPaidDialog.close()
   }
 
   const skip = (row: ExpectationRow) => {
@@ -145,35 +149,32 @@ function PlannedTransactionsRoute() {
           />
         }
         expectations={{
-          onMarkPaid: setPending,
+          onMarkPaid: markPaidDialog.open,
           onSkip: skip,
-          openRowId: pending?.id ?? null,
-          reopenId:
-            markPaid !== undefined && series !== undefined
-              ? `${series}:${markPaid}`
-              : null,
+          openRowId: markPaidDialog.pending?.id ?? null,
+          reopenId: markPaidDialog.reopenId,
         }}
       />
 
-      {pending === null ? null : (
+      {markPaidDialog.pending === null ? null : (
         <MarkPaidDialog
-          key={pending.id}
+          key={markPaidDialog.pending.id}
           isOpen
           onOpenChange={(open) => {
             if (!open) close()
           }}
           series={{
-            id: pending.seriesId,
-            direction: pending.direction,
-            accountId: pending.accountId,
-            categoryId: pending.categoryId,
-            payeeId: pending.payeeId,
+            id: markPaidDialog.pending.seriesId,
+            direction: markPaidDialog.pending.direction,
+            accountId: markPaidDialog.pending.accountId,
+            categoryId: markPaidDialog.pending.categoryId,
+            payeeId: markPaidDialog.pending.payeeId,
           }}
           period={{
-            periodStart: pending.periodStart,
-            dueOn: pending.dueOn,
-            expectedAmountMinor: pending.expectedAmountMinor,
-            expectedCurrencyCode: pending.currencyCode,
+            periodStart: markPaidDialog.pending.periodStart,
+            dueOn: markPaidDialog.pending.dueOn,
+            expectedAmountMinor: markPaidDialog.pending.expectedAmountMinor,
+            expectedCurrencyCode: markPaidDialog.pending.currencyCode,
           }}
           origin="planned"
           onSaved={() => {
