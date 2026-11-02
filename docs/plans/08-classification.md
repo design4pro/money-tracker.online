@@ -20,7 +20,7 @@ children unless overridden.
 
 Delivered: 2026-11-02 - the owned paths listed below exist as built, merged in #740 (tenant
 isolation, money case, handler pins), #741 (write gate), #744 (named refusal), #795 (standard-set
-seed), #796 (empty state) and #798 (browser spec); `pnpm vitest run` on
+seed), #796 (empty state), #798 (browser spec) and #800 (this plan amendment); `pnpm vitest run` on
 `src/server/repos/__tests__/categories.test.ts`,
 `src/server/repos/__tests__/tenant-isolation.test.ts`,
 `src/server/repos/__tests__/money-invariants.test.ts`,

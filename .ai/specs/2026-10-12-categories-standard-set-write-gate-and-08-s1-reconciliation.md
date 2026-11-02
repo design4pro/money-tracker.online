@@ -1,12 +1,12 @@
 # Categories: the standard set, the write gate, the named refusal and the pins, and plan stage 08-S1 reconciled
 
-| Field              | Value                                   |
-| ------------------ | --------------------------------------- |
-| **Status**         | in-progress                             |
-| **Issue**          | #731                                    |
-| **Spec PR**        | #697                                    |
-| **Implementation** | #740, #741, #744, #795, #796, #798      |
-| **Plan**           | 08-S1 (docs/plans/08-classification.md) |
+| Field              | Value                                    |
+| ------------------ | ---------------------------------------- |
+| **Status**         | in-progress                              |
+| **Issue**          | #731                                     |
+| **Spec PR**        | #697                                     |
+| **Implementation** | #740, #741, #744, #795, #796, #798, #800 |
+| **Plan**           | 08-S1 (docs/plans/08-classification.md)  |
 
 ## 📝 TLDR
 
@@ -729,6 +729,5 @@ grep -n "^describe(" src/server/repos/__tests__/money-invariants.test.ts | tail 
 ## Amendment
 
 Phases 1 to 5 merged as #740, #741, #744, #795, #796 and #798. The money-invariant case is numbered
-**22**, not 19, because sections 19–21 landed in between. Phase 6 of this pull request adds the
-`Delivered:` line under `08-S1` and leaves the spec `in-progress` until that pull request number is
-appended.
+**22**, not 19, because sections 19–21 landed in between. Phase 6 is #800: the `Delivered:` line
+under `08-S1` and this implementation list. The spec stays `in-progress` until #800 merges.
