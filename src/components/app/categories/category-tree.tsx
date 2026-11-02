@@ -178,7 +178,9 @@ export function CategoryTree({
               className="size-4 shrink-0 text-ink-2"
             />
             <CategorySwatch color={row.color} />
-            <span className="truncate text-label text-ink">{row.name}</span>
+            <span className="min-w-0 break-words text-label text-ink">
+              {row.name}
+            </span>
             {/*
               The kind yields to the name on a phone. A `Badge` is `shrink-0` and a text span is
               not, so on a 328px row the seven fixed-width elements keep their size and the one

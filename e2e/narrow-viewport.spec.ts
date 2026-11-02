@@ -125,10 +125,12 @@ test.describe('a 360px screen still shows its own subject', () => {
       'the seeded demo workspace has categories to render',
     ).toBeGreaterThan(0)
 
-    // The name is the only truncating span on the row: the drag handle, the two glyphs, the
-    // colour dot and the overflow trigger carry no text of their own.
+    // The name is the wrapping span on the row (`break-words`, never `truncate`): the drag
+    // handle, the two glyphs, the colour dot and the overflow trigger carry no text of their
+    // own. Locating it by class is the contract — a row that ellipsizes again fails here
+    // because there is no `break-words` span to read.
     for (let index = 0; index < count; index += 1) {
-      const name = rows.nth(index).locator('span.truncate').first()
+      const name = rows.nth(index).locator('span.break-words').first()
       const text = await name.textContent()
       // Polled rather than measured once: the tree mounts its drag-and-drop hooks after
       // hydration, and a width read in that frame is a measurement of a moving target — which
