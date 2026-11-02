@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { z } from 'zod'
 
@@ -13,7 +13,8 @@ import {
 } from '#/components/app/accounts'
 import { SegmentedFilter } from '#/components/app/nav'
 import { ErrorPanel } from '#/components/app/shell'
-import { Button, Card, buttonVariants, toast } from '#/components/ui'
+import { ButtonLink } from '#/components/app/shell/button-link'
+import { Button, Card, toast } from '#/components/ui'
 import { formatNumber, useLocale, useTranslate } from '#/lib/i18n'
 import {
   archiveAccount,
@@ -166,12 +167,9 @@ function AccountsListRoute() {
             is deliberately one row at every width, and a second 40px button would take the title
             block's room on a phone.
           */}
-          <Link
-            to="/accounts/groups"
-            className={buttonVariants({ variant: 'link', size: 'sm' })}
-          >
+          <ButtonLink to="/accounts/groups" variant="link" size="sm">
             {t('accounts.groups.manage')}
-          </Link>
+          </ButtonLink>
         </div>
         <Button
           variant="primary"
