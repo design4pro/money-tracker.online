@@ -47,6 +47,20 @@ export function hasMarkPaidSearch(search: MarkPaidSearch): boolean {
   return search.markPaid !== undefined || search.series !== undefined
 }
 
+/**
+ * Drop the reopen address and keep every other search param.
+ *
+ * `/recurring` keeps `status` (and `book`); planned keeps the ledger filters; the series detail
+ * has nothing else, so the result is empty. The three routes pass the whole search in and navigate
+ * to this result on close — they do not each reconstruct which keys to keep.
+ */
+export function omitMarkPaidSearch<T extends MarkPaidSearch>(
+  search: T,
+): Omit<T, 'markPaid' | 'series'> {
+  const { markPaid: _markPaid, series: _series, ...rest } = search
+  return rest
+}
+
 export function isUnsettledPeriodStatus(status: string): boolean {
   return status !== 'paid' && status !== 'skipped'
 }
@@ -75,14 +89,14 @@ export function findReopenedPeriod<T>(
   })
 }
 
-export function useMarkPaidReopen<T>({
+export function useMarkPaidReopen<T, TSearch extends MarkPaidSearch>({
   search,
   initial,
   onClearSearch,
 }: {
-  readonly search: MarkPaidSearch
+  readonly search: TSearch
   readonly initial: T | null
-  readonly onClearSearch: () => void
+  readonly onClearSearch: (kept: Omit<TSearch, 'markPaid' | 'series'>) => void
 }): MarkPaidReopen<T> {
   const [pending, setPending] = useState<T | null>(initial)
   const searchRef = useRef(search)
@@ -97,7 +111,7 @@ export function useMarkPaidReopen<T>({
   const close = useCallback(() => {
     setPending(null)
     if (hasMarkPaidSearch(searchRef.current)) {
-      clearRef.current()
+      clearRef.current(omitMarkPaidSearch(searchRef.current))
     }
   }, [])
 

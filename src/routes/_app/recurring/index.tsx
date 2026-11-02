@@ -146,17 +146,17 @@ function markPaidTarget(
 function RecurringListRoute() {
   const t = useTranslate()
   const { overview, accounts, categories, payees } = Route.useLoaderData()
-  const { status, book, markPaid, series: markPaidSeries } = Route.useSearch()
+  const search = Route.useSearch()
+  const { status, book } = search
   const navigate = Route.useNavigate()
   const refreshCaches = useDataRefresh()
   const runAction = useRecurringAction(refreshCaches)
-  const markPaidSearch = { markPaid, series: markPaidSeries }
-  const markPaidDialog = useMarkPaidReopen<MarkPaidTarget>({
-    search: markPaidSearch,
+  const markPaidDialog = useMarkPaidReopen({
+    search,
     initial: (() => {
       const reopened = findReopenedPeriod(
         overview.upcoming,
-        markPaidSearch,
+        search,
         (candidate) => ({
           periodStart: candidate.periodStart,
           seriesId: candidate.seriesId,
@@ -167,8 +167,8 @@ function RecurringListRoute() {
         ? null
         : markPaidTarget(overview.rows, reopened)
     })(),
-    onClearSearch: () => {
-      void navigate({ search: { status, book }, replace: true })
+    onClearSearch: (kept) => {
+      void navigate({ search: kept, replace: true })
     },
   })
 

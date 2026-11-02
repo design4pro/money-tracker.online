@@ -41,7 +41,6 @@ import type {
   RecurringKind,
   TransactionDirection,
 } from '#/server/db/schema'
-import type { PeriodView } from '#/server/repos/recurring'
 import { pageHead } from '#/routes/-lib/page-title'
 
 /**
@@ -120,18 +119,17 @@ function SeriesDetailRoute() {
   const t = useTranslate()
   const locale = useLocale()
   const { detail, accounts, categories, payees } = Route.useLoaderData()
-  const { markPaid } = Route.useSearch()
+  const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const refreshCaches = useDataRefresh()
   const runAction = useRecurringAction(refreshCaches)
-  const markPaidSearch = { markPaid }
-  const markPaidDialog = useMarkPaidReopen<PeriodView>({
-    search: markPaidSearch,
+  const markPaidDialog = useMarkPaidReopen({
+    search,
     initial: !detail.series.isActive
       ? null
       : (findReopenedPeriod(
           detail.periods,
-          markPaidSearch,
+          search,
           (candidate) => ({
             periodStart: candidate.periodStart,
             seriesId: candidate.seriesId,
@@ -142,8 +140,8 @@ function SeriesDetailRoute() {
               isUnsettledPeriodStatus(candidate.derivedStatus),
           },
         ) ?? null),
-    onClearSearch: () => {
-      void navigate({ search: {}, replace: true })
+    onClearSearch: (kept) => {
+      void navigate({ search: kept, replace: true })
     },
   })
 

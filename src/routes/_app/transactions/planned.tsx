@@ -3,6 +3,7 @@ import { CalendarClock } from 'lucide-react'
 import { z } from 'zod'
 
 import {
+  omitMarkPaidSearch,
   useMarkPaidReopen,
   useRecurringAction,
 } from '#/components/app/recurring'
@@ -77,15 +78,16 @@ export const Route = createFileRoute('/_app/transactions/planned')({
 
 function PlannedTransactionsRoute() {
   const t = useTranslate()
-  const { markPaid, series, ...search } = Route.useSearch()
+  const search = Route.useSearch()
+  const filters = omitMarkPaidSearch(search)
   const navigate = Route.useNavigate()
   const refresh = useDataRefresh()
   const runAction = useRecurringAction(refresh)
-  const markPaidDialog = useMarkPaidReopen<ExpectationRow>({
-    search: { markPaid, series },
-    initial: null,
-    onClearSearch: () => {
-      void navigate({ search, replace: true })
+  const markPaidDialog = useMarkPaidReopen({
+    search,
+    initial: null as ExpectationRow | null,
+    onClearSearch: (kept) => {
+      void navigate({ search: kept, replace: true })
     },
   })
   const close = () => {
@@ -120,14 +122,14 @@ function PlannedTransactionsRoute() {
         mode="planned"
         onChange={(next) => {
           if (next === 'recorded') {
-            void navigate({ to: '/transactions', search })
+            void navigate({ to: '/transactions', search: filters })
           }
         }}
       />
 
       <TransactionsScreen
         policies={PLANNED_POLICIES}
-        search={search}
+        search={filters}
         onSearchChange={(next: TransactionSearch, options) =>
           void navigate({ search: next, replace: options.replace })
         }
