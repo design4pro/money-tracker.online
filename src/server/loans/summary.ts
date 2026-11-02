@@ -11,7 +11,7 @@
  */
 
 import { ZERO_MINOR, asMinor, ratioOfMinor, sumMinor } from '#/lib/money'
-import { listInstalments, listLoans } from '#/server/repos/loans'
+import { listInstalmentsForLoans, listLoans } from '#/server/repos/loans'
 import { conversionContextFor } from '#/server/repos/workspace-currencies'
 
 import type { Minor } from '#/lib/money'
@@ -102,6 +102,16 @@ export async function summariseLoans(
 ): Promise<LoansOverview> {
   const conversion = await conversionContextFor(scope)
   const loans = await listLoans(scope, input)
+  const instalments = await listInstalmentsForLoans(scope, {
+    loanIds: loans.map((loan) => loan.id),
+    today,
+  })
+  const byLoan = new Map<string, Array<InstalmentView>>()
+  for (const row of instalments) {
+    const bucket = byLoan.get(row.loanId)
+    if (bucket === undefined) byLoan.set(row.loanId, [row])
+    else bucket.push(row)
+  }
   const rows: Array<LoanSummary> = []
   const remainingRef: Array<Minor> = []
   const overdueRef: Array<Minor> = []
@@ -110,15 +120,12 @@ export async function summariseLoans(
   let overdueCount = 0
 
   for (const loan of loans) {
-    const instalments = await listInstalments(scope, {
-      loanId: loan.id,
-      today,
-    })
-    const summary = summariseLoan(loan, instalments)
+    const schedule = byLoan.get(loan.id) ?? []
+    const summary = summariseLoan(loan, schedule)
     rows.push(summary)
     remainingRef.push(summary.remainingRefMinor)
     overdueCount += summary.overdueCount
-    for (const row of instalments) {
+    for (const row of schedule) {
       if (row.derivedStatus === 'paid') continue
       if (row.derivedStatus === 'overdue') overdueRef.push(row.refAmountMinor)
       if (row.dueOn.startsWith(thisMonth)) {

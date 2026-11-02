@@ -36,6 +36,7 @@ import {
   derivedInstalmentStatus,
   getLoan,
   listInstalments,
+  listInstalmentsForLoans,
   listLoans,
   listSettledTransactionIds,
   markInstalmentPaid,
@@ -166,6 +167,34 @@ describe('createLoan writes the loan and its imported schedule together', () => 
     expect(business.map((row) => row.name)).toEqual(['Loan A'])
     const personal = await listLoans(scope, { book: 'personal' })
     expect(personal.map((row) => row.name)).toEqual(['Loan P'])
+  })
+
+  it('loads several schedules in one read and nothing when no loan is named', async () => {
+    const first = await createLoan(scope, importedInput())
+    const second = await createLoan(scope, {
+      ...importedInput(),
+      name: 'Loan P',
+      book: 'personal',
+    })
+    expect(await listInstalmentsForLoans(scope, { loanIds: [] })).toEqual([])
+    const rows = await listInstalmentsForLoans(scope, {
+      loanIds: [first.id, second.id],
+      today: '2026-03-21',
+    })
+    expect(new Set(rows.map((row) => row.loanId))).toEqual(
+      new Set([first.id, second.id]),
+    )
+    expect(
+      rows.filter((row) => row.loanId === first.id).map((row) => row.sequence),
+    ).toEqual([1, 2, 3])
+    expect(
+      rows
+        .filter((row) => row.loanId === first.id)
+        .map((row) => row.derivedStatus),
+    ).toEqual(['overdue', 'overdue', 'upcoming'])
+    expect(
+      rows.filter((row) => row.loanId === second.id).map((row) => row.sequence),
+    ).toEqual([1, 2, 3])
   })
 })
 

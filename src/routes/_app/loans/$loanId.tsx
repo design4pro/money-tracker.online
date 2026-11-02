@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
+import { z } from 'zod'
 
 import { LoanDetailSkeleton, LoanMeter } from '#/components/app/loans'
 import { useRowFocusRecovery } from '#/components/app/recurring'
@@ -11,6 +12,7 @@ import { loadLoanDetail } from '#/server/fns/loans'
 import { pageHead } from '#/routes/-lib/page-title'
 
 import { useDataRefresh } from '../-lib/refresh'
+import { findReopenedInstalment } from './-lib/reopen-settle'
 import { ScheduleTable } from './-ui/schedule-table'
 import { SettleDialog } from './-ui/settle-dialog'
 
@@ -23,6 +25,11 @@ import type { InstalmentView } from '#/server/repos/loans'
  *
  * Mark paid links an existing transaction. Overdue is derived. A buyout is a flagged row. After a
  * save, focus goes back to the schedule (or the heading) instead of falling to the page start.
+ *
+ * `?markPaid=<sequence>` reopens the settle picker on that unpaid instalment. It is how the entry
+ * form brings a person back after they recorded a payment the picker had nothing to offer for.
+ * Any other value is ignored, and the address is cleaned when the dialog closes so a reload does
+ * not reopen it.
  */
 
 const KIND_KEYS: Record<LoanKind, MessageKey> = {
@@ -32,7 +39,22 @@ const KIND_KEYS: Record<LoanKind, MessageKey> = {
   other: 'loans.kind.other',
 }
 
+const searchSchema = z.object({
+  markPaid: z
+    .union([
+      z.number(),
+      z
+        .string()
+        .regex(/^\d{1,15}$/)
+        .transform(Number),
+    ])
+    .pipe(z.number().int().min(1))
+    .optional()
+    .catch(undefined),
+})
+
 export const Route = createFileRoute('/_app/loans/$loanId')({
+  validateSearch: searchSchema,
   loader: async ({ params }) =>
     loadLoanDetail({ data: { loanId: params.loanId } }),
   pendingComponent: LoanDetailSkeleton,
@@ -57,11 +79,15 @@ function LoanDetailRoute() {
   const t = useTranslate()
   const locale = useLocale()
   const detail = Route.useLoaderData()
+  const { markPaid } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const router = useRouter()
   const refreshCaches = useDataRefresh()
   const { loan } = detail.summary
 
-  const [pending, setPending] = useState<InstalmentView | null>(null)
+  const [pending, setPending] = useState<InstalmentView | null>(() =>
+    findReopenedInstalment(detail.instalments, markPaid),
+  )
   const tableRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
 
@@ -74,7 +100,12 @@ function LoanDetailRoute() {
     fallbackRef: headingRef,
   })
 
-  const close = () => setPending(null)
+  const close = () => {
+    setPending(null)
+    if (markPaid !== undefined) {
+      void navigate({ search: {}, replace: true })
+    }
+  }
   const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
   return (

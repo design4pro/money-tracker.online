@@ -2499,7 +2499,7 @@ const messages = {
   'loans.schedule.caption':
     'Each row is one expected payment. Paid means it points at a recorded transaction.',
   'loans.schedule.missing':
-    'This liability has no schedule. That should not happen; try again or delete it.',
+    'This liability has no schedule. Try again, or go back to all liabilities.',
   'loans.schedule.title': 'Instalment schedule',
   'loans.schedule.sequence': 'No.',
   'loans.schedule.due': 'Due',

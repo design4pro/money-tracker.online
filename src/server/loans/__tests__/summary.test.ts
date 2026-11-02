@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { asMinor } from '#/lib/money'
+import { PLANS } from '#/lib/plans'
 import {
   createBudgetWorld,
+  executed,
   seedTransaction,
 } from '#/server/repos/__tests__/budget-harness'
 import { setLimitResolver } from '#/server/repos/base'
@@ -86,5 +88,46 @@ describe('summariseLoans', () => {
     expect(summariseLoan(overview.rows[0]!.loan, []).remainingMinor).toBe(
       asMinor(0),
     )
+  })
+
+  it('reads every schedule in one query at the free loan ceiling, without a getLoan per card', async () => {
+    const ceiling = PLANS.free.limits.loans
+    expect(ceiling).toBe(2)
+    await createLoan(world.scope, {
+      name: 'Loan C',
+      currencyCode: 'PLN',
+      instalmentMinor: 40_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [
+        { dueOn: '2026-02-10', amountMinor: 40_00 },
+        { dueOn: '2026-03-10', amountMinor: 40_00 },
+      ],
+    })
+    await createLoan(world.scope, {
+      name: 'Loan D',
+      currencyCode: 'PLN',
+      instalmentMinor: 60_00,
+      paymentDay: 15,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-15', amountMinor: 60_00 }],
+    })
+
+    executed.length = 0
+    const overview = await summariseLoans(world.scope, '2026-03-01', {})
+    expect(overview.rows).toHaveLength(2)
+    expect(overview.remainingRefMinor).toBe(asMinor(140_00))
+
+    const instalmentReads = executed.filter((query) =>
+      /from "loan_instalments"/i.test(query),
+    )
+    expect(instalmentReads).toHaveLength(1)
+    const parentById = executed.filter(
+      (query) =>
+        /from "loans"/i.test(query) &&
+        /"loans"\."id"/i.test(query) &&
+        /limit/i.test(query),
+    )
+    expect(parentById).toHaveLength(0)
   })
 })
