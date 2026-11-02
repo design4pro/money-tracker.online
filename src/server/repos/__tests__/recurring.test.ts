@@ -54,6 +54,7 @@ import {
   markSkipped,
   pauseSeries,
   periodVarianceMinor,
+  removeUnpaidOpenPeriods,
   revertPeriod,
   terminationOf,
   unlinkTransaction,
@@ -764,6 +765,10 @@ describe('tenant isolation', () => {
       'materializeSeries',
       (id: string) =>
         materializeSeries(world.scope, { seriesId: id, today: TODAY }),
+    ],
+    [
+      'removeUnpaidOpenPeriods',
+      (id: string) => removeUnpaidOpenPeriods(world.scope, id),
     ],
   ])("refuses B's series id from A's scope: %s", async (_name, call) => {
     const id = await seriesInB()
