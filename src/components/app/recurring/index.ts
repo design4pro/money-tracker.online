@@ -42,6 +42,7 @@ export {
   hasMarkPaidSearch,
   isUnsettledPeriodStatus,
   markPaidReopenId,
+  omitMarkPaidSearch,
   useMarkPaidReopen,
 } from './use-mark-paid-reopen'
 export type {
