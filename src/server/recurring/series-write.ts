@@ -23,12 +23,14 @@
  * **Pause, complete and delete are not here, and that is a statement:** none of them adds a period.
  * Nor are the period writes, which settle a row that exists. Update and resume materialise whatever
  * the series' active state; the cron, which asks only about active series, owns "stop creating new
- * periods".
+ * periods". An update that moves `anchorDay` or `anchorMonth` rebuilds unpaid open periods against
+ * the new schedule and leaves paid and skipped history in place.
  */
 
 import {
   acceptCandidate,
   createSeries,
+  getSeries,
   resumeSeries,
   updateSeries,
 } from '#/server/repos/recurring'
@@ -72,6 +74,21 @@ export async function writeSeries(
   scope: TenantScope,
   { today, ahead, change }: WriteSeriesInput,
 ): Promise<{ readonly seriesId: string }> {
+  if (change.kind === 'update') {
+    const existing = await getSeries(scope, change.seriesId)
+    const series = await updateSeries(scope, change.seriesId, change.patch)
+    const realignOpen =
+      existing.anchorDay !== series.anchorDay ||
+      existing.anchorMonth !== series.anchorMonth
+    await materializeSeries(scope, {
+      seriesId: series.id,
+      today,
+      ahead,
+      realignOpen,
+    })
+    return { seriesId: series.id }
+  }
+
   const series = await applyChange(scope, change)
   await materializeSeries(scope, { seriesId: series.id, today, ahead })
   return { seriesId: series.id }

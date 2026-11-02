@@ -42,6 +42,7 @@ import { NotFoundError } from '../errors'
 import {
   RecurringAutomationConflictError,
   RecurringPeriodPaidError,
+  RecurringTransactionLinkedError,
   createSeries,
   deleteSeries,
   getSeries,
@@ -53,12 +54,18 @@ import {
   markSkipped,
   pauseSeries,
   periodVarianceMinor,
+  removeUnpaidOpenPeriods,
   revertPeriod,
   terminationOf,
   unlinkTransaction,
   updateSeries,
 } from '../recurring'
-import { NOW, createBudgetWorld, seedTransaction } from './budget-harness'
+import {
+  NOW,
+  createBudgetWorld,
+  fault,
+  seedTransaction,
+} from './budget-harness'
 
 import type { BudgetWorld } from './budget-harness'
 import type { CreateSeriesInput } from '../recurring'
@@ -84,6 +91,34 @@ let world: BudgetWorld
 beforeEach(async () => {
   world = await createBudgetWorld()
 })
+
+async function materialisedPeriod(): Promise<{
+  seriesId: string
+  periodStart: string
+}> {
+  const series = await createSeries(world.scope, seriesInput())
+  await materializeSeries(world.scope, {
+    seriesId: series.id,
+    today: TODAY,
+    ahead: 0,
+  })
+  const period = (await listPeriods(world.scope, series.id, TODAY)).at(0)
+  if (period === undefined) throw new Error('no period materialised')
+  return { seriesId: series.id, periodStart: period.periodStart }
+}
+
+async function storedPeriod(key: { seriesId: string; periodStart: string }) {
+  const [row] = await world.db
+    .select()
+    .from(recurringPeriods)
+    .where(
+      and(
+        eq(recurringPeriods.seriesId, key.seriesId),
+        eq(recurringPeriods.periodStart, key.periodStart),
+      ),
+    )
+  return row
+}
 
 describe('forecast spending policy', () => {
   it.each([
@@ -441,34 +476,6 @@ describe('the termination is a union', () => {
 })
 
 describe('skipping a period', () => {
-  async function materialisedPeriod(): Promise<{
-    seriesId: string
-    periodStart: string
-  }> {
-    const series = await createSeries(world.scope, seriesInput())
-    await materializeSeries(world.scope, {
-      seriesId: series.id,
-      today: TODAY,
-      ahead: 0,
-    })
-    const period = (await listPeriods(world.scope, series.id, TODAY)).at(0)
-    if (period === undefined) throw new Error('no period materialised')
-    return { seriesId: series.id, periodStart: period.periodStart }
-  }
-
-  async function storedPeriod(key: { seriesId: string; periodStart: string }) {
-    const [row] = await world.db
-      .select()
-      .from(recurringPeriods)
-      .where(
-        and(
-          eq(recurringPeriods.seriesId, key.seriesId),
-          eq(recurringPeriods.periodStart, key.periodStart),
-        ),
-      )
-    return row
-  }
-
   it('refuses a period another tab has already marked paid, and leaves it and its link alone', async () => {
     const key = await materialisedPeriod()
     await seedTransaction(world.db, {
@@ -531,6 +538,81 @@ describe('money', () => {
     await expect(
       createSeries(world.scope, seriesInput({ expectedAmountMinor: 0 })),
     ).rejects.toThrow()
+  })
+
+  it('refuses a transaction that already settles another period of another series', async () => {
+    const rent = await createSeries(world.scope, seriesInput({ name: 'Rent' }))
+    const phone = await createSeries(
+      world.scope,
+      seriesInput({ name: 'Phone', expectedAmountMinor: 50_00 }),
+    )
+    await materializeSeries(world.scope, {
+      seriesId: rent.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    await materializeSeries(world.scope, {
+      seriesId: phone.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-shared',
+      refAmountMinor: 250_000,
+      bookedOn: '2026-01-31',
+    })
+    const rentPeriod = (await listPeriods(world.scope, rent.id, TODAY)).at(0)
+    const phonePeriod = (await listPeriods(world.scope, phone.id, TODAY)).at(0)
+    if (rentPeriod === undefined || phonePeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+
+    await markPaid(world.scope, {
+      seriesId: rent.id,
+      periodStart: rentPeriod.periodStart,
+      transactionId: 'txn-shared',
+    })
+    await expect(
+      markPaid(world.scope, {
+        seriesId: phone.id,
+        periodStart: phonePeriod.periodStart,
+        transactionId: 'txn-shared',
+      }),
+    ).rejects.toBeInstanceOf(RecurringTransactionLinkedError)
+    expect((await storedPeriod(phonePeriod)).status).not.toBe('paid')
+  })
+
+  it('is idempotent for the same period and the same transaction', async () => {
+    const key = await materialisedPeriod()
+    await seedTransaction(world.db, {
+      id: 'txn-again',
+      refAmountMinor: 250_000,
+      bookedOn: '2026-01-31',
+    })
+    await markPaid(world.scope, { ...key, transactionId: 'txn-again' })
+    await expect(
+      markPaid(world.scope, { ...key, transactionId: 'txn-again' }),
+    ).resolves.toBeUndefined()
+    expect((await storedPeriod(key)).settledTransactionId).toBe('txn-again')
+  })
+
+  it('does not leave a period paid when the link write fails', async () => {
+    const key = await materialisedPeriod()
+    await seedTransaction(world.db, {
+      id: 'txn-atomic',
+      refAmountMinor: 250_000,
+      bookedOn: '2026-01-31',
+    })
+    fault.when = (query) => /insert into "recurring_links"/i.test(query)
+
+    await expect(
+      markPaid(world.scope, { ...key, transactionId: 'txn-atomic' }),
+    ).rejects.toThrow(/injected fault/i)
+
+    fault.when = null
+    const period = await storedPeriod(key)
+    expect(period.status).not.toBe('paid')
+    expect(period.settledTransactionId).toBeNull()
   })
 
   it('copies no amount when a period is marked paid', async () => {
@@ -683,6 +765,10 @@ describe('tenant isolation', () => {
       'materializeSeries',
       (id: string) =>
         materializeSeries(world.scope, { seriesId: id, today: TODAY }),
+    ],
+    [
+      'removeUnpaidOpenPeriods',
+      (id: string) => removeUnpaidOpenPeriods(world.scope, id),
     ],
   ])("refuses B's series id from A's scope: %s", async (_name, call) => {
     const id = await seriesInB()

@@ -30,9 +30,11 @@ import { accounts, recurringPeriods, transactions } from '#/server/db/schema'
 import { setLedgerBatchPorts } from '#/server/ledger/batch'
 import { rebuildAccountBalance } from '#/server/repos/account-balances'
 import {
+  RecurringTransactionLinkedError,
   createSeries,
   listPeriods,
   listSeriesLinks,
+  markPaid,
 } from '#/server/repos/recurring'
 import { NOW, createBudgetWorld } from '#/server/repos/__tests__/budget-harness'
 
@@ -42,6 +44,15 @@ import { materializeSeries } from '../materialize'
 
 import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
 import type { CreateSeriesInput } from '#/server/repos/recurring'
+import type * as RecurringRepos from '#/server/repos/recurring'
+
+vi.mock('#/server/repos/recurring', async (importOriginal) => {
+  const actual = await importOriginal<typeof RecurringRepos>()
+  return {
+    ...actual,
+    markPaid: vi.fn(actual.markPaid),
+  }
+})
 
 const TODAY = '2026-03-15'
 
@@ -287,6 +298,25 @@ describe('what it refuses to post', () => {
     expect(report.posted).toBe(0)
     expect(refusals).toEqual(['archived-account'])
     expect(await world.db.select().from(transactions)).toHaveLength(0)
+  })
+
+  it('declines a period when markPaid refuses the receipt, and does not crash', async () => {
+    await seriesWithDuePeriod()
+    vi.mocked(markPaid).mockRejectedValueOnce(
+      new RecurringTransactionLinkedError('txn-x', 'series-x', '2026-03-01'),
+    )
+    const refusals: Array<string> = []
+
+    const report = await runAutoRecord({
+      scope: world.scope,
+      markers: createMemoryMarkerStore(),
+      today: TODAY,
+      onRefusal: (outcome) => refusals.push(outcome.skipped ?? ''),
+    })
+
+    expect(report.posted).toBe(0)
+    expect(refusals).toEqual(['already-posted'])
+    expect(report.outcomes.at(0)?.skipped).toBe('already-posted')
   })
 
   it('leaves a series that is not auto_record alone', async () => {

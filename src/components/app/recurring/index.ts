@@ -35,6 +35,22 @@ export {
   useRowFocusRecovery,
 } from './use-row-focus-recovery'
 
+export { useRecurringAction } from './use-recurring-action'
+
+export {
+  findReopenedPeriod,
+  hasMarkPaidSearch,
+  isUnsettledPeriodStatus,
+  markPaidReopenId,
+  useMarkPaidReopen,
+} from './use-mark-paid-reopen'
+export type {
+  FindReopenedPeriodOptions,
+  MarkPaidPeriodKey,
+  MarkPaidReopen,
+  MarkPaidSearch,
+} from './use-mark-paid-reopen'
+
 export { RecurringEmptyState } from './recurring-empty-state'
 export type { RecurringEmptyStateProps } from './recurring-empty-state'
 

@@ -308,6 +308,7 @@ function AccountDetailRoute() {
             if (!open) close()
           }}
           account={account}
+          currencyLocked={transactionCount > 0}
           currencyOptions={[
             ...new Set([baseCurrencyCode, account.currencyCode]),
           ].sort((left, right) => left.localeCompare(right))}

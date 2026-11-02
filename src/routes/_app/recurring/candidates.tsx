@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 
 import {
@@ -86,7 +86,6 @@ function CandidateListError({ reset }: { readonly reset: () => void }) {
 function CandidateListRoute() {
   const t = useTranslate()
   const { candidates, accounts, categories, payees } = Route.useLoaderData()
-  const router = useRouter()
   const refreshCaches = useDataRefresh()
 
   const [isDetecting, setIsDetecting] = useState(false)
@@ -97,7 +96,7 @@ function CandidateListRoute() {
     ReadonlyMap<string, WeakestSignal> | undefined
   >(undefined)
 
-  const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
+  const refresh = refreshCaches
 
   const accountRefs = accounts.accounts.map((account) => ({
     id: account.id,

@@ -937,10 +937,10 @@ export interface CurrencyMismatchReport {
  * Reports the transactions whose `currency_code` differs from their account's **current**
  * `currency_code`: how many there are, and a capped sample of their ids.
  *
- * Read-only, and the safety net for rows the write rule cannot reach — one written before the rule
- * existed, or one stranded when {@link updateAccount} changed the account's currency under its
- * history. It updates, deletes and backfills nothing; what to do about the rows it names is a
- * separate decision. Both joined tables carry the tenant predicate.
+ * Read-only, and the safety net for rows the write rule cannot reach — one written before the
+ * account-currency lock existed. {@link updateAccount} now refuses a currency change once the
+ * account has transactions, so this reporter does not repair anything: it names the rows, and
+ * remediation is a separate decision. Both joined tables carry the tenant predicate.
  */
 export async function findAccountCurrencyMismatches(
   scope: TenantScope,

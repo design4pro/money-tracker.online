@@ -76,7 +76,11 @@ import { pageForReader } from '#/server/repos/notifications'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 
-import { adjustAccountBalance, updateAccount } from '../accounts'
+import {
+  AccountCurrencyLockedError,
+  adjustAccountBalance,
+  updateAccount,
+} from '../accounts'
 import { touchLedgerAccount } from '../base'
 import { budgetSpend, getBudget } from '../budgets'
 import {
@@ -93,8 +97,10 @@ import {
 } from '../categories'
 import { ConflictError } from '../errors'
 import {
+  RecurringTransactionLinkedError,
   createSeries,
   listPeriods as listSeriesPeriods,
+  markPaid,
   periodVarianceMinor,
 } from '../recurring'
 import {
@@ -1022,6 +1028,61 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
     expect(medianOf([100_00, 110_00, 120_00, 130_00])).toBe(110_00)
     expect(medianOf([100_00, 100_01])).toBe(100_00)
     expect(Number.isInteger(medianOf([1, 2, 4]))).toBe(true)
+  })
+
+  it('refuses a second period for a transaction that already settled one', async () => {
+    const world = await createBudgetWorld()
+    const series = await createSeries(world.scope, {
+      name: 'Rent',
+      expectedAmountMinor: 250_000,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      accountId: 'acc-a',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: '2026-03-15',
+      ahead: 0,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-03-15',
+    )
+    const first = periods.at(0)
+    const second = periods.at(1)
+    if (first === undefined || second === undefined) {
+      throw new Error('need two materialised periods')
+    }
+    await seedTransaction(world.db, {
+      id: 'txn-one-receipt',
+      refAmountMinor: 250_000,
+      bookedOn: first.dueOn,
+    })
+
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: first.periodStart,
+      transactionId: 'txn-one-receipt',
+    })
+
+    await expect(
+      markPaid(world.scope, {
+        seriesId: series.id,
+        periodStart: second.periodStart,
+        transactionId: 'txn-one-receipt',
+      }),
+    ).rejects.toBeInstanceOf(RecurringTransactionLinkedError)
+
+    const after = await listSeriesPeriods(world.scope, series.id, '2026-03-15')
+    expect(
+      after.find((row) => row.periodStart === first.periodStart)
+        ?.settledTransactionId,
+    ).toBe('txn-one-receipt')
+    expect(
+      after.find((row) => row.periodStart === second.periodStart)?.status,
+    ).not.toBe('paid')
   })
 })
 
@@ -2369,13 +2430,13 @@ describe('19 — a transaction is in its account’s currency', () => {
   })
 })
 
-describe('20 — changing an account’s currency leaves rows the detection can see', () => {
-  it('reports a row booked in the old currency after updateAccount changes the account’s currency', async () => {
+describe('20 — changing an account’s currency is refused once it has history', () => {
+  it('does not rewrite a booked row, and detection stays empty because the account currency did not move', async () => {
     const world = await createBudgetWorld()
     const conversion = conversionOf('PLN', [
       [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
     ])
-    await createTransaction({
+    const booked = await createTransaction({
       scope: world.scope,
       policies: EVERYTHING,
       conversion,
@@ -2385,16 +2446,27 @@ describe('20 — changing an account’s currency leaves rows the detection can 
       findAccountCurrencyMismatches(world.scope),
     ).resolves.toMatchObject({ count: 0 })
 
-    await updateAccount(
-      world.scope,
-      'acc-a',
-      { currencyCode: 'EUR' },
-      conversion,
-    )
+    await expect(
+      updateAccount(world.scope, 'acc-a', { currencyCode: 'EUR' }, conversion),
+    ).rejects.toBeInstanceOf(AccountCurrencyLockedError)
 
-    const report = await findAccountCurrencyMismatches(world.scope)
-    expect(report.count).toBe(1)
-    expect(report.sample.at(0)?.accountId).toBe('acc-a')
+    const [account] = await world.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, 'acc-a'))
+    const [row] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, booked.id))
+    expect(account?.currencyCode).toBe('PLN')
+    expect(row).toMatchObject({
+      amountMinor: booked.amountMinor,
+      currencyCode: booked.currencyCode,
+      refAmountMinor: booked.refAmountMinor,
+    })
+    await expect(
+      findAccountCurrencyMismatches(world.scope),
+    ).resolves.toMatchObject({ count: 0 })
   })
 })
 

@@ -157,6 +157,7 @@ import {
   listPeriods as listSeriesPeriods,
   listSeriesLinkDetails,
   markPaid,
+  removeUnpaidOpenPeriods,
 } from '../recurring'
 import {
   getWorkspaceTimezone,
@@ -3237,6 +3238,43 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     await expect(
       listSeriesLinkDetails(world.scope, theirs.id),
     ).resolves.toEqual([])
+  })
+})
+
+describe('removing unpaid periods cannot touch another workspace', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('refuses B’s series id from A’s scope and leaves B’s unpaid rows', async () => {
+    const today = '2026-04-15'
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+    const before = await listSeriesPeriods(world.otherScope, theirs.id, today)
+    expect(before.length).toBeGreaterThan(0)
+
+    await expect(
+      removeUnpaidOpenPeriods(world.scope, theirs.id),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const after = await listSeriesPeriods(world.otherScope, theirs.id, today)
+    expect(after.map((period) => period.periodStart)).toEqual(
+      before.map((period) => period.periodStart),
+    )
   })
 })
 

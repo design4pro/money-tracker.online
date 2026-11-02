@@ -31,6 +31,21 @@ Read the base and the head off the pull request rather than off its title. The p
 by `.github/workflows/promote-develop.yml` under a fixed title, but a person can open the same pull
 request by hand under any title at all.
 
+## Gate-path PRs are Rafał's merge
+
+Owner decision 2026-11-02 (ADR 0031 addendum, signed by Rafał). Immediately before step 4
+(merge), after step 2's label/QA gates and after any security verdict this run recorded, run the
+gate-path procedure in `.ai/skills/afk-decide/SKILL.md` § 5. Do not copy the glob list. Use
+tracker **get-pr-files** and the `origin/develop` copy of that skill; never `gh pr view --json
+files`, labels, or the author's risk claim.
+
+On a gate PR (or fail-closed): apply `blocked` via `apply_label`, post the § 5 comment
+(`🤖 HUMAN-ONLY: merge this gate change or close it`, naming the judged head and that **Rafał**
+merges it) unless a trusted-agent comment with that first line already exists, never run
+**merge-pr**, stop and report. If `blocked` and that comment are already present, do nothing more
+and still do not merge. This is not a route back to `om-pr-autopilot`: it is a person's merge.
+Remove no label a person set.
+
 ## Rules
 
 - Merging into `develop` is `pr-autopilot`'s job (`om-pr-autopilot --allow-merge`, ADR 0027); a
@@ -53,7 +68,8 @@ request by hand under any title at all.
   `changes-requested` and a `qa-failed` the QA panel set route to `om-auto-fix-pr <number>`. Never
   merge past one of them in this run. A `risk-high` or `security` PR merges with
   `--match-head-commit <head the security verdict judged>` (`.ai/skills/om-pr-autopilot/SKILL.md`). A
-  `qa-failed` a person set, an active `qa`, `blocked` and `do-not-merge` still stop and report.
+  `qa-failed` a person set, an active `qa`, `blocked` and `do-not-merge` still stop and report. A
+  **gate PR** (`afk-decide` § 5) also stops: never merge it; Rafał does.
 - A second review is not a merge requirement (ADR 0027 removed the mandatory second reviewer). An
   approving review is needed only when the base branch's ruleset asks for one; read it before step
   3: `gh api "repos/{owner}/{repo}/rules/branches/<baseRefName>" --jq '[.[] | select(.type ==
