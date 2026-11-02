@@ -186,6 +186,13 @@ describe('CategoryTree', () => {
    * change is that exactly one of the two copies is painted at any width, and someone deleting
    * either class breaks this line.
    */
+  it('lets a long name wrap rather than ellipsize', () => {
+    renderTree()
+    const name = screen.getByText('Groceries')
+    expect(name.className).toContain('break-words')
+    expect(name.className).not.toContain('truncate')
+  })
+
   it('keeps the kind spoken on a phone while the badge stops being painted', () => {
     renderTree()
     const copies = screen.getAllByText('Money out')
