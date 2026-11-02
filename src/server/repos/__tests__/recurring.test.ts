@@ -51,6 +51,7 @@ import {
   listSeries,
   listSeriesLinkDetails,
   markPaid,
+  sumSeriesSpendThisYear,
   markSkipped,
   pauseSeries,
   periodVarianceMinor,
@@ -63,6 +64,7 @@ import {
 import {
   NOW,
   createBudgetWorld,
+  executed,
   fault,
   seedTransaction,
 } from './budget-harness'
@@ -166,6 +168,224 @@ describe('forecast spending policy', () => {
       expect((await forecast()).spentThisYearMinor).toBe(0)
     },
   )
+})
+
+describe('overview spent-this-year aggregate', () => {
+  async function linkPayment(input: {
+    readonly seriesId: string
+    readonly transactionId: string
+    readonly amountMinor: number
+    readonly bookedOn: string
+    readonly periodStart?: string
+  }): Promise<void> {
+    await seedTransaction(world.db, {
+      id: input.transactionId,
+      refAmountMinor: input.amountMinor,
+      bookedOn: input.bookedOn,
+    })
+    if (input.periodStart !== undefined) {
+      await markPaid(world.scope, {
+        seriesId: input.seriesId,
+        periodStart: input.periodStart,
+        transactionId: input.transactionId,
+      })
+      return
+    }
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: input.seriesId,
+      transactionId: input.transactionId,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+  }
+
+  it('sums this calendar year per series, skipping other years, currencies and policy rows', async () => {
+    const zloty = await createSeries(world.scope, seriesInput({ name: 'Rent' }))
+    const euro = await createSeries(
+      world.scope,
+      seriesInput({
+        name: 'Hosting',
+        expectedAmountMinor: 40_00,
+        expectedCurrencyCode: 'EUR',
+      }),
+    )
+    const income = await createSeries(
+      world.scope,
+      seriesInput({ name: 'Salary', direction: 'income' }),
+    )
+    await materializeSeries(world.scope, {
+      seriesId: zloty.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    await materializeSeries(world.scope, {
+      seriesId: euro.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const zlotyPeriod = (await listPeriods(world.scope, zloty.id, TODAY)).at(0)
+    const euroPeriod = (await listPeriods(world.scope, euro.id, TODAY)).at(0)
+    if (zlotyPeriod === undefined || euroPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-this-year',
+      amountMinor: 250_000,
+      bookedOn: '2026-01-31',
+      periodStart: zlotyPeriod.periodStart,
+    })
+    await linkPayment({
+      seriesId: euro.id,
+      transactionId: 'euro-this-year',
+      amountMinor: 40_00,
+      bookedOn: '2026-02-01',
+      periodStart: euroPeriod.periodStart,
+    })
+    await world.db
+      .update(transactions)
+      .set({
+        currencyCode: 'EUR',
+        refCurrencyCode: 'EUR',
+      })
+      .where(eq(transactions.id, 'euro-this-year'))
+
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-last-year',
+      amountMinor: 250_000,
+      bookedOn: '2025-12-31',
+    })
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-next-year',
+      amountMinor: 250_000,
+      bookedOn: '2027-01-01',
+    })
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-other-currency',
+      amountMinor: 40_00,
+      bookedOn: '2026-02-15',
+    })
+    await world.db
+      .update(transactions)
+      .set({ currencyCode: 'EUR', refCurrencyCode: 'EUR' })
+      .where(eq(transactions.id, 'zloty-other-currency'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-planned',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-01',
+    })
+    await world.db
+      .update(transactions)
+      .set({ isPlanned: true })
+      .where(eq(transactions.id, 'zloty-planned'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-adjustment',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-02',
+    })
+    await world.db
+      .update(transactions)
+      .set({ isBalanceAdjustment: true })
+      .where(eq(transactions.id, 'zloty-adjustment'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-transfer',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-03',
+    })
+    await world.db
+      .update(transactions)
+      .set({ transferKind: 'external_out' })
+      .where(eq(transactions.id, 'zloty-transfer'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-unlinked',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-04',
+    })
+    await world.db
+      .update(recurringLinks)
+      .set({ status: 'unlinked' })
+      .where(eq(recurringLinks.transactionId, 'zloty-unlinked'))
+    await linkPayment({
+      seriesId: income.id,
+      transactionId: 'income-this-year',
+      amountMinor: 8_000_00,
+      bookedOn: '2026-03-01',
+    })
+    await world.db
+      .update(transactions)
+      .set({ direction: 'income' })
+      .where(eq(transactions.id, 'income-this-year'))
+
+    executed.length = 0
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today: TODAY,
+      seriesIds: [zloty.id, euro.id, income.id, zloty.id],
+    })
+    const sql = executed.join('\n')
+
+    expect(rows).toHaveLength(2)
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        {
+          seriesId: zloty.id,
+          currencyCode: 'PLN',
+          spentThisYearMinor: 250_000,
+        },
+        {
+          seriesId: euro.id,
+          currencyCode: 'EUR',
+          spentThisYearMinor: 40_00,
+        },
+      ]),
+    )
+    expect(Number.isInteger(rows[0]?.spentThisYearMinor)).toBe(true)
+    expect(sql).toContain('sum(')
+    expect(sql).toContain('booked_on')
+    expect(sql).toMatch(/organization_id/)
+  })
+
+  it('includes the first and last calendar day of the year and returns nothing for no series', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    await linkPayment({
+      seriesId: series.id,
+      transactionId: 'new-years-day',
+      amountMinor: 10_00,
+      bookedOn: '2026-01-01',
+    })
+    await linkPayment({
+      seriesId: series.id,
+      transactionId: 'new-years-eve',
+      amountMinor: 20_00,
+      bookedOn: '2026-12-31',
+    })
+
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today: '2026-06-15',
+      seriesIds: [series.id],
+    })
+    expect(rows).toEqual([
+      {
+        seriesId: series.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 30_00,
+      },
+    ])
+
+    executed.length = 0
+    await expect(
+      sumSeriesSpendThisYear(world.scope, { today: TODAY, seriesIds: [] }),
+    ).resolves.toEqual([])
+    expect(executed).toEqual([])
+  })
 })
 
 describe('materialisation', () => {
