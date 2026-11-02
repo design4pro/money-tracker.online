@@ -23,7 +23,7 @@
 import { parseDate } from '@internationalized/date'
 
 import { runAutoRecord } from '#/server/recurring/auto-record'
-import { materializeSeries } from '#/server/recurring/materialize'
+import { catchUpSeries } from '#/server/recurring/series-write'
 import {
   dispatchReminders,
   dueReminders,
@@ -72,7 +72,7 @@ export interface RecurringCronArgs {
   /** Wall clock used when `today` is omitted. */
   readonly now?: Date
   readonly logger: Logger
-  /** How far ahead to materialise. The widget's horizon; see `recurring/materialize`. */
+  /** How far ahead to materialise. The widget's horizon; see `SERIES_AHEAD`. */
   readonly ahead?: number
 }
 
@@ -109,7 +109,7 @@ export async function runRecurringHourly(
     try {
       const today = await civilDayForScope(scope, args)
       for (const series of await listSeries(scope, {})) {
-        const result = await materializeSeries(scope, {
+        const result = await catchUpSeries(scope, {
           seriesId: series.id,
           today,
           ...(args.ahead === undefined ? {} : { ahead: args.ahead }),

@@ -27,7 +27,7 @@ import {
 } from '#/server/repos/__tests__/budget-harness'
 import { forecastSeries } from '../forecast'
 import { materializeSeries } from '../materialize'
-import { SERIES_AHEAD, writeSeries } from '../series-write'
+import { SERIES_AHEAD, catchUpSeries, writeSeries } from '../series-write'
 
 import type { RecurringFrequency } from '#/server/db/schema'
 import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
@@ -80,6 +80,73 @@ async function seedCandidate(): Promise<string> {
 describe('the shared horizon', () => {
   it('is three periods, the widget horizon the list and detail screens already use', () => {
     expect(SERIES_AHEAD).toBe(3)
+  })
+})
+
+describe('a catch-up', () => {
+  it('writes the history up to today and `ahead` periods, and counts only the inserts', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+
+    const first = await catchUpSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 2,
+    })
+
+    expect(first.seriesId).toBe(series.id)
+    expect(first.created).toBe(4)
+    expect(await dueDates(world.scope, series.id)).toEqual([
+      ...HISTORY,
+      ...UPCOMING.slice(0, 2),
+    ])
+  })
+
+  it('writes nothing the second time the same horizon is asked for', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    await catchUpSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 2,
+    })
+
+    const second = await catchUpSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 2,
+    })
+
+    expect(second.created).toBe(0)
+  })
+
+  it('uses the shared horizon when ahead is omitted, not a copy of three', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+
+    await catchUpSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+    })
+
+    expect(await dueDates(world.scope, series.id)).toEqual([
+      ...HISTORY,
+      ...UPCOMING.slice(0, SERIES_AHEAD),
+    ])
+  })
+
+  it("refuses another workspace's series and writes no period", async () => {
+    const theirs = await createSeries(
+      world.otherScope,
+      seriesInput({ accountId: 'acc-b' }),
+    )
+
+    await expect(
+      catchUpSeries(world.scope, {
+        seriesId: theirs.id,
+        today: TODAY,
+        ahead: 2,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(await world.db.select().from(recurringPeriods)).toHaveLength(0)
   })
 })
 
