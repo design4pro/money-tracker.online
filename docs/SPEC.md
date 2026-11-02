@@ -534,7 +534,8 @@ Owned by `docs/I18N.md`. The contract other sections rely on:
 - **Numbers, dates and currencies inside messages** are formatted by the message formatter with the
   active locale, not concatenated in as pre-formatted strings.
 - **Notification rows and email envelopes store i18n keys and parameters, never sentences**, so a
-  person who switches language sees their history in the new one.
+  person who switches language sees their history in the new one. Notification **email bodies** do
+  not interpolate money or transaction params (ADR 0035); the in-app centre still does.
 - **The document shell** (`lang`, `dir`, `<title>`, meta) is owned by the root route and by nothing
   else.
 - **Locale negotiation order:** user preference → workspace setting → `Accept-Language` → `en`.
