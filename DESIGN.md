@@ -1059,10 +1059,10 @@ the same three rolled up per currency on `/recurring`. The second call site is t
   and _Due soon_, not here.
 - **The states:** resting only. There is no empty colour wash; an empty rollup is a sentence
   (`recurring.forecast.empty`).
-- **What carries the meaning when the colour does not:** the three labels, and a visually-hidden
-  table of the same three cells so a screen reader gets tabular data rather than three adjacent
-  paragraphs. The clip (`sr-only`) sits on a wrapper `div`, never on the `<table>`: a table lays
-  out by its content and ignores `width: 1px`, so it widens the page at 360px. Amounts are formatted by `formatMoney`; they never become a float in the panel.
+- **What carries the meaning when the colour does not:** the three labelled amounts in the `dl`.
+  A definition list is already structured for a screen reader; a second, visually-hidden table of
+  the same cells would announce each total twice. Amounts are formatted by `formatMoney`; they
+  never become a float in the panel.
 - **It is not** a chart (no SVG, no second encoding) and not _Due soon_ (that list is periods you
   act on). This panel is a year view of integer sums.
 
