@@ -133,7 +133,7 @@ describe('RefusalPanel', () => {
     view.rerender(withPanel(true))
 
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
     expect(document.activeElement).toBe(elsewhere)
   })
 

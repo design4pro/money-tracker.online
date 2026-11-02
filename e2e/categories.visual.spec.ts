@@ -6,7 +6,7 @@ import { expectOutlineWithoutSkips } from './support/headings'
 import { storageStateFor } from './support/session'
 
 import type { AppLocale, AppTheme } from './support/app'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 /**
  * `/categories` in a real browser: the refused drag, the keyboard menu, the empty state, and the
@@ -179,6 +179,15 @@ async function dragBesideChild(
   throw new Error(`No drop target beside ${child} within twelve steps.`)
 }
 
+/** Accessible names in tree order. Inner text follows wrap line-breaks and is not the tree. */
+async function treeRowNames(tree: Locator): Promise<string[]> {
+  return tree
+    .getByRole('row')
+    .evaluateAll((rows) =>
+      rows.map((row) => row.getAttribute('aria-label') ?? ''),
+    )
+}
+
 for (const locale of LOCALES) {
   for (const theme of THEMES) {
     test(`a parent dragged beside another parent's child is refused by name, ${locale} ${theme}`, async ({
@@ -203,7 +212,7 @@ for (const locale of LOCALES) {
       ).toBeVisible()
 
       const tree = page.getByRole('grid', { name: labels.tree })
-      const before = await tree.getByRole('row').allInnerTexts()
+      const before = await treeRowNames(tree)
       expect(before.length).toBeGreaterThan(0)
 
       await dragBesideChild(page, PARENT, TARGET_CHILD)
@@ -219,17 +228,11 @@ for (const locale of LOCALES) {
         labels.nestSentence(PARENT, TARGET_PARENT),
       )
       await expect(region).not.toContainText(labels.genericBody)
-      await expectNoSeriousViolations(
-        page,
-        `/categories refusal (${locale} ${theme})`,
-      )
-      await expectOutlineWithoutSkips(
-        page,
-        `/categories refusal (${locale} ${theme})`,
-      )
       // The panel rests below the sticky header, not under it. The tree refresh that follows a
       // refusal makes the router restore the scroll position, which used to undo the panel
-      // scrolling itself into view, so this settles by polling rather than reading once.
+      // scrolling itself into view, so this settles by polling rather than reading once. Axe
+      // runs after this: it walks the document and can scroll, which is not the refusal's
+      // own scroll.
       const header = page.getByRole('banner').first()
       await expect
         .poll(
@@ -244,13 +247,23 @@ for (const locale of LOCALES) {
           { message: 'the refusal panel is hidden under the sticky header' },
         )
         .toBeGreaterThanOrEqual(-2)
+      await expectNoSeriousViolations(
+        page,
+        `/categories refusal (${locale} ${theme})`,
+      )
+      await expectOutlineWithoutSkips(
+        page,
+        `/categories refusal (${locale} ${theme})`,
+      )
 
-      // A refusal writes nothing: the tree after a reload is the tree before the drag.
+      // A refusal writes nothing: the accessible names after a reload are the names
+      // before the drag. Inner text follows wrap line-breaks and is not the tree.
       await page.reload()
       await expect(
         page.getByRole('heading', { level: 1, name: labels.title }),
       ).toBeVisible()
-      expect(await tree.getByRole('row').allInnerTexts()).toEqual(before)
+      await expect(tree.getByRole('row').first()).toBeVisible()
+      expect(await treeRowNames(tree)).toEqual(before)
     })
   }
 }
