@@ -28,6 +28,10 @@ import {
   transactions,
 } from '#/server/db/schema'
 
+import { CATEGORY_HUES } from '#/components/app/categories/palette'
+import { CATEGORY_ICON_NAMES } from '#/components/app/categories/icon-names'
+import { STANDARD_CATEGORIES } from '#/server/categories/standard-set'
+
 import { ForbiddenError, NotFoundError } from '../errors'
 import { createScope } from '../scope'
 import {
@@ -39,12 +43,14 @@ import {
   archiveCategory,
   assertCategoryUsable,
   createCategory,
+  createCategorySchema,
   deleteCategory,
   getCategory,
   listCategories,
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   slugifyCategoryName,
   spendingByCategory,
   updateCategory,
@@ -62,11 +68,20 @@ const MIGRATIONS = fileURLToPath(
 
 /** Every statement the tests caused, so a test can assert what the SQL did and did not do. */
 const executed: Array<string> = []
+/** Bound parameters of those statements, parallel to {@link executed}. */
+const executedParams: Array<unknown[]> = []
+/** The live sqlite handle, so a test can insert a colliding slug between chunks. */
+let sqlite: DatabaseSync
+/** Optional hooks around each statement. Reset in {@link beforeEach}. */
+const driver = {
+  beforeQuery: null as ((query: string) => void) | null,
+  afterQuery: null as ((query: string) => void) | null,
+}
 
 type TestDb = ReturnType<typeof openTestDb>
 
 function openTestDb() {
-  const sqlite = new DatabaseSync(':memory:')
+  sqlite = new DatabaseSync(':memory:')
   sqlite.exec('PRAGMA foreign_keys = ON;')
   for (const file of readdirSync(MIGRATIONS)
     .filter((name) => name.endsWith('.sql'))
@@ -81,14 +96,18 @@ function openTestDb() {
   }
   return drizzle(async (query, params, method) => {
     executed.push(query)
+    executedParams.push(params as Array<unknown>)
+    driver.beforeQuery?.(query)
     const statement = sqlite.prepare(query)
     if (method === 'run') {
       statement.run(...(params as Array<never>))
+      driver.afterQuery?.(query)
       return { rows: [] }
     }
     const rows = statement
       .all(...(params as Array<never>))
       .map((row) => Object.values(row as Record<string, unknown>))
+    driver.afterQuery?.(query)
     return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
   })
 }
@@ -152,6 +171,9 @@ async function categoryRow(id: string) {
 
 beforeEach(async () => {
   executed.length = 0
+  executedParams.length = 0
+  driver.beforeQuery = null
+  driver.afterQuery = null
   sequence = 0
   db = openTestDb()
 
@@ -676,7 +698,7 @@ interface GatedWrite {
   readonly name: string
   readonly run: (as: TenantScope, rows: GateFixture) => Promise<unknown>
   /** The same call aimed at B's id, which every function must still refuse as not found. */
-  readonly foreign: (as: TenantScope) => Promise<unknown>
+  readonly foreign?: (as: TenantScope) => Promise<unknown>
   /** The same call with input the validator refuses, which must be refused before the gate. */
   readonly malformed: (as: TenantScope) => Promise<unknown>
 }
@@ -684,7 +706,7 @@ interface GatedWrite {
 /** The three calls a row makes, each handed the function the row is named for. */
 interface GateCalls<Fn> {
   readonly run: (fn: Fn, as: TenantScope, rows: GateFixture) => Promise<unknown>
-  readonly foreign: (fn: Fn, as: TenantScope) => Promise<unknown>
+  readonly foreign?: (fn: Fn, as: TenantScope) => Promise<unknown>
   readonly malformed: (fn: Fn, as: TenantScope) => Promise<unknown>
 }
 
@@ -695,7 +717,7 @@ function gated<Fn extends (...args: never) => Promise<unknown>>(
   return {
     name: fn.name,
     run: (as, rows) => calls.run(fn, as, rows),
-    foreign: (as) => calls.foreign(fn, as),
+    foreign: calls.foreign ? (as) => calls.foreign!(fn, as) : undefined,
     malformed: (as) => calls.malformed(fn, as),
   }
 }
@@ -736,6 +758,10 @@ const GATED_WRITES: ReadonlyArray<GatedWrite> = [
     foreign: (fn, as) => fn(as, { id: 'cat-b', parentId: null }),
     malformed: (fn, as) => fn(as, { id: '', parentId: null }),
   }),
+  gated(seedStandardCategories, {
+    run: (fn, as) => fn(as, { locale: 'en' }),
+    malformed: (fn, as) => fn(as, { locale: 'de' } as never),
+  }),
 ]
 
 describe('the write gate', () => {
@@ -752,7 +778,7 @@ describe('the write gate', () => {
     rows = await seedGateFixture()
   })
 
-  it('covers the seven writes and nothing else', () => {
+  it('covers the eight writes and nothing else', () => {
     expect(GATED_WRITES.map(({ name }) => name)).toEqual([
       'createCategory',
       'updateCategory',
@@ -761,6 +787,7 @@ describe('the write gate', () => {
       'deleteCategory',
       'reorderCategories',
       'moveCategory',
+      'seedStandardCategories',
     ])
   })
 
@@ -789,6 +816,7 @@ describe('the write gate', () => {
     })
 
     it('still refuses a wrong-workspace id as not found once the gate is passed', async () => {
+      if (foreign === undefined) return
       await addSecondMember()
       const before = await allCategories()
 
@@ -811,6 +839,7 @@ describe('the write gate', () => {
     })
 
     it('gates before it reads: a member learns nothing about a wrong-workspace id', async () => {
+      if (foreign === undefined) return
       await addSecondMember()
 
       await expect(foreign(scopeAs('member'))).rejects.toBeInstanceOf(
@@ -1130,5 +1159,277 @@ describe('the money boundary', () => {
     expect(after?.refCurrencyCode).toBe(before?.refCurrencyCode)
     expect(after?.rateE10).toBe(before?.rateE10)
     expect(after?.categoryId).toBe(child.id)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* Standard set                                                                */
+/* -------------------------------------------------------------------------- */
+
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
+const HUE_VALUES = new Set(CATEGORY_HUES.map((hue) => hue.value))
+
+function isCategoryInsert(query: string): boolean {
+  return /insert into ["']?categories["']?/iu.test(query)
+}
+
+function insertCollidingSlug(slug: string): void {
+  sqlite.exec(`
+    INSERT INTO categories (
+      id, organization_id, name, slug, color, kind, parent_id, is_system, position, created_at, updated_at
+    ) VALUES (
+      'hook-${slug}', 'org-a', 'Hooked', '${slug}', '#0d6abb', 'expense', NULL, 0, 99, 0, 0
+    )
+  `)
+}
+
+describe('the standard set', () => {
+  it('is a valid two-level tree: parents precede children, slugs unique, hues, icons and names valid', () => {
+    const seen = new Set<string>()
+    const bySlug = new Map(STANDARD_CATEGORIES.map((row) => [row.slug, row]))
+
+    expect(STANDARD_CATEGORIES).toHaveLength(36)
+    expect(
+      STANDARD_CATEGORIES.filter((row) => row.parentSlug === null),
+    ).toHaveLength(12)
+
+    for (const [index, row] of STANDARD_CATEGORIES.entries()) {
+      expect(row.slug, row.slug).toMatch(SLUG_PATTERN)
+      expect(seen.has(row.slug), row.slug).toBe(false)
+      seen.add(row.slug)
+      expect(HUE_VALUES.has(row.hue), row.hue).toBe(true)
+      expect(CATEGORY_ICON_NAMES).toContain(row.icon)
+      createCategorySchema.parse({ name: row.names.en })
+      createCategorySchema.parse({ name: row.names.pl })
+      if (row.parentSlug === null) continue
+      const parentIndex = STANDARD_CATEGORIES.findIndex(
+        (entry) => entry.slug === row.parentSlug,
+      )
+      expect(parentIndex, row.slug).toBeGreaterThanOrEqual(0)
+      expect(parentIndex, row.slug).toBeLessThan(index)
+      expect(bySlug.get(row.parentSlug)?.parentSlug ?? null).toBe(null)
+    }
+  })
+
+  it('fills a fresh workspace in the requested locale, children under parents, not system, inheriting hue', async () => {
+    const result = await seedStandardCategories(scope, { locale: 'pl' })
+    expect(result).toEqual({ created: 36, skipped: 0 })
+
+    const rows = await listCategories(scope)
+    expect(rows).toHaveLength(36)
+    const bySlug = new Map(rows.map((row) => [row.slug, row]))
+
+    for (const entry of STANDARD_CATEGORIES) {
+      const row = bySlug.get(entry.slug)
+      expect(row, entry.slug).toMatchObject({
+        name: entry.names.pl,
+        isSystem: false,
+        kind: entry.kind,
+        icon: entry.icon,
+      })
+      if (entry.parentSlug === null) {
+        expect(row?.parentId).toBeNull()
+        expect(row?.color).toBe(entry.hue)
+      } else {
+        const parent = bySlug.get(entry.parentSlug)
+        expect(row?.parentId).toBe(parent?.id)
+        expect(row?.color).toBe(parent?.color)
+      }
+    }
+  })
+
+  it('creates nothing and skips 36 on a second run', async () => {
+    await seedStandardCategories(scope, { locale: 'en' })
+    const result = await seedStandardCategories(scope, { locale: 'pl' })
+    expect(result).toEqual({ created: 0, skipped: 36 })
+    expect(await listCategories(scope)).toHaveLength(36)
+    expect(
+      (await listCategories(scope)).find((row) => row.slug === 'food')?.name,
+    ).toBe('Food')
+  })
+
+  it('keeps a renamed or archived row and does not duplicate it', async () => {
+    await seedStandardCategories(scope, { locale: 'en' })
+    const food = (await listCategories(scope)).find(
+      (row) => row.slug === 'food',
+    )
+    if (food === undefined) throw new Error('expected food')
+    await updateCategory(scope, food.id, { name: 'Meals' })
+    await archiveCategory(scope, food.id)
+
+    const result = await seedStandardCategories(scope, { locale: 'en' })
+    expect(result).toEqual({ created: 0, skipped: 36 })
+    const rows = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.slug, 'food'))
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      name: 'Meals',
+      archivedAt: expect.any(Date),
+    })
+  })
+
+  it('attaches children to a hand-made active top-level food in its stored colour and does not rename it', async () => {
+    const food = await createCategory(scope, {
+      name: 'Food',
+      color: '#625106',
+    })
+    const result = await seedStandardCategories(scope, { locale: 'en' })
+    expect(result.created + result.skipped).toBe(36)
+    expect(result.skipped).toBeGreaterThanOrEqual(1)
+
+    const after = await getCategory(scope, food.id)
+    expect(after.name).toBe('Food')
+    expect(after.color).toBe('#625106')
+    const children = (await listCategories(scope)).filter(
+      (row) => row.parentId === food.id,
+    )
+    expect(children.map((row) => row.slug).sort()).toEqual([
+      'dining-out',
+      'groceries',
+    ])
+    for (const child of children) expect(child.color).toBe('#625106')
+  })
+
+  it('skips children of an archived food and counts them in skipped', async () => {
+    const food = await createCategory(scope, { name: 'Food' })
+    await archiveCategory(scope, food.id)
+    const result = await seedStandardCategories(scope, { locale: 'en' })
+    expect(result.created + result.skipped).toBe(36)
+    const listed = await listCategories(scope, { includeArchived: true })
+    expect(listed.filter((row) => row.slug === 'groceries')).toHaveLength(0)
+    expect(listed.filter((row) => row.slug === 'dining-out')).toHaveLength(0)
+    expect(result.skipped).toBeGreaterThanOrEqual(3)
+  })
+
+  it('skips children when food is already a child', async () => {
+    const housing = await createCategory(scope, { name: 'Housing' })
+    await createCategory(scope, { name: 'Food', parentId: housing.id })
+    const nested = await seedStandardCategories(scope, { locale: 'en' })
+    expect(nested.created + nested.skipped).toBe(36)
+    const listed = await listCategories(scope)
+    expect(listed.filter((row) => row.slug === 'groceries')).toHaveLength(0)
+    expect(listed.filter((row) => row.slug === 'dining-out')).toHaveLength(0)
+    const food = listed.find((row) => row.slug === 'food')
+    expect(food?.parentId).toBe(housing.id)
+  })
+
+  it('skips children of a hand-made income food', async () => {
+    await createCategory(scope, { name: 'Food', kind: 'income' })
+    const result = await seedStandardCategories(scope, { locale: 'en' })
+    expect(result.created + result.skipped).toBe(36)
+    expect(
+      (await listCategories(scope)).filter(
+        (row) => row.slug === 'groceries' || row.slug === 'dining-out',
+      ),
+    ).toHaveLength(0)
+  })
+
+  it('lets a hand-made both-kind parent take the set’s children', async () => {
+    await createCategory(scope, { name: 'Food', kind: 'both' })
+    const result = await seedStandardCategories(scope, { locale: 'en' })
+    expect(result.created + result.skipped).toBe(36)
+    const food = (await listCategories(scope)).find(
+      (row) => row.slug === 'food',
+    )
+    expect(
+      (await listCategories(scope))
+        .filter((row) => row.parentId === food?.id)
+        .map((row) => row.slug)
+        .sort(),
+    ).toEqual(['dining-out', 'groceries'])
+  })
+
+  it('binds at most 100 parameters on every statement the seed ran', async () => {
+    const mark = executed.length
+    await seedStandardCategories(scope, { locale: 'en' })
+    for (const params of executedParams.slice(mark)) {
+      expect(params.length).toBeLessThanOrEqual(100)
+    }
+    const inserts = executed
+      .map((query, index) => ({ query, params: executedParams[index] ?? [] }))
+      .filter(({ query }) => isCategoryInsert(query))
+    expect(inserts.length).toBeGreaterThan(0)
+    for (const { params } of inserts) {
+      expect(params.length).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('treats a conflicting slug between chunks as a skip, not a raw error', async () => {
+    let categoryInserts = 0
+    driver.afterQuery = (query) => {
+      if (!isCategoryInsert(query)) return
+      categoryInserts += 1
+      if (categoryInserts === 1) insertCollidingSlug('finance')
+    }
+
+    const result = await seedStandardCategories(scope, { locale: 'en' })
+    expect(result.created + result.skipped).toBe(36)
+    expect(result.created).toBe(35)
+    expect(result.skipped).toBe(1)
+    const finance = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.slug, 'finance'))
+    expect(finance).toHaveLength(1)
+    expect(finance[0]?.id).toBe('hook-finance')
+  })
+
+  it('rethrows the second error when a re-planned chunk throws again', async () => {
+    let categoryInserts = 0
+    driver.beforeQuery = (query) => {
+      if (!isCategoryInsert(query)) return
+      categoryInserts += 1
+      if (categoryInserts === 3) throw new Error('retry failed')
+    }
+    driver.afterQuery = (query) => {
+      if (!isCategoryInsert(query)) return
+      if (categoryInserts === 1) insertCollidingSlug('finance')
+    }
+
+    const failure = await seedStandardCategories(scope, { locale: 'en' }).then(
+      () => null,
+      (error: unknown) => error,
+    )
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).cause).toBeInstanceOf(Error)
+    expect(((failure as Error).cause as Error).message).toBe('retry failed')
+  })
+
+  it('rethrows an error that is not a lost race unchanged', async () => {
+    const boom = new Error('connection lost')
+    driver.beforeQuery = (query) => {
+      if (isCategoryInsert(query)) throw boom
+    }
+    const failure = await seedStandardCategories(scope, { locale: 'en' }).then(
+      () => null,
+      (error: unknown) => error,
+    )
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).cause).toBe(boom)
+  })
+
+  it('refuses an unknown locale and an extra field', async () => {
+    await expect(
+      seedStandardCategories(scope, { locale: 'de' } as never),
+    ).rejects.toBeInstanceOf(ZodError)
+    await expect(
+      seedStandardCategories(scope, { locale: 'en', extra: 1 } as never),
+    ).rejects.toBeInstanceOf(ZodError)
+  })
+
+  it('repaints housing’s four children when housing is recoloured afterwards', async () => {
+    await seedStandardCategories(scope, { locale: 'en' })
+    const housing = (await listCategories(scope)).find(
+      (row) => row.slug === 'housing',
+    )
+    if (housing === undefined) throw new Error('expected housing')
+    await updateCategory(scope, housing.id, { color: '#9724b5' })
+    const children = (await listCategories(scope)).filter(
+      (row) => row.parentId === housing.id,
+    )
+    expect(children).toHaveLength(4)
+    for (const child of children) expect(child.color).toBe('#9724b5')
   })
 })
