@@ -1183,6 +1183,28 @@ export async function insertMissingPeriods(
 }
 
 /**
+ * Drops unpaid open periods (`upcoming` / stored `overdue`) of one series.
+ *
+ * Paid and skipped rows are history and stay. An anchor edit rebuilds the open
+ * set against the new schedule; this is the delete half of that rebuild, and
+ * {@link insertMissingPeriods} writes the replacement dates.
+ */
+export async function removeUnpaidOpenPeriods(
+  scope: TenantScope,
+  seriesId: string,
+): Promise<number> {
+  const id = idSchema.parse(seriesId)
+  await getSeries(scope, id)
+  return periodAccess.removeWhere(
+    scope,
+    and(
+      eq(recurringPeriods.seriesId, id),
+      inArray(recurringPeriods.status, ['upcoming', 'overdue']),
+    ) as SQL,
+  )
+}
+
+/**
  * Settles a period with a transaction that already exists.
  *
  * **It links; it does not create, and it copies no amount.** The transaction keeps what was

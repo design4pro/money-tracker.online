@@ -15,15 +15,21 @@ import { recurringPeriods, recurringSeries } from '#/server/db/schema'
 import { NotFoundError } from '#/server/repos/errors'
 import {
   createSeries,
+  getSeries,
   listPeriods,
+  markPaid,
   pauseSeries,
   replacePendingCandidates,
 } from '#/server/repos/recurring'
-import { createBudgetWorld } from '#/server/repos/__tests__/budget-harness'
-
+import {
+  createBudgetWorld,
+  seedTransaction,
+} from '#/server/repos/__tests__/budget-harness'
+import { forecastSeries } from '../forecast'
 import { materializeSeries } from '../materialize'
 import { SERIES_AHEAD, writeSeries } from '../series-write'
 
+import type { RecurringFrequency } from '#/server/db/schema'
 import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
 import type { CreateSeriesInput } from '#/server/repos/recurring'
 
@@ -169,6 +175,97 @@ describe('an update', () => {
       ...HISTORY,
       UPCOMING[0],
     ])
+  })
+
+  it('rebuilds unpaid open periods on an anchor-month edit and leaves paid history', async () => {
+    const today = '2026-06-15'
+    const created = await writeSeries(world.scope, {
+      today,
+      ahead: 1,
+      change: {
+        kind: 'create',
+        input: seriesInput({
+          name: 'Insurance',
+          expectedAmountMinor: 500_00,
+          frequency: 'annual',
+          anchorDay: 10,
+          anchorMonth: 11,
+          startDate: '2025-03-15',
+        }),
+      },
+    })
+    const before = await listPeriods(world.scope, created.seriesId, today)
+    expect(before.map((period) => period.dueOn)).toEqual([
+      '2025-11-10',
+      '2026-11-10',
+    ])
+    await seedTransaction(world.db, {
+      id: 'txn-annual-paid',
+      refAmountMinor: 500_00,
+      bookedOn: '2025-11-10',
+    })
+    await markPaid(world.scope, {
+      seriesId: created.seriesId,
+      periodStart: '2025-11-01',
+      transactionId: 'txn-annual-paid',
+    })
+
+    await writeSeries(world.scope, {
+      today,
+      ahead: 1,
+      change: {
+        kind: 'update',
+        seriesId: created.seriesId,
+        patch: { anchorMonth: 12 },
+      },
+    })
+
+    const periods = await listPeriods(world.scope, created.seriesId, today)
+    const paid = periods.filter((period) => period.derivedStatus === 'paid')
+    const open = periods.filter(
+      (period) =>
+        period.derivedStatus === 'upcoming' ||
+        period.derivedStatus === 'overdue',
+    )
+    expect(paid.map((period) => period.dueOn)).toEqual(['2025-11-10'])
+    expect(paid.map((period) => period.periodStart)).toEqual(['2025-11-01'])
+    expect(open.map((period) => period.dueOn)).toEqual(['2026-12-10'])
+    expect(open.map((period) => period.periodStart)).toEqual(['2026-12-01'])
+    expect(periods.map((period) => period.dueOn)).not.toContain('2026-11-10')
+
+    const series = await getSeries(world.scope, created.seriesId)
+    const forecast = forecastSeries({
+      schedule: {
+        frequency: series.frequency as RecurringFrequency,
+        anchorDay: series.anchorDay,
+        anchorMonth: series.anchorMonth,
+        startDate: series.startDate,
+        endDate: series.endDate,
+        maxOccurrences: series.maxOccurrences,
+      },
+      expectedAmountMinor: series.expectedAmountMinor,
+      expectedCurrencyCode: series.expectedCurrencyCode,
+      direction: 'expense',
+      isActive: series.isActive,
+      today,
+      links: [],
+      periods,
+    })
+    const restOfYearFromGrid = open
+      .filter(
+        (period) =>
+          period.dueOn >= '2026-01-01' && period.dueOn <= '2026-12-31',
+      )
+      .reduce((total, period) => total + period.expectedAmountMinor, 0)
+    expect(forecast.restOfYearMinor).toBe(restOfYearFromGrid)
+    expect(forecast.restOfYearMinor).toBe(500_00)
+    const next12FromGrid = open
+      .filter(
+        (period) =>
+          period.dueOn >= '2026-06-16' && period.dueOn <= '2027-06-15',
+      )
+      .reduce((total, period) => total + period.expectedAmountMinor, 0)
+    expect(forecast.next12MonthsMinor).toBe(next12FromGrid)
   })
 })
 
