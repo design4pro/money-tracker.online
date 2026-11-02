@@ -27,10 +27,13 @@
  */
 
 import { deriveRateE10, money, subtractMinor } from '#/lib/money'
-import { computeRefAmount } from '#/server/repos/transactions'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
 
 import type { CurrencyCode, Minor } from '#/lib/money'
-import type { ConversionContext, RefAmount } from '#/server/repos/transactions'
+import type {
+  ConversionContext,
+  RefAmount,
+} from '#/server/transactions/ref-amount'
 
 /** One side of a transfer — as much of a leg as the arithmetic needs to see. */
 export interface TransferLeg {

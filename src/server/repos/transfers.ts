@@ -42,7 +42,7 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { asCurrencyCode, asMinor } from '#/lib/money'
-import { assertBookable, isBookable } from '#/server/booking-rule'
+import { isBookable } from '#/server/booking-rule'
 import { newId } from '#/server/db/ids'
 import { accounts, transactionSplits, transactions } from '#/server/db/schema'
 import { createTransferSchema, sidesOf } from '#/server/transfers/create'
@@ -56,14 +56,19 @@ import { transferRefAmounts } from '#/server/transfers/ref-amount-cases'
 
 import { createTenantTableAccess, touchLedgerAccount } from './base'
 import { ConflictError, NotFoundError } from './errors'
-import { computeRefAmount, toTransaction } from './transactions'
+import { assertWriteBookable } from './transactions'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
+import { toTransaction } from '#/server/transactions/row'
 
 import type { CurrencyCode, Minor } from '#/lib/money'
 import type { Transaction } from '#/server/db/types'
 import type { CreateTransferInput } from '#/server/transfers/create'
 import type { TransferPair } from '#/server/transfers/pair'
 import type { TenantScope } from './base'
-import type { ConversionContext, RefAmount } from './transactions'
+import type {
+  ConversionContext,
+  RefAmount,
+} from '#/server/transactions/ref-amount'
 
 export type { TransferPair }
 
@@ -182,7 +187,7 @@ export async function createTransfer(
   const sides = sidesOf(input)
   // A transfer leg is a settled row, so it takes the same rule as a transaction and is refused
   // before any account is read or any leg written (`#/server/booking-rule`).
-  assertBookable({ bookedOn: input.bookedOn, isPlanned: false })
+  assertWriteBookable({ bookedOn: input.bookedOn, isPlanned: false })
 
   const source = await prepareSide(scope, sides.source)
   const destination = await prepareSide(scope, sides.destination)
@@ -377,7 +382,7 @@ export async function updateTransfer(
   // Per leg, with that leg's own planned flag, and only when the pair moves: a note or an amount
   // edit of a legacy pair dated after the cutoff must still succeed.
   for (const leg of legs) {
-    assertBookable(
+    assertWriteBookable(
       { bookedOn, isPlanned: leg.isPlanned },
       { stored: { bookedOn: leg.bookedOn, isPlanned: leg.isPlanned } },
     )

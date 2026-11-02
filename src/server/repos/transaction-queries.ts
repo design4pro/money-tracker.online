@@ -58,7 +58,8 @@ import {
 import { ConflictError } from './errors'
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './pagination'
 import { allOf, tenantFilter } from './base'
-import { scopedTransactionFilter, toTransaction } from './transactions'
+import { scopedTransactionFilter } from './transactions'
+import { toTransaction } from '#/server/transactions/row'
 
 import type { SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'

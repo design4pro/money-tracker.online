@@ -36,9 +36,10 @@
  * ---------------------------------------------------------------------------
  * WHAT THIS MODULE BORROWS RATHER THAN OWNS
  * ---------------------------------------------------------------------------
- * - The **conversion** is `./transactions`' `computeRefAmount` and its {@link ConversionContext},
- *   passed in by the caller. Rate resolution order belongs to the workspace-currency repository,
- *   and a second opinion about it here would eventually become a different opinion.
+ * - The **conversion** is `#/server/transactions/ref-amount`'s `computeRefAmount` and its
+ *   {@link ConversionContext}, passed in by the caller. Rate resolution order belongs to the
+ *   workspace-currency repository, and a second opinion about it here would eventually become a
+ *   different opinion.
  * - The **balance adjustment** is written through `./transactions`' `createTransaction`, not
  *   through an insert of its own, so a correction is subject to exactly the invariants every other
  *   transaction is. A parallel write path is how "a real transaction" quietly becomes "nearly a
@@ -89,17 +90,15 @@ import { ConflictError, ForbiddenError, NotFoundError } from './errors'
 // were written in parallel against the same `is_base` row, and two readers of it is two chances to
 // answer a different currency after a base change.
 import { baseCurrencyOf } from './workspace-currencies'
-import {
-  applyPolicies,
-  computeRefAmount,
-  createTransaction,
-} from './transactions'
+import { applyPolicies, createTransaction } from './transactions'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
 
 import type { CurrencyCode, Minor } from '#/lib/money'
 import type { AccountGroupRow } from '#/server/db/schema'
 import type { Account } from '#/server/db/types'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 import type { TenantPatch, TenantScope } from './base'
-import type { ConversionContext, TransactionPolicies } from './transactions'
+import type { TransactionPolicies } from './transactions'
 
 /* -------------------------------------------------------------------------- */
 /* Errors                                                                     */
@@ -909,7 +908,6 @@ export async function adjustAccountBalance(
       accountId: account.id,
       direction,
       amountMinor,
-      currencyCode: account.currencyCode,
       bookedOn: parsed.bookedOn,
       bookedAt: Date.parse(`${parsed.bookedOn}T23:59:59.999Z`),
       note: parsed.note ?? null,
@@ -1310,9 +1308,9 @@ export async function reorderAccountGroups(
 /**
  * One amount in the workspace base currency, at `on`'s rate.
  *
- * A thin call onto `./transactions`' `computeRefAmount`, deliberately: the identity short-circuit,
- * the rate direction and the refusal to invent a missing rate are all decided there, once, for
- * every amount in the product.
+ * A thin call onto `#/server/transactions/ref-amount`'s `computeRefAmount`, deliberately: the
+ * identity short-circuit, the rate direction and the refusal to invent a missing rate are all
+ * decided there, once, for every amount in the product.
  */
 async function toBase(
   amountMinor: Minor,

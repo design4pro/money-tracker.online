@@ -57,8 +57,9 @@ import {
   tenantFilter,
 } from './base'
 import { ConflictError, NotFoundError } from './errors'
-import { computeRefAmount, toTransaction } from './transactions'
 import { conversionContextFor } from './workspace-currencies'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
+import { toTransaction } from '#/server/transactions/row'
 
 import type { Minor, RateE10 } from '#/lib/money'
 import type {
@@ -67,7 +68,10 @@ import type {
   LoanInstalmentRow,
 } from '#/server/db/schema'
 import type { Loan, LoanInstalment, Transaction } from '#/server/db/types'
-import type { ConversionContext, RateResolver } from './transactions'
+import type {
+  ConversionContext,
+  RateResolver,
+} from '#/server/transactions/ref-amount'
 import type { TenantScope } from './base'
 
 /* -------------------------------------------------------------------------- */

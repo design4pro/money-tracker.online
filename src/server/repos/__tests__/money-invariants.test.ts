@@ -31,6 +31,7 @@ import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 import {
   asCurrencyCode,
@@ -133,8 +134,8 @@ import {
   pageTransactions,
   sumTransactions,
 } from '../transaction-queries'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
 import {
-  computeRefAmount,
   createTransaction,
   findAccountCurrencyMismatches,
   getTransaction,
@@ -154,7 +155,11 @@ import type { PlannedScreenInput } from '#/routes/_app/transactions/-server/plan
 import type * as BaseModule from '../base'
 import type { MatchingRules, PeriodView } from '../recurring'
 import type { TenantScope } from '../scope'
-import type { ConversionContext, TransactionPolicies } from '../transactions'
+import type {
+  CreateTransactionInput,
+  TransactionPolicies,
+} from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 vi.mock('../base', async (importOriginal) => {
   const actual = await importOriginal<typeof BaseModule>()
@@ -290,7 +295,6 @@ const INPUT = {
   accountId: 'acc-a',
   direction: 'expense',
   amountMinor: 12_345,
-  currencyCode: 'PLN',
   bookedOn: BOOKED_ON,
 } as const
 
@@ -305,7 +309,7 @@ describe('1 — ref_amount is written once, at booked_on’s rate', () => {
       scope,
       policies: EVERYTHING,
       conversion: march,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
     expect(created.refAmountMinor).toBe(53_353)
 
@@ -336,7 +340,6 @@ describe('1 — ref_amount is written once, at booked_on’s rate', () => {
       input: {
         ...INPUT,
         accountId: 'acc-eur',
-        currencyCode: 'EUR',
         bookedOn: BOOKED_ON,
       },
     })
@@ -395,7 +398,6 @@ describe('3 — rate_e10 travels on the row', () => {
       input: {
         ...INPUT,
         accountId: 'acc-eur',
-        currencyCode: 'EUR',
         amountMinor: 12_345,
       },
     })
@@ -494,7 +496,7 @@ describe('6 — changing booked_on recomputes, and it is a write', () => {
       scope,
       policies: EVERYTHING,
       conversion: book,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     const moved = await updateTransaction({
@@ -515,7 +517,7 @@ describe('6 — changing booked_on recomputes, and it is a write', () => {
       scope,
       policies: EVERYTHING,
       conversion: book,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     const resolveRate = vi.fn(async () => asRateE10(1))
@@ -1316,7 +1318,7 @@ describe('12 — a split allocates the parent’s figures and never re-converts'
       conversion: conversionOf('PLN', [
         [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
       ]),
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
   }
 
@@ -1421,7 +1423,7 @@ describe('13 — a refund is subtracted on read and never written to the origina
       scope,
       policies: EVERYTHING,
       conversion: MARCH_AND_APRIL(),
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
   }
 
@@ -1434,7 +1436,6 @@ describe('13 — a refund is subtracted on read and never written to the origina
         ...INPUT,
         accountId: 'acc-eur',
         direction: 'income',
-        currencyCode: 'EUR',
         amountMinor,
         bookedOn,
       },
@@ -2013,7 +2014,6 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
         input: {
           ...INPUT,
           accountId: 'acc-eur',
-          currencyCode: 'EUR',
           bookedOn: '2026-03-17',
         },
       }),
@@ -2032,7 +2032,7 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     await expect(
@@ -2171,7 +2171,7 @@ describe('19 — a transaction is in its account’s currency', () => {
     return scope.db.select().from(transactions).orderBy(transactions.id)
   }
 
-  it('refuses a create whose currency is not the account’s, naming both, before any rate or write', async () => {
+  it('stamps a create with the account’s currency and refuses a caller-supplied code before any rate or write', async () => {
     const resolveRate = vi.fn(async () => asRateE10(43_218_000_000))
     executed.length = 0
 
@@ -2179,33 +2179,27 @@ describe('19 — a transaction is in its account’s currency', () => {
       scope,
       policies: EVERYTHING,
       conversion: { baseCurrencyCode: asCurrencyCode('PLN'), resolveRate },
-      input: { ...INPUT, accountId: 'acc-a', currencyCode: 'EUR' },
+      input: {
+        ...INPUT,
+        accountId: 'acc-a',
+        currencyCode: 'EUR',
+      } as CreateTransactionInput,
     }).catch((error: unknown) => error)
 
-    expect(failure).toBeInstanceOf(ConflictError)
-    expect((failure as ConflictError).message).toContain('EUR')
-    expect((failure as ConflictError).message).toContain('PLN')
-    // No rate was asked for, no row exists, and the ledger was not told anything moved.
+    expect(failure).toBeInstanceOf(z.ZodError)
     expect(resolveRate).not.toHaveBeenCalled()
     expect(executed.filter((query) => /^\s*insert/i.test(query))).toEqual([])
     expect(await storedRows()).toEqual([])
     expect(touchLedgerAccount).not.toHaveBeenCalled()
-  })
 
-  it('refuses the same mismatch whatever the policies say', async () => {
-    await expect(
-      createTransaction({
-        scope,
-        policies: {
-          planned: 'exclude',
-          adjustments: 'exclude',
-          transfers: 'exclude',
-          completeness: 'complete',
-        },
-        conversion: book(),
-        input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'PLN' },
-      }),
-    ).rejects.toBeInstanceOf(ConflictError)
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      input: { ...INPUT, accountId: 'acc-a' },
+    })
+    expect(created.currencyCode).toBe('PLN')
+    expect(created.refAmountMinor).toBe(12_345)
   })
 
   it('accepts a foreign-currency account written in its own currency, converted at booked_on’s rate', async () => {
@@ -2213,7 +2207,7 @@ describe('19 — a transaction is in its account’s currency', () => {
       scope,
       policies: EVERYTHING,
       conversion: book(),
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     expect(created).toMatchObject({
@@ -2249,70 +2243,6 @@ describe('19 — a transaction is in its account’s currency', () => {
     expect(touchLedgerAccount).not.toHaveBeenCalled()
   })
 
-  it('refuses an update that patches the currency onto an account in another currency', async () => {
-    const created = await createTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      input: INPUT,
-    })
-    const before = await storedRows()
-
-    await expect(
-      updateTransaction({
-        scope,
-        policies: EVERYTHING,
-        conversion: book(),
-        id: created.id,
-        patch: { currencyCode: 'EUR' },
-      }),
-    ).rejects.toBeInstanceOf(ConflictError)
-    expect(await storedRows()).toEqual(before)
-  })
-
-  it('refuses an update that changes the account and the currency to a pair that still disagrees', async () => {
-    const created = await createTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      input: INPUT,
-    })
-
-    await expect(
-      updateTransaction({
-        scope,
-        policies: EVERYTHING,
-        conversion: book(),
-        id: created.id,
-        patch: { accountId: 'acc-eur', currencyCode: 'PLN' },
-      }),
-    ).rejects.toBeInstanceOf(ConflictError)
-  })
-
-  it('takes an update that moves the pair to one that agrees, re-anchoring at booked_on’s rate', async () => {
-    const created = await createTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      input: INPUT,
-    })
-
-    const moved = await updateTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      id: created.id,
-      patch: { accountId: 'acc-eur', currencyCode: 'EUR' },
-    })
-
-    expect(moved).toMatchObject({
-      accountId: 'acc-eur',
-      currencyCode: 'EUR',
-      refAmountMinor: 53_353,
-      rateE10: 43_218_000_000,
-    })
-  })
-
   it('lets a legacy mismatched row take an edit that does not move it to a mismatching pair', async () => {
     const id = await seedLegacyMismatch()
 
@@ -2321,8 +2251,7 @@ describe('19 — a transaction is in its account’s currency', () => {
       policies: EVERYTHING,
       conversion: book(),
       id,
-      // The detail screen re-sends the pair it already holds on every save.
-      patch: { note: 'still here', accountId: 'acc-a', currencyCode: 'EUR' },
+      patch: { note: 'still here', accountId: 'acc-a' },
     })
     expect(noted).toMatchObject({
       note: 'still here',
@@ -2441,7 +2370,7 @@ describe('20 — changing an account’s currency is refused once it has history
       scope: world.scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...INPUT, accountId: 'acc-a', currencyCode: 'PLN' },
+      input: { ...INPUT, accountId: 'acc-a' },
     })
     await expect(
       findAccountCurrencyMismatches(world.scope),
