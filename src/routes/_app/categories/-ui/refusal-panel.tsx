@@ -36,6 +36,7 @@ const TITLE_KEYS = {
   move: 'categories.move.refused',
   reorder: 'categories.move.refused',
   restore: 'categories.restore.refused',
+  seed: 'categories.seed.failed',
 } as const satisfies Readonly<Record<RefusalCall, MessageKey>>
 
 export function RefusalPanel({ refusal }: { refusal: Refusal }) {
@@ -43,11 +44,14 @@ export function RefusalPanel({ refusal }: { refusal: Refusal }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'nearest' })
+    // `start`, not `nearest`: a panel that already peeks into the viewport under the sticky
+    // header is "nearest" to staying there. `scroll-mt-16` matches `<html>`'s `scroll-pt-16`
+    // so the heading comes to rest below the 64px bar (WCAG 2.2 §2.4.11).
+    ref.current?.scrollIntoView({ block: 'start' })
   }, [])
 
   return (
-    <div ref={ref}>
+    <div ref={ref} className="scroll-mt-16">
       <ErrorPanel
         mode="region"
         headingLevel={2}

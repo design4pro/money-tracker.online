@@ -102,6 +102,7 @@ describe('RefusalPanel', () => {
     ['move', 'categories.move.refused'],
     ['reorder', 'categories.move.refused'],
     ['restore', 'categories.restore.refused'],
+    ['seed', 'categories.seed.failed'],
   ] as const)('titles a %s failure from its source', (call, key) => {
     renderPanel({ kind: 'generic', call })
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(en[key])
@@ -132,7 +133,7 @@ describe('RefusalPanel', () => {
     view.rerender(withPanel(true))
 
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
     expect(document.activeElement).toBe(elsewhere)
   })
 

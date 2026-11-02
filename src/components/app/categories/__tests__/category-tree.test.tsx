@@ -139,6 +139,40 @@ describe('CategoryTree', () => {
     expect(screen.getAllByText('Money out').length).toBe(categories.length * 2)
   })
 
+  it('focuses the first row when autoFocus is first on the first render', () => {
+    renderTree({ autoFocus: 'first' })
+    expect(document.activeElement).toBe(screen.getAllByRole('row')[0])
+  })
+
+  it('does not take focus when autoFocus is turned on after mount', () => {
+    const props = {
+      categories,
+      onEdit: vi.fn(),
+      onAddChild: vi.fn(),
+      onArchive: vi.fn(),
+      onRestore: vi.fn(),
+      onDelete: vi.fn(),
+      onMove: vi.fn(),
+    }
+    const view = render(
+      <I18nProvider locale="en" messages={en as Catalogue}>
+        <CategoryTree {...props} />
+      </I18nProvider>,
+    )
+    const body = document.body
+    body.setAttribute('tabindex', '-1')
+    body.focus()
+    expect(document.activeElement).toBe(body)
+
+    view.rerender(
+      <I18nProvider locale="en" messages={en as Catalogue}>
+        <CategoryTree {...props} autoFocus="first" />
+      </I18nProvider>,
+    )
+
+    expect(document.activeElement).toBe(body)
+  })
+
   /**
    * The kind yields its width to the name below `sm`, and stays in the accessibility tree.
    *
@@ -152,6 +186,13 @@ describe('CategoryTree', () => {
    * change is that exactly one of the two copies is painted at any width, and someone deleting
    * either class breaks this line.
    */
+  it('lets a long name wrap rather than ellipsize', () => {
+    renderTree()
+    const name = screen.getByText('Groceries')
+    expect(name.className).toContain('break-words')
+    expect(name.className).not.toContain('truncate')
+  })
+
   it('keeps the kind spoken on a phone while the badge stops being painted', () => {
     renderTree()
     const copies = screen.getAllByText('Money out')

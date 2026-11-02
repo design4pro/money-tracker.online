@@ -24,7 +24,7 @@ import { readFailure } from '#/lib/failure'
  */
 
 /** Which write failed. The panel's title follows it. */
-export type RefusalCall = 'move' | 'reorder' | 'restore'
+export type RefusalCall = 'move' | 'reorder' | 'restore' | 'seed'
 
 /** What the route knows about the write it just made: the call, and the names it holds in `byId`. */
 export interface RefusalContext {
