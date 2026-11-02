@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 
 import { ErrorPanel } from '#/components/app/shell'
-import { reparentMove } from '#/components/app/tree'
+import { hasChildren, reparentMove } from '#/components/app/tree'
 import { Button, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import {
@@ -19,6 +19,7 @@ import { refusalFor } from './group-refusal'
 import {
   buildEntries,
   focusKeyAfterDelete,
+  focusKeyAfterGone,
   groupKey,
   memberKey,
 } from './group-rows'
@@ -82,24 +83,82 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   const treeRef = useRef<HTMLDivElement>(null)
   // `Button` takes no ref, so the "New group" button is found through its wrapper.
   const createSlotRef = useRef<HTMLDivElement>(null)
+  const previousEntriesRef = useRef(buildEntries(groups))
+  const lastTreeFocusKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const root = treeRef.current
+    if (root === null) return
+    const onFocusIn = (event: FocusEvent) => {
+      const key = (event.target as Element | null)
+        ?.closest('[data-key]')
+        ?.getAttribute('data-key')
+      if (key !== null && key !== undefined) lastTreeFocusKeyRef.current = key
+    }
+    root.addEventListener('focusin', onFocusIn)
+    return () => root.removeEventListener('focusin', onFocusIn)
+  })
+
+  useEffect(() => {
+    const entries = buildEntries(groups)
+    const previous = previousEntriesRef.current
+    previousEntriesRef.current = entries
+    if (focusRequest !== undefined || pending.kind !== 'none') return
+    const gone = lastTreeFocusKeyRef.current
+    if (gone === null) return
+    if (entries.some((entry) => entry.key === gone)) return
+    const next = focusKeyAfterGone(previous, entries, gone)
+    lastTreeFocusKeyRef.current = next
+    setFocusRequest({ key: next })
+  }, [focusRequest, groups, pending.kind])
 
   useEffect(() => {
     if (focusRequest === undefined || pending.kind !== 'none') return
     if (focusRequest.key === null && groups.length !== 0) return
-    // Let the collection finish restoring focus after removing the old row first.
-    const frame = requestAnimationFrame(() => {
-      const target =
-        focusRequest.key === null
-          ? createSlotRef.current?.querySelector('button')
-          : treeRef.current?.querySelector<HTMLElement>(
-              `[data-key="${focusRequest.key}"]`,
-            )
-      if (target) {
-        target.focus()
-        setFocusRequest(undefined)
-      }
-    })
-    return () => cancelAnimationFrame(frame)
+    // A closing dialog restores focus to its trigger after the first paint. Hold the request and
+    // re-assert until the row (or the create button) actually keeps it.
+    let cancelled = false
+    const timers: number[] = []
+    const frames: number[] = []
+
+    const targetOf = (): HTMLElement | undefined =>
+      focusRequest.key === null
+        ? (createSlotRef.current?.querySelector('button') ?? undefined)
+        : (treeRef.current?.querySelector<HTMLElement>(
+            `[data-key="${focusRequest.key}"]`,
+          ) ?? undefined)
+
+    const tryFocus = (): boolean => {
+      if (cancelled) return false
+      const target = targetOf()
+      if (target === undefined) return false
+      target.focus()
+      return document.activeElement === target
+    }
+
+    const finish = () => {
+      if (cancelled) return
+      if (tryFocus()) setFocusRequest(undefined)
+    }
+
+    frames.push(
+      requestAnimationFrame(() => {
+        frames.push(
+          requestAnimationFrame(() => {
+            tryFocus()
+            // React Aria restores the trigger on a later task (~50 ms after overlay teardown).
+            for (const delay of [0, 50, 100]) {
+              timers.push(window.setTimeout(finish, delay))
+            }
+          }),
+        )
+      }),
+    )
+    return () => {
+      cancelled = true
+      for (const frame of frames) cancelAnimationFrame(frame)
+      for (const timer of timers) window.clearTimeout(timer)
+    }
   }, [focusRequest, groups, pending.kind])
 
   const close = () => setPending({ kind: 'none' })
@@ -140,6 +199,8 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   async function applyMove(move: TreeMove): Promise<boolean> {
     const current = byId.get(move.id)
     if (current === undefined) return false
+    // Empty the live region first so a second identical refusal is a DOM change (WCAG 4.1.3).
+    setRefusal(null)
     let isReparented = false
     try {
       if (current.parentId !== move.parentId) {
@@ -254,6 +315,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
   /** Never rejects: a refusal goes to the alert region, so the dialog's raw-message panel stays unused. */
   async function deleteGroup(group: GroupItem) {
     const next = focusKeyAfterDelete(buildEntries(groups), group.id)
+    setRefusal(null)
     try {
       await deleteAccountGroup({ data: { groupId: group.id } })
     } catch (error) {
@@ -352,6 +414,7 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
             if (!open) close()
           }}
           group={pending.group}
+          hasSubgroups={hasChildren(groups, pending.group.id)}
           onConfirm={() => deleteGroup(pending.group)}
         />
       ) : null}

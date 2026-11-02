@@ -4,6 +4,7 @@ import {
   acceptsDrop,
   buildEntries,
   focusKeyAfterDelete,
+  focusKeyAfterGone,
   groupIdOf,
   groupKey,
   isMemberKey,
@@ -131,5 +132,41 @@ describe('focusKeyAfterDelete', () => {
       focusKeyAfterDelete(buildEntries([group('only')]), 'only'),
     ).toBeNull()
     expect(focusKeyAfterDelete(entries, 'ghost')).toBeNull()
+  })
+})
+
+describe('focusKeyAfterGone', () => {
+  const previous = buildEntries(groups)
+
+  it('picks the next key that is still in the reloaded list', () => {
+    const current = buildEntries(groups.filter((row) => row.id !== 'business'))
+    expect(focusKeyAfterGone(previous, current, 'group:business')).toBe(
+      'group:savings',
+    )
+  })
+
+  it('skips keys that left with the focused row', () => {
+    const current = buildEntries(
+      groups
+        .filter((row) => row.id !== 'joint')
+        .map((row) =>
+          row.parentId === 'joint' ? { ...row, parentId: null } : row,
+        ),
+    )
+    expect(focusKeyAfterGone(previous, current, 'group:joint')).toBe(
+      'group:trips',
+    )
+  })
+
+  it('falls back to the previous surviving key, then null', () => {
+    const withoutLast = buildEntries(
+      groups.filter((row) => row.id !== 'savings'),
+    )
+    expect(focusKeyAfterGone(previous, withoutLast, 'group:savings')).toBe(
+      'group:business',
+    )
+    expect(
+      focusKeyAfterGone(previous, [], memberKey('savings', 'vault')),
+    ).toBeNull()
   })
 })
