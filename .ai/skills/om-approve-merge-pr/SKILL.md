@@ -65,11 +65,13 @@ Remove no label a person set.
   rules: report the PR not mergeable now and name the route. `needs-qa` without `qa-approved`, a
   stale `QA head:`, and `needs-qa` beside `skip-qa` route to
   `om-auto-qa-pr <number> --self-qa-signoff` on the current head (treat the pair as `needs-qa`);
-  `changes-requested` and a `qa-failed` the QA panel set route to `om-auto-fix-pr <number>`. Never
-  merge past one of them in this run. A `risk-high` or `security` PR merges with
+  `changes-requested` and a `qa-failed` with `isPanelQaFailed` true route to
+  `om-auto-fix-pr <number>`. Never merge past one of them in this run. Judge the panel label with
+  `node .ai/scripts/qa-panel-failed.mjs --repo {owner}/{repo} --pr {n}` (the only definition of
+  `isPanelQaFailed`). A `risk-high` or `security` PR merges with
   `--match-head-commit <head the security verdict judged>` (`.ai/skills/om-pr-autopilot/SKILL.md`). A
-  `qa-failed` a person set, an active `qa`, `blocked` and `do-not-merge` still stop and report. A
-  **gate PR** (`afk-decide` § 5) also stops: never merge it; Rafał does.
+  `qa-failed` with `isPanelQaFailed` false, an active `qa`, `blocked` and `do-not-merge` still stop
+  and report. A **gate PR** (`afk-decide` § 5) also stops: never merge it; Rafał does.
 - A second review is not a merge requirement (ADR 0027 removed the mandatory second reviewer). An
   approving review is needed only when the base branch's ruleset asks for one; read it before step
   3: `gh api "repos/{owner}/{repo}/rules/branches/<baseRefName>" --jq '[.[] | select(.type ==
