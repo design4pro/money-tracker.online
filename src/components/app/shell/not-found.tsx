@@ -1,26 +1,10 @@
 import { Link } from '@tanstack/react-router'
 
-import { buttonVariants } from '#/components/ui'
-import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 
 import { BrandMark } from './brand-mark'
+import { ButtonLink } from './button-link'
 import { MAIN_CONTENT_ID } from './main-content'
-
-/**
- * Real links painted as buttons, the pattern `(auth)/reset-password.tsx` already uses: these
- * navigate, so they must be `<a>`s. `buttonVariants` paints React Aria's `data-[hovered]` and
- * `data-[pressed]`, which a plain anchor never receives, so both states are restated as CSS
- * pseudo-classes.
- */
-const PRIMARY_LINK = cn(
-  buttonVariants({ variant: 'primary', size: 'lg' }),
-  'no-underline hover:bg-accent-hover hover:shadow-elevated active:translate-y-px',
-)
-const SECONDARY_LINK = cn(
-  buttonVariants({ variant: 'secondary', size: 'lg' }),
-  'no-underline hover:border-ink-2 hover:bg-surface-sunken active:translate-y-px',
-)
 
 /**
  * What an unknown address renders.
@@ -43,9 +27,10 @@ const SECONDARY_LINK = cn(
  * a workspace navigation.
  *
  * It is a module of its own, loaded lazily by `__root.tsx`, because it is the only thing the root
- * needs from the design system. Importing `buttonVariants` there statically would carry the
+ * needs from the design system. Importing `ButtonLink` there statically would carry the
  * button primitive, and React Aria with it, into the chunk every visitor downloads - including
- * the one reading the marketing page, which renders no primitive at all.
+ * the one reading the marketing page, which renders no primitive at all. The ways out go through
+ * `ButtonLink` so hover, press and the 44px hit area live in one place.
  */
 export function NotFound() {
   const t = useTranslate()
@@ -78,12 +63,12 @@ export function NotFound() {
             {t('empty.notFound.body')}
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link to="/" className={PRIMARY_LINK}>
+            <ButtonLink to="/" variant="primary" size="lg">
               {t('empty.notFound.home')}
-            </Link>
-            <Link to="/login" className={SECONDARY_LINK}>
+            </ButtonLink>
+            <ButtonLink to="/login" variant="secondary" size="lg">
               {t('marketing.nav.signIn')}
-            </Link>
+            </ButtonLink>
           </div>
         </div>
       </main>

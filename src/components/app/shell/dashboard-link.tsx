@@ -1,19 +1,6 @@
-import { Link } from '@tanstack/react-router'
-
-import { buttonVariants } from '#/components/ui'
-import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 
-/**
- * A real link painted as a button, as `not-found.tsx` does: it navigates, so it is an `<a>`.
- * `buttonVariants` paints React Aria's `data-[hovered]` and `data-[pressed]`, which a plain
- * anchor never receives, so both states are restated as CSS pseudo-classes. `target-min` in the
- * variants keeps the 44px hit area.
- */
-const SECONDARY_LINK = cn(
-  buttonVariants({ variant: 'secondary' }),
-  'no-underline hover:border-ink-2 hover:bg-surface-sunken active:translate-y-px',
-)
+import { ButtonLink } from './button-link'
 
 export interface DashboardLinkProps {
   /**
@@ -28,8 +15,8 @@ export interface DashboardLinkProps {
 export function DashboardLink({ to }: DashboardLinkProps) {
   const t = useTranslate()
   return (
-    <Link to={to} className={SECONDARY_LINK}>
+    <ButtonLink to={to} variant="secondary">
       {t('failure.dashboard.action')}
-    </Link>
+    </ButtonLink>
   )
 }
