@@ -22,6 +22,8 @@
 import { z } from 'zod'
 
 import {
+  RecurringPeriodSettledError,
+  RecurringTransactionLinkedError,
   getMatchableTransaction,
   listOpenPeriodRows,
   listSeries,
@@ -192,12 +194,20 @@ export async function matchTransaction(
       })
       if (!verdict.matched) continue
 
-      await markPaid(scope, {
-        seriesId: series.id,
-        periodStart: period.periodStart,
-        transactionId: transaction.id,
-        matchSource: 'rule',
-      })
+      try {
+        await markPaid(scope, {
+          seriesId: series.id,
+          periodStart: period.periodStart,
+          transactionId: transaction.id,
+          matchSource: 'rule',
+        })
+      } catch (error) {
+        // One receipt already pays a period: this transaction is done, not crashed.
+        if (error instanceof RecurringTransactionLinkedError) return unmatched
+        // This period was settled under us; try the next open one.
+        if (error instanceof RecurringPeriodSettledError) continue
+        throw error
+      }
       // The transaction now names its series, which is what stops a second run from adopting the
       // same row into the *next* open period — and what lets the ledger show which bill it paid.
       // `categorization_source` is deliberately not touched: a person chose that category.

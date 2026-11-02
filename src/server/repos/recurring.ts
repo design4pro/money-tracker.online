@@ -42,7 +42,19 @@
  *    quietly change with the exchange rate. Reports sum transactions; they never sum this column.
  */
 
-import { and, asc, desc, eq, gte, inArray, lte, ne, or, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  ne,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
 
 import { parseDate } from '@internationalized/date'
@@ -74,6 +86,7 @@ import {
   createScope,
   createTenantRepository,
   createTenantTableAccess,
+  runTenantBatch,
   tenantFilter,
 } from './base'
 import { ConflictError, NotFoundError } from './errors'
@@ -96,7 +109,12 @@ import type {
   RecurringPeriod,
   RecurringSeries,
 } from '#/server/db/types'
-import type { Database, KeyedTenantTable, TenantScope } from './base'
+import type {
+  Database,
+  KeyedTenantTable,
+  TenantScope,
+  TenantStatement,
+} from './base'
 
 /* -------------------------------------------------------------------------- */
 /* Errors                                                                     */
@@ -117,7 +135,7 @@ export class RecurringAutomationConflictError extends ConflictError {
   }
 }
 
-/** Thrown when a period is asked to be paid by a transaction that is already settling another. */
+/** Thrown when a period is already paid by a different transaction. */
 export class RecurringPeriodSettledError extends ConflictError {
   readonly seriesId: string
   readonly periodStart: string
@@ -126,6 +144,25 @@ export class RecurringPeriodSettledError extends ConflictError {
     super(
       `The period starting ${periodStart} of series ${seriesId} is already settled; revert it before settling it again.`,
     )
+    this.seriesId = seriesId
+    this.periodStart = periodStart
+  }
+}
+
+/**
+ * Thrown when a transaction already settles another period. One receipt pays one occurrence —
+ * attaching it to a second period is how a series goes quiet while two months claim the same money.
+ */
+export class RecurringTransactionLinkedError extends ConflictError {
+  readonly transactionId: string
+  readonly seriesId: string
+  readonly periodStart: string
+
+  constructor(transactionId: string, seriesId: string, periodStart: string) {
+    super(
+      `Transaction ${transactionId} already settles another period; revert that period before using it for ${periodStart} of series ${seriesId}.`,
+    )
+    this.transactionId = transactionId
     this.seriesId = seriesId
     this.periodStart = periodStart
   }
@@ -420,6 +457,28 @@ function periodKey(seriesId: string, periodStart: string): SQL {
   return and(
     eq(recurringPeriods.seriesId, seriesId),
     eq(recurringPeriods.periodStart, periodStart),
+  ) as SQL
+}
+
+function linkKey(seriesId: string, transactionId: string): SQL {
+  return and(
+    eq(recurringLinks.seriesId, seriesId),
+    eq(recurringLinks.transactionId, transactionId),
+  ) as SQL
+}
+
+/** Any other period already pointing at this receipt — same series or another. */
+function otherPeriodSettledBy(
+  seriesId: string,
+  periodStart: string,
+  transactionId: string,
+): SQL {
+  return and(
+    eq(recurringPeriods.settledTransactionId, transactionId),
+    or(
+      ne(recurringPeriods.seriesId, seriesId),
+      ne(recurringPeriods.periodStart, periodStart),
+    ),
   ) as SQL
 }
 
@@ -1212,6 +1271,10 @@ export async function removeUnpaidOpenPeriods(
  * its variance instead of pretending every month cost the same. Minting a transaction is
  * `auto_record`'s job or the person's own; this is neither.
  *
+ * **One receipt, one period.** A transaction that already settles another occurrence is refused
+ * with {@link RecurringTransactionLinkedError}. The period row and its link are written in one
+ * {@link runTenantBatch}: a failure between them cannot leave a period paid with no evidence.
+ *
  * No ledger rebuild is enqueued: nothing about any account's balance changed.
  */
 export async function markPaid(
@@ -1236,25 +1299,109 @@ export async function markPaid(
     throw new RecurringPeriodSettledError(parsed.seriesId, parsed.periodStart)
   }
 
-  const now = new Date()
-  // The period's `expected_amount_minor` is **not** rewritten and the transaction's
-  // `amount_minor` is **not** read into it. Both figures stay where they are; the difference is
-  // `periodVarianceMinor` at read, and is stored nowhere.
-  await periodAccess.updateWhere(
+  const linkedElsewhere = await periodAccess.findOne(
     scope,
-    periodKey(parsed.seriesId, parsed.periodStart),
-    {
-      status: 'paid',
-      settledTransactionId: parsed.transactionId,
-      updatedAt: now,
-    },
+    otherPeriodSettledBy(
+      parsed.seriesId,
+      parsed.periodStart,
+      parsed.transactionId,
+    ),
   )
-  await upsertLink(scope, {
+  if (linkedElsewhere !== null) {
+    throw new RecurringTransactionLinkedError(
+      parsed.transactionId,
+      parsed.seriesId,
+      parsed.periodStart,
+    )
+  }
+
+  const now = new Date()
+  const linkStatement = await linkUpsertStatement(scope, {
     seriesId: parsed.seriesId,
     transactionId: parsed.transactionId,
     matchSource: parsed.matchSource,
     now,
   })
+  // Idempotent same pair: the period is already this receipt. Still write the link in case a
+  // previous crash paid the period and died before the evidence row existed.
+  if (
+    existing.status === 'paid' &&
+    existing.settledTransactionId === parsed.transactionId
+  ) {
+    await runTenantBatch(scope, [linkStatement])
+    return
+  }
+
+  // The period's `expected_amount_minor` is **not** rewritten and the transaction's
+  // `amount_minor` is **not** read into it. Both figures stay where they are; the difference is
+  // `periodVarianceMinor` at read, and is stored nowhere.
+  //
+  // The `notExists` sits in the UPDATE so two requests cannot attach the same receipt to two
+  // periods: the second write matches nothing rather than overwriting. `ne(status, 'paid')` is
+  // the same defence `markSkipped` uses against a tab that settled the period in between.
+  const [updated] = await runTenantBatch(scope, [
+    periodAccess.updateWhereStatement(
+      scope,
+      and(
+        periodKey(parsed.seriesId, parsed.periodStart),
+        ne(recurringPeriods.status, 'paid'),
+        notExists(
+          scope.db
+            .select({ periodStart: recurringPeriods.periodStart })
+            .from(recurringPeriods)
+            .where(
+              tenantFilter(
+                scope,
+                recurringPeriods,
+                otherPeriodSettledBy(
+                  parsed.seriesId,
+                  parsed.periodStart,
+                  parsed.transactionId,
+                ),
+              ),
+            ),
+        ),
+      ) as SQL,
+      {
+        status: 'paid',
+        settledTransactionId: parsed.transactionId,
+        updatedAt: now,
+      },
+    ),
+    linkStatement,
+  ])
+  if (updated.length > 0) return
+
+  const current = await periodAccess.findOne(
+    scope,
+    periodKey(parsed.seriesId, parsed.periodStart),
+  )
+  if (
+    current?.status === 'paid' &&
+    current.settledTransactionId === parsed.transactionId
+  ) {
+    return
+  }
+  if (
+    (await periodAccess.findOne(
+      scope,
+      otherPeriodSettledBy(
+        parsed.seriesId,
+        parsed.periodStart,
+        parsed.transactionId,
+      ),
+    )) !== null
+  ) {
+    throw new RecurringTransactionLinkedError(
+      parsed.transactionId,
+      parsed.seriesId,
+      parsed.periodStart,
+    )
+  }
+  if (current?.status === 'paid') {
+    throw new RecurringPeriodSettledError(parsed.seriesId, parsed.periodStart)
+  }
+  throw new NotFoundError('recurring period', parsed.periodStart)
 }
 
 /**
@@ -1340,7 +1487,7 @@ export async function revertPeriod(
 }
 
 /** Adds the link, or reactivates the one that is already there. Idempotent by primary key. */
-async function upsertLink(
+async function linkUpsertStatement(
   scope: TenantScope,
   input: {
     readonly seriesId: string
@@ -1348,24 +1495,22 @@ async function upsertLink(
     readonly matchSource: RecurringMatchSource
     readonly now: Date
   },
-): Promise<void> {
-  const where = and(
-    eq(recurringLinks.seriesId, input.seriesId),
-    eq(recurringLinks.transactionId, input.transactionId),
-  ) as SQL
+): Promise<TenantStatement> {
+  const where = linkKey(input.seriesId, input.transactionId)
   const existing = await linkAccess.findOne(scope, where)
   if (existing === null) {
-    await linkAccess.insert(scope, {
-      seriesId: input.seriesId,
-      transactionId: input.transactionId,
-      matchSource: input.matchSource,
-      status: 'active',
-      createdAt: input.now,
-      updatedAt: input.now,
-    })
-    return
+    return linkAccess.insertManyStatement(scope, [
+      {
+        seriesId: input.seriesId,
+        transactionId: input.transactionId,
+        matchSource: input.matchSource,
+        status: 'active',
+        createdAt: input.now,
+        updatedAt: input.now,
+      },
+    ])
   }
-  await linkAccess.updateWhere(scope, where, {
+  return linkAccess.updateWhereStatement(scope, where, {
     status: 'active',
     matchSource: input.matchSource,
     updatedAt: input.now,
