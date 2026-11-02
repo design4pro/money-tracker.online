@@ -794,11 +794,13 @@ export type OrganizationExchangeRateRow =
  * a parent does not orphan a child into an unreachable third level (`set null` promotes it).
  *
  * `color` is `NOT NULL` — a child inherits its parent's colour at creation time and stores it,
- * rather than resolving it on read. A stored colour survives the parent being recoloured, which is
- * what a reader expects of a chart they printed last month.
+ * rather than resolving it on read. A child that still carries the parent's colour is repainted
+ * when the parent is recoloured (`cascadeColor`); a child that carries its own colour is not.
  *
- * `is_system` rows may be renamed and recoloured but not deleted: the import mappers and the rule
- * engine address them by `slug`, and a missing slug is a silently mis-categorised import.
+ * `is_system` is reserved for a row the product itself must find by slug. None exists today.
+ * The standard set writes ordinary rows (`is_system = 0`) so a person who does not want them can
+ * delete them. Import mappers and the rule engine address categories by free text and by id, not
+ * by this flag.
  */
 export const categories = sqliteTable(
   'categories',
