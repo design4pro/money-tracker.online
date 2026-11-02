@@ -74,6 +74,7 @@ Rules:
 - Prefer a normal follow-up commit.
 - Use conventional-commit-style messages scoped to the affected area: `fix(<area>): <summary>`, `feat(<area>): <summary>`, `refactor(<area>): <summary>`, etc.
 - Before pushing, ensure the latest autofix cycle included tests, the targeted validation commands, and a fresh code review on the final diff.
+- Immediately before each `git push` to the PR head, run tracker operation **get-pr** and read `state` in the same command as the push. Anything other than `OPEN` stops the run: do not push, release the claim, post one comment saying why the run stopped, and report the commits that were not pushed. A merged or closed PR's deleted head must not be recreated (#447).
 
 ### Fork PRs
 
