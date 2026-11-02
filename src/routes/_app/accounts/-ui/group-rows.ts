@@ -185,3 +185,30 @@ export function focusKeyAfterDelete(
   const previous = entries.slice(0, index).reverse().find(survives)
   return previous?.key ?? null
 }
+
+/**
+ * The row focus goes to when a reload has removed the row that held it: the next key that is still
+ * present, then the previous one, then `null` (the "New group" button).
+ *
+ * Unlike {@link focusKeyAfterDelete}, this compares the list as it was with the list as it is, so a
+ * refused write whose refresh dropped an arbitrary row (not only a delete we issued) still has a
+ * landing place.
+ */
+export function focusKeyAfterGone(
+  previous: ReadonlyArray<TreeEntry>,
+  current: ReadonlyArray<TreeEntry>,
+  goneKey: string,
+): string | null {
+  const currentKeys = new Set(current.map((entry) => entry.key))
+  const index = previous.findIndex((entry) => entry.key === goneKey)
+  if (index === -1) return current[0]?.key ?? null
+  const next = previous
+    .slice(index + 1)
+    .find((entry) => currentKeys.has(entry.key))
+  if (next !== undefined) return next.key
+  const earlier = previous
+    .slice(0, index)
+    .reverse()
+    .find((entry) => currentKeys.has(entry.key))
+  return earlier?.key ?? null
+}

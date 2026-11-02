@@ -147,6 +147,43 @@ describe('GroupTree rows', () => {
       expect(button.className).toContain('target-min')
     }
   })
+
+  it('stacks the account-count badge under the name below sm so a long name wraps at words', () => {
+    renderTree()
+    const row = screen.getByRole('row', { name: /^Trips, inside Joint/ })
+    const name = within(row).getByText('Trips')
+    expect(name.className).toMatch(/\bbreak-words\b/)
+    expect(name.className).not.toMatch(/\bbreak-all\b/)
+    const cluster = name.parentElement
+    expect(cluster?.className).toMatch(/\bflex-col\b/)
+    expect(cluster?.className).toMatch(/\bsm:flex-row\b/)
+    expect(within(cluster!).getByText('1 account')).not.toBeNull()
+  })
+})
+
+describe('GroupTree narrow layout', () => {
+  it('treats viewports up to 48rem as narrow so Move to… opens under the menu', () => {
+    const matchMedia = vi.fn((query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }))
+    const original = window.matchMedia
+    window.matchMedia = matchMedia
+    try {
+      renderTree()
+      expect(matchMedia.mock.calls.map((call) => call[0])).toContain(
+        '(max-width: 48rem)',
+      )
+    } finally {
+      window.matchMedia = original
+    }
+  })
 })
 
 describe('GroupTree menu', () => {

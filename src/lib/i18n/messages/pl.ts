@@ -355,13 +355,12 @@ const messages = {
   'accounts.group.delete.action': 'Usuń grupę',
   'accounts.group.delete.title': 'Usunąć grupę {name}?',
   'accounts.group.delete.body': {
-    one: '{count} konto opuszcza tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
-    few: '{count} konta opuszczą tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
-    many: '{count} kont opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
-    other:
-      '{count} konta opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    one: '{count} konto opuszcza tę grupę. Żadne nie zostanie usunięte.',
+    few: '{count} konta opuszczą tę grupę. Żadne nie zostanie usunięte.',
+    many: '{count} kont opuści tę grupę. Żadne nie zostanie usunięte.',
+    other: '{count} konta opuści tę grupę. Żadne nie zostanie usunięte.',
   },
-  'accounts.group.delete.bodyEmpty': 'Podgrupy trafią na poziom główny.',
+  'accounts.group.delete.subgroups': 'Podgrupy trafią na poziom główny.',
   'accounts.group.delete.rules':
     'Reguły używające tej grupy zostaną wstrzymane, dopóki nie wybierzesz innej.',
   'accounts.count': {
