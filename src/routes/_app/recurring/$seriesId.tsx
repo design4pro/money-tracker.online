@@ -7,6 +7,9 @@ import {
   ForecastPanel,
   PeriodGrid,
   SeriesDetailSkeleton,
+  findReopenedPeriod,
+  isUnsettledPeriodStatus,
+  useMarkPaidReopen,
   useRecurringAction,
 } from '#/components/app/recurring'
 import { ErrorPanel } from '#/components/app/shell'
@@ -112,7 +115,6 @@ type Pending =
   | { kind: 'pause' }
   | { kind: 'complete' }
   | { kind: 'delete' }
-  | { kind: 'markPaid'; period: PeriodView }
 
 function SeriesDetailRoute() {
   const t = useTranslate()
@@ -122,23 +124,33 @@ function SeriesDetailRoute() {
   const navigate = Route.useNavigate()
   const refreshCaches = useDataRefresh()
   const runAction = useRecurringAction(refreshCaches)
-
-  const [pending, setPending] = useState<Pending>(() => {
-    const reopened = detail.periods.find(
-      (candidate) =>
-        candidate.periodStart === markPaid &&
-        candidate.derivedStatus !== 'paid' &&
-        candidate.derivedStatus !== 'skipped',
-    )
-    return reopened === undefined || !detail.series.isActive
-      ? { kind: 'none' }
-      : { kind: 'markPaid', period: reopened }
+  const markPaidSearch = { markPaid }
+  const markPaidDialog = useMarkPaidReopen<PeriodView>({
+    search: markPaidSearch,
+    initial: !detail.series.isActive
+      ? null
+      : (findReopenedPeriod(
+          detail.periods,
+          markPaidSearch,
+          (candidate) => ({
+            periodStart: candidate.periodStart,
+            seriesId: candidate.seriesId,
+          }),
+          {
+            matchSeries: false,
+            canOpen: (candidate) =>
+              isUnsettledPeriodStatus(candidate.derivedStatus),
+          },
+        ) ?? null),
+    onClearSearch: () => {
+      void navigate({ search: {}, replace: true })
+    },
   })
+
+  const [pending, setPending] = useState<Pending>({ kind: 'none' })
   const close = () => {
     setPending({ kind: 'none' })
-    if (markPaid !== undefined) {
-      void navigate({ search: {}, replace: true })
-    }
+    markPaidDialog.close()
   }
 
   const { series, periods, links, forecast } = detail
@@ -254,9 +266,11 @@ function SeriesDetailRoute() {
           copy={series.dutyCode === null ? 'series' : 'duty'}
           isReadOnly={!series.isActive}
           openPeriodStart={
-            pending.kind === 'markPaid' ? pending.period.periodStart : null
+            pending.kind === 'none'
+              ? (markPaidDialog.pending?.periodStart ?? null)
+              : null
           }
-          onMarkPaid={(period) => setPending({ kind: 'markPaid', period })}
+          onMarkPaid={(period) => markPaidDialog.open(period)}
           onSkip={(period) => {
             void runAction(
               () =>
@@ -379,15 +393,15 @@ function SeriesDetailRoute() {
         />
       ) : null}
 
-      {pending.kind === 'markPaid' ? (
+      {pending.kind === 'none' && markPaidDialog.pending !== null ? (
         <MarkPaidDialog
-          key={pending.period.periodStart}
+          key={markPaidDialog.pending.periodStart}
           isOpen
           onOpenChange={(open) => {
             if (!open) close()
           }}
           series={series}
-          period={pending.period}
+          period={markPaidDialog.pending}
           origin="series"
           onSaved={() => {
             toast.success(t('recurring.toast.periodPaid'))

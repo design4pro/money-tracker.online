@@ -10,6 +10,8 @@ import {
   RecurringListSkeleton,
   SeriesCard,
   UpcomingPanel,
+  findReopenedPeriod,
+  useMarkPaidReopen,
   useRecurringAction,
 } from '#/components/app/recurring'
 import { SegmentedFilter } from '#/components/app/nav'
@@ -121,22 +123,24 @@ type Pending =
   | { kind: 'form'; series: RecurringSeries | null }
   | { kind: 'pause'; series: RecurringSeries }
   | { kind: 'complete'; series: RecurringSeries }
-  | { kind: 'markPaid'; period: UpcomingPeriod; series: RecurringSeries }
+
+type MarkPaidTarget = {
+  readonly period: UpcomingPeriod
+  readonly series: RecurringSeries
+}
 
 /**
  * The dialog state for marking one listed period paid.
  *
  * A period is listed only for an active series and `rows` holds every active series, so the lookup
- * finds one; the `none` branch is what keeps the type honest rather than a case that is expected.
+ * finds one; `null` is what keeps the type honest rather than a case that is expected.
  */
-function markPaidPending(
+function markPaidTarget(
   rows: ReadonlyArray<SeriesListRow>,
   period: UpcomingPeriod,
-): Pending {
+): MarkPaidTarget | null {
   const series = rows.find((row) => row.series.id === period.seriesId)?.series
-  return series === undefined
-    ? { kind: 'none' }
-    : { kind: 'markPaid', period, series }
+  return series === undefined ? null : { period, series }
 }
 
 function RecurringListRoute() {
@@ -146,22 +150,32 @@ function RecurringListRoute() {
   const navigate = Route.useNavigate()
   const refreshCaches = useDataRefresh()
   const runAction = useRecurringAction(refreshCaches)
-
-  const [pending, setPending] = useState<Pending>(() => {
-    const reopened = overview.upcoming.find(
-      (candidate) =>
-        candidate.periodStart === markPaid &&
-        candidate.seriesId === markPaidSeries,
-    )
-    return reopened === undefined
-      ? { kind: 'none' }
-      : markPaidPending(overview.rows, reopened)
+  const markPaidSearch = { markPaid, series: markPaidSeries }
+  const markPaidDialog = useMarkPaidReopen<MarkPaidTarget>({
+    search: markPaidSearch,
+    initial: (() => {
+      const reopened = findReopenedPeriod(
+        overview.upcoming,
+        markPaidSearch,
+        (candidate) => ({
+          periodStart: candidate.periodStart,
+          seriesId: candidate.seriesId,
+        }),
+        { matchSeries: true },
+      )
+      return reopened === undefined
+        ? null
+        : markPaidTarget(overview.rows, reopened)
+    })(),
+    onClearSearch: () => {
+      void navigate({ search: { status, book }, replace: true })
+    },
   })
+
+  const [pending, setPending] = useState<Pending>({ kind: 'none' })
   const close = () => {
     setPending({ kind: 'none' })
-    if (markPaid !== undefined || markPaidSeries !== undefined) {
-      void navigate({ search: { status, book }, replace: true })
-    }
+    markPaidDialog.close()
   }
 
   const baseCurrencyCode = accounts.overview.baseCurrencyCode
@@ -320,10 +334,15 @@ function RecurringListRoute() {
 
           <UpcomingPanel
             upcoming={overview.upcoming}
-            openPeriod={pending.kind === 'markPaid' ? pending.period : null}
-            onMarkPaid={(period) =>
-              setPending(markPaidPending(overview.rows, period))
+            openPeriod={
+              pending.kind === 'none'
+                ? (markPaidDialog.pending?.period ?? null)
+                : null
             }
+            onMarkPaid={(period) => {
+              const target = markPaidTarget(overview.rows, period)
+              if (target !== null) markPaidDialog.open(target)
+            }}
             onSkip={(period) => {
               void runAction(
                 () =>
@@ -367,15 +386,15 @@ function RecurringListRoute() {
         />
       ) : null}
 
-      {pending.kind === 'markPaid' ? (
+      {pending.kind === 'none' && markPaidDialog.pending !== null ? (
         <MarkPaidDialog
-          key={`${pending.period.seriesId}:${pending.period.periodStart}`}
+          key={`${markPaidDialog.pending.period.seriesId}:${markPaidDialog.pending.period.periodStart}`}
           isOpen
           onOpenChange={(open) => {
             if (!open) close()
           }}
-          series={pending.series}
-          period={pending.period}
+          series={markPaidDialog.pending.series}
+          period={markPaidDialog.pending.period}
           origin="list"
           onSaved={() => {
             toast.success(t('recurring.toast.periodPaid'))

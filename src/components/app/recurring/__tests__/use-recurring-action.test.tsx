@@ -108,4 +108,37 @@ describe('useRecurringAction', () => {
     expect(toast.success).toHaveBeenCalledExactlyOnceWith('Period skipped')
     expect(refresh).toHaveBeenCalledTimes(1)
   })
+
+  it('ignores a second press while the first call has not settled', async () => {
+    const { run, order } = setup()
+    let release: (() => void) | undefined
+    const call = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          order.push('call')
+          release = () => resolve('stored')
+        }),
+    )
+
+    const first = run(call, 'Period skipped')
+    const second = run(call, 'Period skipped')
+    expect(release).toBeDefined()
+    release?.()
+    await Promise.all([first, second])
+
+    expect(call).toHaveBeenCalledTimes(1)
+    expect(toast.success).toHaveBeenCalledTimes(1)
+    expect(order).toEqual(['call', 'success', 'refresh'])
+  })
+
+  it('accepts another press once the first call has settled', async () => {
+    const { run } = setup()
+    const call = vi.fn(() => Promise.resolve('stored'))
+
+    await run(call, 'Period skipped')
+    await run(call, 'Period skipped')
+
+    expect(call).toHaveBeenCalledTimes(2)
+    expect(toast.success).toHaveBeenCalledTimes(2)
+  })
 })
