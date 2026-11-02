@@ -86,6 +86,7 @@ import {
   createScope,
   createTenantRepository,
   createTenantTableAccess,
+  inIds,
   runTenantBatch,
   tenantFilter,
 } from './base'
@@ -976,6 +977,93 @@ export async function listSeriesLinkDetails(
     isBalanceAdjustment: row.isBalanceAdjustment,
     transferKind: row.transferKind,
     note: row.note,
+  }))
+}
+
+export const sumSeriesSpendThisYearSchema = z.strictObject({
+  today: z.iso.date(),
+  seriesIds: z.array(idSchema),
+})
+export type SumSeriesSpendThisYearInput = z.input<
+  typeof sumSeriesSpendThisYearSchema
+>
+
+/** One series' calendar-year spending, in that series' own currency. */
+export interface SeriesSpendThisYear {
+  readonly seriesId: string
+  readonly currencyCode: string
+  readonly spentThisYearMinor: Minor
+}
+
+/**
+ * Calendar-year spending for the given series, as one integer sum each.
+ *
+ * The overview asks "what went out this year", not "show every receipt". The join is bounded to
+ * `today`'s calendar year and to the same transaction policy the per-series forecast uses
+ * (`#/server/recurring/forecast`): linked **expense** rows in the series currency, not planned,
+ * not a correction, not a transfer, not an `unlinked` pointer. The linked rows themselves are not
+ * returned. Detail history stays on {@link listSeriesLinkDetails}.
+ *
+ * Both halves of the join are scoped: a link planted in this workspace that points at another
+ * workspace's transaction is not a payment here, and a foreign series id is not a key we sum.
+ */
+export async function sumSeriesSpendThisYear(
+  scope: TenantScope,
+  input: SumSeriesSpendThisYearInput,
+): Promise<ReadonlyArray<SeriesSpendThisYear>> {
+  const parsed = sumSeriesSpendThisYearSchema.parse(input)
+  const seriesIds = [...new Set(parsed.seriesIds)]
+  if (seriesIds.length === 0) return []
+
+  const today = parseDate(parsed.today)
+  const yearStart = today.set({ month: 1, day: 1 }).toString()
+  const yearEnd = today.set({ month: 12, day: 31 }).toString()
+
+  const rows = await scope.db
+    .select({
+      seriesId: recurringLinks.seriesId,
+      currencyCode: recurringSeries.expectedCurrencyCode,
+      total: sql<number>`coalesce(sum(${transactions.amountMinor}), 0)`,
+    })
+    .from(recurringLinks)
+    .innerJoin(
+      transactions,
+      tenantFilter(
+        scope,
+        transactions,
+        eq(transactions.id, recurringLinks.transactionId),
+      ),
+    )
+    .innerJoin(
+      recurringSeries,
+      tenantFilter(
+        scope,
+        recurringSeries,
+        eq(recurringSeries.id, recurringLinks.seriesId),
+      ),
+    )
+    .where(
+      tenantFilter(
+        scope,
+        recurringLinks,
+        inIds(recurringLinks.seriesId, seriesIds),
+        ne(recurringLinks.status, 'unlinked'),
+        eq(recurringSeries.direction, 'expense'),
+        eq(transactions.direction, 'expense'),
+        eq(transactions.currencyCode, recurringSeries.expectedCurrencyCode),
+        eq(transactions.isPlanned, false),
+        eq(transactions.isBalanceAdjustment, false),
+        eq(transactions.transferKind, 'none'),
+        gte(transactions.bookedOn, yearStart),
+        lte(transactions.bookedOn, yearEnd),
+      ),
+    )
+    .groupBy(recurringLinks.seriesId, recurringSeries.expectedCurrencyCode)
+
+  return rows.map((row) => ({
+    seriesId: row.seriesId,
+    currencyCode: row.currencyCode,
+    spentThisYearMinor: asMinor(Number(row.total)),
   }))
 }
 

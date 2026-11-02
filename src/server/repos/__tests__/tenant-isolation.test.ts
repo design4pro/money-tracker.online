@@ -160,6 +160,7 @@ import {
   listSeriesLinkDetails,
   markPaid,
   removeUnpaidOpenPeriods,
+  sumSeriesSpendThisYear,
 } from '../recurring'
 import {
   getWorkspaceTimezone,
@@ -3332,6 +3333,100 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     await expect(
       listSeriesLinkDetails(world.scope, theirs.id),
     ).resolves.toEqual([])
+  })
+
+  it('does not add another workspace’s year spend through the overview aggregate', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-a-overview-spend',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-overview-spend',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-overview-spend',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-overview-spend',
+    })
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: mine.id,
+      transactionId: 'txn-b-overview-spend',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today,
+      seriesIds: [mine.id, theirs.id],
+    })
+    expect(rows).toEqual([
+      {
+        seriesId: mine.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 100_00,
+      },
+    ])
+    await expect(
+      sumSeriesSpendThisYear(world.otherScope, {
+        today,
+        seriesIds: [theirs.id],
+      }),
+    ).resolves.toEqual([
+      {
+        seriesId: theirs.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 777_00,
+      },
+    ])
   })
 })
 
