@@ -15,8 +15,9 @@
  * `overdue`) against the new schedule so the grid and the forecast name the same dates. Paid and
  * skipped rows stay put; they occupy their occurrence slot so a settled year is not opened twice.
  *
- * Runs on series create, on series edit, and from the the hourly `RECURRING_CRON` cron branch. All three call the
- * same function with the same arguments, so there is one answer to "which periods exist".
+ * Runs from `writeSeries` after a series change and from `catchUpSeries` on a read or the hourly
+ * `RECURRING_CRON` branch. Both call the same function with the same arguments, so there is one
+ * answer to "which periods exist".
  */
 
 import { parseDate } from '@internationalized/date'

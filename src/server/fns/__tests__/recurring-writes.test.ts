@@ -296,4 +296,9 @@ describe('the handler file, by reading its own source', () => {
     expect(source).not.toMatch(/const AHEAD\b/)
     expect(source).not.toMatch(/ahead: \d/)
   })
+
+  it('imports no materializeSeries: read-time catch-up goes through the series-change module', () => {
+    expect(source).not.toMatch(/materializeSeries/)
+    expect(source).toMatch(/catchUpSeries/)
+  })
 })

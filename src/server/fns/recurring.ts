@@ -35,8 +35,11 @@ import { getWorkspaceTimezone } from '#/server/repos/workspace-settings'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
 import { confidenceBand, detectCandidates } from '#/server/recurring/detect'
 import { forecastSeries, rollupForecasts } from '#/server/recurring/forecast'
-import { materializeSeries } from '#/server/recurring/materialize'
-import { SERIES_AHEAD, writeSeries } from '#/server/recurring/series-write'
+import {
+  SERIES_AHEAD,
+  catchUpSeries,
+  writeSeries,
+} from '#/server/recurring/series-write'
 import { BOOKS } from '#/lib/enums'
 import {
   candidateSchema,
@@ -149,7 +152,7 @@ export const loadRecurring = createServerFn({ method: 'GET' })
     })
     for (const one of series) {
       if (one.isActive) {
-        await materializeSeries(scope, {
+        await catchUpSeries(scope, {
           seriesId: one.id,
           today,
           ahead: SERIES_AHEAD,
@@ -234,7 +237,7 @@ export const loadSeriesDetail = createServerFn({ method: 'GET' })
       rethrowAsNotFound,
     )
     if (series.isActive) {
-      await materializeSeries(scope, {
+      await catchUpSeries(scope, {
         seriesId: series.id,
         today,
         ahead: SERIES_AHEAD,
