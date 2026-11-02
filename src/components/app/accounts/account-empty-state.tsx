@@ -1,6 +1,6 @@
 import { Banknote, CreditCard, Landmark, Plus, Wallet } from 'lucide-react'
 
-import { Button, EmptyState } from '#/components/ui'
+import { Button, EmptyState, KindTile } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
 import { accountCategoryFacts } from './categories'
 
@@ -75,25 +75,14 @@ export function AccountEmptyState({
         <p className="mt-1 text-caption text-ink-2">
           {t('accounts.empty.pick.body')}
         </p>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-3">
+        <ul className="mt-4 grid auto-rows-fr gap-3 sm:grid-cols-3">
           {SHORTCUTS.map(({ category, Icon }) => (
-            <li key={category}>
-              {/*
-                `size="lg"` stays: these are `h-auto flex-col` tiles whose height comes from their
-                content, so the prop only supplies the padding and type step (#362).
-              */}
-              <Button
-                variant="secondary"
-                size="lg"
-                block
-                className="h-auto flex-col items-start gap-2 py-4 text-start"
+            <li key={category} className="flex">
+              <KindTile
+                icon={<Icon />}
+                title={t(accountCategoryFacts(category).labelKey)}
                 onPress={() => onCreate(category)}
-              >
-                <Icon aria-hidden="true" className="size-5 text-ink-2" />
-                <span className="text-label font-semibold text-ink">
-                  {t(accountCategoryFacts(category).labelKey)}
-                </span>
-              </Button>
+              />
             </li>
           ))}
         </ul>

@@ -69,6 +69,9 @@ export type { DrawerProps } from './drawer'
 export { EmptyState } from './empty-state'
 export type { EmptyStateProps } from './empty-state'
 
+export { KindTile } from './kind-tile'
+export type { KindTileProps } from './kind-tile'
+
 export {
   Description,
   FieldError,

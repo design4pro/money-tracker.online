@@ -842,12 +842,37 @@ a sentence that says what to do, not a blank.
 - **Needs more?** A surface that wants to offer more than two actions - a choice of kind, say -
   does it in a sibling section under its own sub-heading, never inside the card. `/accounts` (three
   kind shortcuts) and `/budgets` (two) are the examples: a labelled `<section>` below the empty
-  state.
+  state, whose tiles are `KindTile` (Kind tile, below).
 - **It is not** a `brand` card (an invitation or an upsell on a page that has content) and not
   `ErrorPanel` (something went wrong). An empty list with a filter on is the same state with the
   filter's own copy.
 - `src/components/ui/__tests__/empty-state-ownership.test.ts` fails when `variant="dashed"`
   appears outside `src/components/ui`.
+
+### Kind tile
+
+The pick-a-kind shortcut on an empty list. `/accounts` draws three, `/budgets` two; `KindTile` is
+the one owner of the tile.
+
+- **The shape:** the secondary `lg` button's paint - hairline `border-strong` on `surface`,
+  `--shadow-card`, `md` radius, `lg` type step and side padding - stretched to fill its grid cell.
+  `h-auto` so the cell, not the copy, sets the height (the `lg` 48px box would pin it). Content is
+  a column, start-aligned, 6px gap: a 20px glyph in `ink-2`, then a `label` semibold title, then
+  optional `caption` `ink-2` help. `whitespace-normal` so the help wraps. The grid is the
+  caller's (`auto-rows-fr`, a flex `<li>`); the tile fills it. Hit area is 44px (`target-min`) and
+  the focus ring is the product's (Focus, above).
+- **The tones:** one, `secondary`. It is not the empty state's primary action; it is a shortcut
+  that opens a form with a kind already chosen and creates nothing.
+- **The states:** hover, press, focus and disabled from the button paint. No selected state
+  (choosing a tile leaves the screen). No pending state (a tile writes no row).
+- **What carries the meaning when the colour does not:** the title, and the help when the caller
+  gives one. The glyph is `aria-hidden`. The accessible name is the title alone, or the title plus
+  the help. Under forced colours the tile is a bordered button with text; the glyph can vanish.
+- **It is not** the shared `Button` (that primitive wraps children in an inner row, so a column
+  layout never reaches them) and not `EmptyState` (the dashed card with at most two actions). The
+  tile lives in the sibling section Empty state already describes; it never goes inside the card.
+- **Verified by:** `src/components/ui/__tests__/kind-tile.test.tsx` (name, press, no inner row) and
+  `e2e/empty-kind-tiles.spec.ts` (equal height and stacking at 360 and 1280, EN and PL).
 
 ### Error panel
 
