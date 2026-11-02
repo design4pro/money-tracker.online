@@ -297,8 +297,8 @@ product decision that could change without a migration.
 ### Server (repo, server function, Zod)
 
 - **Repository.** `src/server/repos/accounts.ts`: `listAccountGroups`, `createAccountGroup`,
-  `updateAccountGroup`, `deleteAccountGroup`, `setAccountGroupMembers`, `reorderAccountGroups`
-  and `moveAccountToGroup`. Deleting a group removes its memberships, promotes its child groups
+  `updateAccountGroup`, `deleteAccountGroup`, `setAccountGroupMembers`, `reorderAccountGroups`,
+  `moveAccountGroup` and `moveAccountToGroup`. Deleting a group removes its memberships, promotes its child groups
   and pauses rules referencing it; accounts and their other memberships survive. A move changes
   only the source row's membership, preserving any membership in another group.
 - The same module exports `adjustAccountBalance(scope, { accountId, targetMinor, bookedOn, note },
@@ -309,8 +309,8 @@ conversion)`. It computes the delta against the account's balance **on that date
 - `getAccountBalanceOn(scope, { accountId, on })` returns `{ balanceMinor }` through the same private
   `balanceOn` helper the adjustment uses, never the cached balance.
 - **Server functions.** `src/server/fns/accounts.ts` exposes `listAccountGroups` and
-  `getAccountBalanceOn` as GETs; the group writes, `moveAccountToGroup` and `adjustAccountBalance`
-  are POSTs.
+  `getAccountBalanceOn` as GETs; the group writes, `moveAccountGroup`, `moveAccountToGroup` and
+  `adjustAccountBalance` are POSTs.
 - **Zod.** Strict schemas are validated at the server-function boundary and parsed again in the
   repository. `adjustBalanceSchema` uses `minorSchema` for `targetMinor` and `bookableDaySchema`
   for `bookedOn`; `getAccountBalanceOnSchema` uses the same date schema for `on`.
@@ -347,7 +347,8 @@ later stage does not add one silently.
 ### Tenant isolation test
 
 `src/server/repos/__tests__/tenant-isolation.test.ts` covers group reads and writes with foreign
-group, parent and account ids, `moveAccountToGroup` with foreign ids even on no-ops, and
+group, parent and account ids, `moveAccountGroup` with a foreign group, parent or id in the order,
+`moveAccountToGroup` with foreign ids even on no-ops, and
 `getAccountBalanceOn` with a foreign account. Foreign references return `NotFoundError` and the
 other workspace's data stays unchanged. `accounts.test.ts` also covers adjustment isolation.
 

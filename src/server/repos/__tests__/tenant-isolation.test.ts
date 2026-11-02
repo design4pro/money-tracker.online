@@ -126,6 +126,7 @@ import {
   deleteAccountGroup,
   getAccountBalanceOn,
   listAccountGroups,
+  moveAccountGroup,
   moveAccountToGroup,
   reorderAccountGroups,
   setAccountGroupMembers,
@@ -645,6 +646,30 @@ describe('account groups cannot be reached or aimed across a workspace boundary'
   it('reorderAccountGroups refuses an order that names B’s group', async () => {
     await expectRefused(reorderAccountGroups(a, [B_GROUP, A_GROUP]))
     await expectRefused(reorderAccountGroups(a, [B_GROUP]))
+  })
+
+  it('moveAccountGroup refuses a foreign group, a foreign parent and a foreign id in the order', async () => {
+    await expectRefused(
+      moveAccountGroup(a, {
+        id: B_GROUP,
+        parentId: null,
+        orderedIds: [B_GROUP],
+      }),
+    )
+    await expectRefused(
+      moveAccountGroup(a, {
+        id: A_GROUP,
+        parentId: B_GROUP,
+        orderedIds: [A_GROUP],
+      }),
+    )
+    await expectRefused(
+      moveAccountGroup(a, {
+        id: A_GROUP,
+        parentId: null,
+        orderedIds: [A_GROUP, B_GROUP],
+      }),
+    )
   })
 })
 

@@ -8,6 +8,7 @@ import { useTranslate } from '#/lib/i18n'
 import {
   createAccountGroup,
   deleteAccountGroup,
+  moveAccountGroup,
   moveAccountToGroup,
   reorderAccountGroups,
   updateAccountGroup,
@@ -36,13 +37,12 @@ import type { GroupItem } from './group-rows'
 /**
  * The groups screen: the header, the refusal region, the tree and its dialogs.
  *
- * ## One move, one or two writes, and the route owns that
+ * ## One move, one write
  *
  * The tree hands back a {@link TreeMove}: a group, its new parent, and the complete order of the
  * run it lands in. A move inside one run is a single `reorderAccountGroups`. A move between runs is
- * `updateAccountGroup` followed by `reorderAccountGroups`, because re-parenting does not renumber
- * the siblings around it, and two groups sharing a position is how a list starts reordering itself
- * on reload.
+ * one `moveAccountGroup`, because re-parenting without rewriting the run it lands in is how two
+ * groups share a position and the list starts reordering itself on reload.
  *
  * ## A refusal is a catalogue sentence in an always-mounted alert region
  *
@@ -204,12 +204,17 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
     let isReparented = false
     try {
       if (current.parentId !== move.parentId) {
-        await updateAccountGroup({
-          data: { groupId: move.id, patch: { parentId: move.parentId } },
+        await moveAccountGroup({
+          data: {
+            id: move.id,
+            parentId: move.parentId,
+            orderedIds: [...move.orderedIds],
+          },
         })
         isReparented = true
+      } else {
+        await reorderAccountGroups({ data: { ids: [...move.orderedIds] } })
       }
-      await reorderAccountGroups({ data: { ids: [...move.orderedIds] } })
     } catch (error) {
       refuse(error)
       return false
@@ -277,20 +282,25 @@ export function GroupsScreen({ groups, onRefresh }: GroupsScreenProps) {
         toast.success(t('accounts.group.toast.created', { name: created.name }))
       } else {
         const isReparented = values.parentId !== group.parentId
-        await updateAccountGroup({
-          data: {
-            groupId: group.id,
-            patch: {
-              name: values.name,
-              ...(isReparented ? { parentId: values.parentId } : {}),
+        if (values.name !== group.name) {
+          await updateAccountGroup({
+            data: {
+              groupId: group.id,
+              patch: { name: values.name },
             },
-          },
-        })
+          })
+        }
         if (isReparented) {
           // Re-filed through the form lands at the end of its new run, as "Move to…" does.
           const move = reparentMove(groups, group.id, values.parentId)
           if (move !== null) {
-            await reorderAccountGroups({ data: { ids: [...move.orderedIds] } })
+            await moveAccountGroup({
+              data: {
+                id: group.id,
+                parentId: values.parentId,
+                orderedIds: [...move.orderedIds],
+              },
+            })
           }
         }
         setFocusRequest({ key: groupKey(group.id) })

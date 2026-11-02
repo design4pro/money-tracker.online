@@ -40,7 +40,7 @@ import { buildEnvelope } from '#/server/errors/envelope'
 import { setLimitResolver, touchLedgerAccount } from '../base'
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors'
 import { createScope } from '../scope'
-import { sqliteBatchCallback } from './db-harness'
+import { fault, sqliteBatchCallback } from './db-harness'
 import {
   AccountCurrencyLockedError,
   AccountHasTransactionsError,
@@ -58,6 +58,8 @@ import {
   getAccountBalanceOnSchema,
   listAccountGroups,
   listAccounts,
+  moveAccountGroup,
+  moveAccountGroupSchema,
   moveAccountToGroup,
   moveAccountToGroupSchema,
   reorderAccountGroups,
@@ -121,7 +123,12 @@ function openTestDb() {
         .map((row) => Object.values(row as Record<string, unknown>))
       return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
     },
-    sqliteBatchCallback(sqlite, (query) => executed.push(query)),
+    sqliteBatchCallback(sqlite, (query) => {
+      executed.push(query)
+      if (fault.when?.(query) === true) {
+        throw new Error(`injected fault: ${query}`)
+      }
+    }),
   )
 }
 
@@ -198,6 +205,7 @@ async function accountRow(id: string) {
 beforeEach(async () => {
   executed.length = 0
   sequence = 0
+  fault.when = null
   setLimitResolver(null)
   db = openTestDb()
   // `.onConflictDoNothing()` because `drizzle/0002_seed_currency_catalogue.sql` — which this
@@ -1763,6 +1771,131 @@ describe('account groups', () => {
     ).rejects.toBeInstanceOf(GroupDepthError)
   })
 
+  it('moves a group to a parent and position in one batch', async () => {
+    const household = await createAccountGroup(scope, { name: 'Household' })
+    const kids = await createAccountGroup(scope, {
+      name: 'Kids',
+      parentId: household.id,
+    })
+    const business = await createAccountGroup(scope, { name: 'Business' })
+
+    executed.length = 0
+    await moveAccountGroup(scope, {
+      id: business.id,
+      parentId: household.id,
+      orderedIds: [kids.id, business.id],
+    })
+    expect(
+      executed.filter((query) => query.startsWith('update "account_groups"')),
+    ).toHaveLength(2)
+
+    const listed = await listAccountGroups(scope)
+    const byId = new Map(listed.map((entry) => [entry.group.id, entry.group]))
+    expect(byId.get(business.id)?.parentId).toBe(household.id)
+    expect(byId.get(kids.id)?.position).toBe(0)
+    expect(byId.get(business.id)?.position).toBe(1)
+  })
+
+  it('refuses a depth violation from both directions and writes nothing', async () => {
+    const household = await createAccountGroup(scope, { name: 'Household' })
+    const kids = await createAccountGroup(scope, {
+      name: 'Kids',
+      parentId: household.id,
+    })
+    const business = await createAccountGroup(scope, { name: 'Business' })
+    const before = (await listAccountGroups(scope)).map((entry) => ({
+      id: entry.group.id,
+      parentId: entry.group.parentId,
+      position: entry.group.position,
+    }))
+
+    await expect(
+      moveAccountGroup(scope, {
+        id: household.id,
+        parentId: business.id,
+        orderedIds: [business.id, household.id],
+      }),
+    ).rejects.toBeInstanceOf(GroupDepthError)
+    await expect(
+      moveAccountGroup(scope, {
+        id: kids.id,
+        parentId: kids.id,
+        orderedIds: [kids.id],
+      }),
+    ).rejects.toBeInstanceOf(GroupDepthError)
+    await expect(
+      moveAccountGroup(scope, {
+        id: business.id,
+        parentId: kids.id,
+        orderedIds: [business.id],
+      }),
+    ).rejects.toBeInstanceOf(GroupDepthError)
+
+    expect(
+      (await listAccountGroups(scope)).map((entry) => ({
+        id: entry.group.id,
+        parentId: entry.group.parentId,
+        position: entry.group.position,
+      })),
+    ).toEqual(before)
+  })
+
+  it('leaves parent and positions unchanged when a statement in the batch fails', async () => {
+    const household = await createAccountGroup(scope, { name: 'Household' })
+    const kids = await createAccountGroup(scope, {
+      name: 'Kids',
+      parentId: household.id,
+    })
+    const business = await createAccountGroup(scope, { name: 'Business' })
+    const before = (await listAccountGroups(scope)).map((entry) => ({
+      id: entry.group.id,
+      parentId: entry.group.parentId,
+      position: entry.group.position,
+    }))
+
+    let updates = 0
+    fault.when = (query) => {
+      if (!query.startsWith('update "account_groups"')) return false
+      updates += 1
+      return updates === 2
+    }
+
+    await expect(
+      moveAccountGroup(scope, {
+        id: business.id,
+        parentId: household.id,
+        orderedIds: [kids.id, business.id],
+      }),
+    ).rejects.toThrow(/injected fault/)
+
+    expect(
+      (await listAccountGroups(scope)).map((entry) => ({
+        id: entry.group.id,
+        parentId: entry.group.parentId,
+        position: entry.group.position,
+      })),
+    ).toEqual(before)
+  })
+
+  it('refuses a payload whose order does not name the moved group', async () => {
+    const group = await createAccountGroup(scope, { name: 'Joint' })
+    const other = await createAccountGroup(scope, { name: 'Business' })
+    expect(
+      moveAccountGroupSchema.safeParse({
+        id: group.id,
+        parentId: null,
+        orderedIds: [other.id],
+      }).success,
+    ).toBe(false)
+    await expect(
+      moveAccountGroup(scope, {
+        id: group.id,
+        parentId: null,
+        orderedIds: [other.id],
+      }),
+    ).rejects.toHaveProperty('name', 'ZodError')
+  })
+
   it('replaces membership wholesale, in the order given', async () => {
     const group = await createAccountGroup(scope, { name: 'Joint' })
     const one = await createAccount(scope, EVERYDAY, conversion)
@@ -1850,6 +1983,13 @@ describe('account groups', () => {
         reorderAccountGroups(scope, ['grp-b']),
       ).rejects.toBeInstanceOf(NotFoundError)
       await expect(
+        moveAccountGroup(scope, {
+          id: 'grp-b',
+          parentId: null,
+          orderedIds: ['grp-b'],
+        }),
+      ).rejects.toBeInstanceOf(NotFoundError)
+      await expect(
         createAccountGroup(scope, { name: 'Sneaky', parentId: 'grp-b' }),
       ).rejects.toBeInstanceOf(NotFoundError)
 
@@ -1884,6 +2024,13 @@ describe('account groups', () => {
       ).rejects.toBeInstanceOf(ForbiddenError)
       await expect(
         updateAccountGroup(asMember, group.id, { name: 'Theirs' }),
+      ).rejects.toBeInstanceOf(ForbiddenError)
+      await expect(
+        moveAccountGroup(asMember, {
+          id: group.id,
+          parentId: null,
+          orderedIds: [group.id],
+        }),
       ).rejects.toBeInstanceOf(ForbiddenError)
       await expect(
         deleteAccountGroup(asMember, group.id),
