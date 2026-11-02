@@ -31,7 +31,7 @@ describe('refusalOf', () => {
     ).toEqual({ kind: 'nest', call: 'move', ...NAMES })
   })
 
-  it.each(['reorder', 'restore'] as const)(
+  it.each(['reorder', 'restore', 'seed'] as const)(
     'never reads a conflict on %s as the depth refusal',
     (call) => {
       expect(refusalOf(wireError('conflict'), { call, ...NAMES })).toEqual({
@@ -55,7 +55,7 @@ describe('refusalOf', () => {
     },
   )
 
-  it.each(['move', 'reorder', 'restore'] as const)(
+  it.each(['move', 'reorder', 'restore', 'seed'] as const)(
     'reads a forbidden failure on %s as forbidden',
     (call) => {
       expect(refusalOf(wireError('forbidden'), { call, ...NAMES })).toEqual({

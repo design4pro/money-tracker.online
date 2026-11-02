@@ -10,7 +10,7 @@ import {
 } from '#/components/app/categories'
 import { ErrorPanel } from '#/components/app/shell'
 import { Button, Switch, toast } from '#/components/ui'
-import { useTranslate } from '#/lib/i18n'
+import { useLocale, useTranslate } from '#/lib/i18n'
 import { CATEGORY_KINDS } from '#/lib/enums'
 import {
   archiveCategory,
@@ -19,6 +19,7 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
 } from '#/server/fns/categories'
 
 import { useDataRefresh } from '../-lib/refresh'
@@ -99,6 +100,7 @@ type Pending =
 
 function CategoriesRoute() {
   const t = useTranslate()
+  const locale = useLocale()
   const categories = Route.useLoaderData()
   const { status } = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -112,7 +114,11 @@ function CategoriesRoute() {
     readonly value: Refusal
     readonly attempt: number
   } | null>(null)
+  const [isSeeding, setIsSeeding] = useState(false)
+  // Set before the refresh that mounts the tree: React Aria reads `autoFocus` once, on mount.
+  const [focusTree, setFocusTree] = useState(false)
   const close = () => setPending({ kind: 'none' })
+  const clearTreeFocus = () => setFocusTree(false)
 
   const refreshed = () => Promise.all([router.invalidate(), refreshCaches()])
   const refresh = () => void refreshed()
@@ -124,6 +130,7 @@ function CategoriesRoute() {
   const byId = new Map(categories.map((row) => [row.id, row]))
 
   function withRefusal(context: RefusalContext, work: () => Promise<unknown>) {
+    clearTreeFocus()
     void work().then(
       () => {
         setRefusal(null)
@@ -163,6 +170,29 @@ function CategoriesRoute() {
     )
   }
 
+  async function applySeed() {
+    if (isSeeding) return
+    setIsSeeding(true)
+    try {
+      const result = await seedStandardCategories({ data: { locale } })
+      if (result.created > 0) {
+        setFocusTree(true)
+        setRefusal(null)
+        await refreshed()
+        toast.success(t('categories.toast.seeded', { count: result.created }))
+        return
+      }
+      toast.success(t('categories.toast.seeded.none'))
+    } catch (error: unknown) {
+      setRefusal((previous) => ({
+        value: refusalOf(error, { call: 'seed' }),
+        attempt: (previous?.attempt ?? 0) + 1,
+      }))
+    } finally {
+      setIsSeeding(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -193,23 +223,26 @@ function CategoriesRoute() {
         )}
       </div>
 
+      <Switch
+        isSelected={status === 'all'}
+        onChange={(showArchived) => {
+          clearTreeFocus()
+          void navigate({
+            search: { status: showArchived ? 'all' : 'active' },
+          })
+        }}
+      >
+        {t('categories.filter.showArchived')}
+      </Switch>
+
       {categories.length === 0 && status === 'active' ? (
         <CategoryEmptyState
+          onSeed={() => void applySeed()}
           onCreate={() => setPending({ kind: 'form', category: null })}
+          isSeeding={isSeeding}
         />
       ) : (
         <>
-          <Switch
-            isSelected={status === 'all'}
-            onChange={(showArchived) =>
-              void navigate({
-                search: { status: showArchived ? 'all' : 'active' },
-              })
-            }
-          >
-            {t('categories.filter.showArchived')}
-          </Switch>
-
           {/*
             One column of rows, so it takes the list band rather than the whole well. A row holds a
             name, a swatch, a badge and an overflow menu; there is no fifth fact to promote to a
@@ -219,6 +252,7 @@ function CategoriesRoute() {
           <div className="max-w-list">
             <CategoryTree
               categories={rows}
+              autoFocus={focusTree ? 'first' : undefined}
               onEdit={(id) => {
                 const category = byId.get(id)
                 if (category !== undefined)
@@ -260,6 +294,7 @@ function CategoriesRoute() {
           initialParentId={pending.parentId ?? null}
           parentOptions={parents}
           onSaved={(saved, mode) => {
+            clearTreeFocus()
             toast.success(
               t(
                 mode === 'created'
@@ -287,6 +322,7 @@ function CategoriesRoute() {
           errorTitle={t('categories.error.title')}
           errorBody={t('empty.error.body')}
           onConfirm={async () => {
+            clearTreeFocus()
             const name = pending.category.name
             await archiveCategory({ data: { categoryId: pending.category.id } })
             toast.success(t('categories.toast.archived', { name }))
@@ -309,6 +345,7 @@ function CategoriesRoute() {
           errorTitle={t('categories.delete.refused')}
           errorBody={t('categories.delete.refused.body')}
           onConfirm={async () => {
+            clearTreeFocus()
             const name = pending.category.name
             await deleteCategory({ data: { categoryId: pending.category.id } })
             toast.success(t('categories.toast.deleted', { name }))

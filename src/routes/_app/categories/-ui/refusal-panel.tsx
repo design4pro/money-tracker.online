@@ -36,6 +36,7 @@ const TITLE_KEYS = {
   move: 'categories.move.refused',
   reorder: 'categories.move.refused',
   restore: 'categories.restore.refused',
+  seed: 'categories.seed.failed',
 } as const satisfies Readonly<Record<RefusalCall, MessageKey>>
 
 export function RefusalPanel({ refusal }: { refusal: Refusal }) {

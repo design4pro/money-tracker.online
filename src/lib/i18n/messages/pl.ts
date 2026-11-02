@@ -965,7 +965,17 @@ const messages = {
   'categories.error.title': 'Nie udało się wczytać kategorii',
   'categories.empty.title': 'Nie masz jeszcze kategorii',
   'categories.empty.body':
-    'Kategoria odpowiada na pytanie „na co to było”. Dodaj pierwszą, a raporty będą miały według czego grupować.',
+    'Kategoria odpowiada na pytanie „na co to poszło”. Zacznij od gotowego zestawu, który możesz zmieniać, przemalować lub zarchiwizować, albo dodaj własną.',
+  'categories.seed.action': 'Dodaj zestaw standardowy',
+  'categories.seed.failed': 'Nie udało się dodać zestawu standardowego',
+  'categories.toast.seeded': {
+    one: 'Dodaliśmy {count} kategorię.',
+    few: 'Dodaliśmy {count} kategorie.',
+    many: 'Dodaliśmy {count} kategorii.',
+    other: 'Dodaliśmy {count} kategorii.',
+  },
+  'categories.toast.seeded.none':
+    'Nic nowego nie dodaliśmy. Zestaw standardowy już tu jest; zarchiwizowane kategorie znajdziesz pod „Pokaż zarchiwizowane kategorie”.',
   'categories.archive.title': 'Zarchiwizować kategorię {name}?',
   'categories.archive.body':
     'Przestaniemy ją proponować przy nowych wpisach, a wszystko, co już do niej przypisano, zachowa swoją etykietę. Podkategorie archiwizują się razem z nią. Możesz ją przywrócić w każdej chwili.',
