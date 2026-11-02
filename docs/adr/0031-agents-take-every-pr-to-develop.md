@@ -5,6 +5,9 @@ Date: 2026-10-06
 Amends: ADR 0027 (`risk-high` QA no longer stays with the owner), ADR 0029 (the owner's
 `qa-approved` on `risk-high` is no longer a brake), ADR 0030 (the WIP limit counts `blocked`,
 `do-not-merge` and a parked `changes-requested` only)
+Amended 2026-11-02 (Rafał): a PR whose files match a gate-path glob in `afk-decide` § 5 is
+person-only at the merge row; Rafał merges it. Ordinary `risk-high` and `security` PRs that do
+not touch a gate path still merge on a specialist verdict.
 
 ## Context
 
@@ -49,5 +52,13 @@ ADR 0035.
 - More runs and CI per PR: the panel is up to three sub-agents, and a rejected PR runs the chain up
   to three times.
 - What still stops: `do-not-merge`, `blocked`, an active `qa` label or a `qa-failed` a person set,
-  spec-only PRs other than `afk-plan-to-spec`'s (ADR 0030), and the rest of the `afk-decide` § 5
-  list.
+  spec-only PRs other than `afk-plan-to-spec`'s (ADR 0030), a **gate PR** at the merge row
+  (`afk-decide` § 5), and the rest of the `afk-decide` § 5 list.
+
+> **Amended 2026-11-02 (Rafał).** A PR whose changed files match a gate-path glob in `afk-decide`
+> § 5 is a person's merge once the agents have finished fix, review, QA and the security verdict
+> at the judged head. **Rafał** merges it (not Grosik, not `om-pr-autopilot`, not
+> `om-approve-merge-pr`). `blocked` plus one `🤖 HUMAN-ONLY: merge this gate change or close it`
+> comment is the hold. `risk-high` and `security` are no longer "never a person's" for that class;
+> they remain autonomous when the PR does not touch a gate path. The glob list lives only in
+> `afk-decide` § 5 and is read from `origin/develop` so a PR cannot exempt itself.
