@@ -45,6 +45,8 @@ import { z } from 'zod'
 import { runWithLedgerBatch } from '#/server/ledger/batch'
 import { getAccount } from '#/server/repos/accounts'
 import {
+  RecurringPeriodSettledError,
+  RecurringTransactionLinkedError,
   listDuePeriodRows,
   markPaid,
   stampRecurringOrigin,
@@ -182,12 +184,23 @@ export async function runAutoRecord(
         seriesId: series.id,
         categorizationSource: 'automation',
       })
-      await markPaid(scope, {
-        seriesId: series.id,
-        periodStart: period.periodStart,
-        transactionId: created.id,
-        matchSource: 'auto',
-      })
+      try {
+        await markPaid(scope, {
+          seriesId: series.id,
+          periodStart: period.periodStart,
+          transactionId: created.id,
+          matchSource: 'auto',
+        })
+      } catch (error) {
+        if (
+          error instanceof RecurringPeriodSettledError ||
+          error instanceof RecurringTransactionLinkedError
+        ) {
+          outcomes.push(decline(args, period, series.id, 'already-posted'))
+          continue
+        }
+        throw error
+      }
 
       // The marker last, after everything that can fail has succeeded. A crash before this line
       // retries; the period's `paid` status is what makes that retry a no-op rather than a
