@@ -92,6 +92,7 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   spendingByCategory,
   updateCategory,
 } from '../categories'
@@ -2678,6 +2679,7 @@ describe('22 — a category write never touches an amount', () => {
     await restoreCategory(world.scope, 'cat-home')
     await deleteCategory(world.scope, 'cat-unused')
     await deleteCategory(world.scope, created.id)
+    await seedStandardCategories(world.scope, { locale: 'en' })
     await listCategories(world.scope, { includeArchived: true })
     await getCategory(world.scope, 'cat-food')
     await spendingByCategory(world.scope, {

@@ -1,5 +1,5 @@
 /**
- * The nine category server functions, run: the guard, the scope, the strict input and the absence of
+ * The ten category server functions, run: the guard, the scope, the strict input and the absence of
  * a ledger batch.
  *
  * Nothing else runs these handlers. The repository tests call `createCategory` directly, where no
@@ -38,6 +38,7 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   updateCategory,
 } from '../categories'
 
@@ -174,13 +175,17 @@ const HANDLERS: ReadonlyArray<{
     name: 'moveCategory',
     run: () => call(moveCategory, { id: TREE.child, parentId: TREE.loose }),
   },
+  {
+    name: 'seedStandardCategories',
+    run: () => call(seedStandardCategories, { locale: 'en' }),
+  },
 ]
 
 describe('the guard and the scope', () => {
   it('has a case for every export of the handler file', async () => {
     const exported = Object.keys(await import('../categories')).sort()
     expect(HANDLERS.map(({ name }) => name).sort()).toEqual(exported)
-    expect(exported).toHaveLength(9)
+    expect(exported).toHaveLength(10)
   })
 
   it.each(HANDLERS)(
@@ -199,7 +204,12 @@ describe('the guard and the scope', () => {
     const before = await allCategories()
 
     for (const { name, run } of HANDLERS) {
-      if (name === 'listCategories' || name === 'createCategory') continue
+      if (
+        name === 'listCategories' ||
+        name === 'createCategory' ||
+        name === 'seedStandardCategories'
+      )
+        continue
       await expect(run(), name).rejects.toBeInstanceOf(NotFoundError)
     }
 
@@ -209,9 +219,12 @@ describe('the guard and the scope', () => {
       organizationId: string
     }>
     expect(listed.map((row) => row.organizationId)).toEqual(['org-b'])
-    await expect(call(createCategory, { name: 'Pets' })).resolves.toMatchObject(
-      { organizationId: 'org-b' },
-    )
+    await expect(
+      call(createCategory, { name: 'Widgets' }),
+    ).resolves.toMatchObject({ organizationId: 'org-b' })
+    await expect(
+      call(seedStandardCategories, { locale: 'en' }),
+    ).resolves.toEqual({ created: 36, skipped: 0 })
   })
 
   it.each(HANDLERS)(
@@ -269,6 +282,16 @@ describe('the strict input is refused at the door', () => {
       label: 'an unknown field on move',
       handler: moveCategory,
       data: { id: TREE.child, parentId: null, isSystem: true },
+    },
+    {
+      label: 'an unknown field on seed',
+      handler: seedStandardCategories,
+      data: { locale: 'en', extra: 1 },
+    },
+    {
+      label: 'an unknown locale on seed',
+      handler: seedStandardCategories,
+      data: { locale: 'de' },
     },
     {
       label: 'a colour without its hash on create',
@@ -408,6 +431,24 @@ describe('the write gate reaches the handlers', () => {
     await expect(call(createCategory, { name: 'Pets' })).rejects.toBeInstanceOf(
       ForbiddenError,
     )
+
+    expect(await allCategories()).toEqual(before)
+  })
+
+  it('refuses a plain member in a shared workspace through the seed handler and writes nothing', async () => {
+    await addSecondMember(world.db)
+    requireOrg.mockResolvedValue(
+      createScope(world.db, {
+        userId: 'user-b',
+        organizationId: 'org-a',
+        role: 'member',
+      }),
+    )
+    const before = await allCategories()
+
+    await expect(
+      call(seedStandardCategories, { locale: 'en' }),
+    ).rejects.toBeInstanceOf(ForbiddenError)
 
     expect(await allCategories()).toEqual(before)
   })

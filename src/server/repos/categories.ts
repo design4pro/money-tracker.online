@@ -33,9 +33,9 @@
  *    is exactly the one this rule forbids.
  *
  * **Writes are gated, reads are not.** Every write — create, edit, archive, restore, delete,
- * reorder and move — needs `owner | admin` once the workspace has a second member
- * ({@link assertMayAdminister}), because a rename, an archive or a re-parent regroups what every
- * other member files transactions under. {@link listCategories}, {@link getCategory},
+ * reorder, move and the standard-set seed — needs `owner | admin` once the workspace has a second
+ * member ({@link assertMayAdminister}), because a rename, an archive or a re-parent regroups what
+ * every other member files transactions under. {@link listCategories}, {@link getCategory},
  * {@link spendingByCategory} and {@link assertCategoryUsable} stay open to every member.
  *
  * {@link spendingByCategory} is the read the dashboard donut is drawn from. It rolls a child's
@@ -57,7 +57,9 @@ import {
 } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { isSupportedLocale } from '#/lib/i18n'
 import { ZERO_MINOR, asMinor } from '#/lib/money'
+import { STANDARD_CATEGORIES } from '#/server/categories/standard-set'
 import { member } from '#/server/db/auth-schema'
 import {
   CATEGORY_KINDS,
@@ -76,9 +78,11 @@ import { scopedTransactionFilter } from './transactions'
 import { CATEGORY_ICON_NAMES } from '#/components/app/categories/icon-names'
 
 import type { SQL } from 'drizzle-orm'
+import type { Locale } from '#/lib/i18n'
 import type { Minor } from '#/lib/money'
+import type { StandardCategory } from '#/server/categories/standard-set'
 import type { CategoryRow } from '#/server/db/schema'
-import type { TenantScope } from './base'
+import type { TenantInsert, TenantScope } from './base'
 import type { TransactionPolicies } from './transactions'
 
 /* -------------------------------------------------------------------------- */
@@ -270,6 +274,18 @@ export const spendingByCategorySchema = z.strictObject({
 })
 export type SpendingByCategoryInput = z.input<typeof spendingByCategorySchema>
 
+export const seedStandardCategoriesSchema = z.strictObject({
+  locale: z.custom<Locale>(isSupportedLocale, 'An unsupported locale.'),
+})
+export type SeedStandardCategoriesInput = z.input<
+  typeof seedStandardCategoriesSchema
+>
+
+export interface StandardSetResult {
+  readonly created: number
+  readonly skipped: number
+}
+
 /* -------------------------------------------------------------------------- */
 /* Returned shapes                                                            */
 /* -------------------------------------------------------------------------- */
@@ -320,6 +336,17 @@ const SPENDING_POLICIES: TransactionPolicies = {
 
 /** The hue a top-level category gets when the person did not pick one. `series-1`. */
 export const DEFAULT_CATEGORY_COLOR = '#0d6abb'
+
+/**
+ * Bound parameters one category insert row sends. Measured on drizzle's sqlite-proxy `toSQL()`:
+ * 11 payload columns plus the `organization_id` the base repository stamps = 12. D1 caps a
+ * statement at 100, so a chunk is `floor(100 / 12)` rows (8), never a hand-picked size.
+ */
+const CATEGORY_INSERT_PARAMETERS = 12
+const D1_MAX_BOUND_PARAMETERS = 100
+const CATEGORY_ROWS_PER_INSERT = Math.floor(
+  D1_MAX_BOUND_PARAMETERS / CATEGORY_INSERT_PARAMETERS,
+)
 
 /* -------------------------------------------------------------------------- */
 /* Guards                                                                     */
@@ -808,6 +835,173 @@ export async function moveCategory(
     color,
     updatedAt: new Date(),
   })
+}
+
+type PlannedCategory = TenantInsert<typeof categories> & { slug: string }
+
+type ParentCandidate = Pick<
+  CategoryRow,
+  'id' | 'parentId' | 'kind' | 'color' | 'archivedAt'
+>
+
+function parentTakesChild(
+  parent: ParentCandidate,
+  childKind: StandardCategory['kind'],
+): boolean {
+  if (!canTakeChildren(parent)) return false
+  if (parent.archivedAt !== null) return false
+  return parent.kind === 'both' || parent.kind === childKind
+}
+
+function nextSiblingSlot(
+  highest: Map<string, number>,
+  parentId: string | null,
+): number {
+  const key = parentId ?? ''
+  const next = (highest.get(key) ?? -1) + 1
+  highest.set(key, next)
+  return next
+}
+
+function planStandardSet(
+  existing: ReadonlyArray<CategoryRow>,
+  locale: Locale,
+): PlannedCategory[] {
+  const bySlug = new Map(existing.map((row) => [row.slug, row]))
+  const highest = new Map<string, number>()
+  for (const row of existing) {
+    const key = row.parentId ?? ''
+    const current = highest.get(key)
+    if (current === undefined || row.position > current) {
+      highest.set(key, row.position)
+    }
+  }
+
+  const plannedBySlug = new Map<string, PlannedCategory>()
+  const now = new Date()
+
+  for (const entry of STANDARD_CATEGORIES) {
+    if (bySlug.has(entry.slug) || plannedBySlug.has(entry.slug)) continue
+
+    const name = nameSchema.parse(entry.names[locale])
+    const hue = colorSchema.parse(entry.hue)
+
+    if (entry.parentSlug === null) {
+      const row: PlannedCategory = {
+        id: newId(),
+        name,
+        slug: entry.slug,
+        kind: entry.kind,
+        parentId: null,
+        color: hue,
+        icon: entry.icon,
+        isSystem: false,
+        position: nextSiblingSlot(highest, null),
+        createdAt: now,
+        updatedAt: now,
+      }
+      plannedBySlug.set(entry.slug, row)
+      continue
+    }
+
+    const plannedParent = plannedBySlug.get(entry.parentSlug)
+    const existingParent = bySlug.get(entry.parentSlug)
+    const parentRow: ParentCandidate | undefined =
+      plannedParent === undefined
+        ? existingParent
+        : {
+            id: plannedParent.id,
+            parentId: plannedParent.parentId ?? null,
+            kind: plannedParent.kind ?? entry.kind,
+            color: plannedParent.color,
+            archivedAt: null,
+          }
+    if (parentRow === undefined) continue
+    if (!parentTakesChild(parentRow, entry.kind)) continue
+
+    const row: PlannedCategory = {
+      id: newId(),
+      name,
+      slug: entry.slug,
+      kind: entry.kind,
+      parentId: parentRow.id,
+      color: colorSchema.parse(parentRow.color),
+      icon: entry.icon,
+      isSystem: false,
+      position: nextSiblingSlot(highest, parentRow.id),
+      createdAt: now,
+      updatedAt: now,
+    }
+    plannedBySlug.set(entry.slug, row)
+  }
+
+  const planned = [...plannedBySlug.values()]
+  return [
+    ...planned.filter((row) => row.parentId === null),
+    ...planned.filter((row) => row.parentId !== null),
+  ]
+}
+
+function nextSeedChunk(
+  remaining: ReadonlyArray<PlannedCategory>,
+): PlannedCategory[] {
+  const parents = remaining.filter((row) => row.parentId === null)
+  if (parents.length > 0) {
+    return parents.slice(0, CATEGORY_ROWS_PER_INSERT)
+  }
+  return remaining.slice(0, CATEGORY_ROWS_PER_INSERT)
+}
+
+function withoutSlugs(
+  remaining: ReadonlyArray<PlannedCategory>,
+  chunk: ReadonlyArray<PlannedCategory>,
+): PlannedCategory[] {
+  const taken = new Set(chunk.map((row) => row.slug))
+  return remaining.filter((row) => !taken.has(row.slug))
+}
+
+/**
+ * Applies the standard set to this workspace, skipping any slug it already holds.
+ *
+ * Parents are inserted before children, in statements of at most
+ * {@link CATEGORY_ROWS_PER_INSERT} rows. A unique-slug collision with another tab is a lost race:
+ * the seed re-reads once, re-plans, and continues. Any other failure is rethrown unchanged.
+ * `created + skipped` is always the size of the set.
+ */
+export async function seedStandardCategories(
+  scope: TenantScope,
+  input: SeedStandardCategoriesInput,
+): Promise<StandardSetResult> {
+  const parsed = seedStandardCategoriesSchema.parse(input)
+  await assertMayAdminister(scope, 'seed standard categories')
+
+  const existing = await categoryRepo.findMany(scope, {})
+  let remaining = planStandardSet(existing, parsed.locale)
+  let created = 0
+
+  while (remaining.length > 0) {
+    const chunk = nextSeedChunk(remaining)
+    try {
+      const inserted = await categoryRepo.insertMany(scope, chunk)
+      created += inserted.length
+      remaining = withoutSlugs(remaining, chunk)
+    } catch (error) {
+      const fresh = await categoryRepo.findMany(scope, {})
+      const taken = new Set(fresh.map((row) => row.slug))
+      if (!chunk.some((row) => taken.has(row.slug))) throw error
+      remaining = planStandardSet(fresh, parsed.locale)
+      const retry = nextSeedChunk(remaining)
+      if (retry.length === 0) break
+      const inserted = await categoryRepo.insertMany(scope, retry)
+      created += inserted.length
+      remaining = withoutSlugs(remaining, retry)
+    }
+  }
+
+  return {
+    created,
+    skipped: STANDARD_CATEGORIES.length - created,
+  }
 }
 
 /* -------------------------------------------------------------------------- */

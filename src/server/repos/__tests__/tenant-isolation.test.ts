@@ -92,6 +92,7 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   spendingByCategory,
   updateCategory,
 } from '../categories'
@@ -2101,6 +2102,32 @@ describe('categories cannot be reached or be aimed across a workspace boundary',
     expect(theirs.categories.map((slice) => slice.categoryId)).toEqual([
       FOREIGN.parent,
     ])
+  })
+
+  it('A seeding the standard set leaves B’s tree byte-identical, and B holding food does not make A skip it', async () => {
+    await world.db.insert(categories).values({
+      id: 'cat-b-food-slug',
+      organizationId: 'org-b',
+      name: 'Jedzenie',
+      slug: 'food',
+      color: '#0f7b62',
+      kind: 'expense',
+      position: 10,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    const before = await rowsAtStake()
+
+    const result = await seedStandardCategories(world.scope, { locale: 'en' })
+
+    expect(result.created).toBe(36)
+    expect(result.skipped).toBe(0)
+    const after = await rowsAtStake()
+    expect(after.bCategories).toEqual(before.bCategories)
+    expect(after.bTransactions).toEqual(before.bTransactions)
+    const aFood = after.aCategories.filter((row) => row.slug === 'food')
+    expect(aFood).toHaveLength(1)
+    expect(aFood[0]?.organizationId).toBe('org-a')
   })
 })
 

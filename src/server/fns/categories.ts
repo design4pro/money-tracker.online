@@ -42,11 +42,13 @@ import {
   reorderCategories as reorderCategoriesRow,
   reorderCategoriesSchema,
   restoreCategory as restoreCategoryRow,
+  seedStandardCategories as seedStandardCategoriesRow,
+  seedStandardCategoriesSchema,
   updateCategory as updateCategoryRow,
   updateCategorySchema,
 } from '#/server/repos/categories'
 
-import type { Category } from '#/server/repos/categories'
+import type { Category, StandardSetResult } from '#/server/repos/categories'
 
 const categoryIdSchema = z.strictObject({
   categoryId: z.string().trim().min(1).max(64),
@@ -135,4 +137,12 @@ export const moveCategory = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<Category> => {
     const scope = await requireOrg()
     return moveCategoryRow(scope, data)
+  })
+
+/** Applies the standard set. Idempotent by slug; ordinary rows, not system rows. */
+export const seedStandardCategories = createServerFn({ method: 'POST' })
+  .inputValidator(seedStandardCategoriesSchema)
+  .handler(async ({ data }): Promise<StandardSetResult> => {
+    const scope = await requireOrg()
+    return seedStandardCategoriesRow(scope, data)
   })
