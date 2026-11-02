@@ -56,15 +56,34 @@ function escape(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/**
+ * A group name as it may appear in an accessible name: wrapping at 360 px can put newlines
+ * between words, and the a11y tree flattens those to spaces. A literal space in the regex
+ * would miss that.
+ */
+function flexibleName(name: string): string {
+  return escape(name).replace(/ +/g, '\\s+')
+}
+
+/** Either catalogue: cleanup can run after a locale switch that has not yet been navigated. */
+const ACTIONS_PREFIX = '(?:Actions for |Działania dla: )'
+const DELETE_ACTION = new RegExp(
+  `^(?:${escape(say('en', 'accounts.group.delete.action'))}|${escape(say('pl', 'accounts.group.delete.action'))})$`,
+)
+
 /** The row of a group, by the start of its accessible name (`Name, group, …` / `Name, inside …`). */
 function groupRow(page: Page, name: string): Locator {
-  return page.getByRole('row', { name: new RegExp(`^${escape(name)}, `) })
+  return page.getByRole('row', { name: new RegExp(`^${flexibleName(name)}, `) })
+}
+
+function actionsTrigger(page: Page, name: string): Locator {
+  return page.getByRole('button', {
+    name: new RegExp(`^${ACTIONS_PREFIX}${flexibleName(name)}`),
+  })
 }
 
 async function openActions(page: Page, name: string): Promise<void> {
-  await page
-    .getByRole('button', { name: new RegExp(`^Actions for ${escape(name)}`) })
-    .click()
+  await actionsTrigger(page, name).click()
 }
 
 async function createGroup(page: Page, name: string): Promise<void> {
@@ -103,7 +122,7 @@ async function createSubGroup(
 async function removeIfPresent(page: Page, name: string): Promise<void> {
   if ((await groupRow(page, name).count()) === 0) return
   const remove = page.getByRole('menuitem', {
-    name: say('en', 'accounts.group.delete.action'),
+    name: DELETE_ACTION,
   })
   // A page that has only just loaded can swallow its first press on the trigger, so the press is
   // retried until the menu is there; a press on an open menu never happens, the retry only runs
@@ -115,7 +134,7 @@ async function removeIfPresent(page: Page, name: string): Promise<void> {
   await remove.click()
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: say('en', 'accounts.group.delete.action') })
+    .getByRole('button', { name: DELETE_ACTION })
     .click()
   await expect(groupRow(page, name)).toHaveCount(0)
 }
@@ -212,6 +231,87 @@ test('create, nest, move out and delete leave the console silent and the workspa
       page.getByRole('status').filter({ hasText: child }),
     ).toBeVisible()
   } finally {
+    await removeIfPresent(page, child)
+    await removeIfPresent(page, parent)
+  }
+})
+
+test('the Move to… submenu on a sub-group stays inside the viewport at 641, 700 and 768 px', async ({
+  page,
+}) => {
+  const parent = uniqueToken('Joint')
+  const child = uniqueToken('Trips')
+  await gotoApp(page, '/accounts/groups')
+
+  try {
+    await createGroup(page, parent)
+    await createSubGroup(page, parent, child)
+
+    for (const width of [641, 700, 768]) {
+      await page.setViewportSize({ width, height: 800 })
+      await openActions(page, child)
+      await page
+        .getByRole('menuitem', {
+          name: new RegExp(`^${say('en', 'action.moveTo')}`),
+        })
+        .click()
+      const submenu = page.getByRole('menu').last()
+      await expect(
+        submenu.getByRole('menuitem', {
+          name: say('en', 'accounts.group.parent.none'),
+        }),
+      ).toBeVisible()
+      const menuBox = await submenu.boundingBox()
+      expect(menuBox).not.toBeNull()
+      expect(menuBox!.x).toBeGreaterThanOrEqual(0)
+      expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(width)
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('menu')).toHaveCount(0)
+    }
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await removeIfPresent(page, child)
+    await removeIfPresent(page, parent)
+  }
+})
+
+test('at 360 px in Polish a long child name wraps and the count badge sits under it', async ({
+  page,
+  context,
+}) => {
+  const parent = uniqueToken('Wspolne')
+  const child = `${uniqueToken('Wycieczki')} ${'szeroka '.repeat(8)}`.trim()
+  await gotoApp(page, '/accounts/groups')
+
+  try {
+    await createGroup(page, parent)
+    await createSubGroup(page, parent, child)
+    await useLocale(context, 'pl')
+    await gotoApp(page, '/accounts/groups')
+    await page.setViewportSize({ width: 360, height: 800 })
+
+    const row = page.getByRole('row', {
+      name: new RegExp(`^${escape(child)}, `),
+    })
+    const name = row.getByText(child, { exact: true })
+    const badge = row.getByText(/kont/)
+    await expect(name).toBeVisible()
+    await expect(badge).toBeVisible()
+    const nameBox = await name.boundingBox()
+    const badgeBox = await badge.boundingBox()
+    expect(nameBox).not.toBeNull()
+    expect(badgeBox).not.toBeNull()
+    expect(badgeBox!.y).toBeGreaterThan(nameBox!.y)
+    expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(360)
+    // The Actions trigger stays named after the full child, even when the visible name wraps.
+    await expect(actionsTrigger(page, child)).toBeVisible()
+  } finally {
+    await useLocale(context, 'en')
+    await page.setViewportSize({ width: 1280, height: 800 })
+    // The cookie does not re-render the tree; without this navigation, cleanup would still
+    // see Polish accessible names while looking for English ones.
+    await gotoApp(page, '/accounts/groups')
     await removeIfPresent(page, child)
     await removeIfPresent(page, parent)
   }

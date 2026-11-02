@@ -10,7 +10,7 @@ import type { GroupItem } from './group-rows'
  * Three facts the person must have before pressing the button: the accounts in the group leave it
  * and **none is deleted**; its sub-groups become top-level groups; and rules that use the group are
  * paused rather than deleted. An empty group drops the first sentence rather than saying "0
- * accounts leave this group".
+ * accounts leave this group". A group with no sub-groups drops the second.
  *
  * A refusal is not shown here. `onConfirm` is expected to resolve even when the server refuses,
  * having put the sentence in the screen's alert region, so the dialog's own failure panel - which
@@ -20,6 +20,8 @@ export interface GroupDeleteDialogProps {
   isOpen: boolean
   onOpenChange: (isOpen: boolean) => void
   group: GroupItem
+  /** Whether any group currently lists this one as its parent. */
+  readonly hasSubgroups: boolean
   onConfirm: () => Promise<unknown>
 }
 
@@ -27,6 +29,7 @@ export function GroupDeleteDialog({
   isOpen,
   onOpenChange,
   group,
+  hasSubgroups,
   onConfirm,
 }: GroupDeleteDialogProps) {
   const t = useTranslate()
@@ -40,11 +43,10 @@ export function GroupDeleteDialog({
       title={t('accounts.group.delete.title', { name: group.name })}
       body={
         <div className="flex flex-col gap-2">
-          <p>
-            {count === 0
-              ? t('accounts.group.delete.bodyEmpty')
-              : t('accounts.group.delete.body', { count })}
-          </p>
+          {count === 0 ? null : (
+            <p>{t('accounts.group.delete.body', { count })}</p>
+          )}
+          {hasSubgroups ? <p>{t('accounts.group.delete.subgroups')}</p> : null}
           <p>{t('accounts.group.delete.rules')}</p>
         </div>
       }
