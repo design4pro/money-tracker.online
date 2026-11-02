@@ -91,19 +91,12 @@ export const Route = createFileRoute('/_app/accounts/$accountId')({
   component: AccountDetailRoute,
 })
 
-function AccountDetailError({
-  error,
-  reset,
-}: {
-  error: Error
-  reset: () => void
-}) {
+function AccountDetailError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('accounts.detail.error.title')}
       body={t('accounts.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

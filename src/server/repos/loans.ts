@@ -115,11 +115,11 @@ export class LoanSettlementRefusedError extends ConflictError {
     | 'not-a-payment'
 
   constructor(
-    transactionId: string,
+    input: MarkInstalmentPaidInput,
     reason: LoanSettlementRefusedError['reason'],
   ) {
     super(
-      `Transaction ${transactionId} cannot settle this instalment: ${reason}.`,
+      `Transaction ${input.transactionId} cannot settle instalment ${input.sequence} of loan ${input.loanId}: ${reason}.`,
     )
     this.reason = reason
   }
@@ -736,7 +736,11 @@ export async function updateLoan(
     if (paid !== null) throw new LoanTermsLockedError(parsedId, paid)
   }
 
-  const conversion = await conversionContextFor(scope)
+  // One stored FX rate prices every loan amount, even after catalogue backfills (§3.2).
+  const conversion: ConversionContext = {
+    ...(await conversionContextFor(scope)),
+    resolveRate: async () => asRateE10(existing.rateE10),
+  }
   const { currencyCode, openedOn } = existing
 
   if (parsed.firstPaymentOn != null && parsed.firstPaymentOn < openedOn) {
@@ -817,7 +821,6 @@ export async function updateLoan(
             ? {}
             : { instalmentMinor: parsed.instalmentMinor }),
           refInstalmentMinor: instalmentRef.refAmountMinor,
-          rateE10: instalmentRef.rateE10,
         }),
     ...(outstandingRef === undefined
       ? {}
@@ -893,20 +896,20 @@ export async function markInstalmentPaid(
     listSettledTransactionIds(scope),
   ])
   if (transaction.direction !== 'expense') {
-    throw new LoanSettlementRefusedError(transaction.id, 'not-an-expense')
+    throw new LoanSettlementRefusedError(parsed, 'not-an-expense')
   }
   if (transaction.currencyCode !== loan.currencyCode) {
-    throw new LoanSettlementRefusedError(transaction.id, 'currency-mismatch')
+    throw new LoanSettlementRefusedError(parsed, 'currency-mismatch')
   }
   if (loan.accountId !== null && transaction.accountId !== loan.accountId) {
-    throw new LoanSettlementRefusedError(transaction.id, 'account-mismatch')
+    throw new LoanSettlementRefusedError(parsed, 'account-mismatch')
   }
   if (
     transaction.isPlanned ||
     transaction.isBalanceAdjustment ||
     transaction.transferKind !== 'none'
   ) {
-    throw new LoanSettlementRefusedError(transaction.id, 'not-a-payment')
+    throw new LoanSettlementRefusedError(parsed, 'not-a-payment')
   }
 
   if (existing === null) {
@@ -925,7 +928,7 @@ export async function markInstalmentPaid(
     existing.settledTransactionId !== parsed.transactionId &&
     linked.has(parsed.transactionId)
   ) {
-    throw new LoanSettlementRefusedError(transaction.id, 'already-linked')
+    throw new LoanSettlementRefusedError(parsed, 'already-linked')
   }
 
   const rows = await instalmentAccess.updateWhere(
@@ -933,10 +936,7 @@ export async function markInstalmentPaid(
     and(
       eq(loanInstalments.loanId, parsed.loanId),
       eq(loanInstalments.sequence, parsed.sequence),
-      or(
-        ne(loanInstalments.status, 'paid'),
-        eq(loanInstalments.settledTransactionId, parsed.transactionId),
-      ),
+      ne(loanInstalments.status, 'paid'),
       notExists(
         scope.db
           .select({ sequence: loanInstalments.sequence })
@@ -964,9 +964,6 @@ export async function markInstalmentPaid(
   )
   const updated = rows.at(0)
   if (updated === undefined) {
-    if ((await listSettledTransactionIds(scope)).has(parsed.transactionId)) {
-      throw new LoanSettlementRefusedError(transaction.id, 'already-linked')
-    }
     const current = await instalmentAccess.findOne(
       scope,
       and(
@@ -974,6 +971,15 @@ export async function markInstalmentPaid(
         eq(loanInstalments.sequence, parsed.sequence),
       ) as SQL,
     )
+    if (
+      current?.status === 'paid' &&
+      current.settledTransactionId === parsed.transactionId
+    ) {
+      return toInstalment(current)
+    }
+    if ((await listSettledTransactionIds(scope)).has(parsed.transactionId)) {
+      throw new LoanSettlementRefusedError(parsed, 'already-linked')
+    }
     if (current !== null) {
       throw new LoanInstalmentSettledError(parsed.loanId, parsed.sequence)
     }

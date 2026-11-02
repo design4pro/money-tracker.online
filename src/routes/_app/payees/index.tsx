@@ -8,7 +8,7 @@ import {
   PayeeList,
   PayeeListSkeleton,
 } from '#/components/app/payees'
-import { ErrorPanel } from '#/components/app/shell'
+import { ErrorPanel, FailurePanel } from '#/components/app/shell'
 import {
   Button,
   Disclosure,
@@ -17,6 +17,7 @@ import {
   TextField,
   toast,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { listCategories } from '#/server/fns/categories'
 import {
@@ -32,6 +33,7 @@ import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 import { MergePayeesDialog } from './-ui/merge-payees-dialog'
 import { PayeeFormDialog } from './-ui/payee-form-dialog'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { PayeeListItem } from '#/components/app/payees'
 import type { PayeeRow } from '#/server/db/schema'
 import { pageHead } from '#/routes/-lib/page-title'
@@ -76,13 +78,12 @@ export const Route = createFileRoute('/_app/payees/')({
   component: PayeesRoute,
 })
 
-function PayeesError({ error, reset }: { error: Error; reset: () => void }) {
+function PayeesError({ reset }: { reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('payees.error.title')}
       body={t('empty.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -276,7 +277,7 @@ function IgnoredNames({
 }) {
   const t = useTranslate()
   const [draft, setDraft] = useState('')
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   async function add() {
     setFailure(null)
@@ -285,7 +286,7 @@ function IgnoredNames({
       setDraft('')
       onChanged()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     }
   }
 
@@ -322,10 +323,10 @@ function IgnoredNames({
         </Form>
 
         {failure === null ? null : (
-          <ErrorPanel
+          <FailurePanel
+            failure={failure}
+            placement="after-action"
             title={t('payees.ignored.failed')}
-            body={t('empty.error.body')}
-            detail={failure}
           />
         )}
 
@@ -351,11 +352,7 @@ function IgnoredNames({
                     void removeIgnoredName({ data: { id: row.id } }).then(
                       onChanged,
                       (error: unknown) => {
-                        setFailure(
-                          error instanceof Error
-                            ? error.message
-                            : String(error),
-                        )
+                        setFailure(failureOf(error))
                       },
                     )
                   }}

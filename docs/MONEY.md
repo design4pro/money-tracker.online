@@ -198,6 +198,12 @@ report change every morning.
 Reports sum `ref_amount_minor`. A report that recomputes a conversion is a defect, and a code review
 that lets one through is the review's failure.
 
+Loan reference amounts, including imported instalments, are anchored to the loan's `opened_on`,
+not the instalments' future `due_on`. The opening rate follows §2.3, including its look-back limit;
+a future opening date without an available rate is refused. `opened_on` is immutable. Editing a
+loan amount uses its stored `rate_e10` (§3.2), leaving other reference amounts and the schedule
+unchanged even when catalogue rates have since been back-filled.
+
 The two legitimate ways `ref_amount_minor` changes:
 
 - The transaction itself is edited (its amount, its currency or its `booked_on`), in which case the

@@ -3,7 +3,7 @@ import { today } from '@internationalized/date'
 import { Info } from 'lucide-react'
 
 import { Amount, DirectionalAmount } from '#/components/app/accounts'
-import { ErrorPanel, FormModal } from '#/components/app/shell'
+import { FailurePanel, FormModal } from '#/components/app/shell'
 import {
   Button,
   Card,
@@ -16,6 +16,7 @@ import {
   MoneyField,
   TextAreaField,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { formatCalendarDate, useLocale, useTranslate } from '#/lib/i18n'
 import { absMinor, formatMoney, makeMoney, subtractMinor } from '#/lib/money'
 import {
@@ -23,6 +24,7 @@ import {
   getAccountBalanceOn,
 } from '#/server/fns/accounts'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { CalendarDate } from '@internationalized/date'
 import type { Minor } from '#/lib/money'
 import type { Account } from '#/server/db/types'
@@ -109,7 +111,7 @@ export function AdjustBalanceDialog({
   const [bookedOn, setBookedOn] = useState<CalendarDate>(todayValue)
   const [note, setNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
   const [result, setResult] = useState<Recorded | null>(null)
 
   const [read, setRead] = useState<BalanceRead | null>(null)
@@ -236,7 +238,7 @@ export function AdjustBalanceDialog({
       setResult({ adjustment: written, bookedOn: writtenOn })
       onRecorded(written)
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsSaving(false)
     }
@@ -275,10 +277,10 @@ export function AdjustBalanceDialog({
             >
               <DialogBody className="flex flex-col gap-5">
                 {failure === null ? null : (
-                  <ErrorPanel
+                  <FailurePanel
+                    failure={failure}
+                    placement="after-action"
                     title={t('accounts.adjust.error.title')}
-                    body={t('empty.error.body')}
-                    detail={failure}
                   />
                 )}
 

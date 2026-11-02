@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getLocalTimeZone, parseDate, today } from '@internationalized/date'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -17,13 +18,14 @@ import type { TransactionReference } from '../types'
 /**
  * A settled entry stops at today and a planned one may run up to ten years ahead. `FUTURE` is a year
  * on, inside the planned range, so a planned entry is valid and a settled one is not.
+ * Mid-month keeps the preceding day inside the visible month, rather than a disabled overflow cell.
  */
 
-const DAY_MS = 86_400_000
-const FUTURE = new Date(Date.now() + 365 * DAY_MS).toISOString().slice(0, 10)
-const ANOTHER_FUTURE = new Date(Date.now() + 366 * DAY_MS)
-  .toISOString()
-  .slice(0, 10)
+const FUTURE = today(getLocalTimeZone())
+  .add({ years: 1 })
+  .set({ day: 15 })
+  .toString()
+const ANOTHER_FUTURE = parseDate(FUTURE).add({ days: 1 }).toString()
 
 const REFERENCE: TransactionReference = {
   accounts: [
@@ -97,7 +99,7 @@ function dateDescription(): string {
 
 /** The calendar day before `iso`, as `YYYY-MM-DD`. */
 function dayBefore(iso: string): string {
-  return new Date(Date.parse(iso) - DAY_MS).toISOString().slice(0, 10)
+  return parseDate(iso).subtract({ days: 1 }).toString()
 }
 
 /** The day cell for `iso`, found through the calendar popover the date field opens. */

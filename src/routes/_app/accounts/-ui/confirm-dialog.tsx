@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -9,8 +9,10 @@ import {
   DialogHeader,
   Modal,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { ReactNode } from 'react'
 
 /**
@@ -42,7 +44,7 @@ export interface ConfirmDialogProps {
   /** Title for the panel shown when the server refuses. */
   errorTitle: string
   /**
-   * Prose shown above the raw error — the *likely* reason, in the caller's words. Delete passes
+   * Prose shown for a refusal — the *likely* reason, in the caller's words. Delete passes
    * "this account still has 42 transactions"; archive has no such case and passes the generic one.
    */
   errorBody: ReactNode
@@ -62,7 +64,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const t = useTranslate()
   const [isWorking, setIsWorking] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   async function confirm(close: () => void) {
     setIsWorking(true)
@@ -71,7 +73,7 @@ export function ConfirmDialog({
       await onConfirm()
       close()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setIsWorking(false)
     }
@@ -90,10 +92,11 @@ export function ConfirmDialog({
             <DialogBody className="flex flex-col gap-4">
               <div className="text-body text-ink-2">{body}</div>
               {failure === null ? null : (
-                <ErrorPanel
+                <FailurePanel
+                  failure={failure}
+                  placement="after-action"
                   title={errorTitle}
                   body={errorBody}
-                  detail={failure}
                 />
               )}
             </DialogBody>

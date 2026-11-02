@@ -52,20 +52,13 @@ export const Route = createFileRoute('/_app/loans/months')({
   component: CalendarRoute,
 })
 
-function CalendarError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function CalendarError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   const router = useRouter()
   return (
     <ErrorPanel
       title={t('loans.calendar.error.title')}
       body={t('loans.calendar.error.body')}
-      detail={error.message}
       onRetry={() => void router.invalidate().then(reset)}
     />
   )

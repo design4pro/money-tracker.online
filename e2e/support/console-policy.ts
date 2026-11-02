@@ -144,6 +144,15 @@ export const DELIBERATE_SERVER_FAILURE: readonly ExpectedConsoleMessage[] = [
   },
 ]
 
+/** The production boundary also logs the exact error body the loader test deliberately injected. */
+export const DELIBERATE_LOADER_FAILURE: readonly ExpectedConsoleMessage[] = [
+  ...DELIBERATE_SERVER_FAILURE,
+  {
+    why: 'the production router boundary logging the deliberately intercepted loader error',
+    match: /^deliberate failure from e2e\/support\/states\.ts$/,
+  },
+]
+
 /**
  * Where one console message lands. `type` is Playwright's `ConsoleMessage.type()`.
  *

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import { Card, Skeleton } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import {
   formatCalendarDate,
   formatNumber,
@@ -14,6 +15,7 @@ import { RULE_PREVIEW_SCAN_LIMIT } from '#/server/repos/rule-preview'
 import { PREVIEW_DEBOUNCE_MS, createDebouncer } from '../-lib/debounce'
 import { previewRule } from '../-server/preview'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { Minor } from '#/lib/money'
 import type { RuleDefinition } from '#/server/rules/schema'
 import type { RulePreviewResult } from '../-server/preview'
@@ -60,7 +62,7 @@ type State =
   | { readonly kind: 'idle' }
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly result: RulePreviewResult }
-  | { readonly kind: 'failed'; readonly detail: string }
+  | { readonly kind: 'failed'; readonly failure: FailureEnvelope }
 
 export function RulePreview({ rule }: RulePreviewProps) {
   const t = useTranslate()
@@ -96,10 +98,7 @@ export function RulePreview({ rule }: RulePreviewProps) {
           })
           .catch((error: unknown) => {
             if (token !== latest.current) return
-            setState({
-              kind: 'failed',
-              detail: error instanceof Error ? error.message : String(error),
-            })
+            setState({ kind: 'failed', failure: failureOf(error) })
           })
       },
     )
@@ -129,10 +128,11 @@ export function RulePreview({ rule }: RulePreviewProps) {
       {state.kind === 'loading' ? <SampleSkeleton /> : null}
 
       {state.kind === 'failed' ? (
-        <ErrorPanel
+        <FailurePanel
+          failure={state.failure}
+          placement="in-place"
           title={t('rules.preview.error.title')}
           body={t('rules.preview.error.body')}
-          detail={state.detail}
         />
       ) : null}
 

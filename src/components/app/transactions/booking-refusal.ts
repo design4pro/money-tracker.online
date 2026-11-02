@@ -1,4 +1,6 @@
-import { ZodError } from 'zod'
+import { failureOf, readFailure } from '#/lib/failure'
+
+import type { Translate } from '#/lib/i18n'
 
 import type { RefusedBooking } from './transaction-form'
 
@@ -6,43 +8,20 @@ import type { RefusedBooking } from './transaction-form'
  * Telling the booking rule's refusal from every other failed save.
  *
  * The server refuses a settled row dated after the latest calendar day on Earth with a Zod `custom`
- * issue at `bookedOn` (`#/server/booking-rule`). After a server-function round trip it is a plain
- * `Error` whose message is the JSON issue list, so it is recognised by that structure and nothing
- * else. This is client code and imports nothing from `server/`; the shape it reads is the one
- * `validationIssuesOf` (`#/server/errors/classify`) reads, narrowed to the one issue this form can
- * say better than the server's English.
+ * issue at `bookedOn` (`#/server/booking-rule`). The failure middleware turns that into a
+ * `validation` envelope whose `fields` name the path and never the issue's own sentence, so it is
+ * recognised by that kind and path and nothing else. The envelope's field key is `invalid` for every
+ * issue code but the two length codes, so a malformed date at the same path reads as a refusal too;
+ * the date input does not let a malformed date through, and the sentence it gets is the one that
+ * names the date.
  */
-
-/** A longer list is cut here, never trusted: only the first items are looked at. */
-const MAX_ISSUES_READ = 100
 
 /** Whether `error` is the server's refusal of a settled row dated after the cutoff. Never throws. */
 export function isBookedOnRefusal(error: unknown): boolean {
-  try {
-    return issuesOf(error).some(isBookedOnCustomIssue)
-  } catch {
-    return false
-  }
-}
-
-function issuesOf(error: unknown): ReadonlyArray<unknown> {
-  if (error instanceof ZodError) return error.issues.slice(0, MAX_ISSUES_READ)
-  if (!(error instanceof Error)) return []
-  // A subclass (a `TypeError`, a repository error) names its own cause; only the bare `Error` the
-  // serialiser rebuilds carries an issue list.
-  if (Object.getPrototypeOf(error) !== Error.prototype) return []
-  const parsed: unknown = JSON.parse(error.message)
-  return Array.isArray(parsed) ? parsed.slice(0, MAX_ISSUES_READ) : []
-}
-
-function isBookedOnCustomIssue(item: unknown): boolean {
-  if (typeof item !== 'object' || item === null) return false
-  const { path, code } = item as { path?: unknown; code?: unknown }
+  const failure = readFailure(error)
   return (
-    code === 'custom' &&
-    Array.isArray(path) &&
-    path.length === 1 &&
-    path[0] === 'bookedOn'
+    failure?.kind === 'validation' &&
+    (failure.fields ?? []).some((field) => field.path === 'bookedOn')
   )
 }
 
@@ -73,17 +52,17 @@ export function withoutRefusal(failure: SaveFailure): SaveFailure {
  *
  * A booking-date refusal is remembered as the `(date, planned)` pair that was refused, so the form
  * can say it at the date field and drop it the moment either changes. Any other failure keeps the
- * banner: the error's own message, or `fallback` for a value that is not an `Error`.
+ * banner, with the catalogue sentence of its kind and never the error's own text.
  */
 export function saveFailureOf(
   error: unknown,
   entry: RefusedBooking,
-  fallback: string,
+  t: Translate,
 ): SaveFailure {
   if (isBookedOnRefusal(error)) {
     return {
       refusedBooking: { bookedOn: entry.bookedOn, isPlanned: entry.isPlanned },
     }
   }
-  return { serverError: error instanceof Error ? error.message : fallback }
+  return { serverError: t(failureOf(error).message.key) }
 }

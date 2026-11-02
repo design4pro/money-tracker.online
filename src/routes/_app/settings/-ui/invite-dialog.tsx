@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { ErrorPanel } from '#/components/app/shell'
+import { FailurePanel } from '#/components/app/shell'
 import {
   Button,
   Dialog,
@@ -13,8 +13,10 @@ import {
   RadioGroup,
   TextField,
 } from '#/components/ui'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 
+import type { FailureEnvelope } from '#/lib/failure-envelope'
 import type { FormEvent } from 'react'
 
 /**
@@ -51,7 +53,7 @@ export function InviteDialog({
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<InviteRole>('member')
   const [isWorking, setWorking] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   async function submit(event: FormEvent<HTMLFormElement>, close: () => void) {
     event.preventDefault()
@@ -63,7 +65,7 @@ export function InviteDialog({
       setRole('member')
       close()
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
+      setFailure(failureOf(error))
     } finally {
       setWorking(false)
     }
@@ -113,10 +115,10 @@ export function InviteDialog({
               </RadioGroup>
 
               {failure === null ? null : (
-                <ErrorPanel
+                <FailurePanel
+                  failure={failure}
+                  placement="after-action"
                   title={t('members.error.title')}
-                  body={t('members.error.generic')}
-                  detail={failure}
                 />
               )}
             </DialogBody>

@@ -74,19 +74,12 @@ export const Route = createFileRoute('/_app/import/$batchId')({
  * import commit happens elsewhere — and that is the reassurance a person part-way through bringing
  * in a statement needs before they consider pressing anything again.
  */
-function ImportBatchError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function ImportBatchError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('import.detail.error.title')}
       body={t('import.detail.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )

@@ -27,6 +27,7 @@ import type {
 } from '#/server/db/schema'
 import type { CandidateRow } from '#/server/fns/recurring'
 import type { WeakestSignal } from '#/server/recurring/detect'
+import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { pageHead } from '#/routes/-lib/page-title'
 
@@ -71,19 +72,12 @@ export const Route = createFileRoute('/_app/recurring/candidates')({
   component: CandidateListRoute,
 })
 
-function CandidateListError({
-  error,
-  reset,
-}: {
-  readonly error: Error
-  readonly reset: () => void
-}) {
+function CandidateListError({ reset }: { readonly reset: () => void }) {
   const t = useTranslate()
   return (
     <ErrorPanel
       title={t('recurring.candidates.error.title')}
       body={t('recurring.candidates.error.body')}
-      detail={error.message}
       onRetry={reset}
     />
   )
@@ -131,10 +125,9 @@ function CandidateListRoute() {
       toast.success(t('recurring.candidates.found', { count: report.found }))
       refresh()
     } catch (error) {
-      toast.error(
-        t('recurring.toast.failed'),
-        error instanceof Error ? { description: error.message } : undefined,
-      )
+      toast.error(t('recurring.toast.failed'), {
+        description: t(failureOf(error).message.key),
+      })
     } finally {
       setIsDetecting(false)
     }

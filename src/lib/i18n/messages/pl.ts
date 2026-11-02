@@ -856,6 +856,8 @@ const messages = {
   'refunds.dialog.submit': 'Powiąż zwrot',
   'refunds.dialog.cancel': 'Anuluj',
   'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
+  'refunds.dialog.error.refused':
+    'Nic się nie zmieniło. Tego zwrotu nie da się powiązać w tej postaci. Sprawdź transakcję, jej kwotę, walutę i kierunek, a potem spróbuj ponownie.',
   'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
   'refunds.suggest.empty':
     'Żaden wydatek u tego samego odbiorcy z ostatnich 90 dni nie jest dość duży, aby to był jego zwrot.',
@@ -1035,6 +1037,8 @@ const messages = {
   'payees.aliases.remove': 'Usuń {name}',
   'payees.aliases.empty': 'Na razie pasuje tylko własna nazwa tego odbiorcy.',
   'payees.aliases.failed': 'Nie dodaliśmy tego opisu',
+  'payees.aliases.conflict':
+    'Opis może już należeć do odbiorcy, nie zawierać niczego przydatnego do dopasowania albo przekraczać limit opisów tego odbiorcy. Proszę użyć innego opisu lub usunąć nieużywany wpis z tej listy.',
   'payees.ignored.title': 'Opisy, które nigdy nie są odbiorcą',
   'payees.ignored.body':
     'Nazwy, z których nie da się zrobić odbiorcy: „PŁATNOŚĆ KARTĄ”, „POLECENIE ZAPŁATY” i wszystko inne, co bank dopisuje do każdej pozycji.',
@@ -2646,10 +2650,7 @@ const messages = {
   'rules.editor.load.error.body':
     'Żadna zasada nie została utworzona ani zmieniona. Spróbuj ponownie za chwilę.',
   'rules.error.title': 'Nie udało się wczytać zasad',
-  'rules.error.body':
-    'Nic nie zostało zmienione. Spróbuj ponownie, a jeśli będzie się powtarzać, prześlij nam szczegóły poniżej.',
-  'rules.error.locked':
-    'Zasady nie wchodzą w skład tego planu, więc nic nie zapisano.',
+  'rules.error.body': 'Nic nie zostało zmienione. Spróbuj ponownie za chwilę.',
 
   'rules.empty.title': 'Nie ma jeszcze żadnej zasady',
   'rules.empty.body':
