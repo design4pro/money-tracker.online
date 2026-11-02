@@ -196,6 +196,8 @@ export default defineConfig({
             // policy that lives outside `src/**` and nothing else gates them.
             '.ai/scripts/**/__tests__/*.test.mjs',
             'e2e/support/__tests__/*.test.ts',
+            // PreToolUse Python hooks: spawn the script with a Claude-shaped payload.
+            '.claude/hooks/__tests__/*.test.ts',
           ],
           testTimeout: 30_000,
           // beforeEach git-init cases are hooks, so they use hookTimeout (default 10000), not
