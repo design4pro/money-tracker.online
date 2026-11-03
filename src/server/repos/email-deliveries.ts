@@ -34,6 +34,7 @@ const insertSchema = z.strictObject({
   notificationId: z.string().trim().min(1).max(64).nullable().optional(),
   dedupeKey: z.string().trim().min(1).max(200),
   status: statusSchema.optional(),
+  errorCode: z.string().trim().min(1).max(64).nullable().optional(),
 })
 export type InsertDeliveryInput = z.infer<typeof insertSchema>
 
@@ -71,7 +72,7 @@ export async function insertDelivery(
       toHash: null,
       providerMessageId: null,
       status: parsed.status ?? 'queued',
-      errorCode: null,
+      errorCode: parsed.errorCode ?? null,
       createdAt: now,
       sentAt: null,
     },

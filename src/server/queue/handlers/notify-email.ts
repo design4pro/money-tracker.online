@@ -12,6 +12,11 @@ import { hashRecipient } from '#/server/email/recipient-hash'
 import { renderEmail } from '#/server/email/render'
 import { sendEmail } from '#/server/email/send'
 import { notificationEmail } from '#/server/email/templates/notification'
+import {
+  listUnsubscribeHeaders,
+  notificationUnsubscribeLinks,
+} from '#/server/email/unsubscribe-link'
+import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
 import { NOTIFICATION_KINDS } from '#/server/notify/kinds'
 import {
   claimDelivery,
@@ -27,6 +32,7 @@ import type { NotificationKind } from '#/lib/enums'
 import type { Locale } from '#/lib/i18n'
 import type { StoredLocaleSeam } from '#/server/email/locale'
 import type { EmailTransport } from '#/server/email/send'
+import type { UnsubscribeKeys } from '#/server/email/unsubscribe-token'
 import type { Logger } from '#/server/observability/logger'
 import type { Database } from '#/server/repos/base'
 
@@ -56,6 +62,7 @@ export interface NotifyEmailArgs {
   readonly transport: EmailTransport
   readonly hashSalt: string | null
   readonly appUrl: string
+  readonly unsubscribeKeys?: UnsubscribeKeys | null
   readonly storedLocale?: StoredLocaleSeam
   readonly locale?: Locale
 }
@@ -214,6 +221,27 @@ export async function handleNotifyEmail(
     args.locale ??
     (await resolveRecipientLocale(scope, claimed.userId, args.storedLocale))
   const t = createTranslator(locale, await loadCatalogue(locale))
+
+  let unsubscribe: { readonly href: string; readonly label: string } | undefined
+  let headers: Readonly<Record<string, string>> | undefined
+  if (args.unsubscribeKeys) {
+    const token = await signUnsubscribeToken(
+      {
+        userId: claimed.userId,
+        organizationId: args.organizationId,
+        subject: claimed.kind,
+      },
+      args.unsubscribeKeys.current,
+      args.now,
+    )
+    const links = notificationUnsubscribeLinks(args.appUrl, token)
+    unsubscribe = {
+      href: links.pageHref,
+      label: t('email.layout.footer.unsubscribe'),
+    }
+    headers = listUnsubscribeHeaders(links.oneClickHref)
+  }
+
   const { subject, element } = notificationEmail(
     {
       kind: claimed.kind,
@@ -223,6 +251,7 @@ export async function handleNotifyEmail(
         deepLinkOf(claimed.kind, parsed.data),
       ),
       workspaceName: await workspaceName(scope),
+      unsubscribe,
     },
     t,
   )
@@ -234,6 +263,7 @@ export async function handleNotifyEmail(
       subject,
       html,
       text,
+      headers,
       idempotencyKey: claimed.id,
       tags: [
         { name: 'delivery', value: claimed.id },

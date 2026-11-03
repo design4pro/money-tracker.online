@@ -27,7 +27,8 @@ export const taskHandlers: TaskHandlers = {
     // module evaluation. The handler itself takes them as arguments; this is the one place they
     // are read, and only when a `notify.email` message actually runs.
     const { appUrl, emailDelivery } = await import('#/server/auth/env')
-    const { emailHashSalt } = await import('#/server/email/env')
+    const { emailHashSalt, unsubscribeKeys } =
+      await import('#/server/email/env')
     const outcome = await handleNotifyEmail({
       db: ctx.db,
       organizationId: task.organizationId,
@@ -41,6 +42,7 @@ export const taskHandlers: TaskHandlers = {
       },
       hashSalt: emailHashSalt(),
       appUrl: appUrl(),
+      unsubscribeKeys: unsubscribeKeys(),
     })
     ctx.logger.debug('queue message handled', { kind: task.kind, outcome })
   },
