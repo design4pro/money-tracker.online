@@ -6,11 +6,11 @@ import { d1Query, sqlText } from './support/d1'
 import {
   acquireExclusiveFileLock,
   importDemoQuotaLockPath,
-  type ExclusiveFileLock,
 } from './support/process-lock'
 import { storageStateFor } from './support/session'
 
 import type { Page } from '@playwright/test'
+import type { ExclusiveFileLock } from './support/process-lock'
 
 /**
  * The import flow in a real browser, as far as `19-S2` goes and not one step further.
