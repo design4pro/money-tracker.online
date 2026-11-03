@@ -3,6 +3,11 @@ import { expect, test } from './support/console'
 import { gotoApp, uniqueToken, useLocale } from './support/app'
 import { expectNoSeriousViolations } from './support/budgets'
 import { d1Query, sqlText } from './support/d1'
+import {
+  acquireExclusiveFileLock,
+  importDemoQuotaLockPath,
+  type ExclusiveFileLock,
+} from './support/process-lock'
 import { storageStateFor } from './support/session'
 
 import type { Page } from '@playwright/test'
@@ -36,10 +41,16 @@ import type { Page } from '@playwright/test'
  * is on a plan with `importsPerMonth: 2`, and the seed's own completed batch already counts in the
  * current month, so a second batch left behind by a failed attempt made every retry fail on the
  * quota rather than on anything it was testing (#295), and a persistent local database hit the same
- * wall one run later (#228). `import_row_errors` cascades on delete, and `transactions.import_batch_id`
- * only sets null on delete - safe here because the test writes no transactions. The batch is found by
- * its file name, which carries the attempt's token and ends the stored `file_r2_key`, so the cleanup
- * does not depend on the upload's navigation having finished.
+ * wall one run later (#228). Locally the same quota is one outstanding batch across Playwright
+ * projects: `fullyParallel: true` with the default worker count lets chromium, mobile-safari,
+ * mobile-chromium and webkit overlap, and the second upload is refused before the first
+ * `afterEach` has deleted (#329). A cross-process file lock covers the upload-to-cleanup window;
+ * the spec still signs in as `demo` and still asserts what it asserted. `import_row_errors`
+ * cascades on delete, and `transactions.import_batch_id` only sets null on delete - safe here
+ * because the test writes no transactions. The batch is found by its file name, which carries the
+ * attempt's token and ends the stored `file_r2_key`, so the cleanup does not depend on the
+ * upload's navigation having finished. The lock is released only after that delete, so a waiter
+ * never uploads into a still-occupied slot.
  *
  * The labels are quoted rather than imported for the reason `support/app.ts` gives: the catalogue
  * loader is built on `import.meta.glob`, which Playwright's module runner does not have. The
@@ -130,6 +141,8 @@ async function choose(page: Page, label: string, option?: string | RegExp) {
 test.describe('import: map a statement and preview it', () => {
   /** The file this attempt uploads; its batch, if the upload got that far, is found by it. */
   let fileName: string | undefined
+  /** Held from just before the upload until the batch delete has finished (#329). */
+  let quotaLock: ExclusiveFileLock | undefined
 
   test.beforeEach(async ({ context }) => {
     await useLocale(context, 'en')
@@ -138,14 +151,20 @@ test.describe('import: map a statement and preview it', () => {
   test.afterEach(async () => {
     const name = fileName
     fileName = undefined
-    if (name === undefined) return
-    // A cleanup failure is reported, not raised: it must not fail an attempt whose body passed.
     try {
-      await d1Query(
-        `delete from import_batches where file_r2_key like ${sqlText(`imports/%/${name}`)}`,
-      )
-    } catch (error) {
-      console.warn(`import batch for ${name} was not cleaned up`, error)
+      if (name === undefined) return
+      // A cleanup failure is reported, not raised: it must not fail an attempt whose body passed.
+      try {
+        await d1Query(
+          `delete from import_batches where file_r2_key like ${sqlText(`imports/%/${name}`)}`,
+        )
+      } catch (error) {
+        console.warn(`import batch for ${name} was not cleaned up`, error)
+      }
+    } finally {
+      const held = quotaLock
+      quotaLock = undefined
+      await held?.release()
     }
   })
 
@@ -165,6 +184,8 @@ test.describe('import: map a statement and preview it', () => {
     // The account the rows would land in. Any account of the demo workspace will do: this test
     // asserts nothing about balances, because nothing is written.
     await choose(page, 'Import into')
+
+    quotaLock = await acquireExclusiveFileLock(importDemoQuotaLockPath())
 
     await page
       .locator('input[type="file"]')
