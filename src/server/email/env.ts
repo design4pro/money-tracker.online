@@ -42,3 +42,12 @@ export function unsubscribeKeys(): UnsubscribeKeys | null {
 export function emailHashSalt(): string | null {
   return readString('EMAIL_HASH_SALT')
 }
+
+/**
+ * Resend's Standard Webhooks signing secret.
+ *
+ * Absent, `POST /api/webhooks/resend` answers 503 rather than accepting an unverified body.
+ */
+export function resendWebhookSecret(): string | null {
+  return readString('RESEND_WEBHOOK_SECRET')
+}
