@@ -58,11 +58,10 @@ import { describe, expect, it } from 'vitest'
  * WHAT THIS FILE DELIBERATELY DOES NOT DO
  * ---------------------------------------------------------------------------
  *
- * It does not edit `package.json`. The rows below marked `pending-removal` and
- * `pending-dev-dependency` are **recommendations with the evidence attached, not decisions** -
- * `AGENTS.md` puts adding, removing or upgrading a dependency under **Ask First**, and §3.1
- * reserves the change for a human in an ADR. Recording the recommendation is what this file is
- * for; spending it is #353, which those seven rows cite.
+ * It does not edit `package.json`. #353 spent the seven Ask First rows that used to sit here as
+ * `pending-*`: three TanStack devtools packages moved to `devDependencies`, `papaparse`, `d3-time`
+ * and `date-fns` left (ADR 0036), and `@tanstack/react-form` stayed declared. The table below is
+ * only the runtime dependencies that nothing imports **and** that a human decided to keep.
  *
  * @see https://github.com/design4pro/money-tracker.online/issues/234
  * @see https://github.com/design4pro/money-tracker.online/issues/353
@@ -75,14 +74,11 @@ const root = resolve(__dirname, '../..')
 /**
  * What a row's disposition says about the package.
  *
- * - `keep` - an open stage names it and will import it. The row leaves when that stage lands.
- * - `pending-dev-dependency` - nothing in the product imports it and nothing is expected to; it
- *   belongs in `devDependencies`. The move is a `package.json` edit, so it waits for a human.
- * - `pending-removal` - the stage that justified it has already shipped **without** it, which is
- *   the `motion` shape exactly. Removal is a `package.json` edit and an ADR, so it waits for a
- *   human.
+ * - `keep` - either an open stage names it and will import it, or a human decided to keep the
+ *   declaration (ADR 0036 for `@tanstack/react-form`). The row leaves when the package is first
+ *   imported, or when a later ADR removes it.
  */
-type Disposition = 'keep' | 'pending-dev-dependency' | 'pending-removal'
+type Disposition = 'keep'
 
 interface DependencyDisposition {
   readonly disposition: Disposition
@@ -155,54 +151,13 @@ const DISPOSITIONS: Readonly<Record<string, DependencyDisposition>> = {
     why: 'Stage `00-S8` owns `src/components/ui/data-table.tsx`, which the plan states is this package headless plus `@tanstack/react-virtual`. The file has not landed.',
   },
 
-  // The three devtools packages are consumed by a Vite plugin, not by application code, so "zero
-  // imports" is their normal resting state and no stage will ever change that. `@tanstack/devtools-vite`,
-  // the plugin `vite.config.ts` actually imports, is already a devDependency - these three sit in
-  // `dependencies` beside it for no stated reason. That is a placement question, not a removal one.
-  '@tanstack/react-devtools': {
-    disposition: 'pending-dev-dependency',
-    justification: 'docs/SPEC.md',
-    issue: 353,
-    why: 'Development-time tooling behind `@tanstack/devtools-vite`, which is itself a devDependency. No stage will import it from application code.',
-  },
-  '@tanstack/react-query-devtools': {
-    disposition: 'pending-dev-dependency',
-    justification: 'docs/SPEC.md',
-    issue: 353,
-    why: 'Development-time tooling behind `@tanstack/devtools-vite`, which is itself a devDependency. No stage will import it from application code.',
-  },
-  '@tanstack/react-router-devtools': {
-    disposition: 'pending-dev-dependency',
-    justification: 'docs/SPEC.md',
-    issue: 353,
-    why: 'Development-time tooling behind `@tanstack/devtools-vite`, which is itself a devDependency. No stage will import it from application code.',
-  },
-
-  // The four rows whose justification is spent. Each one is `motion`'s shape: the module that was
-  // supposed to import the package exists, and it does the job another way.
+  // #353 asked whether this should leave with `papaparse`, `d3-time` and `date-fns`. The answer
+  // (2026-11-03) was keep it in `dependencies`. Nothing imports it yet; SPEC §3 still names it.
   '@tanstack/react-form': {
-    disposition: 'pending-removal',
-    justification: 'docs/SPEC.md',
+    disposition: 'keep',
+    justification: 'docs/adr/0036-remove-unused-papaparse-d3-time-date-fns.md',
     issue: 353,
-    why: 'Its only mention anywhere is the §3 stack list. `src/components/ui/form.tsx` shipped on React Aria `Form`, and no plan stage names this package.',
-  },
-  'd3-time': {
-    disposition: 'pending-removal',
-    justification: 'docs/plans/16-charts.md',
-    issue: 353,
-    why: 'Stage `16-S1` promised "the scale and axis utilities over `d3-scale` and `d3-time`". `scales.ts` and `axis.tsx` both landed; `scales.ts` imports `d3-scale` only.',
-  },
-  'date-fns': {
-    disposition: 'pending-removal',
-    justification: 'docs/MONEY.md',
-    issue: 353,
-    why: '`docs/MONEY.md` scopes it to formatting only, and formatting shipped on `Intl.DateTimeFormat` in `src/lib/i18n/format.ts`. Calendar arithmetic was always `@internationalized/date`.',
-  },
-  papaparse: {
-    disposition: 'pending-removal',
-    justification: 'docs/plans/19-import.md',
-    issue: 353,
-    why: 'Stage `19-S1` owns `src/server/import/csv/scan.ts` and `parse.ts`; both landed, hand-rolled, importing no parsing library.',
+    why: 'Kept in the pinned stack by the #353 decision. `src/components/ui/form.tsx` ships on React Aria `Form` today; the package stays declared rather than being removed.',
   },
 }
 

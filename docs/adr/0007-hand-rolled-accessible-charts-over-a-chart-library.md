@@ -65,3 +65,10 @@ does not type-check — and it cannot regress when a dependency updates.
 
 Given that two of this product's five claimed AAA criteria and a large share of its AA surface live
 inside charts, that property is worth two weeks.
+
+## Amendment (2026-11-03)
+
+The Decision above still names `d3-time` because that is what was decided on 2026-09-01. Plan 16
+then shipped `src/components/charts/scales.ts` importing `d3-scale` only. ADR 0036 removes
+`d3-time` from the pinned set. The live chart stack is `d3-scale` and `d3-shape`. This paragraph
+does not rewrite the original Decision.

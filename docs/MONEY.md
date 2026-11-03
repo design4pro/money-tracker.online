@@ -103,7 +103,9 @@ that is rounded, stored, read and rounded again has been rounded twice and is wr
 They are never mixed and never stored in one column. A calendar date is not an instant with the
 time zeroed; it is a date, and it has no timezone.
 
-Calendar arithmetic goes through `@internationalized/date`. `date-fns` is for formatting only.
+Calendar arithmetic goes through `@internationalized/date`. Formatting goes through
+`src/lib/i18n/format.ts` (`@internationalized/date` and `@internationalized/number`), never through
+a date library. `date-fns` was declared for formatting and never imported; ADR 0036 removed it.
 
 ---
 
