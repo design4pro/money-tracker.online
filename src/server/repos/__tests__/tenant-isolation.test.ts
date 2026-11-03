@@ -130,6 +130,7 @@ import {
   listDeferredSince,
   listStale,
   markDelivery,
+  markDeliveryByProviderMessage,
 } from '../email-deliveries'
 import { isSuppressed, suppress } from '../email-suppressions'
 import * as emailSuppressions from '../email-suppressions'
@@ -3102,6 +3103,13 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     expect(
       await markDelivery(world.scope, theirs.id, { status: 'failed' }),
     ).toBeNull()
+    expect(
+      await markDeliveryByProviderMessage(world.scope, {
+        id: theirs.id,
+        providerMessageId: 'email_b',
+        status: 'bounced',
+      }),
+    ).toBeNull()
     expect(await countSince(world.scope, AT)).toBe(0)
     expect(await listStale(world.scope, AT, new Date(0))).toEqual([])
     expect(await listDeferredSince(world.scope, AT)).toEqual([])
@@ -3110,6 +3118,56 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
       status: 'queued',
     })
     expect(await countSince(world.otherScope, AT)).toBe(1)
+  })
+
+  it('marks bounced only when this workspace, this id and this provider message agree', async () => {
+    const mine = await queuedIn(
+      world.scope,
+      'user-a',
+      'notification:provider-a',
+    )
+    await markDelivery(world.scope, mine.id, {
+      status: 'sent',
+      providerMessageId: 'email_a',
+    })
+    const theirs = await queuedIn(
+      world.otherScope,
+      'user-b',
+      'notification:provider-b',
+    )
+    await markDelivery(world.otherScope, theirs.id, {
+      status: 'sent',
+      providerMessageId: 'email_b',
+    })
+
+    expect(
+      await markDeliveryByProviderMessage(world.scope, {
+        id: mine.id,
+        providerMessageId: 'email_wrong',
+        status: 'bounced',
+      }),
+    ).toBeNull()
+    expect(
+      await markDeliveryByProviderMessage(world.scope, {
+        id: theirs.id,
+        providerMessageId: 'email_b',
+        status: 'bounced',
+      }),
+    ).toBeNull()
+    expect(
+      await markDeliveryByProviderMessage(world.otherScope, {
+        id: theirs.id,
+        providerMessageId: 'email_b',
+        status: 'complained',
+      }),
+    ).toMatchObject({ status: 'complained' })
+
+    expect(await getDelivery(world.scope, mine.id)).toMatchObject({
+      status: 'sent',
+    })
+    expect(await getDelivery(world.otherScope, theirs.id)).toMatchObject({
+      status: 'complained',
+    })
   })
 
   it('lets two workspaces hold the same digest key, because the index is scoped', async () => {
@@ -3149,6 +3207,11 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     await getDelivery(world.scope, row.id)
     await claimDelivery(world.scope, row.id)
     await markDelivery(world.scope, row.id, { status: 'failed' })
+    await markDeliveryByProviderMessage(world.scope, {
+      id: row.id,
+      providerMessageId: 'email_scoped',
+      status: 'bounced',
+    })
     await countSince(world.scope, AT)
     await listStale(world.scope, AT, new Date(0))
     await listDeferredSince(world.scope, AT)

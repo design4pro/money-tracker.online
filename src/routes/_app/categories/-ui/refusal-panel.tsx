@@ -17,12 +17,12 @@ import type { Refusal, RefusalCall } from '../-lib/refusal'
  * quoted and preceded by a noun because a Polish name cannot be declined inside a sentence. There
  * is no `detail`, so no disclosure and no server text.
  *
- * ## One live region, so this is a labelled region
+ * ## A labelled region, never a nested alert
  *
- * The route's `role="alert"` wrapper is the live region; a panel that was an alert as well would be
- * a second, nested one. The route keys this component by a counter that increments on every
- * refusal, so an identical repeat mounts a new node and is meant to be announced again (an intent,
- * not a verified screen-reader behaviour: `docs/ACCESSIBILITY.md` §5.4).
+ * The panel is `mode="region"` and the route does not wrap it in `role="alert"`: that pairing was
+ * a nested alert and region, and a wrapper that stayed mounted did not announce an identical
+ * repeat. The route keys this component by a counter that increments on every refusal, so a
+ * repeat mounts a new node. It does not steal focus from a keyboard dragger.
  *
  * ## It scrolls, and never takes focus
  *

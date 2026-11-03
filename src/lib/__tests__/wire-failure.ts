@@ -1,6 +1,6 @@
 import { FAILURE_MESSAGE_KEYS } from '#/lib/failure-envelope'
 
-import type { FailureKind } from '#/lib/failure-envelope'
+import type { FailureKind, FailureReason } from '#/lib/failure-envelope'
 
 /** A repository sentence of the kind that must never reach a screen: an id and a count. */
 export const LEAKED_MESSAGE = 'Account 01k9z still has 412 transaction(s)'
@@ -12,8 +12,14 @@ export const LEAKED_MESSAGE = 'Account 01k9z still has 412 transaction(s)'
 export function wireFailure(
   kind: FailureKind,
   message: string = LEAKED_MESSAGE,
+  reason?: FailureReason,
 ): Error {
   return Object.assign(new Error(message), {
-    envelope: { v: 1, kind, message: { key: FAILURE_MESSAGE_KEYS[kind] } },
+    envelope: {
+      v: 1,
+      kind,
+      message: { key: FAILURE_MESSAGE_KEYS[kind] },
+      ...(reason ? { reason } : {}),
+    },
   })
 }

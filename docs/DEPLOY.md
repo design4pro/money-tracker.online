@@ -22,7 +22,7 @@ staging before production takes a card.
 ## 0. Prerequisites
 
 ```bash
-node --version              # 24.x or newer
+node --version              # matches `.nvmrc` (24.x or newer; engines.node warns only)
 pnpm --version              # 10.15.0
 pnpm install --frozen-lockfile
 pnpm exec wrangler --version
@@ -223,6 +223,9 @@ pnpm exec wrangler secret put APPLE_CLIENT_ID
 pnpm exec wrangler secret put APPLE_CLIENT_SECRET
 pnpm exec wrangler secret put APPLE_APP_BUNDLE_IDENTIFIER
 pnpm exec wrangler secret put EMAIL_API_KEY             # Resend
+pnpm exec wrangler secret put RESEND_WEBHOOK_SECRET     # Resend bounce/complaint webhook
+pnpm exec wrangler secret put EMAIL_HASH_SALT           # recipient hashes; never rotate
+pnpm exec wrangler secret put UNSUBSCRIBE_TOKEN_SECRET  # unsubscribe links
 pnpm exec wrangler secret put CLOUDFLARE_ACCOUNT_ID     # backup cron
 pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN      # backup cron, D1:read only
 pnpm exec wrangler secret put D1_DATABASE_ID            # backup cron
@@ -239,6 +242,9 @@ pnpm exec wrangler secret put SENTRY_DSN
 | `POLAR_ACCESS_TOKEN` / `_WEBHOOK_SECRET` | `BillingConfigError` on the first Upgrade click; the webhook answers 400                                                                                                |
 | `POLAR_SERVER`                           | Same. **There is deliberately no default** — defaulting to production would let a sandbox key hit real money, and defaulting to sandbox would silently take no payments |
 | `EMAIL_API_KEY`                          | Queued mail fails loudly to the dead-letter queue rather than being dropped silently                                                                                    |
+| `RESEND_WEBHOOK_SECRET`                  | `POST /api/webhooks/resend` answers 503 and never accepts a body                                                                                                        |
+| `EMAIL_HASH_SALT`                        | Notification mail stays queued; a verified bounce/complaint webhook answers 503 rather than writing a hash it could not later match                                     |
+| `UNSUBSCRIBE_TOKEN_SECRET`               | Every unsubscribe link is invalid; the one-click endpoint answers 400                                                                                                   |
 | `CLOUDFLARE_*` / `D1_DATABASE_ID`        | The nightly backup logs a skip and continues. **No backups exist**                                                                                                      |
 | `FX_API_KEY`                             | Falls back to the keyless provider. Not needed unless a keyed provider is chosen                                                                                        |
 | `SENTRY_DSN`                             | Nothing is reported. Errors still classify and redact correctly                                                                                                         |
@@ -324,12 +330,13 @@ asserts `/api/health` answers exactly `200`; behind Access it answers `302`, so 
 deploy job fails on a healthy deploy. §11 has the detail and the two ways out. Staging is
 unaffected.
 
-**Before plan 22 ships billing, Polar's webhook needs its own bypass application.** Access is
-default-deny, so a `POST` from Polar to `/api/webhooks/polar` gets the 302 above and the webhook
-fails silently. `planned.travel` solves this with a separate application scoped to the webhook path
-carrying a `Bypass` policy, ordered ahead of the site-wide one; mirror that rather than widening the
-site policy. This is written down here because the failure looks like "Polar is not sending
-webhooks", not like an access-control problem.
+**Polar's and Resend's webhooks each need their own bypass application.** Access is
+default-deny, so a `POST` from Polar to `/api/webhooks/polar` or from Resend to
+`/api/webhooks/resend` gets the 302 above and the webhook fails silently. `planned.travel` solves
+this with a separate application scoped to the webhook path carrying a `Bypass` policy, ordered
+ahead of the site-wide one; mirror that rather than widening the site policy. Rafał sets the Resend
+webhook secret and the Access bypass **after this path merges**. This is written down here because
+the failure looks like "the provider is not sending webhooks", not like an access-control problem.
 
 ---
 
@@ -563,6 +570,23 @@ Staging receives **full** notification delivery through the same templates and s
 production (ADR 0035). There is no staging-stripped body and no staging-disabled notification flag.
 Provider secrets (Resend and related) are owner-added with `wrangler secret put … --env staging`;
 they are not in the repository. When those secrets are unset, the existing no-provider path applies.
+
+### Bounce and complaint webhook
+
+Endpoint `https://money-tracker.online/api/webhooks/resend` (and the staging equivalent). In Resend,
+create a webhook for `email.bounced` and `email.complained`, then copy the signing secret into
+`RESEND_WEBHOOK_SECRET` with `wrangler secret put` (production and `--env staging`). Do not put the
+value in the repository, a log, or a pull request.
+
+The handler verifies a Standard Webhooks HMAC-SHA256 over `${svix-id}.${svix-timestamp}.${raw}`
+with a 300s tolerance (the same verifier as Polar; Resend's `svix-*` headers are mapped onto it).
+Status codes:
+
+- **401** — unsigned or badly signed. Empty body. Never processed.
+- **503** — `RESEND_WEBHOOK_SECRET` (or, on a suppressible event, `EMAIL_HASH_SALT`) is unset. The
+  provider should retry once the secret is in place.
+- **200** — accepted, including a transient bounce, an unknown event type, a redelivery, and a
+  payload whose tags match no delivery (the suppression still lands).
 
 A DMARC record already exists on the apex and is a leftover from another provider:
 

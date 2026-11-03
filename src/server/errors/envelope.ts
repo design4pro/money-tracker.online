@@ -3,9 +3,10 @@
  *
  * `buildEnvelope` produces the public, versioned shape from **closed sets only**: the kind and its
  * catalogue key from `#/lib/failure-envelope`, a `QuotaMetric` for a quota or feature-locked
- * failure, and, for a validation failure, at most twenty field paths with a closed field key.
- * Nothing it emits is read from the thrown value's `message`, `name`, `entity` or `id`, so two
- * failures of one kind serialise to the same bytes and the envelope can carry no id, entity,
+ * failure, a closed `reason` for the refund refusals that share `conflict`, and, for a validation
+ * failure, at most twenty field paths with a closed field key. Nothing it emits is read from the
+ * thrown value's `message`, `name`, `entity` or `id`. Two failures of one kind serialise to the
+ * same bytes unless they carry different closed reasons. The envelope can carry no id, entity,
  * count, limit, plan, amount, timestamp or request id.
  *
  * `retryAfter` is never produced: no throw site has a source for it, and one that did would still
@@ -22,11 +23,19 @@ import {
   MAX_FAILURE_PATH_SEGMENT_LENGTH,
 } from '#/lib/failure-envelope'
 import { isQuotaMetric } from '#/lib/plans'
-import { FeatureLockedError, QuotaExceededError } from '#/server/repos/errors'
+import {
+  FeatureLockedError,
+  QuotaExceededError,
+  isRepositoryError,
+} from '#/server/repos/errors'
 
 import { validationIssuesOf } from './classify'
 
-import type { FailureEnvelope, FailureFieldKey } from '#/lib/failure-envelope'
+import type {
+  FailureEnvelope,
+  FailureFieldKey,
+  FailureReason,
+} from '#/lib/failure-envelope'
 import type { QuotaMetric } from '#/lib/plans'
 
 import type { Classification, ValidationIssue } from './classify'
@@ -85,6 +94,22 @@ function fieldsOf(
  * The metric a quota or feature-locked error names, when the catalogue knows it. The throw site
  * holds a free string, so it is checked here rather than trusted.
  */
+/** Repository `code`s that add a closed reason without changing the kind. */
+const REASON_BY_REPOSITORY_CODE: ReadonlyMap<string, FailureReason> = new Map([
+  ['REFUND_DIRECTION', 'refund_direction'],
+  ['REFUND_CURRENCY', 'refund_currency'],
+  ['OVER_REFUND', 'over_refund'],
+])
+
+function reasonOf(error: unknown): FailureReason | undefined {
+  try {
+    if (!isRepositoryError(error)) return undefined
+    return REASON_BY_REPOSITORY_CODE.get(error.code)
+  } catch {
+    return undefined
+  }
+}
+
 function metricOf(error: unknown): QuotaMetric | undefined {
   try {
     const candidate =
@@ -118,5 +143,7 @@ export function buildEnvelope(
     const issues = validationIssuesOf(error)
     if (issues && issues.length > 0) envelope.fields = fieldsOf(issues)
   }
+  const reason = reasonOf(error)
+  if (reason) envelope.reason = reason
   return envelope
 }

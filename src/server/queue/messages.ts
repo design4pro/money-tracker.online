@@ -121,6 +121,7 @@ export const taskMessageSchema = z.discriminatedUnion('kind', [
 
 export type TaskMessage = z.infer<typeof taskMessageSchema>
 export type BillingEventMessage = z.infer<typeof billingEventMessageSchema>
+export type NotifyEmailMessage = z.infer<typeof notifyEmailMessageSchema>
 
 /** Parses a message body, or `null` when nothing in this deploy knows what it is. */
 export function parseTaskMessage(body: unknown): TaskMessage | null {

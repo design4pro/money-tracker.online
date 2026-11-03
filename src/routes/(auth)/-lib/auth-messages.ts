@@ -6,9 +6,9 @@ import type { MessageKey, Translate } from '#/lib/i18n'
  *
  * Better Auth answers with an upper-snake-case `code` and an English `message`. The code is the
  * stable half — the message is a dependency's prose, in one language, and it changes on a minor
- * version. So the screens key off the code and the English text is used only as the last resort
- * for a code this table does not know yet, where showing *something* specific beats showing
- * "try again" for a refusal the reader could have acted on.
+ * version. Screens key off the code (or the HTTP status). An unknown code with no mapped status
+ * is the generic catalogue sentence, never the English string: a Polish reader must not see
+ * Better Auth's copy, and a new code must not become an account-enumeration oracle.
  *
  * A code that means the same thing to a reader gets the same key: the three ways Better Auth can
  * say "those credentials do not match" are one sentence here, because a reader who is told
@@ -57,10 +57,6 @@ export function authFailureMessage(t: Translate, failure: AuthFailure): string {
 
   const byStatus = MESSAGE_BY_STATUS[failure.status]
   if (byStatus) return t(byStatus)
-
-  // The dependency's own English sentence, only where we have nothing better. It is still more
-  // useful to a reader than "something went wrong", and it is never the first choice.
-  if (failure.message.trim() !== '') return failure.message
 
   return t('auth.error.generic')
 }

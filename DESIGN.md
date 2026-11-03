@@ -926,8 +926,10 @@ failure kind calls for, so a screen never invents its own way out. Both live in
   sentence, Retry when the caller has one, a way back to the dashboard where the reader is known to
   be signed in, and a reference). `not_found` and `forbidden` share the `internal` recovery on
   purpose, so the screen never offers a different way out (the sentence still differs) for a missing row and a foreign one
-  (`RECOVERY_OF`). The sentence is the envelope's own catalogue key, so two failures of one kind
-  read the same, and no recovery shows a plan name or an amount.
+  (`RECOVERY_OF`). The body is the envelope's own catalogue key, so two failures of one kind
+  read the same, and no recovery shows a plan name or an amount. The heading is the call site's
+  `title` when it passes one (`retryable`, and also `internal`, `quota` and `feature_locked`), so a
+  screen reader hears the action that failed rather than only the generic kind.
 - **The states.** It has two placements, `after-action` and `in-place` (the alert-versus-region
   rule below), and Retry has a pending state (the Pending-Not-Disabled Rule). It does not have
   hover, press, selected, disabled or invalid: a panel is not interactive, only its buttons and

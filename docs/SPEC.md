@@ -84,16 +84,17 @@ in `docs/agents/reference.md`; it never blocks a merge, and the ten clauses abov
 
 ## 3. Stack (pinned — do not change, do not add deps)
 
-Package manager **pnpm 10.15.0**, Node **24.x**, ESM, `#/*` → `./src/*` subpath imports.
+Package manager **pnpm 10.15.0**, Node **24.x** (the major in `.nvmrc`; `engines.node` is
+`>=24` and warns only), ESM, `#/*` → `./src/*` subpath imports.
 
 Runtime: **TanStack Start** (React 19) on **Cloudflare Workers** via `@cloudflare/vite-plugin` ·
 **Drizzle** on **D1** · **KV** (two namespaces) · **R2** · **Queues** · one **Durable Object**
 (`AccountLedger`) · **Tailwind 4** · **React Aria Components** with `class-variance-authority` in
 the shadcn shape · **`@internationalized/date`** and **`@internationalized/number`** ·
 `@tanstack/react-table`, `@tanstack/react-virtual`, `@tanstack/react-form`, `@tanstack/react-query` ·
-`d3-scale` / `d3-shape` / `d3-time` · `papaparse` · **Better Auth** with KV secondary storage ·
+`d3-scale` / `d3-shape` · **Better Auth** with KV secondary storage ·
 **Polar** through a hand-rolled REST client · `zod` v4 · Sentry · React Email · `sonner` ·
-`@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
+`@dnd-kit/*` · `nanoid`.
 
 Tooling: Vite 8 · Wrangler 4 · TypeScript 7 (ADR 0024) · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
 (ADR 0015) · Playwright · **`@axe-core/playwright`** · `drizzle-kit` · oxlint (ADR 0023) · Prettier ·
@@ -118,7 +119,8 @@ whole class of failures nobody can explain.
 
 The set itself is changed by a human, in an ADR, with the reason attached - the freeze binds
 stages and agent runs, not the decision record. It binds both directions: `@cloudflare/vitest-pool-workers`
-was an addition (ADR 0015), `motion` a removal (ADR 0019), declared and imported by nothing, and
+was an addition (ADR 0015), `motion` a removal (ADR 0019), declared and imported by nothing,
+`papaparse` / `d3-time` / `date-fns` a later removal of the same shape (ADR 0036), and
 `oxlint` a replacement for `eslint` and `@tanstack/eslint-config` (ADR 0023). A `### Blockers` row
 is still how a stage reports needing a package.
 
@@ -130,9 +132,10 @@ left under its own power once a stage imported it. A fourteenth, `@tanstack/reac
 scan could not see: it counted a package as imported whenever its name appeared in quotes, and an
 unrelated test fixture quotes that one. So every runtime dependency that no file imports
 is dispositioned in
-`scripts/__tests__/dependency-imports.test.ts` — **keep** with the open stage that will import it,
-or **pending** a human's `package.json` decision — and the gate fails on an undispositioned one.
-That table may only shrink: a row leaves when its package is first imported, or when it is removed.
+`scripts/__tests__/dependency-imports.test.ts` as **keep**. #353 spent the seven `pending-*` rows:
+three TanStack `*-devtools` packages moved to `devDependencies`, three packages left (ADR 0036),
+and `@tanstack/react-form` stayed. The gate fails on an undispositioned one. That table may only
+shrink: a row leaves when its package is first imported, or when it is removed.
 
 ---
 
@@ -204,8 +207,8 @@ ticket.
 `email_suppressions` is the **fourth** (`.ai/specs/2026-09-19-transactional-email-resend.md`,
 spec A2): a bounce or complaint is a fact about a mailbox, so the table has no `organization_id`.
 `isSuppressed` and `suppress` in `src/server/repos/email-suppressions.ts` take a bare `Database`.
-The lookup is reachable only from the notification-email queue handler; the write is for the
-Resend webhook (a later phase), never a server function.
+The lookup is reachable only from the notification-email queue handler; the write is for
+`POST /api/webhooks/resend`, never a server function.
 
 `assertScopedWrite` throws when a write composes to an empty predicate list. Transaction reads and
 writes additionally require **explicit policies** — planned, balance-adjustment, transfer and

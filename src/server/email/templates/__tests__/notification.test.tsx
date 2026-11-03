@@ -8,6 +8,14 @@ import { createTranslator, loadCatalogue } from '#/lib/i18n'
 import { asCurrencyCode, asMinor, formatMoney } from '#/lib/money'
 
 import { renderEmail } from '../../render'
+import {
+  listUnsubscribeHeaders,
+  notificationUnsubscribeLinks,
+} from '../../unsubscribe-link'
+import {
+  signUnsubscribeToken,
+  verifyUnsubscribeToken,
+} from '../../unsubscribe-token'
 import { notificationEmail } from '../notification'
 
 import type { Locale, Translate } from '#/lib/i18n'
@@ -89,6 +97,59 @@ describe('the message', () => {
       expect(part).not.toContain(formatted('en', PAYLOAD.spentMinor))
       expect(part).not.toContain(formatted('pl', PAYLOAD.spentMinor))
     }
+  })
+
+  it('carries List-Unsubscribe headers and a footer link whose token verifies', async () => {
+    const t = await translatorFor('en')
+    const now = new Date('2026-09-29T10:00:00.000Z')
+    const key = 'test-unsubscribe-signing-key'
+    const token = await signUnsubscribeToken(
+      {
+        userId: 'user-a',
+        organizationId: 'org-a',
+        subject: 'budget.exceeded',
+      },
+      key,
+      now,
+    )
+    const links = notificationUnsubscribeLinks(
+      'https://app.example.test',
+      token,
+    )
+    const headers = listUnsubscribeHeaders(links.oneClickHref)
+    const { element } = notificationEmail(
+      {
+        kind: 'budget.exceeded',
+        locale: 'en',
+        actionHref: HREF,
+        workspaceName: WORKSPACE,
+        unsubscribe: {
+          href: links.pageHref,
+          label: t('email.layout.footer.unsubscribe'),
+        },
+      },
+      t,
+    )
+    const { html, text } = await renderEmail(element)
+
+    expect(headers['List-Unsubscribe']).toBe(`<${links.oneClickHref}>`)
+    expect(headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
+    expect(html).toContain(links.pageHref)
+    expect(text).toContain(links.pageHref)
+    expect(html).toContain(t('email.layout.footer.unsubscribe'))
+    expect(html).not.toContain('/api/unsubscribe')
+
+    const parsed = new URL(links.pageHref)
+    const claims = await verifyUnsubscribeToken(
+      parsed.searchParams.get('t') ?? '',
+      { current: key },
+      now,
+    )
+    expect(claims).toEqual({
+      userId: 'user-a',
+      organizationId: 'org-a',
+      subject: 'budget.exceeded',
+    })
   })
 
   it('escapes a workspace name that looks like markup, and still has no payload names', async () => {

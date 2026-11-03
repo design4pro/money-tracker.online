@@ -138,6 +138,25 @@ describe('failureEnvelopeSchema', () => {
     expect(failureEnvelopeSchema.safeParse(valid).success).toBe(true)
   })
 
+  it('accepts a closed refund reason and rejects any other', () => {
+    expect(
+      failureEnvelopeSchema.safeParse({
+        v: 1,
+        kind: 'conflict',
+        message: { key: 'failure.conflict' },
+        reason: 'refund_direction',
+      }).success,
+    ).toBe(true)
+    expect(
+      failureEnvelopeSchema.safeParse({
+        v: 1,
+        kind: 'conflict',
+        message: { key: 'failure.conflict' },
+        reason: 'made_up',
+      }).success,
+    ).toBe(false)
+  })
+
   it('tolerates an unknown extra key at the top level and in params, and drops it', () => {
     const parsed = failureEnvelopeSchema.parse({
       ...valid,

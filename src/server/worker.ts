@@ -34,8 +34,13 @@ import './billing/install'
 // summaries say `dispatcherInstalled: false`.
 import './notify/install'
 
+// Side effect only: installs the notification-email enqueuer when the unsubscribe signing key
+// and the recipient-hash salt are both set. Unset, the named no-op stays and the module logs why.
+import './email/install'
+
 import { runBudgetPeriodSweep } from './cron/budget-periods'
 import { runBudgetThresholdSweep } from './cron/budget-thresholds'
+import { runEmailRecovery } from './cron/email-recovery'
 import { runRecurringHourly, runRecurringReminderSweep } from './cron/recurring'
 import { dbFromEnv } from './db/from-env'
 import { handleTaskBatch } from './queue/dispatch'
@@ -163,6 +168,18 @@ export default {
         today: now.toISOString().slice(0, 10),
       })
       logger.info('budget threshold sweep finished', { ...thresholds })
+
+      const recovery = await runEmailRecovery({
+        scopes: args.scopes,
+        now,
+        logger,
+        send: async (message) => {
+          await env.TASKS.send(message)
+        },
+        hasProvider:
+          typeof env.EMAIL_API_KEY === 'string' && env.EMAIL_API_KEY.length > 0,
+      })
+      logger.info('email recovery sweep finished', { ...recovery })
 
       // Returned, not fallen through: this slot now has handlers, and reaching the warning below
       // would report the tag reminders that are still owed as if nothing in the slot had run.

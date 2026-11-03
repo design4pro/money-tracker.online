@@ -43,7 +43,7 @@ runs:
     - name: Set up Node
       uses: actions/setup-node@v7
       with:
-        node-version: 24.x
+        node-version-file: .nvmrc
         cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
 
     - name: Install dependencies

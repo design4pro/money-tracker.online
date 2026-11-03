@@ -121,8 +121,10 @@ function MembersRoute() {
   const seatsLeft = members.seatLimit - members.seatsUsed
   const close = () => setPending({ kind: 'none' })
   const refresh = () => void router.invalidate()
-  const reportFailure = (error: unknown) =>
-    toast.error(t(failureOf(error).message.key))
+  const reportFailure = (title: string, error: unknown) =>
+    toast.error(title, {
+      description: t(failureOf(error).message.key),
+    })
 
   const day = (value: Date) => formatCalendarDate(locale, utcDay(value))
   const seatLimitLabel =
@@ -227,7 +229,14 @@ function MembersRoute() {
                         onChangeRole={(role) => {
                           void changeMemberRole({
                             data: { memberId: person.memberId, role },
-                          }).then(refresh, reportFailure)
+                          }).then(refresh, (error: unknown) =>
+                            reportFailure(
+                              t('members.toast.roleFailed', {
+                                name: person.name,
+                              }),
+                              error,
+                            ),
+                          )
                         }}
                         onRemove={() =>
                           setPending({ kind: 'remove', member: person })
@@ -280,10 +289,19 @@ function MembersRoute() {
                         onPress={() => {
                           void resendInvitation({
                             data: { invitationId: invitation.id },
-                          }).then(() => {
-                            toast.success(t('members.pending.resent'))
-                            refresh()
-                          }, reportFailure)
+                          }).then(
+                            () => {
+                              toast.success(t('members.pending.resent'))
+                              refresh()
+                            },
+                            (error: unknown) =>
+                              reportFailure(
+                                t('members.toast.resendFailed', {
+                                  email: invitation.email,
+                                }),
+                                error,
+                              ),
+                          )
                         }}
                       >
                         {t('members.pending.resend')}
@@ -294,10 +312,19 @@ function MembersRoute() {
                         onPress={() => {
                           void revokeInvitation({
                             data: { invitationId: invitation.id },
-                          }).then(() => {
-                            toast.success(t('members.pending.revoked'))
-                            refresh()
-                          }, reportFailure)
+                          }).then(
+                            () => {
+                              toast.success(t('members.pending.revoked'))
+                              refresh()
+                            },
+                            (error: unknown) =>
+                              reportFailure(
+                                t('members.toast.revokeFailed', {
+                                  email: invitation.email,
+                                }),
+                                error,
+                              ),
+                          )
                         }}
                       >
                         {t('members.pending.revoke')}

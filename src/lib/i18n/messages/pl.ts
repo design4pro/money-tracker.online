@@ -861,6 +861,12 @@ const messages = {
   'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
   'refunds.dialog.error.refused':
     'Nic się nie zmieniło. Tego zwrotu nie da się powiązać w tej postaci. Sprawdź transakcję, jej kwotę, walutę i kierunek, a potem spróbuj ponownie.',
+  'refunds.dialog.error.direction':
+    'Nic się nie zmieniło. Zwrot musi iść w przeciwną stronę niż oryginał. Wybierz transakcję drugiego rodzaju albo zapisz to jako coś spoza domu.',
+  'refunds.dialog.error.currency':
+    'Nic się nie zmieniło. Zwrot i to, czego dotyczy, muszą być w tej samej walucie. Wybierz pasującą walutę albo zapisz to jako coś spoza domu.',
+  'refunds.dialog.error.over':
+    'Nic się nie zmieniło. To oddałoby więcej, niż zapłacono. Wybierz większy oryginał albo mniejszy zwrot.',
   'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
   'refunds.suggest.empty':
     'Żaden wydatek u tego samego odbiorcy z ostatnich 90 dni nie jest dość duży, aby to był jego zwrot.',
@@ -1822,6 +1828,11 @@ const messages = {
   'members.error.seatsFull':
     'W tym planie nie ma wolnego miejsca. Zmień plan albo najpierw wycofaj jedno zaproszenie.',
   'members.error.generic': 'Nie udało się. Nic nie zostało zmienione.',
+  'members.toast.roleFailed': 'Nie udało się zmienić roli osoby {name}',
+  'members.toast.resendFailed':
+    'Nie udało się ponownie wysłać zaproszenia na adres {email}',
+  'members.toast.revokeFailed':
+    'Nie udało się wycofać zaproszenia na adres {email}',
 
   /* -- Accepting an invitation -------------------------------------------- */
   'invite.title': 'Dołącz do domu {workspace}',
@@ -2906,6 +2917,7 @@ const messages = {
     'Plik {name} zostanie usunięty na stałe. Sam wpis pozostanie bez zmian.',
   'attachments.confirm.action': 'Usuń',
   'attachments.toast.deleted': 'Paragon usunięty',
+  'attachments.toast.deleteFailed': 'Nie usunięto pliku {name}',
   /* -- Why an import refused a row (19-S2) ---------------------------------- */
   'import.error.date_empty': 'Kolumna daty jest pusta w tym wierszu.',
   'import.error.date_unparseable':

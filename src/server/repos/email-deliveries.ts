@@ -34,6 +34,7 @@ const insertSchema = z.strictObject({
   notificationId: z.string().trim().min(1).max(64).nullable().optional(),
   dedupeKey: z.string().trim().min(1).max(200),
   status: statusSchema.optional(),
+  errorCode: z.string().trim().min(1).max(64).nullable().optional(),
 })
 export type InsertDeliveryInput = z.infer<typeof insertSchema>
 
@@ -71,7 +72,7 @@ export async function insertDelivery(
       toHash: null,
       providerMessageId: null,
       status: parsed.status ?? 'queued',
-      errorCode: null,
+      errorCode: parsed.errorCode ?? null,
       createdAt: now,
       sentAt: null,
     },
@@ -108,6 +109,15 @@ export async function claimDelivery(
   return rows[0] ?? null
 }
 
+const webhookStatusSchema = z.enum(['bounced', 'complained'])
+
+const markByProviderSchema = z.strictObject({
+  id: idSchema,
+  providerMessageId: z.string().trim().min(1).max(200),
+  status: webhookStatusSchema,
+})
+export type MarkDeliveryByProviderInput = z.infer<typeof markByProviderSchema>
+
 /**
  * Records the outcome. Scoped: a patch aimed at another workspace's id matches nothing.
  *
@@ -141,6 +151,27 @@ export async function markDelivery(
         : { errorCode: parsed.errorCode }),
       ...(parsed.sentAt === undefined ? {} : { sentAt: parsed.sentAt }),
     },
+  )
+  return rows[0] ?? null
+}
+
+/**
+ * Sets `bounced` or `complained` only when this workspace, this delivery id and this
+ * provider message id all name the same row. Anything else matches nothing: a webhook whose
+ * tags or Resend id drifted must not rewrite a neighbour (or this workspace's other sends).
+ */
+export async function markDeliveryByProviderMessage(
+  scope: TenantScope,
+  input: MarkDeliveryByProviderInput,
+): Promise<EmailDeliveryRow | null> {
+  const parsed = markByProviderSchema.parse(input)
+  const rows = await deliveryRepo.updateWhere(
+    scope,
+    allOf(
+      eq(emailDeliveries.id, parsed.id),
+      eq(emailDeliveries.providerMessageId, parsed.providerMessageId),
+    ),
+    { status: parsed.status },
   )
   return rows[0] ?? null
 }
