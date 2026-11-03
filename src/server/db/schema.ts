@@ -124,6 +124,9 @@ import {
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
   NOTIFICATION_KIND_IDS,
+  EMAIL_DELIVERY_STATUSES,
+  EMAIL_DELIVERY_KINDS,
+  EMAIL_SUPPRESSION_REASONS,
   BOOKS,
   LOAN_KINDS,
   LOAN_STATUSES,
@@ -172,6 +175,9 @@ export {
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
   NOTIFICATION_KIND_IDS,
+  EMAIL_DELIVERY_STATUSES,
+  EMAIL_DELIVERY_KINDS,
+  EMAIL_SUPPRESSION_REASONS,
   BOOKS,
   LOAN_KINDS,
   LOAN_STATUSES,
@@ -215,6 +221,9 @@ export type {
   ExportStatus,
   SuggestionKind,
   NotificationKind,
+  EmailDeliveryStatus,
+  EmailDeliveryKind,
+  EmailSuppressionReason,
   Book,
   LoanKind,
   LoanStatus,
@@ -3187,3 +3196,84 @@ export const notificationPrefs = sqliteTable(
 )
 
 export type NotificationPrefRow = typeof notificationPrefs.$inferSelect
+
+/**
+ * One attempt to send a notification (or digest) email.
+ *
+ * The unique key is `(organization_id, user_id, dedupe_key)`, so a second enqueue of the same
+ * occasion in the same workspace is an insert conflict, and two workspaces may both hold
+ * `digest:2026-09-20`. `to_hash` is written at send time from the address actually used, never
+ * the address itself; rotating `EMAIL_HASH_SALT` would break bounce correlation, which is why
+ * that secret is never rotated.
+ *
+ * `notification_id` is null for a digest and becomes null when the in-app row is deleted
+ * (`ON DELETE SET NULL`). The handler treats that as `gone` and does not call the provider.
+ */
+export const emailDeliveries = sqliteTable(
+  'email_deliveries',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    notificationId: text('notification_id').references(() => notifications.id, {
+      onDelete: 'set null',
+    }),
+    dedupeKey: text('dedupe_key').notNull(),
+    /** HMAC-SHA-256 of the address actually used. Never the address. */
+    toHash: text('to_hash'),
+    providerMessageId: text('provider_message_id'),
+    status: text('status').notNull(),
+    /** Provider HTTP status or an error `name`. Never a message body. */
+    errorCode: text('error_code'),
+    createdAt: createdAt(),
+    sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex(
+      'email_deliveries_organization_id_user_id_dedupe_key_unique',
+    ).on(table.organizationId, table.userId, table.dedupeKey),
+    index('email_deliveries_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    enumCheck('email_deliveries_kind_check', table.kind, EMAIL_DELIVERY_KINDS),
+    enumCheck(
+      'email_deliveries_status_check',
+      table.status,
+      EMAIL_DELIVERY_STATUSES,
+    ),
+  ],
+)
+
+export type EmailDeliveryRow = typeof emailDeliveries.$inferSelect
+export type EmailDeliveryInsert = typeof emailDeliveries.$inferInsert
+
+/**
+ * Addresses that must never be mailed again, keyed by the same salted hash `to_hash` uses.
+ *
+ * **Platform data, not tenant data** — the fourth documented carve-out from `docs/SPEC.md` §5.2.
+ * A bounce or complaint is a fact about a mailbox. Per-workspace suppression would keep emailing
+ * a complained address from a second household and burn sender reputation. There is no
+ * `organization_id`, and the only readers are the queue handler (lookup) and the Resend webhook
+ * (write, a later phase).
+ */
+export const emailSuppressions = sqliteTable(
+  'email_suppressions',
+  {
+    emailHash: text('email_hash').primaryKey(),
+    reason: text('reason').notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    enumCheck(
+      'email_suppressions_reason_check',
+      table.reason,
+      EMAIL_SUPPRESSION_REASONS,
+    ),
+  ],
+)
+
+export type EmailSuppressionRow = typeof emailSuppressions.$inferSelect

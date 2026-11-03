@@ -7,6 +7,7 @@
  */
 
 import { handleBillingEvent } from './billing-event'
+import { handleNotifyEmail } from './notify-email'
 import { notInstalled } from './not-installed'
 
 import type { TaskHandlers } from '../dispatch'
@@ -18,6 +19,28 @@ export const taskHandlers: TaskHandlers = {
       eventId: task.eventId,
       now: ctx.now(),
       logger: ctx.logger,
+    })
+    ctx.logger.debug('queue message handled', { kind: task.kind, outcome })
+  },
+  'notify.email': async (task, ctx) => {
+    // Bindings live behind `cloudflare:workers`, which the server test project cannot load at
+    // module evaluation. The handler itself takes them as arguments; this is the one place they
+    // are read, and only when a `notify.email` message actually runs.
+    const { appUrl, emailDelivery } = await import('#/server/auth/env')
+    const { emailHashSalt } = await import('#/server/email/env')
+    const outcome = await handleNotifyEmail({
+      db: ctx.db,
+      organizationId: task.organizationId,
+      deliveryId: task.deliveryId,
+      now: ctx.now(),
+      logger: ctx.logger,
+      transport: {
+        delivery: emailDelivery(),
+        logger: ctx.logger,
+        kind: 'notify.email',
+      },
+      hashSalt: emailHashSalt(),
+      appUrl: appUrl(),
     })
     ctx.logger.debug('queue message handled', { kind: task.kind, outcome })
   },

@@ -198,6 +198,26 @@ export async function isMember(
 }
 
 /**
+ * The address on file for one member of this workspace, or `null` if they are not a member.
+ *
+ * Read at send time so a changed address is hashed under its new value. The delivery row never
+ * stores the address, only the salted hash.
+ */
+export async function memberEmail(
+  scope: TenantScope,
+  userId: string,
+): Promise<string | null> {
+  const rows = await scope.db
+    .select({ email: user.email })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(allOf(tenantFilter(scope, member), eq(member.userId, userId)))
+    .limit(1)
+  const email = rows[0]?.email
+  return email === undefined || email.trim() === '' ? null : email
+}
+
+/**
  * A scope for one person in one workspace, built from a signed link rather than a session.
  *
  * The unsubscribe token (`#/server/email/unsubscribe-token`) names a person and a workspace, and

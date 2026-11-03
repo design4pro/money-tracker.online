@@ -201,6 +201,12 @@ workspace creation (`organization_currencies` with a base currency the person ch
 `workspace_settings`, preset categories and budgets) need their own recorded decision in that
 ticket.
 
+`email_suppressions` is the **fourth** (`.ai/specs/2026-09-19-transactional-email-resend.md`,
+spec A2): a bounce or complaint is a fact about a mailbox, so the table has no `organization_id`.
+`isSuppressed` and `suppress` in `src/server/repos/email-suppressions.ts` take a bare `Database`.
+The lookup is reachable only from the notification-email queue handler; the write is for the
+Resend webhook (a later phase), never a server function.
+
 `assertScopedWrite` throws when a write composes to an empty predicate list. Transaction reads and
 writes additionally require **explicit policies** — planned, balance-adjustment, transfer and
 completeness — so that "which rows does this query mean" is always answered, never defaulted.

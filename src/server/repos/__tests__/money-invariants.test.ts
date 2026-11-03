@@ -38,9 +38,13 @@ import {
   asMinor,
   asRateE10,
   minorUnitDigits,
+  formatMoney,
   parseMoney,
   subtractMinor,
 } from '#/lib/money'
+import { createTranslator, loadCatalogue } from '#/lib/i18n'
+import { renderEmail } from '#/server/email/render'
+import { notificationEmail } from '#/server/email/templates/notification'
 import { listEnabledCurrencies } from '#/server/catalog/currencies'
 import { projectCompletion } from '#/server/goals/project'
 import { runAutoRecord } from '#/server/recurring/auto-record'
@@ -2944,5 +2948,43 @@ describe('23 — an imported loan schedule is integer amounts with paid-requires
     )
     expect(source).not.toMatch(/\bMath\.(pow|floor|ceil|round)\b/)
     expect(source).not.toMatch(/\/\s*\d*(?:00|100)\b/)
+  })
+})
+
+describe('24 — notification email is not a money surface', () => {
+  const payload = {
+    spentMinor: 205_000,
+    availableMinor: 200_000,
+    overspentMinor: 5_000,
+    budgetName: 'Groceries',
+    currencyCode: 'PLN',
+  } as const
+
+  it('renders event name and deep link with no minor units or formatted money', async () => {
+    const t = createTranslator('en', await loadCatalogue('en'))
+    const { subject, element } = notificationEmail(
+      {
+        kind: 'budget.exceeded',
+        locale: 'en',
+        actionHref: 'https://app.example.test/budgets/budget-1',
+        workspaceName: 'Haushalt',
+      },
+      t,
+    )
+    const { html, text } = await renderEmail(element)
+    const drawn = formatMoney('en', {
+      amountMinor: asMinor(payload.spentMinor),
+      currencyCode: asCurrencyCode(payload.currencyCode),
+    })
+
+    expect(subject).toBe('Spent budgets')
+    expect(html).toContain('/budgets/budget-1')
+    expect(text).toContain('/budgets/budget-1')
+    for (const part of [html, text, subject]) {
+      expect(part).not.toContain(String(payload.spentMinor))
+      expect(part).not.toContain(String(payload.availableMinor))
+      expect(part).not.toContain(payload.budgetName)
+      expect(part).not.toContain(drawn)
+    }
   })
 })
