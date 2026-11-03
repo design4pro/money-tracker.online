@@ -39,6 +39,9 @@ const THRESHOLD = {
   spentMinor: 160_000,
   availableMinor: 200_000,
   currencyCode: 'PLN',
+  payee: 'SYNTH_PAYEE_ACME',
+  account: 'SYNTH_ACCOUNT_CHECKING',
+  category: 'SYNTH_CATEGORY_FOOD',
 }
 const DUE_SOON = {
   v: 1 as const,
@@ -57,7 +60,7 @@ const GOAL = {
   targetMinor: 100_000,
   contributedMinor: 100_000,
   currencyCode: 'PLN',
-  transactionId: 'tx-1',
+  transactionId: 'SYNTH_TX_9f3a',
 }
 const EXCEEDED = {
   v: 1 as const,
@@ -178,6 +181,9 @@ describe('runDigest', () => {
     expect(body.html).toContain(`${APP_URL}/goals/goal-1`)
     expect(body.html).not.toContain(`${APP_URL}/budgets/budget-2`)
     expect(body.html).not.toContain('Spent budgets')
+    expect(body.html).toContain('Budget thresholds')
+    expect(body.html).toContain('Upcoming bills')
+    expect(body.html).toContain('Reached goals')
     for (const part of [body.html, body.text, body.subject]) {
       expect(part).not.toContain(String(THRESHOLD.spentMinor))
       expect(part).not.toContain(String(DUE_SOON.expectedAmountMinor))
@@ -185,6 +191,10 @@ describe('runDigest', () => {
       expect(part).not.toContain('Groceries')
       expect(part).not.toContain('Rent')
       expect(part).not.toContain('Emergency')
+      expect(part).not.toContain('SYNTH_PAYEE_ACME')
+      expect(part).not.toContain('SYNTH_ACCOUNT_CHECKING')
+      expect(part).not.toContain('SYNTH_CATEGORY_FOOD')
+      expect(part).not.toContain('SYNTH_TX_9f3a')
     }
     expect(body.html).toContain(`${APP_URL}/unsubscribe?t=`)
   })
