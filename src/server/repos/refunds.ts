@@ -61,7 +61,8 @@ import { refunds, transactionSplits, transactions } from '#/server/db/schema'
 
 import { allOf, asc, createTenantTableAccess, desc, inIds } from './base'
 import { ConflictError, NotFoundError } from './errors'
-import { applyPolicies, getTransaction, toTransaction } from './transactions'
+import { applyPolicies, getTransaction } from './transactions'
+import { toTransaction } from '#/server/transactions/row'
 
 import type { SQL } from 'drizzle-orm'
 import type { Minor } from '#/lib/money'

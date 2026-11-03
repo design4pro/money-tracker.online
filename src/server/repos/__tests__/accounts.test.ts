@@ -73,7 +73,7 @@ import {
 import type { RateE10 } from '#/lib/money'
 import type * as BaseModule from '../base'
 import type { TenantScope } from '../scope'
-import type { ConversionContext } from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 vi.mock('../base', async (importOriginal) => {
   const actual = await importOriginal<typeof BaseModule>()

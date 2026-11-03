@@ -65,7 +65,7 @@ import {
   tenantFilter,
 } from './base'
 import { ConflictError, NotFoundError } from './errors'
-import { toTransaction } from './transactions'
+import { toTransaction } from '#/server/transactions/row'
 
 import type { SQL } from 'drizzle-orm'
 import type { Minor } from '#/lib/money'

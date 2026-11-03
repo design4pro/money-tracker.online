@@ -201,7 +201,8 @@ import {
 
 import type { BudgetWorld } from './budget-harness'
 import type { TenantScope } from '../scope'
-import type { ConversionContext, TransactionPolicies } from '../transactions'
+import type { TransactionPolicies } from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 /* -------------------------------------------------------------------------- */
 /* Harness                                                                     */
@@ -1553,7 +1554,6 @@ describe('the transaction write path cannot reach or be aimed across a workspace
     accountId: 'acc-a',
     direction: 'expense',
     amountMinor: 12_345,
-    currencyCode: 'PLN',
     bookedOn: '2026-03-10',
   } as const
   const categoryRepo = createTenantRepository(categories, 'category')
@@ -1829,6 +1829,7 @@ describe('the transaction write path cannot reach or be aimed across a workspace
       organizationId: 'org-a',
       createdByUserId: 'user-a',
       accountId: 'acc-a',
+      currencyCode: 'PLN',
       categoryId: 'cat-a',
       payeeId: 'pay-a',
     })

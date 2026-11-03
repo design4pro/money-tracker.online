@@ -273,9 +273,6 @@ function TransactionDetailScreen({
       readonly amountMinor: Minor
     }) => {
       const { entry } = input
-      const account = reference.accounts.find(
-        (option) => option.id === entry.accountId,
-      )
       return updateTransaction({
         data: {
           transactionId: transaction.id,
@@ -284,7 +281,6 @@ function TransactionDetailScreen({
             accountId: entry.accountId,
             direction: entry.direction,
             amountMinor: input.amountMinor,
-            currencyCode: account?.currencyCode ?? transaction.currencyCode,
             bookedOn: entry.bookedOn,
             categoryId: entry.categoryId,
             payeeId: entry.payeeId,

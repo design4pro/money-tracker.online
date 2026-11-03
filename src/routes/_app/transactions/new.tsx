@@ -315,9 +315,6 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
       readonly addAnother: boolean
     }) => {
       const { entry } = input
-      const account = reference.accounts.find(
-        (option) => option.id === entry.accountId,
-      )
       return createTransaction({
         data: {
           policies: WRITE_POLICIES,
@@ -327,7 +324,6 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
             // Already `Minor` — an integer count of the currency's own minor units. Nothing on this
             // path parses a string or divides by a hundred.
             amountMinor: input.amountMinor,
-            currencyCode: account?.currencyCode ?? reference.baseCurrencyCode,
             bookedOn: entry.bookedOn,
             categoryId: entry.categoryId,
             payeeId: entry.payeeId,
