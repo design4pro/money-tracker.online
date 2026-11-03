@@ -18,14 +18,35 @@ const MAX_UTC_OFFSET_MS = 14 * 60 * 60 * 1000
  */
 export const DEFAULT_WORKSPACE_TIMEZONE = 'Europe/Warsaw'
 
-/** True when `value` is an IANA zone `Intl` will accept in this isolate. */
-export function isIanaTimeZone(value: string): boolean {
-  try {
-    Intl.DateTimeFormat('en-US', { timeZone: value })
-    return true
-  } catch {
-    return false
+/**
+ * The canonical IANA id for `value`, or `null` when it is not one.
+ *
+ * `Intl` accepts offsets (`+05:00`), abbreviations (`EST`) and lower-case ids
+ * (`europe/warsaw`). Those are not stored: due/overdue "today" is a named zone
+ * (`docs/MONEY.md` §6.4), and the row keeps `resolvedOptions().timeZone`.
+ */
+export function canonicalIanaTimeZone(value: string): string | null {
+  if (value !== value.trim() || value.length === 0 || value.length > 64) {
+    return null
   }
+  // Offsets, not names.
+  if (/^[+-]\d/.test(value) || value.includes(':')) return null
+  // Abbreviations and country aliases (`EST`, `GMT`, `Poland`) have no slash.
+  if (value !== 'UTC' && !value.includes('/')) return null
+  // IANA ids are mixed-case. A lower-cased Area/Location is not stored.
+  if (value !== 'UTC' && value === value.toLowerCase()) return null
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: value,
+    }).resolvedOptions().timeZone
+  } catch {
+    return null
+  }
+}
+
+/** True when `value` is an IANA zone this isolate will accept and we will store. */
+export function isIanaTimeZone(value: string): boolean {
+  return canonicalIanaTimeZone(value) !== null
 }
 
 /**

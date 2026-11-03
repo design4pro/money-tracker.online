@@ -94,8 +94,9 @@ export function serverToday(): string {
 /**
  * Today in a workspace timezone, still honouring the development and e2e pins.
  *
- * Recurring due/overdue reads this. Report month buckets keep {@link serverToday} (UTC), so a
- * timezone change cannot move a booked row between months (`docs/MONEY.md` §6.2, §6.4).
+ * Recurring and planned due/overdue read this. Report month buckets keep
+ * {@link serverToday} (UTC), so a timezone change cannot move a booked row
+ * between months (`docs/MONEY.md` §6.2, §6.4).
  */
 export function workspaceCivilDay(
   timeZone: string = DEFAULT_WORKSPACE_TIMEZONE,

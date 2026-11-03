@@ -2809,23 +2809,37 @@ describe('workspace timezone cannot be aimed across a workspace boundary', () =>
     harnessExecuted.length = 0
     await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
 
-    const updates = harnessExecuted.filter((query) =>
-      /update\s+"organization_settings"/i.test(query),
+    const writes = harnessExecuted.filter((query) =>
+      /(insert\s+into|update)\s+"organization_settings"/i.test(query),
     )
-    expect(updates).not.toHaveLength(0)
-    for (const statement of updates) {
+    expect(writes).not.toHaveLength(0)
+    for (const statement of writes) {
       expect(statement).toContain('organization_id')
     }
-    expect(
-      harnessExecuted.filter((query) =>
-        /insert\s+into\s+"organization_settings"/i.test(query),
-      ),
-    ).toHaveLength(0)
 
     expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
     expect(await getWorkspaceTimezone(world.otherScope)).toBe(
       'Pacific/Auckland',
     )
+  })
+
+  it('stores the canonical Intl id rather than a link name', async () => {
+    await setWorkspaceTimezone(world.scope, { timezone: 'US/Eastern' })
+    expect(await getWorkspaceTimezone(world.scope)).toBe('America/New_York')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+  })
+
+  it('creates the row with insert-on-conflict instead of a read that decides the write', async () => {
+    harnessExecuted.length = 0
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    const sql = harnessExecuted.join('\n')
+    expect(sql).toMatch(/insert\s+into\s+"organization_settings"/i)
+    expect(sql).toMatch(/on conflict/i)
+    expect(sql).not.toMatch(
+      /select[\s\S]*insert\s+into\s+"organization_settings"/i,
+    )
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
   })
 
   it('updates only A’s existing row when both workspaces already have one', async () => {
@@ -2841,9 +2855,11 @@ describe('workspace timezone cannot be aimed across a workspace boundary', () =>
   })
 
   it('refuses a timezone that is not an IANA name, without writing B', async () => {
-    await expect(
-      setWorkspaceTimezone(world.scope, { timezone: 'Not/AZone' }),
-    ).rejects.toThrow()
+    for (const timezone of ['Not/AZone', '+05:00', 'EST', 'europe/warsaw']) {
+      await expect(
+        setWorkspaceTimezone(world.scope, { timezone }),
+      ).rejects.toThrow()
+    }
     expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
   })
 })

@@ -126,7 +126,11 @@ export function SeriesCard({ row, today, actions }: SeriesCardProps) {
               )}
             </span>
             <span aria-hidden="true">·</span>
-            <span>{t(`book.${series.book as Book}`)}</span>
+            <span>
+              {t('book.value', {
+                book: t(`book.${series.book as Book}`),
+              })}
+            </span>
           </p>
         </div>
 
