@@ -5,6 +5,12 @@
 One document per designed change. The directory a spec sits in is its state, and the table under
 its `H1` names the issue and the pull requests behind it. The rules are in [AGENTS.md](AGENTS.md).
 
+## Draft — being written (1)
+
+| Spec                                                                                                       | Date       | Issue                                                                 | Spec PR | Implementation |
+| ---------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------- | -------------- |
+| [Dashboard cash-flow: whole-month plan beside actual](2026-11-03-dashboard-cash-flow-planned-vs-actual.md) | 2026-11-03 | [#840](https://github.com/design4pro/money-tracker.online/issues/840) | —       | —              |
+
 ## Ready — merged, waiting for a build (6)
 
 | Spec                                                                                                                                                                    | Date       | Issue | Spec PR                                                             | Implementation |
