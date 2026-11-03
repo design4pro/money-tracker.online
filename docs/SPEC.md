@@ -91,9 +91,9 @@ Runtime: **TanStack Start** (React 19) on **Cloudflare Workers** via `@cloudflar
 (`AccountLedger`) · **Tailwind 4** · **React Aria Components** with `class-variance-authority` in
 the shadcn shape · **`@internationalized/date`** and **`@internationalized/number`** ·
 `@tanstack/react-table`, `@tanstack/react-virtual`, `@tanstack/react-form`, `@tanstack/react-query` ·
-`d3-scale` / `d3-shape` / `d3-time` · `papaparse` · **Better Auth** with KV secondary storage ·
+`d3-scale` / `d3-shape` · **Better Auth** with KV secondary storage ·
 **Polar** through a hand-rolled REST client · `zod` v4 · Sentry · React Email · `sonner` ·
-`@dnd-kit/*` · `nanoid` · `date-fns` (formatting only).
+`@dnd-kit/*` · `nanoid`.
 
 Tooling: Vite 8 · Wrangler 4 · TypeScript 7 (ADR 0024) · Vitest 4 · **`@cloudflare/vitest-pool-workers`**
 (ADR 0015) · Playwright · **`@axe-core/playwright`** · `drizzle-kit` · oxlint (ADR 0023) · Prettier ·
@@ -118,7 +118,8 @@ whole class of failures nobody can explain.
 
 The set itself is changed by a human, in an ADR, with the reason attached - the freeze binds
 stages and agent runs, not the decision record. It binds both directions: `@cloudflare/vitest-pool-workers`
-was an addition (ADR 0015), `motion` a removal (ADR 0019), declared and imported by nothing, and
+was an addition (ADR 0015), `motion` a removal (ADR 0019), declared and imported by nothing,
+`papaparse` / `d3-time` / `date-fns` a later removal of the same shape (ADR 0036), and
 `oxlint` a replacement for `eslint` and `@tanstack/eslint-config` (ADR 0023). A `### Blockers` row
 is still how a stage reports needing a package.
 
@@ -130,9 +131,10 @@ left under its own power once a stage imported it. A fourteenth, `@tanstack/reac
 scan could not see: it counted a package as imported whenever its name appeared in quotes, and an
 unrelated test fixture quotes that one. So every runtime dependency that no file imports
 is dispositioned in
-`scripts/__tests__/dependency-imports.test.ts` — **keep** with the open stage that will import it,
-or **pending** a human's `package.json` decision — and the gate fails on an undispositioned one.
-That table may only shrink: a row leaves when its package is first imported, or when it is removed.
+`scripts/__tests__/dependency-imports.test.ts` as **keep**. #353 spent the seven `pending-*` rows:
+three TanStack `*-devtools` packages moved to `devDependencies`, three packages left (ADR 0036),
+and `@tanstack/react-form` stayed. The gate fails on an undispositioned one. That table may only
+shrink: a row leaves when its package is first imported, or when it is removed.
 
 ---
 

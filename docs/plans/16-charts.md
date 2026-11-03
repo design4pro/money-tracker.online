@@ -2,7 +2,7 @@
 
 ## Area brief
 
-Four chart types, hand-rolled as accessible SVG on `d3-scale`, `d3-shape` and `d3-time`: **line/area**,
+Four chart types, hand-rolled as accessible SVG on `d3-scale` and `d3-shape`: **line/area**,
 **stacked bar**, **donut** and **sparkline**. No chart library
 (`docs/adr/0007-hand-rolled-accessible-charts-over-a-chart-library.md`,
 `99-boundaries-and-blockers.md` BND-20).
@@ -28,7 +28,8 @@ builds the four chart types on top of it and the axis/scale utilities they share
 
 ### Reference rows
 
-`CHART-01 missing → done` — the scale and axis utilities over `d3-scale` and `d3-time`.
+`CHART-01 missing → done` — the scale and axis utilities over `d3-scale` (`d3-time` was named here
+and never imported; ADR 0036 removed it).
 `CHART-02 missing → done` — the line and area chart with keyboard-reachable points.
 
 ### Owned paths
@@ -52,7 +53,7 @@ None. `src/components/charts/**` is client code and, like `components/ui`, **nev
 ### UI (route, components)
 
 - **Route.** None; the gallery route (`01-S1`) hosts the visual evidence.
-- **Components.** `scales.ts` wraps `scaleTime`, `scaleLinear` and `scaleBand` with our own nice-tick
+- **Components.** `scales.ts` wraps `scaleLinear` and `scaleBand` with our own nice-tick
   logic; `axis.tsx` renders ticks with locale-formatted labels; `line-chart.tsx` composes
   `chart-frame` (`00-S10`) with `d3-shape`'s line and area generators; `data-table.tsx` is the shared
   visually-hidden table renderer every chart type passes to the frame.
