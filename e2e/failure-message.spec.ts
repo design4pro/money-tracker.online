@@ -19,7 +19,8 @@ import pl from '#/lib/i18n/messages/pl'
 import type { AppLocale, AppTheme } from './support/app'
 
 /**
- * A refused save shows the catalogue sentence of its failure, and nothing the error said (#718).
+ * A refused save shows the action-specific title, the catalogue sentence of its kind, and nothing
+ * the error said (#718, #721).
  *
  * The create-account dialog stands for the ~25 after-action sites that moved onto `FailurePanel`:
  * the same `failureOf` in the `catch`, the same panel in the dialog body. The stub of
@@ -114,18 +115,17 @@ test.describe('a refused save', () => {
             .click()
 
           const panel = dialog.getByRole('alert')
-          await expect(panel).toContainText(
-            CATALOGUE[locale]['empty.error.title'],
-          )
+          const saveTitle = CATALOGUE[locale]['accounts.form.error.title']
+          await expect(panel).toContainText(saveTitle)
           await expect(panel).toContainText(
             CATALOGUE[locale]['failure.internal'],
           )
           await expect(dialog.locator('details')).toHaveCount(0)
           await expect(page.locator('body')).not.toContainText(STUB_TEXT)
-          // Focus moved to the panel's heading: the reader hears the alert and is where it is.
+          // Focus moved to the panel's heading: the reader hears the action that failed.
           await expect(
             panel.getByRole('heading', {
-              name: CATALOGUE[locale]['empty.error.title'],
+              name: saveTitle,
             }),
           ).toBeFocused()
           await expectNoWcagViolations(
