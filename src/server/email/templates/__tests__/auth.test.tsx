@@ -140,10 +140,13 @@ describe('in Polish', () => {
 
 describe('what an auth email must not do', () => {
   it('offers no unsubscribe, because nobody can opt out of a password reset', async () => {
-    const { html } = await render()
+    const { html, text } = await render()
 
     expect(html.toLowerCase()).not.toContain('unsubscribe')
     expect(html.toLowerCase()).not.toContain('wypisz')
+    expect(text.toLowerCase()).not.toContain('unsubscribe')
+    expect(html).not.toContain('List-Unsubscribe')
+    expect(text).not.toContain('List-Unsubscribe')
   })
 
   it('leaves no placeholder unfilled in either locale', async () => {

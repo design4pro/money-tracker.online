@@ -44,7 +44,7 @@ async function seed(createdAt: Date, status: 'queued' | 'sending' = 'sending') {
 }
 
 describe('runEmailRecovery', () => {
-  it('requeues a crash-after-claim row with the same delivery id', async () => {
+  it('requeues a crash-after-claim row once with the same Idempotency-Key', async () => {
     const row = await seed(SIXTEEN_MIN_AGO, 'sending')
     const sent: Array<NotifyEmailMessage> = []
 
@@ -59,13 +59,13 @@ describe('runEmailRecovery', () => {
     })
 
     expect(report).toMatchObject({ requeued: 1, expired: 0, failures: 0 })
-    expect(sent).toEqual([
-      {
-        kind: 'notify.email',
-        organizationId: 'org-a',
-        deliveryId: row.id,
-      },
-    ])
+    expect(sent).toHaveLength(1)
+    // The handler posts `Idempotency-Key: {deliveryId}` (`notify-email.test.ts`).
+    expect(sent[0]).toEqual({
+      kind: 'notify.email',
+      organizationId: 'org-a',
+      deliveryId: row.id,
+    })
     expect(await getDelivery(world.scope, row.id)).toMatchObject({
       status: 'queued',
     })
