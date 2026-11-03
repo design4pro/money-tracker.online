@@ -1,11 +1,11 @@
 # Transactional email on Resend: React Email templates, the digest and unsubscribe
 
-| Field              | Value                        |
-| ------------------ | ---------------------------- |
-| **Status**         | in-progress                  |
-| **Issue**          | #210                         |
-| **Spec PR**        | #344                         |
-| **Implementation** | #349, #821, #488, #829, #830 |
+| Field              | Value                              |
+| ------------------ | ---------------------------------- |
+| **Status**         | in-progress                        |
+| **Issue**          | #210                               |
+| **Spec PR**        | #344                               |
+| **Implementation** | #349, #821, #488, #829, #830, #831 |
 
 ## 📝 TLDR
 
@@ -609,4 +609,4 @@ paths. It records them on the Implementation row, restates that rollback is stil
 revert, and adds the remaining Phase 4 checks: install skip+log when either secret is unset, auth
 mail without `List-Unsubscribe` on the wire (A4), and recovery requeue once with the same
 `Idempotency-Key` (the delivery id). Digest / `deferred` remains Phase 5 (#484). The Implementation
-row lists this PR once it exists.
+row lists this PR (#831).
