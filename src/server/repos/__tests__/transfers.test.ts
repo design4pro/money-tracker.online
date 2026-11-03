@@ -55,7 +55,8 @@ import {
 import type { RateE10 } from '#/lib/money'
 import type { CreateTransferInput } from '#/server/transfers/create'
 import type { Database, TenantScope } from '../base'
-import type { ConversionContext, TransactionPolicies } from '../transactions'
+import type { TransactionPolicies } from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 import type { UpdateTransferInput } from '../transfers'
 
 /** The `internal` member of the create union, which is what every fixture below builds. */

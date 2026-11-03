@@ -8,9 +8,8 @@
  * correctly for nobody in particular, permanently, because it would be what the row said.
  *
  * This module is the other half of that decision: the single place those stored values become
- * display strings. `21-S2`'s email templates call it, and `21-S3`'s in-app notification item will
- * call it, which is what makes "the email states the same number the app states" true by
- * construction rather than by two implementations agreeing.
+ * display strings for **in-app** rendering. `21-S3`'s notification item calls it. Notification
+ * **email** does not (ADR 0035): mail is event name + deep link, not a second copy of the number.
  *
  * **It is pure, and it imports nothing from `server/`.** That is not tidiness — it is the whole
  * reason a component in the browser and a queue handler in workerd can share it.

@@ -220,8 +220,8 @@ it breaks that correlation. `docs/SECURITY.md` §4 records the choice.
   Polar client (BND-23): a `fetch` wrapper, typed request and response, explicit retries. No SDK.
   `send.ts` exposes `sendEmail({ to, subject, html, text, headers })` and nothing else.
 - **Every email is HTML and plain text.** Text is not a fallback afterthought; it is generated from
-  the same template data, and `render.test.ts` asserts both contain the same amounts and the same
-  link.
+  the same template data, and `render.test.ts` asserts both contain the same event name and the same
+  deep link, and neither part contains an amount (ADR 0035).
 - **Templates** are **React Email components** (`@react-email/components`, pinned in `docs/SPEC.md`
   §3). `render()` runs twice on the same element — once for HTML, once with `{ plainText: true }` —
   so both parts come from the same typed data by construction, which is what this stage originally
@@ -291,30 +291,28 @@ token names both, and both are checked.
 
 ### Money invariant
 
-_An email states the same number the app states._ Cases in `render.test.ts`:
+_Email is not a money surface_ (ADR 0035, spec A13, `docs/MONEY.md` §7.5). Cases in `render.test.ts`
+and `money-invariants.test.ts`:
 
-- _the HTML and text parts of every template render byte-identical amount strings_ for the same
-  payload — two renderings of one number that disagree is the bug this catches.
-- _amounts are formatted from the payload's integers in the recipient's locale_, asserted with an
-  `en` and a `pl` recipient receiving the same `budget.exceeded` payload.
-- _each digest line's amount equals the same notification rendered on its own_. **The digest sums
-  nothing** (spec A3): the per-kind totals this plan originally asked for would add the spend of
-  different budgets, and amounts in different currencies, which is not a meaningful quantity and
-  breaks `docs/MONEY.md` §2 the moment two currencies meet. The digest lists each notification with
-  its own amount instead, and the invariant is that the list and the standalone rendering agree.
-- _no template interpolates a raw `amountMinor` into user-facing text_ — a test scans the rendered
-  output for the integer's raw form and fails on a match, which is how `123456` reaching someone's
-  inbox as "123456" gets caught.
+- _the HTML and text parts of every notification and digest template contain the event name and the
+  deep link, and no amount_ — no minor-unit integer, no locale-formatted money, no payee / account /
+  category amount, no transaction row.
+- _a synthetic `budget.exceeded` payload's integers and any `formatMoney` rendering of them are
+  absent from both parts_ for an `en` and a `pl` recipient.
+- _the digest lists each notification as event name + link and sums nothing_ (spec A3). It does not
+  print per-line amounts.
+- _no template interpolates a raw `amountMinor` or a formatted amount into user-facing text_ — a
+  test scans the rendered output for the fixture integer and for a formatted form of it and fails on
+  a match.
 
-The formatting itself lives in `src/lib/notifications/render-copy.ts`, which is pure and imports
-nothing from `server/`, so `21-S3`'s in-app notification item renders the same payload through the
-same function: one payload, two surfaces, one number.
+In-app rendering still formats payload integers through `src/lib/notifications/render-copy.ts`.
+Email templates do not call that path for money params. Tests use synthetic data only.
 
 ### Verification
 
 - Command gate.
-- `render.test.ts`: the four money cases; both locales; HTML escaping of a payee name containing
-  `<script>`; the plain-text part containing no markup.
+- `render.test.ts`: the four money cases (absence of amounts); both locales; payload names such as
+  a budget containing `<script>` do not appear in the mail; the plain-text part containing no markup.
 - `notify-email.test.ts`: the conditional-update no-double-send under redelivery; 5xx retry and 4xx
   terminal paths; the suppression skip still writing the in-app row; the daily cap switching to
   digest.
@@ -400,10 +398,10 @@ count and the list contents, with no cross-bleed from a cached loader.
 
 ### Money invariant
 
-_The in-app rendering and the email rendering of one notification state the same amount._ Case in
-`money-invariants.test.ts`: _`notification-item` and the email template produce the same formatted
-amount for the same payload and locale_, asserted for `budget.exceeded`, `goal.reached` and
-`recurring.recorded`. One payload, two surfaces, one number.
+_In-app rendering states the amount that caused the notification; email does not state an amount_
+(ADR 0035). Case in `money-invariants.test.ts`: _`notification-item` formats payload integers in the
+reader's locale_ for `budget.exceeded`, `goal.reached` and `recurring.recorded`. The email template
+for the same payload contains the event name and the deep link and none of those formatted strings.
 
 ### Verification
 

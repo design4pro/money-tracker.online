@@ -25,8 +25,9 @@
  * 4. **`null`.** No rate is invented, and `null` never means "assume parity". The caller
  *    (`computeRefAmount`) turns it into a `RateUnavailableError` naming the pair and the date.
  *
- * The `RateResolver` contract in `./transactions` is what fixes the return type: this function
- * *reports* the absence of a rate, and the conversion is what refuses to proceed without one. Two
+ * The `RateResolver` contract in `#/server/transactions/ref-amount` is what fixes the return type:
+ * this function *reports* the absence of a rate, and the conversion is what refuses to proceed
+ * without one. Two
  * modules with two opinions about the order above is the defect this file exists to prevent, so
  * nothing else in the codebase reads `exchange_rates` on a write path.
  *
@@ -59,7 +60,7 @@ import type { CurrencyCode, RateE10 } from '#/lib/money'
 import type { OrganizationCurrencyRow } from '#/server/db/schema'
 import type { OrganizationExchangeRate } from '#/server/db/types'
 import type { TenantScope } from './base'
-import type { ConversionContext } from './transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 /* -------------------------------------------------------------------------- */
 /* Errors                                                                     */

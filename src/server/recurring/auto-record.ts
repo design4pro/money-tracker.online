@@ -170,7 +170,6 @@ export async function runAutoRecord(
           direction: series.direction as TransactionDirection,
           // Exactly the expectation. Nothing scales it, nothing rounds it.
           amountMinor: series.expectedAmountMinor,
-          currencyCode: series.expectedCurrencyCode,
           // The due date, so `ref_amount_minor` is anchored to that day's rate on a retry too.
           bookedOn: period.dueOn,
           categoryId: series.categoryId,

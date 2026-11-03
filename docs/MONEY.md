@@ -546,6 +546,14 @@ report.** The redaction middleware scrubs money-shaped fields by key **and** the
 built from typed error codes rather than from interpolated messages. An exception message that
 embeds an amount is a data-protection incident, not a debugging convenience.
 
+### 7.5 Email is not a money surface
+
+Notification and other transactional emails **do not format, quote or list amounts**. They name the
+event and link into the app (ADR 0035). Stored notification rows still hold integer minor units;
+in-app rendering still goes through `formatMoney` at `currencies.digits`. The mailbox is not a
+second copy of that number. A template that interpolates `amountMinor`, a locale-formatted amount,
+or a payee / account / category amount into HTML or text is a defect, not a formatting choice.
+
 ---
 
 ## 8. The failure gallery
@@ -569,6 +577,7 @@ product category.
 | 12  | A conversion silently invented at a made-up rate                                                                   | §2.3 rung 4, refuse and ask             |
 | 13  | An amount appearing in a Sentry event                                                                              | §7.4                                    |
 | 14  | Reports changing because someone changed the workspace timezone                                                    | §6.4                                    |
+| 15  | An amount or a transaction row appearing in a notification email                                                   | §7.5, ADR 0035                          |
 
 ---
 

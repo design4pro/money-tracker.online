@@ -557,8 +557,12 @@ though the parent shows `verified`.
 Staging therefore sends as `no-reply@money-tracker.online` and distinguishes itself in the display
 name, not in the domain. The alternative - adding `staging.money-tracker.online` as a second Resend
 domain with its own DKIM and SPF records on the zone - is deliberately not taken: a second sending
-domain is a second reputation to warm and a second set of records to keep correct, for no benefit
-beyond a cosmetic sender address on an environment no customer receives mail from.
+domain is a second reputation to warm and a second set of records to keep correct.
+
+Staging receives **full** notification delivery through the same templates and send path as
+production (ADR 0035). There is no staging-stripped body and no staging-disabled notification flag.
+Provider secrets (Resend and related) are owner-added with `wrangler secret put … --env staging`;
+they are not in the repository. When those secrets are unset, the existing no-provider path applies.
 
 A DMARC record already exists on the apex and is a leftover from another provider:
 

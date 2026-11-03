@@ -47,7 +47,8 @@ import { resolveRate } from '../workspace-currencies'
 
 import type { RateE10 } from '#/lib/money'
 import type { Database, TenantScope } from '../base'
-import type { ConversionContext, TransactionPolicies } from '../transactions'
+import type { TransactionPolicies } from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 /* -------------------------------------------------------------------------- */
 /* Harness                                                                     */
@@ -303,12 +304,6 @@ function spend(accountId: string, amountMinor: number, bookedOn: string) {
         accountId,
         direction: 'expense',
         amountMinor,
-        currencyCode:
-          accountId === 'acc-eur'
-            ? 'EUR'
-            : accountId === 'acc-usd'
-              ? 'USD'
-              : 'PLN',
         bookedOn,
       },
     }),
@@ -426,7 +421,6 @@ describe('a transaction written through the repository', () => {
             accountId: 'acc-pln',
             direction: 'expense',
             amountMinor: 10_00,
-            currencyCode: 'PLN',
             bookedOn: day,
           },
         })
@@ -554,7 +548,6 @@ describe('the stored grid', () => {
           accountId: 'acc-pln',
           direction: 'expense',
           amountMinor: 10_00,
-          currencyCode: 'PLN',
           bookedOn: '2026-09-15',
           bookedAt: Date.parse('2026-09-15T23:30:00.000Z'),
         },
@@ -567,7 +560,6 @@ describe('the stored grid', () => {
           accountId: 'acc-pln',
           direction: 'expense',
           amountMinor: 20_00,
-          currencyCode: 'PLN',
           bookedOn: '2026-09-16',
           bookedAt: Date.parse('2026-09-16T00:30:00.000Z'),
         },
@@ -593,7 +585,6 @@ describe('the stored grid', () => {
           accountId: 'acc-pln',
           direction: 'expense',
           amountMinor: 400_00,
-          currencyCode: 'PLN',
           bookedOn: '2026-10-15',
           isPlanned: true,
         },
