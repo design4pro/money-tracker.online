@@ -57,8 +57,9 @@ permanently (`docs/adr/0008-no-bank-connectors.md`).
   test.
 - Never: `--no-verify`, a force-push, `@ts-ignore` or lint-disable comments, `.skip`/`.only` on a
   test, a PNG or report inside the repository.
-- Branches are `<type>/issue-<n>-<slug>` (or `<type>/<slug>` with no issue). Commits are
-  Conventional Commits in English. PRs target `develop` and carry `Closes #<n>`.
+- Branches and PR keywords follow `AGENTS.md` -> Always (`<type>/issue-<n>-<slug>`, plus
+  `-phase-<k>` on a multi-phase spec PR; `Closes #<n>` only when the PR finishes the issue).
+  Commits are Conventional Commits in English. PRs target `develop`.
 - Push with an explicit refspec: `git push origin HEAD:refs/heads/<branch>`.
 - In a worktree, every `Write` and `Edit` path starts at the worktree root.
 - The rest of the rules are in `AGENTS.md`; read its Always, Ask First and Never sections.
