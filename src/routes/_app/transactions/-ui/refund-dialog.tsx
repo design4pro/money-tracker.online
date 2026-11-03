@@ -155,15 +155,12 @@ export function RefundDialog({
                     failure={failure}
                     placement="after-action"
                     title={t('refunds.dialog.error.title')}
-                    // A refused link (over-refund, another currency, the wrong direction, a link that already exists) is a
-                    // conflict or a validation failure, and the kind sentence alone would say
-                    // "reload": the dialog's own sentence says what to change instead.
-                    body={
-                      failure.kind === 'conflict' ||
-                      failure.kind === 'validation'
-                        ? t('refunds.dialog.error.refused')
-                        : undefined
-                    }
+                    // A refused link (over-refund, another currency, the wrong direction, a link
+                    // that already exists) is a conflict or a validation failure, and the kind
+                    // sentence alone would say "reload": the dialog's own sentence says what to
+                    // change instead. A closed `reason` picks among those sentences; a conflict
+                    // without one keeps the generic refusal.
+                    body={refusedBody(t, failure)}
                   />
                 )}
 
@@ -233,6 +230,26 @@ export function RefundDialog({
       </Dialog>
     </FormModal>
   )
+}
+
+/** Dialog-owned copy for a refused link. The kind sentence would say "reload". */
+function refusedBody(
+  t: Translate,
+  failure: FailureEnvelope,
+): string | undefined {
+  if (failure.kind !== 'conflict' && failure.kind !== 'validation') {
+    return undefined
+  }
+  if (failure.reason === 'refund_direction') {
+    return t('refunds.dialog.error.direction')
+  }
+  if (failure.reason === 'refund_currency') {
+    return t('refunds.dialog.error.currency')
+  }
+  if (failure.reason === 'over_refund') {
+    return t('refunds.dialog.error.over')
+  }
+  return t('refunds.dialog.error.refused')
 }
 
 /**

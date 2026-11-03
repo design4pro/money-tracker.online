@@ -62,6 +62,21 @@ describe('RefundDialog, a refused link', () => {
     },
   )
 
+  it.each([
+    ['refund_direction', 'refunds.dialog.error.direction'],
+    ['refund_currency', 'refunds.dialog.error.currency'],
+    ['over_refund', 'refunds.dialog.error.over'],
+  ] as const)('says what to change for a %s conflict', async (reason, key) => {
+    const alert = await linkRefusedWith(
+      wireFailure('conflict', LEAKED_MESSAGE, reason),
+    )
+
+    expect(alert.textContent).toContain(en['refunds.dialog.error.title'])
+    expect(alert.textContent).toContain(en[key])
+    expect(alert.textContent).not.toContain(en['refunds.dialog.error.refused'])
+    expect(document.body.textContent).not.toContain(LEAKED_MESSAGE)
+  })
+
   it('shows the sentence of the kind for an internal failure', async () => {
     const alert = await linkRefusedWith(wireFailure('internal'))
 

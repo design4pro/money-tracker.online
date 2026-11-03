@@ -59,8 +59,8 @@ export interface AuthFailure {
   /**
    * The server's own sentence.
    *
-   * A fallback for a code the catalogue does not know yet, never the primary text: it is English,
-   * it comes from a dependency, and the product ships in more than one language.
+   * Kept for diagnostics. Screens never render it: `authFailureMessage` maps `code` and `status`
+   * to the catalogue, and falls back to the generic auth failure, never this English string.
    */
   readonly message: string
 }

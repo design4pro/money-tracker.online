@@ -54,14 +54,16 @@ import { pageHead } from '#/routes/-lib/page-title'
  * not renumber the siblings around it, and leaving two rows sharing a position is how a list starts
  * reordering itself on reload.
  *
- * ## The depth-cap refusal is announced, not just drawn
+ * ## The depth-cap refusal stays on the page, not in a toast
  *
- * Every refusal lands in a `role="alert"` region above the tree, and nowhere else. A toast is
- * dismissed on a timer; the sentence that explains why a category cannot go where somebody just
- * put it has to stay until they have read it, and has to reach a screen reader without them going
- * looking for it. The sentence is the catalogue's, built from the names this route already holds
- * (`refusalOf`), and after any refused move the tree is refreshed so it shows what the server
- * holds.
+ * Every refusal lands in the panel above the tree, and nowhere else. A toast is dismissed on a
+ * timer; the sentence that explains why a category cannot go where somebody just put it has to
+ * stay until they have read it. The panel is an in-place region (`RefusalPanel`), not an extra
+ * `role="alert"` around one: nesting an alert and a region, or wrapping a persistent alert that
+ * never remounts, is how a repeated identical refusal goes unannounced. The route keys the panel
+ * by attempt so a repeat is a new node. The sentence is the catalogue's, built from the names
+ * this route already holds (`refusalOf`), and after any refused move the tree is refreshed so it
+ * shows what the server holds.
  */
 
 const searchSchema = z.object({
@@ -213,15 +215,9 @@ function CategoriesRoute() {
         </Button>
       </header>
 
-      {/*
-        Assertive, because it is the answer to something the reader just did, and a polite region
-        would queue behind the tree's own drag announcements and arrive after they have moved on.
-      */}
-      <div role="alert" aria-live="assertive">
-        {refusal === null ? null : (
-          <RefusalPanel key={refusal.attempt} refusal={refusal.value} />
-        )}
-      </div>
+      {refusal === null ? null : (
+        <RefusalPanel key={refusal.attempt} refusal={refusal.value} />
+      )}
 
       <Switch
         isSelected={status === 'all'}

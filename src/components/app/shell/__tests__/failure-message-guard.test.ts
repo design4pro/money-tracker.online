@@ -32,6 +32,11 @@ const FORBIDDEN: ReadonlyArray<{ name: string; pattern: RegExp }> = [
   { name: 'toast.*(x.message)', pattern: /toast\.\w+\(\s*[\w.]*\.message/ },
   { name: 'description: x.message', pattern: /description:\s*[\w.]*\.message/ },
   { name: 'String(error)', pattern: /String\(error\)/ },
+  {
+    name: 'const m = e.message',
+    pattern:
+      /(?:const|let|var)\s+\w+\s*=\s*(?:[\w.]+\.)?(?:e|err|error)\.message\b(?!\s*\.key)/,
+  },
 ]
 
 const sourceFiles = function* (root: string): Generator<string> {
@@ -84,6 +89,8 @@ describe('a thrown error is never rendered', () => {
       'description: x.message',
     ],
     ['String(error)', 'String(error)'],
+    ['const m = e.message\ntoast.error(m)', 'const m = e.message'],
+    ['const text = error.message\nsetFailure(text)', 'const m = e.message'],
   ])('flags %j', (source, name) => {
     expect(findings(source)).toContain(name)
   })

@@ -826,6 +826,12 @@ const messages = {
   'refunds.dialog.error.title': 'The refund was not linked',
   'refunds.dialog.error.refused':
     'Nothing was changed. This refund cannot be linked as it is. Check the transaction, its amount, its currency and its direction, then try again.',
+  'refunds.dialog.error.direction':
+    'Nothing was changed. A refund has to point the opposite way to the original. Pick a transaction of the other kind, or record this as something outside the household.',
+  'refunds.dialog.error.currency':
+    'Nothing was changed. A refund and what it refunds have to be in the same currency. Pick a matching currency, or record this as something outside the household.',
+  'refunds.dialog.error.over':
+    'Nothing was changed. This would give back more than was paid. Pick a larger original, or a smaller refund.',
   'refunds.suggest.loading': 'Looking for what this refunds…',
   'refunds.suggest.empty':
     'Nothing with the same payee in the last 90 days is large enough to be what this refunds.',
@@ -1783,6 +1789,10 @@ const messages = {
   'members.error.seatsFull':
     'This plan has no seat left. Move up a plan, or withdraw an invitation first.',
   'members.error.generic': 'That did not work. Nothing was changed.',
+  'members.toast.roleFailed': 'Could not change {name}’s role',
+  'members.toast.resendFailed':
+    'Could not send the invitation to {email} again',
+  'members.toast.revokeFailed': 'Could not withdraw the invitation to {email}',
 
   /* -- Accepting an invitation -------------------------------------------- */
   'invite.title': 'Join {workspace}',
@@ -2839,6 +2849,7 @@ const messages = {
     '{name} is deleted for good. The entry itself is untouched.',
   'attachments.confirm.action': 'Remove',
   'attachments.toast.deleted': 'Receipt removed',
+  'attachments.toast.deleteFailed': '{name} was not removed',
   /* -- Why an import refused a row (19-S2) ---------------------------------- */
   // One key per `import_row_errors.code`. The row is written once and read back
   // in whatever language the person is using then, so the column stores the key
