@@ -31,6 +31,7 @@ import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
 
 const SALT = 'test-salt-never-rotate'
 const APP_URL = 'https://app.example.test'
+const UNSUBSCRIBE_KEY = 'test-unsubscribe-signing-key'
 const KIND = 'budget.exceeded' as const
 
 const PAYLOAD = {
@@ -118,6 +119,7 @@ function handle(
     transport: wire,
     hashSalt: SALT,
     appUrl: APP_URL,
+    unsubscribeKeys: { current: UNSUBSCRIBE_KEY },
   })
 }
 
@@ -141,11 +143,19 @@ describe('sending one notification email', () => {
       to: string[]
       html: string
       text: string
+      headers?: Record<string, string>
       tags: Array<{ name: string; value: string }>
     }
     expect(body.to).toEqual(['a@example.com'])
     expect(body.html).toContain(`${APP_URL}/budgets/budget-1`)
     expect(body.text).toContain(`${APP_URL}/budgets/budget-1`)
+    expect(body.html).toContain(`${APP_URL}/unsubscribe?t=`)
+    expect(body.headers?.['List-Unsubscribe']).toMatch(
+      new RegExp(`^<${APP_URL}/api/unsubscribe\\?t=.+>$`),
+    )
+    expect(body.headers?.['List-Unsubscribe-Post']).toBe(
+      'List-Unsubscribe=One-Click',
+    )
     expect(body.html).not.toContain(String(PAYLOAD.spentMinor))
     expect(body.text).not.toContain('Groceries')
     const headers = (init?.headers ?? {}) as Record<string, string>
