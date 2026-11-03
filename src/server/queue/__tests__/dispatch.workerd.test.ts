@@ -45,7 +45,7 @@ function batchOf(message: ReturnType<typeof fakeMessage>) {
   } as unknown as MessageBatch<unknown>
 }
 
-/** A table that fills all six kinds, so the type checks and the test says which one it drives. */
+/** A table that fills every kind, so the type checks and the test says which one it drives. */
 function handlersWith(importExecuteHandler: TaskHandlers['import.execute']) {
   const unused = () => Promise.resolve()
   return {
@@ -55,6 +55,7 @@ function handlersWith(importExecuteHandler: TaskHandlers['import.execute']) {
     'import.revert': unused,
     'export.build': unused,
     'backup.run': unused,
+    'notify.email': unused,
   } satisfies TaskHandlers
 }
 

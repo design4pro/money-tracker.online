@@ -58,6 +58,13 @@ describe('claimKey', () => {
         jobId: 'job-9',
       }),
     ).toBe('task:claim:v1:export.build:org-a:job-9')
+    expect(
+      claimKey({
+        kind: 'notify.email',
+        organizationId: 'org-a',
+        deliveryId: 'deliv_1',
+      }),
+    ).toBe('task:claim:v1:notify.email:org-a:deliv_1')
   })
 
   it('puts the literal platform where the backup kind has no workspace', () => {

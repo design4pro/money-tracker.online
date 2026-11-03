@@ -24,6 +24,7 @@ const idKinds = [
   ['import.execute', { ...tenantFields, batchId: 'batch-1' }],
   ['import.revert', { ...tenantFields, batchId: 'batch-1' }],
   ['export.build', { ...tenantFields, jobId: 'job-1' }],
+  ['notify.email', { organizationId: 'org-a', deliveryId: 'deliv_1' }],
 ] as const
 
 const validBackup = { kind: 'backup.run', date: '2026-10-04' }
@@ -157,7 +158,7 @@ describe('billing.event', () => {
 })
 
 describe('the union', () => {
-  it('has the six kinds', () => {
+  it('has the seven kinds', () => {
     const kinds = taskMessageSchema.options.map((o) => o.shape.kind.value)
     expect(kinds.sort()).toEqual([
       'backup.run',
@@ -166,6 +167,7 @@ describe('the union', () => {
       'import.execute',
       'import.parse',
       'import.revert',
+      'notify.email',
     ])
   })
 
@@ -191,6 +193,7 @@ describe('no envelope field can carry a value that is stored in a row', () => {
     'batchId',
     'jobId',
     'eventId',
+    'deliveryId',
     'date',
     'cursor',
   ]
@@ -224,7 +227,7 @@ describe('no envelope field can carry a value that is stored in a row', () => {
   })
 
   it('walks the whole union: every member was checked', () => {
-    expect(taskMessageSchema.options).toHaveLength(6)
+    expect(taskMessageSchema.options).toHaveLength(7)
   })
 
   it('fails for an unlisted name, a non-string type and a loose object', () => {

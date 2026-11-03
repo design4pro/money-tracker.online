@@ -15,11 +15,12 @@ import { HandlerNotInstalledError } from '../not-installed'
 import type { TaskContext } from '../../dispatch'
 
 const kinds = taskMessageSchema.options.map((o) => o.shape.kind.value)
-const notInstalledKinds = kinds.filter((k) => k !== 'billing.event')
+const installedKinds = new Set(['billing.event', 'notify.email'])
+const notInstalledKinds = kinds.filter((k) => !installedKinds.has(k))
 
 describe('taskHandlers', () => {
-  it('has an entry for all six kinds, and for nothing else', () => {
-    expect(kinds).toHaveLength(6)
+  it('has an entry for all seven kinds, and for nothing else', () => {
+    expect(kinds).toHaveLength(7)
     expect(Object.keys(taskHandlers).sort()).toEqual([...kinds].sort())
     for (const kind of kinds) {
       expect(taskHandlers[kind], kind).toBeTypeOf('function')

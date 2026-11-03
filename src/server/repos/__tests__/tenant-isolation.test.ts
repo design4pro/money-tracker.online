@@ -115,12 +115,24 @@ import {
 } from './budget-harness'
 import {
   countUnread,
+  getNotification,
   insertNotification,
   listPrefsFor,
   markRead,
   pageForReader,
   upsertPref,
 } from '../notifications'
+import {
+  claimDelivery,
+  countSince,
+  getDelivery,
+  insertDelivery,
+  listDeferredSince,
+  listStale,
+  markDelivery,
+} from '../email-deliveries'
+import { isSuppressed, suppress } from '../email-suppressions'
+import * as emailSuppressions from '../email-suppressions'
 import {
   createAccountGroup,
   deleteAccountGroup,
@@ -132,7 +144,7 @@ import {
   setAccountGroupMembers,
   updateAccountGroup,
 } from '../accounts'
-import { isMember, memberScopeFor } from '../members'
+import { isMember, memberEmail, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
 import { notify } from '#/server/notify/dispatch'
@@ -3007,6 +3019,22 @@ describe('notifications cannot be read, counted or marked across a workspace bou
     expect((await listPrefsFor(world.scope, 'user-a')).size).toBe(0)
   })
 
+  it('never lets A load B’s notification by id', async () => {
+    const theirs = await insertNotification(
+      world.otherScope,
+      {
+        userId: 'user-b',
+        kind: KIND,
+        payloadJson: '{"v":1}',
+        dedupeKey: 'by-id',
+      },
+      AT,
+    )
+    expect(theirs).not.toBeNull()
+    expect(await getNotification(world.scope, theirs!.id)).toBeNull()
+    expect(await getNotification(world.otherScope, theirs!.id)).not.toBeNull()
+  })
+
   it('scopes every statement the notification repository runs', async () => {
     harnessExecuted.length = 0
     await insertNotification(
@@ -3042,6 +3070,119 @@ describe('notifications cannot be read, counted or marked across a workspace bou
   })
 })
 
+describe('email deliveries cannot be read, claimed, marked or listed across a workspace boundary', () => {
+  const AT = new Date('2026-03-15T10:00:00.000Z')
+  const KIND = 'budget.exceeded' as const
+
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  async function queuedIn(
+    scope: typeof world.scope,
+    userId: string,
+    dedupeKey: string,
+  ) {
+    const row = await insertDelivery(
+      scope,
+      { userId, kind: KIND, notificationId: null, dedupeKey },
+      AT,
+    )
+    expect(row).not.toBeNull()
+    return row!
+  }
+
+  it('never lets A get, claim, mark or list B’s delivery', async () => {
+    const theirs = await queuedIn(world.otherScope, 'user-b', 'notification:b')
+
+    expect(await getDelivery(world.scope, theirs.id)).toBeNull()
+    expect(await claimDelivery(world.scope, theirs.id)).toBeNull()
+    expect(
+      await markDelivery(world.scope, theirs.id, { status: 'failed' }),
+    ).toBeNull()
+    expect(await countSince(world.scope, AT)).toBe(0)
+    expect(await listStale(world.scope, AT, new Date(0))).toEqual([])
+    expect(await listDeferredSince(world.scope, AT)).toEqual([])
+
+    expect(await getDelivery(world.otherScope, theirs.id)).toMatchObject({
+      status: 'queued',
+    })
+    expect(await countSince(world.otherScope, AT)).toBe(1)
+  })
+
+  it('lets two workspaces hold the same digest key, because the index is scoped', async () => {
+    const dedupeKey = 'digest:2026-09-20'
+    expect(
+      await insertDelivery(
+        world.scope,
+        { userId: 'user-a', kind: 'digest', dedupeKey },
+        AT,
+      ),
+    ).not.toBeNull()
+    expect(
+      await insertDelivery(
+        world.otherScope,
+        { userId: 'user-b', kind: 'digest', dedupeKey },
+        AT,
+      ),
+    ).not.toBeNull()
+    expect(await countSince(world.scope, AT)).toBe(1)
+    expect(await countSince(world.otherScope, AT)).toBe(1)
+  })
+
+  it('drops a second insert of the same key in one workspace', async () => {
+    const input = {
+      userId: 'user-a' as const,
+      kind: KIND,
+      dedupeKey: 'notification:same',
+    }
+    expect(await insertDelivery(world.scope, input, AT)).not.toBeNull()
+    expect(await insertDelivery(world.scope, input, AT)).toBeNull()
+    expect(await countSince(world.scope, AT)).toBe(1)
+  })
+
+  it('scopes every statement the delivery repository runs', async () => {
+    harnessExecuted.length = 0
+    const row = await queuedIn(world.scope, 'user-a', 'notification:a')
+    await getDelivery(world.scope, row.id)
+    await claimDelivery(world.scope, row.id)
+    await markDelivery(world.scope, row.id, { status: 'failed' })
+    await countSince(world.scope, AT)
+    await listStale(world.scope, AT, new Date(0))
+    await listDeferredSince(world.scope, AT)
+
+    const statements = harnessExecuted.filter((statement) =>
+      statement.includes('email_deliveries'),
+    )
+    expect(statements.length).toBeGreaterThan(0)
+    for (const statement of statements.filter(
+      (candidate) => !candidate.startsWith('insert'),
+    )) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+})
+
+describe('email suppressions are platform data, not a scoped reader', () => {
+  it('exports no TenantScope-taking function', () => {
+    expect(Object.keys(emailSuppressions).sort()).toEqual([
+      'isSuppressed',
+      'suppress',
+    ])
+    expect(isSuppressed.length).toBe(2)
+    expect(suppress.length).toBe(4)
+  })
+
+  it('looks up by hash with no workspace column to leak', async () => {
+    const world = await createBudgetWorld()
+    await suppress(world.db, 'abc123hash', 'complained', budgetWorldNow)
+    expect(await isSuppressed(world.db, 'abc123hash')).toBe(true)
+    expect(await isSuppressed(world.db, 'other')).toBe(false)
+  })
+})
+
 describe('membership is a question about one workspace at a time', () => {
   let world: BudgetWorld
 
@@ -3054,6 +3195,8 @@ describe('membership is a question about one workspace at a time', () => {
     await expect(isMember(world.scope, 'user-b')).resolves.toBe(false)
     await expect(isMember(world.otherScope, 'user-b')).resolves.toBe(true)
     await expect(isMember(world.otherScope, 'user-a')).resolves.toBe(false)
+    expect(await memberEmail(world.scope, 'user-b')).toBeNull()
+    expect(await memberEmail(world.otherScope, 'user-b')).toBe('b@example.com')
   })
 
   it('scopes the lookup, so the answer cannot come from another workspace’s row', async () => {

@@ -91,6 +91,11 @@ EMAIL_API_KEY=
 UNSUBSCRIBE_TOKEN_SECRET=
 UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS=
 
+# HMAC key for recipient hashes on email_deliveries.to_hash. Never rotate: a new salt cannot
+# match a bounce against a hash written under the old one. Unset, queued notification mail
+# stays queued. Generate: openssl rand -base64 32
+EMAIL_HASH_SALT=
+
 
 # ── Nightly D1 backup to R2 (optional; the cron logs and skips without it) ───
 
