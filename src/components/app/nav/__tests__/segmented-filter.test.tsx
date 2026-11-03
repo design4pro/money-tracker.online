@@ -66,6 +66,24 @@ describe('SegmentedFilter', () => {
     expect(screen.getByText('Book').className).not.toMatch(/\bsr-only\b/)
     expect(screen.getByRole('radiogroup', { name: 'Book' })).toBeTruthy()
   })
+
+  it('leaves the radiogroup as a direct child of the caller band when the caption is hidden', () => {
+    const { container } = render(
+      <div data-band="">
+        <SegmentedFilter
+          label="Show"
+          value="active"
+          options={OPTIONS}
+          onChange={vi.fn()}
+        />
+        <p>Showing 1 of 12</p>
+      </div>,
+    )
+    const band = container.querySelector('[data-band]')
+    const group = screen.getByRole('radiogroup')
+    expect(group.parentElement).toBe(band)
+    expect(band?.querySelector('p')?.textContent).toBe('Showing 1 of 12')
+  })
 })
 
 describe('FilterLiveStatus', () => {
@@ -76,5 +94,6 @@ describe('FilterLiveStatus', () => {
 
     rerender(<FilterLiveStatus message="2 series" />)
     expect(region.textContent).toBe('2 series')
+    expect(region.tagName).not.toBe('P')
   })
 })

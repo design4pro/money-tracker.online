@@ -55,6 +55,12 @@ const pendingRestore = new Set<string>()
  *
  * The choice is remembered for the next mount of this named group, which puts focus back on the
  * current radio so a keyboard user is not dumped on `<body>` when the skeleton replaces the page.
+ *
+ * ## The radiogroup is the root when the caption is hidden
+ *
+ * `/accounts` measures the filter *band* as `radiogroup`'s parent: the control at the start, the
+ * count at the end, the hairline on that row. A wrapper around a caption-less group would steal
+ * that parent, shrink the band to the three words, and hide the count from `band.locator('p')`.
  */
 export function SegmentedFilter<TStatus extends string>({
   label,
@@ -76,43 +82,45 @@ export function SegmentedFilter<TStatus extends string>({
       ?.focus()
   }, [label])
 
+  const group = (
+    <RadioGroup
+      ref={rootRef}
+      aria-label={showCaption ? undefined : label}
+      aria-labelledby={showCaption ? captionId : undefined}
+      orientation="horizontal"
+      value={value}
+      onChange={(next) => {
+        pendingRestore.add(label)
+        onChange(next as TStatus)
+      }}
+      className={cn('flex flex-wrap border-b border-border-subtle', className)}
+    >
+      {options.map((option) => (
+        <Radio
+          key={option.id}
+          value={option.id}
+          className={cn(
+            'relative flex h-11 cursor-pointer select-none items-center px-3 text-label font-medium text-ink-2',
+            'data-[hovered]:text-ink',
+            'data-[selected]:font-semibold data-[selected]:text-brand',
+            'data-[selected]:before:absolute data-[selected]:before:inset-x-0 data-[selected]:before:top-0 data-[selected]:before:h-px data-[selected]:before:bg-brand data-[selected]:before:content-[""]',
+            focusRing,
+          )}
+        >
+          {option.label}
+        </Radio>
+      ))}
+    </RadioGroup>
+  )
+
+  if (!showCaption) return group
+
   return (
-    <div ref={rootRef}>
-      {showCaption ? (
-        <p id={captionId} className="text-label font-medium text-ink">
-          {label}
-        </p>
-      ) : null}
-      <RadioGroup
-        aria-label={showCaption ? undefined : label}
-        aria-labelledby={showCaption ? captionId : undefined}
-        orientation="horizontal"
-        value={value}
-        onChange={(next) => {
-          pendingRestore.add(label)
-          onChange(next as TStatus)
-        }}
-        className={cn(
-          'flex flex-wrap border-b border-border-subtle',
-          className,
-        )}
-      >
-        {options.map((option) => (
-          <Radio
-            key={option.id}
-            value={option.id}
-            className={cn(
-              'relative flex h-11 cursor-pointer select-none items-center px-3 text-label font-medium text-ink-2',
-              'data-[hovered]:text-ink',
-              'data-[selected]:font-semibold data-[selected]:text-brand',
-              'data-[selected]:before:absolute data-[selected]:before:inset-x-0 data-[selected]:before:top-0 data-[selected]:before:h-px data-[selected]:before:bg-brand data-[selected]:before:content-[""]',
-              focusRing,
-            )}
-          >
-            {option.label}
-          </Radio>
-        ))}
-      </RadioGroup>
+    <div>
+      <div id={captionId} className="text-label font-medium text-ink">
+        {label}
+      </div>
+      {group}
     </div>
   )
 }
@@ -122,14 +130,17 @@ export function SegmentedFilter<TStatus extends string>({
  *
  * Mounted empty on the first paint so the count or the filtered-empty copy arrives as a change
  * to a region that already exists. The caller translates; this holds no message key.
+ *
+ * A `div`, not a `p`: `/accounts` finds its counterweight as `band.locator('p')`, and a live
+ * region in that band must not be the paragraph the density spec is measuring.
  */
 export function FilterLiveStatus({ message }: { readonly message: string }) {
   const [isMounted, setIsMounted] = useState(false)
   useEffect(() => setIsMounted(true), [])
 
   return (
-    <p role="status" className="sr-only">
+    <div role="status" className="sr-only">
       {isMounted ? message : ''}
-    </p>
+    </div>
   )
 }

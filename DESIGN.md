@@ -1194,15 +1194,18 @@ sites include `/recurring` and the transactions mode switch.
   The group is one tab stop and the arrow keys move and select.
 - **The caption:** `hidden` (the default) names the group with `aria-label` only, which is enough
   for a lone Show bar. `visible` prints the name above the bar — the second filter on a screen
-  that already has a Show control, so the two groups are not two unnamed rows of segments.
+  that already has a Show control, so the two groups are not two unnamed rows of segments. When
+  the caption is hidden the radiogroup **is** the component's root: `/accounts` measures the
+  filter band as that node's parent (control at the start, count at the end, hairline on the
+  row). Wrapping a caption-less group would shrink the band to the three words.
 - **Where focus goes when the route pending-swaps (2.4.3):** choosing a segment often unmounts the
   group (the loader replaces the page with the skeleton). Focus would fall to `<body>`. The
   component remembers the named group that was chosen and, on the next mount, focuses the current
   radio. Every call site gets this; a screen must not re-implement it.
-- **Filter results (4.1.3):** `FilterLiveStatus` is the polite live region for the list the bars
-  filter. It mounts empty and then announces the row count or the filtered-empty copy. The caller
-  translates; the component holds no message key. This is the AA live-region pattern, not a wider
-  conformance claim.
+- **Filter results (4.1.3):** `FilterLiveStatus` is a `div` `role="status"`, never a `p`, so a
+  band that finds its counterweight as `p` still finds that caption. It mounts empty and then
+  announces the row count or the filtered-empty copy. The caller translates; the component holds
+  no message key. This is the AA live-region pattern, not a wider conformance claim.
 - **The one thing it is not:** a navigation entry or a tab bar. There is no panel under it to
   switch, only a list whose address changes with the filters.
 
