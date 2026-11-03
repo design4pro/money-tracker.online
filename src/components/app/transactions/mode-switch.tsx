@@ -1,5 +1,3 @@
-import { useEffect, useRef } from 'react'
-
 import { SegmentedFilter } from '#/components/app/nav'
 import { useTranslate } from '#/lib/i18n'
 
@@ -13,14 +11,9 @@ import { useTranslate } from '#/lib/i18n'
  * narrowed (`destinations.ts`).
  *
  * It is {@link SegmentedFilter}, so it is a radio group: one tab stop, the arrow keys move and
- * select, the current value is announced. It reports the choice and navigates nowhere - the routes
- * know their own addresses and carry the active filters across.
- *
- * ## Focus survives the route change
- *
- * Each route mounts its own switch, so choosing a mode unmounts the one the keyboard was on. The
- * choice is remembered for the next mount, which puts focus back on the current radio: arrowing on
- * to the other mode (or back) keeps working, and a screen reader hears the new value.
+ * select, the current value is announced. Focus surviving the route change is the filter's job,
+ * not this wrapper's. It reports the choice and navigates nowhere - the routes know their own
+ * addresses and carry the active filters across.
  *
  * The labels are `Recorded` and `Planned`, never the codebase's own word for the surface
  * (`docs/I18N.md`).
@@ -33,38 +26,21 @@ export interface TransactionsModeSwitchProps {
   readonly onChange: (mode: TransactionsMode) => void
 }
 
-/** Set when the person chose a mode, read by the switch the next route mounts. */
-let restoreFocus = false
-
 export function TransactionsModeSwitch({
   mode,
   onChange,
 }: TransactionsModeSwitchProps) {
   const t = useTranslate()
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!restoreFocus) return
-    restoreFocus = false
-    ref.current
-      ?.querySelector<HTMLInputElement>('input[type="radio"]:checked')
-      ?.focus()
-  }, [])
 
   return (
-    <div ref={ref}>
-      <SegmentedFilter
-        label={t('transactions.mode.label')}
-        value={mode}
-        options={[
-          { id: 'recorded', label: t('transactions.mode.actual') },
-          { id: 'planned', label: t('transactions.mode.planned') },
-        ]}
-        onChange={(next) => {
-          restoreFocus = true
-          onChange(next)
-        }}
-      />
-    </div>
+    <SegmentedFilter
+      label={t('transactions.mode.label')}
+      value={mode}
+      options={[
+        { id: 'recorded', label: t('transactions.mode.actual') },
+        { id: 'planned', label: t('transactions.mode.planned') },
+      ]}
+      onChange={onChange}
+    />
   )
 }

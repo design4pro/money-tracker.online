@@ -12,6 +12,7 @@ import { z } from 'zod'
 
 import {
   DEFAULT_WORKSPACE_TIMEZONE,
+  canonicalIanaTimeZone,
   isIanaTimeZone,
 } from '#/server/calendar-day'
 import { organizationSettings } from '#/server/db/schema'
@@ -44,29 +45,37 @@ export async function getWorkspaceTimezone(
 }
 
 /**
- * Creates or replaces the timezone. The extra `WHERE 1` is the 1:1 table's identity — the
- * tenant predicate is the real scope, and there is no second key to name.
+ * Creates or replaces the timezone. One insert-on-conflict, then an update if
+ * the row already existed — never a read that decides the write, which two
+ * concurrent first saves would both see as empty. The extra `WHERE 1` is the
+ * 1:1 table's identity — the tenant predicate is the real scope, and there is
+ * no second key to name. The stored value is the Intl canonical id.
  */
 export async function setWorkspaceTimezone(
   scope: TenantScope,
   input: WorkspaceTimezoneInput,
 ): Promise<string> {
   const parsed = workspaceTimezoneSchema.parse(input)
-  const existing = await settingsAccess.findMany(scope, { limit: 1 })
+  const timezone = canonicalIanaTimeZone(parsed.timezone)
+  if (timezone === null) {
+    throw new Error('Invalid IANA time zone')
+  }
   const now = new Date()
 
-  if (existing[0]) {
-    await settingsAccess.updateWhere(scope, sql`1`, {
-      timezone: parsed.timezone,
+  const inserted = await settingsAccess.insertOnConflictDoNothing(
+    scope,
+    {
+      timezone,
+      createdAt: now,
       updatedAt: now,
-    })
-    return parsed.timezone
-  }
+    },
+    [organizationSettings.organizationId],
+  )
+  if (inserted !== null) return inserted.timezone
 
-  await settingsAccess.insert(scope, {
-    timezone: parsed.timezone,
-    createdAt: now,
+  await settingsAccess.updateWhere(scope, sql`1`, {
+    timezone,
     updatedAt: now,
   })
-  return parsed.timezone
+  return timezone
 }

@@ -1869,11 +1869,16 @@ const messages = {
   'recurring.filter.label': 'Show',
   'recurring.filter.active': 'Active',
   'recurring.filter.all': 'All, including paused',
+  'recurring.filter.results': {
+    one: '{count} series',
+    other: '{count} series',
+  },
 
   'book.filter.label': 'Book',
   'book.filter.all': 'All',
   'book.business': 'Business',
   'book.personal': 'Personal',
+  'book.value': 'Book: {book}',
   'book.field.label': 'Book',
   'book.field.description':
     'Whether this series belongs to the business or to personal finances.',

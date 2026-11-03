@@ -14,7 +14,7 @@ import {
   useMarkPaidReopen,
   useRecurringAction,
 } from '#/components/app/recurring'
-import { SegmentedFilter } from '#/components/app/nav'
+import { FilterLiveStatus, SegmentedFilter } from '#/components/app/nav'
 import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, toast } from '#/components/ui'
 import { useTranslate } from '#/lib/i18n'
@@ -33,7 +33,10 @@ import { useDataRefresh } from '../-lib/refresh'
 import { ConfirmDialog } from '../accounts/-ui/confirm-dialog'
 import { MarkPaidDialog } from './-ui/mark-paid-dialog'
 import { SeriesActionsMenu } from './-ui/series-actions-menu'
-import { SeriesFormDialog } from './-ui/series-form-dialog'
+import {
+  SeriesFormDialog,
+  seriesFormCurrencyOptions,
+} from './-ui/series-form-dialog'
 
 import { BOOKS } from '#/lib/enums'
 
@@ -179,13 +182,11 @@ function RecurringListRoute() {
   }
 
   const baseCurrencyCode = accounts.overview.baseCurrencyCode
-  const currencyOptions = [
-    ...new Set([
-      baseCurrencyCode,
-      ...accounts.accounts.map((account) => account.currencyCode),
-      ...overview.rows.map((row) => row.series.expectedCurrencyCode),
-    ]),
-  ]
+  const currencyOptions = seriesFormCurrencyOptions(
+    baseCurrencyCode,
+    accounts.accounts.map((account) => account.currencyCode),
+  )
+  const defaultBook = book === 'all' ? 'personal' : book
   const accountRefs = accounts.accounts.map((account) => ({
     id: account.id,
     name: account.name,
@@ -273,6 +274,7 @@ function RecurringListRoute() {
             />
             <SegmentedFilter
               label={t('book.filter.label')}
+              caption="visible"
               value={book}
               options={[
                 { id: 'all', label: t('book.filter.all') },
@@ -282,6 +284,15 @@ function RecurringListRoute() {
               onChange={(next: BookFilter) => {
                 void navigate({ search: { status, book: next } })
               }}
+            />
+            <FilterLiveStatus
+              message={
+                overview.rows.length === 0
+                  ? `${t('recurring.empty.filtered.title')} ${t('recurring.empty.filtered.body')}`
+                  : t('recurring.filter.results', {
+                      count: overview.rows.length,
+                    })
+              }
             />
 
             {overview.rows.length === 0 ? (
@@ -372,6 +383,7 @@ function RecurringListRoute() {
           payees={payeeRefs}
           currencyOptions={currencyOptions}
           baseCurrencyCode={baseCurrencyCode}
+          defaultBook={defaultBook}
           onSaved={(mode) => {
             toast.success(
               t(
