@@ -84,7 +84,8 @@ in `docs/agents/reference.md`; it never blocks a merge, and the ten clauses abov
 
 ## 3. Stack (pinned — do not change, do not add deps)
 
-Package manager **pnpm 10.15.0**, Node **24.x**, ESM, `#/*` → `./src/*` subpath imports.
+Package manager **pnpm 10.15.0**, Node **24.x** (the major in `.nvmrc`; `engines.node` is
+`>=24` and warns only), ESM, `#/*` → `./src/*` subpath imports.
 
 Runtime: **TanStack Start** (React 19) on **Cloudflare Workers** via `@cloudflare/vite-plugin` ·
 **Drizzle** on **D1** · **KV** (two namespaces) · **R2** · **Queues** · one **Durable Object**

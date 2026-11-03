@@ -22,7 +22,7 @@ staging before production takes a card.
 ## 0. Prerequisites
 
 ```bash
-node --version              # 24.x or newer
+node --version              # matches `.nvmrc` (24.x or newer; engines.node warns only)
 pnpm --version              # 10.15.0
 pnpm install --frozen-lockfile
 pnpm exec wrangler --version

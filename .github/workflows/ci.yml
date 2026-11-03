@@ -106,6 +106,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      # No dependency tree: this job only runs `scripts/ci/attestation.mjs`.
+      # Node still comes from `.nvmrc` so GitHub-hosted ubuntu-latest cannot drift.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
       - name: Judge the attestation
         id: judge
         env:
@@ -144,6 +151,12 @@ jobs:
         with:
           fetch-depth: 2
 
+      # No dependency tree: this job only runs `scripts/ci/verified-tree.mjs`.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
       - name: Look for a run that already judged this tree
         id: lookup
         env:
@@ -173,7 +186,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 2
-          sparse-checkout: scripts/ci
+          sparse-checkout: |
+            .nvmrc
+            scripts/ci
+
+      # No dependency tree: this job only runs `scripts/ci/change-scope.mjs`.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
 
       - name: Classify the changed files
         id: scope
