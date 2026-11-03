@@ -303,6 +303,22 @@ target `develop` until its base merges, which is expected, not a finding.
   one. Revisit only after a second stacked-PR incident: then a trigger on `edited` with a per-event
   concurrency key and no cancellation on `edited`.
 
+### Phase pull requests
+
+A spec that ships as more than one implementation PR is a **phase series**, not a stack. Each phase
+PR targets `develop` on its own branch. Stacking is the other shape (`### Stacked pull requests`);
+do not mix them unless the ticket or spec says to.
+
+- **Branch.** `<type>/issue-<n>-<slug>-phase-<k>`. Usually `feat/issue-<n>-<slug>-phase-<k>`;
+  `fix/issue-<n>-<slug>-phase-<k>` when that phase is a correction. The `-phase-<k>` suffix is what
+  makes a phase-1 branch valid under `AGENTS.md`.
+- **Closing keyword.** Every phase that is not the last carries `Refs #<n>` and never `Closes` on
+  the umbrella issue. The last phase PR carries `Closes #<n>`, so the issue closes exactly once.
+- **Who names the last phase.** The spec's own phase list is the artefact (`.ai/specs/AGENTS.md`).
+  The coordinator is who notices the current PR is the last one and puts `Closes` on it.
+
+A phase-1 PR that matches this section is not a process violation.
+
 ### The Reconciler
 
 The Reconciler is a level-triggered loop on the cezar host (a cron every ten minutes; `docs/agents/cezar.md`

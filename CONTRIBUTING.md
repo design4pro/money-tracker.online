@@ -118,8 +118,10 @@ carries one category label, a priority, a risk and the sections `om-prepare-issu
 Spec, Analysis, How to implement, Out of scope); `om-auto-manage-issues` checks that Definition of
 Ready and fills in the labels. A feature that needs more than one run gets a spec in `.ai/specs/`
 first and one issue per phase; `.ai/specs/README.md` lists every spec with its state, its issue
-and the pull requests that built it, and `.ai/specs/AGENTS.md` is the contract for that directory. Every pull request carries `Closes #n`: merging to `develop` does
-not close an issue natively, `om-close-fixed-issues` does. Full contract:
+and the pull requests that built it, and `.ai/specs/AGENTS.md` is the contract for that directory. A
+PR that finishes an issue carries `Closes #n`; a phase PR that is not the last phase of its spec,
+and a stacked PR that is not the last in its stack, carry `Refs #n` (`AGENTS.md`). Merging to
+`develop` does not close an issue natively, `om-close-fixed-issues` does. Full contract:
 `docs/agents/issue-tracker.md`; lifecycle and labels: `SDLC.md`.
 
 The staged plan set in `docs/plans/` is where a slice's scope comes from. If you are implementing a

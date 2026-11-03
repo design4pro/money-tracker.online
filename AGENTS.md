@@ -32,11 +32,16 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   additive.
 - Anything slow is enqueued on `TASKS`; balances are rebuilt through the `LEDGER` Durable Object.
 - Conventional Commits in English, scope = module or plan area. Branches are `<type>/issue-<n>-<slug>`
-  when an issue exists and `<type>/<slug>` when none does; `<type>` is an open set (`fix`, `feat`,
-  `chore`, `docs`, `ci`, `perf`, `test`, `claude`), `spec/<slug>` is a spec, `cez/<id8>` is Cezar's
-  task branch, and Dependabot's and other bot branches are outside the rule. PRs target `develop`
-  and carry `Closes #<n>` when there is an issue (a stacked PR is the one exception to the target:
-  `SDLC.md` -> Stacked pull requests).
+  when an issue exists and `<type>/<slug>` when none does; a phase PR of a multi-phase spec is
+  `<type>/issue-<n>-<slug>-phase-<k>` (usually `feat/`, `fix/` when that phase is a correction).
+  `<type>` is an open set (`fix`, `feat`, `chore`, `docs`, `ci`, `perf`, `test`, `claude`),
+  `spec/<slug>` is a spec, `cez/<id8>` is Cezar's task branch, and Dependabot's and other bot
+  branches are outside the rule. PRs target `develop` (a stacked PR is the one exception to the
+  target: `SDLC.md` -> Stacked pull requests). A PR that finishes an issue carries `Closes #<n>`.
+  A phase PR that is not the last phase of its spec, and a stacked PR that is not the last in its
+  stack, carry `Refs #<n>` and never `Closes` on the umbrella. The spec's phase list names the last
+  phase; the coordinator is who notices it and puts `Closes #<n>` on that last phase PR
+  (`SDLC.md` -> Phase pull requests).
 - Every number you write down came from a command whose output you read (`docs/SPEC.md` §7.7). So
   does every claim about what a tool, a library or the suite does: probe it once instead of copying
   a sentence from a comment, an ADR or a brief (#472, #531, #574). A spec or a brief describes the
