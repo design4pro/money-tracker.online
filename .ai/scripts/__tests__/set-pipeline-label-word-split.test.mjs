@@ -9,10 +9,14 @@
  * The count in the issue's table is competing labels (every pipeline label except the one
  * being set). `blocked` / `do-not-merge` are skipped later as a person's hold; that is a
  * different rule and is not what this file measures.
+ *
+ * zsh is the shell that made the bug live, but GitHub-hosted ubuntu-latest has no
+ * `/bin/zsh`. Bash and sh always run. zsh cases run when `/bin/zsh` or `zsh` on PATH
+ * exists; otherwise they skip with that ENOENT reason.
  */
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -32,11 +36,22 @@ const PORTABLE_SPLIT = `printf '%s\\n' "$PIPELINE_LABELS" | tr ' ' '\\n' | while
 
 const UNQUOTED_FOR_DO = 'for label in $PIPELINE_LABELS; do'
 
-const SHELLS = {
-  zsh: '/bin/zsh',
+const REQUIRED_SHELLS = {
   bash: '/bin/bash',
   sh: '/bin/sh',
 }
+
+const ZSH_MISSING =
+  'zsh is not installed (/bin/zsh ENOENT and zsh is not on PATH); GitHub-hosted ubuntu-latest has no zsh, so the #87 zsh table cannot run here'
+
+const resolveZsh = () => {
+  if (existsSync('/bin/zsh')) return '/bin/zsh'
+  const which = spawnSync('sh', ['-c', 'command -v zsh'], { encoding: 'utf8' })
+  const path = which.status === 0 ? which.stdout.trim() : ''
+  return path && existsSync(path) ? path : undefined
+}
+
+const ZSH = resolveZsh()
 
 const extractSetPipelineLabel = (markdown) => {
   const start = markdown.indexOf('set_pipeline_label() {')
@@ -56,6 +71,9 @@ const extractSetPipelineLabel = (markdown) => {
 
 const run = (shell, script) => {
   const result = spawnSync(shell, ['-c', script], { encoding: 'utf8' })
+  if (result.error?.code === 'ENOENT') {
+    throw result.error
+  }
   expect(result.error, `${shell}: ${result.error}`).toBeUndefined()
   expect(result.status, `${shell} stderr:\n${result.stderr}`).toBe(0)
   return result.stdout
@@ -68,6 +86,27 @@ const competingScript = (loopBody) => `PIPELINE_LABELS='${PIPELINE_LABELS}'
 incoming='${INCOMING}'
 ${loopBody}
 `
+
+const competingFromPortableLoop = (shell, name) => {
+  const labels = run(
+    shell,
+    competingScript(`${PORTABLE_SPLIT}
+  [ -z "$label" ] && continue
+  [ "$label" = "$incoming" ] && continue
+  printf '%s\\n' "$label"
+done
+`),
+  )
+  expect(labels, name).toHaveLength(COMPETING)
+  expect(labels).toEqual([
+    'review',
+    'changes-requested',
+    'qa',
+    'qa-failed',
+    'blocked',
+    'do-not-merge',
+  ])
+}
 
 describe('set_pipeline_label word-split (#87)', () => {
   const installed = readFileSync(INSTALLED, 'utf8')
@@ -95,33 +134,30 @@ describe('set_pipeline_label word-split (#87)', () => {
     )
   })
 
-  it.each(Object.entries(SHELLS))(
+  it.each(Object.entries(REQUIRED_SHELLS))(
     'under %s the portable loop removes 6 competing labels',
     (name, shell) => {
-      const labels = run(
-        shell,
-        competingScript(`${PORTABLE_SPLIT}
-  [ -z "$label" ] && continue
-  [ "$label" = "$incoming" ] && continue
-  printf '%s\\n' "$label"
-done
-`),
-      )
-      expect(labels, name).toHaveLength(COMPETING)
-      expect(labels).toEqual([
-        'review',
-        'changes-requested',
-        'qa',
-        'qa-failed',
-        'blocked',
-        'do-not-merge',
-      ])
+      competingFromPortableLoop(shell, name)
     },
   )
 
-  it('under zsh the unquoted for-loop still iterates once (the bug #86/#87 fixed)', () => {
+  it('under zsh the portable loop removes 6 competing labels', ({ skip }) => {
+    if (!ZSH) {
+      skip(ZSH_MISSING)
+      return
+    }
+    competingFromPortableLoop(ZSH, 'zsh')
+  })
+
+  it('under zsh the unquoted for-loop still iterates once (the bug #86/#87 fixed)', ({
+    skip,
+  }) => {
+    if (!ZSH) {
+      skip(ZSH_MISSING)
+      return
+    }
     const labels = run(
-      SHELLS.zsh,
+      ZSH,
       competingScript(`for label in $PIPELINE_LABELS; do
   [ "$label" = "$incoming" ] && continue
   printf '%s\\n' "$label"
