@@ -2,10 +2,10 @@
 
 | Field              | Value                              |
 | ------------------ | ---------------------------------- |
-| **Status**         | in-progress                        |
+| **Status**         | implemented                        |
 | **Issue**          | #210                               |
 | **Spec PR**        | #344                               |
-| **Implementation** | #349, #821, #488, #829, #830, #831 |
+| **Implementation** | #349, #821, #488, #829, #830, #832 |
 
 ## 📝 TLDR
 

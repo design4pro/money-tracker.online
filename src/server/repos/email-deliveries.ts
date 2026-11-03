@@ -205,7 +205,7 @@ export async function listStale(
   })
 }
 
-/** `deferred` rows written at or after `since`. The digest (Phase 5) drains these. */
+/** `deferred` rows written at or after `since`. The digest drains these. */
 export async function listDeferredSince(
   scope: TenantScope,
   since: Date,
@@ -214,6 +214,21 @@ export async function listDeferredSince(
     where: allOf(
       eq(emailDeliveries.status, 'deferred'),
       gte(emailDeliveries.createdAt, sinceSchema.parse(since)),
+    ),
+  })
+}
+
+/**
+ * `deferred` rows older than `olderThan`. The recovery sweep expires these after 48 hours.
+ */
+export async function listDeferredOlderThan(
+  scope: TenantScope,
+  olderThan: Date,
+): Promise<ReadonlyArray<EmailDeliveryRow>> {
+  return deliveryRepo.findMany(scope, {
+    where: allOf(
+      eq(emailDeliveries.status, 'deferred'),
+      lte(emailDeliveries.createdAt, sinceSchema.parse(olderThan)),
     ),
   })
 }

@@ -118,6 +118,7 @@ import {
   getNotification,
   insertNotification,
   listPrefsFor,
+  listUnreadForSince,
   markRead,
   pageForReader,
   upsertPref,
@@ -127,6 +128,7 @@ import {
   countSince,
   getDelivery,
   insertDelivery,
+  listDeferredOlderThan,
   listDeferredSince,
   listStale,
   markDelivery,
@@ -2913,6 +2915,10 @@ describe('notifications cannot be read, counted or marked across a workspace bou
     // B's row is untouched, as B sees it.
     expect(await countUnread(world.otherScope)).toBe(1)
     expect((await pageForReader(world.otherScope)).items[0].readAt).toBeNull()
+    expect(await listUnreadForSince(world.scope, 'user-b', AT)).toEqual([])
+    expect(
+      await listUnreadForSince(world.otherScope, 'user-b', AT),
+    ).toHaveLength(1)
   })
 
   it('lets two workspaces hold the same dedupe key, because the index is scoped', async () => {
@@ -3113,6 +3119,7 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     expect(await countSince(world.scope, AT)).toBe(0)
     expect(await listStale(world.scope, AT, new Date(0))).toEqual([])
     expect(await listDeferredSince(world.scope, AT)).toEqual([])
+    expect(await listDeferredOlderThan(world.scope, AT)).toEqual([])
 
     expect(await getDelivery(world.otherScope, theirs.id)).toMatchObject({
       status: 'queued',
@@ -3170,6 +3177,26 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     })
   })
 
+  it('never lets A list B’s deferred rows by age', async () => {
+    expect(
+      await insertDelivery(
+        world.otherScope,
+        {
+          userId: 'user-b',
+          kind: KIND,
+          notificationId: null,
+          dedupeKey: 'notification:deferred-b',
+          status: 'deferred',
+        },
+        AT,
+      ),
+    ).not.toBeNull()
+
+    expect(await listDeferredOlderThan(world.scope, AT)).toEqual([])
+    expect(await listDeferredSince(world.scope, AT)).toEqual([])
+    expect(await listDeferredOlderThan(world.otherScope, AT)).toHaveLength(1)
+  })
+
   it('lets two workspaces hold the same digest key, because the index is scoped', async () => {
     const dedupeKey = 'digest:2026-09-20'
     expect(
@@ -3215,6 +3242,7 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     await countSince(world.scope, AT)
     await listStale(world.scope, AT, new Date(0))
     await listDeferredSince(world.scope, AT)
+    await listDeferredOlderThan(world.scope, AT)
 
     const statements = harnessExecuted.filter((statement) =>
       statement.includes('email_deliveries'),

@@ -20,6 +20,7 @@ import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
 const KIND = 'budget.exceeded' as const
 const SIXTEEN_MIN_AGO = new Date(NOW.getTime() - 16 * 60 * 1000)
 const TWENTY_FOUR_HOURS_AGO = new Date(NOW.getTime() - 24 * 60 * 60 * 1000)
+const FORTY_NINE_HOURS_AGO = new Date(NOW.getTime() - 49 * 60 * 60 * 1000)
 
 let world: BudgetWorld
 
@@ -111,6 +112,50 @@ describe('runEmailRecovery', () => {
     expect(await getDelivery(world.scope, row.id)).toMatchObject({
       status: 'failed',
       errorCode: 'expired',
+    })
+  })
+
+  it('expires a deferred row older than 48 hours', async () => {
+    const row = await insertDelivery(
+      world.scope,
+      {
+        userId: 'user-a',
+        kind: KIND,
+        notificationId: null,
+        dedupeKey: 'notification:deferred-old',
+        status: 'deferred',
+      },
+      FORTY_NINE_HOURS_AGO,
+    )
+    if (!row) throw new Error('expected a delivery row')
+    const young = await insertDelivery(
+      world.scope,
+      {
+        userId: 'user-a',
+        kind: KIND,
+        notificationId: null,
+        dedupeKey: 'notification:deferred-young',
+        status: 'deferred',
+      },
+      TWENTY_FOUR_HOURS_AGO,
+    )
+    if (!young) throw new Error('expected a delivery row')
+
+    const report = await runEmailRecovery({
+      scopes: await listCronScopes(world.db),
+      now: NOW,
+      logger: createLogger({ sink: createMemorySink(), level: 'debug' }),
+      send: async () => undefined,
+      hasProvider: true,
+    })
+
+    expect(report.expired).toBe(1)
+    expect(await getDelivery(world.scope, row.id)).toMatchObject({
+      status: 'failed',
+      errorCode: 'expired',
+    })
+    expect(await getDelivery(world.scope, young.id)).toMatchObject({
+      status: 'deferred',
     })
   })
 })
