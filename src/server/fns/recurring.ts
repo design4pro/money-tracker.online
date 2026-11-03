@@ -29,6 +29,7 @@ import { parseDate } from '@internationalized/date'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
+import { asMinor } from '#/lib/money'
 import { requireOrg } from '#/server/auth/guards'
 import { workspaceCivilDay } from '#/server/clock'
 import { getWorkspaceTimezone } from '#/server/repos/workspace-settings'
@@ -55,6 +56,7 @@ import {
   listSeries as listSeriesRow,
   listSeriesLinkDetails,
   listSeriesLinks,
+  sumSeriesSpendThisYear,
   markPaid as markPaidRow,
   markPaidSchema,
   markSkipped as markSkippedRow,
@@ -160,7 +162,7 @@ export const loadRecurring = createServerFn({ method: 'GET' })
       }
     }
 
-    const [upcoming, candidates] = await Promise.all([
+    const [upcoming, candidates, spentThisYear] = await Promise.all([
       getUpcomingRow(scope, {
         today,
         within: 30,
@@ -168,35 +170,43 @@ export const loadRecurring = createServerFn({ method: 'GET' })
         ...(data.book === undefined ? {} : { book: data.book }),
       }),
       listCandidatesRow(scope, 'pending'),
+      sumSeriesSpendThisYear(scope, {
+        today,
+        seriesIds: series.map((one) => one.id),
+      }),
     ])
+    const spentThisYearBySeries = new Map(
+      spentThisYear.map((row) => [row.seriesId, row.spentThisYearMinor]),
+    )
 
     const rows = await Promise.all(
       series.map(async (one): Promise<SeriesListRow> => {
-        const [periods, links] = await Promise.all([
-          listPeriodsRow(scope, one.id, today),
-          listSeriesLinkDetails(scope, one.id),
-        ])
+        const periods = await listPeriodsRow(scope, one.id, today)
         const open = periods.filter(
           (period) =>
             period.derivedStatus === 'upcoming' ||
             period.derivedStatus === 'overdue',
         )
+        const forecast = forecastSeries({
+          schedule: scheduleOf(one),
+          expectedAmountMinor: one.expectedAmountMinor,
+          expectedCurrencyCode: one.expectedCurrencyCode,
+          direction: one.direction as TransactionDirection,
+          isActive: one.isActive,
+          today,
+          links: [],
+          periods,
+        })
         return {
           series: one,
           next: open.at(0) ?? null,
           overdueCount: open.filter(
             (period) => period.derivedStatus === 'overdue',
           ).length,
-          forecast: forecastSeries({
-            schedule: scheduleOf(one),
-            expectedAmountMinor: one.expectedAmountMinor,
-            expectedCurrencyCode: one.expectedCurrencyCode,
-            direction: one.direction as TransactionDirection,
-            isActive: one.isActive,
-            today,
-            links,
-            periods,
-          }),
+          forecast: {
+            ...forecast,
+            spentThisYearMinor: spentThisYearBySeries.get(one.id) ?? asMinor(0),
+          },
         }
       }),
     )
