@@ -95,6 +95,11 @@ export interface SeriesFormDialogProps {
   readonly payees: ReadonlyArray<{ readonly id: string; readonly name: string }>
   readonly currencyOptions: ReadonlyArray<string>
   readonly baseCurrencyCode: string
+  /**
+   * Book for a new series. Comes from `?book=` on the list, never hard-coded
+   * inside {@link draftFrom}. Ignored when editing.
+   */
+  readonly defaultBook?: Book
   /** Prefills the form from an accepted suggestion. */
   readonly initial?: Partial<Draft>
   /**
@@ -181,14 +186,28 @@ export interface Draft {
   showInWidget: boolean
 }
 
+/**
+ * Currencies the create form may pick.
+ *
+ * Workspace base plus every account. Not the series currently on screen: a book
+ * filter that hides rows must not shrink or retarget the form's currency list.
+ */
+export function seriesFormCurrencyOptions(
+  baseCurrencyCode: string,
+  accountCurrencyCodes: Iterable<string>,
+): ReadonlyArray<string> {
+  return [...new Set([baseCurrencyCode, ...accountCurrencyCodes])]
+}
+
 function draftFrom(
   series: RecurringSeries | null,
   baseCurrencyCode: string,
+  book: Book,
 ): Draft {
   const base: Draft = {
     name: '',
     kind: 'subscription',
-    book: 'personal',
+    book,
     direction: 'expense',
     expectedAmountMinor: null,
     currencyCode: baseCurrencyCode,
@@ -269,6 +288,7 @@ export function SeriesFormDialog({
   payees,
   currencyOptions,
   baseCurrencyCode,
+  defaultBook = 'personal',
   initial,
   onCreate,
   onSaved,
@@ -280,7 +300,7 @@ export function SeriesFormDialog({
   // Seeded once and never synchronised: the route mounts this only while the dialog is open and
   // keys it by the series it is editing, so a fresh open is a fresh component.
   const [draft, setDraft] = useState<Draft>(() => ({
-    ...draftFrom(series, baseCurrencyCode),
+    ...draftFrom(series, baseCurrencyCode, defaultBook),
     ...initial,
   }))
   const [isSaving, setIsSaving] = useState(false)

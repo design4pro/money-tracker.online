@@ -38,6 +38,16 @@ export const billingEventMessageSchema = z.strictObject({
  */
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)
 
+/**
+ * One notification email to send. Ids only: the delivery row is the record, and a copy in the
+ * message could disagree with it. The consumer ships in 21-S2 Phase 2; the enqueuer in Phase 4.
+ */
+export const notifyEmailMessageSchema = z.strictObject({
+  kind: z.literal('notify.email'),
+  organizationId: idSchema,
+  deliveryId: idSchema,
+})
+
 /** A real calendar day. The round trip through `Date` refuses `2026-02-31`, which the pattern allows. */
 const daySchema = z
   .string()
@@ -101,6 +111,7 @@ export const backupRunMessageSchema = z.strictObject({
 
 export const taskMessageSchema = z.discriminatedUnion('kind', [
   billingEventMessageSchema,
+  notifyEmailMessageSchema,
   importParseMessageSchema,
   importExecuteMessageSchema,
   importRevertMessageSchema,

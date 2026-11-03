@@ -5,7 +5,10 @@ import userEvent from '@testing-library/user-event'
 import { I18nProvider } from '#/lib/i18n'
 import en from '#/lib/i18n/messages/en'
 
-import { SeriesFormDialog } from '../series-form-dialog'
+import {
+  SeriesFormDialog,
+  seriesFormCurrencyOptions,
+} from '../series-form-dialog'
 
 import type { Catalogue } from '#/lib/i18n'
 
@@ -25,7 +28,9 @@ vi.mock('#/server/fns/recurring', () => server)
 
 const user = userEvent.setup()
 
-function renderDialog() {
+function renderDialog(
+  over: { readonly defaultBook?: 'personal' | 'business' } = {},
+) {
   return render(
     <I18nProvider locale="en" messages={en as Catalogue}>
       <SeriesFormDialog
@@ -38,10 +43,34 @@ function renderDialog() {
         currencyOptions={['PLN']}
         baseCurrencyCode="PLN"
         onSaved={() => {}}
+        {...over}
       />
     </I18nProvider>,
   )
 }
+
+describe('seriesFormCurrencyOptions', () => {
+  it('does not take the visible (filtered) series list as the option set', () => {
+    expect(seriesFormCurrencyOptions('PLN', ['PLN', 'EUR'])).toEqual([
+      'PLN',
+      'EUR',
+    ])
+  })
+})
+
+describe('SeriesFormDialog book', () => {
+  it('honours the default book instead of always starting on Personal', () => {
+    renderDialog({ defaultBook: 'business' })
+    expect(
+      (screen.getByRole('radio', { name: 'Business' }) as HTMLInputElement)
+        .checked,
+    ).toBe(true)
+    expect(
+      (screen.getByRole('radio', { name: 'Personal' }) as HTMLInputElement)
+        .checked,
+    ).toBe(false)
+  })
+})
 
 describe('SeriesFormDialog name', () => {
   it.each(['', '   '])(

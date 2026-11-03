@@ -109,6 +109,16 @@ describe('SeriesCard', () => {
     expect(screen.getByText('Duty')).toBeTruthy()
   })
 
+  it('labels the book, not only the value', async () => {
+    await renderLinkedRecurring(
+      <SeriesCard
+        row={listRow({ series: series({ book: 'business' }) })}
+        today={TODAY}
+      />,
+    )
+    expect(screen.getByText(/Book:\s*Business/)).toBeTruthy()
+  })
+
   it('says that a series records itself, rather than leaving it to be discovered', async () => {
     await renderLinkedRecurring(
       <SeriesCard

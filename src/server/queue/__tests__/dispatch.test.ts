@@ -68,6 +68,7 @@ const notInstalledKinds = {
   'import.revert': notInstalled('import.revert'),
   'export.build': notInstalled('export.build'),
   'backup.run': notInstalled('backup.run'),
+  'notify.email': notInstalled('notify.email'),
 } satisfies Omit<TaskHandlers, 'billing.event'>
 
 function run(

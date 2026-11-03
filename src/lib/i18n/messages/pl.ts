@@ -1493,8 +1493,13 @@ const messages = {
     catalogue that cannot ask who is reading must not guess. That is why the reset line reads
     "Jeśli to nie Ty prosisz" rather than the past tense, which would have to pick one form.
   */
+  'email.layout.footer.reason':
+    'Dostajesz tę wiadomość, bo należysz do domu {workspace} w {app}.',
   'email.layout.footer.reasonAccount':
     'Dostajesz tę wiadomość, bo na Twoim koncie {app} coś się wydarzyło.',
+  'email.layout.footer.unsubscribe': 'Zatrzymaj te e-maile',
+  'email.notification.action': 'Otwórz w {app}',
+  'email.notification.body': 'Otwórz {app}, aby zobaczyć, co się stało.',
   'email.auth.greeting': 'Cześć {name},',
   'email.auth.singleUse': 'Ten link zadziała tylko raz i wkrótce wygaśnie.',
   'email.auth.verifyEmail.subject': 'Potwierdź swój adres w {app}',
@@ -1906,12 +1911,19 @@ const messages = {
   'recurring.filter.label': 'Pokaż',
   'recurring.filter.active': 'Aktywne',
   'recurring.filter.all': 'Wszystkie, łącznie z wstrzymanymi',
+  'recurring.filter.results': {
+    one: '{count} seria',
+    few: '{count} serie',
+    many: '{count} serii',
+    other: '{count} serii',
+  },
 
-  'book.filter.label': 'Wymiar',
+  'book.filter.label': 'Księga',
   'book.filter.all': 'Wszystko',
   'book.business': 'Firma',
   'book.personal': 'Prywatne',
-  'book.field.label': 'Wymiar',
+  'book.value': 'Księga: {book}',
+  'book.field.label': 'Księga',
   'book.field.description':
     'Czy ta seria należy do firmy, czy do finansów prywatnych.',
 

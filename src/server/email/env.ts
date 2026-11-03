@@ -34,3 +34,11 @@ export function unsubscribeKeys(): UnsubscribeKeys | null {
     previous: readString('UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS'),
   }
 }
+
+/**
+ * Salt for `hashRecipient`. Unset, the notification-email handler requeues and does not send:
+ * a hash written under no key cannot be correlated with a later bounce.
+ */
+export function emailHashSalt(): string | null {
+  return readString('EMAIL_HASH_SALT')
+}

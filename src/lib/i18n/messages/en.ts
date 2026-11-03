@@ -1443,8 +1443,13 @@ const messages = {
     frame states why it arrived, and the body says in one line what to do. `{app}` is filled from
     `app.name` rather than typed, so a rename lands in twelve strings at once.
   */
+  'email.layout.footer.reason':
+    'You are getting this because you are a member of {workspace} on {app}.',
   'email.layout.footer.reasonAccount':
     'You are getting this because of activity on your {app} account.',
+  'email.layout.footer.unsubscribe': 'Stop these emails',
+  'email.notification.action': 'Open in {app}',
+  'email.notification.body': 'Open {app} to see what happened.',
   'email.auth.greeting': 'Hi {name},',
   /*
     Stated once, in the frame of every auth email, because the failure it prevents is a person
@@ -1869,11 +1874,16 @@ const messages = {
   'recurring.filter.label': 'Show',
   'recurring.filter.active': 'Active',
   'recurring.filter.all': 'All, including paused',
+  'recurring.filter.results': {
+    one: '{count} series',
+    other: '{count} series',
+  },
 
   'book.filter.label': 'Book',
   'book.filter.all': 'All',
   'book.business': 'Business',
   'book.personal': 'Personal',
+  'book.value': 'Book: {book}',
   'book.field.label': 'Book',
   'book.field.description':
     'Whether this series belongs to the business or to personal finances.',

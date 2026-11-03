@@ -1178,19 +1178,43 @@ the series detail grid and _Due soon_ on `/recurring`.
 - **The one thing it is not:** a row menu. The actions are visible buttons on purpose; burying
   _Mark paid_ behind a menu adds a click to the only thing the table is for.
 
+### Segmented filter
+
+The "Show" / "Book" control of a list: two or three views of one list, side by side on a rule.
+`SegmentedFilter` is the shared component (`src/components/app/nav/segmented-filter.tsx`). Call
+sites include `/recurring` and the transactions mode switch.
+
+- **The shape:** a radio group on a `border-subtle` rule, 44px segments (`h-11`), the current one
+  marked by a one-pixel `brand` rule along its top edge and `brand` text at the heavier weight.
+- **The tones:** one. There is no emphasis between the options; the current one is marked by
+  position and weight, not by a fill.
+- **The states:** hover washes the text to `ink`; focus is the product ring; there is no disabled
+  state, because every option is always reachable.
+- **What carries the meaning when the colour does not:** `aria-checked`, the weight and the rule.
+  The group is one tab stop and the arrow keys move and select.
+- **The caption:** `hidden` (the default) names the group with `aria-label` only, which is enough
+  for a lone Show bar. `visible` prints the name above the bar — the second filter on a screen
+  that already has a Show control, so the two groups are not two unnamed rows of segments. When
+  the caption is hidden the radiogroup **is** the component's root: `/accounts` measures the
+  filter band as that node's parent (control at the start, count at the end, hairline on the
+  row). Wrapping a caption-less group would shrink the band to the three words.
+- **Where focus goes when the route pending-swaps (2.4.3):** choosing a segment often unmounts the
+  group (the loader replaces the page with the skeleton). Focus would fall to `<body>`. The
+  component remembers the named group that was chosen and, on the next mount, focuses the current
+  radio. Every call site gets this; a screen must not re-implement it.
+- **Filter results (4.1.3):** `FilterLiveStatus` is a `div` `role="status"`, never a `p`, so a
+  band that finds its counterweight as `p` still finds that caption. It mounts empty and then
+  announces the row count or the filtered-empty copy. The caller translates; the component holds
+  no message key. This is the AA live-region pattern, not a wider conformance claim.
+- **The one thing it is not:** a navigation entry or a tab bar. There is no panel under it to
+  switch, only a list whose address changes with the filters.
+
 ### Mode switch
 
 The control that moves between two addresses of one screen: _Recorded_ and _Planned_ on the
-transactions screen. It is the `SegmentedFilter`, so it takes that component's shape: a radio group
-on a `border-subtle` rule, 44px segments, the current one marked by a one-pixel `brand` rule along
-its top edge and `brand` text at the heavier weight.
+transactions screen. It is the `SegmentedFilter`, so it takes that component's shape, tones,
+states, non-colour encoding and pending-remount focus restore.
 
-- **The tones:** one. There is no emphasis between the two modes; the current one is marked by
-  position and weight, not by a fill.
-- **The states:** hover washes the text to `ink`; focus is the product ring; there is no disabled
-  state, because both modes are always reachable.
-- **What carries the meaning when the colour does not:** `aria-checked`, the weight and the rule.
-  The group is one tab stop and the arrow keys move and select.
 - **The one thing it is not:** a navigation entry or a tab bar. A mode is not an area, so it adds
   nothing to the navigation table; and there is no panel under it to switch, only a list whose
   address changes with the filters carried across.

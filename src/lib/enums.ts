@@ -352,6 +352,41 @@ export const NOTIFICATION_KIND_IDS = [
 export type NotificationKind = (typeof NOTIFICATION_KIND_IDS)[number]
 
 /**
+ * One outbound notification (or digest) mail. The statuses the plan named, plus the ones the
+ * delivery store needs: `sending` is the claim, `failed` is terminal, `deferred` is the daily
+ * cap, `digested` is a deferred row a digest has since carried, and `suppressed` / `bounced` /
+ * `complained` are the address-level stops.
+ */
+export const EMAIL_DELIVERY_STATUSES = [
+  'queued',
+  'sending',
+  'sent',
+  'failed',
+  'deferred',
+  'digested',
+  'suppressed',
+  'bounced',
+  'complained',
+] as const
+export type EmailDeliveryStatus = (typeof EMAIL_DELIVERY_STATUSES)[number]
+
+/**
+ * What a delivery is *about*. Notification kind ids, or `digest` for the nightly summary.
+ *
+ * Listed here rather than derived at the CHECK so the schema and the repository parse the same
+ * tuple. A new notification kind must be added in both this list and {@link NOTIFICATION_KIND_IDS}.
+ */
+export const EMAIL_DELIVERY_KINDS = [
+  ...NOTIFICATION_KIND_IDS,
+  'digest',
+] as const
+export type EmailDeliveryKind = (typeof EMAIL_DELIVERY_KINDS)[number]
+
+/** Why an address must never be mailed again. Facts about a mailbox, not a workspace. */
+export const EMAIL_SUPPRESSION_REASONS = ['bounced', 'complained'] as const
+export type EmailSuppressionReason = (typeof EMAIL_SUPPRESSION_REASONS)[number]
+
+/**
  * Firma / Prywatne — which book a row belongs to inside one workspace.
  *
  * One workspace holds both, so a dashboard filter of "everything / business / personal" is a

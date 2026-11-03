@@ -1,6 +1,6 @@
 /**
- * The KV claim a delivery of one of the five import, export and backup kinds takes before its
- * handler runs.
+ * The KV claim a delivery of one of the import, export, backup and notify.email kinds takes
+ * before its handler runs.
  *
  * **A concurrency guard, not the correctness mechanism.** Workers KV has no compare-and-swap, so
  * two deliveries can both read "free" and both write; the guard narrows the window in which two
@@ -64,6 +64,8 @@ export function claimKey(task: ClaimedTask): string {
       return `task:claim:v1:${task.kind}:${task.organizationId}:${task.jobId}`
     case 'backup.run':
       return `task:claim:v1:${task.kind}:${PLATFORM}:${task.date}`
+    case 'notify.email':
+      return `task:claim:v1:${task.kind}:${task.organizationId}:${task.deliveryId}`
   }
 }
 

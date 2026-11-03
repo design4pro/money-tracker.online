@@ -36,6 +36,7 @@ import { MarkPaidDialog } from './-ui/mark-paid-dialog'
 import { SeriesActionsMenu } from './-ui/series-actions-menu'
 import { SeriesFormDialog } from './-ui/series-form-dialog'
 
+import type { Book } from '#/lib/enums'
 import type {
   RecurringFrequency,
   RecurringKind,
@@ -190,6 +191,12 @@ function SeriesDetailRoute() {
                 {t(
                   `recurring.direction.${series.direction as TransactionDirection}`,
                 )}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {t('book.value', {
+                  book: t(`book.${series.book as Book}`),
+                })}
               </span>
               <span aria-hidden="true">·</span>
               <span>

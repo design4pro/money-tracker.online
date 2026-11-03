@@ -2,8 +2,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
-import { serverToday } from '#/server/clock'
+import { workspaceCivilDay } from '#/server/clock'
 import { loggerFromEnv } from '#/server/observability/logger'
+import { getWorkspaceTimezone } from '#/server/repos/workspace-settings'
 import {
   transactionFiltersSchema,
   transactionSortSchema,
@@ -18,8 +19,9 @@ import type { PlannedScreenPage } from './planned-data'
 /**
  * The planned screen's server function: the door, and nothing else.
  *
- * It re-establishes who is asking (`requireOrg`, once), reads the day from the server clock (once,
- * never from the caller), validates what was asked for and hands all three to
+ * It re-establishes who is asking (`requireOrg`, once), reads the workspace civil
+ * day (once, never from the caller — `docs/MONEY.md` §6.4, the same "today"
+ * recurring due/overdue uses), validates what was asked for and hands all three to
  * {@link plannedScreenFor}, where every decision about the answer lives. The split follows the
  * dashboard's (`dashboard/-server/load-dashboard.ts`): this module is in the client graph, so the
  * composition sits in its own module and is imported only from inside the handler.
@@ -50,7 +52,8 @@ export const loadPlannedScreen = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<PlannedScreenPage> => {
     const scope = await requireOrg()
     const { env } = await import('cloudflare:workers')
-    return plannedScreenFor(scope, data, serverToday(), {
+    const today = workspaceCivilDay(await getWorkspaceTimezone(scope))
+    return plannedScreenFor(scope, data, today, {
       readLedger: ledgerPageFor,
       logger: loggerFromEnv(env, {
         context: { component: 'transactions', route: 'planned' },

@@ -66,6 +66,7 @@ const prefRepo = createTenantTableAccess(
 /* -------------------------------------------------------------------------- */
 
 const userId = z.string().trim().min(1).max(64)
+const rowId = z.string().trim().min(1).max(64)
 const kindSchema = z.enum(NOTIFICATION_KIND_IDS)
 
 export const notificationPrefSchema = z.strictObject({
@@ -153,6 +154,14 @@ export async function pageForReader(
     limit: clampPageSize(parsed.limit),
     cursor: parsed.cursor ?? null,
   })
+}
+
+/** One notification in this workspace, or `null`. Used by the email handler to load the row. */
+export async function getNotification(
+  scope: TenantScope,
+  id: string,
+): Promise<NotificationRow | null> {
+  return notificationRepo.findById(scope, rowId.parse(id))
 }
 
 /** How many of this reader's notifications are unread. The number in the badge. */
