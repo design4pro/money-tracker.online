@@ -1,11 +1,11 @@
 # Transactional email on Resend: React Email templates, the digest and unsubscribe
 
-| Field              | Value       |
-| ------------------ | ----------- |
-| **Status**         | in-progress |
-| **Issue**          | #210        |
-| **Spec PR**        | #344        |
-| **Implementation** | #349        |
+| Field              | Value                        |
+| ------------------ | ---------------------------- |
+| **Status**         | in-progress                  |
+| **Issue**          | #210                         |
+| **Spec PR**        | #344                         |
+| **Implementation** | #349, #821, #488, #829, #830 |
 
 ## 📝 TLDR
 
@@ -405,7 +405,9 @@ payload amounts and entity names for the in-app centre. The English strings from
   migration is additive.
 - **Rollback.** Revert the phase. Before reverting Phase 4, run `setNotificationEmailEnqueuer(null)`
   (or a revert of `install.ts`), which stops sending without touching the data. `deferred` or
-  `queued` rows left behind are ignored by older code.
+  `queued` rows left behind are ignored by older code. **This uninstall-before-revert order still
+  holds after go-live:** reverting the Worker while `src/server/email/install.ts` is imported would
+  keep enqueueing against older handlers. Uninstall first, then revert.
 - **OPEN-8.** `docs/SECURITY.md` §6.6 already lists Resend as a sub-processor. Confirming that this
   satisfies OPEN-8 is a human call, and it blocks launch, not the build (the plan's own wording).
 
@@ -597,3 +599,14 @@ amounts. Staging gets full delivery once the owner adds secrets. Tests use synth
 
 `email.notification.body` is a new catalogue key; EN + PL land in the same #480 change, not in this
 docs PR.
+
+## Amendment — Phase 4 go-live close (#483)
+
+#829 installed the enqueuer, the daily cap (`failed` / `capped`), `runEmailRecovery`, RFC 8058
+headers, the footer token, and Worker `install.ts`. #830 shipped the Resend bounce webhook. #821 is
+the delivery store and uninstalled handler; #488 is unsubscribe. This close does not rebuild those
+paths. It records them on the Implementation row, restates that rollback is still uninstall-before-
+revert, and adds the remaining Phase 4 checks: install skip+log when either secret is unset, auth
+mail without `List-Unsubscribe` on the wire (A4), and recovery requeue once with the same
+`Idempotency-Key` (the delivery id). Digest / `deferred` remains Phase 5 (#484). The Implementation
+row lists this PR once it exists.
