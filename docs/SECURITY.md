@@ -109,6 +109,12 @@ auth tables, not the session (ADR 0011, Amendment).
   (`src/server/observability/__tests__/request-fields.test.ts`). Replacing
   `UNSUBSCRIBE_TOKEN_SECRET` without carrying the old value into
   `UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS` revokes every outstanding link at once.
+- **Recipient hashes, not addresses.** `email_deliveries.to_hash` and
+  `email_suppressions.email_hash` are HMAC-SHA-256 of the folded address, keyed by
+  `EMAIL_HASH_SALT`. The salt is never rotated: a new value cannot match a bounce against a hash
+  written under the old one. Those tables never store the address. `RESEND_WEBHOOK_SECRET` signs
+  `POST /api/webhooks/resend`; unset, the endpoint answers 503 and never accepts an unverified
+  body. There is no un-suppress path.
 
 ---
 

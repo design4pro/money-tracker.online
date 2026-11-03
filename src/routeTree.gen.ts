@@ -53,6 +53,7 @@ import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/porta
 import { Route as ApiBillingReturnRouteImport } from './routes/api/billing/return'
 import { Route as ApiFilesIdRouteImport } from './routes/api/files/$id'
 import { Route as ApiWebhooksPolarRouteImport } from './routes/api/webhooks/polar'
+import { Route as ApiWebhooksResendRouteImport } from './routes/api/webhooks/resend'
 import { Route as AppTransactionsRulesIndexRouteImport } from './routes/_app/transactions/rules/index'
 import { Route as AppTransactionsRulesRuleIdRouteImport } from './routes/_app/transactions/rules/$ruleId'
 import { Route as AppTransactionsRulesNewRouteImport } from './routes/_app/transactions/rules/new'
@@ -276,6 +277,11 @@ const ApiWebhooksPolarRoute = ApiWebhooksPolarRouteImport.update({
   path: '/api/webhooks/polar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWebhooksResendRoute = ApiWebhooksResendRouteImport.update({
+  id: '/api/webhooks/resend',
+  path: '/api/webhooks/resend',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppTransactionsRulesIndexRoute =
   AppTransactionsRulesIndexRouteImport.update({
     id: '/transactions/rules/',
@@ -326,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/api/billing/return': typeof ApiBillingReturnRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/webhooks/polar': typeof ApiWebhooksPolarRoute
+  '/api/webhooks/resend': typeof ApiWebhooksResendRoute
   '/accounts/': typeof AppAccountsIndexRoute
   '/budgets/': typeof AppBudgetsIndexRoute
   '/categories/': typeof AppCategoriesIndexRoute
@@ -373,6 +380,7 @@ export interface FileRoutesByTo {
   '/api/billing/return': typeof ApiBillingReturnRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/webhooks/polar': typeof ApiWebhooksPolarRoute
+  '/api/webhooks/resend': typeof ApiWebhooksResendRoute
   '/accounts': typeof AppAccountsIndexRoute
   '/budgets': typeof AppBudgetsIndexRoute
   '/categories': typeof AppCategoriesIndexRoute
@@ -423,6 +431,7 @@ export interface FileRoutesById {
   '/api/billing/return': typeof ApiBillingReturnRoute
   '/api/files/$id': typeof ApiFilesIdRoute
   '/api/webhooks/polar': typeof ApiWebhooksPolarRoute
+  '/api/webhooks/resend': typeof ApiWebhooksResendRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
   '/_app/budgets/': typeof AppBudgetsIndexRoute
   '/_app/categories/': typeof AppCategoriesIndexRoute
@@ -472,6 +481,7 @@ export interface FileRouteTypes {
     | '/api/billing/return'
     | '/api/files/$id'
     | '/api/webhooks/polar'
+    | '/api/webhooks/resend'
     | '/accounts/'
     | '/budgets/'
     | '/categories/'
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/api/billing/return'
     | '/api/files/$id'
     | '/api/webhooks/polar'
+    | '/api/webhooks/resend'
     | '/accounts'
     | '/budgets'
     | '/categories'
@@ -568,6 +579,7 @@ export interface FileRouteTypes {
     | '/api/billing/return'
     | '/api/files/$id'
     | '/api/webhooks/polar'
+    | '/api/webhooks/resend'
     | '/_app/accounts/'
     | '/_app/budgets/'
     | '/_app/categories/'
@@ -598,6 +610,7 @@ export interface RootRouteChildren {
   ApiBillingReturnRoute: typeof ApiBillingReturnRoute
   ApiFilesIdRoute: typeof ApiFilesIdRoute
   ApiWebhooksPolarRoute: typeof ApiWebhooksPolarRoute
+  ApiWebhooksResendRoute: typeof ApiWebhooksResendRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -910,6 +923,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksPolarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/webhooks/resend': {
+      id: '/api/webhooks/resend'
+      path: '/api/webhooks/resend'
+      fullPath: '/api/webhooks/resend'
+      preLoaderRoute: typeof ApiWebhooksResendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/transactions/rules/': {
       id: '/_app/transactions/rules/'
       path: '/transactions/rules'
@@ -1034,6 +1054,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingReturnRoute: ApiBillingReturnRoute,
   ApiFilesIdRoute: ApiFilesIdRoute,
   ApiWebhooksPolarRoute: ApiWebhooksPolarRoute,
+  ApiWebhooksResendRoute: ApiWebhooksResendRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
