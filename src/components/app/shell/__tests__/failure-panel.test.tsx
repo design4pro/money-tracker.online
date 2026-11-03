@@ -265,6 +265,22 @@ describe('each recovery renders its own actions and not the others', () => {
     )
   })
 
+  it.each(['internal', 'quota', 'feature_locked'] as const)(
+    '%s: the call-site title is the heading when given',
+    async (kind) => {
+      await renderInRouter(
+        panel({
+          failure: envelope(kind, kind === 'quota' ? 'accounts' : undefined),
+          title: 'The account was not saved',
+        }),
+      )
+
+      expect(screen.getByRole('heading').textContent).toBe(
+        'The account was not saved',
+      )
+    },
+  )
+
   it('internal: offers only what the caller passed', async () => {
     const { container } = await renderInRouter(
       panel({ failure: envelope('internal') }),
