@@ -23,7 +23,7 @@
  * clicking it next week.
  */
 
-import { directionOf } from '#/lib/i18n'
+import { directionOf } from '#/lib/i18n/locales'
 
 import { EmailAction, EmailLayout, EmailMuted, EmailText } from './layout'
 
@@ -37,8 +37,13 @@ import type { ReactElement } from 'react'
  * exactly three of them and what each one says; `src/server/auth/email.ts` re-exports it so its
  * public surface is unchanged.
  */
-export type AuthEmailKind =
-  'verify-email' | 'reset-password' | 'organization-invitation'
+export const AUTH_EMAIL_KINDS = [
+  'verify-email',
+  'reset-password',
+  'organization-invitation',
+] as const
+
+export type AuthEmailKind = (typeof AUTH_EMAIL_KINDS)[number]
 
 export interface AuthEmailProps {
   readonly kind: AuthEmailKind

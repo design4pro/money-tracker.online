@@ -7,7 +7,7 @@
 
 import { Heading, Link, Text } from '@react-email/components'
 
-import { directionOf } from '#/lib/i18n'
+import { directionOf } from '#/lib/i18n/locales'
 import { eventNameOf } from './notification'
 import { EmailLayout, EmailMuted, emailStyles } from './layout'
 
@@ -95,11 +95,7 @@ export function digestEmail(
             <Heading
               as="h3"
               className="email-ink"
-              style={{
-                ...emailStyles.heading,
-                fontSize: 16,
-                margin: '16px 0 8px',
-              }}
+              style={emailStyles.groupHeading}
             >
               {group.label}
             </Heading>
@@ -112,7 +108,7 @@ export function digestEmail(
                 <Link
                   className="email-link"
                   href={item.href}
-                  style={emailStyles.paragraph}
+                  style={emailStyles.link}
                 >
                   {group.label}
                 </Link>
