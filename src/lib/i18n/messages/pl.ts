@@ -1729,6 +1729,8 @@ const messages = {
   'plans.feature.household.roles':
     'Właściciele i administratorzy decydują, kto co zmienia',
   'plans.feature.household.storage': 'Pięć gigabajtów na paragony',
+  'plans.feature.mcp':
+    'Agenci mogą czytać i zmieniać dane tej przestrzeni przez MCP',
   'plans.interval.monthly': 'Miesięcznie',
   'plans.interval.yearly': 'Rocznie',
   'plans.price.monthly': '{amount} miesięcznie',

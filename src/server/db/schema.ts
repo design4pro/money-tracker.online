@@ -133,6 +133,9 @@ import {
   LOAN_REPAYMENT_SHAPES,
   LOAN_PAYMENT_FREQUENCIES,
   LOAN_INSTALMENT_STATUSES,
+  AGENT_GRANT_KINDS,
+  AGENT_AUDIT_OUTCOMES,
+  AGENT_VERBS,
 } from '#/lib/enums'
 
 /**
@@ -184,6 +187,11 @@ export {
   LOAN_REPAYMENT_SHAPES,
   LOAN_PAYMENT_FREQUENCIES,
   LOAN_INSTALMENT_STATUSES,
+  AGENT_GRANT_KINDS,
+  AGENT_RESOURCES,
+  AGENT_VERBS,
+  AGENT_AUDIT_OUTCOMES,
+  AGENT_PAT_ENVIRONMENTS,
 } from '#/lib/enums'
 export type {
   PlanId,
@@ -230,6 +238,11 @@ export type {
   LoanRepaymentShape,
   LoanPaymentFrequency,
   LoanInstalmentStatus,
+  AgentGrantKind,
+  AgentResource,
+  AgentVerb,
+  AgentAuditOutcome,
+  AgentPatEnvironment,
 } from '#/lib/enums'
 
 /* -------------------------------------------------------------------------- */
@@ -3260,6 +3273,95 @@ export const emailDeliveries = sqliteTable(
 
 export type EmailDeliveryRow = typeof emailDeliveries.$inferSelect
 export type EmailDeliveryInsert = typeof emailDeliveries.$inferInsert
+
+/**
+ * One agent grant: OAuth or a personal token, bound to one user and one workspace.
+ *
+ * The secret is never stored. `token_hash` is SHA-256 of the PAT; OAuth rows leave it null.
+ * Revocation sets `revoked_at`; v1 does not delete the row (`docs/specs` MCP Phase 1).
+ */
+export const agentGrants = sqliteTable(
+  'agent_grants',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    name: text('name').notNull(),
+    clientId: text('client_id'),
+    tokenHash: text('token_hash'),
+    tokenPrefix: text('token_prefix'),
+    /** JSON array of `resource:verb` strings. */
+    scopes: text('scopes').notNull(),
+    createdAt: createdAt(),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    index('agent_grants_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    index('agent_grants_organization_id_user_id_idx').on(
+      table.organizationId,
+      table.userId,
+    ),
+    uniqueIndex('agent_grants_token_hash_unique').on(table.tokenHash),
+    enumCheck('agent_grants_kind_check', table.kind, AGENT_GRANT_KINDS),
+    maxLengthCheck('agent_grants_name_length_check', table.name, 80),
+    check(
+      'agent_grants_kind_secret_check',
+      sql`(${table.kind} = 'pat' and ${table.tokenHash} is not null and ${table.tokenPrefix} is not null and ${table.clientId} is null) or (${table.kind} = 'oauth' and ${table.tokenHash} is null and ${table.tokenPrefix} is null)`,
+    ),
+  ],
+)
+
+export type AgentGrantRow = typeof agentGrants.$inferSelect
+export type AgentGrantInsert = typeof agentGrants.$inferInsert
+
+/**
+ * One MCP (or mint) operation. Ids, tool, verb, outcome — never amounts or payloads.
+ */
+export const agentAuditLog = sqliteTable(
+  'agent_audit_log',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    grantId: text('grant_id')
+      .notNull()
+      .references(() => agentGrants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    tool: text('tool').notNull(),
+    verb: text('verb').notNull(),
+    resource: text('resource').notNull(),
+    resourceId: text('resource_id'),
+    outcome: text('outcome').notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('agent_audit_log_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    index('agent_audit_log_organization_id_grant_id_idx').on(
+      table.organizationId,
+      table.grantId,
+    ),
+    enumCheck('agent_audit_log_verb_check', table.verb, AGENT_VERBS),
+    enumCheck(
+      'agent_audit_log_outcome_check',
+      table.outcome,
+      AGENT_AUDIT_OUTCOMES,
+    ),
+  ],
+)
+
+export type AgentAuditLogRow = typeof agentAuditLog.$inferSelect
+export type AgentAuditLogInsert = typeof agentAuditLog.$inferInsert
 
 /**
  * Addresses that must never be mailed again, keyed by the same salted hash `to_hash` uses.

@@ -1690,6 +1690,7 @@ const messages = {
   'plans.feature.household.roles':
     'Owners and admins decide who may change what',
   'plans.feature.household.storage': 'Five gigabytes of receipts',
+  'plans.feature.mcp': 'Let agents read and change this workspace through MCP',
   'plans.interval.monthly': 'Monthly',
   'plans.interval.yearly': 'Yearly',
   'plans.price.monthly': '{amount} a month',

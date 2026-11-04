@@ -453,3 +453,37 @@ export type LoanPaymentFrequency = (typeof LOAN_PAYMENT_FREQUENCIES)[number]
  */
 export const LOAN_INSTALMENT_STATUSES = ['upcoming', 'paid'] as const
 export type LoanInstalmentStatus = (typeof LOAN_INSTALMENT_STATUSES)[number]
+
+/**
+ * How an agent grant was minted. OAuth rows land in a later phase; PATs are Phase 1.
+ */
+export const AGENT_GRANT_KINDS = ['oauth', 'pat'] as const
+export type AgentGrantKind = (typeof AGENT_GRANT_KINDS)[number]
+
+/** Closed resource vocabulary on a grant scope (`resource:verb`). */
+export const AGENT_RESOURCES = [
+  'accounts',
+  'transactions',
+  'categories',
+  'payees',
+  'recurring',
+  'budgets',
+] as const
+export type AgentResource = (typeof AGENT_RESOURCES)[number]
+
+export const AGENT_VERBS = ['read', 'write', 'delete'] as const
+export type AgentVerb = (typeof AGENT_VERBS)[number]
+
+export const AGENT_AUDIT_OUTCOMES = [
+  'ok',
+  'denied',
+  'not_found',
+  'invalid',
+  'rate_limited',
+  'error',
+] as const
+export type AgentAuditOutcome = (typeof AGENT_AUDIT_OUTCOMES)[number]
+
+/** Staging vs live PAT prefix. Cross-environment paste is a different secret, not a fallback. */
+export const AGENT_PAT_ENVIRONMENTS = ['stg', 'live'] as const
+export type AgentPatEnvironment = (typeof AGENT_PAT_ENVIRONMENTS)[number]
