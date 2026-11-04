@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mockup — Connected agents list and token once</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.45 'Iowan Old Style',
+          Palatino,
+          serif;
+        background: #f6f1e8;
+        color: #1b1916;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      .badge {
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #5c574f;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fffdf8;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 12px;
+        border-bottom: 1px solid #e4dccf;
+        vertical-align: top;
+      }
+      button {
+        min-height: 44px;
+        padding: 0 12px;
+        font: inherit;
+      }
+      .danger {
+        color: #8b1e1e;
+        background: transparent;
+        border: 1px solid #8b1e1e;
+        border-radius: 8px;
+      }
+      .flash {
+        margin-top: 20px;
+        padding: 16px;
+        background: #fff6d8;
+        border: 1px solid #e0c36a;
+        border-radius: 12px;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+        word-break: break-all;
+      }
+      dialog {
+        border: 1px solid #e4dccf;
+        border-radius: 12px;
+        padding: 20px;
+        width: min(420px, 92vw);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="badge">Proposed · /settings/agents · list + one-time secret</p>
+      <h1>Connected agents</h1>
+      <div class="flash">
+        <p>
+          Copy this token now. It will not be shown again. Treat it like a
+          password.
+        </p>
+        <p>
+          <code>mto_stg_nwh_32f9c1a0b7e44d1e9c0a.exampletokennotreal</code>
+        </p>
+      </div>
+      <table>
+        <caption style="text-align: left; padding: 12px">
+          Two grants on one workspace. Synthetic names only.
+        </caption>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Kind</th>
+            <th>Access</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Laptop notes</td>
+            <td>Personal token</td>
+            <td>accounts read · transactions read, write</td>
+            <td><button class="danger" type="button">Revoke</button></td>
+          </tr>
+          <tr>
+            <td>Example MCP client</td>
+            <td>OAuth app</td>
+            <td>accounts read · transactions read</td>
+            <td><button class="danger" type="button">Revoke</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <dialog open>
+        <form method="dialog">
+          <h2>Revoke Laptop notes?</h2>
+          <p>
+            The next tool call with this token fails. This does not delete
+            transactions it already wrote.
+          </p>
+          <button type="submit">Cancel</button>
+          <button class="danger" type="submit">Revoke access</button>
+        </form>
+      </dialog>
+    </main>
+  </body>
+</html>
