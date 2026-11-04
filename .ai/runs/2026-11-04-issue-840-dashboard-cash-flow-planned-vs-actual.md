@@ -52,17 +52,17 @@ The dashboard cash-flow chart shows the whole month’s plan (one-off planned ro
 
 ### Phase 1: Reads, column, invariants
 
-- [ ] 1.1 Failing tenant-isolation cases
-- [ ] 1.2 Failing money-invariant cases
-- [ ] 1.3 Additive was_planned column and writers
-- [ ] 1.4 sumPlannedPeriodsByMonth
-- [ ] 1.5 sumPlannedTransactionsByMonth
-- [ ] 1.6 convertExpectedAmount helper
+- [x] 1.1 Failing tenant-isolation cases — 2e0e078
+- [x] 1.2 Failing money-invariant cases — 2e0e078
+- [x] 1.3 Additive was_planned column and writers — 2e0e078
+- [x] 1.4 sumPlannedPeriodsByMonth — 2e0e078
+- [x] 1.5 sumPlannedTransactionsByMonth — 2e0e078
+- [x] 1.6 convertExpectedAmount helper — 2e0e078
 
 ### Phase 2: Chart
 
-- [ ] 2.1 CashFlowBucket and cashFlowBuckets composition
-- [ ] 2.2 cash-flow-widget four series and empty state
-- [ ] 2.3 EN + PL copy
-- [ ] 2.4 Spec status in-progress and spec index
-- [ ] 2.5 Widget and dashboard tests
+- [x] 2.1 CashFlowBucket and cashFlowBuckets composition — 2e0e078
+- [x] 2.2 cash-flow-widget four series and empty state — 2e0e078
+- [x] 2.3 EN + PL copy — 2e0e078
+- [x] 2.4 Spec status in-progress and spec index — 2e0e078
+- [x] 2.5 Widget and dashboard tests — 2e0e078
