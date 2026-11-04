@@ -10,10 +10,14 @@
  * No provider configured means no requeue. Expiry still runs, so a key that never arrives does
  * not leave `sending` rows forever.
  *
- * Phase 5 expires `deferred` rows older than 48 hours. This sweep does not.
+ * `deferred` rows older than 48 hours (two missed digests) expire to `failed` / `expired`.
  */
 
-import { listStale, markDelivery } from '#/server/repos/email-deliveries'
+import {
+  listDeferredOlderThan,
+  listStale,
+  markDelivery,
+} from '#/server/repos/email-deliveries'
 
 import type { Logger } from '#/server/observability/logger'
 import type { NotifyEmailMessage } from '#/server/queue/messages'
@@ -21,6 +25,7 @@ import type { TenantScope } from '#/server/repos/base'
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 const TWENTY_THREE_HOURS_MS = 23 * 60 * 60 * 1000
+const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000
 
 export interface EmailRecoveryArgs {
   readonly scopes: ReadonlyArray<TenantScope>
@@ -75,6 +80,20 @@ export async function runEmailRecovery(
           deliveryId: row.id,
         })
         requeued += 1
+      }
+
+      const staleDeferred = await listDeferredOlderThan(
+        scope,
+        new Date(args.now.getTime() - FORTY_EIGHT_HOURS_MS),
+      )
+      for (const row of staleDeferred) {
+        await markDelivery(
+          scope,
+          row.id,
+          { status: 'failed', errorCode: 'expired' },
+          'deferred',
+        )
+        expired += 1
       }
     } catch (error) {
       failures += 1

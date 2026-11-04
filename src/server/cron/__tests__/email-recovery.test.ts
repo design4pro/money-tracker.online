@@ -20,6 +20,7 @@ import type { BudgetWorld } from '#/server/repos/__tests__/budget-harness'
 const KIND = 'budget.exceeded' as const
 const SIXTEEN_MIN_AGO = new Date(NOW.getTime() - 16 * 60 * 1000)
 const TWENTY_FOUR_HOURS_AGO = new Date(NOW.getTime() - 24 * 60 * 60 * 1000)
+const FORTY_NINE_HOURS_AGO = new Date(NOW.getTime() - 49 * 60 * 60 * 1000)
 
 let world: BudgetWorld
 
@@ -44,7 +45,7 @@ async function seed(createdAt: Date, status: 'queued' | 'sending' = 'sending') {
 }
 
 describe('runEmailRecovery', () => {
-  it('requeues a crash-after-claim row with the same delivery id', async () => {
+  it('requeues a crash-after-claim row once with the same Idempotency-Key', async () => {
     const row = await seed(SIXTEEN_MIN_AGO, 'sending')
     const sent: Array<NotifyEmailMessage> = []
 
@@ -59,13 +60,13 @@ describe('runEmailRecovery', () => {
     })
 
     expect(report).toMatchObject({ requeued: 1, expired: 0, failures: 0 })
-    expect(sent).toEqual([
-      {
-        kind: 'notify.email',
-        organizationId: 'org-a',
-        deliveryId: row.id,
-      },
-    ])
+    expect(sent).toHaveLength(1)
+    // The handler posts `Idempotency-Key: {deliveryId}` (`notify-email.test.ts`).
+    expect(sent[0]).toEqual({
+      kind: 'notify.email',
+      organizationId: 'org-a',
+      deliveryId: row.id,
+    })
     expect(await getDelivery(world.scope, row.id)).toMatchObject({
       status: 'queued',
     })
@@ -111,6 +112,50 @@ describe('runEmailRecovery', () => {
     expect(await getDelivery(world.scope, row.id)).toMatchObject({
       status: 'failed',
       errorCode: 'expired',
+    })
+  })
+
+  it('expires a deferred row older than 48 hours', async () => {
+    const row = await insertDelivery(
+      world.scope,
+      {
+        userId: 'user-a',
+        kind: KIND,
+        notificationId: null,
+        dedupeKey: 'notification:deferred-old',
+        status: 'deferred',
+      },
+      FORTY_NINE_HOURS_AGO,
+    )
+    if (!row) throw new Error('expected a delivery row')
+    const young = await insertDelivery(
+      world.scope,
+      {
+        userId: 'user-a',
+        kind: KIND,
+        notificationId: null,
+        dedupeKey: 'notification:deferred-young',
+        status: 'deferred',
+      },
+      TWENTY_FOUR_HOURS_AGO,
+    )
+    if (!young) throw new Error('expected a delivery row')
+
+    const report = await runEmailRecovery({
+      scopes: await listCronScopes(world.db),
+      now: NOW,
+      logger: createLogger({ sink: createMemorySink(), level: 'debug' }),
+      send: async () => undefined,
+      hasProvider: true,
+    })
+
+    expect(report.expired).toBe(1)
+    expect(await getDelivery(world.scope, row.id)).toMatchObject({
+      status: 'failed',
+      errorCode: 'expired',
+    })
+    expect(await getDelivery(world.scope, young.id)).toMatchObject({
+      status: 'deferred',
     })
   })
 })

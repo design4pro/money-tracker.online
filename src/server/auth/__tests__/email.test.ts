@@ -168,10 +168,44 @@ describe('when a provider is configured', () => {
       subject: string
       text: string
       html: string
+      headers?: Record<string, string>
     }
     expect(body.from).toBe(DELIVERY.from)
     expect(body.to).toEqual(['anna@example.com'])
     expect(body.text).toContain(RESET.url)
+  })
+
+  it('posts neither List-Unsubscribe header on any of the three kinds (A4)', async () => {
+    const { logger } = loggerWithSink()
+
+    for (const kind of [
+      'reset-password',
+      'verify-email',
+      'organization-invitation',
+    ] as const) {
+      const transport = okFetch()
+      await expect(
+        createAuthEmailer({
+          delivery: DELIVERY,
+          logger,
+          fetch: transport.fetch,
+        }).send({
+          ...RESET,
+          kind,
+          organizationName: 'Haushalt',
+        }),
+      ).resolves.toBe('sent')
+
+      const body = JSON.parse(String(transport.calls[0]?.body)) as {
+        headers?: Record<string, string>
+        html: string
+        text: string
+      }
+      expect(body.headers).toBeUndefined()
+      expect(JSON.stringify(body)).not.toMatch(/List-Unsubscribe/)
+      expect(body.html.toLowerCase()).not.toContain('unsubscribe')
+      expect(body.text.toLowerCase()).not.toContain('unsubscribe')
+    }
   })
 
   it('never logs the token, which is a bearer credential', async () => {

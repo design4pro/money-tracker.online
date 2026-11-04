@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 
+import { cn } from '#/lib/cn'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { currencyName } from '#/lib/money'
 
@@ -25,9 +26,12 @@ import type { LedgerTotals } from './types'
  * The strip used to set the row count, money in, money out and the difference at one size and one
  * weight, which made "600 transactions" exactly as loud as the only figure anybody filters a ledger
  * to find out. The difference now leads at `subtitle`, in the primary ink, under a `micro` label;
- * money in and money out follow at `label` in their own hues; the count drops to `caption` in the
- * muted ink and sits at the far left as the metadata it is.
+ * money in and money out follow the same stack at `label` in their own hues; the count drops to
+ * `caption` in the muted ink and sits at the far left as the metadata it is.
  */
+
+const PAIR = 'flex flex-col'
+const TERM = 'text-micro tracking-label uppercase text-ink-2'
 
 export interface ListSummaryProps {
   readonly totals: LedgerTotals
@@ -58,11 +62,9 @@ export function ListSummary({ totals, matchCount }: ListSummaryProps) {
         </p>
       </div>
 
-      <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-        <div className="flex flex-col">
-          <dt className="text-micro tracking-label uppercase text-ink-2">
-            {t('dashboard.net')}
-          </dt>
+      <dl className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className={PAIR}>
+          <dt className={TERM}>{t('dashboard.net')}</dt>
           <dd>
             <NetAmount
               amountMinor={totals.netMinor}
@@ -72,10 +74,10 @@ export function ListSummary({ totals, matchCount }: ListSummaryProps) {
           </dd>
         </div>
 
-        <div className="flex items-baseline gap-2">
-          {/* The arrow is on the label, never on the figure: it says which way this row of the
+        <div className={PAIR}>
+          {/* The arrow is on the label, never on the figure: it says which way this item of the
               strip runs without giving the numbers beside it two left edges. */}
-          <dt className="inline-flex items-center gap-1 text-caption text-ink-2">
+          <dt className={cn(TERM, 'inline-flex items-center gap-1')}>
             <ArrowDownLeft aria-hidden="true" className="size-3.5" />
             {t('dashboard.income')}
           </dt>
@@ -90,8 +92,8 @@ export function ListSummary({ totals, matchCount }: ListSummaryProps) {
           </dd>
         </div>
 
-        <div className="flex items-baseline gap-2">
-          <dt className="inline-flex items-center gap-1 text-caption text-ink-2">
+        <div className={PAIR}>
+          <dt className={cn(TERM, 'inline-flex items-center gap-1')}>
             <ArrowUpRight aria-hidden="true" className="size-3.5" />
             {t('dashboard.expenses')}
           </dt>

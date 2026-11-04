@@ -52,10 +52,9 @@ import type { LedgerRow } from './types'
  * ## On the pitch
  *
  * The page is ruled at 2.5rem. A cell has no vertical padding, its rule is an inset shadow on its
- * last pixel row, and every line of type in it is a {@link TYPED_LINE}: a 2.5rem box painted so the
- * baseline sits three pixels above the rule. The translate is on a span *inside* the link, never on
- * the link itself, because a transform moves hit-testing too and a link painted 13px lower would
- * catch taps meant for the line under it.
+ * last pixel row, and every line of type in it is a {@link TYPED_LINE}: a 2.5rem box with the type
+ * vertically centred in the rule. The typed line is a span *inside* the link, never the link
+ * itself, so the 44px hit box stays on its rule.
  *
  * ## Nothing may leave its column
  *
@@ -279,15 +278,15 @@ function AccountFacts({
           {accountName}
         </span>
       ) : null}
-      {/* A mark sits on the line it covers: `-top-px` puts the `sm` word within 0.25px of the
-          caption's baseline on the typed line (measured; `-top-0.5` was derived for the box). */}
+      {/* A mark sits on the line it covers. META_LINE is a centred flex row, so the badge
+          shares the line without a baseline offset. */}
       {row.isBalanceAdjustment ? (
-        <Badge tone="warning" size="sm" className="relative -top-px">
+        <Badge tone="warning" size="sm">
           {t('transactions.balanceAdjustment')}
         </Badge>
       ) : null}
       {row.excludeFromStats ? (
-        <Badge tone="neutral" size="sm" className="relative -top-px">
+        <Badge tone="neutral" size="sm">
           {t('transactions.excludedFromTotals')}
         </Badge>
       ) : null}
@@ -378,8 +377,9 @@ function TransactionRowImpl({
         <span className={TARGET_LINE}>
           <Checkbox
             excludeFromTabOrder
-            // `target-min` rather than the primitive's `target-min-h`: a checkbox with no visible
-            // label is only as wide as its 18px box, and the select column's content box is 24px.
+            // `target-min` grows the hit area to 44px without changing the 40px line. The
+            // primitive already does this when it has no label; the class stays so the column
+            // keeps the guarantee if that branch moves.
             className="target-min"
             isSelected={isSelected}
             onChange={() => actions.onToggleSelect(row.id)}

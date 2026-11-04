@@ -8,7 +8,7 @@
 
 import { Heading } from '@react-email/components'
 
-import { directionOf } from '#/lib/i18n'
+import { directionOf } from '#/lib/i18n/locales'
 
 import { EmailAction, EmailLayout, EmailText, emailStyles } from './layout'
 

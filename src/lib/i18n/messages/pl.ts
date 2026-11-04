@@ -1086,6 +1086,8 @@ const messages = {
   'dashboard.period.label': 'Okres',
   'dashboard.income': 'Wpływy',
   'dashboard.expenses': 'Wydatki',
+  'dashboard.plannedIncome': 'Zaplanowane wpływy',
+  'dashboard.plannedExpenses': 'Zaplanowane wydatki',
   'dashboard.net': 'Różnica',
   'dashboard.comparedToPrevious': '{change} względem poprzedniego okresu',
   'dashboard.widget.netWorth': 'Wartość netto',
@@ -1127,6 +1129,14 @@ const messages = {
   'dashboard.cashFlow.shareOfIncome': '{share} z {amount} wpływów',
   'dashboard.cashFlow.context':
     'Wybrany okres: {month}. Wcześniejsze miesiące to kontekst.',
+  'dashboard.cashFlow.plannedNote':
+    'Kwoty zaplanowane to plan całego miesiąca, nie tylko to, co jeszcze nieopłacone.',
+  'dashboard.cashFlow.convertedNote':
+    'Kwoty zaplanowane w innych walutach są przeliczane po kursie z dnia wymagalności, nie z dzisiaj.',
+  'dashboard.cashFlow.rateMissingNote':
+    'Część zaplanowanych kwot nie ma kursu na dzień wymagalności, więc są wypisane w swojej walucie i pominięte w sumie wykresu.',
+  'dashboard.cashFlow.plannedInHeader': 'Zaplanowane wpływy',
+  'dashboard.cashFlow.plannedOutHeader': 'Zaplanowane wydatki',
   'dashboard.cashFlow.empty.title': 'W tym okresie nic się nie wydarzyło',
   'dashboard.cashFlow.empty.body': 'Zapisz wydatek albo wybierz dłuższy okres.',
   'dashboard.spending.other': 'Pozostałe',
@@ -1506,6 +1516,15 @@ const messages = {
   'email.layout.footer.unsubscribe': 'Zatrzymaj te e-maile',
   'email.notification.action': 'Otwórz w {app}',
   'email.notification.body': 'Otwórz {app}, aby zobaczyć, co się stało.',
+  'email.digest.subject': {
+    one: '{count} aktualizacja z domu {workspace}',
+    few: '{count} aktualizacje z domu {workspace}',
+    many: '{count} aktualizacji z domu {workspace}',
+    other: '{count} aktualizacji z domu {workspace}',
+  },
+  'email.digest.heading': 'Twoje dzienne podsumowanie',
+  'email.digest.intro':
+    'Oto co wydarzyło się w domu {workspace} w ciągu ostatniej doby.',
   'email.auth.greeting': 'Cześć {name},',
   'email.auth.singleUse': 'Ten link zadziała tylko raz i wkrótce wygaśnie.',
   'email.auth.verifyEmail.subject': 'Potwierdź swój adres w {app}',

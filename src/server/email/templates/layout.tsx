@@ -124,6 +124,9 @@ const TYPE = {
   bodyLine: '23px',
   label: '13px',
   labelLine: '20px',
+  /** Between `body` and `subtitle`: a digest group heading, not a page title. */
+  group: '16px',
+  groupLine: '24px',
   subtitle: '20px',
   subtitleLine: '25px',
 } as const
@@ -180,7 +183,7 @@ const container: CSSProperties = {
   borderRadius: RADIUS,
   margin: '0 auto',
   maxWidth: '600px',
-  padding: '32px 28px',
+  padding: '32px 20px',
   width: '100%',
 }
 
@@ -298,6 +301,19 @@ export const emailStyles = {
     lineHeight: TYPE.subtitleLine,
     margin: '0 0 12px',
   } satisfies CSSProperties,
+  /**
+   * A digest kind group. Unitless `font-size: 16` is ignored in enough clients
+   * that the group then inherits the 20 px page heading and the list collapses
+   * into one shout.
+   */
+  groupHeading: {
+    color: LIGHT.ink,
+    fontFamily: FONT_STACK,
+    fontSize: TYPE.group,
+    fontWeight: 700,
+    lineHeight: TYPE.groupLine,
+    margin: '16px 0 8px',
+  } satisfies CSSProperties,
   paragraph: {
     color: LIGHT.ink,
     fontFamily: FONT_STACK,
@@ -311,6 +327,18 @@ export const emailStyles = {
     fontSize: TYPE.label,
     lineHeight: TYPE.labelLine,
     margin: '0 0 16px',
+  } satisfies CSSProperties,
+  /**
+   * An in-body link (digest rows). Light clients get the stamp colour, not ink
+   * that looks like the surrounding paragraph; the dark block already restates
+   * `.email-link`.
+   */
+  link: {
+    color: LIGHT.accent,
+    fontFamily: FONT_STACK,
+    fontSize: TYPE.body,
+    lineHeight: TYPE.bodyLine,
+    textDecoration: 'underline',
   } satisfies CSSProperties,
   /**
    * The band a call to action sits in.

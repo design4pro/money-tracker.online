@@ -40,6 +40,7 @@ import './email/install'
 
 import { runBudgetPeriodSweep } from './cron/budget-periods'
 import { runBudgetThresholdSweep } from './cron/budget-thresholds'
+import { runDigest } from './cron/digest'
 import { runEmailRecovery } from './cron/email-recovery'
 import { runRecurringHourly, runRecurringReminderSweep } from './cron/recurring'
 import { dbFromEnv } from './db/from-env'
@@ -184,6 +185,22 @@ export default {
       // Returned, not fallen through: this slot now has handlers, and reaching the warning below
       // would report the tag reminders that are still owed as if nothing in the slot had run.
       return
+    }
+
+    if (controller.cron === NIGHTLY_CRON) {
+      const now = new Date(controller.scheduledTime)
+      const digest = await runDigest({
+        scopes: await listCronScopes(dbFromEnv(env)),
+        now,
+        logger,
+        send: async (message) => {
+          await env.TASKS.send(message)
+        },
+        hasProvider:
+          typeof env.EMAIL_API_KEY === 'string' && env.EMAIL_API_KEY.length > 0,
+      })
+      logger.info('digest sweep finished', { ...digest })
+      // Digest is wired; the remaining nightly jobs are still owed, so the warning stays.
     }
 
     logger.warn('cron has no handler yet', {

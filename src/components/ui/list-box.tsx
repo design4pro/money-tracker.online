@@ -85,10 +85,11 @@ export function ListBoxItem<T extends object>({
         <>
           <span
             aria-hidden="true"
+            data-slot="selection-check"
             className={cn(
               'grid size-4 shrink-0 place-items-center',
               // The slot is always present so selecting a row never shifts the
-              // text beside it.
+              // text beside it. Named so `Select` can hide it in the trigger.
               renderProps.isSelected ? 'opacity-100' : 'opacity-0',
             )}
           >

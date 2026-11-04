@@ -1038,6 +1038,8 @@ const messages = {
   'dashboard.period.label': 'Period',
   'dashboard.income': 'Money in',
   'dashboard.expenses': 'Money out',
+  'dashboard.plannedIncome': 'Planned in',
+  'dashboard.plannedExpenses': 'Planned out',
   'dashboard.net': 'Difference',
   'dashboard.comparedToPrevious': '{change} against the previous period',
   'dashboard.widget.netWorth': 'Net worth',
@@ -1079,6 +1081,14 @@ const messages = {
   'dashboard.cashFlow.shareOfIncome': '{share} of the {amount} that came in',
   'dashboard.cashFlow.context':
     'Selected period: {month}. Earlier months are context.',
+  'dashboard.cashFlow.plannedNote':
+    'Planned amounts are the whole month’s plan, not only what is still unpaid.',
+  'dashboard.cashFlow.convertedNote':
+    'Planned amounts in other currencies are converted at each due date’s rate, not today’s.',
+  'dashboard.cashFlow.rateMissingNote':
+    'Some planned amounts have no exchange rate for their due date, so they are listed in their own currency and omitted from the chart total.',
+  'dashboard.cashFlow.plannedInHeader': 'Planned in',
+  'dashboard.cashFlow.plannedOutHeader': 'Planned out',
   'dashboard.cashFlow.empty.title': 'No money moved in this period',
   'dashboard.cashFlow.empty.body':
     'Record an expense, or pick a longer period.',
@@ -1456,6 +1466,12 @@ const messages = {
   'email.layout.footer.unsubscribe': 'Stop these emails',
   'email.notification.action': 'Open in {app}',
   'email.notification.body': 'Open {app} to see what happened.',
+  'email.digest.subject': {
+    one: '{count} update from {workspace}',
+    other: '{count} updates from {workspace}',
+  },
+  'email.digest.heading': 'Your daily summary',
+  'email.digest.intro': 'Here is what happened in {workspace} in the last day.',
   'email.auth.greeting': 'Hi {name},',
   /*
     Stated once, in the frame of every auth email, because the failure it prevents is a person

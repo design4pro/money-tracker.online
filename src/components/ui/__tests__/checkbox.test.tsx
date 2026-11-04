@@ -80,6 +80,27 @@ describe('Checkbox', () => {
     expect(box.getAttribute('aria-describedby')).toBeNull()
   })
 
+  it('centres a label-less box without growing the line', () => {
+    render(<Checkbox aria-label="Select this row" />)
+
+    const box = screen.getByRole('checkbox', { name: 'Select this row' })
+    const root = box.closest('label')
+    expect(root).not.toBeNull()
+    const classes = root?.className.split(/\s+/) ?? []
+
+    // A bare box sits in a 40px ledger line. `target-min-h` would make the root
+    // 44px tall and overflow the rule; `items-start` plus `py-1` would park the
+    // 18px square at the top. The 44px target is the `target-min` pseudo-element.
+    expect(classes).toContain('items-center')
+    expect(classes).toContain('target-min')
+    expect(classes).not.toContain('items-start')
+    expect(classes).not.toContain('target-min-h')
+    expect(classes).not.toContain('py-1')
+
+    const paint = root?.querySelector('[aria-hidden="true"]')
+    expect(paint?.className.split(/\s+/)).not.toContain('mt-px')
+  })
+
   it('leaves the tab order when disabled', async () => {
     const user = userEvent.setup()
     render(

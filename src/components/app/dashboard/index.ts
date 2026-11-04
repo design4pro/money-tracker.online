@@ -59,6 +59,7 @@ export type {
   DashboardAccount,
   DashboardData,
   DashboardTransaction,
+  NativePlanLine,
 } from './types'
 
 export { WidgetFrame } from './widget-frame'

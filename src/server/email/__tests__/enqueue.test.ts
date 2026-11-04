@@ -1,6 +1,6 @@
 /**
- * The enqueuer writes a delivery row and a queue message that name the same id, or a capped
- * failure and no message. Amounts never leave the in-app row.
+ * The enqueuer writes a delivery row and a queue message that name the same id, or a deferred
+ * row and no message once the daily cap is reached. Amounts never leave the in-app row.
  */
 
 import { readFileSync } from 'node:fs'
@@ -132,7 +132,7 @@ describe('an under-cap enqueue', () => {
 })
 
 describe('the daily cap', () => {
-  it('writes failed/capped and does not enqueue once the workspace is over', async () => {
+  it('writes deferred and does not enqueue once the workspace is over', async () => {
     const first = await seedNotification('budget:exceeded:v1:one')
     const second = await seedNotification('budget:exceeded:v1:two')
     const sent: Array<NotifyEmailMessage> = []
@@ -167,9 +167,9 @@ describe('the daily cap', () => {
 
     expect(sent).toHaveLength(1)
     const rows = await world.db.select().from(emailDeliveries)
-    const capped = rows.filter((row) => row.status === 'failed')
-    expect(capped.length).toBe(2)
-    expect(capped.every((row) => row.errorCode === 'capped')).toBe(true)
+    const deferred = rows.filter((row) => row.status === 'deferred')
+    expect(deferred.length).toBe(2)
+    expect(deferred.every((row) => row.errorCode === null)).toBe(true)
     const capLogs = sink.records.filter(
       (record) => record.msg === 'workspace daily email cap reached',
     )

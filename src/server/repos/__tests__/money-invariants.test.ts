@@ -44,6 +44,7 @@ import {
 } from '#/lib/money'
 import { createTranslator, loadCatalogue } from '#/lib/i18n'
 import { renderEmail } from '#/server/email/render'
+import { digestEmail } from '#/server/email/templates/digest'
 import { notificationEmail } from '#/server/email/templates/notification'
 import { listEnabledCurrencies } from '#/server/catalog/currencies'
 import { projectCompletion } from '#/server/goals/project'
@@ -108,7 +109,10 @@ import {
   createSeries,
   listPeriods as listSeriesPeriods,
   markPaid,
+  markSkipped,
+  pauseSeries,
   periodVarianceMinor,
+  sumPlannedPeriodsByMonth,
   sumSeriesSpendThisYear,
 } from '../recurring'
 import {
@@ -138,8 +142,10 @@ import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
   countTransactions,
   pageTransactions,
+  sumPlannedTransactionsByMonth,
   sumTransactions,
 } from '../transaction-queries'
+import { convertExpectedAmount } from '#/server/transactions/display-expected'
 import { computeRefAmount } from '#/server/transactions/ref-amount'
 import {
   createTransaction,
@@ -2986,5 +2992,232 @@ describe('24 — notification email is not a money surface', () => {
       expect(part).not.toContain(payload.budgetName)
       expect(part).not.toContain(drawn)
     }
+  })
+
+  it('renders a digest of event names and links with no amounts or totals', async () => {
+    const t = createTranslator('en', await loadCatalogue('en'))
+    const { subject, element } = digestEmail(
+      {
+        locale: 'en',
+        workspaceName: 'Haushalt',
+        items: [
+          {
+            kind: 'budget.threshold_crossed',
+            href: 'https://app.example.test/budgets/budget-1',
+          },
+          {
+            kind: 'goal.reached',
+            href: 'https://app.example.test/goals/goal-1',
+          },
+        ],
+      },
+      t,
+    )
+    const { html, text } = await renderEmail(element)
+    const drawn = formatMoney('en', {
+      amountMinor: asMinor(payload.spentMinor),
+      currencyCode: asCurrencyCode(payload.currencyCode),
+    })
+
+    expect(subject).toBe('2 updates from Haushalt')
+    expect(html).toContain('/budgets/budget-1')
+    expect(html).toContain('/goals/goal-1')
+    expect(text).toContain('/budgets/budget-1')
+    for (const part of [html, text, subject]) {
+      expect(part).not.toContain(String(payload.spentMinor))
+      expect(part).not.toContain(payload.budgetName)
+      expect(part).not.toContain(drawn)
+      expect(part).not.toMatch(/total/i)
+    }
+  })
+})
+
+describe('16 — dashboard whole-month plan never joins actuals', () => {
+  const WINDOW = { from: '2026-04-01', to: '2026-05-01' } as const
+  const FLOW: TransactionPolicies = {
+    planned: 'exclude',
+    adjustments: 'include',
+    transfers: 'exclude',
+    completeness: 'any',
+  }
+
+  it('keeps actual totals byte-identical when a plan exists beside them', async () => {
+    const world = await createBudgetWorld()
+    await seedTransaction(world.db, {
+      id: 'posted',
+      refAmountMinor: 80_00,
+      bookedOn: '2026-04-12',
+    })
+    const without = await sumTransactions({
+      scope: world.scope,
+      policies: FLOW,
+      filters: { from: '2026-04-01', to: '2026-04-30' },
+      historyFloor: null,
+      baseCurrencyCode: asCurrencyCode('PLN'),
+    })
+    await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    await seedTransaction(world.db, {
+      id: 'plan-row',
+      refAmountMinor: 40_00,
+      bookedOn: '2026-04-20',
+      isPlanned: true,
+    })
+    const withPlan = await sumTransactions({
+      scope: world.scope,
+      policies: FLOW,
+      filters: { from: '2026-04-01', to: '2026-04-30' },
+      historyFloor: null,
+      baseCurrencyCode: asCurrencyCode('PLN'),
+    })
+    expect(JSON.stringify(withPlan)).toBe(JSON.stringify(without))
+    expect(withPlan).toMatchObject({
+      incomeMinor: 0,
+      expenseMinor: 80_00,
+    })
+  })
+
+  it('keeps a paid period in the plan at expected_amount_minor and counts the settlement once in actual', async () => {
+    const world = await createBudgetWorld()
+    const series = await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-04-15',
+    )
+    const april = periods.find((period) => period.dueOn.startsWith('2026-04'))
+    if (april === undefined) throw new Error('expected an April period')
+    await seedTransaction(world.db, {
+      id: 'settled-rent',
+      refAmountMinor: 250_00,
+      bookedOn: '2026-04-10',
+    })
+    const before = await sumPlannedPeriodsByMonth(world.scope, WINDOW)
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: april.periodStart,
+      transactionId: 'settled-rent',
+    })
+    const after = await sumPlannedPeriodsByMonth(world.scope, WINDOW)
+    expect(after).toEqual(before)
+    expect(after[0]?.amountMinor).toBe(250_00)
+    const actual = await sumTransactions({
+      scope: world.scope,
+      policies: FLOW,
+      filters: { from: '2026-04-01', to: '2026-04-30' },
+      historyFloor: null,
+      baseCurrencyCode: asCurrencyCode('PLN'),
+    })
+    expect(actual.expenseMinor).toBe(250_00)
+  })
+
+  it('excludes skipped periods and transfers from the plan', async () => {
+    const world = await createBudgetWorld()
+    const series = await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-04-15',
+    )
+    const april = periods.find((period) => period.dueOn.startsWith('2026-04'))
+    if (april === undefined) throw new Error('expected an April period')
+    await markSkipped(world.scope, {
+      seriesId: series.id,
+      periodStart: april.periodStart,
+    })
+    expect(await sumPlannedPeriodsByMonth(world.scope, WINDOW)).toEqual([])
+
+    await seedTransaction(world.db, {
+      id: 'plan-xfer',
+      refAmountMinor: 50_00,
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+      transferKind: 'internal',
+      transferId: 'xfer-1',
+    })
+    expect(
+      await sumPlannedTransactionsByMonth({
+        scope: world.scope,
+        ...WINDOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('omits unpaid periods of a paused series and keeps paid ones', async () => {
+    const world = await createBudgetWorld()
+    const series = await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    await pauseSeries(world.scope, series.id)
+    expect(await sumPlannedPeriodsByMonth(world.scope, WINDOW)).toEqual([])
+  })
+
+  it('converts an expected amount at due_on and treats a missing rate as a gap, not zero', async () => {
+    const converted = await convertExpectedAmount(
+      {
+        amountMinor: asMinor(100_00),
+        currencyCode: asCurrencyCode('EUR'),
+        dueOn: '2026-04-10',
+        baseCurrencyCode: asCurrencyCode('PLN'),
+      },
+      async ({ date }) =>
+        date === '2026-04-10' ? asRateE10(43_000_000_000) : null,
+    )
+    expect(converted).toBe(430_00)
+
+    const gap = await convertExpectedAmount(
+      {
+        amountMinor: asMinor(100_00),
+        currencyCode: asCurrencyCode('EUR'),
+        dueOn: '2026-04-10',
+        baseCurrencyCode: asCurrencyCode('PLN'),
+      },
+      async () => null,
+    )
+    expect(gap).toBeNull()
+  })
+
+  it('stamps was_planned on create and keeps it through the flip to posted', async () => {
+    const conversion = conversionOf('PLN', [])
+    const planned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, isPlanned: true },
+    })
+    expect(planned.wasPlanned).toBe(true)
+    const posted = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      id: planned.id,
+      patch: { isPlanned: false },
+    })
+    expect(posted).toMatchObject({ isPlanned: false, wasPlanned: true })
+    const neverPlanned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, amountMinor: 50_00 },
+    })
+    expect(neverPlanned.wasPlanned).toBe(false)
+    expect(
+      await sumPlannedTransactionsByMonth({
+        scope,
+        from: '2026-03-01',
+        to: '2026-04-01',
+      }),
+    ).toEqual([
+      {
+        monthKey: '2026-03-01',
+        direction: 'expense',
+        amountMinor: planned.refAmountMinor,
+      },
+    ])
   })
 })

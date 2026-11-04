@@ -118,6 +118,7 @@ import {
   getNotification,
   insertNotification,
   listPrefsFor,
+  listUnreadForSince,
   markRead,
   pageForReader,
   upsertPref,
@@ -127,6 +128,7 @@ import {
   countSince,
   getDelivery,
   insertDelivery,
+  listDeferredOlderThan,
   listDeferredSince,
   listStale,
   markDelivery,
@@ -173,6 +175,7 @@ import {
   listSeriesLinkDetails,
   markPaid,
   removeUnpaidOpenPeriods,
+  sumPlannedPeriodsByMonth,
   sumSeriesSpendThisYear,
 } from '../recurring'
 import {
@@ -211,6 +214,7 @@ import {
   getTransaction,
   updateTransaction,
 } from '../transactions'
+import { sumPlannedTransactionsByMonth } from '../transaction-queries'
 
 import type { BudgetWorld } from './budget-harness'
 import type { TenantScope } from '../scope'
@@ -2913,6 +2917,10 @@ describe('notifications cannot be read, counted or marked across a workspace bou
     // B's row is untouched, as B sees it.
     expect(await countUnread(world.otherScope)).toBe(1)
     expect((await pageForReader(world.otherScope)).items[0].readAt).toBeNull()
+    expect(await listUnreadForSince(world.scope, 'user-b', AT)).toEqual([])
+    expect(
+      await listUnreadForSince(world.otherScope, 'user-b', AT),
+    ).toHaveLength(1)
   })
 
   it('lets two workspaces hold the same dedupe key, because the index is scoped', async () => {
@@ -3113,6 +3121,7 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     expect(await countSince(world.scope, AT)).toBe(0)
     expect(await listStale(world.scope, AT, new Date(0))).toEqual([])
     expect(await listDeferredSince(world.scope, AT)).toEqual([])
+    expect(await listDeferredOlderThan(world.scope, AT)).toEqual([])
 
     expect(await getDelivery(world.otherScope, theirs.id)).toMatchObject({
       status: 'queued',
@@ -3170,6 +3179,26 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     })
   })
 
+  it('never lets A list B’s deferred rows by age', async () => {
+    expect(
+      await insertDelivery(
+        world.otherScope,
+        {
+          userId: 'user-b',
+          kind: KIND,
+          notificationId: null,
+          dedupeKey: 'notification:deferred-b',
+          status: 'deferred',
+        },
+        AT,
+      ),
+    ).not.toBeNull()
+
+    expect(await listDeferredOlderThan(world.scope, AT)).toEqual([])
+    expect(await listDeferredSince(world.scope, AT)).toEqual([])
+    expect(await listDeferredOlderThan(world.otherScope, AT)).toHaveLength(1)
+  })
+
   it('lets two workspaces hold the same digest key, because the index is scoped', async () => {
     const dedupeKey = 'digest:2026-09-20'
     expect(
@@ -3215,6 +3244,7 @@ describe('email deliveries cannot be read, claimed, marked or listed across a wo
     await countSince(world.scope, AT)
     await listStale(world.scope, AT, new Date(0))
     await listDeferredSince(world.scope, AT)
+    await listDeferredOlderThan(world.scope, AT)
 
     const statements = harnessExecuted.filter((statement) =>
       statement.includes('email_deliveries'),
@@ -4246,5 +4276,76 @@ describe('loans cannot be reached across a workspace boundary', () => {
     expect(mine).toHaveLength(1)
     expect(mine[0]?.id).not.toBe(loanBId)
     expect(JSON.stringify(mine)).not.toContain(loanBId)
+  })
+})
+
+describe('the dashboard plan aggregates cannot leak another workspace’s rows', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('sums A’s planned periods and never B’s, even when months and currencies match', async () => {
+    const window = { from: '2026-04-01', to: '2026-05-01' }
+    for (const [scope, suffix] of [
+      [world.scope, 'a'],
+      [world.otherScope, 'b'],
+    ] as const) {
+      const series = await createSeries(scope, {
+        name: 'Rent',
+        expectedAmountMinor: suffix === 'a' ? 250_00 : 777_00,
+        expectedCurrencyCode: 'PLN',
+        startDate: '2026-04-10',
+        accountId: `acc-${suffix}`,
+      })
+      await materializeSeries(scope, {
+        seriesId: series.id,
+        today: '2026-04-01',
+        ahead: 1,
+      })
+    }
+
+    const mine = await sumPlannedPeriodsByMonth(world.scope, window)
+    const theirs = await sumPlannedPeriodsByMonth(world.otherScope, window)
+
+    expect(mine.map((row) => row.amountMinor)).toEqual([250_00])
+    expect(theirs.map((row) => row.amountMinor)).toEqual([777_00])
+    expect(JSON.stringify(mine)).not.toContain('777')
+  })
+
+  it('sums A’s one-off plan rows and never B’s', async () => {
+    await seedTransaction(world.db, {
+      id: 'plan-a',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+    await seedTransaction(world.db, {
+      id: 'plan-b',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+
+    const mine = await sumPlannedTransactionsByMonth({
+      scope: world.scope,
+      from: '2026-04-01',
+      to: '2026-05-01',
+    })
+    const theirs = await sumPlannedTransactionsByMonth({
+      scope: world.otherScope,
+      from: '2026-04-01',
+      to: '2026-05-01',
+    })
+
+    expect(mine).toEqual([
+      { monthKey: '2026-04-01', direction: 'expense', amountMinor: 100_00 },
+    ])
+    expect(theirs).toEqual([
+      { monthKey: '2026-04-01', direction: 'expense', amountMinor: 777_00 },
+    ])
   })
 })

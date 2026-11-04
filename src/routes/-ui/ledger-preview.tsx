@@ -353,9 +353,9 @@ export function LedgerPreview() {
               {/* The one mark on the page. Beside the line where there is room for it; on the
                   narrow page it takes the entry's second line, where a category would go, so
                   the row keeps the two-line shape of every other entry rather than wrapping
-                  at whatever width the word happens to run out. It sits on the baseline like
-                  the word it covers: a highlighter is run over the line, not placed above it. */}
-              <span className="sm:ms-1 max-sm:block">
+                  at whatever width the word happens to run out. It sits on the line with the
+                  word it covers: a highlighter is run over the type, not placed above it. */}
+              <span className="sm:ms-1 max-sm:block align-middle">
                 <Badge tone="settled" size="sm">
                   {t('marketing.ledger.settled')}
                 </Badge>
