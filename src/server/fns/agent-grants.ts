@@ -12,7 +12,10 @@ import { z } from 'zod'
 import { appUrl } from '#/server/auth/env'
 import { requireOrg } from '#/server/auth/guards'
 import { resolveLimits } from '#/server/billing/resolve-limits'
+import { mcpResourceUrl } from '#/server/mcp/resource'
 import {
+  createOauthGrant,
+  createOauthGrantSchema,
   createPatGrant,
   createPatGrantSchema,
   listGrants,
@@ -20,9 +23,24 @@ import {
   revokeGrantSchema,
 } from '#/server/repos/agent-grants'
 import { FeatureLockedError } from '#/server/repos/errors'
+import { workspaceName } from '#/server/repos/members'
 
 import type { AgentPatEnvironment } from '#/lib/enums'
 import type { AgentGrantView, MintedPat } from '#/server/repos/agent-grants'
+
+export type AgentsPageView =
+  | { readonly kind: 'member'; readonly mcpUrl: string }
+  | {
+      readonly kind: 'locked' | 'ready'
+      readonly mcpUrl: string
+      readonly grants: ReadonlyArray<AgentGrantView>
+    }
+
+export type ConsentPageView = {
+  readonly workspaceName: string
+  readonly mcpEnabled: boolean
+  readonly canManage: boolean
+}
 
 const mintSchema = createPatGrantSchema.omit({ environment: true }).extend({
   environment: z.enum(['stg', 'live']).optional(),
@@ -48,6 +66,44 @@ export const loadAgentGrants = createServerFn({ method: 'GET' }).handler(
     return listGrants(await requireOrg())
   },
 )
+
+export const loadAgentsPage = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<AgentsPageView> => {
+    const scope = await requireOrg()
+    const mcpUrl = mcpResourceUrl()
+    if (scope.ctx.role === 'member') {
+      return { kind: 'member', mcpUrl }
+    }
+    const grants = (await listGrants(scope)).filter(
+      (grant) => grant.revokedAt == null,
+    )
+    const mcpEnabled = (await resolveLimits(scope)).features.mcp
+    return { kind: mcpEnabled ? 'ready' : 'locked', mcpUrl, grants }
+  },
+)
+
+export const loadConsentPage = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<ConsentPageView> => {
+    const scope = await requireOrg()
+    const mcpEnabled = (await resolveLimits(scope)).features.mcp
+    return {
+      workspaceName: await workspaceName(scope),
+      mcpEnabled,
+      canManage: scope.ctx.role !== 'member',
+    }
+  },
+)
+
+export const recordOauthGrant = createServerFn({ method: 'POST' })
+  .inputValidator(createOauthGrantSchema)
+  .handler(async ({ data }): Promise<AgentGrantView> => {
+    const scope = await requireOrg()
+    const effective = await resolveLimits(scope)
+    if (!effective.features.mcp) {
+      throw new FeatureLockedError('mcp')
+    }
+    return createOauthGrant(scope, data, new Date())
+  })
 
 export const mintAgentPat = createServerFn({ method: 'POST' })
   .inputValidator(mintSchema)

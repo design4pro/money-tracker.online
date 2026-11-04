@@ -1,5 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ChevronRight, CreditCard, Shapes, Store, Users } from 'lucide-react'
+import {
+  Bot,
+  ChevronRight,
+  CreditCard,
+  Shapes,
+  Store,
+  Users,
+} from 'lucide-react'
 
 import { writeLocaleCookie } from '#/components/app/shell'
 import {
@@ -129,6 +136,14 @@ function SettingsRoute() {
                 Icon={Users}
                 label={t('members.title')}
                 description={t('members.subtitle')}
+              />
+            </li>
+            <li className="border-b border-border-subtle last:border-b-0">
+              <RecordLink
+                href="/settings/agents"
+                Icon={Bot}
+                label={t('settings.agents.title')}
+                description={t('settings.agents.subtitle')}
               />
             </li>
             <li className="border-b border-border-subtle last:border-b-0">
