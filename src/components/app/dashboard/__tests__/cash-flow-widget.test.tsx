@@ -16,6 +16,12 @@ function bucket(
   income: number,
   expense: number,
   inPeriod = true,
+  planned: {
+    readonly income?: number | null
+    readonly expense?: number | null
+    readonly rateMissing?: boolean
+    readonly native?: CashFlowBucket['nativePlan']
+  } = {},
 ): CashFlowBucket {
   return {
     key,
@@ -23,6 +29,12 @@ function bucket(
     expenseMinor: asMinor(expense),
     netMinor: asMinor(income - expense),
     inPeriod,
+    plannedIncomeMinor:
+      planned.income === null ? null : asMinor(planned.income ?? 0),
+    plannedExpenseMinor:
+      planned.expense === null ? null : asMinor(planned.expense ?? 0),
+    plannedRateMissing: planned.rateMissing ?? false,
+    nativePlan: planned.native ?? [],
   }
 }
 
@@ -44,7 +56,13 @@ describe('CashFlowWidget', () => {
     const columns = within(table)
       .getAllByRole('columnheader')
       .map((node) => node.textContent)
-    expect(columns).toEqual(['Month', 'Money in', 'Money out'])
+    expect(columns).toEqual([
+      'Month',
+      'Money in',
+      'Money out',
+      'Planned in',
+      'Planned out',
+    ])
 
     const rowHeaders = within(table)
       .getAllByRole('rowheader')
@@ -55,7 +73,16 @@ describe('CashFlowWidget', () => {
       within(table)
         .getAllByRole('cell')
         .map((cell) => plain(cell.textContent)),
-    ).toEqual(['zł 8,200.00', 'zł 5,340.50', 'zł 7,900.00', 'zł 6,110.00'])
+    ).toEqual([
+      'zł 8,200.00',
+      'zł 5,340.50',
+      'zł 0.00',
+      'zł 0.00',
+      'zł 7,900.00',
+      'zł 6,110.00',
+      'zł 0.00',
+      'zł 0.00',
+    ])
   })
 
   it('names money out as a direction rather than as a negative income', () => {
@@ -74,6 +101,8 @@ describe('CashFlowWidget', () => {
     expect(names).toEqual([
       'Money in, Jan 2026, zł 8,200.00',
       'Money out, Jan 2026, zł 5,340.50',
+      'Planned in, Jan 2026, zł 0.00',
+      'Planned out, Jan 2026, zł 0.00',
     ])
   })
 
@@ -146,5 +175,54 @@ describe('CashFlowWidget', () => {
 
     expect(screen.getByText('No money moved in this period')).toBeTruthy()
     expect(screen.queryByRole('table')).toBeNull()
+  })
+
+  it('draws the chart when only a plan exists', () => {
+    renderWidget(
+      <CashFlowWidget
+        baseCurrencyCode={PLN}
+        buckets={[bucket('2026-08-01', 0, 0, true, { expense: 250_00 })]}
+      />,
+    )
+
+    expect(screen.queryByText('No money moved in this period')).toBeNull()
+    expect(
+      within(screen.getByRole('table'))
+        .getAllByRole('columnheader')
+        .map((node) => node.textContent),
+    ).toEqual(['Month', 'Money in', 'Money out', 'Planned in', 'Planned out'])
+    expect(
+      screen.getByText(
+        'Planned amounts are the whole month’s plan, not only what is still unpaid.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('lists native-currency planned amounts in the table and names a missing rate', () => {
+    renderWidget(
+      <CashFlowWidget
+        baseCurrencyCode={PLN}
+        buckets={[
+          bucket('2026-08-01', 0, 0, true, {
+            expense: null,
+            rateMissing: true,
+            native: [
+              {
+                currencyCode: asCurrencyCode('EUR'),
+                incomeMinor: asMinor(0),
+                expenseMinor: asMinor(100_00),
+              },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    expect(
+      screen.getByText(
+        'Some planned amounts have no exchange rate for their due date, so they are listed in their own currency and omitted from the chart total.',
+      ),
+    ).toBeTruthy()
+    expect(screen.getByText('Aug 2026 · EUR')).toBeTruthy()
   })
 })

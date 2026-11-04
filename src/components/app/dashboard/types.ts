@@ -17,6 +17,13 @@ import type { CurrencyCode, Minor } from '#/lib/money'
  *   here is how two surfaces start disagreeing about the same row.
  */
 
+/** Native-currency expected amounts that could not (or must not) collapse into the base series. */
+export interface NativePlanLine {
+  readonly currencyCode: CurrencyCode
+  readonly incomeMinor: Minor
+  readonly expenseMinor: Minor
+}
+
 /** One month of the cash-flow chart. Always present for every month in the range, zeros included. */
 export interface CashFlowBucket {
   /** The month's first day, `YYYY-MM-DD`. Stable identity for the chart and the table. */
@@ -26,6 +33,16 @@ export interface CashFlowBucket {
   readonly expenseMinor: Minor
   /** Income less expense. Signed, and the only figure here that may be negative. */
   readonly netMinor: Minor
+  /**
+   * Whole-month plan in the workspace base currency. `null` is a gap: the month had planned
+   * amounts that could not be converted (missing rate), not a claim that the plan was zero.
+   */
+  readonly plannedIncomeMinor: Minor | null
+  readonly plannedExpenseMinor: Minor | null
+  /** True when at least one expected amount for this month had no `due_on` rate. */
+  readonly plannedRateMissing: boolean
+  /** Native figures for foreign-currency expectations, converted or not. */
+  readonly nativePlan: ReadonlyArray<NativePlanLine>
   /**
    * Whether this month is inside the **selected** period.
    *

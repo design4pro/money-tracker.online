@@ -39,6 +39,7 @@ import {
   sql,
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
+import { parseDate } from '@internationalized/date'
 import { z } from 'zod'
 
 import { ZERO_MINOR, asMinor, subtractMinor } from '#/lib/money'
@@ -791,4 +792,97 @@ export async function sumTransactions(
     netMinor: subtractMinor(incomeMinor, expenseMinor),
     currencyCode: args.baseCurrencyCode,
   }
+}
+
+const plannedTransactionWindowSchema = z
+  .strictObject({
+    from: z.iso.date(),
+    to: z.iso.date(),
+  })
+  .refine((window) => window.to > window.from, {
+    message: 'the range ends before it starts',
+    path: ['to'],
+  })
+
+export type PlannedTransactionWindow = z.input<
+  typeof plannedTransactionWindowSchema
+>
+
+/**
+ * One-off plan membership for the dashboard: `booked_on` in `[from, to)` and
+ * (`is_planned` or `was_planned`), under the same adjustments / transfers /
+ * completeness / exclude-from-stats rules as cash-flow actuals.
+ *
+ * Amounts are stored `ref_amount_minor`. `FLOW_POLICIES` is not used: that path
+ * stays `planned: 'exclude'`.
+ */
+export interface PlannedTransactionSum {
+  readonly monthKey: string
+  readonly direction: 'income' | 'expense'
+  readonly amountMinor: Minor
+}
+
+const PLAN_HISTORY_POLICIES: TransactionPolicies = {
+  planned: 'include',
+  adjustments: 'include',
+  transfers: 'exclude',
+  completeness: 'any',
+}
+
+export async function sumPlannedTransactionsByMonth(args: {
+  readonly scope: TenantScope
+  readonly from: string
+  readonly to: string
+}): Promise<ReadonlyArray<PlannedTransactionSum>> {
+  const parsed = plannedTransactionWindowSchema.parse({
+    from: args.from,
+    to: args.to,
+  })
+  const onAnExcludedAccount = exists(
+    args.scope.db
+      .select({ present: sql`1` })
+      .from(accounts)
+      .where(
+        tenantFilter(
+          args.scope,
+          accounts,
+          eq(accounts.id, transactions.accountId),
+          eq(accounts.excludeFromStats, true),
+        ),
+      ),
+  )
+
+  const rows = await args.scope.db
+    .select({
+      monthKey: sql<string>`substr(${transactions.bookedOn}, 1, 7) || '-01'`,
+      direction: transactions.direction,
+      total: sql<number>`coalesce(sum(${transactions.refAmountMinor}), 0)`,
+    })
+    .from(transactions)
+    .where(
+      scopedTransactionFilter(
+        args.scope,
+        PLAN_HISTORY_POLICIES,
+        gte(transactions.bookedOn, parsed.from),
+        lt(transactions.bookedOn, parsed.to),
+        or(eq(transactions.isPlanned, true), eq(transactions.wasPlanned, true)),
+        eq(transactions.excludeFromStats, false),
+        not(onAnExcludedAccount),
+      ),
+    )
+    .groupBy(
+      sql`substr(${transactions.bookedOn}, 1, 7) || '-01'`,
+      transactions.direction,
+    )
+
+  return rows.map((row) => ({
+    monthKey: row.monthKey,
+    direction: row.direction === 'income' ? 'income' : 'expense',
+    amountMinor: asMinor(Number(row.total)),
+  }))
+}
+
+/** Inclusive last day → exclusive `to` for the dashboard plan window. */
+export function exclusiveAfter(inclusiveTo: string): string {
+  return parseDate(inclusiveTo).add({ days: 1 }).toString()
 }

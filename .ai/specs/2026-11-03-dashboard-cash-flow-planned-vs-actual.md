@@ -1,11 +1,11 @@
 # Dashboard cash-flow: whole-month plan beside actual
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #840  |
-| **Spec PR**        | #841  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #840        |
+| **Spec PR**        | #841        |
+| **Implementation** | none        |
 
 ## 📝 TLDR
 
