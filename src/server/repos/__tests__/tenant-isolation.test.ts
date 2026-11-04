@@ -144,6 +144,7 @@ import {
   listGrants,
   revokeGrant,
 } from '../agent-grants'
+import { insertAgentAudit, listAgentAudit } from '../agent-audit'
 import {
   createAccountGroup,
   deleteAccountGroup,
@@ -4466,5 +4467,66 @@ describe('agent grants cannot be listed or revoked across a workspace boundary',
     })
     expect(theirs?.organizationId).toBe('org-b')
     expect(theirs?.kind).toBe('oauth')
+  })
+})
+
+describe('agent audit cannot be listed across a workspace boundary', () => {
+  const scopes = ['accounts:read'] as const
+
+  it('lists only the caller’s workspace, and the SQL always carries organization_id', async () => {
+    const world = await createBudgetWorld()
+    const mintedA = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    const mintedB = await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    await insertAgentAudit(
+      world.scope,
+      {
+        grantId: mintedA.grant.id,
+        userId: 'user-a',
+        tool: 'list_accounts',
+        verb: 'read',
+        resource: 'accounts',
+        resourceId: 'acc-a',
+        outcome: 'ok',
+      },
+      budgetWorldNow,
+    )
+    await insertAgentAudit(
+      world.otherScope,
+      {
+        grantId: mintedB.grant.id,
+        userId: 'user-b',
+        tool: 'list_accounts',
+        verb: 'read',
+        resource: 'accounts',
+        resourceId: 'acc-b',
+        outcome: 'ok',
+      },
+      budgetWorldNow,
+    )
+
+    harnessExecuted.length = 0
+    const listed = await listAgentAudit(world.scope)
+    expect(listed.map((row) => row.resourceId)).toEqual(['acc-a'])
+    expect(JSON.stringify(listed)).not.toContain('acc-b')
+
+    const theirs = await listAgentAudit(world.otherScope)
+    expect(theirs.map((row) => row.resourceId)).toEqual(['acc-b'])
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('from "agent_audit_log"'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads) {
+      expect(statement).toContain('organization_id')
+    }
   })
 })

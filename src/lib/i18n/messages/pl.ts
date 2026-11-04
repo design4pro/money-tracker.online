@@ -1731,6 +1731,10 @@ const messages = {
   'plans.feature.household.storage': 'Pięć gigabajtów na paragony',
   'plans.feature.mcp':
     'Agenci mogą czytać i zmieniać dane tej przestrzeni przez MCP',
+  'mcp.preview.delete.transaction': 'Usunąć wpis {id}?',
+  'mcp.preview.delete.category': 'Usunąć kategorię {id}?',
+  'mcp.preview.delete.payee': 'Usunąć odbiorcę {id}?',
+  'mcp.preview.delete.recurring': 'Usunąć cykl {id}?',
   'plans.interval.monthly': 'Miesięcznie',
   'plans.interval.yearly': 'Rocznie',
   'plans.price.monthly': '{amount} miesięcznie',

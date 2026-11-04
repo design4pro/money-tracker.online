@@ -1,9 +1,9 @@
 /**
  * Streamable HTTP MCP at `/api/mcp`.
  *
- * `createMcpHandler` from `agents/mcp/server` (ADR 0037). Phase 3 registers
- * the grant's read tools. Auth is PAT hash lookup or Better Auth
- * `requireMcpAuth` (JWT), then a grant row. No Durable Object.
+ * `createMcpHandler` from `agents/mcp/server` (ADR 0037). Phase 4 registers
+ * the grant's read, write and delete tools. Auth is PAT hash lookup or Better
+ * Auth `requireMcpAuth` (JWT), then a grant row. No Durable Object.
  */
 
 import { requireMcpAuth } from '@better-auth/mcp'
@@ -12,7 +12,7 @@ import { createMcpHandler } from 'agents/mcp/server'
 
 import { getAuth } from '#/server/auth'
 import { getDb } from '#/server/auth/db'
-import { appUrl } from '#/server/auth/env'
+import { appUrl, sessionStore } from '#/server/auth/env'
 import { FeatureLockedError } from '#/server/repos/errors'
 
 import {
@@ -85,12 +85,12 @@ async function afterGrant(
 ): Promise<Response> {
   try {
     const scope = await scopeForGrant(db, grant)
-    const ctx = toolContextForGrant(grant, scope)
+    const ctx = toolContextForGrant(grant, scope, sessionStore())
     const handler = createMcpHandler(
       () => {
         const server = new McpServer({
           name: 'money-tracker.online',
-          version: 'phase-3',
+          version: 'phase-4',
         })
         registerMcpTools(server, ctx)
         return server

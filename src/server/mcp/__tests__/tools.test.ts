@@ -1,11 +1,13 @@
 /**
- * Phase 3 MCP read tools: grant-scoped list, integer minors, tenant isolation
- * on synthetic workspaces A and B.
+ * MCP read and write tools: grant-scoped list, integer minors, tenant
+ * isolation, two-step delete, rate limits, audit without amounts.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { payees, recurringSeries } from '#/server/db/schema'
+import { listAgentAudit } from '#/server/repos/agent-audit'
+import { createPatGrant } from '#/server/repos/agent-grants'
 import {
   createBudgetWorld,
   NOW,
@@ -14,8 +16,9 @@ import {
   seedTransaction,
 } from '#/server/repos/__tests__/budget-harness'
 
-import { listedReadToolNames } from '../catalog'
+import { listedMcpToolNames, listedReadToolNames } from '../catalog'
 import { jsonHasDecimalNumber } from '../json'
+import { MemoryMcpKv } from '../kv'
 import { invokeMcpTool } from '../tools'
 
 import type { McpToolContext } from '../tools'
@@ -54,6 +57,41 @@ function ctxFor(
   return {
     scopes,
     scope: side === 'a' ? world.scope : world.otherScope,
+  }
+}
+
+const ALL_WRITE: ReadonlyArray<AgentScope> = [
+  ...ALL_READ,
+  'transactions:write',
+  'transactions:delete',
+  'categories:write',
+  'categories:delete',
+  'payees:write',
+  'payees:delete',
+  'recurring:write',
+  'recurring:delete',
+  'budgets:write',
+]
+
+async function mintedCtx(
+  side: 'a' | 'b',
+  scopes: ReadonlyArray<AgentScope> = ALL_WRITE,
+  options: { kv?: MemoryMcpKv; now?: () => number } = {},
+): Promise<McpToolContext> {
+  const scope = side === 'a' ? world.scope : world.otherScope
+  const minted = await createPatGrant(
+    scope,
+    { name: `${side} agent`, scopes: [...scopes], environment: 'stg' },
+    NOW,
+  )
+  const now = options.now ?? (() => NOW.getTime())
+  return {
+    scopes,
+    scope,
+    grantId: minted.grant.id,
+    userId: scope.ctx.userId,
+    kv: options.kv ?? new MemoryMcpKv(now),
+    now,
   }
 }
 
@@ -139,6 +177,16 @@ describe('listTools follows grant scopes', () => {
     expect(listed).not.toContain('list_transactions')
     expect(listed).not.toContain('create_transaction')
     expect(listed).not.toContain('confirm_delete')
+  })
+
+  it('lists write and confirm_delete only when those scopes are held', () => {
+    const readOnly = listedMcpToolNames(['accounts:read'])
+    expect(readOnly).toEqual(['list_accounts', 'get_balances'])
+    const writes = listedMcpToolNames(['transactions:write'])
+    expect(writes).toEqual(['create_transaction', 'update_transaction'])
+    expect(writes).not.toContain('delete_transaction')
+    const deletes = listedMcpToolNames(['transactions:delete'])
+    expect(deletes).toEqual(['delete_transaction', 'confirm_delete'])
   })
 })
 
@@ -279,5 +327,193 @@ describe('list_transactions requires policies', () => {
       cursor: null,
     })
     expect(result).toEqual({ ok: false, kind: 'invalid' })
+  })
+})
+
+describe('write tools stay inside the grantor’s workspace', () => {
+  it('create_transaction with B’s account is not_found', async () => {
+    const result = await invokeMcpTool(
+      ctxFor('a', ALL_WRITE),
+      'create_transaction',
+      {
+        accountId: 'acc-b',
+        direction: 'expense',
+        amountMinor: 10_00,
+        bookedOn: '2026-03-10',
+        policies: POLICIES,
+      },
+    )
+    expect(result).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('update_transaction with B’s id is not_found', async () => {
+    const result = await invokeMcpTool(
+      ctxFor('a', ALL_WRITE),
+      'update_transaction',
+      {
+        id: 'tx-b',
+        note: 'nope',
+        policies: POLICIES,
+      },
+    )
+    expect(result).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('update_category with B’s id is not_found', async () => {
+    const result = await invokeMcpTool(
+      ctxFor('a', ALL_WRITE),
+      'update_category',
+      {
+        id: 'cat-b',
+        name: 'Stolen',
+      },
+    )
+    expect(result).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('update_payee with B’s id is not_found', async () => {
+    const result = await invokeMcpTool(ctxFor('a', ALL_WRITE), 'update_payee', {
+      id: 'payee-b',
+      name: 'Stolen',
+    })
+    expect(result).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('update_recurring with B’s id is not_found', async () => {
+    const result = await invokeMcpTool(
+      ctxFor('a', ALL_WRITE),
+      'update_recurring',
+      {
+        id: 'series-b',
+        name: 'Stolen',
+      },
+    )
+    expect(result).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('update_budget with B’s id is not_found', async () => {
+    const result = await invokeMcpTool(
+      ctxFor('a', ALL_WRITE),
+      'update_budget',
+      {
+        id: 'budget-b',
+        name: 'Stolen',
+      },
+    )
+    expect(result).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('a write grant cannot call delete_transaction', async () => {
+    const result = await invokeMcpTool(
+      ctxFor('a', ['transactions:write', 'transactions:read']),
+      'delete_transaction',
+      { id: 'tx-a', policies: POLICIES },
+    )
+    expect(result).toEqual({ ok: false, kind: 'denied' })
+  })
+})
+
+describe('two-step delete', () => {
+  it('previews, confirms once, and a second confirm is not_found', async () => {
+    const ctx = await mintedCtx('a')
+    const preview = await invokeMcpTool(ctx, 'delete_transaction', {
+      id: 'tx-a',
+      policies: POLICIES,
+    })
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    const data = preview.data as {
+      resource: string
+      id: string
+      labelKey: string
+      confirmToken: string
+      expiresInSec: number
+    }
+    expect(data).toMatchObject({
+      resource: 'transactions',
+      id: 'tx-a',
+      labelKey: 'mcp.preview.delete.transaction',
+      expiresInSec: 60,
+    })
+    expect(data.confirmToken.length).toBeGreaterThan(8)
+    expect(JSON.stringify(data)).not.toMatch(/1234/)
+
+    const first = await invokeMcpTool(ctx, 'confirm_delete', {
+      confirmToken: data.confirmToken,
+    })
+    expect(first.ok).toBe(true)
+
+    const second = await invokeMcpTool(ctx, 'confirm_delete', {
+      confirmToken: data.confirmToken,
+    })
+    expect(second).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('delete_transaction with B’s id is not_found', async () => {
+    const ctx = await mintedCtx('a')
+    const result = await invokeMcpTool(ctx, 'delete_transaction', {
+      id: 'tx-b',
+      policies: POLICIES,
+    })
+    expect(result).toEqual({ ok: false, kind: 'not_found' })
+  })
+
+  it('A cannot confirm B’s ticket', async () => {
+    const ctxB = await mintedCtx('b')
+    const preview = await invokeMcpTool(ctxB, 'delete_payee', { id: 'payee-b' })
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    const token = (preview.data as { confirmToken: string }).confirmToken
+    const ctxA = await mintedCtx('a')
+    const stolen = await invokeMcpTool(ctxA, 'confirm_delete', {
+      confirmToken: token,
+    })
+    expect(stolen).toEqual({ ok: false, kind: 'not_found' })
+  })
+})
+
+describe('audit rows carry ids, never amounts', () => {
+  it('does not store the written minor units', async () => {
+    const amountMinor = 77_777
+    const ctx = await mintedCtx('a')
+    const created = await invokeMcpTool(ctx, 'create_transaction', {
+      accountId: 'acc-a',
+      direction: 'expense',
+      amountMinor,
+      bookedOn: '2026-03-10',
+      policies: POLICIES,
+    })
+    expect(created.ok).toBe(true)
+    const rows = await listAgentAudit(world.scope)
+    expect(rows.length).toBeGreaterThan(0)
+    const payload = JSON.stringify(rows)
+    expect(payload).not.toContain(String(amountMinor))
+    expect(payload).not.toMatch(/amount/i)
+    expect(rows[0]?.outcome).toBe('ok')
+    expect(rows[0]?.tool).toBe('create_transaction')
+    expect(rows[0]?.resourceId).toEqual(expect.any(String))
+  })
+})
+
+describe('rate limits use a fake KV clock', () => {
+  it('refuses the sixth delete in a minute and resets after the window', async () => {
+    let now = NOW.getTime()
+    const kv = new MemoryMcpKv(() => now)
+    const ctx = await mintedCtx('a', ALL_WRITE, { kv, now: () => now })
+    for (let i = 0; i < 5; i += 1) {
+      const result = await invokeMcpTool(ctx, 'delete_category', {
+        id: 'cat-a',
+      })
+      expect(result.ok).toBe(true)
+    }
+    const limited = await invokeMcpTool(ctx, 'delete_category', { id: 'cat-a' })
+    expect(limited.ok).toBe(false)
+    if (limited.ok) return
+    expect(limited.kind).toBe('rate_limited')
+    expect(limited.retryAfterSec).toBeGreaterThan(0)
+
+    now += 60_000
+    const after = await invokeMcpTool(ctx, 'delete_category', { id: 'cat-a' })
+    expect(after.ok).toBe(true)
   })
 })
