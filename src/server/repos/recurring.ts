@@ -39,7 +39,10 @@
  * 6. **An expected amount is a plan, not a fact.** `expected_amount_minor` has no
  *    `ref_amount_minor` and never acquires one here: it has no rate and no booking date until
  *    something settles it, and converting a plan at today's rate is how a person's expectations
- *    quietly change with the exchange rate. Reports sum transactions; they never sum this column.
+ *    quietly change with the exchange rate. Reports sum transactions; they never sum this column,
+ *    except the dashboard cash-flow **planned** series (`docs/plans/13-recurring.md` 13-S1
+ *    exception, issue #840), which sums native expected amounts in
+ *    {@link sumPlannedPeriodsByMonth} and converts them at read time — never here, never stored.
  */
 
 import {
@@ -49,6 +52,8 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
+  lt,
   lte,
   ne,
   notExists,
@@ -60,7 +65,7 @@ import { z } from 'zod'
 import { parseDate } from '@internationalized/date'
 
 import { BOOKS } from '#/lib/enums'
-import { asMinor } from '#/lib/money'
+import { asCurrencyCode, asMinor } from '#/lib/money'
 import {
   RECURRING_DUTY_CODES,
   RECURRING_FREQUENCIES,
@@ -93,7 +98,7 @@ import {
 import { ConflictError, NotFoundError } from './errors'
 
 import type { SQL } from 'drizzle-orm'
-import type { Minor } from '#/lib/money'
+import type { CurrencyCode, Minor } from '#/lib/money'
 import type {
   RECURRING_CANDIDATE_STATUSES,
   RECURRING_LINK_STATUSES,
@@ -882,6 +887,88 @@ export async function getUpcoming(
 /** `YYYY-MM-DD` plus `days`, on the calendar. Never `Date` arithmetic — see `./recurring/schedule`. */
 function addDaysIso(day: string, days: number): string {
   return parseDate(day).add({ days }).toString()
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reads — dashboard whole-month plan                                          */
+/* -------------------------------------------------------------------------- */
+
+const plannedPeriodWindowSchema = z
+  .strictObject({
+    from: z.iso.date(),
+    to: z.iso.date(),
+  })
+  .refine((window) => window.to > window.from, {
+    message: 'the range ends before it starts',
+    path: ['to'],
+  })
+
+export type PlannedPeriodWindow = z.input<typeof plannedPeriodWindowSchema>
+
+/**
+ * Native expected amounts due in `[from, to)`, grouped by due date, direction and currency.
+ *
+ * **Does not convert.** The dashboard composes `resolveRate` on each `dueOn` and `convert` at
+ * read time. Skipped periods are out. Unpaid periods of a paused or completed series are out;
+ * paid periods of those series stay in (they were the month's plan once they settled).
+ */
+export interface PlannedPeriodSum {
+  readonly monthKey: string
+  readonly dueOn: string
+  readonly direction: TransactionDirection
+  readonly currencyCode: CurrencyCode
+  readonly amountMinor: Minor
+}
+
+export async function sumPlannedPeriodsByMonth(
+  scope: TenantScope,
+  input: PlannedPeriodWindow,
+): Promise<ReadonlyArray<PlannedPeriodSum>> {
+  const parsed = plannedPeriodWindowSchema.parse(input)
+  const liveUnpaid =
+    and(
+      eq(recurringSeries.isActive, true),
+      isNull(recurringSeries.completedAt),
+    ) ?? eq(recurringSeries.isActive, true)
+  const rows = await scope.db
+    .select({
+      dueOn: recurringPeriods.dueOn,
+      direction: recurringSeries.direction,
+      currencyCode: recurringSeries.expectedCurrencyCode,
+      total: sql<number>`coalesce(sum(${recurringPeriods.expectedAmountMinor}), 0)`,
+    })
+    .from(recurringPeriods)
+    .innerJoin(
+      recurringSeries,
+      tenantFilter(
+        scope,
+        recurringSeries,
+        eq(recurringSeries.id, recurringPeriods.seriesId),
+      ),
+    )
+    .where(
+      tenantFilter(
+        scope,
+        recurringPeriods,
+        gte(recurringPeriods.dueOn, parsed.from),
+        lt(recurringPeriods.dueOn, parsed.to),
+        inArray(recurringPeriods.status, ['upcoming', 'overdue', 'paid']),
+        or(eq(recurringPeriods.status, 'paid'), liveUnpaid),
+      ),
+    )
+    .groupBy(
+      recurringPeriods.dueOn,
+      recurringSeries.direction,
+      recurringSeries.expectedCurrencyCode,
+    )
+
+  return rows.map((row) => ({
+    monthKey: `${row.dueOn.slice(0, 7)}-01`,
+    dueOn: row.dueOn,
+    direction: row.direction as TransactionDirection,
+    currencyCode: asCurrencyCode(row.currencyCode),
+    amountMinor: asMinor(Number(row.total)),
+  }))
 }
 
 /* -------------------------------------------------------------------------- */

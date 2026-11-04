@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `was_planned` integer DEFAULT false NOT NULL;

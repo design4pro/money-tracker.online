@@ -579,6 +579,7 @@ export async function createTransaction(
     note: input.note ?? null,
     paymentMethod: input.paymentMethod ?? null,
     isPlanned: subject.isPlanned,
+    wasPlanned: subject.isPlanned,
     isBalanceAdjustment: subject.isBalanceAdjustment,
     excludeFromStats: input.excludeFromStats ?? false,
     createdByUserId: scope.ctx.userId,
@@ -712,6 +713,7 @@ export async function updateTransaction(
           ? current.paymentMethod
           : (patch.paymentMethod ?? null),
       isPlanned: next.isPlanned,
+      wasPlanned: current.wasPlanned || current.isPlanned || next.isPlanned,
       isBalanceAdjustment: next.isBalanceAdjustment,
       excludeFromStats: patch.excludeFromStats ?? current.excludeFromStats,
       updatedAt: new Date(),

@@ -1832,6 +1832,16 @@ export const transactions = sqliteTable(
       .notNull()
       .default(false),
     /**
+     * This row was created as a plan, or was flipped from planned to posted.
+     *
+     * Never cleared. The dashboard whole-month plan (`#840`) uses `is_planned OR was_planned`
+     * so a posted one-off stays in the plan at its stored `ref_amount_minor`. Rows created
+     * already posted stay `false`. Additive: history before this column is an accepted hole.
+     */
+    wasPlanned: integer('was_planned', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    /**
      * A correction row.
      *
      * A balance adjustment is a **real transaction with its own filter policy**, never a silent

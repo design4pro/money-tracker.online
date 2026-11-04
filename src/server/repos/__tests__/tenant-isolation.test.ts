@@ -175,6 +175,7 @@ import {
   listSeriesLinkDetails,
   markPaid,
   removeUnpaidOpenPeriods,
+  sumPlannedPeriodsByMonth,
   sumSeriesSpendThisYear,
 } from '../recurring'
 import {
@@ -213,6 +214,7 @@ import {
   getTransaction,
   updateTransaction,
 } from '../transactions'
+import { sumPlannedTransactionsByMonth } from '../transaction-queries'
 
 import type { BudgetWorld } from './budget-harness'
 import type { TenantScope } from '../scope'
@@ -4274,5 +4276,76 @@ describe('loans cannot be reached across a workspace boundary', () => {
     expect(mine).toHaveLength(1)
     expect(mine[0]?.id).not.toBe(loanBId)
     expect(JSON.stringify(mine)).not.toContain(loanBId)
+  })
+})
+
+describe('the dashboard plan aggregates cannot leak another workspace’s rows', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('sums A’s planned periods and never B’s, even when months and currencies match', async () => {
+    const window = { from: '2026-04-01', to: '2026-05-01' }
+    for (const [scope, suffix] of [
+      [world.scope, 'a'],
+      [world.otherScope, 'b'],
+    ] as const) {
+      const series = await createSeries(scope, {
+        name: 'Rent',
+        expectedAmountMinor: suffix === 'a' ? 250_00 : 777_00,
+        expectedCurrencyCode: 'PLN',
+        startDate: '2026-04-10',
+        accountId: `acc-${suffix}`,
+      })
+      await materializeSeries(scope, {
+        seriesId: series.id,
+        today: '2026-04-01',
+        ahead: 1,
+      })
+    }
+
+    const mine = await sumPlannedPeriodsByMonth(world.scope, window)
+    const theirs = await sumPlannedPeriodsByMonth(world.otherScope, window)
+
+    expect(mine.map((row) => row.amountMinor)).toEqual([250_00])
+    expect(theirs.map((row) => row.amountMinor)).toEqual([777_00])
+    expect(JSON.stringify(mine)).not.toContain('777')
+  })
+
+  it('sums A’s one-off plan rows and never B’s', async () => {
+    await seedTransaction(world.db, {
+      id: 'plan-a',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+    await seedTransaction(world.db, {
+      id: 'plan-b',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+
+    const mine = await sumPlannedTransactionsByMonth({
+      scope: world.scope,
+      from: '2026-04-01',
+      to: '2026-05-01',
+    })
+    const theirs = await sumPlannedTransactionsByMonth({
+      scope: world.otherScope,
+      from: '2026-04-01',
+      to: '2026-05-01',
+    })
+
+    expect(mine).toEqual([
+      { monthKey: '2026-04-01', direction: 'expense', amountMinor: 100_00 },
+    ])
+    expect(theirs).toEqual([
+      { monthKey: '2026-04-01', direction: 'expense', amountMinor: 777_00 },
+    ])
   })
 })
