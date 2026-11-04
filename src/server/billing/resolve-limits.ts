@@ -35,12 +35,13 @@ import {
   UNLIMITED,
   isPlanId,
   isQuotaMetric,
+  planFeatures,
   planForProductId,
 } from '#/lib/plans'
 import { getSubscription } from '#/server/repos/subscriptions'
 import { countUsage } from '#/server/repos/usage'
 
-import type { PlanId, PlanLimits, QuotaMetric } from '#/lib/plans'
+import type { PlanFeatures, PlanId, PlanLimits, QuotaMetric } from '#/lib/plans'
 import type { TenantScope } from '#/server/repos/base'
 import type { SubscriptionRow } from '#/server/db/schema'
 import type { WorkspaceUsage } from '#/server/repos/usage'
@@ -177,6 +178,7 @@ export function limitsFor(
 export interface EffectiveLimits {
   readonly entitlement: Entitlement
   readonly limits: PlanLimits
+  readonly features: PlanFeatures
   readonly usage: WorkspaceUsage
   /** Metrics whose current holding is already past the ceiling. Empty in the ordinary case. */
   readonly exceeded: ReadonlyArray<QuotaMetric>
@@ -195,6 +197,7 @@ export async function resolveLimits(
   return {
     entitlement,
     limits,
+    features: planFeatures(entitlement.planId),
     usage,
     exceeded: QUOTA_METRICS.filter((metric) => usage[metric] > limits[metric]),
     subscription: row,

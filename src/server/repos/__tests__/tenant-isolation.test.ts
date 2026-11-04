@@ -137,6 +137,12 @@ import {
 import { isSuppressed, suppress } from '../email-suppressions'
 import * as emailSuppressions from '../email-suppressions'
 import {
+  createPatGrant,
+  findPatGrantByTokenHash,
+  listGrants,
+  revokeGrant,
+} from '../agent-grants'
+import {
   createAccountGroup,
   deleteAccountGroup,
   getAccountBalanceOn,
@@ -4347,5 +4353,90 @@ describe('the dashboard plan aggregates cannot leak another workspace’s rows',
     expect(theirs).toEqual([
       { monthKey: '2026-04-01', direction: 'expense', amountMinor: 777_00 },
     ])
+  })
+})
+
+describe('agent grants cannot be listed or revoked across a workspace boundary', () => {
+  const scopes = ['accounts:read'] as const
+
+  it('lists only the caller’s workspace, and the SQL always carries organization_id', async () => {
+    const world = await createBudgetWorld()
+    await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    harnessExecuted.length = 0
+    const listed = await listGrants(world.scope)
+    expect(listed.map((grant) => grant.name)).toEqual(['A inspector'])
+    expect(listed[0]?.tokenPrefix).toMatch(/^mto_stg_[a-z0-9]+\.$/)
+    expect(JSON.stringify(listed)).not.toMatch(/tokenHash/)
+
+    const theirs = await listGrants(world.otherScope)
+    expect(theirs.map((grant) => grant.name)).toEqual(['B inspector'])
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('from "agent_grants"'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+
+  it('does not revoke B’s grant from A’s scope, and B’s secret still resolves', async () => {
+    const world = await createBudgetWorld()
+    const mintedB = await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    await expect(
+      revokeGrant(world.scope, { grantId: mintedB.grant.id }, budgetWorldNow),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const still = await findPatGrantByTokenHash(world.db, mintedB.secret)
+    expect(still?.id).toBe(mintedB.grant.id)
+    expect(still?.organizationId).toBe('org-b')
+  })
+
+  it('refuses a member who tries to mint or list, and a revoked secret stops resolving', async () => {
+    const world = await createBudgetWorld()
+    await addSecondMember(world.db)
+    const memberScope = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+
+    await expect(
+      createPatGrant(
+        memberScope,
+        { name: 'nope', scopes: [...scopes], environment: 'stg' },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError)
+    await expect(listGrants(memberScope)).rejects.toBeInstanceOf(ForbiddenError)
+
+    const minted = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    expect(minted.secret).toMatch(/^mto_stg_[a-z0-9]+\.[A-Za-z0-9_-]+$/)
+    expect(
+      await findPatGrantByTokenHash(world.db, minted.secret),
+    ).not.toBeNull()
+
+    await revokeGrant(world.scope, { grantId: minted.grant.id }, budgetWorldNow)
+    expect(await findPatGrantByTokenHash(world.db, minted.secret)).toBeNull()
+    expect(await findPatGrantByTokenHash(world.db, 'not-a-token')).toBeNull()
   })
 })
