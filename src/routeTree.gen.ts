@@ -17,6 +17,7 @@ import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-p
 import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as authRegisterRouteImport } from './routes/(auth)/register'
 import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
+import { Route as AppConsentRouteImport } from './routes/_app/consent'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as ApiUnsubscribeRouteImport } from './routes/api/unsubscribe'
@@ -42,6 +43,7 @@ import { Route as AppRecurringIndexRouteImport } from './routes/_app/recurring/i
 import { Route as AppRecurringSeriesIdRouteImport } from './routes/_app/recurring/$seriesId'
 import { Route as AppRecurringCandidatesRouteImport } from './routes/_app/recurring/candidates'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsAgentsRouteImport } from './routes/_app/settings/agents'
 import { Route as AppSettingsBillingRouteImport } from './routes/_app/settings/billing'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as AppTransactionsIndexRouteImport } from './routes/_app/transactions/index'
@@ -97,6 +99,11 @@ const authResetPasswordRoute = authResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
   getParentRoute: () => authRouteRoute,
+} as any)
+const AppConsentRoute = AppConsentRouteImport.update({
+  id: '/consent',
+  path: '/consent',
+  getParentRoute: () => AppRoute,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
@@ -223,6 +230,11 @@ const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsAgentsRoute = AppSettingsAgentsRouteImport.update({
+  id: '/settings/agents',
+  path: '/settings/agents',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsBillingRoute = AppSettingsBillingRouteImport.update({
   id: '/settings/billing',
   path: '/settings/billing',
@@ -319,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof authLoginRoute
   '/register': typeof authRegisterRoute
   '/reset-password': typeof authResetPasswordRoute
+  '/consent': typeof AppConsentRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
@@ -334,6 +347,7 @@ export interface FileRoutesByFullPath {
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/settings/agents': typeof AppSettingsAgentsRoute
   '/settings/billing': typeof AppSettingsBillingRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
@@ -369,6 +383,7 @@ export interface FileRoutesByTo {
   '/login': typeof authLoginRoute
   '/register': typeof authRegisterRoute
   '/reset-password': typeof authResetPasswordRoute
+  '/consent': typeof AppConsentRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
@@ -384,6 +399,7 @@ export interface FileRoutesByTo {
   '/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/settings/agents': typeof AppSettingsAgentsRoute
   '/settings/billing': typeof AppSettingsBillingRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
@@ -422,6 +438,7 @@ export interface FileRoutesById {
   '/(auth)/login': typeof authLoginRoute
   '/(auth)/register': typeof authRegisterRoute
   '/(auth)/reset-password': typeof authResetPasswordRoute
+  '/_app/consent': typeof AppConsentRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/unsubscribe': typeof ApiUnsubscribeRoute
@@ -437,6 +454,7 @@ export interface FileRoutesById {
   '/_app/payees/$payeeId': typeof AppPayeesPayeeIdRoute
   '/_app/recurring/$seriesId': typeof AppRecurringSeriesIdRoute
   '/_app/recurring/candidates': typeof AppRecurringCandidatesRoute
+  '/_app/settings/agents': typeof AppSettingsAgentsRoute
   '/_app/settings/billing': typeof AppSettingsBillingRoute
   '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
@@ -474,6 +492,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/reset-password'
+    | '/consent'
     | '/api/health'
     | '/api/mcp'
     | '/api/unsubscribe'
@@ -489,6 +508,7 @@ export interface FileRouteTypes {
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
+    | '/settings/agents'
     | '/settings/billing'
     | '/settings/members'
     | '/transactions/$transactionId'
@@ -524,6 +544,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/reset-password'
+    | '/consent'
     | '/api/health'
     | '/api/mcp'
     | '/api/unsubscribe'
@@ -539,6 +560,7 @@ export interface FileRouteTypes {
     | '/payees/$payeeId'
     | '/recurring/$seriesId'
     | '/recurring/candidates'
+    | '/settings/agents'
     | '/settings/billing'
     | '/settings/members'
     | '/transactions/$transactionId'
@@ -576,6 +598,7 @@ export interface FileRouteTypes {
     | '/(auth)/login'
     | '/(auth)/register'
     | '/(auth)/reset-password'
+    | '/_app/consent'
     | '/api/health'
     | '/api/mcp'
     | '/api/unsubscribe'
@@ -591,6 +614,7 @@ export interface FileRouteTypes {
     | '/_app/payees/$payeeId'
     | '/_app/recurring/$seriesId'
     | '/_app/recurring/candidates'
+    | '/_app/settings/agents'
     | '/_app/settings/billing'
     | '/_app/settings/members'
     | '/_app/transactions/$transactionId'
@@ -696,6 +720,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/reset-password'
       preLoaderRoute: typeof authResetPasswordRouteImport
       parentRoute: typeof authRouteRoute
+    }
+    '/_app/consent': {
+      id: '/_app/consent'
+      path: '/consent'
+      fullPath: '/consent'
+      preLoaderRoute: typeof AppConsentRouteImport
+      parentRoute: typeof AppRoute
     }
     '/api/health': {
       id: '/api/health'
@@ -872,6 +903,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/agents': {
+      id: '/_app/settings/agents'
+      path: '/settings/agents'
+      fullPath: '/settings/agents'
+      preLoaderRoute: typeof AppSettingsAgentsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/billing': {
       id: '/_app/settings/billing'
       path: '/settings/billing'
@@ -1013,6 +1051,7 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppConsentRoute: typeof AppConsentRoute
   AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
   AppAccountsGroupsRoute: typeof AppAccountsGroupsRoute
   AppBudgetsBudgetIdRoute: typeof AppBudgetsBudgetIdRoute
@@ -1023,6 +1062,7 @@ interface AppRouteChildren {
   AppPayeesPayeeIdRoute: typeof AppPayeesPayeeIdRoute
   AppRecurringSeriesIdRoute: typeof AppRecurringSeriesIdRoute
   AppRecurringCandidatesRoute: typeof AppRecurringCandidatesRoute
+  AppSettingsAgentsRoute: typeof AppSettingsAgentsRoute
   AppSettingsBillingRoute: typeof AppSettingsBillingRoute
   AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppTransactionsTransactionIdRoute: typeof AppTransactionsTransactionIdRoute
@@ -1046,6 +1086,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppConsentRoute: AppConsentRoute,
   AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,
   AppAccountsGroupsRoute: AppAccountsGroupsRoute,
   AppBudgetsBudgetIdRoute: AppBudgetsBudgetIdRoute,
@@ -1056,6 +1097,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPayeesPayeeIdRoute: AppPayeesPayeeIdRoute,
   AppRecurringSeriesIdRoute: AppRecurringSeriesIdRoute,
   AppRecurringCandidatesRoute: AppRecurringCandidatesRoute,
+  AppSettingsAgentsRoute: AppSettingsAgentsRoute,
   AppSettingsBillingRoute: AppSettingsBillingRoute,
   AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppTransactionsTransactionIdRoute: AppTransactionsTransactionIdRoute,

@@ -11,9 +11,14 @@ import { subscriptions } from '#/server/db/schema'
 import { createBudgetWorld, NOW } from '#/server/repos/__tests__/budget-harness'
 import { FeatureLockedError } from '#/server/repos/errors'
 
+import { createScope } from '#/server/repos/scope'
+
 import {
   loadAgentGrants,
+  loadAgentsPage,
+  loadConsentPage,
   mintAgentPat,
+  recordOauthGrant,
   revokeAgentGrant,
 } from '../agent-grants'
 
@@ -121,5 +126,70 @@ describe('loadAgentGrants and revokeAgentGrant', () => {
       data: { grantId: minted.grant.id },
     } as never)) as { revokedAt: Date | null }
     expect(revoked.revokedAt).not.toBeNull()
+  })
+})
+
+describe('loadAgentsPage', () => {
+  it('does not list grants for a member', async () => {
+    await seedPlus()
+    await mintAgentPat({
+      data: { name: 'Inspector', scopes: ['accounts:read'] },
+    } as never)
+    current.scope = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+
+    await expect(loadAgentsPage()).resolves.toMatchObject({
+      kind: 'member',
+    })
+  })
+
+  it('returns locked with remaining grants on the free plan', async () => {
+    await seedPlus()
+    await mintAgentPat({
+      data: { name: 'Inspector', scopes: ['accounts:read'] },
+    } as never)
+    await world.db.delete(subscriptions)
+
+    const page = (await loadAgentsPage()) as {
+      kind: string
+      grants: ReadonlyArray<{ name: string }>
+    }
+    expect(page.kind).toBe('locked')
+    expect(page.grants.map((grant) => grant.name)).toEqual(['Inspector'])
+  })
+})
+
+describe('loadConsentPage and recordOauthGrant', () => {
+  it('lets an admin on Plus record an OAuth grant', async () => {
+    await seedPlus()
+    const consent = (await loadConsentPage()) as {
+      canManage: boolean
+      mcpEnabled: boolean
+    }
+    expect(consent).toMatchObject({ canManage: true, mcpEnabled: true })
+
+    const grant = (await recordOauthGrant({
+      data: {
+        name: 'Inspector',
+        clientId: 'client-1',
+        scopes: ['accounts:read'],
+      },
+    } as never)) as { kind: string; clientId: string }
+    expect(grant).toMatchObject({ kind: 'oauth', clientId: 'client-1' })
+  })
+
+  it('refuses minting an OAuth grant on the free plan', async () => {
+    await expect(
+      recordOauthGrant({
+        data: {
+          name: 'Inspector',
+          clientId: 'client-1',
+          scopes: ['accounts:read'],
+        },
+      } as never),
+    ).rejects.toBeInstanceOf(FeatureLockedError)
   })
 })
