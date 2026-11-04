@@ -1,9 +1,9 @@
 /**
  * Streamable HTTP MCP at `/api/mcp`.
  *
- * `createMcpHandler` from `agents/mcp/server` (ADR 0037). Zero tools until
- * Phase 3. Auth is PAT hash lookup or Better Auth `requireMcpAuth` (JWT), then
- * a grant row. No Durable Object.
+ * `createMcpHandler` from `agents/mcp/server` (ADR 0037). Phase 3 registers
+ * the grant's read tools. Auth is PAT hash lookup or Better Auth
+ * `requireMcpAuth` (JWT), then a grant row. No Durable Object.
  */
 
 import { requireMcpAuth } from '@better-auth/mcp'
@@ -29,6 +29,7 @@ import {
   mcpResourceMetadataUrl,
   mcpResourceUrl,
 } from './resource'
+import { registerMcpTools, toolContextForGrant } from './tools'
 
 import type { OauthAccessClaims } from './authenticate'
 import type { AgentGrantRow } from '#/server/db/schema'
@@ -83,24 +84,28 @@ async function afterGrant(
   grant: AgentGrantRow,
 ): Promise<Response> {
   try {
-    await scopeForGrant(db, grant)
+    const scope = await scopeForGrant(db, grant)
+    const ctx = toolContextForGrant(grant, scope)
+    const handler = createMcpHandler(
+      () => {
+        const server = new McpServer({
+          name: 'money-tracker.online',
+          version: 'phase-3',
+        })
+        registerMcpTools(server, ctx)
+        return server
+      },
+      {
+        route: MCP_ROUTE,
+        allowedOriginHostnames: '*',
+      },
+    )
+    return handler.fetch(request)
   } catch (error) {
     if (error instanceof FeatureLockedError) return jsonRpcFeatureLocked()
     if (error instanceof McpGrantNotUsableError) return jsonRpcUnauthorized()
     throw error
   }
-  const handler = createMcpHandler(
-    () =>
-      new McpServer({
-        name: 'money-tracker.online',
-        version: 'phase-2',
-      }),
-    {
-      route: MCP_ROUTE,
-      allowedOriginHostnames: '*',
-    },
-  )
-  return handler.fetch(request)
 }
 
 async function handleOauth(

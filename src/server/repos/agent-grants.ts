@@ -99,6 +99,11 @@ function parseStoredScopes(raw: string): Array<AgentScope> {
   return z.array(z.enum(AGENT_SCOPE_TUPLE)).min(1).parse(parsed)
 }
 
+/** The closed `resource:verb` list stored on a grant row. */
+export function scopesOfGrant(row: AgentGrantRow): ReadonlyArray<AgentScope> {
+  return parseStoredScopes(row.scopes)
+}
+
 function toView(row: AgentGrantRow): AgentGrantView {
   return {
     id: row.id,
