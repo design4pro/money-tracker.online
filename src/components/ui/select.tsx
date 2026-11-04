@@ -3,9 +3,9 @@ import {
   Select as RACSelect,
   SelectValue as RACSelectValue,
 } from 'react-aria-components/Select'
+import { Fragment, isValidElement } from 'react'
 import { ChevronDown } from 'lucide-react'
 
-import { cn } from '#/lib/cn'
 import {
   Description,
   FieldError,
@@ -21,6 +21,25 @@ import type { SelectProps as RACSelectProps } from 'react-aria-components'
 import type { ReactNode } from 'react'
 import type { FieldSize } from './shared'
 import type { FieldErrorMessage } from './text-field'
+
+/**
+ * Drop the listbox check slot from a selected item's children. RAC's SelectValue
+ * otherwise paints that 16px grid inside the trigger and the label drops a line.
+ */
+function omitSelectionCheck(node: ReactNode): ReactNode {
+  if (node == null || typeof node === 'boolean') return node
+  if (Array.isArray(node)) {
+    return node.map(omitSelectionCheck)
+  }
+  if (!isValidElement<{ 'data-slot'?: string; children?: ReactNode }>(node)) {
+    return node
+  }
+  if (node.props['data-slot'] === 'selection-check') return null
+  if (node.type === Fragment) {
+    return omitSelectionCheck(node.props.children)
+  }
+  return node
+}
 
 export {
   ListBoxItem as SelectItem,
@@ -97,17 +116,24 @@ export function Select<T extends object>({
         )}
       >
         <RACSelectValue
-          className={cn(
-            'min-w-0 flex-1 truncate',
+          className={composeTw(
+            ({ defaultClassName }) => defaultClassName ?? '',
+            'min-w-0 flex-1 flex items-center gap-2',
+            // The listbox row still reserves 16px for the check; the trigger
+            // must not. Hide the named slot and keep icon + label on one line.
+            '[&_[data-slot=selection-check]]:hidden',
+            '[&>span.min-w-0]:truncate',
             // `data-placeholder` rather than a JS check on the selected key:
             // the placeholder is a rendering state, not application state.
             'data-[placeholder]:text-ink-2',
           )}
         >
-          {placeholder === undefined
-            ? undefined
-            : ({ isPlaceholder, selectedText }) =>
-                isPlaceholder ? placeholder : selectedText}
+          {({ isPlaceholder, selectedText, defaultChildren }) => {
+            if (isPlaceholder) {
+              return placeholder === undefined ? selectedText : placeholder
+            }
+            return omitSelectionCheck(defaultChildren)
+          }}
         </RACSelectValue>
         <ChevronDown
           aria-hidden="true"

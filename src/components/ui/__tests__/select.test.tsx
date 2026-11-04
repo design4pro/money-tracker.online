@@ -105,4 +105,25 @@ describe('Select', () => {
     const selected = screen.getByRole('option', { name: 'Savings' })
     expect(selected.getAttribute('aria-selected')).toBe('true')
   })
+
+  it('shows a selected value as a single label line, without the listbox check slot', () => {
+    render(
+      <Select label="Account" defaultSelectedKey="cash">
+        <SelectItem id="cash">Cash</SelectItem>
+        <SelectItem
+          id="card"
+          icon={<svg data-testid="option-icon" aria-hidden="true" />}
+        >
+          Card
+        </SelectItem>
+        <SelectItem id="savings">Savings</SelectItem>
+      </Select>,
+    )
+
+    const trigger = screen.getByRole('button', { name: /Account/ })
+    const value = trigger.querySelector('.react-aria-SelectValue')
+    expect(value).not.toBeNull()
+    expect(value!.querySelector('[data-slot="selection-check"]')).toBeNull()
+    expect(value!.textContent).toBe('Cash')
+  })
 })
