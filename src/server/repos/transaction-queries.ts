@@ -59,7 +59,10 @@ import {
 import { ConflictError } from './errors'
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './pagination'
 import { allOf, tenantFilter } from './base'
-import { scopedTransactionFilter } from './transactions'
+import {
+  scopedTransactionFilter,
+  transactionPoliciesSchema,
+} from './transactions'
 import { toTransaction } from '#/server/transactions/row'
 
 import type { SQL } from 'drizzle-orm'
@@ -183,6 +186,17 @@ export type TransactionSortField = (typeof TRANSACTION_SORT_FIELDS)[number]
 export const transactionSortSchema = z.strictObject({
   field: z.enum(TRANSACTION_SORT_FIELDS),
   direction: z.enum(['asc', 'desc']),
+})
+
+/** The ledger page input the MCP tool and `loadTransactions` share. */
+export const ledgerPageInputSchema = z.strictObject({
+  policies: transactionPoliciesSchema,
+  filters: transactionFiltersSchema,
+  sort: transactionSortSchema,
+  cursor: z.string().min(1).nullable(),
+  limit: z.number().int().positive().optional(),
+  /** The per-account passbook asks for the balance-after column; the all-accounts ledger does not. */
+  includeBalanceAfter: z.boolean().optional(),
 })
 
 export type TransactionSort = z.infer<typeof transactionSortSchema>
